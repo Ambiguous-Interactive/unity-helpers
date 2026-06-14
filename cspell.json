@@ -521,6 +521,7 @@
         "NUL",
         "UTF",
         "ASCII",
+        "ACMRTUXB",
         "ASTC",
         "DXT",
         "TOCTOU",
@@ -548,6 +549,7 @@
         "SSAO",
         "AO",
         "MSAA",
+        "MSYS",
         "FXAA",
         "TAA",
         "DOF",
@@ -821,6 +823,7 @@
         "instanceof",
         "TMPDIR",
         "cwd",
+        "gantt",
         "mcp"
       ]
     }

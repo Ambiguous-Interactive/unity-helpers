@@ -1,4 +1,7 @@
 Param(
+    [string[]]$Paths,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AdditionalPaths,
     [switch]$VerboseOutput
 )
 
@@ -53,6 +56,48 @@ function Test-PathWithCase {
         $current = $parent
     }
     return $true
+}
+
+$pathWithCaseCache = [System.Collections.Generic.Dictionary[string, bool]]::new([System.StringComparer]::Ordinal)
+$repoFileSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+
+function Test-CachedPathWithCase {
+    param(
+        [string]$FullPath,
+        [string]$RepoRoot
+    )
+
+    $cacheKey = "$RepoRoot`0$FullPath"
+    if ($pathWithCaseCache.ContainsKey($cacheKey)) {
+        return $pathWithCaseCache[$cacheKey]
+    }
+
+    $result = Test-PathWithCase -FullPath $FullPath -RepoRoot $RepoRoot
+    $pathWithCaseCache[$cacheKey] = $result
+    return $result
+}
+
+function Test-RepoIndexedPath {
+    param(
+        [string]$FullPath,
+        [string]$RepoRoot
+    )
+
+    if ($repoFileSet.Count -eq 0) {
+        return Test-CachedPathWithCase -FullPath $FullPath -RepoRoot $RepoRoot
+    }
+
+    try {
+        $repoRelativePath = [System.IO.Path]::GetRelativePath($RepoRoot, $FullPath) -replace '\\', '/'
+    } catch {
+        return $false
+    }
+
+    if ([string]::IsNullOrWhiteSpace($repoRelativePath) -or $repoRelativePath.StartsWith('../') -or $repoRelativePath -eq '..') {
+        return $false
+    }
+
+    return $repoFileSet.Contains($repoRelativePath)
 }
 
 function Write-Violation {
@@ -163,14 +208,14 @@ function Resolve-LocalPath {
     $sourceDirectory = Split-Path -Path $SourceFile -Parent
     $candidate = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($sourceDirectory, $normalized))
 
-    if (Test-PathWithCase -FullPath $candidate -RepoRoot $RepoRoot) {
+    if (Test-RepoIndexedPath -FullPath $candidate -RepoRoot $RepoRoot) {
         return $candidate
     }
 
     if ($normalized.Length -gt 0 -and $normalized[0] -ne '.') {
         $rootRelative = $normalized.TrimStart($separator)
         $candidateFromRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($RepoRoot, $rootRelative))
-        if (Test-PathWithCase -FullPath $candidateFromRoot -RepoRoot $RepoRoot) {
+        if (Test-RepoIndexedPath -FullPath $candidateFromRoot -RepoRoot $RepoRoot) {
             return $candidateFromRoot
         }
     }
@@ -178,7 +223,7 @@ function Resolve-LocalPath {
     return $null
 }
 
-$mdPattern = [regex]'[A-Za-z0-9._/\-]+\.md(?:#[A-Za-z0-9_\-]+)?'
+$mdPattern = [regex]'[A-Za-z0-9._/\-]+\.md(?:#[A-Za-z0-9_\-]+)?(?![A-Za-z0-9_-])'
 # LIMITATION: [^)] patterns cannot handle URLs with parentheses like file(1).md
 # This is valid markdown but rare. Files with parens in names should be renamed.
 $linkPattern = [regex]'\[[^\]]+\]\([^)]+\)'
@@ -187,6 +232,7 @@ $anglePattern = [regex]'<[^>]+>'
 $filenameTextLinkPattern = [regex]'\[(?<text>[^\]]+?\.md(?:#[^\]]+)?)\]\((?<target>[^)]+?\.md(?:#[^)]+)?)\)'
 # Match actual markdown inline code spans (double-backtick then single-backtick)
 $codeSpanPattern = [regex]'(?:``(.+?)``|`([^`\n]+)`)'
+$codeSpanMarkdownPathPattern = [regex]'(?i)(^|[^A-Za-z0-9_.-])(?<path>[A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?)(?![A-Za-z0-9_-])'
 $imagePattern = [regex]'!\[[^\]]*\]\((?<target>[^)]+)\)'
 $imageReferencePattern = [regex]'!\[[^\]]*\]\[(?<label>[^\]]+)\]'
 $definitionPattern = [regex]'^\s*\[(?<label>[^\]]+)\]:\s*(?<rest>.+)$'
@@ -207,15 +253,71 @@ $violationCount = 0
 $codeDocsPattern = [regex]'(?i)docs[\\/][A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?'
 $codeFileExtensions = @('.cs', '.csproj', '.props', '.targets', '.ps1', '.psm1', '.psd1', '.py', '.ts', '.tsx', '.js', '.jsx', '.json', '.yml', '.yaml', '.sh', '.cmd')
 
+function ConvertTo-RepoRelativePath {
+    param(
+        [string]$RepoRoot,
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $null
+    }
+
+    $candidate = $Path.Trim()
+    $fullPath = if ([System.IO.Path]::IsPathRooted($candidate)) {
+        [System.IO.Path]::GetFullPath($candidate)
+    } else {
+        [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($RepoRoot, $candidate))
+    }
+
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        return $null
+    }
+
+    $repoRootFullPath = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar, '/')
+    if ($fullPath -ne $repoRootFullPath -and -not $fullPath.StartsWith($repoRootFullPath + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $null
+    }
+
+    return ([System.IO.Path]::GetRelativePath($RepoRoot, $fullPath) -replace '\\', '/')
+}
+
 # Use git ls-files for efficiency and to respect .gitignore.
 # Always anchor at the repository root so invoking this script from a
 # subdirectory still yields repo-relative paths.
-$gitFiles = & git -C $repoRoot ls-files --cached --others --exclude-standard 2>$null
-if (-not $gitFiles) {
+$allGitFiles = & git -C $repoRoot ls-files --cached --others --exclude-standard 2>$null
+if (-not $allGitFiles) {
     Write-Host "Warning: Not in a git repository or git not available, falling back to filesystem scan" -ForegroundColor Yellow
-    $gitFiles = Get-ChildItem -Path $repoRoot -Recurse -File | ForEach-Object {
+    $allGitFiles = Get-ChildItem -Path $repoRoot -Recurse -File | ForEach-Object {
         [System.IO.Path]::GetRelativePath($repoRoot, $_.FullName) -replace '\\', '/'
     }
+}
+
+foreach ($gitFile in $allGitFiles) {
+    if (-not [string]::IsNullOrWhiteSpace($gitFile)) {
+        $repoFileSet.Add($gitFile) | Out-Null
+    }
+}
+
+$effectivePaths = @()
+if ($Paths -and $Paths.Count -gt 0) {
+    $effectivePaths += $Paths
+}
+if ($AdditionalPaths -and $AdditionalPaths.Count -gt 0) {
+    $effectivePaths += $AdditionalPaths
+}
+
+$gitFiles = @()
+if ($effectivePaths.Count -gt 0) {
+    $seenPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($path in $effectivePaths) {
+        $relativePath = ConvertTo-RepoRelativePath -RepoRoot $repoRoot -Path $path
+        if ($relativePath -and $seenPaths.Add($relativePath)) {
+            $gitFiles += $relativePath
+        }
+    }
+} else {
+    $gitFiles = $allGitFiles
 }
 
 $mdFiles = $gitFiles | Where-Object { $_ -match '\.md$' }
@@ -286,12 +388,13 @@ $mdFiles | ForEach-Object {
         # Uses proper backtick-pair parsing to avoid matching text between separate code spans
         foreach ($match in $codeSpanPattern.Matches($line)) {
             $content = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
-            # Skip if content doesn't reference a .md file
-            if ($content -notmatch '[A-Za-z0-9_\-]+\.md') { continue }
             # Skip glob patterns and bare extensions: .md, *.md, **/*.md, .json, etc.
             if ($content -match '^(\*\*/|\./)?(\*)?\.[\w]+$') { continue }
+            $markdownPathMatch = $codeSpanMarkdownPathPattern.Match($content)
+            if (-not $markdownPathMatch.Success) { continue }
             $violationCount++
-            Write-Violation -File $file -LineNumber $lineNo -Message "Inline code mentions .md; use a human-readable link instead" -Line $line
+            $markdownPath = $markdownPathMatch.Groups['path'].Value
+            Write-Violation -File $file -LineNumber $lineNo -Message "Inline code mentions markdown file '$markdownPath'; use a human-readable link instead" -Line $line
         }
 
         $stripped = $linkPattern.Replace($line, '')
@@ -412,7 +515,12 @@ $codeFiles | ForEach-Object {
     $language = Get-LanguageFromExtension -Path $file
     if (-not $language) { return }
     Write-Verbose "Scanning code file: $relativePath (language: $language)"
-    $lines = @(Get-Content -LiteralPath $file)
+    $text = [System.IO.File]::ReadAllText($file)
+    if (-not $codeDocsPattern.IsMatch($text)) { return }
+    $lines = @($text -split '\r?\n')
+    if ($lines.Count -gt 1 -and $lines[-1] -eq '') {
+        $lines = $lines[0..($lines.Count - 2)]
+    }
     $maskedLines = Get-CommentMaskedLines -Lines $lines -Language $language
     for ($index = 0; $index -lt $lines.Length; $index++) {
         $originalLine = $lines[$index]

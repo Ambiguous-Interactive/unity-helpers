@@ -4,12 +4,12 @@
 
 ## Purpose
 
-Patterns and techniques for keeping git hooks fast (<10s). Covers changed-file
+Patterns and techniques for keeping git hooks fast (<1s warm path). Covers changed-file
 detection, caching, batching, parallel execution, and incremental checking.
 
 ## When to Use This Skill
 
-- A hook takes more than 10 seconds on a typical push/commit
+- A hook takes more than 1 second on a typical warm push/commit
 - Adding a new check to an existing hook
 - Debugging slow hook performance
 - Deciding whether a check belongs in hook vs CI
@@ -81,7 +81,8 @@ bash scripts/audit-license-years.sh --summary --paths file1.cs file2.cs
 bash scripts/audit-license-years.sh --summary --no-cache
 ```
 
-**Performance:** First run ~60s (builds cache), subsequent runs with 5 changed files ~1-2s.
+**Performance:** Full uncached scans are too slow for hooks. Hook and preflight paths must pass
+changed files through `--paths`; warm cache checks for a few changed files should stay sub-second.
 
 ---
 
@@ -151,14 +152,14 @@ for the full pattern. Key considerations:
 
 ## Performance Budget for Hooks
 
-| Category                  | Target   | Technique                     |
-| ------------------------- | -------- | ----------------------------- |
-| Changed-file detection    | <500ms   | Parse stdin, `git diff`       |
-| Node.js checks (group)    | <3s      | `--no-install`, changed files |
-| PowerShell checks (group) | <3s      | Batched git ops, `-Paths`     |
-| License audit             | <1s      | Cache + `--paths` incremental |
-| Bash checks (group)       | <2s      | Regex, no subprocesses        |
-| **Total pre-push**        | **<10s** | Parallel groups               |
+| Category                  | Target  | Technique                          |
+| ------------------------- | ------- | ---------------------------------- |
+| Changed-file detection    | <100ms  | Parse stdin, `git diff`            |
+| Node.js checks (group)    | <500ms  | Repo-local tools, changed files    |
+| PowerShell checks (group) | <500ms  | Batched git ops, `-Paths`          |
+| License audit             | <250ms  | Cache + `--paths` incremental      |
+| Bash checks (group)       | <250ms  | Regex, no broad filesystem scans   |
+| **Total pre-push**        | **<1s** | Parallel groups, warm cache target |
 
 ---
 

@@ -52,6 +52,12 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/generate-meta.sh') (Join-Path $scriptsDir 'generate-meta.sh') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/run-node-bin.js') (Join-Path $scriptsDir 'run-node-bin.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/run-prettier.js') (Join-Path $scriptsDir 'run-prettier.js') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') (Join-Path $scriptsDir 'fix-markdown-fence-languages.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1') (Join-Path $scriptsDir 'lint-staged-markdown.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') (Join-Path $scriptsDir 'lint-duplicate-usings.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
     # configure-git-defaults.ps1 is preserved as a CLI entry point; it also
     # depends on git-push-defaults-helpers.ps1 (already copied above).
     Copy-Item (Join-Path $repoRoot 'scripts/configure-git-defaults.ps1') (Join-Path $scriptsDir 'configure-git-defaults.ps1') -Force
@@ -491,6 +497,87 @@ finally {
     Remove-Item -Path $repo8 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test 8b: -Fix should add missing Markdown fence languages before markdownlint is the last resort
+Write-Host "`nTest group: markdown fence language auto-fix" -ForegroundColor Magenta
+$repo8b = New-TestRepo -ConfigurePushDefaults
+try {
+    $readmePath = Join-Path $repo8b 'README.md'
+    Set-Content -Path $readmePath -Value @'
+# Fixture
+
+```
+Unity (Windows, stdio) -> bridge -> agent
+```
+
+```
+npm run agent:preflight:fix
+```
+'@ -Encoding UTF8
+    Add-FakePrettierPackage -RepoPath $repo8b
+    Add-FakeMarkdownlintPackage -RepoPath $repo8b
+
+    Push-Location $repo8b
+    try {
+        git add README.md
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result8b = Invoke-Preflight -RepoPath $repo8b -Arguments @('-Fix', '-Paths', 'README.md')
+    Write-TestResult 'MarkdownFenceFix_ExitCode0' ($result8b.ExitCode -eq 0) "Expected exit code 0 after fence fix, got $($result8b.ExitCode). Output: $($result8b.Output)"
+
+    $fixedMarkdown = Get-Content -Path $readmePath -Raw
+    Write-TestResult 'MarkdownFenceFix_TextFallback' ($fixedMarkdown -match '```text\s+Unity \(Windows, stdio\) -> bridge -> agent') 'Expected plain-text diagram fence to get text language'
+    Write-TestResult 'MarkdownFenceFix_BashInference' ($fixedMarkdown -match '```bash\s+npm run agent:preflight:fix') 'Expected shell command fence to get bash language'
+
+    Push-Location $repo8b
+    try {
+        $stagedMarkdown = git show ':README.md' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'MarkdownFenceFix_StagedBlobUpdated' ($stagedMarkdown -match '```text' -and $stagedMarkdown -match '```bash') 'Expected staged README.md blob to include inferred fence languages'
+}
+finally {
+    Remove-Item -Path $repo8b -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 8c: lint-staged-markdown.ps1 should share the same fence-language recovery
+Write-Host "`nTest group: staged markdown helper fence recovery" -ForegroundColor Magenta
+$repo8c = New-TestRepo -ConfigurePushDefaults
+try {
+    $readmePath = Join-Path $repo8c 'README.md'
+    Set-Content -Path $readmePath -Value @'
+# Fixture
+
+```
+git status --short
+```
+'@ -Encoding UTF8
+    Add-FakeMarkdownlintPackage -RepoPath $repo8c
+
+    Push-Location $repo8c
+    try {
+        git add README.md
+        $helperOutput = & pwsh -NoProfile -File scripts/lint-staged-markdown.ps1 README.md 2>&1
+        $helperExit = $LASTEXITCODE
+        $stagedMarkdown = git show ':README.md' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+
+    $helperJoined = ($helperOutput -join "`n")
+    Write-TestResult 'LintStagedMarkdownFenceFix_ExitCode0' ($helperExit -eq 0) "Expected exit code 0 from lint-staged-markdown.ps1, got $helperExit. Output: $helperJoined"
+    Write-TestResult 'LintStagedMarkdownFenceFix_WorktreeUpdated' ((Get-Content -Path $readmePath -Raw) -match '```bash\s+git status --short') 'Expected worktree README.md to include bash fence language'
+    Write-TestResult 'LintStagedMarkdownFenceFix_StagedUpdated' ($stagedMarkdown -match '```bash\s+git status --short') 'Expected staged README.md blob to include bash fence language'
+}
+finally {
+    Remove-Item -Path $repo8c -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 9: Changed markdown typos should fail preflight with actionable output
 Write-Host "`nTest group: spelling failure diagnostics" -ForegroundColor Magenta
 $repo9 = New-TestRepo -ConfigurePushDefaults
@@ -538,6 +625,176 @@ try {
 }
 finally {
     Remove-Item -Path $repo10b -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10c: Changed C# license year drift should fail, and -Fix should repair/stage
+Write-Host "`nTest group: license header auto-fix" -ForegroundColor Magenta
+$repo10c = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $filePath = Join-Path $repo10c 'Loose.cs'
+    Set-Content -Path $filePath -Value @'
+// MIT License - Copyright (c) 2025 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class Loose {}
+'@ -Encoding UTF8
+
+    $result10c = Invoke-Preflight -RepoPath $repo10c -Arguments @('-Paths', 'Loose.cs')
+    Write-TestResult 'LicenseHeaderDrift_ExitCode1' ($result10c.ExitCode -eq 1) "Expected exit code 1 for mismatched license year, got $($result10c.ExitCode). Output: $($result10c.Output)"
+    Write-TestResult 'LicenseHeaderDrift_Message' ($result10c.Output -match 'License year header issues detected') 'Expected license header drift diagnostic'
+
+    Push-Location $repo10c
+    try {
+        git add Loose.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result10cFix = Invoke-Preflight -RepoPath $repo10c -Arguments @('-Fix', '-Paths', 'Loose.cs')
+    Write-TestResult 'LicenseHeaderFix_ExitCode0' ($result10cFix.ExitCode -eq 0) "Expected exit code 0 after license fix, got $($result10cFix.ExitCode). Output: $($result10cFix.Output)"
+    $fixedContent = Get-Content -Path $filePath -Raw
+    Write-TestResult 'LicenseHeaderFix_WorktreeUpdated' ($fixedContent -match "Copyright \(c\) $currentYear wallstop") "Expected worktree header year $currentYear"
+
+    Push-Location $repo10c
+    try {
+        $stagedContent = git show ':Loose.cs'
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'LicenseHeaderFix_StagedUpdatedBlob' (($stagedContent -join "`n") -match "Copyright \(c\) $currentYear wallstop") "Expected staged header year $currentYear"
+}
+finally {
+    Remove-Item -Path $repo10c -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10d: PathList recovery should work even when the worktree starts clean
+Write-Host "`nTest group: path-list recovery from clean worktree" -ForegroundColor Magenta
+$repo10d = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $previousYear = $currentYear - 1
+    $filePath = Join-Path $repo10d 'CommittedBad.cs'
+    Set-Content -Path $filePath -Value @"
+// MIT License - Copyright (c) $previousYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class CommittedBad {}
+"@ -Encoding UTF8
+
+    Push-Location $repo10d
+    try {
+        git add CommittedBad.cs
+        git -c user.email=test@example.com -c user.name=test commit -q -m 'add bad license year'
+    }
+    finally {
+        Pop-Location
+    }
+
+    $pathListPath = Join-Path $repo10d '.git/pre-push-agent-preflight-paths.bin'
+    [System.IO.File]::WriteAllBytes($pathListPath, [System.Text.Encoding]::UTF8.GetBytes("CommittedBad.cs`0"))
+
+    $result10d = Invoke-Preflight -RepoPath $repo10d -Arguments @('-Fix', '-PathList', $pathListPath)
+    Write-TestResult 'PathListRecovery_ExitCode0' ($result10d.ExitCode -eq 0) "Expected exit code 0 after path-list recovery, got $($result10d.ExitCode). Output: $($result10d.Output)"
+
+    $fixedContent = Get-Content -Path $filePath -Raw
+    Write-TestResult 'PathListRecovery_WorktreeUpdated' ($fixedContent -match "Copyright \(c\) $currentYear wallstop") "Expected worktree header year $currentYear"
+
+    Push-Location $repo10d
+    try {
+        $dirty = git status --short -- CommittedBad.cs
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'PathListRecovery_DirtyForRecommit' (($dirty -join "`n") -match 'CommittedBad\.cs') 'Expected recovered file to be dirty so the bad pushed commit can be amended/recommitted'
+}
+finally {
+    Remove-Item -Path $repo10d -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10e: EOL drift should be auto-fixed and re-staged
+Write-Host "`nTest group: EOL auto-fix" -ForegroundColor Magenta
+$repo10e = New-TestRepo -ConfigurePushDefaults
+try {
+    Add-FakePrettierPackage -RepoPath $repo10e
+    $packagePath = Join-Path $repo10e 'package.json'
+    [System.IO.File]::WriteAllBytes(
+        $packagePath,
+        [System.Text.UTF8Encoding]::new($false).GetBytes("{`r`n  `"name`": `"fixture`"`r`n}`r`n")
+    )
+
+    Push-Location $repo10e
+    try {
+        git add package.json
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result10e = Invoke-Preflight -RepoPath $repo10e -Arguments @('-Fix', '-Paths', 'package.json')
+    Write-TestResult 'EolFix_ExitCode0' ($result10e.ExitCode -eq 0) "Expected exit code 0 after EOL fix, got $($result10e.ExitCode). Output: $($result10e.Output)"
+
+    $fixedText = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($packagePath))
+    Write-TestResult 'EolFix_WorktreeUsesLf' (-not $fixedText.Contains("`r`n")) 'Expected package.json to be normalized to LF in worktree'
+
+    Push-Location $repo10e
+    try {
+        $stagedText = git show ':package.json' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'EolFix_StagedBlobUsesLf' (-not $stagedText.Contains("`r`n")) 'Expected staged package.json blob to be normalized to LF'
+}
+finally {
+    Remove-Item -Path $repo10e -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10f: cspell.json config drift should be auto-fixed and re-staged
+Write-Host "`nTest group: cspell config auto-fix" -ForegroundColor Magenta
+$repo10f = New-TestRepo -ConfigurePushDefaults
+try {
+    Add-FakePrettierPackage -RepoPath $repo10f
+    $cspellPath = Join-Path $repo10f 'cspell.json'
+    Set-Content -Path $cspellPath -Value @'
+{
+  "caseSensitive": false,
+  "words": [
+    "Wallstop",
+    "wallstop"
+  ],
+  "dictionaryDefinitions": []
+}
+'@ -Encoding UTF8
+
+    Push-Location $repo10f
+    try {
+        git add cspell.json
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result10f = Invoke-Preflight -RepoPath $repo10f -Arguments @('-Fix', '-Paths', 'cspell.json')
+    Write-TestResult 'CspellConfigFix_ExitCode0' ($result10f.ExitCode -eq 0) "Expected exit code 0 after cspell config fix, got $($result10f.ExitCode). Output: $($result10f.Output)"
+
+    $fixedConfig = Get-Content -Path $cspellPath -Raw | ConvertFrom-Json
+    Write-TestResult 'CspellConfigFix_WorktreeDeduped' (@($fixedConfig.words).Count -eq 1) 'Expected cspell.json duplicate word to be removed in worktree'
+
+    Push-Location $repo10f
+    try {
+        $stagedConfig = (git show ':cspell.json' | Out-String) | ConvertFrom-Json
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'CspellConfigFix_StagedDeduped' (@($stagedConfig.words).Count -eq 1) 'Expected cspell.json duplicate word to be removed in staged blob'
+}
+finally {
+    Remove-Item -Path $repo10f -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 11: Missing push.autoSetupRemote should fail preflight

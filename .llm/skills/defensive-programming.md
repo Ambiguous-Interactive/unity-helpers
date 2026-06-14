@@ -25,12 +25,12 @@ Production code—including editor tooling—must be **resilient to any state**.
 
 Exceptions should ONLY be thrown for:
 
-| Scenario                             | Example                                                                          | Why It's OK                                                                                                        |
-| ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Programmer error (debug only)**    | `Debug.Assert(index >= 0)`                                                       | Catches bugs during development                                                                                    |
-| **Fundamentally impossible states**  | Constructor receives negative capacity                                           | API contract violation                                                                                             |
-| **Security violations**              | Unauthorized access to protected resources                                       | Must fail loudly                                                                                                   |
-| **Serializer input/decode failures** | `Serializer.ProtoDeserialize<T>(corrupt)` throws `SerializationFailureException` | Save/network data is load-bearing — silent `default(T)` corrupts state. See `.llm/skills/serialization-safety.md`. |
+| Scenario                             | Example                                                                          | Why It's OK                                                                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Programmer error (debug only)**    | `Debug.Assert(index >= 0)`                                                       | Catches bugs during development                                                                                                |
+| **Fundamentally impossible states**  | Constructor receives negative capacity                                           | API contract violation                                                                                                         |
+| **Security violations**              | Unauthorized access to protected resources                                       | Must fail loudly                                                                                                               |
+| **Serializer input/decode failures** | `Serializer.ProtoDeserialize<T>(corrupt)` throws `SerializationFailureException` | Save/network data is load-bearing — silent `default(T)` corrupts state. See [Serialization Safety](./serialization-safety.md). |
 
 ### When Exceptions Are FORBIDDEN
 

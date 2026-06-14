@@ -107,14 +107,21 @@ function Save-FixtureFiles {
 function Invoke-LintInFixture {
     param(
         [string]$FixtureRoot,
-        [string]$WorkingDirectory = $FixtureRoot
+        [string]$WorkingDirectory = $FixtureRoot,
+        [string[]]$Paths = @()
     )
 
     $lintCopy = Join-Path $FixtureRoot 'scripts/lint-doc-links.ps1'
     Save-FixtureFiles -Root $FixtureRoot
     Push-Location $WorkingDirectory
     try {
-        $output = & pwsh -NoProfile -File $lintCopy *>&1
+        $arguments = @('-NoProfile', '-File', $lintCopy)
+        if ($Paths -and $Paths.Count -gt 0) {
+            $arguments += '-Paths'
+            $arguments += $Paths
+        }
+
+        $output = & pwsh @arguments *>&1
         $exitCode = $LASTEXITCODE
     } finally {
         Pop-Location
@@ -145,7 +152,12 @@ function Invoke-TestCase {
             }
         }
 
-        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory
+        $paths = @()
+        if ($Case.PSObject.Properties['Paths']) {
+            $paths = @($Case.Paths)
+        }
+
+        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory -Paths $paths
 
         $reasons = @()
 
@@ -442,6 +454,31 @@ class Foo {
             ExpectedOutputNotContains = @('jekyll-relative-links', 'Absolute GitHub Pages path', 'does not resolve to an existing markdown file')
         }
         [pscustomobject]@{
+            Name = 'Fail_InlineCodeMarkdownReference_InMarkdown'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = 'See `docs/readme.md` please.' }
+            )
+            ExpectedExit = 'nonzero'
+            ExpectedOutputContains = @('Inline code mentions markdown file', 'docs/readme.md')
+            ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path', 'does not resolve to an existing markdown file')
+        }
+        [pscustomobject]@{
+            Name = 'Pass_InlineCodeMarkdownGlobsAllowed'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = 'Patterns: `.md`, `*.md`, and `**/*.md`.' }
+            )
+            ExpectedExit = 0
+            ExpectedOutputContains = @('Markdown link lint passed')
+        }
+        [pscustomobject]@{
+            Name = 'Pass_InlineCodeMdxMentionAllowed'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = 'Use `foo.mdx` for MDX examples.' }
+            )
+            ExpectedExit = 0
+            ExpectedOutputContains = @('Markdown link lint passed')
+        }
+        [pscustomobject]@{
             Name = 'Fail_MissingRelativePrefix_InMarkdown'
             Files = @(
                 [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
@@ -493,6 +530,36 @@ class Foo {
             WorkingDirectoryRelativePath = 'docs'
             ExpectedExit = 0
             ExpectedOutputContains = @('Markdown link lint passed')
+        }
+        [pscustomobject]@{
+            Name = 'Fail_PathScopedListedMarkdownViolation'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = "See foo.md please.`n" }
+                [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
+            )
+            Paths = @('README.md')
+            ExpectedExit = 'nonzero'
+            ExpectedOutputContains = @('Bare .md mention')
+        }
+        [pscustomobject]@{
+            Name = 'Pass_PathScopedUnlistedMarkdownViolationIgnored'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = "See foo.md please.`n" }
+                [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
+            )
+            Paths = @('docs/readme.md')
+            ExpectedExit = 0
+            ExpectedOutputContains = @('Markdown link lint passed')
+        }
+        [pscustomobject]@{
+            Name = 'Fail_PathScopedSecondPathViolationCaught'
+            Files = @(
+                [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
+                [pscustomobject]@{ Path = 'README.md'; Content = "See foo.md please.`n" }
+            )
+            Paths = @('docs/readme.md', 'README.md')
+            ExpectedExit = 'nonzero'
+            ExpectedOutputContains = @('Bare .md mention')
         }
     )
 

@@ -1,10 +1,19 @@
 param(
     [string[]]$Paths,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AdditionalPaths,
     [switch]$VerboseOutput
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+$effectivePaths = @()
+if ($Paths -and $Paths.Count -gt 0) {
+    $effectivePaths += $Paths
+}
+if ($AdditionalPaths -and $AdditionalPaths.Count -gt 0) {
+    $effectivePaths += $AdditionalPaths
+}
 
 # =============================================================================
 # LINE ENDING POLICY (must match .gitattributes, .prettierrc.json, .yamllint.yaml)
@@ -60,9 +69,9 @@ function Test-ShouldUseLf([string]$path) {
 }
 
 function Get-TrackedFiles {
-    if ($Paths -and $Paths.Count -gt 0) {
+    if ($effectivePaths.Count -gt 0) {
         # Use provided file list instead of scanning all tracked files
-        return $Paths | Where-Object {
+        return $effectivePaths | Where-Object {
             $ext = [System.IO.Path]::GetExtension($_).TrimStart('.').ToLowerInvariant()
             $extensions -contains $ext
         }

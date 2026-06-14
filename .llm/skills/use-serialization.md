@@ -17,7 +17,7 @@
 
 ## Error Handling
 
-`Serializer` is the **single documented exception** to this repo's "never throw" rule (see `.llm/skills/defensive-programming.md`). Save/network data is too load-bearing for silent `default(T)`. **Every** deserialize entry point either throws `SerializationFailureException` or returns `false` via a `TryXxx` sibling. Full details: `.llm/skills/serialization-safety.md`.
+`Serializer` is the **single documented exception** to this repo's "never throw" rule (see [Defensive Programming](./defensive-programming.md)). Save/network data is too load-bearing for silent `default(T)`. **Every** deserialize entry point either throws `SerializationFailureException` or returns `false` via a `TryXxx` sibling. Full details: [Serialization Safety](./serialization-safety.md).
 
 ```csharp
 // Throwing — catch SerializationFailureException for any format/stage.

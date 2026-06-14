@@ -11,10 +11,10 @@
 Unity runs on a Windows host; agents run in a Linux devcontainer. The Windows
 relay speaks stdio, which cannot cross into the container, so `supergateway`
 bridges it to streamable HTTP and the container's agents point at that HTTP
-endpoint. Full setup: [`docs/guides/mcp-local-setup.md`](../../docs/guides/mcp-local-setup.md);
-script details: `scripts/mcp/README.md`.
+endpoint. Full setup: [MCP local setup guide](../../docs/guides/mcp-local-setup.md);
+script details: [MCP helper README](../../scripts/mcp/README.md).
 
-```
+```text
 Unity (Windows, stdio) → supergateway bridge → http://<host>:<port>/mcp → agent clients (Linux container)
 ```
 
@@ -65,4 +65,4 @@ When you add a new MCP client config path or helper script, update
 
 ## Related Skills
 
-- `.llm/skills/unity-devcontainer-testing.md` — running Unity from the devcontainer.
+- [Unity devcontainer testing](./unity-devcontainer-testing.md) — running Unity from the devcontainer.

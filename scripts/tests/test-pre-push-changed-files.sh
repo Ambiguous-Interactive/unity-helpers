@@ -161,6 +161,14 @@ else
 fi
 
 run_test
+diff_filter_count=$(grep -c -- '--diff-filter=ACMRTUXB' "$PRE_PUSH" || true)
+if [ "$diff_filter_count" -ge 2 ]; then
+    pass "Hook excludes deleted paths from changed-file validation"
+else
+    fail "Hook excludes deleted paths from changed-file validation" "diff-filter=ACMRTUXB on git diff calls" "found $diff_filter_count occurrence(s)"
+fi
+
+run_test
 if grep -q "read -r -d ''" "$PRE_PUSH"; then
     pass "Hook reads changed files with null-delimited loop"
 else
@@ -220,6 +228,34 @@ rm -f "$input_file"
     pass "collect_changed_files parses NUL-delimited input safely"
 else
     fail "collect_changed_files parses NUL-delimited input safely" "two unique files parsed from NUL-delimited stream" "parser failed for deduplication or special filenames"
+fi
+
+run_test
+if run_pre_push_helper_script '
+DOC_LINK_FULL_SCAN_REQUIRED=0
+input_file=$(mktemp)
+printf "D\0docs/deleted.md\0R100\0docs/old-name.md\0docs/new-name.md\0D\0Runtime/Foo.cs\0" > "$input_file"
+collect_doc_link_full_scan_triggers < "$input_file"
+rm -f "$input_file"
+[[ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 1 ]]
+'; then
+    pass "Deleted or renamed markdown targets force full doc-link lint"
+else
+    fail "Deleted or renamed markdown targets force full doc-link lint" "DOC_LINK_FULL_SCAN_REQUIRED=1" "trigger was not set"
+fi
+
+run_test
+if run_pre_push_helper_script '
+DOC_LINK_FULL_SCAN_REQUIRED=0
+input_file=$(mktemp)
+printf "D\0Runtime/Foo.cs\0R100\0scripts/old.ps1\0scripts/new.ps1\0" > "$input_file"
+collect_doc_link_full_scan_triggers < "$input_file"
+rm -f "$input_file"
+[[ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 0 ]]
+'; then
+    pass "Non-markdown deletes do not force full doc-link lint"
+else
+    fail "Non-markdown deletes do not force full doc-link lint" "DOC_LINK_FULL_SCAN_REQUIRED=0" "trigger was set"
 fi
 
 # =============================================================================
@@ -467,6 +503,16 @@ if grep -Fq -- '"${CHANGED_PRETTIER[@]}"' "$PRE_PUSH" && \
     pass "Tool invocations consume quoted arrays"
 else
     fail "Tool invocations consume quoted arrays" "quoted array expansions present" "one or more array expansions missing"
+fi
+
+run_test
+if grep -q 'CHANGED_DOC_LINK=()' "$PRE_PUSH" && \
+   grep -q 'CHANGED_DOC_LINK+=("$file")' "$PRE_PUSH" && \
+   grep -q 'node ./scripts/run-doc-link-lint.js -Paths "${CHANGED_DOC_LINK\[@\]}"' "$PRE_PUSH" && \
+   grep -q '\*.cs|.*\*.ps1|.*\*.json|.*\*.yaml' "$PRE_PUSH"; then
+    pass "Doc-link lint runs for changed source and config files"
+else
+    fail "Doc-link lint runs for changed source and config files" "CHANGED_DOC_LINK classification and invocation present" "missing source/config doc-link guard"
 fi
 
 # Verify no \s escape sequences in grep patterns (non-POSIX)

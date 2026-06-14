@@ -88,26 +88,97 @@ if command -v dotnet >/dev/null 2>&1; then
   dotnet tool restore >/dev/null 2>&1 || true
 fi
 
+# ============================================================================
+# SECURITY: Safe file list handling
+# ============================================================================
+# File lists are read using null-delimited (-z) output from git and stored in
+# bash arrays. This prevents shell injection attacks via crafted filenames
+# containing spaces, newlines, semicolons, or other special characters.
+#
+# Pattern: git diff -z | while IFS= read -r -d '' file; do array+=("$file"); done
+# This ensures each filename is treated as a single atomic argument, regardless
+# of what characters it contains.
+# ============================================================================
+
+# Read staged files into an array safely using null-delimited output
+STAGED_FILES_ARRAY=()
+while IFS= read -r -d '' file; do
+    STAGED_FILES_ARRAY+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+DOC_LINK_FULL_SCAN_REQUIRED=0
+mark_doc_link_full_scan_path() {
+  case "$1" in
+    *.md|*.markdown)
+      DOC_LINK_FULL_SCAN_REQUIRED=1
+      ;;
+  esac
+}
+
+while IFS= read -r -d '' status; do
+  case "$status" in
+    D*)
+      IFS= read -r -d '' deleted_path || true
+      mark_doc_link_full_scan_path "$deleted_path"
+      ;;
+    R*)
+      IFS= read -r -d '' old_path || true
+      IFS= read -r -d '' _new_path || true
+      mark_doc_link_full_scan_path "$old_path"
+      ;;
+  esac
+done < <(git diff --cached --name-status -z -M --diff-filter=DR)
+
+# Early exit if no staged files (e.g., amend with no changes, or merge commit)
+if [ ${#STAGED_FILES_ARRAY[@]} -eq 0 ] && [ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 0 ]; then
+    echo "No staged files to check. Skipping pre-commit hooks."
+    exit 0
+fi
+
 # 3) Lint Markdown link text style (via Node wrapper -> PowerShell script)
-if command -v node >/dev/null 2>&1; then
-  node ./scripts/run-doc-link-lint.js
-else
-  run_pwsh() {
+DOC_LINK_FILES_ARRAY=()
+for file in "${STAGED_FILES_ARRAY[@]}"; do
+  case "$file" in
+    *.md|*.markdown|*.cs|*.csproj|*.props|*.targets|*.ps1|*.psm1|*.psd1|*.py|*.ts|*.tsx|*.js|*.jsx|*.json|*.yml|*.yaml|*.sh|*.cmd)
+      DOC_LINK_FILES_ARRAY+=("$file")
+      ;;
+  esac
+done
+
+if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ]; then
+  if command -v node >/dev/null 2>&1; then
+    node ./scripts/run-doc-link-lint.js
+  elif command -v pwsh >/dev/null 2>&1; then
     pwsh -NoProfile -File scripts/lint-doc-links.ps1
-  }
-
-  run_windows_ps() {
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-doc-links.ps1
-  }
-
-  if command -v pwsh >/dev/null 2>&1; then
-    run_pwsh
   elif command -v powershell >/dev/null 2>&1; then
-    run_windows_ps
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-doc-links.ps1
   else
     echo "PowerShell not found. Please install Node.js (preferred) or pwsh/powershell to run docs linter." >&2
     exit 1
   fi
+elif [ ${#DOC_LINK_FILES_ARRAY[@]} -gt 0 ]; then
+  if command -v node >/dev/null 2>&1; then
+    node ./scripts/run-doc-link-lint.js -Paths "${DOC_LINK_FILES_ARRAY[@]}"
+  else
+    run_pwsh() {
+      pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Paths "${DOC_LINK_FILES_ARRAY[@]}"
+    }
+
+    run_windows_ps() {
+      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-doc-links.ps1 -Paths "${DOC_LINK_FILES_ARRAY[@]}"
+    }
+
+    if command -v pwsh >/dev/null 2>&1; then
+      run_pwsh
+    elif command -v powershell >/dev/null 2>&1; then
+      run_windows_ps
+    else
+      echo "PowerShell not found. Please install Node.js (preferred) or pwsh/powershell to run docs linter." >&2
+      exit 1
+    fi
+  fi
+else
+  echo "No staged files require documentation link lint."
 fi
 
 run_node_tool() {
@@ -130,30 +201,6 @@ require_node_tool() {
     exit 1
   fi
 }
-
-# ============================================================================
-# SECURITY: Safe file list handling
-# ============================================================================
-# File lists are read using null-delimited (-z) output from git and stored in
-# bash arrays. This prevents shell injection attacks via crafted filenames
-# containing spaces, newlines, semicolons, or other special characters.
-#
-# Pattern: git diff -z | while IFS= read -r -d '' file; do array+=("$file"); done
-# This ensures each filename is treated as a single atomic argument, regardless
-# of what characters it contains.
-# ============================================================================
-
-# Read staged files into an array safely using null-delimited output
-STAGED_FILES_ARRAY=()
-while IFS= read -r -d '' file; do
-    STAGED_FILES_ARRAY+=("$file")
-done < <(git diff --cached --name-only --diff-filter=ACM -z)
-
-# Early exit if no staged files (e.g., amend with no changes, or merge commit)
-if [ ${#STAGED_FILES_ARRAY[@]} -eq 0 ]; then
-    echo "No staged files to check. Skipping pre-commit hooks."
-    exit 0
-fi
 
 # 5) Ensure staged text files end with a final newline
 # This MUST run before Prettier formatting to prevent missing-newline diffs
@@ -318,11 +365,47 @@ if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
   fi
 fi
 
-# 7) Markdown lint for staged Markdown files
+# 6b) Audit and auto-fix staged C# license years before commit.
+if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
+  echo "Checking license year headers on staged C# files..."
+  if ! bash scripts/audit-license-years.sh --summary --paths "${CS_FILES_ARRAY[@]}"; then
+    echo "License year drift detected. Attempting auto-fix..." >&2
+    bash scripts/update-license-headers.sh --paths "${CS_FILES_ARRAY[@]}"
+    stage_with_retry_or_fail "license header auto-fix re-stage" "${CS_FILES_ARRAY[@]}"
+
+    if ! bash scripts/audit-license-years.sh --summary --paths "${CS_FILES_ARRAY[@]}"; then
+      echo "" >&2
+      echo "=== License year audit failed after auto-fix ===" >&2
+      echo "Run: npm run agent:preflight:fix" >&2
+      echo "" >&2
+      exit 1
+    fi
+  fi
+fi
+
+# 7) Auto-fix staged Markdown files, recover missing fence languages when needed, then lint
 if [ ${#MD_FILES_ARRAY[@]} -gt 0 ]; then
   require_node_tool markdownlint "markdownlint validation"
   # First, auto-fix what can be fixed
-  run_node_tool markdownlint --fix --config .markdownlint.json --ignore-path .markdownlintignore -- "${MD_FILES_ARRAY[@]}" || true
+  MARKDOWNLINT_FIX_CAPTURE="$(mktemp 2>/dev/null || true)"
+  if [ -z "$MARKDOWNLINT_FIX_CAPTURE" ]; then
+    echo "Error: Failed to create temporary file for markdownlint auto-fix output." >&2
+    exit 1
+  fi
+  MARKDOWNLINT_FIX_EXIT=0
+  run_node_tool markdownlint --fix --config .markdownlint.json --ignore-path .markdownlintignore -- "${MD_FILES_ARRAY[@]}" >"$MARKDOWNLINT_FIX_CAPTURE" 2>&1 || MARKDOWNLINT_FIX_EXIT=$?
+  if [ "$MARKDOWNLINT_FIX_EXIT" -ne 0 ] && grep -q 'MD040/fenced-code-language' -- "$MARKDOWNLINT_FIX_CAPTURE"; then
+    if command -v pwsh >/dev/null 2>&1; then
+      pwsh -NoProfile -File scripts/fix-markdown-fence-languages.ps1 -Paths "${MD_FILES_ARRAY[@]}"
+      stage_with_retry_or_fail "Markdown fence language auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
+    elif command -v powershell >/dev/null 2>&1; then
+      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-markdown-fence-languages.ps1 -Paths "${MD_FILES_ARRAY[@]}"
+      stage_with_retry_or_fail "Markdown fence language auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
+    else
+      echo "PowerShell not found. Skipping Markdown fence language auto-fix." >&2
+    fi
+  fi
+  rm -f "$MARKDOWNLINT_FIX_CAPTURE"
   # Re-stage the fixed files
   stage_with_retry_or_fail "markdownlint auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
   # Then run markdownlint again to catch any remaining unfixable issues

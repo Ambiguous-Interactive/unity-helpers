@@ -55,7 +55,7 @@ Invoke these skills for specific tasks.
 **Regenerate with**: `pwsh -NoProfile -File scripts/generate-skills-index.ps1`
 
 <!-- BEGIN GENERATED SKILLS INDEX -->
-<!-- Generated: 2026-06-14 00:31:13 UTC -->
+<!-- Generated: 2026-06-14 08:58:31 UTC -->
 <!-- Command: pwsh -NoProfile -File scripts/generate-skills-index.ps1 -->
 
 ### Core Skills (Always Consider)
@@ -111,7 +111,7 @@ Invoke these skills for specific tasks.
 | [run-retrospective](./skills/run-retrospective.md)                                           | Structured retrospective analyzing what happened, what worked, and what to improve                          |
 | [search-codebase](./skills/search-codebase.md)                                               | Finding code, files, or patterns                                                                            |
 | [self-regulate-changes](./skills/self-regulate-changes.md)                                   | Know when to stop: risk scoring and hard caps for cascading changes                                         |
-| [serialization-safety](./skills/serialization-safety.md)                                     | Serializer exception contract — every entry point throws SerializationFailureException or has a Try sibling |
+| [serialization-safety](./skills/serialization-safety.md)                                     | Serializer exception contract - every entry point throws SerializationFailureException or has a Try sibling |
 | [ship-changes](./skills/ship-changes.md)                                                     | End-to-end workflow for shipping changes: validate, review, version, changelog, commit                      |
 | [test-data-driven](./skills/test-data-driven.md)                                             | Data-driven testing with TestCase and TestCaseSource                                                        |
 | [test-naming-conventions](./skills/test-naming-conventions.md)                               | Test method and TestName naming rules                                                                       |
@@ -224,7 +224,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../.claude/settings.json) which ships with the repo) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit, so typos surface immediately; manual invocation before completion remains the expectation (the hook is a safety net, not a substitute -- it does not fire in CI or when editing outside Claude Code)
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
-- **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed markdown spelling checks) before any commit attempt
+- **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
 - **Pre-push parity**: run `npm run validate:prepush` (includes full `lint:spelling`) before push; treat git hooks as last-resort only. For the push step itself (setup, redirection, rejection handling) follow [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote)
 
 See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/validate-before-commit.md) for details.

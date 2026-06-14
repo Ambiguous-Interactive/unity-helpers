@@ -11,7 +11,11 @@ if [ -z "$REPO_ROOT" ]; then
   exit 0
 fi
 
-CACHE_FILE="$REPO_ROOT/.git/license-year-cache"
+CACHE_FILE=$(git rev-parse --git-path license-year-cache 2>/dev/null)
+case "$CACHE_FILE" in
+  /*) ;;
+  *) CACHE_FILE="$REPO_ROOT/$CACHE_FILE" ;;
+esac
 if [ -f "$CACHE_FILE" ]; then
   rm -f "$CACHE_FILE"
   echo "License year cache invalidated (history rewritten)."

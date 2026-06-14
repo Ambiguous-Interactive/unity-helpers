@@ -157,7 +157,7 @@ These rules are disabled in this project:
 ### Command
 
 ```bash
-npm run lint:docs
+npm run lint:docs # full scan; use scripts/lint-doc-links.ps1 -Paths <files> for scoped checks
 ```
 
 ### What It Checks

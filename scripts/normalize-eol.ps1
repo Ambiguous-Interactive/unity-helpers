@@ -1,11 +1,20 @@
 param(
     [string[]]$Paths,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AdditionalPaths,
     [switch]$DryRun,
     [switch]$VerboseOutput
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+$effectivePaths = @()
+if ($Paths -and $Paths.Count -gt 0) {
+    $effectivePaths += $Paths
+}
+if ($AdditionalPaths -and $AdditionalPaths.Count -gt 0) {
+    $effectivePaths += $AdditionalPaths
+}
 
 # =============================================================================
 # LINE ENDING POLICY (must match .gitattributes, .prettierrc.json, .yamllint.yaml)
@@ -74,9 +83,6 @@ function Get-TargetFiles([string[]]$paths, [string[]]$trackedFiles) {
         return $trackedFiles
     }
 
-    $trackedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    foreach ($file in $trackedFiles) { $trackedSet.Add($file) | Out-Null }
-
     $targets = New-Object System.Collections.Generic.List[string]
     foreach ($path in $paths) {
         if ([string]::IsNullOrWhiteSpace($path)) { continue }
@@ -84,10 +90,13 @@ function Get-TargetFiles([string[]]$paths, [string[]]$trackedFiles) {
         if (-not $resolved) { continue }
 
         $fullPath = $resolved.Path
+        if (-not [System.IO.File]::Exists($fullPath)) { continue }
+
         $relative = [System.IO.Path]::GetRelativePath($repoRoot, $fullPath)
         $normalized = $relative -replace '\\', '/'
+        $ext = [System.IO.Path]::GetExtension($normalized).TrimStart('.').ToLowerInvariant()
 
-        if ($trackedSet.Contains($normalized)) {
+        if ($extensions -contains $ext) {
             $targets.Add($normalized) | Out-Null
         }
     }
@@ -110,7 +119,7 @@ $bomRemoved = 0
 $modified = New-Object System.Collections.Generic.List[string]
 
 $tracked = Get-TrackedFiles
-$targets = Get-TargetFiles $Paths $tracked
+$targets = Get-TargetFiles $effectivePaths $tracked
 foreach ($path in $targets) {
     $fullPath = Join-Path $repoRoot $path
     try { $bytes = [System.IO.File]::ReadAllBytes($fullPath) } catch { continue }

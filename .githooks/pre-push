@@ -7,7 +7,7 @@ set -euo pipefail
 # This hook reads stdin to detect which files are being pushed, then runs
 # only the relevant checks on changed files. Full-repo validation happens in CI.
 #
-# Performance: Targets <10s for typical pushes by:
+# Performance: Targets <1s for typical warm pushes by:
 #   - Parsing stdin to detect exactly which files changed
 #   - Running checks only on changed files (not the whole repo)
 #   - Executing independent checks in parallel
@@ -43,6 +43,7 @@ set -euo pipefail
 ZERO_SHA="0000000000000000000000000000000000000000"
 HAS_REFS=false
 ALL_CHANGED_FILES=()
+DOC_LINK_FULL_SCAN_REQUIRED=0
 
 array_contains_exact() {
   local needle="$1"
@@ -67,10 +68,62 @@ add_changed_file() {
   fi
 }
 
+write_agent_preflight_path_list() {
+  local path_list
+  path_list=$(git rev-parse --git-path pre-push-agent-preflight-paths.bin 2>/dev/null || printf '%s' ".git/pre-push-agent-preflight-paths.bin")
+
+  if [ "$#" -gt 0 ]; then
+    # NUL-delimit so even unusual filenames survive the handoff to PowerShell.
+    printf '%s\0' "$@" > "$path_list"
+  else
+    : > "$path_list"
+  fi
+
+  printf '%s\n' "$path_list"
+}
+
+print_agent_preflight_fix_hint() {
+  local path_list
+  path_list=$(write_agent_preflight_path_list "$@")
+
+  echo "Automated recovery (path-scoped):"
+  echo "  npm run agent:preflight:fix -- -PathList \"$path_list\""
+  echo "Then commit generated fixes and push again."
+}
+
 collect_changed_files() {
   local file
   while IFS= read -r -d '' file; do
     add_changed_file "$file"
+  done
+}
+
+mark_doc_link_full_scan_path() {
+  case "$1" in
+    *.md|*.markdown)
+      DOC_LINK_FULL_SCAN_REQUIRED=1
+      ;;
+  esac
+}
+
+collect_doc_link_full_scan_triggers() {
+  local status
+  local deleted_path
+  local old_path
+  local new_path
+
+  while IFS= read -r -d '' status; do
+    case "$status" in
+      D*)
+        IFS= read -r -d '' deleted_path || true
+        mark_doc_link_full_scan_path "$deleted_path"
+        ;;
+      R*)
+        IFS= read -r -d '' old_path || true
+        IFS= read -r -d '' new_path || true
+        mark_doc_link_full_scan_path "$old_path"
+        ;;
+    esac
   done
 }
 
@@ -95,19 +148,21 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     # New branch: compare against default branch merge-base
     merge_base=$(git merge-base main "$local_sha" 2>/dev/null || echo "")
     if [ -n "$merge_base" ]; then
-      collect_changed_files < <(git diff --name-only -z "$merge_base".."$local_sha" 2>/dev/null || true)
+      collect_changed_files < <(git diff --name-only -z --diff-filter=ACMRTUXB "$merge_base".."$local_sha" 2>/dev/null || true)
+      collect_doc_link_full_scan_triggers < <(git diff --name-status -z -M --diff-filter=DR "$merge_base".."$local_sha" 2>/dev/null || true)
     else
       # No merge-base (orphan branch or no main): compare against the full tree.
       collect_changed_files < <(git ls-tree -r -z --name-only "$local_sha" 2>/dev/null || true)
     fi
   else
     # Normal push: diff between remote and local
-    collect_changed_files < <(git diff --name-only -z "$remote_sha".."$local_sha" 2>/dev/null || true)
+    collect_changed_files < <(git diff --name-only -z --diff-filter=ACMRTUXB "$remote_sha".."$local_sha" 2>/dev/null || true)
+    collect_doc_link_full_scan_triggers < <(git diff --name-status -z -M --diff-filter=DR "$remote_sha".."$local_sha" 2>/dev/null || true)
   fi
 done
 
 # If no refs to push (delete-only) or stdin was empty (no-op), skip all checks
-if [ "$HAS_REFS" = "false" ] || [ ${#ALL_CHANGED_FILES[@]} -eq 0 ]; then
+if [ "$HAS_REFS" = "false" ] || { [ ${#ALL_CHANGED_FILES[@]} -eq 0 ] && [ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 0 ]; }; then
   echo "No files changed in push, skipping checks."
   exit 0
 fi
@@ -134,6 +189,7 @@ CHANGED_LINT_DUPLICATE_USINGS=()
 CHANGED_GITIGNORE_DOCS_LINT=()
 CHANGED_SYNC_SCRIPT_CONTRACTS=()
 CHANGED_LINT_ERROR_CODE_SCRIPTS=()
+CHANGED_DOC_LINK=()
 
 for file in "${ALL_CHANGED_FILES[@]}"; do
   [[ "$file" =~ \.(md|markdown)$ ]] && CHANGED_MD+=("$file")
@@ -166,6 +222,11 @@ for file in "${ALL_CHANGED_FILES[@]}"; do
   # its regression test. The `.githooks/` anchor uses `^\.githooks/` to avoid
   # accidentally matching the similarly-prefixed `.github/` directory.
   [[ "$file" =~ ^(scripts/lint-[^/]+\.(ps1|js)|scripts/tests/test-lint-[^/]+\.(ps1|js|sh)|\.githooks/[^/]+|scripts/validate-lint-error-codes\.ps1|scripts/tests/test-validate-lint-error-codes\.ps1|cspell\.json)$ ]] && CHANGED_LINT_ERROR_CODE_SCRIPTS+=("$file")
+  case "$file" in
+    *.md|*.markdown|*.cs|*.csproj|*.props|*.targets|*.ps1|*.psm1|*.psd1|*.py|*.ts|*.tsx|*.js|*.jsx|*.json|*.yml|*.yaml|*.sh|*.cmd)
+      CHANGED_DOC_LINK+=("$file")
+      ;;
+  esac
 done
 
 CHANGED_PRETTIER=("${CHANGED_MD[@]}" "${CHANGED_JSON[@]}" "${CHANGED_YAML[@]}" "${CHANGED_JS[@]}")
@@ -212,8 +273,7 @@ run_node_checks() {
     if ! node scripts/run-prettier.js --check -- "${CHANGED_PRETTIER[@]}"; then
       echo ""
       echo "=== Prettier formatting issues detected ==="
-      echo "Run: node scripts/run-prettier.js --write -- <files>"
-      echo "Then commit and push again."
+      echo "Run the path-scoped recovery command printed at the end of this hook."
       echo ""
       return 1
     fi
@@ -293,7 +353,7 @@ run_node_checks() {
         if ! node scripts/lint-cspell-config.js; then
           echo ""
           echo "=== cspell.json configuration issues ==="
-          echo "Run: npm run lint:spelling:config:fix"
+          echo "Run the path-scoped recovery command printed at the end of this hook."
           echo ""
           return 1
         fi
@@ -302,10 +362,14 @@ run_node_checks() {
   fi
 
   # 4) Doc link lint (only if docs or markdown changed)
-  if [ ${#CHANGED_MD[@]} -gt 0 ] || [ ${#CHANGED_DOCS[@]} -gt 0 ] || [ ${#CHANGED_LLM[@]} -gt 0 ]; then
+  if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ] || [ ${#CHANGED_DOC_LINK[@]} -gt 0 ]; then
     require_node "documentation link lint" || return 1
     echo "Checking documentation links..."
-    node ./scripts/run-doc-link-lint.js || return 1
+    if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ]; then
+      node ./scripts/run-doc-link-lint.js || return 1
+    else
+      node ./scripts/run-doc-link-lint.js -Paths "${CHANGED_DOC_LINK[@]}" || return 1
+    fi
     echo "✓ Doc links OK"
   fi
 
@@ -355,7 +419,7 @@ run_pwsh_checks() {
     "${PWSH_CMD[@]}" scripts/check-eol.ps1 -VerboseOutput -Paths "${CHANGED_EOL[@]}" || {
       echo ""
       echo "=== EOL check failed ==="
-      echo "Run: npm run fix:eol"
+      echo "Run the path-scoped recovery command printed at the end of this hook."
       echo ""
       return 1
     }
@@ -404,7 +468,7 @@ run_pwsh_checks() {
     "${PWSH_CMD[@]}" scripts/lint-llm-instructions.ps1 || {
       echo ""
       echo "=== LLM instructions validation failed ==="
-      echo "Run: pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix"
+      echo "Run the path-scoped recovery command printed at the end of this hook."
       echo ""
       return 1
     }
@@ -422,7 +486,7 @@ run_bash_checks() {
     if ! bash scripts/audit-license-years.sh --summary --paths "${CHANGED_CS[@]}"; then
       echo ""
       echo "=== License year audit failed ==="
-      echo "To auto-fix: bash scripts/update-license-headers.sh"
+      echo "Run the path-scoped recovery command printed at the end of this hook."
       echo ""
       return 1
     fi
@@ -603,7 +667,8 @@ fi
 # ============================================================================
 if [ $HOOK_FAILED -ne 0 ]; then
   echo ""
-  echo "Pre-push checks FAILED. Fix the issues above and push again."
+  echo "Pre-push checks FAILED."
+  print_agent_preflight_fix_hint "${ALL_CHANGED_FILES[@]}"
   echo "To skip in emergencies: git push --no-verify (CI will still validate)"
   exit 1
 fi

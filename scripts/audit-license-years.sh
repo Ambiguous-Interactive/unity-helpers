@@ -22,7 +22,7 @@ set -euo pipefail
 
 # Configuration
 REPO_START_YEAR=2023
-CURRENT_YEAR=2026
+CURRENT_YEAR=$(date +%Y)
 
 # Parse arguments
 OUTPUT_MODE="default"
@@ -71,7 +71,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 # --- Cache setup ---
-CACHE_FILE="$REPO_ROOT/.git/license-year-cache"
+CACHE_FILE=$(git rev-parse --git-path license-year-cache 2>/dev/null || true)
+if [[ -z "$CACHE_FILE" ]]; then
+    CACHE_FILE="$REPO_ROOT/.git/license-year-cache"
+elif [[ "$CACHE_FILE" != /* ]]; then
+    CACHE_FILE="$REPO_ROOT/$CACHE_FILE"
+fi
 declare -A year_cache=()
 cache_dirty=false
 
@@ -127,12 +132,41 @@ get_header_year() {
     fi
 }
 
+normalize_repo_path() {
+    local path="$1"
+    local rel
+
+    path="${path//\\//}"
+    if [[ "$path" =~ ^[A-Za-z]:/ ]]; then
+        if command -v cygpath >/dev/null 2>&1; then
+            path=$(cygpath -u "$path")
+        else
+            return 1
+        fi
+    fi
+
+    if [[ "$path" = /* ]]; then
+        case "$path" in
+            "$REPO_ROOT"/*)
+                rel="${path#"$REPO_ROOT"/}"
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    else
+        rel="$path"
+    fi
+
+    rel="${rel#./}"
+    printf '%s\n' "$rel"
+}
+
 # Get git creation year for a file (with cache)
 # Sets global _git_year to avoid subshell (cache writes must stay in main shell)
 _git_year=""
 get_git_creation_year() {
-    local file="$1"
-    local rel="$2"
+    local rel="$1"
 
     # Check cache first
     if [[ "$USE_CACHE" == true && -n "${year_cache[$rel]+_}" ]]; then
@@ -141,7 +175,7 @@ get_git_creation_year() {
     fi
 
     # Use --follow to track across renames, --diff-filter=A for additions only
-    _git_year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$file" 2>/dev/null | tail -1)
+    _git_year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$rel" 2>/dev/null | tail -1)
 
     if [[ -n "$_git_year" ]]; then
         # Store in cache
@@ -155,13 +189,11 @@ if [[ "$OUTPUT_MODE" == "csv" ]]; then
     echo "file,current_year,git_year,status"
 fi
 
-# Audit a single file (absolute path)
+# Audit a single file (repo-relative path)
 audit_file() {
-    local file="$1"
+    local rel_path="$1"
+    local file="$REPO_ROOT/$rel_path"
     ((total_files++)) || true
-
-    # Get relative path for cleaner output
-    rel_path="${file#$REPO_ROOT/}"
 
     # Get header year
     header_year=$(get_header_year "$file")
@@ -177,7 +209,7 @@ audit_file() {
     fi
 
     # Get git creation year (sets _git_year global, no subshell)
-    get_git_creation_year "$file" "$rel_path"
+    get_git_creation_year "$rel_path"
     git_year="$_git_year"
 
     if [[ -z "$git_year" ]]; then
@@ -225,23 +257,24 @@ audit_file() {
 if [[ "$PATHS_MODE" == true ]]; then
     # Incremental mode: audit only specified files
     for p in "${PATH_ARGS[@]}"; do
-        # Resolve to absolute path
-        if [[ "$p" = /* ]]; then
-            abs_path="$p"
-        else
-            abs_path="$REPO_ROOT/$p"
+        rel_path=$(normalize_repo_path "$p" || true)
+        if [[ -z "${rel_path:-}" ]]; then
+            echo "WARNING: File outside repository skipped: $p" >&2
+            continue
         fi
-        if [[ -f "$abs_path" ]]; then
-            audit_file "$abs_path"
+
+        if [[ -f "$REPO_ROOT/$rel_path" && "$rel_path" == *.cs ]]; then
+            audit_file "$rel_path"
         else
             echo "WARNING: File not found: $p" >&2
         fi
     done
 else
-    # Full scan: find all .cs files
+    # Full scan: only tracked .cs files. Ignored local worktrees must never
+    # affect repository validation.
     while IFS= read -r -d '' file; do
         audit_file "$file"
-    done < <(find "$REPO_ROOT" -name "*.cs" -type f -print0 | sort -z)
+    done < <(git ls-files -z -- '*.cs' | sort -z)
 fi
 
 # Print summary

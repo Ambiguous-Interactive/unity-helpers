@@ -12,6 +12,7 @@
 # Options:
 #   --dry-run    Show what would be changed without modifying files
 #   --verbose    Show all files processed, not just changes
+#   --paths      Update only the listed .cs files (all args after --paths)
 #   --help       Show this help message
 #
 # Standard header format:
@@ -22,27 +23,40 @@ set -euo pipefail
 
 # Configuration
 REPO_START_YEAR=2023
-CURRENT_YEAR=2026
+CURRENT_YEAR=$(date +%Y)
 COPYRIGHT_HOLDER="wallstop"
 LICENSE_URL="https://github.com/wallstop/unity-helpers/blob/main/LICENSE"
 
 # Parse arguments
 DRY_RUN=false
 VERBOSE=false
-for arg in "$@"; do
-    case "$arg" in
+PATHS_MODE=false
+declare -a PATH_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         --dry-run)
             DRY_RUN=true
+            shift
             ;;
         --verbose)
             VERBOSE=true
+            shift
+            ;;
+        --paths)
+            PATHS_MODE=true
+            shift
+            while [[ $# -gt 0 ]]; do
+                PATH_ARGS+=("$1")
+                shift
+            done
             ;;
         --help|-h)
-            head -21 "$0" | tail -19
+            head -22 "$0" | tail -20
             exit 0
             ;;
         *)
-            echo "Unknown option: $arg" >&2
+            echo "Unknown option: $1" >&2
             exit 1
             ;;
     esac
@@ -76,13 +90,43 @@ has_license_url() {
     [[ "$second_line" == *"Full license text:"* ]]
 }
 
+normalize_repo_path() {
+    local path="$1"
+    local rel
+
+    path="${path//\\//}"
+    if [[ "$path" =~ ^[A-Za-z]:/ ]]; then
+        if command -v cygpath >/dev/null 2>&1; then
+            path=$(cygpath -u "$path")
+        else
+            return 1
+        fi
+    fi
+
+    if [[ "$path" = /* ]]; then
+        case "$path" in
+            "$REPO_ROOT"/*)
+                rel="${path#"$REPO_ROOT"/}"
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    else
+        rel="$path"
+    fi
+
+    rel="${rel#./}"
+    printf '%s\n' "$rel"
+}
+
 # Get git creation year for a file
 get_git_creation_year() {
-    local file="$1"
+    local rel="$1"
     local year
 
     # Use --follow to track across renames, --diff-filter=A for additions only
-    year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$file" 2>/dev/null | tail -1)
+    year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$rel" 2>/dev/null | tail -1)
 
     if [[ -z "$year" ]]; then
         # No git history - use current year
@@ -111,8 +155,8 @@ get_header_year() {
 # Update a file with correct header
 update_file() {
     local file="$1"
-    local target_year="$2"
-    local rel_path="${file#$REPO_ROOT/}"
+    local rel_path="$2"
+    local target_year="$3"
 
     local header_line1="// MIT License - Copyright (c) $target_year $COPYRIGHT_HOLDER"
     local header_line2="// Full license text: $LICENSE_URL"
@@ -203,17 +247,39 @@ echo "Copyright holder: $COPYRIGHT_HOLDER"
 echo "License URL: $LICENSE_URL"
 echo ""
 
-# Find all .cs files
-while IFS= read -r -d '' file; do
+process_relative_path() {
+    local rel_path="$1"
+    local file="$REPO_ROOT/$rel_path"
+
+    if [[ ! -f "$file" || "$rel_path" != *.cs ]]; then
+        return
+    fi
+
     ((total_files++)) || true
 
     # Determine target year
-    target_year=$(get_git_creation_year "$file")
+    target_year=$(get_git_creation_year "$rel_path")
 
     # Update the file
-    update_file "$file" "$target_year"
+    update_file "$file" "$rel_path" "$target_year"
+}
 
-done < <(find "$REPO_ROOT" -name "*.cs" -type f -print0 | sort -z)
+if [[ "$PATHS_MODE" == true ]]; then
+    for path in "${PATH_ARGS[@]}"; do
+        rel_path=$(normalize_repo_path "$path" || true)
+        if [[ -z "${rel_path:-}" ]]; then
+            echo "WARNING: File outside repository skipped: $path" >&2
+            continue
+        fi
+        process_relative_path "$rel_path"
+    done
+else
+    # Full mode updates only tracked .cs files. Ignored local worktrees and
+    # generated directories must never be mutated by a repository fixer.
+    while IFS= read -r -d '' file; do
+        process_relative_path "$file"
+    done < <(git ls-files -z -- '*.cs' | sort -z)
+fi
 
 # Print summary
 echo ""

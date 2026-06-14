@@ -1,5 +1,6 @@
 Param(
     [string[]]$Paths,
+    [string]$PathList,
     [switch]$Fix,
     [switch]$AllowCriticalSkillSize,
     [switch]$VerboseOutput,
@@ -92,6 +93,43 @@ function Get-GitStagedPaths {
     }
 
     return ,$stagedPaths
+}
+
+function Get-PathListEntries {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$PathList
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PathList)) {
+        return @()
+    }
+
+    $pathListPath = if ([System.IO.Path]::IsPathRooted($PathList)) {
+        $PathList
+    }
+    else {
+        Join-Path -Path $RepoRoot -ChildPath $PathList
+    }
+
+    if (-not (Test-Path -LiteralPath $pathListPath -PathType Leaf)) {
+        Write-ErrorMsg "Path list file not found: $pathListPath"
+        return @()
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($pathListPath)
+    if ($bytes.Length -eq 0) {
+        return @()
+    }
+
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($text.Contains([string][char]0)) {
+        return @($text -split ([string][char]0) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+
+    return @($text -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
 function Add-PathsToGitIndexWithRetry {
@@ -459,7 +497,8 @@ function Invoke-NodeToolOnPaths {
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments,
         [Parameter(Mandatory = $true)]
-        [string[]]$Paths
+        [string[]]$Paths,
+        [switch]$SuppressOutput
     )
 
     $existingPaths = @()
@@ -478,8 +517,10 @@ function Invoke-NodeToolOnPaths {
     try {
         $output = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName @Arguments -- $existingPaths 2>&1
         $exitCode = $LASTEXITCODE
-        foreach ($line in $output) {
-            Write-Host $line
+        if (-not $SuppressOutput) {
+            foreach ($line in $output) {
+                Write-Host $line
+            }
         }
         return $exitCode
     }
@@ -583,6 +624,268 @@ function Invoke-PrettierOnPaths {
     return Invoke-Prettier -RepoRoot $RepoRoot -Arguments (@($Arguments) + @('--') + @($existingPaths))
 }
 
+function New-LicenseYearCache {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $cachePath = Join-Path -Path (Join-Path -Path $RepoRoot -ChildPath '.git') -ChildPath 'license-year-cache'
+    Push-Location $RepoRoot
+    try {
+        $gitCachePath = & git rev-parse --git-path license-year-cache 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitCachePath)) {
+            $gitCachePath = ([string]$gitCachePath).Trim()
+            $cachePath = if ([System.IO.Path]::IsPathRooted($gitCachePath)) {
+                $gitCachePath
+            }
+            else {
+                Join-Path -Path $RepoRoot -ChildPath $gitCachePath
+            }
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $items = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    if (Test-Path -LiteralPath $cachePath -PathType Leaf) {
+        foreach ($line in Get-Content -LiteralPath $cachePath -ErrorAction SilentlyContinue) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            $parts = ([string]$line) -split "`t", 2
+            if ($parts.Count -eq 2 -and -not [string]::IsNullOrWhiteSpace($parts[0]) -and $parts[1] -match '^\d{4}$') {
+                $items[$parts[0]] = $parts[1]
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Path = $cachePath
+        Items = $items
+        Dirty = $false
+    }
+}
+
+function Save-LicenseYearCache {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Cache
+    )
+
+    if (-not $Cache.Dirty) {
+        return
+    }
+
+    $cacheDirectory = Split-Path -Parent $Cache.Path
+    if (-not (Test-Path -LiteralPath $cacheDirectory -PathType Container)) {
+        return
+    }
+
+    $lines = foreach ($key in ($Cache.Items.Keys | Sort-Object)) {
+        "$key`t$($Cache.Items[$key])"
+    }
+
+    $content = ($lines -join "`n") + "`n"
+    [System.IO.File]::WriteAllText($Cache.Path, $content, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Get-LicenseCreationYear {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Cache
+    )
+
+    if ($Cache.Items.ContainsKey($RelativePath)) {
+        return $Cache.Items[$RelativePath]
+    }
+
+    Push-Location $RepoRoot
+    try {
+        $historyYears = @(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- $RelativePath 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $historyYears.Count -eq 0) {
+            return [string](Get-Date).Year
+        }
+
+        $year = [string]$historyYears[$historyYears.Count - 1]
+        if ([string]::IsNullOrWhiteSpace($year)) {
+            return [string](Get-Date).Year
+        }
+
+        if ([int]$year -lt 2023) {
+            $year = '2023'
+        }
+
+        $Cache.Items[$RelativePath] = $year
+        $Cache.Dirty = $true
+        return $year
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Get-LicenseHeaderYear {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $firstLine = ''
+    try {
+        $firstLine = [System.IO.File]::ReadLines($Path) | Select-Object -First 1
+    }
+    catch {
+        return ''
+    }
+
+    $match = [regex]::Match([string]$firstLine, 'Copyright \(c\) (?<year>\d{4})')
+    if (-not $match.Success) {
+        return ''
+    }
+
+    return $match.Groups['year'].Value
+}
+
+function Set-LicenseHeader {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Year
+    )
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $normalized = $text -replace "`r`n", "`n" -replace "`r", "`n"
+    $lineArray = [regex]::Split($normalized, "`n")
+    $lines = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $lineArray) {
+        $lines.Add($line) | Out-Null
+    }
+
+    if ($lines.Count -eq 1 -and $lines[0] -eq '') {
+        $lines.Clear()
+    }
+
+    $headerLine1 = "// MIT License - Copyright (c) $Year wallstop"
+    $headerLine2 = '// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE'
+
+    if ($lines.Count -gt 0 -and $lines[0].Contains('MIT License')) {
+        $lines[0] = $headerLine1
+        if ($lines.Count -gt 1 -and $lines[1].Contains('Full license text:')) {
+            $lines[1] = $headerLine2
+        }
+        else {
+            $lines.Insert(1, $headerLine2)
+        }
+    }
+    else {
+        $lines.Insert(0, $headerLine1)
+        $lines.Insert(1, $headerLine2)
+        $lines.Insert(2, '')
+    }
+
+    $updated = [string]::Join($newline, $lines)
+    if ($updated -eq $text) {
+        return $false
+    }
+
+    [System.IO.File]::WriteAllBytes($Path, [System.Text.UTF8Encoding]::new($false).GetBytes($updated))
+    return $true
+}
+
+function Test-LicenseYearHeaders {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths,
+        [Parameter(Mandatory = $true)]
+        [ref]$FailureCount,
+        [switch]$Fix
+    )
+
+    $targets = @($Paths | Where-Object {
+        $_ -like '*.cs' -and (Test-Path -LiteralPath (Join-Path -Path $RepoRoot -ChildPath $_) -PathType Leaf)
+    } | Sort-Object -Unique)
+
+    if ($targets.Count -eq 0) {
+        return
+    }
+
+    Write-Host '[agent-preflight] Checking license year headers on changed C# files...' -ForegroundColor Blue
+    $cache = New-LicenseYearCache -RepoRoot $RepoRoot
+    $issues = New-Object System.Collections.Generic.List[string]
+    $updatedPaths = New-Object System.Collections.Generic.List[string]
+
+    foreach ($path in $targets) {
+        $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
+        $actualYear = Get-LicenseHeaderYear -Path $fullPath
+        $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache
+
+        if ([string]::IsNullOrWhiteSpace($actualYear)) {
+            $issues.Add("${path}: missing copyright year, expected $expectedYear") | Out-Null
+        }
+        elseif ($actualYear -ne $expectedYear) {
+            $issues.Add("${path}: has $actualYear, expected $expectedYear") | Out-Null
+        }
+    }
+
+    if ($Fix -and $issues.Count -gt 0) {
+        foreach ($path in $targets) {
+            $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
+            $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache
+            if (Set-LicenseHeader -Path $fullPath -Year $expectedYear) {
+                $updatedPaths.Add($path) | Out-Null
+            }
+        }
+
+        if ($updatedPaths.Count -gt 0) {
+            Write-Host "[agent-preflight] Updated $($updatedPaths.Count) license header(s)." -ForegroundColor Green
+
+            $stagedPaths = Get-GitStagedPaths -RepoRoot $RepoRoot
+            $stagedUpdatedPaths = @($updatedPaths | Where-Object { $stagedPaths.Contains($_) })
+            if ($stagedUpdatedPaths.Count -gt 0 -and -not (Add-PathsToGitIndexWithRetry -RepoRoot $RepoRoot -Paths $stagedUpdatedPaths)) {
+                Write-ErrorMsg 'Failed to stage license header fixes. Git index.lock contention or another git error is likely.'
+                foreach ($path in $stagedUpdatedPaths) {
+                    Write-Host "  $path" -ForegroundColor Yellow
+                }
+                Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                $FailureCount.Value++
+            }
+        }
+
+        $issues.Clear()
+        foreach ($path in $targets) {
+            $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
+            $actualYear = Get-LicenseHeaderYear -Path $fullPath
+            $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache
+            if ($actualYear -ne $expectedYear) {
+                $issues.Add("${path}: has $actualYear, expected $expectedYear") | Out-Null
+            }
+        }
+    }
+
+    Save-LicenseYearCache -Cache $cache
+
+    if ($issues.Count -gt 0) {
+        Write-ErrorMsg 'License year header issues detected in changed C# files:'
+        foreach ($issue in $issues) {
+            Write-Host "  $issue" -ForegroundColor Yellow
+        }
+        Write-Host 'Run: npm run agent:preflight:fix' -ForegroundColor Cyan
+        $FailureCount.Value++
+    }
+}
+
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $sourceRoots = @('Runtime', 'Editor', 'Tests', 'Samples~', 'Shaders', 'Styles', 'URP', 'docs', 'scripts')
 
@@ -598,7 +901,10 @@ $prettierAvailable = $false
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 
-$candidatePaths = if ($null -ne $Paths -and $Paths.Count -gt 0) {
+$candidatePaths = if (-not [string]::IsNullOrWhiteSpace($PathList)) {
+    Get-PathListEntries -RepoRoot $repoRoot -PathList $PathList
+}
+elseif ($null -ne $Paths -and $Paths.Count -gt 0) {
     $resolved = @($Paths)
     if ($null -ne $AdditionalPaths -and $AdditionalPaths.Count -gt 0) {
         $resolved += $AdditionalPaths
@@ -672,8 +978,11 @@ $spellingTargets = @(
         $_ -like '*.cs'
     }
 )
-$testFiles = @($relativePaths | Where-Object { $_ -like 'Tests/*.cs' })
+$csharpTargets = @($relativePaths | Where-Object { $_ -like '*.cs' })
+$testFiles = @($csharpTargets | Where-Object { $_ -like 'Tests/*.cs' })
 $metaRelevantPaths = @($relativePaths | Where-Object { Test-MetaRequiredPath -RelativePath $_ })
+$eolTargets = @($relativePaths)
+$cspellConfigChanged = $dedupedPaths.Contains('cspell.json')
 
 $requiredNodeTools = [ordered]@{}
 if ($markdownTargets.Count -gt 0) {
@@ -726,6 +1035,10 @@ if ($llmFiles.Count -gt 0) {
     }
 }
 
+if ($csharpTargets.Count -gt 0) {
+    Test-LicenseYearHeaders -RepoRoot $repoRoot -Paths $csharpTargets -FailureCount ([ref]$failureCount) -Fix:$Fix
+}
+
 if ($prettierTargets.Count -gt 0) {
     if ($prettierAvailable) {
         if ($Fix) {
@@ -771,14 +1084,12 @@ if ($prettierTargets.Count -gt 0) {
 if ($markdownTargets.Count -gt 0) {
     if ($availableNodeTools.ContainsKey('markdownlint') -and $availableNodeTools['markdownlint']) {
         if ($Fix) {
-            Write-Host '[agent-preflight] Auto-fixing changed Markdown files with markdownlint...' -ForegroundColor Blue
-            $markdownFixExit = Invoke-NodeToolOnPaths `
-                -RepoRoot $repoRoot `
-                -ToolName 'markdownlint' `
-                -Arguments @('--fix', '--config', '.markdownlint.json', '--ignore-path', '.markdownlintignore') `
-                -Paths $markdownTargets
-            if ($markdownFixExit -ne 0) {
-                Write-ErrorMsg "markdownlint auto-fix failed with exit code $markdownFixExit."
+            Write-Host '[agent-preflight] Adding missing Markdown fence languages where inferable...' -ForegroundColor Blue
+            $markdownFenceFixExit = 0
+            & (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') -Paths $markdownTargets -VerboseOutput:$VerboseOutput
+            $markdownFenceFixExit = $LASTEXITCODE
+            if ($markdownFenceFixExit -ne 0) {
+                Write-ErrorMsg "Markdown fence language auto-fix failed with exit code $markdownFenceFixExit."
                 $failureCount++
             }
             else {
@@ -786,13 +1097,37 @@ if ($markdownTargets.Count -gt 0) {
                 $stagedMarkdownTargets = @($markdownTargets | Where-Object { $stagedPaths.Contains($_) })
                 if ($stagedMarkdownTargets.Count -gt 0) {
                     if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets)) {
-                        Write-ErrorMsg 'Failed to stage markdownlint-fixed files. Git index.lock contention or another git error is likely.'
+                        Write-ErrorMsg 'Failed to stage Markdown fence language fixes. Git index.lock contention or another git error is likely.'
                         foreach ($path in $stagedMarkdownTargets) {
                             Write-Host "  $path" -ForegroundColor Yellow
                         }
                         Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
                         $failureCount++
                     }
+                }
+            }
+
+            Write-Host '[agent-preflight] Auto-fixing changed Markdown files with markdownlint...' -ForegroundColor Blue
+            $markdownFixExit = Invoke-NodeToolOnPaths `
+                -RepoRoot $repoRoot `
+                -ToolName 'markdownlint' `
+                -Arguments @('--fix', '--config', '.markdownlint.json', '--ignore-path', '.markdownlintignore') `
+                -Paths $markdownTargets `
+                -SuppressOutput
+            if ($markdownFixExit -ne 0) {
+                Write-Info "markdownlint --fix exited $markdownFixExit; final validation will report remaining issues."
+            }
+
+            $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+            $stagedMarkdownTargets = @($markdownTargets | Where-Object { $stagedPaths.Contains($_) })
+            if ($stagedMarkdownTargets.Count -gt 0) {
+                if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets)) {
+                    Write-ErrorMsg 'Failed to stage markdownlint-fixed files. Git index.lock contention or another git error is likely.'
+                    foreach ($path in $stagedMarkdownTargets) {
+                        Write-Host "  $path" -ForegroundColor Yellow
+                    }
+                    Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                    $failureCount++
                 }
             }
         }
@@ -886,6 +1221,117 @@ if ($spellingTargets.Count -gt 0) {
     }
 }
 
+if ($cspellConfigChanged) {
+    Write-Host '[agent-preflight] Validating cspell.json configuration...' -ForegroundColor Blue
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Write-ErrorMsg 'Node.js is required to validate cspell.json. Install Node.js/npm and run npm install.'
+        $failureCount++
+    }
+    else {
+        if ($Fix) {
+            Push-Location $repoRoot
+            try {
+                $cspellFixOutput = & node (Join-Path $repoRoot 'scripts/lint-cspell-config.js') --fix 2>&1
+                $cspellFixExit = $LASTEXITCODE
+                foreach ($line in $cspellFixOutput) { Write-Host $line }
+            }
+            finally {
+                Pop-Location
+            }
+
+            if ($cspellFixExit -ne 0) {
+                Write-ErrorMsg "cspell.json configuration auto-fix failed with exit code $cspellFixExit."
+                $failureCount++
+            }
+            else {
+                if ($prettierAvailable) {
+                    $cspellPrettierExit = Invoke-PrettierOnPaths `
+                        -RepoRoot $repoRoot `
+                        -Arguments @('--write', '--log-level', 'warn') `
+                        -Paths @('cspell.json')
+                    if ($cspellPrettierExit -ne 0) {
+                        Write-ErrorMsg "Prettier formatting failed for cspell.json after configuration auto-fix with exit code $cspellPrettierExit."
+                        $failureCount++
+                    }
+                }
+
+                $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                if ($stagedPaths.Contains('cspell.json')) {
+                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths @('cspell.json'))) {
+                        Write-ErrorMsg 'Failed to stage cspell.json after configuration auto-fix. Git index.lock contention or another git error is likely.'
+                        Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                        $failureCount++
+                    }
+                }
+            }
+        }
+
+        Push-Location $repoRoot
+        try {
+            $cspellConfigOutput = & node (Join-Path $repoRoot 'scripts/lint-cspell-config.js') 2>&1
+            $cspellConfigExit = $LASTEXITCODE
+            foreach ($line in $cspellConfigOutput) { Write-Host $line }
+        }
+        finally {
+            Pop-Location
+        }
+
+        if ($cspellConfigExit -ne 0) {
+            Write-ErrorMsg 'cspell.json configuration issues detected.'
+            Write-Host 'Run: npm run agent:preflight:fix' -ForegroundColor Cyan
+            $failureCount++
+        }
+    }
+}
+
+if ($eolTargets.Count -gt 0) {
+    if ($Fix) {
+        Write-Host '[agent-preflight] Normalizing line endings on changed files...' -ForegroundColor Blue
+        Push-Location $repoRoot
+        try {
+            & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -Paths $eolTargets
+            $normalizeEolExit = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+
+        if ($normalizeEolExit -ne 0) {
+            $failureCount++
+        }
+        else {
+            $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+            $stagedEolTargets = @($eolTargets | Where-Object { $stagedPaths.Contains($_) })
+            if ($stagedEolTargets.Count -gt 0) {
+                if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedEolTargets)) {
+                    Write-ErrorMsg 'Failed to stage EOL-normalized files. Git index.lock contention or another git error is likely.'
+                    foreach ($path in $stagedEolTargets) {
+                        Write-Host "  $path" -ForegroundColor Yellow
+                    }
+                    Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                    $failureCount++
+                }
+            }
+        }
+    }
+
+    Write-Host '[agent-preflight] Checking line endings on changed files...' -ForegroundColor Blue
+    Push-Location $repoRoot
+    try {
+        & (Join-Path $repoRoot 'scripts/check-eol.ps1') -VerboseOutput:$VerboseOutput -Paths $eolTargets
+        $checkEolExit = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+
+    if ($checkEolExit -ne 0) {
+        Write-ErrorMsg 'Line ending issues detected in changed files.'
+        Write-Host 'Run: npm run agent:preflight:fix' -ForegroundColor Cyan
+        $failureCount++
+    }
+}
+
 if ($testFiles.Count -gt 0) {
     if ($Fix) {
         Write-Host '[agent-preflight] Auto-fixing Unity null assertions in changed tests...' -ForegroundColor Blue
@@ -898,6 +1344,41 @@ if ($testFiles.Count -gt 0) {
     Write-Host '[agent-preflight] Running test linter on changed tests...' -ForegroundColor Blue
     & (Join-Path $repoRoot 'scripts/lint-tests.ps1') -Paths $testFiles -VerboseOutput:$VerboseOutput
     if ($LASTEXITCODE -ne 0) {
+        $failureCount++
+    }
+}
+
+if ($csharpTargets.Count -gt 0) {
+    Write-Host '[agent-preflight] Checking duplicate using directives on changed C# files...' -ForegroundColor Blue
+    Push-Location $repoRoot
+    try {
+        & (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') -Paths $csharpTargets
+        if ($LASTEXITCODE -ne 0) {
+            $failureCount++
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $regionViolations = New-Object System.Collections.Generic.List[string]
+    foreach ($path in $csharpTargets) {
+        $fullPath = Join-Path -Path $repoRoot -ChildPath $path
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+            continue
+        }
+
+        $matches = Select-String -LiteralPath $fullPath -Pattern '^\s*#\s*(region|endregion)' -CaseSensitive:$false
+        foreach ($match in $matches) {
+            $regionViolations.Add("${path}:$($match.LineNumber): $($match.Line.Trim())") | Out-Null
+        }
+    }
+
+    if ($regionViolations.Count -gt 0) {
+        Write-ErrorMsg 'Forbidden #region/#endregion directives detected in changed C# files:'
+        foreach ($violation in $regionViolations) {
+            Write-Host "  $violation" -ForegroundColor Yellow
+        }
         $failureCount++
     }
 }

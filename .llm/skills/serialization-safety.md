@@ -8,7 +8,7 @@
 
 ## Why This Skill Exists
 
-`Serializer` is the **single, documented carve-out** from this repository's "never throw, handle gracefully" rule (see `.llm/skills/defensive-programming.md`). Save files, network packets, and persisted state are too load-bearing to silently return `default(T)` — a swallowed corruption looks identical to a missing field and produces ghost data hours later in production.
+`Serializer` is the **single, documented carve-out** from this repository's "never throw, handle gracefully" rule (see [Defensive Programming](./defensive-programming.md)). Save files, network packets, and persisted state are too load-bearing to silently return `default(T)` — a swallowed corruption looks identical to a missing field and produces ghost data hours later in production.
 
 A real production crash (`ArgumentNullException: Buffer cannot be null`) leaked out of `new MemoryStream(byte[])` deep inside a ZLinq pipeline. The fix is structural: **every deserialize path is wrapped, every failure has a typed exception, and every throwing method has a `Try*` sibling for callers who want flow control.**
 
@@ -180,6 +180,6 @@ foreach (byte[] blob in records) {
 
 ## Related Skills
 
-- `.llm/skills/use-serialization.md` — overall serializer reference (formats, schema evolution, Unity types).
-- `.llm/skills/defensive-programming.md` — the "never throw" rule and its serialization carve-out.
-- `.llm/references/forbidden-patterns.md` — concrete anti-patterns to flag in PR review.
+- [Use Serialization](./use-serialization.md) — overall serializer reference (formats, schema evolution, Unity types).
+- [Defensive Programming](./defensive-programming.md) — the "never throw" rule and its serialization carve-out.
+- [Forbidden Patterns](../references/forbidden-patterns.md) — concrete anti-patterns to flag in PR review.

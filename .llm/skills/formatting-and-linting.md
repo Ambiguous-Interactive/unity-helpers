@@ -39,15 +39,17 @@ bash scripts/install-hooks.sh
 
 1. Syncs versions (banner SVG + [LLM context](../context.md) from `package.json`; issue template dropdowns from `package.json`, the [CHANGELOG](../../CHANGELOG.md), and git tags)
 2. Normalizes line endings (CRLF/LF per file type)
-3. Formats staged files with Prettier (Markdown, JSON, YAML, JS)
-4. Formats staged C# files with CSharpier
-5. Runs markdownlint on staged Markdown files
-6. Runs CHANGELOG lint when [CHANGELOG](../../CHANGELOG.md) is staged, plus YAML lint, Dependabot config schema lint, spell check (with copy-pasteable cspell.json patch for unregistered lint-error-code prefixes), LLM instruction lint, and test lint
-7. Checks staged C# files for duplicate using directives (`UNH007`)
-8. Checks for forbidden `#region` directives
-9. Checks drawer/editor files for missing multi-object editing support (GenericMenu without `hasMultipleDifferentValues`)
-10. Checks Odin drawer Undo safety (WeakTargets null-filtering before `Undo.RecordObjects`)
-11. Checks for missing `.meta` files on staged files (auto-stages existing `.meta` companions)
+3. Runs path-scoped documentation link lint on staged Markdown/docs/source files
+4. Formats staged files with Prettier (Markdown, JSON, YAML, JS)
+5. Formats staged C# files with CSharpier
+6. Audits and auto-fixes staged C# license year headers
+7. Adds missing Markdown fence languages where inferable, then runs markdownlint on staged Markdown files
+8. Runs CHANGELOG lint when [CHANGELOG](../../CHANGELOG.md) is staged, plus YAML lint, Dependabot config schema lint, spell check (with copy-pasteable cspell.json patch for unregistered lint-error-code prefixes), LLM instruction lint, and test lint
+9. Checks staged C# files for duplicate using directives (`UNH007`)
+10. Checks for forbidden `#region` directives
+11. Checks drawer/editor files for missing multi-object editing support (GenericMenu without `hasMultipleDifferentValues`)
+12. Checks Odin drawer Undo safety (WeakTargets null-filtering before `Undo.RecordObjects`)
+13. Checks for missing `.meta` files on staged files (auto-stages existing `.meta` companions)
 
 The repository also installs a `pre-merge-commit` hook that delegates to `pre-commit`. Git does NOT run `pre-commit` on merge commits by default, so without this delegation any file introduced through a merge (including manual conflict resolution) would bypass every validation. The April 2026 `PWS001` regression is the concrete incident this guards against.
 
@@ -67,7 +69,7 @@ npm run validate:prepush
 
 ## Markdown File References
 
-When referencing markdown files in documentation, always use proper markdown link syntax with a relative path prefix. Never use bare filenames or inline-code-wrapped filenames. The [lint-doc-links.ps1](../../scripts/lint-doc-links.ps1) script enforces this in CI.
+When referencing markdown files in documentation, always use proper markdown link syntax with a relative path prefix. Never use bare filenames or inline-code-wrapped filenames. The [lint-doc-links.ps1](../../scripts/lint-doc-links.ps1) script enforces this in CI and supports `-Paths` for fast hook checks.
 
 ```markdown
 <!-- Wrong: bare or backtick-wrapped references -->

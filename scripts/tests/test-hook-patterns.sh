@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PRE_COMMIT="$REPO_ROOT/.githooks/pre-commit"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -183,6 +187,13 @@ if case_matches "Editor/CustomDrawers/FooDrawer.cs" "*Drawer.cs"; then
     pass "*Drawer.cs matches with path: Editor/CustomDrawers/FooDrawer.cs"
 else
     fail "*Drawer.cs matches with path: Editor/CustomDrawers/FooDrawer.cs" "match" "no match"
+fi
+
+run_test
+if grep -q -- '--diff-filter=ACMR' "$PRE_COMMIT"; then
+    pass "Pre-commit staged path collection includes renamed new paths"
+else
+    fail "Pre-commit staged path collection includes renamed new paths" "--diff-filter=ACMR" "not found"
 fi
 
 # =============================================================================

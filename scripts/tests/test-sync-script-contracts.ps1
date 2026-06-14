@@ -258,6 +258,82 @@ function Run-AgentValidationContractTests {
     -Message 'Expected cspell invocation through scripts/run-node-bin.js was not found.'
 }
 
+function Run-PowerShellPathBindingContractTests {
+  Write-Host ""
+  Write-Host "PowerShell CLI path binding contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $pathScripts = @(
+    @{ Name = 'check-eol.ps1'; Path = Join-Path $repoRoot 'scripts/check-eol.ps1' },
+    @{ Name = 'normalize-eol.ps1'; Path = Join-Path $repoRoot 'scripts/normalize-eol.ps1' }
+  )
+
+  foreach ($scriptInfo in $pathScripts) {
+    if (-not (Test-Path $scriptInfo.Path)) {
+      Write-TestResult `
+        -TestName "$($scriptInfo.Name) exists for path binding contract" `
+        -Passed $false `
+        -Message "Missing file: $($scriptInfo.Path)"
+      continue
+    }
+
+    $content = Get-Content -Path $scriptInfo.Path -Raw
+    $hasRemainingArgs = $content -match 'ValueFromRemainingArguments\s*=\s*\$true' -and
+      $content -match '\$AdditionalPaths'
+    $usesEffectivePaths = $content -match '\$effectivePaths'
+
+    Write-TestResult `
+      -TestName "$($scriptInfo.Name) captures trailing -Paths arguments under pwsh -File" `
+      -Passed ($hasRemainingArgs -and $usesEffectivePaths) `
+      -Message 'Expected ValueFromRemainingArguments AdditionalPaths and effective path merging.'
+  }
+}
+
+function Run-HookInstallContractTests {
+  Write-Host ""
+  Write-Host "Hook install contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $packageJsonPath = Join-Path $repoRoot 'package.json'
+  $installHooksPath = Join-Path $repoRoot 'scripts/install-hooks.ps1'
+
+  if (-not (Test-Path $packageJsonPath)) {
+    Write-TestResult `
+      -TestName 'package.json exists for hooks:install contract' `
+      -Passed $false `
+      -Message "Missing file: $packageJsonPath"
+  }
+  else {
+    $packageJson = Get-Content -Path $packageJsonPath -Raw | ConvertFrom-Json
+    $hooksInstallScript = [string]$packageJson.scripts.'hooks:install'
+    Write-TestResult `
+      -TestName 'hooks:install uses PowerShell installer instead of Unix-only chmod' `
+      -Passed ($hooksInstallScript -eq 'pwsh -NoProfile -File scripts/install-hooks.ps1 -HooksOnly') `
+      -Message "hooks:install: $hooksInstallScript"
+  }
+
+  if (-not (Test-Path $installHooksPath)) {
+    Write-TestResult `
+      -TestName 'install-hooks.ps1 exists for HooksOnly contract' `
+      -Passed $false `
+      -Message "Missing file: $installHooksPath"
+  }
+  else {
+    $installHooksContent = Get-Content -Path $installHooksPath -Raw
+    $hasHooksOnlyParam = $installHooksContent -match '\[switch\]\$HooksOnly'
+    $hasHooksOnlyBranch = $installHooksContent -match 'if \(\$HooksOnly\)' -and
+      $installHooksContent -match 'Install-GitHooks' -and
+      $installHooksContent -match 'Set-GitPushDefaults'
+
+    Write-TestResult `
+      -TestName 'install-hooks.ps1 exposes HooksOnly hook setup path' `
+      -Passed ($hasHooksOnlyParam -and $hasHooksOnlyBranch) `
+      -Message 'Expected -HooksOnly param and branch configuring hooks plus push defaults.'
+  }
+}
+
 function Run-RepoLocalPrettierContractTests {
   Write-Host ""
   Write-Host "Repo-local Node tool invocation contracts:" -ForegroundColor Magenta
@@ -266,6 +342,7 @@ function Run-RepoLocalPrettierContractTests {
   $repoRoot = Get-RepoRoot
   $launcherPath = Join-Path $repoRoot 'scripts/run-prettier.js'
   $packageJsonPath = Join-Path $repoRoot 'package.json'
+  $prettierConfigPath = Join-Path $repoRoot '.prettierrc.json'
   $formatStagedPath = Join-Path $repoRoot 'scripts/format-staged-prettier.ps1'
   $lintStagedMarkdownPath = Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1'
   $agentPreflightPath = Join-Path $repoRoot 'scripts/agent-preflight.ps1'
@@ -301,6 +378,32 @@ function Run-RepoLocalPrettierContractTests {
     -TestName 'package format scripts use repo-local Prettier launcher' `
     -Passed ($formatScriptDrift.Count -eq 0) `
     -Message "Drifted scripts: $($formatScriptDrift -join '; ')"
+
+  if (-not (Test-Path $prettierConfigPath)) {
+    Write-TestResult `
+      -TestName '.prettierrc.json exists for EOL parity contract' `
+      -Passed $false `
+      -Message "Missing file: $prettierConfigPath"
+  }
+  else {
+    $prettierConfig = Get-Content -Path $prettierConfigPath -Raw | ConvertFrom-Json
+    $lfOverrideFiles = New-Object System.Collections.Generic.List[string]
+    foreach ($override in @($prettierConfig.overrides)) {
+      $endOfLineProperty = $override.options.PSObject.Properties['endOfLine']
+      if ($null -eq $endOfLineProperty -or [string]$endOfLineProperty.Value -ne 'lf') {
+        continue
+      }
+
+      foreach ($filePattern in @($override.files)) {
+        $lfOverrideFiles.Add([string]$filePattern) | Out-Null
+      }
+    }
+
+    Write-TestResult `
+      -TestName 'Prettier LF overrides include .github/** to match .gitattributes' `
+      -Passed ($lfOverrideFiles -contains '.github/**') `
+      -Message "LF override files: $($lfOverrideFiles -join ', ')"
+  }
 
   $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath, $preCommitPath, $prePushPath)
   $requiredFiles = @($formatStagedPath, $lintStagedMarkdownPath, $agentPreflightPath, $validateLintErrorCodesPath, $preCommitPath, $prePushPath)
@@ -339,6 +442,37 @@ function Run-RepoLocalPrettierContractTests {
     -TestName 'hooks and preflight route cspell/markdownlint through repo-local launcher' `
     -Passed ($nodeToolDrift.Count -eq 0) `
     -Message "Missing node-tool launcher reference: $($nodeToolDrift -join '; ')"
+
+  $markdownFenceFixDrift = @()
+  foreach ($file in @($lintStagedMarkdownPath, $agentPreflightPath, $preCommitPath)) {
+    if (-not (Test-Path $file)) {
+      $markdownFenceFixDrift += "missing: $file"
+      continue
+    }
+
+    $content = Get-Content -Path $file -Raw
+    if ($content -notmatch 'fix-markdown-fence-languages\.ps1') {
+      $markdownFenceFixDrift += $file
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'Markdown hook/preflight paths run fence-language auto-fix before markdownlint' `
+    -Passed ($markdownFenceFixDrift.Count -eq 0) `
+    -Message "Missing fence fixer reference: $($markdownFenceFixDrift -join '; ')"
+
+  if (Test-Path $preCommitPath) {
+    $preCommitContent = Get-Content -Path $preCommitPath -Raw
+    Write-TestResult `
+      -TestName 'pre-commit runs fence-language fixer from markdownlint MD040 diagnostics' `
+      -Passed ($preCommitContent -match 'MD040/fenced-code-language' -and $preCommitContent -match 'MARKDOWNLINT_FIX_CAPTURE') `
+      -Message 'Expected pre-commit to invoke the fence fixer only after markdownlint reports MD040.'
+
+    Write-TestResult `
+      -TestName 'pre-commit avoids line-only bare-fence pre-scan' `
+      -Passed ($preCommitContent -notmatch 'MARKDOWN_FENCE_FIX_REQUIRED') `
+      -Message 'A line-only bare-fence pre-scan mistakes normal closing fences for missing-language openings.'
+  }
 
   $forbiddenHits = @()
   foreach ($file in $requiredFiles + @($packageJsonPath)) {
@@ -543,6 +677,8 @@ function Print-SummaryAndExit {
 Run-SyncScriptContractTests
 Run-CspellContractTests
 Run-AgentValidationContractTests
+Run-PowerShellPathBindingContractTests
+Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Print-SummaryAndExit

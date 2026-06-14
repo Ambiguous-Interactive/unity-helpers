@@ -250,6 +250,10 @@ More text.
 
 > **MD025 — Generated Content Warning**: Documents like the [LLM context file](../context.md) have a single `#` title. Generated content (e.g., the skills index) must use `###` or lower — never `#` or `##`. The LLM instructions lint script (`scripts/lint-llm-instructions.ps1`) enforces this; run with `-Fix` to auto-correct violations.
 
+Plain ASCII/Unicode flow diagrams or command output examples use `text`.
+Use `mermaid` only for blocks that contain valid Mermaid syntax such as
+`graph`, `flowchart`, `sequenceDiagram`, or `classDiagram`.
+
 ---
 
 ## Escaping Example Links in Documentation

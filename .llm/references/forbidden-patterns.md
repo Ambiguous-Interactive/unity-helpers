@@ -335,7 +335,7 @@ When passing file arguments to CLI tools, a `--` (end-of-options) separator MUST
 
 ## Serialization Patterns
 
-`Serializer` is the single documented carve-out from the "never throw" rule (see `.llm/skills/serialization-safety.md`). Inside `Runtime/Core/Serialization/Serializer.cs` and any future format added there:
+`Serializer` is the single documented carve-out from the "never throw" rule (see [Serialization Safety](../skills/serialization-safety.md)). Inside `Runtime/Core/Serialization/Serializer.cs` and any future format added there:
 
 | Forbidden                                                                           | Use Instead                                                                                                 | Reason                                                                                   |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |

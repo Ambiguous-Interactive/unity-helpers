@@ -44,10 +44,15 @@ run_test() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 AUDIT_SCRIPT="$REPO_ROOT/scripts/audit-license-years.sh"
-CACHE_FILE="$REPO_ROOT/.git/license-year-cache"
 POST_REWRITE="$REPO_ROOT/.githooks/post-rewrite"
+PRE_COMMIT="$REPO_ROOT/.githooks/pre-commit"
 
 cd "$REPO_ROOT"
+CACHE_FILE="$(git rev-parse --git-path license-year-cache)"
+case "$CACHE_FILE" in
+    /*) ;;
+    *) CACHE_FILE="$REPO_ROOT/$CACHE_FILE" ;;
+esac
 
 # =============================================================================
 # Test: audit-license-years.sh exists and has required flags
@@ -84,6 +89,20 @@ else
 fi
 
 run_test
+if grep -q 'git rev-parse --git-path license-year-cache' "$AUDIT_SCRIPT" && grep -q 'git rev-parse --git-path license-year-cache' "$POST_REWRITE"; then
+    pass "License cache path is worktree-safe"
+else
+    fail "License cache path is worktree-safe" "git rev-parse --git-path license-year-cache" "not found"
+fi
+
+run_test
+if grep -q 'CURRENT_YEAR=$(date +%Y)' "$AUDIT_SCRIPT" && grep -q 'CURRENT_YEAR=$(date +%Y)' "$REPO_ROOT/scripts/update-license-headers.sh"; then
+    pass "License scripts compute current year dynamically"
+else
+    fail "License scripts compute current year dynamically" 'CURRENT_YEAR=$(date +%Y)' "not found"
+fi
+
+run_test
 if grep -q 'year_cache' "$AUDIT_SCRIPT"; then
     pass "Cache associative array exists"
 else
@@ -102,6 +121,34 @@ if grep -q 'load_cache' "$AUDIT_SCRIPT"; then
     pass "Cache load function defined"
 else
     fail "Cache load function defined" "load_cache function" "not found"
+fi
+
+run_test
+if grep -q "git ls-files -z -- '\\*.cs'" "$AUDIT_SCRIPT"; then
+    pass "Full audit enumerates tracked C# files through git ls-files"
+else
+    fail "Full audit uses tracked C# file enumeration" "git ls-files -z -- '*.cs'" "not found"
+fi
+
+run_test
+if grep -q "git ls-files -z -- '\\*.cs'" "$REPO_ROOT/scripts/update-license-headers.sh"; then
+    pass "License header updater enumerates tracked C# files through git ls-files"
+else
+    fail "License updater uses tracked C# file enumeration" "git ls-files -z -- '*.cs'" "not found"
+fi
+
+run_test
+if grep -q -- '--paths' "$REPO_ROOT/scripts/update-license-headers.sh"; then
+    pass "License header updater supports --paths for scoped recovery"
+else
+    fail "License updater supports --paths" "--paths present" "not found"
+fi
+
+run_test
+if grep -q 'audit-license-years.sh --summary --paths' "$PRE_COMMIT" && grep -q 'update-license-headers.sh --paths' "$PRE_COMMIT"; then
+    pass "Pre-commit runs staged C# license audit and scoped auto-fix"
+else
+    fail "Pre-commit license recovery wiring" "audit-license-years.sh and update-license-headers.sh path-scoped calls" "not found"
 fi
 
 run_test
@@ -139,6 +186,33 @@ if [ -n "$CS_FILE" ]; then
     fi
 else
     fail "Cache creation" "found .cs file" "no .cs files in repo"
+fi
+
+run_test
+if [ -n "$CS_FILE" ]; then
+    TMP_PARENT=$(mktemp -d)
+    TMP_WORKTREE="$TMP_PARENT/worktree"
+    if git worktree add -q "$TMP_WORKTREE" HEAD >/dev/null 2>&1; then
+        cp "$AUDIT_SCRIPT" "$TMP_WORKTREE/scripts/audit-license-years.sh"
+        WORKTREE_CACHE=$(git -C "$TMP_WORKTREE" rev-parse --git-path license-year-cache)
+        case "$WORKTREE_CACHE" in
+            /*) ;;
+            *) WORKTREE_CACHE="$TMP_WORKTREE/$WORKTREE_CACHE" ;;
+        esac
+        rm -f "$WORKTREE_CACHE"
+        bash "$TMP_WORKTREE/scripts/audit-license-years.sh" --summary --paths "$CS_FILE" >/dev/null 2>&1 || true
+        if [ -f "$WORKTREE_CACHE" ]; then
+            pass "Linked worktree audit writes cache through git rev-parse --git-path"
+        else
+            fail "Linked worktree audit writes cache through git rev-parse --git-path" "cache file at $WORKTREE_CACHE" "not created"
+        fi
+        git worktree remove -f "$TMP_WORKTREE" >/dev/null 2>&1 || true
+    else
+        fail "Linked worktree audit writes cache through git rev-parse --git-path" "temporary linked worktree" "git worktree add failed"
+    fi
+    rm -rf "$TMP_PARENT"
+else
+    fail "Linked worktree cache behavior" "found .cs file" "no .cs files in repo"
 fi
 
 # =============================================================================

@@ -24,6 +24,15 @@ if ($existingPaths.Count -eq 0) {
   exit 0
 }
 
+$fenceFixScript = Join-Path -Path $repositoryInfo.RepositoryRoot -ChildPath 'scripts/fix-markdown-fence-languages.ps1'
+if (Test-Path -LiteralPath $fenceFixScript -PathType Leaf) {
+  & $fenceFixScript -Paths $existingPaths
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Markdown fence language auto-fix failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+  }
+}
+
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) {
   Write-Error "node not found; install Node.js and run npm install to run markdownlint."
