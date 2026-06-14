@@ -1,0 +1,47 @@
+name: Validate MCP Config
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".mcp.json"
+      - ".cursor/**"
+      - ".vscode/**"
+      - ".codex/**"
+      - "scripts/mcp/**"
+      - "scripts/validate-mcp-config.ps1"
+      - "scripts/tests/test-validate-mcp-config.ps1"
+      - "docs/guides/mcp-local-setup.md"
+      - ".gitignore"
+      - ".github/workflows/validate-mcp-config.yml"
+  pull_request:
+    paths:
+      - ".mcp.json"
+      - ".cursor/**"
+      - ".vscode/**"
+      - ".codex/**"
+      - "scripts/mcp/**"
+      - "scripts/validate-mcp-config.ps1"
+      - "scripts/tests/test-validate-mcp-config.ps1"
+      - "docs/guides/mcp-local-setup.md"
+      - ".gitignore"
+      - ".github/workflows/validate-mcp-config.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-mcp-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Test MCP config validator
+        shell: pwsh
+        run: ./scripts/tests/test-validate-mcp-config.ps1 -VerboseOutput
+
+      - name: Validate MCP config
+        shell: pwsh
+        run: ./scripts/validate-mcp-config.ps1 -VerboseOutput

@@ -818,7 +818,8 @@
         "env",
         "instanceof",
         "TMPDIR",
-        "cwd"
+        "cwd",
+        "mcp"
       ]
     }
   ],
