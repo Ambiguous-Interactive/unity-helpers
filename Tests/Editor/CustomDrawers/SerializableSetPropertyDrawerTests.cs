@@ -21,6 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.EditorFramework;
     using Object = UnityEngine.Object;
+    using TestData = WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.TestData;
 
     // TODO: Consolidate
     [TestFixture]

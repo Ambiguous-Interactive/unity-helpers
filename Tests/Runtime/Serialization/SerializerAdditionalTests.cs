@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             TestMessage msg = new() { Id = 1, Name = "Test" };
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.Serialize(msg, (SerializationType)999)
             );
         }
@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] data = { 1, 2, 3 };
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.Deserialize<TestMessage>(data, (SerializationType)999)
             );
         }
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             TestMessage msg = new() { Id = 1, Name = "Test" };
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
 #pragma warning disable CS0618 // Type or member is obsolete
                 Serializer.Serialize(msg, SerializationType.None)
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] data = { 1, 2, 3 };
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
 #pragma warning disable CS0618 // Type or member is obsolete
                 Serializer.Deserialize<TestMessage>(data, SerializationType.None)
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             TestMessage msg = new() { Id = 1 };
             byte[] buffer = null;
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.Serialize(msg, (SerializationType)999, ref buffer)
             );
         }
@@ -812,19 +812,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeNullDataThrowsException()
         {
-            Assert.Throws<ProtoException>(() => Serializer.ProtoDeserialize<TestMessage>(null));
+            Assert.Throws<SerializationInputException>(
+                () => Serializer.ProtoDeserialize<TestMessage>(null)
+            );
         }
 
         [Test]
-        public void ProtoDeserializeEmptyArrayReturnsDefaultInstance()
+        public void ProtoDeserializeEmptyArrayThrowsInputException()
         {
             byte[] emptyData = Array.Empty<byte>();
 
-            // Protobuf allows deserializing empty data as default instance
-            TestMessage result = Serializer.ProtoDeserialize<TestMessage>(emptyData);
-
-            Assert.NotNull(result);
-            Assert.AreEqual(0, result.Id);
+            Assert.Throws<SerializationInputException>(
+                () => Serializer.ProtoDeserialize<TestMessage>(emptyData)
+            );
         }
 
         [Test]
@@ -913,7 +913,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string filePath = Path.Combine(_tempDirectory, "invalid.json");
             File.WriteAllText(filePath, "{ invalid json content }");
 
-            Assert.Throws<JsonException>(() => Serializer.ReadFromJsonFile<TestMessage>(filePath));
+            Assert.Throws<SerializationCorruptDataException>(() => Serializer.ReadFromJsonFile<TestMessage>(filePath));
         }
     }
 }

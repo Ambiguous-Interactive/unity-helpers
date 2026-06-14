@@ -25,22 +25,22 @@ Production code—including editor tooling—must be **resilient to any state**.
 
 Exceptions should ONLY be thrown for:
 
-| Scenario                            | Example                                    | Why It's OK                     |
-| ----------------------------------- | ------------------------------------------ | ------------------------------- |
-| **Programmer error (debug only)**   | `Debug.Assert(index >= 0)`                 | Catches bugs during development |
-| **Fundamentally impossible states** | Constructor receives negative capacity     | API contract violation          |
-| **Security violations**             | Unauthorized access to protected resources | Must fail loudly                |
+| Scenario                             | Example                                                                          | Why It's OK                                                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Programmer error (debug only)**    | `Debug.Assert(index >= 0)`                                                       | Catches bugs during development                                                                                    |
+| **Fundamentally impossible states**  | Constructor receives negative capacity                                           | API contract violation                                                                                             |
+| **Security violations**              | Unauthorized access to protected resources                                       | Must fail loudly                                                                                                   |
+| **Serializer input/decode failures** | `Serializer.ProtoDeserialize<T>(corrupt)` throws `SerializationFailureException` | Save/network data is load-bearing — silent `default(T)` corrupts state. See `.llm/skills/serialization-safety.md`. |
 
 ### When Exceptions Are FORBIDDEN
 
-| Scenario                    | Bad                                       | Good                                     |
-| --------------------------- | ----------------------------------------- | ---------------------------------------- |
-| Null input to public method | `throw new ArgumentNullException()`       | Return `default`, empty, or `false`      |
-| Index out of range          | `throw new IndexOutOfRangeException()`    | Clamp, return `false`, or no-op          |
-| Type mismatch               | `throw new InvalidCastException()`        | Use `TryXxx` pattern or return `default` |
-| Missing resource            | `throw new FileNotFoundException()`       | Return `null`, log warning               |
-| Deserialization failure     | `throw new JsonException()`               | Return `default(T)` with error info      |
-| Invalid enum value          | `throw new ArgumentOutOfRangeException()` | Use `default` case, log warning          |
+| Scenario                    | Bad                                    | Good                                                                                           |
+| --------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- | --- | ------------------ | ----------------------------------------- | ------------------------------- |
+| Null input to public method | `throw new ArgumentNullException()`    | Return `default`, empty, or `false`                                                            |
+| Index out of range          | `throw new IndexOutOfRangeException()` | Clamp, return `false`, or no-op                                                                |
+| Type mismatch               | `throw new InvalidCastException()`     | Use `TryXxx` pattern or return `default`                                                       |
+| Missing resource            | `throw new FileNotFoundException()`    | Return `null`, log warning                                                                     |
+| Deserialization failure     | `throw new JsonException()`            | `Serializer.TryXxx` or wrap `SerializationFailureException` (see `serialization-safety` skill) |     | Invalid enum value | `throw new ArgumentOutOfRangeException()` | Use `default` case, log warning |
 
 ---
 

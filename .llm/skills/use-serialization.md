@@ -15,6 +15,32 @@
 
 ---
 
+## Error Handling
+
+`Serializer` is the **single documented exception** to this repo's "never throw" rule (see `.llm/skills/defensive-programming.md`). Save/network data is too load-bearing for silent `default(T)`. **Every** deserialize entry point either throws `SerializationFailureException` or returns `false` via a `TryXxx` sibling. Full details: `.llm/skills/serialization-safety.md`.
+
+```csharp
+// Throwing — catch SerializationFailureException for any format/stage.
+try
+{
+    PlayerData data = Serializer.ProtoDeserialize<PlayerData>(bytes);
+}
+catch (SerializationFailureException ex)
+{
+    Debug.LogWarning($"Load failed: {ex.Format}/{ex.Stage} — {ex.Message}");
+}
+
+// Non-throwing — Try* returns false on null/empty/corrupt input.
+if (Serializer.TryProtoDeserialize(bytes, out PlayerData data))
+{
+    Apply(data);
+}
+```
+
+`Try*` swallows `SerializationInputException` and `SerializationCorruptDataException`. `SerializationTypeException` (unresolved polymorphic root) and `SerializationConfigurationException` (invalid `SerializationType`) still propagate — they are programmer errors.
+
+---
+
 ## JSON Serialization
 
 ### Basic Usage

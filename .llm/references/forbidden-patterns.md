@@ -333,6 +333,22 @@ When passing file arguments to CLI tools, a `--` (end-of-options) separator MUST
 
 ---
 
+## Serialization Patterns
+
+`Serializer` is the single documented carve-out from the "never throw" rule (see `.llm/skills/serialization-safety.md`). Inside `Runtime/Core/Serialization/Serializer.cs` and any future format added there:
+
+| Forbidden                                                                           | Use Instead                                                                                                 | Reason                                                                                   |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `new MemoryStream(byte[])` without a prior null/empty guard                         | `SerializationFailureException.ThrowNullInput<T>` / `ThrowEmptyInput<T>` then `new MemoryStream(data)`      | Legacy crash: `ArgumentNullException: Buffer cannot be null` leaked to a ZLinq pipeline. |
+| `throw new ProtoBuf.ProtoException(...)`                                            | `SerializationFailureException.ThrowCorrupt<T>(..., inner)` (wrap the framework exception)                  | Callers can only catch one type — the documented hierarchy.                              |
+| `throw new System.Text.Json.JsonException(...)`                                     | `SerializationFailureException.ThrowCorrupt<T>(..., inner)`                                                 | Same.                                                                                    |
+| `throw new ArgumentNullException(nameof(data))` from `*Deserialize*`                | `SerializationFailureException.ThrowNullInput<T>(format, op)`                                               | Same hierarchy.                                                                          |
+| A new `*Deserialize*` method without a matching `Try*` sibling                      | Add `TryXxx` overload that catches `SerializationInputException` + `SerializationCorruptDataException` only | `SerializerApiContractTests` will fail the build otherwise.                              |
+| A `Try*` sibling that catches `Exception`                                           | Catch only `SerializationInputException` + `SerializationCorruptDataException`                              | Programmer errors (`Type` / `Configuration`) must propagate.                             |
+| Silent `catch { return default; }` around `Serializer.*Deserialize*` in caller code | `Try*` sibling, OR catch `SerializationFailureException` and log+fallback                                   | Silent corruption looks identical to a missing field hours later.                        |
+
+---
+
 ## Related Documentation
 
 - [high-performance-csharp](../skills/high-performance-csharp.md) - Core performance patterns
@@ -340,3 +356,4 @@ When passing file arguments to CLI tools, a `--` (end-of-options) separator MUST
 - [memory-allocation-traps](../skills/memory-allocation-traps.md) - Hidden allocation sources
 - [avoid-reflection](../skills/avoid-reflection.md) - Reflection avoidance
 - [avoid-magic-strings](../skills/avoid-magic-strings.md) - Magic string avoidance
+- [serialization-safety](../skills/serialization-safety.md) - Serializer exception contract

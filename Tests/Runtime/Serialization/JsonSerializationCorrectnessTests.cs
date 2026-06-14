@@ -317,10 +317,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 Id = 888,
                 Name = "LargeCollection",
-                Values = new List<int>(100_000),
+                Values = new List<int>(10_000),
             };
 
-            for (int i = 0; i < 100_000; ++i)
+            // 10k still exercises large-collection round-trip paths while keeping
+            // this correctness test in the fast suite (full-scale throughput is
+            // covered by the Performance-categorized benchmark suite).
+            for (int i = 0; i < 10_000; ++i)
             {
                 msg.Values.Add(i);
             }
@@ -330,7 +333,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.AreEqual(msg.Id, clone.Id);
             Assert.AreEqual(msg.Name, clone.Name);
-            Assert.AreEqual(100_000, clone.Values.Count);
+            Assert.AreEqual(10_000, clone.Values.Count);
             CollectionAssert.AreEqual(msg.Values, clone.Values);
         }
 
@@ -338,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void DeserializeInvalidJsonThrowsException()
         {
             string invalidJson = "{ invalid json }";
-            Assert.Throws<JsonException>(() =>
+            Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(invalidJson)
             );
         }
@@ -347,7 +350,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void DeserializeMalformedJsonThrowsException()
         {
             string malformedJson = "{\"Id\": 123, \"Name\": \"Test\""; // Missing closing brace
-            Assert.Throws<JsonException>(() =>
+            Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(malformedJson)
             );
         }
@@ -355,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeEmptyStringThrowsException()
         {
-            Assert.Throws<JsonException>(() =>
+            Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(string.Empty)
             );
         }

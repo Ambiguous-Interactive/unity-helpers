@@ -88,39 +88,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             SampleMessage sample = new();
 
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.Serialize(sample, (SerializationType)999)
             );
-            Assert.Throws<InvalidEnumArgumentException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.Deserialize<SampleMessage>(Array.Empty<byte>(), (SerializationType)999)
             );
         }
 
         [Test]
-        public void ProtoDeserializeHandlesEmpty()
+        public void ProtoDeserializeEmptyArrayThrowsSerializationInputException()
         {
-            SampleMessage message = Serializer.ProtoDeserialize<SampleMessage>(Array.Empty<byte>());
-            Assert.IsTrue(
-                message != null,
-                "ProtoDeserialize should return non-null for empty byte array"
+            // Empty byte[] is unambiguously caller error: no codec can decode 0 bytes into a meaningful instance.
+            Assert.Throws<SerializationInputException>(() =>
+                Serializer.ProtoDeserialize<SampleMessage>(Array.Empty<byte>())
             );
-            SampleMessage expected = new();
-            Assert.AreEqual(expected.Id, message.Id);
-            Assert.AreEqual(expected.Name, message.Name);
-            Assert.AreEqual(expected.Values, message.Values);
         }
 
         [Test]
         public void ProtoDeserializeThrowsWhenDataNull()
         {
-            Assert.Throws<ProtoException>(() => Serializer.ProtoDeserialize<SampleMessage>(null));
+            Assert.Throws<SerializationInputException>(() =>
+                Serializer.ProtoDeserialize<SampleMessage>(null)
+            );
         }
 
         [Test]
         public void ProtoDeserializeThrowsWhenDataIsGarbage()
         {
             byte[] garbage = { 0xFF, 0x00, 0x01, 0x02, 0xAB, 0xCD };
-            Assert.Throws<ProtoException>(() =>
+            Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.ProtoDeserialize<SampleMessage>(garbage)
             );
         }
@@ -130,28 +127,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             SampleMessage original = new() { Id = 1, Name = "NullType" };
             byte[] data = Serializer.ProtoSerialize(original);
-            Assert.Throws<ArgumentNullException>(() =>
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.ProtoDeserialize<object>(data, null)
             );
         }
 
         [Test]
-        public void ProtoDeserializeWithExplicitTypeWhenDataEmpty()
+        public void ProtoDeserializeWithExplicitTypeWhenDataEmptyThrows()
         {
-            object message = Serializer.ProtoDeserialize<object>(
-                Array.Empty<byte>(),
-                typeof(SampleMessage)
+            Assert.Throws<SerializationInputException>(() =>
+                Serializer.ProtoDeserialize<object>(Array.Empty<byte>(), typeof(SampleMessage))
             );
-            Assert.IsTrue(
-                message != null,
-                "ProtoDeserialize should return non-null for empty byte array with explicit type"
-            );
-            Assert.IsInstanceOf<SampleMessage>(message);
-            SampleMessage sample = (SampleMessage)message;
-            SampleMessage expected = new();
-            Assert.AreEqual(expected.Id, sample.Id);
-            Assert.AreEqual(expected.Name, sample.Name);
-            Assert.AreEqual(expected.Values, sample.Values);
         }
 
         [Test]

@@ -1102,12 +1102,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 default:
                 {
-                    throw new InvalidEnumArgumentException(
-                        nameof(serializationType),
-                        (int)serializationType,
-                        typeof(SerializationType)
+                    SerializationFailureException.ThrowConfiguration<T>(
+                        SerializationFormat.Dispatcher,
+                        SerializationOperation.Deserialize,
+                        $"Unknown SerializationType '{(int)serializationType}'."
                     );
+                    return default;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize bytes using <paramref name="serializationType"/>. Returns <see langword="false"/>
+        /// and sets <paramref name="value"/> to <see langword="default"/> if the payload is null/empty or the
+        /// codec rejects it. Programmer errors (unknown <see cref="SerializationType"/>, unresolved polymorphic
+        /// root) still throw <see cref="SerializationFailureException"/>.
+        /// </summary>
+        public static bool TryDeserialize<T>(
+            byte[] serialized,
+            SerializationType serializationType,
+            out T value
+        )
+        {
+            try
+            {
+                value = Deserialize<T>(serialized, serializationType);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
             }
         }
 
@@ -1146,11 +1176,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 default:
                 {
-                    throw new InvalidEnumArgumentException(
-                        nameof(serializationType),
-                        (int)serializationType,
-                        typeof(SerializationType)
+                    SerializationFailureException.ThrowConfiguration<T>(
+                        SerializationFormat.Dispatcher,
+                        SerializationOperation.Serialize,
+                        $"Unknown SerializationType '{(int)serializationType}'."
                     );
+                    return default;
                 }
             }
         }
@@ -1187,11 +1218,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 default:
                 {
-                    throw new InvalidEnumArgumentException(
-                        nameof(serializationType),
-                        (int)serializationType,
-                        typeof(SerializationType)
+                    SerializationFailureException.ThrowConfiguration<T>(
+                        SerializationFormat.Dispatcher,
+                        SerializationOperation.Serialize,
+                        $"Unknown SerializationType '{(int)serializationType}'."
                     );
+                    return 0;
                 }
             }
         }
@@ -1208,13 +1240,70 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         public static T BinaryDeserialize<T>(byte[] data)
         {
-            using Utils.PooledResource<PooledReadOnlyMemoryStream> lease =
-                PooledReadOnlyMemoryStream.Rent(out PooledReadOnlyMemoryStream stream);
-            stream.SetBuffer(data);
-            using Utils.PooledResource<BinaryFormatter> fmtLease = BinaryFormatterPool.Get(
-                out BinaryFormatter binaryFormatter
-            );
-            return (T)binaryFormatter.Deserialize(stream);
+            if (data == null)
+            {
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Binary,
+                    SerializationOperation.Deserialize
+                );
+            }
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Binary,
+                    SerializationOperation.Deserialize
+                );
+            }
+
+            try
+            {
+                using Utils.PooledResource<PooledReadOnlyMemoryStream> lease =
+                    PooledReadOnlyMemoryStream.Rent(out PooledReadOnlyMemoryStream stream);
+                stream.SetBuffer(data);
+                using Utils.PooledResource<BinaryFormatter> fmtLease = BinaryFormatterPool.Get(
+                    out BinaryFormatter binaryFormatter
+                );
+                return (T)binaryFormatter.Deserialize(stream);
+            }
+            catch (SerializationFailureException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Binary,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "BinaryFormatter rejected the payload."
+                );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize bytes with <c>BinaryFormatter</c>. Returns <see langword="false"/>
+        /// for null/empty/corrupt payloads.
+        /// </summary>
+        public static bool TryBinaryDeserialize<T>(byte[] data, out T value)
+        {
+            try
+            {
+                value = BinaryDeserialize<T>(data);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1297,7 +1386,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             if (data == null)
             {
-                throw new ProtoException("No data provided for Protobuf deserialization.");
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize
+                );
+            }
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize
+                );
             }
 
             // Intercept serializable collection types to use wrapper-based deserialization
@@ -1305,7 +1404,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Type declared = typeof(T);
             if (IsSerializableCollectionType(declared))
             {
-                return DeserializeCollectionFromWrapper<T>(data);
+                try
+                {
+                    return DeserializeCollectionFromWrapper<T>(data);
+                }
+                catch (SerializationFailureException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    SerializationFailureException.ThrowCorrupt<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Deserialize,
+                        data.Length,
+                        SerializationStage.PostProcess,
+                        e,
+                        "Failed to unpack protobuf collection wrapper."
+                    );
+                    return default;
+                }
             }
 
             try
@@ -1328,7 +1446,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                             return (T)ProtoDeserializeTypeFromROMFast(root, rom);
                         }
 
-                        throw new ProtoException(
+                        SerializationFailureException.ThrowTypeResolution<T>(
+                            SerializationFormat.Protobuf,
+                            SerializationOperation.Deserialize,
                             $"Unable to resolve a unique protobuf root for declared type {declared.FullName}. Register a root via RegisterProtobufRoot or annotate a shared abstract base with [ProtoInclude]s."
                         );
                     }
@@ -1353,7 +1473,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                             return (T)ProtoDeserializeTypeFromROSFast(root, ros);
                         }
 
-                        throw new ProtoException(
+                        SerializationFailureException.ThrowTypeResolution<T>(
+                            SerializationFormat.Protobuf,
+                            SerializationOperation.Deserialize,
                             $"Unable to resolve a unique protobuf root for declared type {declared.FullName}. Register a root via RegisterProtobufRoot or annotate a shared abstract base with [ProtoInclude]s."
                         );
                     }
@@ -1379,7 +1501,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                             return (T)ProtoBuf.Serializer.Deserialize(root, ms);
                         }
 
-                        throw new ProtoException(
+                        SerializationFailureException.ThrowTypeResolution<T>(
+                            SerializationFormat.Protobuf,
+                            SerializationOperation.Deserialize,
                             $"Unable to resolve a unique protobuf root for declared type {declared.FullName}. Register a root via RegisterProtobufRoot or annotate a shared abstract base with [ProtoInclude]s."
                         );
                     }
@@ -1407,23 +1531,54 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         return (T)ProtoBuf.Serializer.Deserialize(root, stream);
                     }
 
-                    throw new ProtoException(
+                    SerializationFailureException.ThrowTypeResolution<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Deserialize,
                         $"Unable to resolve a unique protobuf root for declared type {declaredLarge.FullName}. Register a root via RegisterProtobufRoot or annotate a shared abstract base with [ProtoInclude]s."
                     );
                 }
 
                 return ProtoBuf.Serializer.Deserialize<T>(stream);
             }
-            catch (ProtoException)
+            catch (SerializationFailureException)
             {
                 throw;
             }
             catch (Exception e)
             {
-                throw new ProtoException(
-                    "Protobuf deserialization failed: invalid or corrupted data.",
-                    e
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "protobuf-net rejected the payload."
                 );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize a protobuf payload. Returns <see langword="false"/> and sets
+        /// <paramref name="value"/> to <see langword="default"/> for null/empty/corrupt input.
+        /// Polymorphic-root resolution failures still throw (programmer error).
+        /// </summary>
+        public static bool TryProtoDeserialize<T>(byte[] data, out T value)
+        {
+            try
+            {
+                value = ProtoDeserialize<T>(data);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
             }
         }
 
@@ -1541,12 +1696,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             if (data == null)
             {
-                throw new ArgumentException(nameof(data));
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize
+                );
             }
-
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize
+                );
+            }
             if (type == null)
             {
-                throw new ArgumentNullException(nameof(type));
+                SerializationFailureException.ThrowConfiguration<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    "Target Type argument is null."
+                );
             }
 
             try
@@ -1574,16 +1742,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 stream.SetBuffer(data);
                 return (T)ProtoBuf.Serializer.Deserialize(type, stream);
             }
-            catch (ProtoException)
+            catch (SerializationFailureException)
             {
                 throw;
             }
             catch (Exception e)
             {
-                throw new ProtoException(
-                    "Protobuf deserialization failed: invalid or corrupted data.",
-                    e
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "protobuf-net rejected the payload."
                 );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize a protobuf payload into the supplied <paramref name="type"/>.
+        /// Returns <see langword="false"/> on null/empty/corrupt input. A null
+        /// <paramref name="type"/> still throws (programmer error).
+        /// </summary>
+        public static bool TryProtoDeserialize<T>(byte[] data, Type type, out T value)
+        {
+            try
+            {
+                value = ProtoDeserialize<T>(data, type);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
             }
         }
 
@@ -1690,12 +1887,73 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             JsonSerializerOptions options = null
         )
         {
-            return (T)
-                JsonSerializer.Deserialize(
-                    data,
-                    type ?? typeof(T),
-                    options ?? SerializerEncoding.NormalJsonOptions
+            if (data == null)
+            {
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
                 );
+            }
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+
+            try
+            {
+                return (T)
+                    JsonSerializer.Deserialize(
+                        data,
+                        type ?? typeof(T),
+                        options ?? SerializerEncoding.NormalJsonOptions
+                    );
+            }
+            catch (SerializationFailureException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "System.Text.Json rejected the payload."
+                );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize a JSON string. Returns <see langword="false"/> for null/empty/corrupt input.
+        /// </summary>
+        public static bool TryJsonDeserialize<T>(
+            string data,
+            out T value,
+            Type type = null,
+            JsonSerializerOptions options = null
+        )
+        {
+            try
+            {
+                value = JsonDeserialize<T>(data, type, options);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1715,16 +1973,72 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             if (data == null)
             {
-                throw new ArgumentNullException(nameof(data));
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
             }
 
-            ReadOnlySpan<byte> span = new(data);
-            return (T)
-                JsonSerializer.Deserialize(
-                    span,
-                    type ?? typeof(T),
-                    options ?? SerializerEncoding.NormalJsonOptions
+            try
+            {
+                ReadOnlySpan<byte> span = new(data);
+                return (T)
+                    JsonSerializer.Deserialize(
+                        span,
+                        type ?? typeof(T),
+                        options ?? SerializerEncoding.NormalJsonOptions
+                    );
+            }
+            catch (SerializationFailureException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "System.Text.Json rejected the payload."
                 );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize JSON bytes. Returns <see langword="false"/> for null/empty/corrupt input.
+        /// </summary>
+        public static bool TryJsonDeserialize<T>(
+            byte[] data,
+            out T value,
+            Type type = null,
+            JsonSerializerOptions options = null
+        )
+        {
+            try
+            {
+                value = JsonDeserialize<T>(data, type, options);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1734,10 +2048,62 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             if (data == null)
             {
-                throw new ArgumentNullException(nameof(data));
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.JsonFast,
+                    SerializationOperation.Deserialize
+                );
             }
-            ReadOnlySpan<byte> span = new(data);
-            return JsonSerializer.Deserialize<T>(span, SerializerEncoding.FastJsonOptions);
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.JsonFast,
+                    SerializationOperation.Deserialize
+                );
+            }
+
+            try
+            {
+                ReadOnlySpan<byte> span = new(data);
+                return JsonSerializer.Deserialize<T>(span, SerializerEncoding.FastJsonOptions);
+            }
+            catch (SerializationFailureException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.JsonFast,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "System.Text.Json (fast options) rejected the payload."
+                );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Attempts a fast-path JSON deserialize. Returns <see langword="false"/> for null/empty/corrupt input.
+        /// </summary>
+        public static bool TryJsonDeserializeFast<T>(byte[] data, out T value)
+        {
+            try
+            {
+                value = JsonDeserializeFast<T>(data);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
         }
 
         /// <summary>

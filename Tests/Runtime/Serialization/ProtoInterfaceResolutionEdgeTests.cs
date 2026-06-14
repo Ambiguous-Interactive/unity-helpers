@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using NUnit.Framework;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -29,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             IWidget original = new Widget { Id = 3, Label = "ok" };
             byte[] data = Serializer.ProtoSerialize(original);
 
-            Assert.Throws<ProtoException>(
+            Assert.Throws<SerializationTypeException>(
                 () => Serializer.ProtoDeserialize<IWidget>(data),
                 "Deserializing interface even with a single implementation should require registration"
             );
@@ -71,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AbstractBase original = new DerivedA { Common = 9, ExtraA = "x" };
             byte[] data = Serializer.ProtoSerialize(original, forceRuntimeType: true);
 
-            Assert.Throws<ProtoException>(
+            Assert.Throws<SerializationTypeException>(
                 () => Serializer.ProtoDeserialize<AbstractBase>(data),
                 "Deserializing abstract base with multiple derived types should require registration"
             );
