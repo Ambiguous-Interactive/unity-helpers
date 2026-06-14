@@ -1,0 +1,33 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for the UnityEngine built-in modules + editor-bundled packages (com.unity.ugui) that the ephemeral Unity TEST PROJECT must declare so com.wallstop-studios.unity-helpers' Runtime + Editor code AND its test fixtures COMPILE. If a required module is absent the editor fails compilation BEFORE any test runs (CS1069 'type forwarded to assembly UnityEngine.<X>Module' / 'Enable the built in package <Y>'), which produces no NUnit results.xml and fails the whole matrix leg. Consumed by BOTH manifest generators: scripts/unity/run-ci-tests.ps1 (New-ManifestJson, the self-hosted CI path) and scripts/unity/create-test-project.sh (local/devcontainer path). Keeping the list HERE (not duplicated inline in each generator) is what prevents the two from drifting apart.",
+  "_note_packagejson": "These deliberately do NOT live in the package's package.json: that file is dual-purpose (npm devDependencies for repo tooling + the UPM manifest), and CI runs `npm ci`, which would try to resolve com.unity.modules.* / com.unity.ugui from the npm registry and fail (no matching version). The test-project manifest is therefore the correct home for them.",
+  "_note_adding": "When shipped (Runtime/Editor) or test code starts using a new UnityEngine module, add the package id here and BOTH generators pick it up automatically. The compile error and run-ci-tests.ps1's missing-module diagnostic name the module assembly; map UnityEngine.<X>Module -> com.unity.modules.<x> (lowercased), and UnityEngine.UI -> com.unity.ugui.",
+  "modules": {
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.grid": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.particlesystem": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.physics2d": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.ugui": "1.0.0"
+  },
+  "_evidence": {
+    "com.unity.modules.animation": "Runtime/Core/Extension/AnimatorExtensions.cs, Runtime/Utils/AnimatorEnumStateMachine.cs (Animator, AnimationClip, AnimationEvent)",
+    "com.unity.modules.audio": "TEST-ONLY: Tests/Editor/CustomDrawers/TestTypes/*.cs fixtures (AudioSource/AudioClip [WNotNull] fields). Not used by shipped code.",
+    "com.unity.modules.grid": "Runtime/Core/Extension/Partials/GridConvexHull.cs (Grid grid parameter)",
+    "com.unity.modules.imageconversion": "Editor/Sprites/SpriteCropper.cs (Texture2D.EncodeToPNG)",
+    "com.unity.modules.imgui": "Editor/* (GUIContent/GUILayout/GUIStyle, 64 files)",
+    "com.unity.modules.jsonserialize": "Editor/PrefabChecker.cs (JsonUtility)",
+    "com.unity.modules.particlesystem": "Runtime/Core/Serialization/JsonConverters/MinMaxCurveConverter.cs (ParticleSystem.MinMaxCurve)",
+    "com.unity.modules.physics": "Runtime/Core/Serialization/JsonConverters/RaycastHitConverter.cs (RaycastHit)",
+    "com.unity.modules.physics2d": "Runtime/Utils/CollisionProxy.cs (Collider2D, Collision2D)",
+    "com.unity.modules.ui": "Transitive base of com.unity.ugui (UnityEngine.UIModule: Canvas/CanvasRenderer); declared explicitly for the test project.",
+    "com.unity.modules.uielements": "Runtime/Visuals/UIToolkit/MultiFileSelectorElement.cs (VisualElement, ListView)",
+    "com.unity.ugui": "Runtime/Visuals/UGUI/EnhancedImage.cs, Runtime/Core/Serialization/JsonConverters/ColorBlockConverter.cs (UnityEngine.UI: Image, ColorBlock)"
+  }
+}

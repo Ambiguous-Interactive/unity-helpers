@@ -812,8 +812,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeNullDataThrowsException()
         {
-            Assert.Throws<SerializationInputException>(
-                () => Serializer.ProtoDeserialize<TestMessage>(null)
+            Assert.Throws<SerializationInputException>(() =>
+                Serializer.ProtoDeserialize<TestMessage>(null)
             );
         }
 
@@ -822,8 +822,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] emptyData = Array.Empty<byte>();
 
-            Assert.Throws<SerializationInputException>(
-                () => Serializer.ProtoDeserialize<TestMessage>(emptyData)
+            Assert.Throws<SerializationInputException>(() =>
+                Serializer.ProtoDeserialize<TestMessage>(emptyData)
             );
         }
 
@@ -913,7 +913,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string filePath = Path.Combine(_tempDirectory, "invalid.json");
             File.WriteAllText(filePath, "{ invalid json content }");
 
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.ReadFromJsonFile<TestMessage>(filePath));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.ReadFromJsonFile<TestMessage>(filePath)
+            );
         }
     }
 }

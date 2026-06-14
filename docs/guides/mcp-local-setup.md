@@ -60,7 +60,7 @@ bash scripts/mcp/probe-unity-mcp-endpoint.sh YOUR_WINDOWS_HOST_IP 9003
 - `9003` is the default fallback port in MCP helper scripts.
 - If your host uses a different port, set it in `.env.local` or pass it as a
   script argument.
-- See the [MCP helper README](../../scripts/mcp/README.md) for script-level details.
+- See the [MCP helper scripts](../../scripts/mcp/) for script-level details.
 
 ## Binding the server to your agent
 

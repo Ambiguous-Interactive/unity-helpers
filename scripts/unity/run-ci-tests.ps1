@@ -185,6 +185,60 @@ function Write-UnityCatastrophicErrorAnnotations {
     }
 }
 
+# CLASS-OF-ISSUE DIAGNOSTIC: a CS1069 "type ... forwarded to assembly
+# 'UnityEngine.<X>Module'" (or its "Enable the built in package" sibling) and a
+# CS0234 "'UI' does not exist in the namespace 'UnityEngine'" both mean the
+# project manifest is MISSING a UnityEngine module/package the code uses -- the
+# editor then fails compilation before any test runs and emits no NUnit
+# results.xml. The raw CS#### line names the ASSEMBLY but NOT the UPM package id a
+# human must add, so this best-effort scanner translates each missing module into
+# the EXACT id to add to .github/unity-test-project-modules.json. The mapping is
+# the (stable) Unity rule "UnityEngine.<Name>Module -> com.unity.modules.<name
+# lowercased>" plus the one special case UnityEngine.UI -> com.unity.ugui, so it
+# needs no lookup table and degrades gracefully for a module not seen before.
+# NEVER throws (the caller is already on a failure path).
+function Write-UnityMissingModuleAnnotations {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [int]$MaxModules = 25
+    )
+
+    if (-not $LogPath -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+        return
+    }
+
+    $found = New-Object 'System.Collections.Generic.HashSet[string]'
+    try {
+        foreach ($hit in @(Select-String -LiteralPath $LogPath -Pattern 'forwarded to assembly [''"]?UnityEngine\.(\w+)Module' -ErrorAction SilentlyContinue)) {
+            foreach ($m in $hit.Matches) {
+                [void]$found.Add('com.unity.modules.' + $m.Groups[1].Value.ToLowerInvariant())
+            }
+        }
+        # UnityEngine.UI (Image/Slider/ColorBlock) lives in the bundled com.unity.ugui
+        # package, NOT a com.unity.modules.* built-in, and surfaces as CS0234 rather
+        # than the CS1069 forward above.
+        if (@(Select-String -LiteralPath $LogPath -Pattern "namespace name 'UI' does not exist in the namespace 'UnityEngine'" -ErrorAction SilentlyContinue).Count -gt 0) {
+            [void]$found.Add('com.unity.ugui')
+        }
+    } catch {
+        return
+    }
+
+    if ($found.Count -lt 1) {
+        return
+    }
+
+    $modules = @($found | Sort-Object | Select-Object -First $MaxModules)
+    Write-Host "::group::Missing Unity module dependencies"
+    Write-Host "::error::Compilation referenced UnityEngine module(s) absent from the test-project manifest. Add to .github/unity-test-project-modules.json: $($modules -join ', ')"
+    foreach ($id in $modules) {
+        Write-Host "  - $id"
+    }
+    Write-Host "Both scripts/unity/run-ci-tests.ps1 (New-ManifestJson) and scripts/unity/create-test-project.sh consume that single source."
+    Write-Host "::endgroup::"
+}
+
 function Test-UnityPackageManagerTransientFailure {
     param([string]$LogPath)
 
@@ -655,6 +709,35 @@ function Get-IntegrationPackages {
     return Get-PackageManifestSource -Root $Root -RelativePath '.github/integration-packages.json' -Kind 'Integration'
 }
 
+# Read the SINGLE SOURCE OF TRUTH for the UnityEngine built-in modules + editor-
+# bundled packages (com.unity.ugui) the ephemeral test project must declare so the
+# package's Runtime/Editor code AND its test fixtures compile. Shared with
+# scripts/unity/create-test-project.sh so the two manifest generators cannot drift
+# (that drift -- this generator declared ZERO modules -- is what failed every
+# matrix leg: the editor could not compile and emitted no NUnit results.xml).
+# Returns an [ordered] id->version map. Fails LOUDLY with the file path if the
+# source is missing or has no 'modules' object, rather than silently producing a
+# module-less manifest (the exact regression this guards against).
+function Get-UnityTestProjectModules {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $source = Get-PackageManifestSource -Root $Root -RelativePath '.github/unity-test-project-modules.json' -Kind 'Unity test-project module'
+    $modulesNode = $source.PSObject.Properties['modules']
+    # Guard BOTH a missing 'modules' key AND a present-but-null value (JSON
+    # "modules": null), so a malformed edit fails with this clear message rather
+    # than an opaque StrictMode "property cannot be found on null" throw below.
+    if (-not $modulesNode -or $null -eq $modulesNode.Value) {
+        throw "unity-test-project-modules.json is missing or has a null 'modules' object; cannot generate the test-project manifest."
+    }
+    $modules = [ordered]@{}
+    foreach ($prop in $modulesNode.Value.PSObject.Properties) {
+        $modules[$prop.Name] = $prop.Value
+    }
+    if ($modules.Count -lt 1) {
+        throw "unity-test-project-modules.json 'modules' object is empty; the test project would fail to compile."
+    }
+    return $modules
+}
+
 function New-ManifestJson {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -667,8 +750,23 @@ function New-ManifestJson {
     $dependencies = [ordered]@{
         'com.unity.test-framework' = $TestFrameworkVersion
         'com.unity.test-framework.performance' = $PerformanceFrameworkVersion
-        $PackageName = "file:$packagePath"
     }
+
+    # UNCONDITIONAL (every leg -- editmode/playmode/standalone, single-threaded,
+    # comparison, integration): the package's required UnityEngine built-in modules
+    # must be in the project or the editor fails compilation BEFORE any test runs.
+    # Sourced from the shared single-source file so this generator and
+    # create-test-project.sh cannot drift. The package.json deliberately does NOT
+    # carry these (dual npm+UPM file; `npm ci` would fail to resolve com.unity.*),
+    # so the test-project manifest is their only home.
+    $moduleRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { $Root } else { $RepoRoot }
+    foreach ($module in (Get-UnityTestProjectModules -Root $moduleRoot).GetEnumerator()) {
+        $dependencies[$module.Key] = $module.Value
+    }
+
+    # Add the local package after the Unity modules (the -IncludeComparisons /
+    # -IncludeIntegrations legs may append further dependencies below this).
+    $dependencies[$PackageName] = "file:$packagePath"
 
     $manifest = [ordered]@{
         dependencies = $dependencies
@@ -1942,6 +2040,10 @@ function Invoke-UnityEditor {
         # shutdown-race crash the log matches no catastrophic pattern, so this
         # is a no-op; on a real compile failure it names the root cause.
         Write-UnityCatastrophicErrorAnnotations -LogPath $LogPath
+        # If that compile failure was a missing UnityEngine module (CS1069 forward
+        # / CS0234 'UI'), name the exact package id to add to the shared manifest
+        # source so the fix is one obvious edit, not a CS-error guessing game.
+        Write-UnityMissingModuleAnnotations -LogPath $LogPath
     }
     # RETURN the exit code; do NOT throw on a non-zero value. The DURABLE ARTIFACT
     # the invocation produces (the configure marker / the built player exe / the

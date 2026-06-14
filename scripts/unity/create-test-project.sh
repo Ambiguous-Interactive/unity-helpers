@@ -76,20 +76,38 @@ EOF
 
 # Step 4: Create Packages/manifest.json
 echo "    [4/4] Writing Packages/manifest.json..."
-cat > "${UNITY_TEST_PROJECT_DIR}/Packages/manifest.json" << 'EOF'
-{
-  "dependencies": {
-    "com.unity.test-framework": "1.1.33",
-    "com.unity.modules.imgui": "1.0.0",
-    "com.unity.modules.jsonserialize": "1.0.0",
-    "com.unity.modules.uielements": "1.0.0",
-    "com.unity.modules.ui": "1.0.0",
-    "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.physics2d": "1.0.0",
-    "com.wallstop-studios.unity-helpers": "file:/workspace"
-  }
-}
-EOF
+# The UnityEngine built-in modules + com.unity.ugui that the package's Runtime/
+# Editor code AND its test fixtures need to COMPILE come from the SHARED single
+# source .github/unity-test-project-modules.json -- the SAME file the CI generator
+# scripts/unity/run-ci-tests.ps1 (New-ManifestJson) reads -- so this local/
+# devcontainer manifest's MODULE LIST can never drift from the CI generator's.
+# (That drift -- the two generators declaring different/incomplete module sets --
+# is exactly what made every Unity test leg fail to compile.) The test-framework
+# version and the package reference below stay independently pinned per generator.
+# These modules cannot live in package.json: it is a dual npm+UPM file and
+# `npm ci` would fail to resolve com.unity.* from the npm registry.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+MODULES_SOURCE="${REPO_ROOT}/.github/unity-test-project-modules.json"
+if [[ ! -f "${MODULES_SOURCE}" ]]; then
+    echo "ERROR: missing Unity module single source: ${MODULES_SOURCE}" >&2
+    exit 1
+fi
+if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required to generate the test-project manifest from ${MODULES_SOURCE}" >&2
+    exit 1
+fi
+
+# Validate the source BEFORE writing, so an empty/malformed modules object fails
+# loudly instead of leaving a stale, module-less manifest.json on disk.
+if ! jq -e '(.modules | length) >= 1' "${MODULES_SOURCE}" >/dev/null; then
+    echo "ERROR: ${MODULES_SOURCE} declares no modules; the test project would fail to compile." >&2
+    exit 1
+fi
+
+# dependencies = test-framework + (shared modules, in file order) + the local
+# package. jq object '+' is last-key-wins and preserves insertion order.
+jq '{dependencies: ({"com.unity.test-framework": "1.1.33"} + .modules + {"com.wallstop-studios.unity-helpers": "file:/workspace"})}' \
+    "${MODULES_SOURCE}" > "${UNITY_TEST_PROJECT_DIR}/Packages/manifest.json"
 
 # Note: packages-lock.json is intentionally NOT created.
 # Unity generates it on first project open during dependency resolution.

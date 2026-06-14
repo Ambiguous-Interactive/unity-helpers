@@ -45,14 +45,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void QuaternionConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Quaternion>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Quaternion>(invalidJson)
+            );
         }
 
         [Test]
         public void QuaternionConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":0,\"y\":0,\"z\":0,\"w\":1,\"extra\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Quaternion>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Quaternion>(invalidJson)
+            );
         }
 
         [Test]
@@ -106,28 +110,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Color32ConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color32>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color32>(invalidJson)
+            );
         }
 
         [Test]
         public void Color32ConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"r\":1,\"g\":2,\"b\":3,\"a\":4,\"x\":5}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color32>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color32>(invalidJson)
+            );
         }
 
         [Test]
         public void Color32ConverterChannelOutOfRangeThrowsException()
         {
             string invalidJson = "{\"r\":-1,\"g\":0,\"b\":0,\"a\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color32>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color32>(invalidJson)
+            );
         }
 
         [Test]
         public void Color32ConverterChannelAboveRangeThrowsException()
         {
             string invalidJson = "{\"r\":256,\"g\":0,\"b\":0,\"a\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color32>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color32>(invalidJson)
+            );
         }
 
         [Test]
@@ -145,14 +157,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Vector2IntConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector2Int>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector2Int>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector2IntConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":1,\"y\":2,\"z\":3}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector2Int>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector2Int>(invalidJson)
+            );
         }
 
         [Test]
@@ -180,14 +196,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Vector3IntConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector3Int>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector3Int>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector3IntConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":1,\"y\":2,\"z\":3,\"w\":4}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector3Int>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector3Int>(invalidJson)
+            );
         }
 
         [Test]
@@ -216,21 +236,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void RectConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Rect>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Rect>(invalidJson)
+            );
         }
 
         [Test]
         public void RectConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":0,\"y\":0,\"width\":1,\"height\":1,\"extra\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Rect>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Rect>(invalidJson)
+            );
         }
 
         [Test]
         public void RectConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"x\":0,\"y\":0";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Rect>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Rect>(incompleteJson)
+            );
         }
 
         [Test]
@@ -261,21 +287,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void RectIntConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<RectInt>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<RectInt>(invalidJson)
+            );
         }
 
         [Test]
         public void RectIntConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":0,\"y\":0,\"width\":1,\"height\":1,\"extra\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<RectInt>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<RectInt>(invalidJson)
+            );
         }
 
         [Test]
         public void RectIntConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"x\":0,\"y\":0";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<RectInt>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<RectInt>(incompleteJson)
+            );
         }
 
         [Test]
@@ -293,7 +325,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void BoundsConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Bounds>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Bounds>(invalidJson)
+            );
         }
 
         [Test]
@@ -301,14 +335,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             string invalidJson =
                 "{\"center\":{\"x\":0,\"y\":0,\"z\":0},\"size\":{\"x\":1,\"y\":1,\"z\":1},\"extra\":1}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Bounds>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Bounds>(invalidJson)
+            );
         }
 
         [Test]
         public void BoundsConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"center\":{\"x\":0}}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Bounds>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Bounds>(incompleteJson)
+            );
         }
 
         [Test]
@@ -335,7 +373,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void BoundsIntConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<BoundsInt>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<BoundsInt>(invalidJson)
+            );
         }
 
         [Test]
@@ -343,7 +383,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             string invalidJson =
                 "{\"position\":{\"x\":0,\"y\":0,\"z\":0},\"size\":{\"x\":1,\"y\":1,\"z\":1},\"extra\":1}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<BoundsInt>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<BoundsInt>(invalidJson)
+            );
         }
 
         [Test]
@@ -400,21 +442,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Vector2ConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector2>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector2>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector2ConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":1.0,\"y\":2.0,\"z\":3.0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector2>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector2>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector2ConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"x\":1.0";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector2>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector2>(incompleteJson)
+            );
         }
 
         [Test]
@@ -455,21 +503,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Vector3ConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector3>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector3>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector3ConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":1.0,\"y\":2.0,\"z\":3.0,\"w\":4.0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector3>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector3>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector3ConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"x\":1.0,\"y\":2.0";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector3>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector3>(incompleteJson)
+            );
         }
 
         [Test]
@@ -512,21 +566,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Vector4ConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector4>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector4>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector4ConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"x\":1.0,\"y\":2.0,\"z\":3.0,\"w\":4.0,\"extra\":5.0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector4>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector4>(invalidJson)
+            );
         }
 
         [Test]
         public void Vector4ConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"x\":1.0,\"y\":2.0,\"z\":3.0";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Vector4>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Vector4>(incompleteJson)
+            );
         }
 
         [Test]
@@ -585,21 +645,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ColorConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color>(invalidJson)
+            );
         }
 
         [Test]
         public void ColorConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"r\":0.5,\"g\":0.5,\"b\":0.5,\"a\":1.0,\"extra\":0.0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color>(invalidJson)
+            );
         }
 
         [Test]
         public void ColorConverterIncompleteJsonThrowsException()
         {
             string incompleteJson = "{\"r\":0.5,\"g\":0.5";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Color>(incompleteJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Color>(incompleteJson)
+            );
         }
 
         [Test]
@@ -666,7 +732,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Matrix4X4ConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "\"not an object\"";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Matrix4x4>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Matrix4x4>(invalidJson)
+            );
         }
 
         [Test]
@@ -683,7 +751,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             string invalidJson =
                 "{\"m00\":\"invalid\",\"m01\":0.0,\"m02\":0.0,\"m03\":0.0,\"m10\":0.0,\"m11\":1.0,\"m12\":0.0,\"m13\":0.0,\"m20\":0.0,\"m21\":0.0,\"m22\":1.0,\"m23\":0.0,\"m30\":0.0,\"m31\":0.0,\"m32\":0.0,\"m33\":1.0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Matrix4x4>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Matrix4x4>(invalidJson)
+            );
         }
 
         // Note: TypeConverter is tested within object contexts in JsonSerializationTest.SerializationWorks
@@ -843,7 +913,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void LayerMaskConverterInvalidTokenTypeThrowsException()
         {
             string invalidJson = "{\"layers\":\"not array\"}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<LayerMask>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<LayerMask>(invalidJson)
+            );
         }
 
         [Test]
@@ -860,7 +932,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void PoseConverterUnknownPropertyThrowsException()
         {
             string invalidJson = "{\"position\":{\"x\":0,\"y\":0,\"z\":0},\"extra\":0}";
-            Assert.Throws<SerializationCorruptDataException>(() => Serializer.JsonDeserialize<Pose>(invalidJson));
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                Serializer.JsonDeserialize<Pose>(invalidJson)
+            );
         }
 
         [Test]
