@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2023 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 // Polyfill DoesNotReturnAttribute on targets older than .NET 5 (e.g. Unity 2021.3 with
@@ -29,14 +29,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         /// <summary>Unknown / not-yet-classified format.</summary>
         Unknown = 0,
+
         /// <summary>protobuf-net binary format.</summary>
         Protobuf = 1,
+
         /// <summary>System.Text.Json (standard options).</summary>
         Json = 2,
+
         /// <summary>System.Text.Json (fast/strict options).</summary>
         JsonFast = 3,
+
         /// <summary>Legacy <c>BinaryFormatter</c>.</summary>
         Binary = 4,
+
         /// <summary>Generic dispatcher (<see cref="Serializer.Serialize{T}(T, SerializationType)"/> / <see cref="Serializer.Deserialize{T}(byte[], SerializationType)"/>).</summary>
         Dispatcher = 5,
     }
@@ -48,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         /// <summary>Decoding bytes/string into an instance.</summary>
         Deserialize = 0,
+
         /// <summary>Encoding an instance into bytes/string.</summary>
         Serialize = 1,
     }
@@ -60,14 +66,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         /// <summary>Argument guards rejected the input (e.g. null or empty payload).</summary>
         InputValidation = 0,
+
         /// <summary>The unified dispatcher rejected an unknown <see cref="SerializationType"/>.</summary>
         Dispatch = 1,
+
         /// <summary>Polymorphic root resolution failed (e.g. missing <c>[ProtoInclude]</c> or registration).</summary>
         TypeResolution = 2,
+
         /// <summary>The wire-format decoder rejected the payload.</summary>
         Decode = 3,
+
         /// <summary>The wire-format encoder failed.</summary>
         Encode = 4,
+
         /// <summary>Post-decode processing failed (e.g. collection wrapper unpack).</summary>
         PostProcess = 5,
     }
@@ -169,10 +180,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <summary>
         /// Serialization constructor for cross-AppDomain / legacy binary serialization scenarios.
         /// </summary>
-        protected SerializationFailureException(
-            SerializationInfo info,
-            StreamingContext context
-        )
+        protected SerializationFailureException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             // info is non-null in every documented BinaryFormatter/ISerializable code path — the base
@@ -226,11 +234,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // is not available. The throw path is already slow — the resulting String.Concat call is
             // comfortably under the cost of the exception throw + stack-walk.
             string declaredName = DeclaredType?.FullName ?? "<unknown>";
-            string resolvedSuffix = ResolvedType == null || ResolvedType == DeclaredType
-                ? string.Empty
-                : " (resolved as " + ResolvedType.FullName + ")";
-            return "[" + Format + "." + Operation + "] " + Stage + " failed for "
-                + declaredName + resolvedSuffix + " (input: " + InputDescriptor + "): " + Reason;
+            string resolvedSuffix =
+                ResolvedType == null || ResolvedType == DeclaredType
+                    ? string.Empty
+                    : " (resolved as " + ResolvedType.FullName + ")";
+            return "["
+                + Format
+                + "."
+                + Operation
+                + "] "
+                + Stage
+                + " failed for "
+                + declaredName
+                + resolvedSuffix
+                + " (input: "
+                + InputDescriptor
+                + "): "
+                + Reason;
         }
 
         // -----------------------------------------------------------------------------------
@@ -348,7 +368,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 < 0 => "byte[?]",
                 0 => "byte[0]",
-                _ => "byte[" + length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]",
+                _ => "byte["
+                    + length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + "]",
             };
 
         internal static string DescribeString(int length) =>
@@ -356,7 +378,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 < 0 => "string(len=?)",
                 0 => "string(len=0)",
-                _ => "string(len=" + length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                _ => "string(len="
+                    + length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + ")",
             };
 
         internal static string DescribeNull(string parameterName) =>
@@ -396,12 +420,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 inputDescriptor,
                 SerializationStage.InputValidation,
                 reason
-            )
-        { }
+            ) { }
 
         private SerializationInputException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
+            : base(info, context) { }
     }
 
     /// <summary>
@@ -433,15 +455,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 stage,
                 reason,
                 innerException: innerException
-            )
-        { }
+            ) { }
 
-        private SerializationCorruptDataException(
-            SerializationInfo info,
-            StreamingContext context
-        )
-            : base(info, context)
-        { }
+        private SerializationCorruptDataException(SerializationInfo info, StreamingContext context)
+            : base(info, context) { }
     }
 
     /// <summary>
@@ -471,12 +488,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 inputDescriptor,
                 SerializationStage.TypeResolution,
                 reason
-            )
-        { }
+            ) { }
 
         private SerializationTypeException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
+            : base(info, context) { }
     }
 
     /// <summary>
@@ -505,14 +520,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 inputDescriptor,
                 SerializationStage.Dispatch,
                 reason
-            )
-        { }
+            ) { }
 
         private SerializationConfigurationException(
             SerializationInfo info,
             StreamingContext context
         )
-            : base(info, context)
-        { }
+            : base(info, context) { }
     }
 }
