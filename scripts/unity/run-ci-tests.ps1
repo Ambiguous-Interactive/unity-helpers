@@ -27,6 +27,27 @@ param(
 
     [switch]$IncludeComparisons,
 
+    # Install the third-party DI-container packages (Reflex / VContainer / Zenject-
+    # Extenject) from .github/integration-packages.json + the OpenUPM scoped
+    # registry into the ephemeral manifest, so the Runtime/Integrations and
+    # Tests/{Editor,Runtime}/Integrations asmdefs (gated on REFLEX_PRESENT /
+    # VCONTAINER_PRESENT / ZENJECT_PRESENT versionDefines) compile and their tests
+    # run. The integration test ASSEMBLIES must additionally be added to
+    # -AssemblyNames by the caller (compute-unity-assemblies include-integrations).
+    [switch]$IncludeIntegrations,
+
+    # Extra GLOBAL scripting define symbols compiled into EVERY assembly (asmdef
+    # assemblies included), e.g. SINGLE_THREADED to exercise the single-threaded
+    # code paths. Empty by default so the DEFAULT (multi-threaded) behavior is
+    # unchanged. Applied via a configure pass that sets PlayerSettings scripting
+    # defines and lets Unity persist them BEFORE the -runTests pass loads the
+    # project, because Unity in -batchmode does NOT recompile when defines change
+    # mid-run -- the symbols must be in place from editor startup (Unity issue
+    # tracker: define edits before project open are honored from 2021.1+, which the
+    # Unity-6-only single-threaded leg satisfies). See New-ConfiguratorSource and
+    # the configure-pass dispatch below.
+    [string[]]$AdditionalScriptingDefines = @(),
+
     [switch]$ReleaseCodeOptimization,
 
     [ValidateSet('IL2CPP', 'Mono2x')]
@@ -603,19 +624,42 @@ function Initialize-UnityCacheEnvironment {
     Write-Host "::endgroup::"
 }
 
-function Get-ComparisonPackages {
-    param([Parameter(Mandatory = $true)][string]$Root)
-    $path = Join-Path $Root '.github/comparison-packages.json'
+# Read+parse a package-manifest single-source JSON (the OpenUPM registry + pinned
+# packages used to extend the ephemeral manifest). Shared by the comparison and
+# integration legs, which read DIFFERENT files of the SAME shape:
+#   .github/comparison-packages.json  (benchmark comparison deps; not present in
+#                                      unity-helpers today)
+#   .github/integration-packages.json (DI-container integration deps)
+# Kept DRY so both legs parse identically and a missing/typo'd source fails loudly
+# with the file path rather than silently producing an empty manifest extension.
+function Get-PackageManifestSource {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$Kind
+    )
+    $path = Join-Path $Root $RelativePath
     if (-not (Test-Path -LiteralPath $path)) {
-        throw "Comparison packages single source not found: $path"
+        throw "$Kind packages single source not found: $path"
     }
     return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+}
+
+function Get-ComparisonPackages {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    return Get-PackageManifestSource -Root $Root -RelativePath '.github/comparison-packages.json' -Kind 'Comparison'
+}
+
+function Get-IntegrationPackages {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    return Get-PackageManifestSource -Root $Root -RelativePath '.github/integration-packages.json' -Kind 'Integration'
 }
 
 function New-ManifestJson {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
         [switch]$IncludeComparisons,
+        [switch]$IncludeIntegrations,
         [string]$RepoRoot
     )
 
@@ -631,12 +675,20 @@ function New-ManifestJson {
         testables = @($PackageName)
     }
 
+    # Accumulate the OpenUPM scoped-registry scopes contributed by whichever opt-in
+    # legs are active. Both comparison and integration legs use the SAME OpenUPM
+    # registry (package.openupm.com); if both were ever active together their
+    # scopes are merged into a SINGLE scopedRegistries entry (Unity would otherwise
+    # see two registries with the same URL). The non-opt-in legs add NOTHING here,
+    # so their manifest stays byte-for-byte identical to before (no scopedRegistries
+    # key, no extra dependencies) and their Library cache/reliability are unchanged.
+    $registryName = $null
+    $registryUrl = $null
+    $registryScopes = New-Object System.Collections.Generic.List[string]
+
     # ONLY the comparison legs (-IncludeComparisons) get the OpenUPM scoped
     # registry, pinned comparison packages, and comparison-package-required Unity
     # built-in modules, read from the single source .github/comparison-packages.json.
-    # Non-comparison legs MUST stay byte-for-byte identical to before (no
-    # scopedRegistries key and no extra dependencies) so their Library cache and
-    # reliability are unchanged.
     if ($IncludeComparisons) {
         if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
             throw "New-ManifestJson -IncludeComparisons requires -RepoRoot (the comparison-packages.json single source)."
@@ -653,14 +705,57 @@ function New-ManifestJson {
             $dependencies[$pkg.Name] = $pkg.Value
         }
         $reg = $comparisons.registry
+        $registryName = $reg.name
+        $registryUrl = $reg.url
+        foreach ($scope in @($reg.scopes)) {
+            if (-not $registryScopes.Contains($scope)) {
+                $registryScopes.Add($scope)
+            }
+        }
+    }
+
+    # ONLY the integration legs (-IncludeIntegrations) get the OpenUPM scoped
+    # registry + the pinned DI-container packages (Reflex / VContainer / Zenject-
+    # Extenject) from .github/integration-packages.json. Installing them is what
+    # makes the Runtime/Integrations + Tests/{Editor,Runtime}/Integrations asmdefs
+    # (REFLEX_PRESENT / VCONTAINER_PRESENT / ZENJECT_PRESENT versionDefines) compile
+    # and their tests run. unityBuiltInPackages is OPTIONAL here (the DI packages
+    # are pure-managed and pull no extra Unity modules).
+    if ($IncludeIntegrations) {
+        if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+            throw "New-ManifestJson -IncludeIntegrations requires -RepoRoot (the integration-packages.json single source)."
+        }
+        $integrations = Get-IntegrationPackages -Root $RepoRoot
+        foreach ($pkg in $integrations.packages.PSObject.Properties) {
+            $dependencies[$pkg.Name] = $pkg.Value
+        }
+        $builtInPackages = $integrations.PSObject.Properties['unityBuiltInPackages']
+        if ($builtInPackages) {
+            foreach ($pkg in $builtInPackages.Value.PSObject.Properties) {
+                $dependencies[$pkg.Name] = $pkg.Value
+            }
+        }
+        $reg = $integrations.registry
+        if (-not $registryName) {
+            $registryName = $reg.name
+            $registryUrl = $reg.url
+        }
+        foreach ($scope in @($reg.scopes)) {
+            if (-not $registryScopes.Contains($scope)) {
+                $registryScopes.Add($scope)
+            }
+        }
+    }
+
+    if ($registryScopes.Count -gt 0) {
         # Ordered so ConvertTo-Json emits name/url/scopes deterministically (matches
         # the committed local-parity manifest field order and keeps the CI-log diff
         # of the generated manifest stable run-to-run).
         $manifest['scopedRegistries'] = @(
             [ordered]@{
-                name = $reg.name
-                url = $reg.url
-                scopes = @($reg.scopes)
+                name = $registryName
+                url = $registryUrl
+                scopes = @($registryScopes.ToArray())
             }
         )
     }
@@ -682,8 +777,11 @@ function New-ConfiguratorSource {
     # generated configurator; no automated contract test pins it anymore.
     @"
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 
 public static class UhCiTestConfigurator
@@ -695,6 +793,22 @@ public static class UhCiTestConfigurator
         UnityEditor.Compilation.CompilationPipeline.codeOptimization = UnityEditor.Compilation.CodeOptimization.Release;
 
         EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
+
+        // GLOBAL scripting define injection (e.g. SINGLE_THREADED). The runner hands
+        // the requested defines in via UH_ADDITIONAL_SCRIPTING_DEFINES (semicolon-
+        // delimited). They are set on the Standalone NamedBuildTarget -- the only
+        // build-target group every CI leg (editmode/playmode/standalone) uses -- so
+        // they apply to ALL assemblies, asmdef assemblies INCLUDED (global scripting
+        // defines, not an Assets/csc.rsp that only reaches the predefined assembly).
+        // Unity in -batchmode does NOT recompile when defines change mid-run, so the
+        // runner runs this configure pass in a SEPARATE editor invocation that
+        // persists the defines to ProjectSettings.asset (AssetDatabase.SaveAssets
+        // below); the subsequent -runTests invocation then loads the project with
+        // the defines in place from startup, and its FIRST compile sees them. When
+        // the env var is empty this is a no-op, so the DEFAULT (no-extra-defines)
+        // behavior and the existing comparison/standalone legs are unchanged.
+        ApplyAdditionalScriptingDefines();
+
         // The scripting backend is parameterized: the runner passes the IL2CPP or
         // the Mono backend for the Mono perf leg via -Backend.
         PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.$Backend);
@@ -715,7 +829,17 @@ public static class UhCiTestConfigurator
 
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
         // + .NET Standard 2.1 + Release for this run.
-        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}");
+        PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone, out string[] effectiveDefines);
+        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
+
+        // Persist the PlayerSettings mutations (scripting backend/api/stripping AND
+        // any injected scripting defines) to ProjectSettings.asset so the SEPARATE
+        // -runTests editor invocation that follows this configure pass loads them
+        // from startup. A clean -batchmode quit normally flushes settings, but the
+        // explicit save removes that dependency and is the load-bearing step for the
+        // editmode/playmode single-threaded leg (where this configure pass is the
+        // ONLY place the defines get persisted before the test invocation compiles).
+        AssetDatabase.SaveAssets();
 
         // Write a success marker as the FINAL action so the runner can treat the
         // CONFIGURED PROJECT -- not Unity's process exit code -- as the source of
@@ -737,6 +861,48 @@ public static class UhCiTestConfigurator
             }
             File.WriteAllText(markerPath, "UhCiTestConfigurator.Apply completed");
         }
+    }
+
+    // Union the requested global scripting defines (UH_ADDITIONAL_SCRIPTING_DEFINES,
+    // semicolon-delimited) with whatever is already set for the Standalone group and
+    // write them back via the non-deprecated SetScriptingDefineSymbols(NamedBuildTarget,
+    // string[]) API (the BuildTargetGroup overload is obsolete in Unity 6). Order is
+    // preserved and duplicates are dropped. A null/empty env var leaves the existing
+    // defines untouched (no-op), so a normal leg's compilation is byte-for-byte
+    // unchanged. NamedBuildTarget.Standalone exists in 2021.2+, so this compiles on
+    // every CI Unity version even though only the Unity-6 leg passes extra defines.
+    private static void ApplyAdditionalScriptingDefines()
+    {
+        string raw = Environment.GetEnvironmentVariable("UH_ADDITIONAL_SCRIPTING_DEFINES");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        string[] requested = raw
+            .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(d => d.Trim())
+            .Where(d => d.Length > 0)
+            .ToArray();
+        if (requested.Length == 0)
+        {
+            return;
+        }
+
+        NamedBuildTarget target = NamedBuildTarget.Standalone;
+        PlayerSettings.GetScriptingDefineSymbols(target, out string[] existing);
+
+        List<string> merged = new List<string>(existing ?? new string[0]);
+        foreach (string define in requested)
+        {
+            if (!merged.Contains(define))
+            {
+                merged.Add(define);
+            }
+        }
+
+        PlayerSettings.SetScriptingDefineSymbols(target, merged.ToArray());
+        Debug.Log(`$"UH additional scripting defines applied to {target.TargetName}: requested=[{string.Join(`";`", requested)}] effective=[{string.Join(`";`", merged)}]");
     }
 }
 "@
@@ -1052,14 +1218,15 @@ function Initialize-EphemeralProject {
         [Parameter(Mandatory = $true)][string]$Mode,
         [string]$Path,
         [switch]$IncludeComparisons,
+        [switch]$IncludeIntegrations,
         [string]$Backend = 'IL2CPP',
         [bool]$DevelopmentBuild = $false,
         [string]$RepoRoot
     )
 
-    # The comparison-packages single source lives at the repo root. Default to
-    # -Root when no explicit -RepoRoot is threaded (the package source root is the
-    # repo root in this harness), so New-ManifestJson -IncludeComparisons can read it.
+    # The comparison/integration package single sources live at the repo root.
+    # Default to -Root when no explicit -RepoRoot is threaded (the package source
+    # root is the repo root in this harness), so New-ManifestJson can read them.
     if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
         $RepoRoot = $Root
     }
@@ -1074,7 +1241,7 @@ function Initialize-EphemeralProject {
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'ProjectSettings') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Assets\Editor') | Out-Null
 
-    New-ManifestJson -Root $Root -IncludeComparisons:$IncludeComparisons -RepoRoot $RepoRoot |
+    New-ManifestJson -Root $Root -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -RepoRoot $RepoRoot |
         Set-Content -LiteralPath (Join-Path $project 'Packages\manifest.json') -Encoding UTF8
     "m_EditorVersion: $Version`n" |
         Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\ProjectVersion.txt') -Encoding UTF8
@@ -2376,6 +2543,64 @@ function Test-NUnitResults {
     Write-CiNotice "${Label}: total=$total passed=$passed failed=$failed skipped=$skipped"
 }
 
+# Run the UhCiTestConfigurator.Apply configure pass (a SEPARATE -executeMethod
+# editor invocation) and validate the success marker it writes as its final action.
+# The CONFIGURED PROJECT -- proven by a FRESH marker -- is the source of truth, NOT
+# Unity's process exit code: Unity can crash in a background thread during shutdown
+# AFTER Apply() fully completes (e.g. the DirectoryMonitor file-watcher faulting,
+# returning 0xC0000005) for a configure that actually succeeded; a MISSING marker is
+# a real failure that throws with the usual diagnostics. Apply() also persists any
+# UH_ADDITIONAL_SCRIPTING_DEFINES onto the Standalone group's scripting defines and
+# saves the project, so a SUBSEQUENT -runTests invocation loads them from startup
+# (Unity does not recompile mid-run in -batchmode). Shared by the standalone path
+# (always) and the editmode/playmode path (only when extra defines are requested).
+function Invoke-UnityConfigurePass {
+    param(
+        [Parameter(Mandatory = $true)][string]$EditorPath,
+        [Parameter(Mandatory = $true)][string]$ProjectPath,
+        [Parameter(Mandatory = $true)][string]$MarkerPath,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [string[]]$ExtraArguments = @()
+    )
+
+    if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
+        Remove-Item -LiteralPath $MarkerPath -Force
+    }
+    $env:UH_CONFIGURE_MARKER_PATH = $MarkerPath
+    $configureStartedUtc = [DateTime]::UtcNow
+    $configureArgs = @(
+        '-quit',
+        '-batchmode',
+        '-nographics',
+        '-projectPath', $ProjectPath,
+        '-buildTarget', 'StandaloneWindows64',
+        '-executeMethod', 'UhCiTestConfigurator.Apply',
+        '-logFile', '-'
+    ) + @($ExtraArguments)
+    $configureExit = Invoke-UnityEditor `
+        -EditorPath $EditorPath `
+        -Arguments $configureArgs `
+        -Label $Label `
+        -LogPath $LogPath
+    # The configurator has run; drop the marker-path env var so it cannot be
+    # inherited by later child processes (only Apply reads it).
+    Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
+    $configureProblem = Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc
+    if (-not [string]::IsNullOrWhiteSpace($configureProblem)) {
+        Write-UnityRunFailureDiagnostics `
+            -Project $ProjectPath `
+            -LogPath $LogPath `
+            -CscLabel $Label `
+            -DiagnosticsLabel $Label
+        throw "$Label failed ($configureProblem; Unity exit code $configureExit / $(Get-NativeExitCodeDescription -ExitCode $configureExit)). See the streamed Unity log above (also saved to $LogPath)."
+    }
+    if ($configureExit -ne 0) {
+        Write-UnityBenignExitWarning -Label $Label -ExitCode $configureExit -LogPath $LogPath
+    }
+    Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $LogPath -Label $Label
+}
+
 $RepoRoot = Resolve-FullPath -Path $RepoRoot
 Assert-RepoRoot -Path $RepoRoot
 $ArtifactsPath = Resolve-FullPath -Path $ArtifactsPath
@@ -2390,7 +2615,19 @@ Initialize-UnityCacheEnvironment -Root $RepoRoot -Version $UnityVersion
 $UseReleaseCodeOptimization = $true
 $UseReleasePlayerBuild = $true
 
-$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -Backend $StandaloneScriptingBackend -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+# Normalize the requested extra scripting defines to a clean, de-duplicated,
+# semicolon-joined string ONCE here. The configurator C# reads this exact value
+# from UH_ADDITIONAL_SCRIPTING_DEFINES; computing it up front keeps the env var,
+# the diagnostic logging, and the configure-pass dispatch decision all consistent.
+$AdditionalScriptingDefinesList = @(
+    @($AdditionalScriptingDefines) |
+        ForEach-Object { if ($null -ne $_) { ([string]$_).Trim() } } |
+        Where-Object { $_ -and $_.Length -gt 0 } |
+        Select-Object -Unique
+)
+$AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
+
+$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
 $LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
 
@@ -2400,6 +2637,8 @@ Write-Host "ProjectPath: $ProjectPath"
 Write-Host "LibraryPath: $LibraryPath"
 Write-Host "ArtifactsPath: $ArtifactsPath"
 Write-Host "IncludeComparisons: $IncludeComparisons"
+Write-Host "IncludeIntegrations: $IncludeIntegrations"
+Write-Host "AdditionalScriptingDefines: $AdditionalScriptingDefinesJoined"
 Write-Host "StandaloneScriptingBackend: $StandaloneScriptingBackend"
 Write-Host "ReleasePlayerBuild: $UseReleasePlayerBuild"
 Write-Host "ReleaseCodeOptimization: $UseReleaseCodeOptimization"
@@ -2517,6 +2756,18 @@ $configureMarkerPath = Join-Path $ArtifactsPath 'configure-complete.marker'
 $standaloneExe = Join-Path $ProjectPath 'Build\UhTestPlayer\UhTestPlayer.exe'
 $playerLogPath = Join-Path $ArtifactsPath 'player.log'
 
+# Hand the requested global scripting defines to the configurator C#
+# (UhCiTestConfigurator.ApplyAdditionalScriptingDefines reads this env var). Set it
+# unconditionally -- empty when none requested, in which case the configurator's
+# define injection is a no-op -- so the SAME env var feeds both the standalone
+# configure pass (already run for every standalone leg) and the editmode/playmode
+# configure pass dispatched below. The configurator unions these onto the Standalone
+# group's defines, which apply to ALL assemblies (asmdef assemblies included).
+$env:UH_ADDITIONAL_SCRIPTING_DEFINES = $AdditionalScriptingDefinesJoined
+if ($AdditionalScriptingDefinesList.Count -gt 0) {
+    Write-CiNotice "Global scripting defines requested for asmdef compilation: $AdditionalScriptingDefinesJoined"
+}
+
 # Activation/return carry the serial/email/password in their argument arrays and
 # Unity may echo account/serial fragments into the activation log, so these logs
 # MUST NOT live under $ArtifactsPath (the workflow uploads that as an artifact and
@@ -2546,51 +2797,32 @@ try {
     }
 
     if ($TestMode -eq 'standalone') {
-        # CONFIGURE the standalone IL2CPP project. The CONFIGURED PROJECT (proven by
-        # the success marker UhCiTestConfigurator.Apply writes as its final action)
-        # is the source of truth -- NOT Unity's process exit code. Delete any stale
-        # marker, hand the path in via UH_CONFIGURE_MARKER_PATH, and validate a
-        # FRESH marker after the run. A non-zero exit with a fresh marker is a benign
-        # post-work shutdown crash (for example the DirectoryMonitor file-watcher
-        # thread faulting during teardown, which returns 0xC0000005 even though the
-        # configuration fully succeeded); a MISSING marker is a real configure
-        # failure that fails loudly with the usual diagnostics.
-        if (Test-Path -LiteralPath $configureMarkerPath -PathType Leaf) {
-            Remove-Item -LiteralPath $configureMarkerPath -Force
-        }
-        $env:UH_CONFIGURE_MARKER_PATH = $configureMarkerPath
-        $configureStartedUtc = [DateTime]::UtcNow
-        $configureArgs = @(
-            '-quit',
-            '-batchmode',
-            '-nographics',
-            '-projectPath', $ProjectPath,
-            '-buildTarget', 'StandaloneWindows64',
-            '-executeMethod', 'UhCiTestConfigurator.Apply',
-            '-logFile', '-'
-        ) + $acceleratorArgs
-        $configureExit = Invoke-UnityEditor `
+        # CONFIGURE the standalone IL2CPP project (scripting backend/api/stripping,
+        # Release code optimization, and any injected scripting defines). Marker-gated
+        # via the shared Invoke-UnityConfigurePass.
+        Invoke-UnityConfigurePass `
             -EditorPath $UnityEditorPath `
-            -Arguments $configureArgs `
+            -ProjectPath $ProjectPath `
+            -MarkerPath $configureMarkerPath `
+            -LogPath $configureLogPath `
             -Label 'Configure standalone IL2CPP project' `
-            -LogPath $configureLogPath
-        # The configurator has run; drop the marker-path env var so it cannot be
-        # inherited by the later build/player child processes (only Apply reads it,
-        # so this is hygiene against a future invocation accidentally writing it).
-        Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
-        $configureProblem = Test-UnityConfigureMarker -MarkerPath $configureMarkerPath -StartedUtc $configureStartedUtc
-        if (-not [string]::IsNullOrWhiteSpace($configureProblem)) {
-            Write-UnityRunFailureDiagnostics `
-                -Project $ProjectPath `
-                -LogPath $configureLogPath `
-                -CscLabel 'standalone configure' `
-                -DiagnosticsLabel 'Unity standalone configure'
-            throw "Configure standalone IL2CPP project failed ($configureProblem; Unity exit code $configureExit / $(Get-NativeExitCodeDescription -ExitCode $configureExit)). See the streamed Unity log above (also saved to $configureLogPath)."
-        }
-        if ($configureExit -ne 0) {
-            Write-UnityBenignExitWarning -Label 'Configure standalone IL2CPP project' -ExitCode $configureExit -LogPath $configureLogPath
-        }
-        Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $configureLogPath -Label 'standalone configure'
+            -ExtraArguments $acceleratorArgs
+    } elseif ($AdditionalScriptingDefinesList.Count -gt 0) {
+        # EDITMODE/PLAYMODE with extra global scripting defines (e.g. SINGLE_THREADED):
+        # run the SAME configure pass FIRST so UhCiTestConfigurator.Apply persists the
+        # defines onto the Standalone group and saves the project. The -runTests
+        # invocation below then loads the project with the defines already in place,
+        # so its first compile of the asmdef assemblies sees them (Unity does not
+        # recompile mid-run in -batchmode). Without requested defines this pass is
+        # skipped entirely, so the default editmode/playmode flow is unchanged (no
+        # extra editor launch, byte-for-byte identical behavior).
+        Invoke-UnityConfigurePass `
+            -EditorPath $UnityEditorPath `
+            -ProjectPath $ProjectPath `
+            -MarkerPath $configureMarkerPath `
+            -LogPath $configureLogPath `
+            -Label "Configure $UnityVersion $TestMode scripting defines" `
+            -ExtraArguments $acceleratorArgs
     }
 
     if ($TestMode -eq 'standalone') {

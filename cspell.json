@@ -30,7 +30,8 @@
     "**/*.min.css",
     "Samples~/**/Library/**",
     "Samples~/**/Temp/**",
-    "Samples~/**/obj/**"
+    "Samples~/**/obj/**",
+    "perf-results/**"
   ],
   "files": [
     "**/*.{md,markdown}",
@@ -489,7 +490,8 @@
         "UnityLogTagFormatter",
         "Sirenix",
         "asmdef",
-        "asmref"
+        "asmref",
+        "stcf"
       ]
     },
     {

@@ -265,7 +265,8 @@ jobs:
               'Tests/**',
               'scripts/unity/run-ci-tests.ps1',
               'scripts/unity/lib/asmdef-discovery.js',
-              '.github/actions/compute-unity-assemblies/action.yml'
+              '.github/actions/compute-unity-assemblies/action.yml',
+              '.github/integration-packages.json'
             ) }}
         with:
           path: |
@@ -288,6 +289,11 @@ jobs:
         with:
           target: "${{ matrix.test-mode }}"
           runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
+          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
+          # alongside core on EVERY version x mode leg. The matching run step passes
+          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
+          # manifest; without that the integration assemblies would not compile.
+          include-integrations: "true"
 
       - name: Validate Unity license secrets
         uses: ./.github/actions/validate-unity-license
@@ -367,6 +373,7 @@ jobs:
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
@@ -430,5 +437,215 @@ jobs:
         with:
           name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          if-no-files-found: warn
+          retention-days: 14
+
+  # SINGLE_THREADED leg. The default matrix never exercises the SINGLE_THREADED
+  # code paths (Runtime/Core/DataStructure/Cache.cs et al. gate thread-safe vs
+  # single-threaded behavior on `#if SINGLE_THREADED`, OFF by default). This job
+  # builds+tests with SINGLE_THREADED (and WALLSTOP_CONCAVE_HULL_STATS) defined as
+  # GLOBAL scripting symbols so EVERY asmdef test assembly compiles the
+  # single-threaded path. Restricted to Unity 6 (6000.3.16f1) editmode+playmode to
+  # keep time small (no IL2CPP standalone build). Core-only (no integrations): the
+  # single-threaded toggle is a core-runtime concern, so installing the DI packages
+  # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
+  # self-hosted Unity seat; the org lock `wallstop-organization-builds` (acquired
+  # below, released if:always()) is what actually serializes it against the main
+  # matrix on that single seat -- max-parallel:1 only serializes within this job's
+  # own (version x mode) legs. Reuses the same secrets gate, runner-preflight,
+  # provisioning, perf-category exclusion, verify-results, and artifact-upload
+  # scaffolding as unity-tests, with DISTINCT project/Library/artifact paths
+  # (suffix `-single-threaded`) so its differently-compiled Library never collides
+  # with or poisons the default matrix's `6000.3.16f1-{mode}` cache.
+  unity-tests-single-threaded:
+    name: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+    needs:
+      - matrix-config
+      - runner-preflight
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected) &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    timeout-minutes: 660
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode
+        # only -- both are fast in-editor runs; the SINGLE_THREADED path does not need
+        # a standalone IL2CPP player build to be exercised.
+        unity-version: ["6000.3.16f1"]
+        test-mode: ["editmode", "playmode"]
+    steps:
+      - name: Enable Git long paths
+        shell: pwsh
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Print runner diagnostics
+        # Composite action runs PowerShell internally; `shell: bash` on a
+        # self-hosted Windows runner can resolve to the WSL stub and fail. Never
+        # use plain `shell: bash` on self-hosted Windows runners.
+        uses: ./.github/actions/print-self-hosted-runner-diagnostics
+        with:
+          matrix-note: "single-threaded (organization lock wraps the Unity section)"
+
+      - name: Cache Unity Library and package caches
+        uses: actions/cache@v5
+        env:
+          PACKAGE_HASH: >-
+            ${{ hashFiles(
+              'package.json',
+              'Runtime/**',
+              'Editor/**',
+              'Tests/**',
+              'scripts/unity/run-ci-tests.ps1',
+              'scripts/unity/lib/asmdef-discovery.js',
+              '.github/actions/compute-unity-assemblies/action.yml',
+              '.github/integration-packages.json'
+            ) }}
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          # `single-threaded` in BOTH the project path above and this key keeps this
+          # leg's Library (compiled WITH SINGLE_THREADED) separate from the default
+          # matrix's `6000.3.16f1-{mode}` Library (compiled WITHOUT it).
+          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-${{ env.PACKAGE_HASH }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Compute test assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          target: "${{ matrix.test-mode }}"
+          runtime-only: "false"
+
+      - name: Validate Unity license secrets
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Provision Unity Editor
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        timeout-minutes: 180
+        shell: pwsh
+        run: |
+          $artifactsPath = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded'
+          $diagnosticsPath = Join-Path $artifactsPath 'provisioning'
+          $diagnosticsFile = Join-Path $diagnosticsPath 'ensure-editor-summary.json'
+          New-Item -ItemType Directory -Force -Path $diagnosticsPath | Out-Null
+          $editor = ./scripts/unity/ensure-editor.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -CiManagedOnly `
+            -RequireHealthyExisting `
+            -ProvisioningProfile 'EditorOnly' `
+            -DiagnosticsPath $diagnosticsFile
+          "UNITY_EDITOR_PATH=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Unity provisioning diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-provisioning-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/provisioning
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Acquire organization Unity lock
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          timeout-minutes: "300"
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Run Unity Test Runner
+        id: run_tests
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        # editmode/playmode in-editor runs finish well below this; stays under the
+        # job timeout (660) so the step clock fires first and releases the seat.
+        timeout-minutes: 150
+        shell: pwsh
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+        run: |
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode '${{ matrix.test-mode }}' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded' `
+            -ProjectPath '.artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded' `
+            -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild
+
+      - name: Return Unity license
+        if: always()
+        uses: ./.github/actions/return-unity-license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Release organization Unity lock
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Dump Unity log tail on failure or cancellation
+        if: ${{ failure() || cancelled() }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+
+      - name: Verify tests actually ran
+        if: >-
+          ${{
+            !cancelled() &&
+            steps.compute.outcome == 'success' &&
+            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+          }}
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+          expected-empty: ${{ steps.compute.outputs.is-empty }}
+
+      - name: Upload Unity test artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
           if-no-files-found: warn
           retention-days: 14
