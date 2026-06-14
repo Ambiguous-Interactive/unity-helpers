@@ -458,6 +458,57 @@ jobs:
             echo "::notice::No staged perf results were downloaded; nothing to commit."
           fi
 
+      # Node 22 (matches the benchmarks job's setup-node) to run the pure-Node,
+      # zero-dependency perf-delta tooling under scripts/unity/lib/.
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      # Extract normalized perf metrics from the assembled NUnit results, diff
+      # them against the committed rolling baseline (perf-results/baseline.json),
+      # write the human-readable report (perf-results/perf-deltas.md) plus a
+      # machine-readable payload (perf-results/perf-deltas.json), and roll the
+      # baseline forward to the latest numbers. These are committed alongside the
+      # raw XML. REPORT-ONLY by default: the weekly scheduled run must never fail
+      # just because perf moved, so we do NOT pass --fail-on-regression here; the
+      # `regressed=` signal is surfaced as a step output + workflow annotation for
+      # visibility. To make a regression hard-fail later, set
+      # PERF_FAIL_ON_REGRESSION=1 on the render step (and gate on its outcome).
+      - name: Compute perf deltas vs baseline
+        id: perf_deltas
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          results=(perf-results/results-*.xml)
+          if [ ${#results[@]} -eq 0 ]; then
+            echo "::notice::No perf results XML to analyze; leaving baseline untouched."
+            echo "regressed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          node scripts/unity/lib/extract-perf-metrics.js "${results[@]}" \
+            --output perf-results/perf-current.json
+          metric_count="$(node -e 'const m=require("./perf-results/perf-current.json");process.stdout.write(String(m.length))')"
+          echo "Extracted ${metric_count} perf metric(s) from ${#results[@]} result file(s)."
+          # render-perf-deltas.js always exits 0 in report-only mode and prints
+          # changed=/regressed= on stdout; capture regressed for the annotation.
+          render_output="$(node scripts/unity/lib/render-perf-deltas.js \
+            --current perf-results/perf-current.json \
+            --baseline perf-results/baseline.json \
+            --out-md perf-results/perf-deltas.md \
+            --out-json perf-results/perf-deltas.json \
+            --update-baseline perf-results/baseline.json)"
+          echo "${render_output}"
+          regressed="$(printf '%s\n' "${render_output}" | sed -n 's/^regressed=//p' | tail -n1)"
+          regressed="${regressed:-false}"
+          echo "regressed=${regressed}" >> "${GITHUB_OUTPUT}"
+          if [ "${regressed}" = "true" ]; then
+            echo "::warning::Perf delta computed a significant regression; see perf-results/perf-deltas.md."
+          fi
+          # perf-current.json is a transient intermediate; do not commit it.
+          rm -f perf-results/perf-current.json
+
       # git-auto-commit-action is a no-op when there is no diff, so a run that
       # produced no new results does not create an empty commit.
       #
@@ -473,7 +524,12 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7.1.0
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
-          file_pattern: perf-results/*.xml
+          # Broadened from perf-results/*.xml to the whole tree so the rolling
+          # baseline (baseline.json) and the generated delta report
+          # (perf-deltas.md / perf-deltas.json) are committed next to the raw XML.
+          # perf-results/** is in .prettierignore and cspell's ignorePaths, so
+          # these generated files never trip the prettier/cspell CI checks.
+          file_pattern: perf-results/**
           commit_user_name: "github-actions[bot]"
           commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
           commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"

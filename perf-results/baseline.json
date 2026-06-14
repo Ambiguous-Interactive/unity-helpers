@@ -1,0 +1,4 @@
+{
+  "_comment": "Rolling perf baseline for unity-helpers benchmarks. Seeded empty; the first Unity Benchmarks run (.github/workflows/unity-benchmarks.yml) extracts metrics from the NUnit results and rewrites this file via scripts/unity/lib/render-perf-deltas.js. Subsequent runs diff current metrics against this file and write perf-results/perf-deltas.md. Do not hand-edit.",
+  "metrics": []
+}

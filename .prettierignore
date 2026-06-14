@@ -13,6 +13,14 @@ Logs/
 # Samples and external content
 Samples~/
 
+# Generated perf artifacts: the raw NUnit XML, the auto-generated rolling
+# baseline (perf-results/baseline.json), and the delta report
+# (perf-results/perf-deltas.md / .json) are machine-written by the Unity
+# Benchmarks workflow (scripts/unity/lib/render-perf-deltas.js). They are
+# emitted prettier-shaped already, but keep the whole tree out of prettier's
+# scope so a generated file can never trip `run-prettier.js --check` in CI.
+perf-results/**
+
 # Only format supported text/assets; Prettier globbing will still be constrained by scripts
 **/*.meta
 **/*.unity
