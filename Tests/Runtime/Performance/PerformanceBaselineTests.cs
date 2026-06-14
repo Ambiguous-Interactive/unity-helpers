@@ -40,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     /// </remarks>
     [Ignore("These have to be created and measured properly.")]
     [TestFixture]
+    [Category("Performance")]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
     public sealed class PerformanceBaselineTests

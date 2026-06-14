@@ -470,11 +470,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 Id = 999,
                 Name = "LargeCollection",
-                Values = new List<int>(100_000),
+                Values = new List<int>(10_000),
                 Data = MakeBytes(1024 * 1024), // 1 MB
             };
 
-            for (int i = 0; i < 100_000; ++i)
+            // 10k still exercises large-collection round-trip paths while keeping
+            // this correctness test in the fast suite (full-scale throughput is
+            // covered by the Performance-categorized benchmark suite).
+            for (int i = 0; i < 10_000; ++i)
             {
                 msg.Values.Add(i);
             }
@@ -484,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.AreEqual(msg.Id, clone.Id);
             Assert.AreEqual(msg.Name, clone.Name);
-            Assert.AreEqual(100_000, clone.Values.Count);
+            Assert.AreEqual(10_000, clone.Values.Count);
             CollectionAssert.AreEqual(msg.Values, clone.Values);
             Assert.AreEqual(1024 * 1024, clone.Data.Length);
             CollectionAssert.AreEqual(msg.Data, clone.Data);

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using WallstopStudios.UnityHelpers.Core.Extension;
 
     [TestFixture]
+    [Category("Performance")]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
     public sealed class ProtoEqualsPerformanceTests

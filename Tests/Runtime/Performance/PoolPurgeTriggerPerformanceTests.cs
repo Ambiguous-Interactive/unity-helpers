@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     /// Guards against regression of GitHub issue #226 where the default OnRent trigger caused 119,752% over budget.
     /// </summary>
     [TestFixture]
+    [Category("Performance")]
     [NUnit.Framework.Category("Slow")]
     public sealed class PoolPurgeTriggerPerformanceTests
     {

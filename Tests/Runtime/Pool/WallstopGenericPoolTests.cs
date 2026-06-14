@@ -3153,6 +3153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        [Category("Performance")]
         public void DefaultPoolGetPerformanceIsAcceptable()
         {
             // Measure that the default pool (Periodic trigger) can do many Get/Return

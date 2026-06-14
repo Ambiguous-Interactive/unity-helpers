@@ -1166,6 +1166,158 @@ $r = Invoke-LintOnFixture -FixtureRelativePath 'CaseNearbyUnityTestDoesNotBleedI
 $ok = ($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH006')
 Write-TestResult "UNH006.DoesNotUseNearbyUnityTestAttribute" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
 
+# ── Test: UNH007 (giant literal loop bound in a non-perf test) ────────────────
+Write-Host "`n  Section: UNH007 detection" -ForegroundColor White
+
+$unh007Pos = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+
+    public sealed class BigLoopTest : CommonTestBase
+    {
+        [Test]
+        public void Loop()
+        {
+            int sum = 0;
+            for (int i = 0; i < 60000; i++)
+            {
+                sum += i;
+            }
+            Assert.IsTrue(sum >= 0);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'BigLoopTest.cs' -FixtureContent $unh007Pos
+Write-TestResult "UNH007.DetectsGiantLoop" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH007')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh007Neg = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+
+    [Category("Stress")]
+    public sealed class BigLoopStressTest : CommonTestBase
+    {
+        [Test]
+        public void Loop()
+        {
+            int sum = 0;
+            for (int i = 0; i < 60000; i++)
+            {
+                sum += i;
+            }
+            Assert.IsTrue(sum >= 0);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'BigLoopStressTest.cs' -FixtureContent $unh007Neg
+Write-TestResult "UNH007.AllowsGiantLoopInStressFixture" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH007')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# ── Test: UNH008 (perf-named fixture must carry Performance/Stress category) ──
+Write-Host "`n  Section: UNH008 detection" -ForegroundColor White
+
+$unh008Pos = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+
+    public sealed class WidgetPerformanceTests : CommonTestBase
+    {
+        [Test]
+        public void Bench()
+        {
+            Assert.IsTrue(true);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WidgetPerformanceTests.cs' -FixtureContent $unh008Pos
+Write-TestResult "UNH008.DetectsUntaggedPerfFixture" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH008')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh008Neg = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+
+    [Category("Performance")]
+    public sealed class WidgetPerformanceTaggedTests : CommonTestBase
+    {
+        [Test]
+        public void Bench()
+        {
+            Assert.IsTrue(true);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WidgetPerformanceTaggedTests.cs' -FixtureContent $unh008Neg
+Write-TestResult "UNH008.AllowsTaggedPerfFixture" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH008')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# Fully-qualified [NUnit.Framework.Category("Performance")] must also satisfy the rule.
+$unh008NegFq = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+
+    [NUnit.Framework.Category("Performance")]
+    public sealed class WidgetPerformanceFqTests : CommonTestBase
+    {
+        [Test]
+        public void Bench()
+        {
+            Assert.IsTrue(true);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WidgetPerformanceFqTests.cs' -FixtureContent $unh008NegFq
+Write-TestResult "UNH008.AllowsFullyQualifiedCategory" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH008')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# ── Test: UNH009 (advisory, non-blocking AssetDatabase churn) ────────────────
+Write-Host "`n  Section: UNH009 advisory" -ForegroundColor White
+
+$unh009Pos = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+    using UnityEditor;
+
+    public sealed class RefreshTest : CommonTestBase
+    {
+        [Test]
+        public void DoRefresh()
+        {
+            AssetDatabase.Refresh();
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'RefreshTest.cs' -FixtureContent $unh009Pos
+# UNH009 is ADVISORY: it must appear in output but MUST NOT fail the build.
+Write-TestResult "UNH009.AdvisoryNonBlocking" (($r.ExitCode -eq 0) -and ($r.Output -match 'UNH009')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh009Neg = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+    using UnityEditor;
+
+    public sealed class RefreshBatchedTest : BatchedEditorTestBase
+    {
+        [Test]
+        public void DoRefresh()
+        {
+            AssetDatabase.Refresh();
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'RefreshBatchedTest.cs' -FixtureContent $unh009Neg
+Write-TestResult "UNH009.SkipsBatchedBase" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH009')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
 } finally {
   # ── Cleanup ──────────────────────────────────────────────────────────────────
   Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue

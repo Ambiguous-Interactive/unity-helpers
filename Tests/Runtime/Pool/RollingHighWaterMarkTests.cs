@@ -127,6 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        [Category("Performance")]
         public void HighVolumeInsertionCompletesWithinBudget()
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);

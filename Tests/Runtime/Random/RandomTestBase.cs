@@ -31,7 +31,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const int NumGeneratorChecks = 1_000;
         private const int NormalIterations = 1_000;
-        private const int SampleCount = 12_750_000;
+
+        // The distribution tests dominate suite runtime: each loops SampleCount
+        // times across ~21 PRNG subclasses (~half a billion iterations at the
+        // historical count). The fast default keeps the MAIN suite quick while
+        // staying statistically valid (see the sqrt deviation floor in
+        // TestAndVerify); the perf/stress CI job exports UH_RANDOM_SAMPLE_COUNT =
+        // ThoroughSampleCount to restore the original, tighter bias-detection
+        // sensitivity. Override the env var for a thorough local run.
+        private const int DefaultFastSampleCount = 250_000;
+        private const int ThoroughSampleCount = 12_750_000;
+        private static readonly int SampleCount = ResolveSampleCount();
+
+        // Floor for the allowed per-bin deviation, in standard deviations. Counts
+        // over `sampleLength` bins are ~Poisson(average) with stddev sqrt(average),
+        // so the natural max deviation grows like sqrt(average). A fixed RELATIVE
+        // tolerance (GetDeviationFor) is correct at large N but turns flaky as N
+        // shrinks; flooring at this many sigma keeps reduced-sample runs reliably
+        // green while large-N runs keep their original tolerance unchanged.
+        private const double DeviationSigmaFloor = 5.5;
         protected const uint DeterministicSeed32 = 0xC0FFEE11U;
         protected const ulong DeterministicSeed64 = 0x0123456789ABCDEFUL;
         protected const ulong DeterministicSeed64B = 0xF0E1D2C3B4A59687UL;
@@ -820,6 +838,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return Math.Min(_samples.Length, sampleLength ?? _samples.Length);
         }
 
+        private static int ResolveSampleCount()
+        {
+            string raw = Environment.GetEnvironmentVariable("UH_RANDOM_SAMPLE_COUNT");
+            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, out int parsed) && parsed > 0)
+            {
+                return parsed;
+            }
+
+            return DefaultFastSampleCount;
+        }
+
         private void TestAndVerify(
             Func<IRandom, int> sample,
             int? maxLength = null,
@@ -843,7 +872,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             sampleLength = GetSampleLength(maxLength);
             double average = SampleCount * 1.0 / sampleLength;
-            double deviationAllowed = average * GetDeviationFor(caller);
+            // Allow the LOOSER of the configured relative tolerance and a
+            // sqrt(average)-based statistical floor. At the historical SampleCount
+            // the relative term dominates (identical behaviour); at the reduced
+            // fast-suite count the sqrt floor prevents spurious failures from
+            // natural sampling variance across `sampleLength` bins.
+            double deviationAllowed = Math.Max(
+                average * GetDeviationFor(caller),
+                DeviationSigmaFloor * Math.Sqrt(average)
+            );
             List<int> zeroCountIndexes = new();
             List<int> outsideRange = new();
             for (int i = 0; i < sampleLength; i++)

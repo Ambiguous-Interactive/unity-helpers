@@ -502,6 +502,10 @@ function Get-TestCaseSourceNamesFromAttributeBlock {
 }
 
 $violations = @()
+# Non-blocking guidance (currently UNH009 asset-churn): reported every run but
+# does NOT fail the build, so pre-existing churn is surfaced for cleanup without
+# forcing a risky mass-conversion of fixtures to a batched base.
+$advisories = @()
 
 $filesToScan = @()
 if ($Paths -and $Paths.Count -gt 0) {
@@ -889,6 +893,85 @@ foreach ($file in $filesToScan) {
         })
       }
     }
+  }
+
+  # ---- Test performance budgets (UNH007 / UNH008 / UNH009) ----
+  # A fixture is "perf-tagged" when it declares the Performance or Stress
+  # category; those fixtures are EXCLUDED from the fast CI matrix
+  # (UH_UNITY_TEST_CATEGORY="!Performance;!Stress") and run only in the
+  # dedicated benchmark job, so heavy work is allowed there.
+  # Match both the short `[Category("Performance")]` and fully-qualified
+  # `[NUnit.Framework.Category("Performance")]` / `...CategoryAttribute(...)` forms.
+  # Use a COMMENT-MASKED (but NOT string-blanked) view: masking comments stops a
+  # commented-out `// [Category("Performance")]` from satisfying the rule, while
+  # preserving string contents keeps the "Performance"/"Stress" category name
+  # visible (the full $scrubbedText would blank it).
+  $categoryRegex = '\[\s*(?:NUnit\.Framework\.)?Category(?:Attribute)?\(\s*"(Performance|Stress)"\s*\)\s*\]'
+  $commentMaskedText = [string]::Join("`n", (Get-CommentMaskedLines -Lines ($text -split "`n", -1) -Language 'csharp'))
+  $perfCategory = [regex]::IsMatch($commentMaskedText, $categoryRegex)
+
+  # UNH008: a fixture that LOOKS like a benchmark (lives under a Performance/
+  # folder or is named *PerformanceTests / *BenchmarkTests) MUST carry the
+  # Performance or Stress category, otherwise the fast matrix would run it.
+  $looksPerf = ($rel -match '(^|/)Performance/') -or [regex]::IsMatch($scrubbedText, '\bclass\s+\w*(Performance|Benchmark)\w*Tests\b')
+  $isTestFile = [regex]::IsMatch($scrubbedText, '\[\s*Test\b|\[\s*TestFixture\b|\[\s*UnityTest\b')
+  if ($looksPerf -and $isTestFile -and -not $perfCategory -and ($text -notmatch 'UNH-SUPPRESS.*UNH008')) {
+    $violations += (@{
+      Path=$rel; Line=1; Message='UNH008: Performance/benchmark fixture must declare [Category("Performance")] or [Category("Stress")] so the main CI matrix (which runs !Performance;!Stress) excludes it'
+    })
+  }
+
+  # UNH009 (ADVISORY, non-blocking): per-test AssetDatabase.Refresh()/
+  # SaveAndReimport() churns the asset importer on every test. Prefer
+  # BatchedEditorTestBase (batches and defers a single refresh to
+  # OneTimeTearDown). Reported as guidance only — converting an existing
+  # fixture to a batched base can change timing-dependent behaviour and must be
+  # validated in the editor, so this never fails the build. Infra/base files
+  # (Tests/Core/**, *TestBase.cs) legitimately manage refreshes and are skipped.
+  $isInfra = ($rel -match '(^|/)Tests/Core/') -or ($rel -match 'TestBase\.cs$')
+  $batchedBase = ($text -match ':\s*(BatchedEditorTestBase|SpriteSheetExtractorTestBase|DetectAssetChangeTestBase)\b')
+  if (-not $batchedBase -and -not $isInfra) {
+    $lineIndex = 0
+    foreach ($line in $content) {
+      $lineIndex++
+      if ($line -match 'UNH-SUPPRESS') { continue }
+      $scrubbedLine = $scrubbedContent[$lineIndex - 1]
+      if ([regex]::IsMatch($scrubbedLine, 'AssetDatabase\.Refresh\s*\(|\.SaveAndReimport\s*\(')) {
+        $advisories += (@{
+          Path=$rel; Line=$lineIndex; Message='UNH009: per-test AssetDatabase.Refresh()/SaveAndReimport() churns imports; prefer BatchedEditorTestBase (advisory)'
+        })
+      }
+    }
+  }
+
+  # UNH007: an enormous literal loop bound in a non-perf test belongs in a
+  # Performance/Stress fixture (excluded from the fast suite) or should be
+  # reduced. Const/field bounds (e.g. `< SampleCount`) are intentionally NOT
+  # matched — only raw literals.
+  if (-not $perfCategory) {
+    $lineIndex = 0
+    foreach ($line in $content) {
+      $lineIndex++
+      if ($line -match 'UNH-SUPPRESS') { continue }
+      $scrubbedLine = $scrubbedContent[$lineIndex - 1]
+      $loopMatch = [regex]::Match($scrubbedLine, '\bfor\s*\([^;]*;[^;]*<\s*=?\s*([0-9][0-9_]{2,})')
+      if ($loopMatch.Success) {
+        $boundText = $loopMatch.Groups[1].Value -replace '_', ''
+        [long]$bound = 0
+        if ([long]::TryParse($boundText, [ref]$bound) -and $bound -ge 50000) {
+          $violations += (@{
+            Path=$rel; Line=$lineIndex; Message="UNH007: loop of $bound iterations in a non-perf test; tag the fixture [Category(`"Stress`")]/[Category(`"Performance`")], reduce the count, or add // UNH-SUPPRESS"
+          })
+        }
+      }
+    }
+  }
+}
+
+if ($advisories.Count -gt 0) {
+  Write-Host "Test performance advisories (non-blocking): $($advisories.Count)" -ForegroundColor DarkYellow
+  foreach ($a in $advisories) {
+    Write-Host ("  {0}:{1}: {2}" -f $a.Path, $a.Line, $a.Message) -ForegroundColor DarkYellow
   }
 }
 
