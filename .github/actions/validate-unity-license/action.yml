@@ -1,0 +1,62 @@
+name: Validate Unity license
+description: >-
+  Fail fast before acquiring the org build lock when classic serial Unity
+  activation is misconfigured: UNITY_SERIAL, UNITY_EMAIL, and UNITY_PASSWORD must
+  all be set, and the retired UNITY_LICENSING_SERVER must NOT be. Prints only
+  presence booleans, never secret values. The directory name
+  (validate-unity-license) is retained to avoid churn in callers/validators.
+runs:
+  using: composite
+  steps:
+    - name: Validate Unity serial-activation preflight
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        # Hygiene/parity pin (same rationale as scripts/unity/run-ci-tests.ps1
+        # and the return action). This block no longer invokes a native binary
+        # through a pipe, so $PSNativeCommandUseErrorActionPreference is purely
+        # belt-and-suspenders here; pinning it $false keeps every pwsh block in
+        # these actions behaving identically regardless of host/version. StrictMode
+        # is the load-bearing part: it makes any accidental $null/undefined-property
+        # access throw loudly instead of silently passing the preflight.
+        $PSNativeCommandUseErrorActionPreference = $false
+
+        # This action validates classic SERIAL activation (the repo uses classic
+        # serial activation, NOT the Unity Licensing Server / floating license).
+        # The directory name validate-unity-license is retained so callers do not
+        # churn.
+        $hasSerial = -not [string]::IsNullOrWhiteSpace($env:UNITY_SERIAL)
+        $hasEmail = -not [string]::IsNullOrWhiteSpace($env:UNITY_EMAIL)
+        $hasPassword = -not [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)
+
+        Write-Host "::group::Unity serial-activation preflight"
+
+        # This repo uses classic serial activation, not the floating-license
+        # server. If UNITY_LICENSING_SERVER is still wired up, fail loudly so it
+        # gets removed (no silent fallback).
+        if (-not [string]::IsNullOrWhiteSpace($env:UNITY_LICENSING_SERVER)) {
+          Write-Host ("::error::UNITY_LICENSING_SERVER is set but unused. This repo uses classic serial activation (UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD); remove the " +
+          "UNITY_LICENSING_SERVER secret.")
+          Write-Host "::endgroup::"
+          exit 1
+        }
+
+        # All three serial-activation credentials are required. Name WHICH are
+        # missing (never their values) so the fix is obvious.
+        $missing = @()
+        if (-not $hasSerial) { $missing += 'UNITY_SERIAL' }
+        if (-not $hasEmail) { $missing += 'UNITY_EMAIL' }
+        if (-not $hasPassword) { $missing += 'UNITY_PASSWORD' }
+        if ($missing.Count -gt 0) {
+          Write-Host ("::error::Serial Unity activation requires UNITY_SERIAL, UNITY_EMAIL, and UNITY_PASSWORD. Missing or empty: " + ($missing -join ', ') + ".")
+          Write-Host "::endgroup::"
+          exit 1
+        }
+
+        # Presence booleans only -- never echo the values.
+        Write-Host "UNITY_SERIAL present: $hasSerial"
+        Write-Host "UNITY_EMAIL present: $hasEmail"
+        Write-Host "UNITY_PASSWORD present: $hasPassword"
+
+        Write-Host "::notice::Unity serial-activation preflight passed."
+        Write-Host "::endgroup::"

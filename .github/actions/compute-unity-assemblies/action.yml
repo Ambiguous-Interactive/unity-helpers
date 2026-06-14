@@ -1,0 +1,70 @@
+name: Compute Unity test assembly list
+description: >-
+  Resolve the default Unity test assembly include list via the single-source
+  asmdef-discovery.js module. Exports it as the UH_TEST_ASSEMBLIES env var AND
+  as step outputs (assemblies, is-empty) so a caller can SKIP a target that has
+  no unity-helpers-owned test assemblies instead of failing the whole run.
+inputs:
+  include-perf:
+    description: "Include the Performance/Stress perf assemblies."
+    required: false
+    default: "false"
+  include-integrations:
+    description: "Include the DI-container integration suites (VContainer / Zenject / Reflex)."
+    required: false
+    default: "false"
+  runtime-only:
+    description: "Drop editor-only asmdefs (standalone player flow cannot run EditMode tests)."
+    required: false
+    default: "false"
+  target:
+    description: "Unity test target: editmode, playmode, or standalone."
+    required: false
+    default: ""
+outputs:
+  assemblies:
+    description: "Semicolon-joined unity-helpers test assembly names (empty string when none match)."
+    value: ${{ steps.compute.outputs.assemblies }}
+  is-empty:
+    description: >-
+      'true' when no unity-helpers-owned test assembly matched this target -- the
+      caller should skip the Unity run/verify steps. 'false' otherwise.
+    value: ${{ steps.compute.outputs.is-empty }}
+runs:
+  using: composite
+  steps:
+    - name: Compute assembly list
+      id: compute
+      shell: pwsh
+      run: |
+        $parts = @()
+        if ("${{ inputs.include-perf }}" -eq "true") { $parts += "includePerf: true" }
+        if ("${{ inputs.include-integrations }}" -eq "true") { $parts += "includeIntegrations: true" }
+        if ("${{ inputs.runtime-only }}" -eq "true") { $parts += "runtimeOnly: true" }
+        if ("${{ inputs.target }}" -ne "") { $parts += "target: '${{ inputs.target }}'" }
+        $opts = if ($parts.Count) { "{ " + ($parts -join ", ") + " }" } else { "{}" }
+        $assemblies = node -e "const m=require('./scripts/unity/lib/asmdef-discovery.js'); console.log(m.defaultIncludeAssemblies(process.cwd(), $opts).join(';'))"
+        $discoveryExit = $LASTEXITCODE
+        # A non-zero exit means the discovery SCRIPT itself failed (bad repo
+        # checkout, syntax error, throw) -- a real error, not an empty list. Fail
+        # hard so it is never silently mistaken for "no assemblies".
+        if ($discoveryExit -ne 0) {
+          Write-Host "::error::asmdef discovery script failed (exit code $discoveryExit). The Unity test assembly list could not be resolved."
+          exit 1
+        }
+        $assemblies = ([string]$assemblies).Trim()
+        if ([string]::IsNullOrWhiteSpace($assemblies)) {
+          # SKIP, do not fail: the discovery succeeded but no unity-helpers-owned
+          # test assembly matched this target (for example a runtime-only
+          # standalone run when every unity-helpers test asmdef is editor-only).
+          # The caller gates its provision/run/verify steps on is-empty so the
+          # target is skipped cleanly instead of failing with "0 tests ran".
+          Write-Host "::notice::No unity-helpers test assemblies matched this target; the Unity run will be skipped."
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "assemblies=" -Encoding utf8
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "is-empty=true" -Encoding utf8
+          exit 0
+        }
+        Add-Content -Path $env:GITHUB_ENV -Value "UH_TEST_ASSEMBLIES=$assemblies" -Encoding utf8
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "assemblies=$assemblies" -Encoding utf8
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "is-empty=false" -Encoding utf8
+        Write-Host "Resolved assemblies: $assemblies"

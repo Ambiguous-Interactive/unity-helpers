@@ -1,0 +1,403 @@
+name: Runner Bootstrap (Windows)
+
+# cspell:ignore Redistributables redist redists MSVCP MSVCR VCRUNTIME UCRT prereqs
+
+# Operator-driven, workflow_dispatch-only bootstrap of a self-hosted Windows
+# runner's host-OS prerequisites for Unity CI. Installs the Microsoft Visual
+# C++ 2010 SP1 + 2015-2022 x64 Redistributables (BOTH generations -- Unity
+# 2021/2022/6000 depend on each: MSVCP100.dll/MSVCR100.dll come from the
+# 2010 redist, VCRUNTIME140.dll/MSVCP140.dll/VCRUNTIME140_1.dll from the
+# 2015-2022 redist), Windows long-paths, Windows Defender exclusions,
+# PowerShell 7, and (where applicable) the UCRT KB.
+#
+# Root cause this workflow addresses: Unity.exe failed at startup with
+# -1073741515 / 0xC0000135 (STATUS_DLL_NOT_FOUND) on DAD-MACHINE because the
+# VC++ Redistributables were missing -- Unity 2021/2022/6000 depend on BOTH
+# the 2010 SP1 (MSVCP100.dll / MSVCR100.dll) AND the 2015-2022 x64 (MSVCP140 +
+# VCRUNTIME140) generations. GitHub-hosted windows-2022 ships both preinstalled;
+# self-hosted runners do not. The fix is OS-level (install the redists), so
+# ensure-editor.ps1's Unity-reinstall retry loop is futile. This workflow
+# gives operators a one-click recovery path that does not require shelling
+# onto the runner host.
+#
+# Targeting a SPECIFIC runner (HARD-FAIL on wrong target):
+#   * The repo's runner topology currently labels both Windows runners
+#     uniformly (`self-hosted, Windows, RAM-64GB`); only ELI-MACHINE carries
+#     the additional `fast` label (the org runner topology).
+#   * To bootstrap one specific machine without affecting the other, take
+#     the OTHER runner offline (gh CLI or Actions UI -> Runners) BEFORE
+#     dispatching this workflow, then bring it back online afterwards.
+#   * If the dispatch lands on the wrong runner the workflow HARD-FAILS with
+#     `::error::` and exit 1 (NOT a silent ::warning::). This is by design:
+#     a silent bootstrap of the WRONG (healthy) machine is operator-fatal.
+#   * Long-term fix: add machine-name labels to runner agents so the
+#     `runs-on:` set can include the runner name itself.
+#
+# Idempotent: the bootstrap script is safe to re-run on a healthy host
+# (every prereq is detected first and remediated only when missing). A
+# repeat dispatch on the same machine is a no-op.
+#
+# SHELL CHOICE (chicken-and-egg): self-hosted-runner steps use
+# `shell: powershell` (Windows PowerShell 5.1, ALWAYS preinstalled on
+# Windows) rather than `shell: pwsh` (PowerShell 7). This workflow's
+# purpose INCLUDES installing pwsh on runners that lack it -- so it cannot
+# require pwsh in order to run. The bootstrap script declares
+# `#Requires -Version 5.1` and is verified PS 5.1-compatible. The
+# ubuntu-latest preflight job uses `shell: bash` as normal.
+#
+# MODE RESOLUTION PRECEDENCE (highest wins):
+#   1. UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1   -> forces detect-only (composite)
+#   2. inputs.detect-only == true             -> detect-only via the composite
+#   3. (composite default)                    -> auto-install
+# Operators flipping the dispatch toggle should know that the composite
+# input is the workflow-author surface; the env var is the operator override.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner-label:
+        description: >-
+          (HARD-FAIL on wrong target) Name of the runner you want to bootstrap
+          (DAD-MACHINE or ELI-MACHINE). Both runners share the same label set,
+          so the scheduler may land on either machine. If it lands on the
+          WRONG one, this workflow FAILS FAST with exit 1 -- it does NOT
+          silently bootstrap the unintended machine. Take the unwanted runner
+          offline (Settings -> Runners) BEFORE dispatching to guarantee
+          targeting.
+        required: true
+        type: choice
+        options:
+          - DAD-MACHINE
+          - ELI-MACHINE
+      detect-only:
+        description: >-
+          When true, run the bootstrap script with -DetectOnly (no installs);
+          the workflow fails with exit 2 if any prereq is missing. Useful for
+          a pure preflight audit without mutating the host. Accepts the
+          natural truthy strings (true/True/1/yes/y); normalized server-side.
+        required: false
+        type: boolean
+        default: false
+
+# Forbid concurrent bootstraps OF THIS REPO across BOTH runners. The group
+# is intentionally NOT parameterized by `inputs.runner-label` so that two
+# dispatches (one per machine) cannot race on installer locks or quarantine
+# the same Windows feature/UCRT machine-wide state simultaneously. This is
+# stricter than per-runner concurrency: any in-flight bootstrap anywhere
+# blocks any other bootstrap dispatch from starting.
+# Distinct from `wallstop-organization-builds` (the Unity build lock) -- this
+# workflow does not enter the Unity license seat path, so it must not block
+# Unity jobs and Unity jobs must not block it.
+concurrency:
+  group: runner-bootstrap-windows
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # Preflight convention: every job whose runs-on declares `self-hosted`
+  # must `needs:` a runner-access preflight (see
+  # docs/runbooks/unity-runners-after-transfer.md). This mirrors the
+  # unity-tests.yml runner-preflight pattern exactly.
+  runner-preflight:
+    name: Self-hosted runner access preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      # NOTE: `administration: read` is NOT a valid permissions key for
+      # workflow GITHUB_TOKEN (per actionlint and the GitHub docs schema).
+      # Listing self-hosted runners requires admin:org (org-scope) OR a
+      # fine-grained PAT with repo "Administration: read" -- neither of
+      # which the default GITHUB_TOKEN can carry. The soft-pass path in
+      # the run script below is the supported coverage when the token
+      # is unscoped. See docs/runbooks/unity-runners-after-transfer.md.
+    concurrency:
+      group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Probe self-hosted runner availability
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
+          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
+          REQUIRED_RUNNER_NAME: ${{ inputs.runner-label }}
+        # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml and
+        # unity-tests.yml. CRITICAL: this preflight must NEVER make CI more broken
+        # than the no-preflight baseline -- if both runner-inventory endpoints
+        # return 403/404, soft-pass with a ::warning::. When the inventory IS
+        # visible AND the named runner is offline, hard-fail (operator action
+        # required before bootstrap can dispatch).
+        run: |
+          set -euo pipefail
+          echo "::group::Runner-access preflight"
+          echo "Required labels: ${REQUIRED_LABELS}"
+          echo "Required runner name: ${REQUIRED_RUNNER_NAME}"
+          IFS=',' read -r -a required <<< "${REQUIRED_LABELS}"
+          runners_json="$(mktemp)"
+          runners_scope=""
+          if gh api --paginate \
+              "orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100" \
+              2>/dev/null \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="org"
+          else
+            if gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100" \
+                2>/dev/null \
+                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+              runners_scope="repo"
+            fi
+          fi
+          if [ -z "${runners_scope}" ]; then
+            org_url="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners"
+            repo_url="repos/${GITHUB_REPOSITORY}/actions/runners"
+            {
+              echo "::warning::Runner inventory unavailable from both ${org_url}"
+              echo "::warning::and ${repo_url} (likely 403: GITHUB_TOKEN lacks admin:org"
+              echo "::warning::or administration:read)."
+              echo "::warning::See docs/runbooks/unity-runners-after-transfer.md"
+              echo "::warning::for how to plumb a RUNNER_AUDIT_PAT secret to upgrade"
+              echo "::warning::this soft-pass to a hard-pass."
+            }
+            echo "Soft pass: skipping runner inventory check."
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "Runner inventory scope: ${runners_scope}"
+          total="$(jq 'length' < "${runners_json}")"
+          echo "Visible runners (${runners_scope} scope): ${total}"
+          matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
+            [ .[]
+              | select(.status == "online")
+              | select(($labels | all(. as $l | (.labels // []) | map(.name) | index($l) | type == "number")))
+            ] | length
+          ' < "${runners_json}")"
+          echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
+          if [ "${matched}" -lt 1 ]; then
+            {
+              echo "::error::No online self-hosted runner satisfies the required labels (${REQUIRED_LABELS})."
+              echo "Bootstrap cannot dispatch. Bring the target runner online first."
+              echo "See docs/runbooks/unity-runners-after-transfer.md for the post-transfer runner-group ACL fix."
+            }
+            jq '[ .[] | {name, status, busy, labels: [(.labels // [])[].name]} ]' \
+              < "${runners_json}"
+            exit 1
+          fi
+          # F12: the label match above is necessary but not sufficient when the
+          # operator named a SPECIFIC runner. Require that the named runner is
+          # also online (otherwise the dispatch would land on the other
+          # machine, which the bootstrap job's "Confirm runner identity" step
+          # then HARD-FAILS on -- catching it here gives a clearer error
+          # before consuming a self-hosted slot).
+          named_online="$(jq --arg name "${REQUIRED_RUNNER_NAME}" '
+            [ .[] | select(.name == $name) | select(.status == "online") ] | length
+          ' < "${runners_json}")"
+          echo "Named runner online (name='${REQUIRED_RUNNER_NAME}'): ${named_online}"
+          if [ "${named_online}" -lt 1 ]; then
+            {
+              echo "::error::Requested runner '${REQUIRED_RUNNER_NAME}' is not currently online."
+              echo "Bring it online via Settings -> Runners (or the runner-host service) before dispatching."
+              echo "See docs/runbooks/unity-runners-after-transfer.md."
+            }
+            jq --arg name "${REQUIRED_RUNNER_NAME}" '
+              [ .[] | select(.name == $name) | {name, status, busy, labels: [(.labels // [])[].name]} ]
+            ' < "${runners_json}"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+  bootstrap:
+    # F9: surface the mode (Audit vs Maintenance) in the job display name so
+    # operators reading the Actions UI immediately see which mode this run is
+    # without expanding the inputs.
+    name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} ${{ inputs.runner-label }}
+    needs:
+      - runner-preflight
+    # Cannot dynamically pin to a specific runner without machine-name labels
+    # configured on the runners themselves (operator action; not yet done in
+    # this org). Use the documented allowlisted set; operator takes the
+    # unwanted runner offline before dispatching when targeting is needed.
+    # The "Confirm runner identity" step below HARD-FAILS if the dispatch
+    # lands on the wrong machine (see header comment for the chicken-and-egg
+    # rationale around `shell: powershell` for the rest of this job).
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    # F13: inherit workflow-level permissions (contents: read, actions: read).
+    # No job-level override -- the previous explicit block silently dropped
+    # `actions: read` and shadowed the workflow-level intent.
+    timeout-minutes: 360
+    steps:
+      - name: Enable Git long paths
+        shell: powershell
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        # Shallow checkout: bootstrap only needs scripts/unity/* and a
+        # composite action; no history depth required.
+        uses: actions/checkout@v6
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          persist-credentials: false
+
+      - name: Confirm runner identity (hard-fail on wrong target)
+        # F15: Windows PowerShell 5.1, NOT pwsh -- this workflow's purpose
+        # includes installing pwsh, so requiring pwsh here would be the
+        # chicken-and-egg failure mode.
+        shell: powershell
+        env:
+          UH_BOOTSTRAP_REQUESTED_RUNNER: ${{ inputs.runner-label }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $actual = $env:RUNNER_NAME
+          $requested = $env:UH_BOOTSTRAP_REQUESTED_RUNNER
+          Write-Host "Requested runner: $requested"
+          Write-Host "Actual runner:    $actual"
+          # F2: HARD-FAIL on mismatch. The previous ::warning:: would silently
+          # bootstrap the wrong (healthy) machine when the scheduler picked
+          # the runner the operator did NOT intend.
+          if (-not [string]::IsNullOrWhiteSpace($actual) -and -not [string]::IsNullOrWhiteSpace($requested)) {
+              if (-not [string]::Equals($actual, $requested, [System.StringComparison]::OrdinalIgnoreCase)) {
+                  Write-Host ("::error::Bootstrap dispatched to '$actual' but operator requested '$requested'. Cancel this run, take '$actual' offline (Settings -> Runners or 'gh api -X POST " +
+                  "orgs/<org>/actions/runners/<id>/...'), then re-dispatch so the run lands on '$requested'. Alternatively, add machine-name labels to runner agents so 'runs-on:' can pin to a " +
+                  "specific runner.")
+                  if ($env:GITHUB_STEP_SUMMARY) {
+                      Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("## Runner Bootstrap (FAILED: wrong target)`n`n- Requested runner: ``$requested```n- Actual runner: ``$actual```n- Action: " +
+                      "hard-fail; take ``$actual`` offline and re-dispatch.")
+                  }
+                  exit 1
+              }
+          }
+          # Surface to the step summary for the Actions UI.
+          $summary = @(
+              "## Runner Bootstrap"
+              ""
+              "- Requested runner: ``$requested``"
+              "- Actual runner: ``$actual``"
+              "- Detect-only: ``${{ inputs.detect-only }}``"
+          ) -join "`n"
+          if ($env:GITHUB_STEP_SUMMARY) {
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+          }
+
+      - name: Run runner maintenance (single-step transcript)
+        # F5/F7: a single PowerShell 5.1 step opens the transcript, invokes
+        # the bootstrap script, and Stop-Transcripts in a finally{} -- the
+        # previous design split Start-Transcript and the bootstrap into
+        # separate pwsh processes, leaving the artifact empty.
+        # F15: Windows PowerShell 5.1 -- see header comment.
+        # F22: we deliberately do NOT `uses: ./.github/actions/assert-unity-host-prereqs`
+        # here, even though that composite would normally own this orchestration.
+        # The composite contains a PS 5.1 preflight (F14) that hard-fails when
+        # pwsh is missing -- but pwsh missing is EXACTLY the case this
+        # workflow exists to repair (chicken-and-egg). To avoid duplication
+        # without breaking the bootstrap-out-of-pwsh-missing case, this
+        # workflow's logic is kept thin: it owns ONLY the transcript wrapper
+        # and the detect-only normalization. All real orchestration
+        # (auto-install vs DetectOnly, redist install, defender exclusions,
+        # UCRT, pwsh install) lives inside scripts/unity/bootstrap-windows-runner.ps1
+        # -- the SAME script the composite invokes. The composite remains the
+        # canonical Unity-job-side entry point.
+        # F4: parse inputs.detect-only via natural truthy normalization
+        # rather than string-equality against the unquoted 'true' literal.
+        # Also honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 here (forces
+        # DetectOnly) so the operator override behaves identically across
+        # the workflow path and the composite path.
+        shell: powershell
+        env:
+          UH_BOOTSTRAP_DETECT_ONLY: ${{ inputs.detect-only }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE '.artifacts\runner-bootstrap'
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          $timestamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
+          $logPath = Join-Path $artifactDir ("maintenance-{0}-{1}-{2}.log" -f $timestamp, $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT)
+          Write-Host "Transcript: $logPath"
+
+          # F4: normalize detect-only to a single bool. Accepts true/True/1/yes/y.
+          $rawDetect = '' + $env:UH_BOOTSTRAP_DETECT_ONLY
+          $normalizedDetect = $rawDetect.Trim().ToLowerInvariant()
+          $detectOnly = ($normalizedDetect -eq 'true' -or $normalizedDetect -eq '1' -or $normalizedDetect -eq 'yes' -or $normalizedDetect -eq 'y')
+          # Operator escape hatch -- UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1
+          # forces DetectOnly even when the dispatch input says auto-install.
+          # Mirrors the composite (./.github/actions/assert-unity-host-prereqs)
+          # so this workflow path and the composite path observe the same
+          # precedence rule (per the header's MODE RESOLUTION PRECEDENCE list).
+          if ($env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -eq '1') {
+              Write-Host "::notice::UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 -> forcing DetectOnly (overrides inputs.detect-only)"
+              $detectOnly = $true
+          }
+          Write-Host "Resolved detect-only: $detectOnly (raw='$rawDetect')"
+
+          # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
+          # reliably the repo root post-checkout (actions/checkout@v6 above).
+          #
+          # TODO(unity-helpers): scripts/unity/maintain-windows-runner.ps1 (and
+          # the scripts/unity/bootstrap-windows-runner.ps1 it wraps, plus the
+          # .github/actions/assert-unity-host-prereqs composite) were NOT ported
+          # in this batch -- they are the host-OS remediation backend (VC++
+          # redist, long-paths, Defender exclusions, pwsh, UCRT installs). Until
+          # they are ported from DxMessaging, this workflow HARD-FAILS below with
+          # a clear "script not found" error instead of silently doing nothing.
+          # The runner-preflight job above (runner online + label check) still
+          # works standalone; only this maintenance step needs the backend.
+          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
+          if (-not (Test-Path -LiteralPath $script)) {
+              Write-Host "::error::Runner maintenance script not found at $script (see TODO(unity-helpers) in this workflow: scripts/unity/maintain-windows-runner.ps1 has not been ported yet)."
+              exit 1
+          }
+
+          $code = 0
+          try {
+              Start-Transcript -Path $logPath -Force | Out-Null
+              . $script
+              $unityVersions = @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1')
+              $provisioningProfile = 'StandaloneWindowsIl2Cpp'
+              $installRoot = if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }
+              $maintenanceArgs = @{
+                  UnityVersions = $unityVersions
+                  ProvisioningProfile = $provisioningProfile
+                  InstallRoot = $installRoot
+                  Force = $true
+                  DiagnosticsRoot = $artifactDir
+              }
+              if ($detectOnly) {
+                  $maintenanceArgs.DetectOnly = $true
+              }
+              $code = Invoke-WindowsRunnerMaintenance @maintenanceArgs
+          } finally {
+              try { Stop-Transcript | Out-Null } catch { Write-Host "::notice::Stop-Transcript: $($_.Exception.Message) (non-fatal)" }
+          }
+
+          Write-Host "Runner maintenance exit code: $code"
+          if ($env:GITHUB_STEP_SUMMARY) {
+              $label = switch ($code) {
+                  0 { 'ok' }
+                  2 { 'detect-only-missing' }
+                  3 { 'mutex-busy' }
+                  4 { 'runner-busy' }
+                  default { "fail($code)" }
+              }
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Runner maintenance result: ``" + $label + "`` (exit $code)")
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Transcript: ``" + $logPath + "``")
+          }
+          if ($code -ne 0) { exit $code }
+
+      # F1: actions/upload-artifact@v7 -- matches the repo-wide pinned
+      # version used by unity-tests.yml/unity-benchmarks.yml.
+      # F19: if-no-files-found is `error` (not `warn`) so a missing transcript
+      # is a HARD failure rather than a silent empty artifact upload.
+      - name: Upload bootstrap transcript
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runner-bootstrap-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/runner-bootstrap/**
+          if-no-files-found: error
+          retention-days: 30

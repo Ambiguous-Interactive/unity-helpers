@@ -1,0 +1,188 @@
+name: Print self-hosted runner diagnostics
+# cspell:ignore WSL prereqs
+description: >-
+  Emit a self-contained diagnostic block for a self-hosted Windows Unity
+  runner. First runs a Windows PowerShell 5.1 preflight that fails fast with
+  a clear, actionable error when PowerShell 7 (pwsh) is missing, so the
+  cryptic "pwsh: command not found" never surfaces. Then emits diagnostics
+  via PowerShell so we never depend on the runner-host PATH ordering between
+  WSL bash and Git Bash. Surfaces the resolved bash path and warns when the
+  WSL stub at System32\bash.exe leaks ahead of
+  C:\Program Files\Git\bin\bash.exe so the operator can fix the agent
+  PATH before queueing further Unity work.
+
+inputs:
+  concurrency-note:
+    description: One-line note describing the job's concurrency contract.
+    required: false
+    default: "wallstop-organization-builds (central organization Unity lock)"
+  matrix-note:
+    description: One-line note describing matrix scheduling.
+    required: false
+    default: ""
+  requested-labels:
+    description: Human-readable runs-on label set for this job.
+    required: false
+    default: "self-hosted, Windows, RAM-64GB"
+
+runs:
+  using: "composite"
+  steps:
+    # Runs in Windows PowerShell 5.1 (always built into Windows runners), so
+    # it executes even when pwsh is absent. The remaining steps in this action
+    # and the Unity jobs that consume it use `shell: pwsh`; without this
+    # preflight a missing pwsh surfaces only as the cryptic
+    # "##[error]pwsh: command not found". This turns that into a clear,
+    # actionable failure pointing at the runbook. PowerShell 5.1-safe: no
+    # `??`, no ternary.
+    - name: Verify PowerShell 7 (pwsh) is available
+      shell: powershell
+      run: |
+        $pwshCommand = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue
+        if ($null -eq $pwshCommand -or
+            [string]::IsNullOrWhiteSpace($pwshCommand.Source) -or
+            -not (Test-Path $pwshCommand.Source -PathType Leaf)) {
+            Write-Output ("::error title=pwsh missing on self-hosted runner::PowerShell 7 (pwsh) is not installed on runner '$env:RUNNER_NAME'. Install it before queueing Unity jobs -- see " +
+            "docs/runbooks/unity-runners-after-transfer.md (PowerShell 7 prerequisite).")
+            exit 1
+        }
+        Write-Output "pwsh found at: $($pwshCommand.Source)"
+    - name: Emit runner diagnostics
+      shell: pwsh
+      env:
+        # Surfaced as inputs so the diagnostic line per workflow stays
+        # accurate (        # other three do). Empty strings render as "n/a".
+        UH_DIAG_CONCURRENCY_NOTE: ${{ inputs.concurrency-note }}
+        UH_DIAG_MATRIX_NOTE: ${{ inputs.matrix-note }}
+        UH_DIAG_REQUESTED_LABELS: ${{ inputs.requested-labels }}
+      run: |
+        $ErrorActionPreference = 'Continue'
+        function Default-Value {
+            param([string]$value, [string]$fallback = '<unset>')
+            if ([string]::IsNullOrEmpty($value)) { return $fallback }
+            return $value
+        }
+        Write-Output "::group::Runner diagnostics"
+        Write-Output ("Runner name:           " + (Default-Value $env:RUNNER_NAME))
+        Write-Output ("Runner OS:             " + (Default-Value $env:RUNNER_OS))
+        Write-Output ("Runner arch:           " + (Default-Value $env:RUNNER_ARCH))
+        Write-Output ("Runner workspace:      " + (Default-Value $env:RUNNER_WORKSPACE))
+        Write-Output ("Concurrency group:     " + (Default-Value $env:UH_DIAG_CONCURRENCY_NOTE 'n/a'))
+        $matrixNote = $env:UH_DIAG_MATRIX_NOTE
+        if (-not [string]::IsNullOrEmpty($matrixNote)) {
+            Write-Output ("Matrix scheduling:     " + $matrixNote)
+        }
+        Write-Output ("Requested labels:      " + $env:UH_DIAG_REQUESTED_LABELS)
+        Write-Output ("GitHub workflow:       " + (Default-Value $env:GITHUB_WORKFLOW))
+        Write-Output ("GitHub job:            " + (Default-Value $env:GITHUB_JOB))
+        $runId = Default-Value $env:GITHUB_RUN_ID
+        $runAttempt = Default-Value $env:GITHUB_RUN_ATTEMPT
+        Write-Output ("GitHub run id/attempt: " + $runId + " / " + $runAttempt)
+        $githubRef = Default-Value $env:GITHUB_REF
+        $refProtected = Default-Value $env:GITHUB_REF_PROTECTED
+        Write-Output ("GitHub ref:            " + $githubRef + " (protected=" + $refProtected + ")")
+        Write-Output ("GitHub event:          " + (Default-Value $env:GITHUB_EVENT_NAME))
+        Write-Output ""
+        Write-Output ("PowerShell version:    " + $PSVersionTable.PSVersion.ToString())
+        # PATH-walk that mirrors actions/runner WhichUtil. The runner agent
+        # resolves shell:bash by walking $env:Path entries in order and
+        # returning the first directory that contains bash.exe (no PATHEXT
+        # search, no PowerShell-specific aliases). PowerShell's Get-Command
+        # consults aliases, functions, and built-ins BEFORE PATH, so it can
+        # report a bash binding that the runner agent will never actually
+        # pick. Reproduce the agent's algorithm explicitly. We probe for
+        # bash.exe first (the standard Windows artifact), then bash without
+        # an extension as a fallback for unconventional installs.
+        $resolvedBash = $null
+        $pathEntries = ($env:Path -split ';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        foreach ($candidateName in @('bash.exe', 'bash')) {
+            foreach ($pathEntry in $pathEntries) {
+                $candidatePath = Join-Path $pathEntry $candidateName
+                if (Test-Path $candidatePath -PathType Leaf) {
+                    $resolvedBash = $candidatePath
+                    break
+                }
+            }
+            if ($null -ne $resolvedBash) { break }
+        }
+        if ($null -ne $resolvedBash) {
+            Write-Output ("Resolved bash:         " + $resolvedBash)
+            # The WSL stub sits at C:\Windows\System32\bash.exe and tries to
+            # launch a WSL distro; on Unity runners that distro is usually
+            # not installed and `shell: bash` steps fail with
+            # "Windows Subsystem for Linux has no installed distributions."
+            # When that stub wins the PATH resolution race, surface a
+            # ::warning:: so the operator fixes the runner-host PATH
+            # ordering (Git Bash must precede System32 in PATH).
+            if ($resolvedBash -match '\\System32\\bash(\.exe)?$' -or $resolvedBash -match '/System32/bash(\.exe)?$') {
+                Write-Output ("::warning::self-hosted runner PATH resolves bash to the WSL stub; ensure Git Bash precedes System32 in PATH")
+            }
+        } else {
+            Write-Output "Resolved bash:         (not on PATH)"
+        }
+        $pathParts = ($env:Path -split ';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $head = $pathParts | Select-Object -First 10
+        Write-Output "PATH (first 10 entries):"
+        foreach ($entry in $head) {
+            Write-Output ("  - " + $entry)
+        }
+        Write-Output "::endgroup::"
+    - name: Configure Git compression tools for Actions cache
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Continue'
+        $candidateDirs = New-Object System.Collections.Generic.List[string]
+        foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432)) {
+            if ([string]::IsNullOrWhiteSpace($root)) {
+                continue
+            }
+            $dir = Join-Path $root 'Git\usr\bin'
+            if (-not $candidateDirs.Contains($dir)) {
+                [void]$candidateDirs.Add($dir)
+            }
+        }
+
+        $gitToolDir = $null
+        foreach ($dir in $candidateDirs) {
+            $gzipPath = Join-Path $dir 'gzip.exe'
+            $tarPath = Join-Path $dir 'tar.exe'
+            if ((Test-Path $gzipPath -PathType Leaf) -and (Test-Path $tarPath -PathType Leaf)) {
+                $gitToolDir = $dir
+                break
+            }
+        }
+
+        if ($null -ne $gitToolDir) {
+            $env:Path = "$gitToolDir;$env:Path"
+            if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_PATH)) {
+                Add-Content -Path $env:GITHUB_PATH -Value $gitToolDir -Encoding utf8
+            }
+            Write-Output "::notice::Prepended Git usr/bin for Actions cache compression tools"
+            Write-Output ("Git tool dir:          " + $gitToolDir)
+            Write-Output ("gzip:                  " + (Join-Path $gitToolDir 'gzip.exe'))
+            Write-Output ("tar:                   " + (Join-Path $gitToolDir 'tar.exe'))
+        } else {
+            Write-Output ("::warning::Git usr/bin with gzip.exe and tar.exe was not found; " +
+              "actions/cache may fail to restore/save compressed archives.")
+            Write-Output "Checked candidate Git usr/bin directories:"
+            foreach ($dir in $candidateDirs) {
+                Write-Output ("  - " + $dir)
+            }
+        }
+    # TODO(unity-helpers): DxMessaging ran an `assert-unity-host-prereqs`
+    # composite here to detect missing Windows host prerequisites
+    # (the Visual C++ runtime, long-paths, Defender exclusions, pwsh, the
+    # Universal C Runtime) -- the class of failure that surfaces as Unity.exe
+    # STATUS_DLL_NOT_FOUND (0xC0000135). That composite plus its
+    # scripts/unity/bootstrap-windows-runner.ps1 / maintain-windows-runner.ps1
+    # backends were NOT ported in this batch (out of scope). The diagnostic
+    # emission above (PATH walk, bash resolution, Git compression tools) still
+    # runs. To restore the host prerequisite assertion, port
+    # .github/actions/assert-unity-host-prereqs/ and its PowerShell backends
+    # from DxMessaging, then re-add the step:
+    #     - name: Assert Unity host prerequisites
+    #       uses: ./.github/actions/assert-unity-host-prereqs
+    #       with:
+    #         auto-install: "false"
+    # Until then this composite is detect/diagnose-only, which is a safe
+    # superset of "do nothing extra" -- it never fails the job on its own.

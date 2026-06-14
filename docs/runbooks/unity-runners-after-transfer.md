@@ -1,0 +1,174 @@
+<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME -->
+
+# Unity Runners After Repository Transfer Runbook
+
+This runbook explains how to restore self-hosted Unity runner access after a repository is transferred between GitHub organizations (or when a freshly provisioned runner does not pick up queued Unity jobs). Keep execution notes local. Do not paste secrets, screenshots of organization settings, or other private account metadata into this file or any tracked follow-up.
+
+It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`, `.github/workflows/unity-benchmarks.yml`, and `.github/workflows/runner-bootstrap.yml`, and by `scripts/unity/ensure-editor.ps1` and `.github/actions/print-self-hosted-runner-diagnostics`.
+
+## Symptom
+
+- A queued Unity workflow run (for example **Unity Tests** or **Unity Benchmarks**) stays queued indefinitely.
+- The GitHub Actions UI shows the job waiting for a runner. There is no error, no warning, and the run never starts.
+- The organization's self-hosted runners report Online and Idle in the GitHub UI, with labels that exactly match the workflow's `runs-on` request (`self-hosted`, `Windows`, `RAM-64GB`).
+- The watchdog defined in `.github/workflows/stuck-job-watchdog.yml` does not recover the run because no idle runner is visible to the repository, so the watchdog's label-matching rule never fires.
+
+## Root cause
+
+After a repository transfer between GitHub organizations, the destination organization's runner groups do not automatically include the transferred repository in their repository-access list. When a runner group is configured as "Selected repositories", any repository that is not explicitly listed cannot dispatch jobs to that group's runners. The dispatcher does not log an error in this state; the job simply stays queued.
+
+This is a configuration-state issue, not the intermittent dispatcher bug tracked upstream as [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811). The dispatcher bug applies when an idle matching runner _is_ visible to the repository through the GitHub API but never receives the job. If the API does not list the runner at all for the repository, this runbook applies instead.
+
+## Diagnose with the GitHub CLI
+
+Run the following from any workstation with `gh auth login` already completed. Replace `<org>` with the destination organization that owns the runners.
+
+List the organization's runner groups, including each group's visibility setting:
+
+```bash
+gh api orgs/<org>/actions/runner-groups \
+  -q '.runner_groups[] | {id, name, visibility, allows_public_repositories}'
+```
+
+For a runner group whose visibility is `selected`, list the repositories that currently have access:
+
+```bash
+gh api orgs/<org>/actions/runner-groups/<group-id>/repositories \
+  -q '.repositories[] | {id, name, full_name}'
+```
+
+If `wallstop/unity-helpers` does not appear in that list, the dispatcher has no path to the group's runners from this repository, which matches the symptom above.
+
+Cross-check by listing runners that the repository itself can see:
+
+```bash
+gh api repos/wallstop/unity-helpers/actions/runners \
+  -q '.runners[] | {id, name, status, busy, labels: [.labels[].name]}'
+```
+
+When this list is empty or omits the expected runner names while the organization-level inventory shows them online, the access list is the cause.
+
+## Resolution
+
+Choose one of the following inside the destination organization. Either restores dispatch; pick the one that matches the organization's security model.
+
+Add the transferred repository to the selected list:
+
+1. Organization Settings.
+2. Actions.
+3. Runner groups.
+4. Default (or the relevant group).
+5. Repository access.
+6. Add `wallstop/unity-helpers` to the list.
+7. Save.
+
+Change the group's visibility to all repositories:
+
+1. Organization Settings.
+2. Actions.
+3. Runner groups.
+4. Default (or the relevant group).
+5. Repository access.
+6. Set visibility to all repositories.
+7. Save.
+
+The second resolution avoids future per-transfer maintenance but exposes the runners to every repository in the organization. Use it only when that exposure is acceptable for the runner group's security posture.
+
+After applying the chosen resolution, re-run the queued workflow from the Actions tab. The `runner-preflight` job added to each Unity workflow validates runner access from `ubuntu-latest` before any matrix entry attempts to dispatch onto self-hosted; a green preflight confirms the fix.
+
+## Preflight diagnostic in this repository
+
+Unity workflows run a `runner-preflight` job on `ubuntu-latest` before the self-hosted matrix. That preflight queries `gh api orgs/${OWNER}/actions/runners` first and, on 403/404 (the default `secrets.GITHUB_TOKEN` cannot list org-scoped runners under most org policies), falls back to `gh api repos/${GITHUB_REPOSITORY}/actions/runners`. If both endpoints fail (typically a 403 from each because the token is unscoped for runner administration), the preflight emits a `::warning::` and exits 0 (soft pass).
+
+**Critical contract:** the preflight must NEVER be more strict than the no-preflight baseline. Its only job is to surface a fast, clear failure when it can _prove_ the runner inventory is wrong. When it cannot prove that, it soft-passes so Unity CI is never made strictly more broken than it was without the preflight.
+
+### Upgrading the soft pass to a hard pass
+
+The default `secrets.GITHUB_TOKEN` cannot list runners under a repo-level scope strict enough to reflect the runner-group ACL, so the preflight falls back to a soft pass on most installations. To upgrade the soft-pass path to a hard-pass:
+
+1. Mint a fine-grained personal access token (or a GitHub App installation token) holding the repository-level "Administration: read" permission, scoped to `wallstop/unity-helpers` only. Do NOT use a classic PAT with `admin:org`, and do NOT use the fine-grained "Organization administration: read" permission: both grant org-wide visibility, which causes `gh api orgs/<org>/actions/runners` to return the entire org runner inventory regardless of any individual repository's runner-group ACL. That would let the preflight see runners as online and silently pass even when the post-transfer ACL is broken, which is exactly the pitfall this runbook addresses.
+2. Add the token as a repository secret named `RUNNER_AUDIT_PAT`.
+3. The Unity workflows already prefer `RUNNER_AUDIT_PAT` over `GITHUB_TOKEN` when set (`GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}`) and query the repo-scoped endpoint. That endpoint enforces the runner-group ACL: if the repository does not have access to a runner via its group, the runner is invisible there, which is the live ACL state we want the preflight to detect. The preflight retains the same soft-pass behavior if the secret is absent, so this is opt-in.
+
+The rationale is deliberate: we want the upgrade token to FAIL when the ACL is misconfigured, not paper over it; that is why we use the repo-scoped "Administration: read" permission rather than any org admin scope. Without that property the hard-pass mode would be worse than the soft-pass mode it replaces.
+
+Because `administration` is not a valid `permissions:` key for the workflow-scoped `GITHUB_TOKEN`, the only way to grant the preflight read access to the runner inventory under a repo-level scope is to provision an external token (PAT or app installation token) via `RUNNER_AUDIT_PAT`. Without that, the preflight falls back to the soft-pass path, which is the design intent.
+
+If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
+
+## PowerShell 7 prerequisite on self-hosted runners
+
+Self-hosted Windows Unity runners require **PowerShell 7 (`pwsh`)** in addition to Git Bash. Every Unity workflow consumes the `print-self-hosted-runner-diagnostics` composite action (`.github/actions/print-self-hosted-runner-diagnostics/action.yml`) before its own steps, and that action plus the Unity run/provision steps run with `shell: pwsh`. PowerShell 7 is _not_ the Windows-built-in PowerShell 5.1 (`powershell`); it is a separate install that provides the `pwsh` executable.
+
+### Symptom
+
+- A self-hosted Unity job fails almost immediately with `##[error]pwsh: command not found`.
+- The failure originates from the first `shell: pwsh` step the agent reaches.
+- Git Bash and the runner agent are otherwise healthy.
+
+The diagnostics composite action fails fast with a clear, actionable error annotation (`pwsh missing on self-hosted runner`) when `pwsh` is absent, so this state no longer surfaces only as the cryptic `pwsh: command not found`. The preflight step that emits that error runs under Windows PowerShell 5.1, which is always present, so it executes even when PowerShell 7 is missing.
+
+### Install PowerShell 7
+
+On a machine with winget:
+
+```powershell
+winget install --id Microsoft.PowerShell --source winget
+```
+
+For machines without winget, download and run the latest MSI installer from the official releases page: <https://github.com/PowerShell/PowerShell/releases>.
+
+### Verify
+
+Open a **new** shell (so the updated PATH is picked up) and confirm:
+
+```powershell
+pwsh -v
+Get-Command pwsh
+```
+
+`pwsh -v` should print the installed PowerShell 7 version, and `Get-Command pwsh` should resolve to the installed executable's path.
+
+### Restart the runner agent
+
+After installing PowerShell 7, restart the self-hosted runner service/agent (or refresh the machine's PATH and restart the runner) so the agent process sees `pwsh` on its PATH. The runner agent inherits its environment at start time; until it is restarted it keeps reporting `pwsh: command not found` even though a fresh interactive shell can find `pwsh`. Re-run the queued Unity workflow once the agent is back online.
+
+## Git compression tools for Actions cache
+
+Self-hosted Windows Unity runners also need Git for Windows' Unix tools available to GitHub Actions cache steps. `actions/cache` restores and saves archives through `tar` and `gzip`; when the runner PATH exposes Git Bash but omits `C:\Program Files\Git\usr\bin`, cache post steps can warn with `gzip: command not found` and fail to save the Unity Library cache.
+
+The `print-self-hosted-runner-diagnostics` composite action prepends Git's `usr\bin` directory to `$GITHUB_PATH` when it finds both `gzip.exe` and `tar.exe`, and emits a warning when that directory is absent. To verify locally on the runner:
+
+```powershell
+Get-Command gzip.exe
+Get-Command tar.exe
+```
+
+If either command is missing, install Git for Windows or add `C:\Program Files\Git\usr\bin` to the runner service PATH, then restart the runner agent.
+
+## Never use plain `shell: bash` on self-hosted Windows runners
+
+On a self-hosted Windows runner, `shell: bash` can resolve to the WSL stub at `C:\Windows\System32\bash.exe`, which tries to launch a WSL distro that is usually not installed and fails with "Windows Subsystem for Linux has no installed distributions." The diagnostics composite warns when the runner PATH resolves bash to that stub (Git Bash must precede `System32` in PATH). Unity workflow steps therefore use `shell: pwsh` (or `shell: powershell` for steps that must run before PowerShell 7 is installed) rather than `shell: bash`.
+
+## Windows host prerequisites (0xC0000135 / STATUS_DLL_NOT_FOUND)
+
+If `Unity.exe` fails at startup with `-1073741515` / `0xC0000135` (STATUS_DLL_NOT_FOUND), the host is missing an OS-level dependency Unity imports — most commonly the Microsoft Visual C++ Redistributables (both the 2010 SP1 and the 2015-2022 x64 generations). This is an OS-level fix; `ensure-editor.ps1`'s Unity-reinstall retry loop cannot repair it (the missing DLL is on the OS, not in the Unity install). `ensure-editor.ps1` detects this case and short-circuits with a clear error rather than retrying futilely.
+
+> **TODO(unity-helpers):** The automated host-prerequisite remediation backend that DxMessaging ships — `scripts/unity/bootstrap-windows-runner.ps1`, `scripts/unity/maintain-windows-runner.ps1`, and the `.github/actions/assert-unity-host-prereqs` composite — was **not** ported in this batch. Until it is, `.github/workflows/runner-bootstrap.yml` hard-fails its maintenance step with a clear "script not found" error, and the runner host must be prepared manually:
+>
+> 1. Install the Microsoft Visual C++ 2010 SP1 x64 Redistributable (provides `MSVCP100.dll` / `MSVCR100.dll`).
+> 2. Install the Microsoft Visual C++ 2015-2022 x64 Redistributable (provides `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, `MSVCP140.dll`).
+> 3. Enable Windows long paths (`git config --system core.longpaths true` and the `LongPathsEnabled` registry value).
+> 4. Add Windows Defender exclusions for the Unity install root and the runner work directory to avoid scan-induced timeouts.
+> 5. Install PowerShell 7 (see above).
+>
+> Re-run the queued Unity workflow once the host is prepared. When the backend scripts are ported, this section should point at them and `runner-bootstrap.yml` will perform these steps automatically.
+
+## Required secrets
+
+The Unity workflows expect the following repository (or organization) secrets. They are NOT provisioned by this batch; a maintainer must add them before the first self-hosted run:
+
+- `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD` — classic serial Unity activation (all three required together).
+- `ORG_BUILD_LOCK_TOKEN` — token for the `wallstop-organization-builds` org build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`).
+- `UNITY_ACCELERATOR_ENDPOINT` — optional; enables the Unity Accelerator cache namespace when set.
+- `RUNNER_AUDIT_PAT` — optional; upgrades the runner-preflight soft pass to a hard pass (see above).

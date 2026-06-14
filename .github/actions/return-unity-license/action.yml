@@ -1,0 +1,123 @@
+name: Return Unity license
+description: >-
+  Defense-in-depth: explicitly return the per-run Unity license seat via
+  `Unity.exe -returnlicense` (classic serial activation). Runs as an if:always()
+  backstop for a killed/crashed/timed-out editor that could not return its own
+  seat. NEVER fails the build (a missing editor path or credentials, or any error, is
+  non-fatal -- the next run's return-at-start is a further backstop).
+inputs:
+  unity-editor-path:
+    description: "Path to the resolved Unity editor exe (exported to GITHUB_ENV by run-ci-tests.ps1). When empty there is nothing to return."
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Return Unity license
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        # Pin $PSNativeCommandUseErrorActionPreference = $false (mirrors the
+        # rationale in scripts/unity/run-ci-tests.ps1). PowerShell 7.4+
+        # can ENABLE the native-error behavior so that `& <native>` THROWS on a
+        # non-zero exit. If that fired here, `& $editorPath @returnArgs` would
+        # throw BEFORE `$exitCode = $LASTEXITCODE` runs, jumping straight to the
+        # catch and making the best-effort return's exit-code-classified warning
+        # unreliable across hosts. Pinning it $false keeps the LASTEXITCODE-based
+        # classification authoritative and identical on every runner. (Pre-7.4
+        # builds lack the variable; assigning it is harmless and StrictMode-safe.)
+        $PSNativeCommandUseErrorActionPreference = $false
+
+        # Best-effort, never-fails seat return. Top-level try/catch + a final
+        # `exit 0` guarantee this step can never fail the build: a leaked seat is
+        # also reclaimed by the NEXT run's return-at-start even if every branch
+        # below is skipped.
+        try {
+          $editorPath = '${{ inputs.unity-editor-path }}'
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            $editorPath = $env:UNITY_EDITOR_PATH
+          }
+
+          # Nothing to return when the editor path was never resolved (the Unity
+          # run never reached the point of exporting UNITY_EDITOR_PATH).
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            Write-Host "::notice::No Unity editor path resolved; nothing to return."
+            exit 0
+          }
+          if (-not (Test-Path -LiteralPath $editorPath -PathType Leaf)) {
+            Write-Host "::notice::Resolved Unity editor path does not exist; nothing to return."
+            exit 0
+          }
+
+          # Serial activation returns by account, so both credentials are required. If
+          # either is empty we cannot return -- warn (never echo the values) and
+          # exit 0 (the next run's return-at-start is the backstop).
+          if ([string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -or [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)) {
+            Write-Host "::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set; cannot return the Unity license here. The next run's return-at-start is the backstop."
+            exit 0
+          }
+
+          # SECURITY: email/password ride in the argument array, and Unity may echo
+          # account fragments into its log, so write the return log to a NON-uploaded
+          # temp dir (RUNNER_TEMP, fallback the system temp path), NOT under the
+          # uploaded artifacts. Never echo the args/secrets.
+          $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+          $returnLog = Join-Path $licenseLogDir 'unity-return-license.log'
+
+          # SECURITY: do NOT echo this array (it carries the credentials).
+          $returnArgs = @(
+            '-quit',
+            '-batchmode',
+            '-nographics',
+            '-returnlicense',
+            '-username', $env:UNITY_EMAIL,
+            '-password', $env:UNITY_PASSWORD,
+            '-logFile', '-'
+          )
+
+          Write-Host "::group::Return Unity license"
+          # Unity.exe is a Windows GUI-subsystem binary: PowerShell's `&` does NOT
+          # wait for it or set $LASTEXITCODE unless its stdout is consumed via the
+          # pipeline. `-logFile -` puts the log on stdout and `| Tee-Object` forces
+          # the wait and sets $LASTEXITCODE. Tee-Object DOES persist the log to
+          # $returnLog, but that target lives under the NON-uploaded temp dir
+          # ($licenseLogDir above), so it stays out of any UPLOADED ARTIFACT and the
+          # account fragments Unity may print cannot leak into uploads. Same proven
+          # idiom as run-ci-tests.ps1.
+          & $editorPath @returnArgs 2>&1 | Tee-Object -FilePath $returnLog
+          $exitCode = $LASTEXITCODE
+          Write-Host "::endgroup::"
+
+          if ($exitCode -ne 0) {
+            $returnedEntitlement = $false
+            $legacyFileUnavailable = $false
+            try {
+              if (Test-Path -LiteralPath $returnLog -PathType Leaf) {
+                $returnedEntitlement = Select-String `
+                  -LiteralPath $returnLog `
+                  -Pattern 'Successfully returned the entitlement license' `
+                  -SimpleMatch `
+                  -Quiet
+                $legacyFileUnavailable = Select-String `
+                  -LiteralPath $returnLog `
+                  -Pattern 'Serial number unavailable for ULF return' `
+                  -SimpleMatch `
+                  -Quiet
+              }
+            } catch {
+              $returnedEntitlement = $false
+              $legacyFileUnavailable = $false
+            }
+
+            if ($returnedEntitlement -and $legacyFileUnavailable) {
+              Write-Host "::notice::Unity returned the entitlement license, then exited with code $exitCode while skipping legacy ULF return; treating the seat return as successful."
+            } else {
+              Write-Host "::warning::Unity license return exited with code $exitCode; the next run's return-at-start is the backstop for the leaked seat."
+            }
+          } else {
+            Write-Host "::notice::Returned the Unity license seat."
+          }
+        } catch {
+          Write-Host "::warning::Unity license return step hit an unexpected error: $($_.Exception.Message). The next run's return-at-start is the backstop."
+        }
+        # Defense-in-depth: this step must never fail the build.
+        exit 0

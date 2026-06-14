@@ -1,0 +1,495 @@
+name: Verify Unity tests actually ran
+# cspell:ignore ieq IPC
+description: >-
+  Fail unless an NUnit results.xml under results-dir reports total > 0 and
+  failed = 0. When XML is absent, list provisioning diagnostics and scan the
+  Unity log for catastrophic compile-time failures.
+inputs:
+  results-dir:
+    description: "Directory the Unity runner wrote the NUnit results XML into."
+    required: true
+  label:
+    description: "Human label used in log lines and annotations."
+    required: false
+    default: "Unity tests"
+  expected-empty:
+    description: >-
+      Set to 'true' by the caller when the unity-helpers test-assembly list
+      resolved EMPTY for this target and the Unity run was intentionally
+      skipped. The verifier then treats the absence of results as an expected
+      skip (notice + success) instead of failing with "tests did not run".
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    # Skip on cancellation so this step does not race against the user's
+    # cancel and emit a misleading "tests did not run" error annotation
+    # when in fact the run was cancelled. Note: this is a STEP-level
+    # condition; the workflow-level "Verify tests actually ran" entry that
+    # invokes this composite should use the SAME idiom so the composite is
+    # not invoked at all on cancel, but the inner guard belt-and-suspenders
+    # protects against a future workflow forgetting the outer condition.
+    - name: Verify tests actually ran
+      if: ${{ !cancelled() }}
+      shell: pwsh
+      env:
+        UH_EXPECTED_EMPTY: ${{ inputs.expected-empty }}
+      run: |
+        $dir = "${{ inputs.results-dir }}"
+        $label = "${{ inputs.label }}"
+        # When the caller resolved an empty unity-helpers test-assembly list for
+        # this target it skips the Unity run entirely (see compute-unity-assemblies
+        # and unity-tests.yml). There are then no results to verify, so treat it
+        # as an explicit success instead of a "tests did not run" failure. Read
+        # the signal from the environment via an env: mapping above (NOT an inline
+        # workflow-expression expansion in this run script) so the spawn-based
+        # verifier tests, which only substitute results-dir/label, observe an
+        # unset var and exercise the normal verification path.
+        if ($env:UH_EXPECTED_EMPTY -eq 'true') {
+          Write-Host "::notice::No unity-helpers test assemblies were selected for $label; the Unity run was skipped, so there is nothing to verify."
+          exit 0
+        }
+        function Write-ProvisioningDiagnosticsHint {
+          param([Parameter(Mandatory = $true)][string]$ResultsDir)
+
+          $roots = New-Object System.Collections.Generic.List[string]
+          foreach ($candidate in @($ResultsDir, '.artifacts', 'artifact')) {
+            if ($candidate -and (Test-Path -LiteralPath $candidate)) {
+              $full = (Resolve-Path -LiteralPath $candidate).Path
+              if (-not $roots.Contains($full)) {
+                $roots.Add($full)
+              }
+            }
+          }
+
+          $dirs = New-Object System.Collections.Generic.List[string]
+          foreach ($root in $roots) {
+            if ((Split-Path -Leaf $root) -ieq 'provisioning') {
+              if (-not $dirs.Contains($root)) {
+                $dirs.Add($root)
+              }
+            }
+
+            $direct = Join-Path $root 'provisioning'
+            if ((Test-Path -LiteralPath $direct) -and -not $dirs.Contains($direct)) {
+              $dirs.Add((Resolve-Path -LiteralPath $direct).Path)
+            }
+
+            Get-ChildItem -LiteralPath $root -Directory -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -ieq 'provisioning' } |
+              ForEach-Object {
+                if (-not $dirs.Contains($_.FullName)) {
+                  $dirs.Add($_.FullName)
+                }
+              }
+          }
+
+          if ($dirs.Count -lt 1) {
+            Write-Host "::warning::No provisioning diagnostics directory found under $ResultsDir, .artifacts, or artifact."
+            return
+          }
+
+          Write-Host "::group::Provisioning diagnostics files"
+          foreach ($diagnosticsDir in $dirs) {
+            Write-Host "Provisioning diagnostics directory: $diagnosticsDir"
+            $files = @(
+              Get-ChildItem -LiteralPath $diagnosticsDir -File -Recurse -ErrorAction SilentlyContinue |
+                Sort-Object FullName
+            )
+            if ($files.Count -lt 1) {
+              Write-Host "- (empty)"
+              continue
+            }
+
+            foreach ($file in $files) {
+              Write-Host "- $($file.FullName)"
+            }
+
+            $summary = $files |
+              Where-Object { $_.Name -match '(?i)summary' } |
+              Select-Object -First 1
+            if ($summary) {
+              Write-Host "::notice::Provisioning summary: $($summary.FullName)"
+              try {
+                $summaryJson = Get-Content -LiteralPath $summary.FullName -Raw | ConvertFrom-Json
+                $classification = if ($summaryJson.finalClassification) {
+                  [string]$summaryJson.finalClassification
+                } else {
+                  '(missing)'
+                }
+                $provisioningProfile = if ($summaryJson.provisioningProfile) {
+                  [string]$summaryJson.provisioningProfile
+                } else {
+                  '(missing)'
+                }
+                Write-Host "::notice::Provisioning summary classification=$classification profile=$provisioningProfile"
+                if ($env:GITHUB_STEP_SUMMARY) {
+                  Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Provisioning summary: ``" + $summary.FullName + "``")
+                  Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Provisioning classification: ``" + $classification + "`` (profile ``" + $provisioningProfile + "``)")
+                }
+                if ($classification -ne 'success' -and $classification -ne '(missing)') {
+                  $missingModules = @()
+                  if ($summaryJson.requiredModulePresence) {
+                    foreach ($property in @($summaryJson.requiredModulePresence.PSObject.Properties)) {
+                      if ($property.Value -eq $false) {
+                        $missingModules += [string]$property.Name
+                      }
+                    }
+                  }
+                  $missingText = if ($missingModules.Count -gt 0) {
+                    " missingModules=$($missingModules -join ',')"
+                  } else {
+                    ""
+                  }
+                  Write-Host "::error::Provisioning failed before Unity results verification: classification=$classification profile=$provisioningProfile summary=$($summary.FullName)$missingText"
+                }
+              } catch {
+                Write-Host "::notice::Provisioning summary metadata could not be parsed: $($_.Exception.Message)"
+              }
+            }
+          }
+          Write-Host "::endgroup::"
+        }
+
+        function Add-UnityDiagnosticLogFile {
+          param(
+            [Parameter(Mandatory = $true)]$LogFiles,
+            [Parameter(Mandatory = $true)]$Seen,
+            [string]$Path
+          )
+
+          if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            return
+          }
+
+          try {
+            $fullPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+          } catch {
+            return
+          }
+
+          if ($Seen.Add($fullPath)) {
+            $LogFiles.Add($fullPath)
+          }
+        }
+
+        function Get-UnityDiagnosticLogFiles {
+          param([string]$ResultsDir)
+
+          $logFiles = New-Object System.Collections.Generic.List[string]
+          $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+          if (-not $ResultsDir) {
+            return @($logFiles)
+          }
+
+          Add-UnityDiagnosticLogFile `
+            -LogFiles $logFiles `
+            -Seen $seen `
+            -Path (Join-Path $ResultsDir 'unity.log')
+
+          if (Test-Path -LiteralPath $ResultsDir -PathType Container) {
+            Get-ChildItem -LiteralPath $ResultsDir -File -Recurse -Filter '*.log' -ErrorAction SilentlyContinue |
+              Sort-Object FullName |
+              ForEach-Object {
+                Add-UnityDiagnosticLogFile `
+                  -LogFiles $logFiles `
+                  -Seen $seen `
+                  -Path $_.FullName
+              }
+          }
+
+          return @($logFiles)
+        }
+
+        # CLASS-OF-ISSUE DIAGNOSTIC: when results.xml is missing, the operator's
+        # next question is "WHY did Unity not produce results?". The most common
+        # silent-killer answers are catastrophic compile-time errors -- the editor
+        # exits before running tests at all, leaving no NUnit XML. Surface these
+        # patterns BEFORE the generic "no results.xml" message so the operator
+        # sees the actual root cause in the GitHub error summary.
+        #
+        # Patterns covered:
+        #   - PrecompiledAssemblyException -- "Multiple precompiled assemblies
+        #     with the same name" (the analyzer-DLL duplicate that motivated this
+        #     diagnostic; the runtime auto-copy that caused it has been removed).
+        #   - CompilationFailedException -- generic compile-failure path.
+        #   - error CS\d+ -- compiler errors (CS0246, CS0103, CS0117, etc).
+        #   - warning CS8032 -- "An instance of analyzer cannot be created"
+        #     (analyzer failed to instantiate; same class of issue).
+        function Write-UnityCatastrophicPatternHits {
+          param([Parameter(Mandatory = $true)][string]$ResultsDir)
+
+          $patterns = @(
+            @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
+            @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
+            @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
+            @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
+            @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
+          )
+
+          $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $ResultsDir)
+
+          if ($logFiles.Count -lt 1) {
+            return
+          }
+
+          $maxPerPattern = 5
+          foreach ($entry in $patterns) {
+            $hits = New-Object System.Collections.Generic.List[object]
+            foreach ($logFile in $logFiles) {
+              try {
+                if ($entry.UseSimple) {
+                  Select-String -LiteralPath $logFile -SimpleMatch -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                    ForEach-Object {
+                      if ($hits.Count -lt $maxPerPattern) {
+                        $hits.Add($_)
+                      }
+                    }
+                } else {
+                  Select-String -LiteralPath $logFile -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                    ForEach-Object {
+                      if ($hits.Count -lt $maxPerPattern) {
+                        $hits.Add($_)
+                      }
+                    }
+                }
+              } catch {
+                # Best-effort; never throw from the diagnostic helper.
+              }
+              if ($hits.Count -ge $maxPerPattern) {
+                break
+              }
+            }
+
+            if ($hits.Count -gt 0) {
+              Write-Host "::group::Catastrophic pattern: $($entry.Label)"
+              foreach ($hit in $hits) {
+                $line = $hit.Line.Trim()
+                Write-Host "::error::Pattern detected -- $($entry.Label):: $line"
+                Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
+              }
+              Write-Host "::endgroup::"
+            }
+          }
+        }
+
+        # DIAGNOSTIC: when results.xml reports failures, name WHICH tests failed
+        # and print their assertion messages. The aggregate "failed=N" count is
+        # not actionable on its own (a real 2021.3 PlayMode run failed 1 of 697
+        # tests and the logs never named it). Emits a single-line ::error::
+        # annotation per failed test plus a ::group:: console block with the full
+        # multi-line message + stack trace. Two classes are enumerated:
+        #   (1) failed leaf cases: //test-case[@result='Failed'], and
+        #   (2) failed suites with their OWN direct <failure> child (the
+        #       OneTimeSetUp/OneTimeTearDown shape, e.g. a [OneTimeTearDown]
+        #       Assert.Fail), which manifest as a failed SUITE. Reported even when
+        #       the suite also has a failed child case, so the teardown's own
+        #       message is not lost; fullname de-dup keeps it distinct from the
+        #       child cases. An aggregate-only suite (no direct <failure>) is
+        #       skipped.
+        # De-duplicated by fullname, capped at the first 50 (with a truncation
+        # notice), and best-effort (never throws -- a diagnostic must not mask
+        # the real failure below). Attribute reads use XmlElement.GetAttribute
+        # (returns '' when absent, never throws) so behavior stays synchronized
+        # with run-ci-tests.ps1 even though this script does not set StrictMode.
+        function ConvertTo-SingleLineDiagnostic {
+          param([string]$Text)
+          if (-not $Text) {
+            return ''
+          }
+          return (($Text -replace '\s+', ' ').Trim())
+        }
+        function Write-UnityPackageManagerFailureHints {
+          param([Parameter(Mandatory = $true)][string]$ResultsDir)
+
+          $patterns = @(
+            'Cancelled resolving packages',
+            'Failed to resolve packages:\s+operation cancelled',
+            'IPCStream \(Upm-[^)]+\): IPC stream failed to read'
+          )
+          $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $ResultsDir)
+
+          foreach ($logFile in $logFiles) {
+            try {
+              $hit = Select-String -LiteralPath $logFile -Pattern $patterns -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+              if ($hit) {
+                $line = ConvertTo-SingleLineDiagnostic -Text $hit.Line
+                Write-Host "::error::Unity Package Manager canceled package resolution before tests started: $line"
+                Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
+                return
+              }
+            } catch {
+              # Best-effort diagnostic only.
+            }
+          }
+        }
+        # Token holder for the ::stop-commands::<token> ... ::<token>:: fence that
+        # wraps caller-controlled raw multi-line dumps (NUnit
+        # <message>/<stack-trace>). GitHub parses every stdout line for
+        # `::command::` directives; fencing the raw body disables that processing
+        # so an assertion message containing a line like `::error file=...::` or
+        # `::set-output name=x::` cannot inject a spurious workflow command. The
+        # token is NOT a fixed literal: a crafted message containing the exact
+        # `::<literal>::` close line could otherwise end the fence early and
+        # re-enable injection. A FRESH random GUID token is generated per dump
+        # via New-WorkflowCommandStopToken (mirroring GitHub's own @actions/core
+        # random per-invocation delimiter) and reused for the open and close.
+        # Kept in sync with run-ci-tests.ps1's matching fence scheme.
+        function New-WorkflowCommandStopToken {
+          return ('uh-stop-commands-{0}' -f [guid]::NewGuid().ToString('N'))
+        }
+        # Resolve a node's display name via XmlElement.GetAttribute (returns ''
+        # for an ABSENT attribute, never throws) -- kept synchronized with
+        # run-ci-tests.ps1's StrictMode-safe Get-NUnitNodeFullName. Prefers
+        # fullname, then name, then a '(unnamed test)' fallback.
+        function Get-NUnitNodeFullName {
+          param([Parameter(Mandatory = $true)]$Node)
+          $fullName = $Node.GetAttribute('fullname')
+          if (-not $fullName) {
+            $fullName = $Node.GetAttribute('name')
+          }
+          if (-not $fullName) {
+            $fullName = '(unnamed test)'
+          }
+          return $fullName
+        }
+        function Write-FailedTestAnnotations {
+          param(
+            [Parameter(Mandatory = $true)]$Doc,
+            [Parameter(Mandatory = $true)][string]$Label,
+            [int]$MaxFailures = 50
+          )
+
+          try {
+            $failedCases = @($Doc.SelectNodes("//test-case[@result='Failed']"))
+            $failedSuites = @($Doc.SelectNodes("//test-suite[@result='Failed']"))
+            # Report a failed suite on its OWN merits whenever it carries a
+            # direct <failure> child (even if it also has a failed descendant
+            # case) so a [OneTimeTearDown] message is not lost. fullname de-dup
+            # keeps it distinct from its child cases; an aggregate-only suite
+            # (no direct <failure>) is skipped.
+            $ownFailureSuites = @(
+              foreach ($suite in $failedSuites) {
+                $directFailure = $suite.SelectSingleNode('failure')
+                if ($directFailure) {
+                  $suite
+                }
+              }
+            )
+            $failedNodes = @($failedCases) + @($ownFailureSuites)
+            if ($failedNodes.Count -lt 1) {
+              return
+            }
+
+            $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+            $uniqueNodes = New-Object 'System.Collections.Generic.List[object]'
+            foreach ($node in $failedNodes) {
+              $fullName = Get-NUnitNodeFullName -Node $node
+              if ($seen.Add($fullName)) {
+                $uniqueNodes.Add($node)
+              }
+            }
+
+            $totalFailed = $uniqueNodes.Count
+            $shown = @($uniqueNodes | Select-Object -First $MaxFailures)
+            foreach ($node in $shown) {
+              $fullName = Get-NUnitNodeFullName -Node $node
+              $failureNode = $node.SelectSingleNode('failure')
+              $message = ''
+              $stackTrace = ''
+              if ($failureNode) {
+                $messageNode = $failureNode.SelectSingleNode('message')
+                if ($messageNode) {
+                  $message = $messageNode.InnerText
+                }
+                $stackNode = $failureNode.SelectSingleNode('stack-trace')
+                if ($stackNode) {
+                  $stackTrace = $stackNode.InnerText
+                }
+              }
+              $firstLine = ConvertTo-SingleLineDiagnostic -Text $message
+              # The single-line ::error:: annotation stays OUTSIDE the fence so
+              # GitHub still processes it; it is already flattened to one line.
+              Write-Host "::error::${Label} failed test: $fullName -- $firstLine"
+              Write-Host "::group::Failed test: $fullName"
+              # SECURITY: the raw NUnit <message>/<stack-trace> are
+              # caller-controlled; GitHub parses every stdout line for
+              # `::command::` directives. Fence the raw multi-line dump with
+              # ::stop-commands::<token> ... ::<token>:: so an injected line like
+              # `::set-output name=x::` is neutralized. The token is a FRESH
+              # random GUID per dump (never a fixed literal) so a crafted message
+              # containing the exact `::<literal>::` close line cannot end the
+              # fence early. The ::group::/::endgroup:: markers stay OUTSIDE the
+              # fence so they are still processed.
+              $stopToken = New-WorkflowCommandStopToken
+              Write-Host "::stop-commands::$stopToken"
+              if ($message) {
+                Write-Host "Message:"
+                Write-Host $message
+              } else {
+                Write-Host "Message: (none recorded)"
+              }
+              if ($stackTrace) {
+                Write-Host "Stack trace:"
+                Write-Host $stackTrace
+              }
+              Write-Host "::$stopToken::"
+              Write-Host "::endgroup::"
+            }
+
+            if ($totalFailed -gt $shown.Count) {
+              $omitted = $totalFailed - $shown.Count
+              Write-Host "::notice::${Label}: $omitted additional failed test(s) not shown (showing first $($shown.Count) of $totalFailed)."
+            }
+          } catch {
+            Write-Host "::warning::Could not enumerate failed tests for ${Label}: $($_.Exception.Message)"
+          }
+        }
+
+        # ALWAYS scan the Unity log for catastrophic patterns first, regardless
+        # of which exit branch fires below. The patterns (PrecompiledAssemblyException,
+        # CompilationFailedException, error CS####, warning CS8032) are the
+        # most common silent-killer causes of every exit branch -- missing dir
+        # AND missing XML AND total==0 AND failed>0 can all coincide with a
+        # partial Unity crash. The helper gracefully skips when no log file
+        # exists, so this is cheap on the happy path. Run it at the TOP so
+        # the operator sees the actual root cause first in the GitHub error
+        # summary, not buried under a generic "tests did not run" line.
+        Write-UnityCatastrophicPatternHits -ResultsDir $dir
+        if (-not (Test-Path $dir)) {
+          Write-ProvisioningDiagnosticsHint -ResultsDir $dir
+          Write-Host "::error::No artifacts directory ($dir) -- Unity Test Runner did not produce results for $label"
+          exit 1
+        }
+        $xml = Get-ChildItem -Path $dir -Recurse -Filter *.xml -ErrorAction SilentlyContinue |
+          Where-Object { Select-String -Path $_.FullName -Pattern '<test-run' -Quiet } |
+          Select-Object -First 1
+        if (-not $xml) {
+          # Catastrophic patterns were already scanned at the TOP of this
+          # step (see the Write-UnityCatastrophicPatternHits call above the
+          # Test-Path block); a second call here would emit duplicate
+          # `::error::` annotations for the same hits.
+          Write-UnityPackageManagerFailureHints -ResultsDir $dir
+          Write-ProvisioningDiagnosticsHint -ResultsDir $dir
+          Write-Host "::error::No NUnit results.xml (with a <test-run> element) under $dir -- tests did not run for $label"
+          exit 1
+        }
+        [xml]$doc = Get-Content -LiteralPath $xml.FullName
+        $run = $doc.SelectSingleNode('//test-run')
+        $total = [int]($run.total)
+        $passed = [int]($run.passed)
+        $failed = [int]($run.failed)
+        $skipped = [int]($run.skipped)
+        Write-Host "Results: total=$total passed=$passed failed=$failed skipped=$skipped ($($xml.Name))"
+        if ($total -lt 1) {
+          Write-Host "::error::0 tests ran for $label -- check the assembly list / filter"
+          exit 1
+        }
+        if ($failed -gt 0) {
+          Write-FailedTestAnnotations -Doc $doc -Label $label
+          Write-Host "::error::$label reported $failed failed test(s); see $($xml.FullName)"
+          exit 1
+        }
+        Write-Host "::notice::${label}: total=$total passed=$passed failed=$failed skipped=$skipped"

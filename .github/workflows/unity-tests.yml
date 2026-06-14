@@ -1,0 +1,434 @@
+name: Unity Tests
+
+# cspell:ignore lfs WSL
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+  schedule:
+    - cron: "17 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      unity-version:
+        description: "Pin a single Unity version. Empty = full matrix."
+        required: false
+        default: ""
+        type: string
+      test-mode:
+        description: "Pin a single test mode."
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - editmode
+          - playmode
+          - standalone
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  matrix-config:
+    name: Resolve Unity test matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      unity-versions: ${{ steps.resolve.outputs.unity-versions }}
+      test-modes: ${{ steps.resolve.outputs.test-modes }}
+      has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # NOTE: DxMessaging had a "ci-owned docs-only PR" detection here that
+      # skipped the licensed matrix when a PR touched ONLY its perf-numbers doc
+      # + baseline. unity-helpers has no such CI-owned perf-doc auto-commit on
+      # the PR path (the unity-benchmarks workflow commits perf results from a
+      # SCHEDULED run, not a PR), so that detection is intentionally DROPPED for
+      # simplicity. If a perf-doc auto-update PR flow is added later, repoint a
+      # docs-only gate at docs/performance/ rather than DxMessaging's
+      # docs/architecture/performance.md path.
+      - name: Resolve dispatch overrides
+        id: resolve
+        env:
+          INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
+          INPUT_TEST_MODE: ${{ inputs.test-mode }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
+            versions="[\"${INPUT_UNITY_VERSION}\"]"
+          else
+            versions="$(jq -c '.all' .github/unity-versions.json)"
+          fi
+          if [ -n "${INPUT_TEST_MODE:-}" ] && [ "${INPUT_TEST_MODE}" != "all" ]; then
+            modes="[\"${INPUT_TEST_MODE}\"]"
+          else
+            modes='["editmode","playmode","standalone"]'
+          fi
+          {
+            echo "unity-versions=${versions}"
+            echo "test-modes=${modes}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check for required Unity license secrets
+        id: check-secrets
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ORG_BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${UNITY_SERIAL:-}" ] && \
+             [ -n "${UNITY_EMAIL:-}" ] && \
+             [ -n "${UNITY_PASSWORD:-}" ] && \
+             [ -n "${ORG_BUILD_LOCK_TOKEN:-}" ]; then
+            echo "has-secrets=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has-secrets=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+  runner-preflight:
+    name: Self-hosted runner access preflight
+    # Runs on ubuntu-latest BEFORE any self-hosted matrix entry tries to
+    # queue. This converts the "stuck forever" failure mode that motivated
+    # docs/runbooks/unity-runners-after-transfer.md into a fast,
+    # clearly-explained failure. The runbook explains the post-transfer
+    # runner-group ACL pitfall and the resolution paths.
+    #
+    # CRITICAL CONTRACT: this preflight must NEVER make Unity CI more
+    # broken than the no-preflight baseline. If the token cannot list
+    # either the org-level OR repo-level runner inventory (403/404 from
+    # both), the preflight emits a ::warning:: and exits 0 (soft pass).
+    # Only when we can prove the inventory is wrong do we fail hard.
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected)
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      # NOTE: `administration: read` is NOT a valid permissions key for
+      # workflow GITHUB_TOKEN (per actionlint and the GitHub docs schema).
+      # Listing self-hosted runners requires admin:org (org-scope) OR a
+      # fine-grained PAT with repo "Administration: read" -- neither of
+      # which the default GITHUB_TOKEN can carry. The soft-pass path in
+      # the run script below is the supported coverage when the token
+      # is unscoped. See docs/runbooks/unity-runners-after-transfer.md.
+    concurrency:
+      group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Probe self-hosted runner availability
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
+          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
+        # Repeated literal of the labels list. Keep in sync with unity-tests
+        # `runs-on:` declaration below; this preflight must run before any
+        # self-hosted matrix in this workflow.
+        # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml;
+        # see that file's comments for why `jq -s` is required.
+        run: |
+          set -euo pipefail
+          echo "::group::Runner-access preflight"
+          echo "Required labels: ${REQUIRED_LABELS}"
+          IFS=',' read -r -a required <<< "${REQUIRED_LABELS}"
+          runners_json="$(mktemp)"
+          runners_scope=""
+          # 1) Try the ORG-scoped endpoint first. Self-hosted runners live
+          # at org scope in this repo (group "Default" in Ambiguous-Interactive).
+          # The default GITHUB_TOKEN often lacks admin:org and will 403 here.
+          if gh api --paginate \
+              "orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100" \
+              2>/dev/null \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="org"
+          else
+            # 2) Fall back to the REPO-scoped endpoint. Requires
+            # administration:read; less common to be granted but possible.
+            if gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100" \
+                2>/dev/null \
+                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+              runners_scope="repo"
+            fi
+          fi
+          if [ -z "${runners_scope}" ]; then
+            # 3) Soft pass: both endpoints failed (almost certainly the
+            # default GITHUB_TOKEN lacks scope). DO NOT fail the build --
+            # that would make Unity CI strictly more broken than baseline.
+            # The watchdog + manual unstick workflows still cover the
+            # actually-stuck case.
+            org_url="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners"
+            repo_url="repos/${GITHUB_REPOSITORY}/actions/runners"
+            {
+              echo "::warning::Runner inventory unavailable from both ${org_url}"
+              echo "::warning::and ${repo_url} (likely 403: GITHUB_TOKEN lacks admin:org"
+              echo "::warning::or administration:read)."
+              echo "::warning::See docs/runbooks/unity-runners-after-transfer.md"
+              echo "::warning::for how to plumb a RUNNER_AUDIT_PAT secret to upgrade"
+              echo "::warning::this soft-pass to a hard-pass."
+            }
+            echo "Soft pass: skipping runner inventory check."
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "Runner inventory scope: ${runners_scope}"
+          total="$(jq 'length' < "${runners_json}")"
+          echo "Visible runners (${runners_scope} scope): ${total}"
+          # Find at least one ONLINE runner with all required labels.
+          matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
+            [ .[]
+              | select(.status == "online")
+              | select(($labels | all(. as $l | (.labels // []) | map(.name) | index($l) | type == "number")))
+            ] | length
+          ' < "${runners_json}")"
+          echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
+          if [ "${matched}" -lt 1 ]; then
+            {
+              echo "::error::No online self-hosted runner satisfies the required labels (${REQUIRED_LABELS})."
+              echo "The Unity matrix would queue forever."
+              echo "See docs/runbooks/unity-runners-after-transfer.md for the post-transfer runner-group ACL fix."
+            }
+            jq '[ .[] | {name, status, busy, labels: [(.labels // [])[].name]} ]' \
+              < "${runners_json}"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+  unity-tests:
+    name: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+    needs:
+      - matrix-config
+      - runner-preflight
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected) &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    timeout-minutes: 660
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
+        test-mode: ${{ fromJSON(needs.matrix-config.outputs.test-modes) }}
+    steps:
+      - name: Enable Git long paths
+        shell: pwsh
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Print runner diagnostics
+        # Composite action runs PowerShell internally; `shell: bash` on a
+        # self-hosted Windows runner can resolve to the WSL stub at
+        # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
+        # for Linux has no installed distributions." Never use plain
+        # `shell: bash` on self-hosted Windows runners.
+        uses: ./.github/actions/print-self-hosted-runner-diagnostics
+        with:
+          matrix-note: "default (organization lock wraps the Unity section)"
+
+      - name: Cache Unity Library and package caches
+        uses: actions/cache@v5
+        env:
+          PACKAGE_HASH: >-
+            ${{ hashFiles(
+              'package.json',
+              'Runtime/**',
+              'Editor/**',
+              'Tests/**',
+              'scripts/unity/run-ci-tests.ps1',
+              'scripts/unity/lib/asmdef-discovery.js',
+              '.github/actions/compute-unity-assemblies/action.yml'
+            ) }}
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-${{ env.PACKAGE_HASH }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      # Single source of truth for the assembly include list: the same
+      # asmdef-discovery.js module the local discovery uses. Extracted into a
+      # composite action so all Unity workflows share one implementation.
+      # shell: pwsh is enforced inside the composite.
+      - name: Compute test assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          target: "${{ matrix.test-mode }}"
+          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
+
+      - name: Validate Unity license secrets
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      # Skip provisioning, the org lock, and the run when no unity-helpers test
+      # assembly matched this target (compute step resolved an empty list). The
+      # verify step runs only after compute succeeds and is told the run was an
+      # expected skip via the expected-empty input. This never triggers for the
+      # current asmdef set; it is the robustness path for a target with no
+      # matching assemblies. If checkout/cache/setup fails before compute, let
+      # that setup failure stand on its own instead of adding a misleading
+      # "tests did not run" annotation for a Unity run that never started.
+      - name: Provision Unity Editor
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        timeout-minutes: 180
+        shell: pwsh
+        run: |
+          $artifactsPath = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
+          $diagnosticsPath = Join-Path $artifactsPath 'provisioning'
+          $diagnosticsFile = Join-Path $diagnosticsPath 'ensure-editor-summary.json'
+          New-Item -ItemType Directory -Force -Path $diagnosticsPath | Out-Null
+          $provisioningProfile = if ('${{ matrix.test-mode }}' -eq 'standalone') {
+            'StandaloneWindowsIl2Cpp'
+          } else {
+            'EditorOnly'
+          }
+          $editor = ./scripts/unity/ensure-editor.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -CiManagedOnly `
+            -RequireHealthyExisting `
+            -ProvisioningProfile $provisioningProfile `
+            -DiagnosticsPath $diagnosticsFile
+          "UNITY_EDITOR_PATH=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Unity provisioning diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-provisioning-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Acquire organization Unity lock
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          timeout-minutes: "300"
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Run Unity Test Runner
+        id: run_tests
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        # 150: the standalone leg builds a NON-development IL2CPP player with
+        # the Release C++ configuration, and a run-ci-tests.ps1 change rotates
+        # the Library cache key, so first runs build cold. The editmode/playmode
+        # legs finish far below this; stays well under the job timeout (660) so
+        # the step clock fires first and releases the shared Unity seat.
+        timeout-minutes: 150
+        shell: pwsh
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+        run: |
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode '${{ matrix.test-mode }}' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild
+
+      - name: Return Unity license
+        if: always()
+        uses: ./.github/actions/return-unity-license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Release organization Unity lock
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      # CANCELLATION + TIMEOUT DIAGNOSTIC: when Unity hangs in csc the runner
+      # step times out (or the operator cancels), and the verify step below
+      # skips -- so its catastrophic-pattern scan never fires either. This step
+      # covers both failure() AND cancelled() so the operator has SOMETHING to
+      # look at in the GitHub summary (the tail of unity.log + any catastrophic
+      # patterns the partial log happened to surface). Best-effort: never fails
+      # the job, no-ops when unity.log doesn't exist (cancellation before Unity
+      # launched).
+      - name: Dump Unity log tail on failure or cancellation
+        if: ${{ failure() || cancelled() }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+
+      # CLASS GUARD: Unity can fail before NUnit writes results. The shared
+      # composite fails unless a results XML exists AND reports total > 0.
+      # Skip on cancellation so a user-cancelled run does not emit the
+      # generic "tests did not run" annotation -- the cancellation itself
+      # is the explanation. Also skip if setup/provisioning/lock work failed
+      # before the Unity run step attempted; that earlier failure is then the
+      # actionable signal. The guard still runs for intentional empty targets,
+      # after a Unity-run failure (to surface "tests did not run" /
+      # catastrophic-compile diagnostics), and on success (to confirm a real
+      # result XML exists).
+      - name: Verify tests actually ran
+        if: >-
+          ${{
+            !cancelled() &&
+            steps.compute.outcome == 'success' &&
+            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+          }}
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          expected-empty: ${{ steps.compute.outputs.is-empty }}
+
+      - name: Upload Unity test artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          if-no-files-found: warn
+          retention-days: 14

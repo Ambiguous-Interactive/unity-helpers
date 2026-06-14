@@ -1,0 +1,479 @@
+name: Unity Benchmarks
+
+# cspell:ignore lfs WSL
+
+on:
+  schedule:
+    - cron: "29 10 * * 3"
+  workflow_dispatch:
+    inputs:
+      unity-version:
+        description: "Pin a single Unity version. Empty = full matrix."
+        required: false
+        default: ""
+        type: string
+
+# Top-level permissions are least-privilege and mirror unity-tests.yml. The
+# licensed matrix jobs (matrix-config, runner-preflight, benchmarks) only need
+# read access plus checks:write for NUnit annotations and issues:write for
+# benchmark-failure notifications; they must NOT inherit write scope. The
+# dedicated commit-perf-results job below opts into contents:write at the JOB
+# level so it (and only it) can push the refreshed perf artifacts.
+permissions:
+  contents: read
+  checks: write
+  issues: write
+
+jobs:
+  matrix-config:
+    name: Resolve benchmark matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      unity-versions: ${{ steps.resolve.outputs.unity-versions }}
+      latest-version: ${{ steps.resolve.outputs.latest-version }}
+      has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Resolve dispatch overrides
+        id: resolve
+        env:
+          INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
+        # The benchmark matrix list and the latest entry both come from the
+        # canonical source (.github/unity-versions.json), so the scheduled perf
+        # coverage tracks every supported runtime and the latest-vs-list pair
+        # cannot drift. The LAST entry is the latest Unity version. A dispatch
+        # override pins a single version.
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
+            versions="[\"${INPUT_UNITY_VERSION}\"]"
+            latest="${INPUT_UNITY_VERSION}"
+          else
+            versions="$(jq -c '.all' .github/unity-versions.json)"
+            latest="$(jq -r '.all[-1]' .github/unity-versions.json)"
+          fi
+          {
+            echo "unity-versions=${versions}"
+            echo "latest-version=${latest}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check for required Unity license secrets
+        id: check-secrets
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ORG_BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${UNITY_SERIAL:-}" ] && \
+             [ -n "${UNITY_EMAIL:-}" ] && \
+             [ -n "${UNITY_PASSWORD:-}" ] && \
+             [ -n "${ORG_BUILD_LOCK_TOKEN:-}" ]; then
+            echo "has-secrets=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has-secrets=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+  runner-preflight:
+    name: Self-hosted runner access preflight
+    # See docs/runbooks/unity-runners-after-transfer.md for the design
+    # contract. CRITICAL: this preflight must NEVER make Unity CI more
+    # broken than the no-preflight baseline -- if both runner-inventory
+    # endpoints return 403/404, soft-pass with a ::warning::.
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      # NOTE: `administration: read` is NOT a valid permissions key for
+      # workflow GITHUB_TOKEN (per actionlint and the GitHub docs schema).
+      # Listing self-hosted runners requires admin:org (org-scope) OR a
+      # fine-grained PAT with repo "Administration: read" -- neither of
+      # which the default GITHUB_TOKEN can carry. The soft-pass path in
+      # the run script below is the supported coverage when the token
+      # is unscoped. See docs/runbooks/unity-runners-after-transfer.md.
+    concurrency:
+      group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Probe self-hosted runner availability
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
+          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
+        # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml.
+        run: |
+          set -euo pipefail
+          echo "::group::Runner-access preflight"
+          echo "Required labels: ${REQUIRED_LABELS}"
+          IFS=',' read -r -a required <<< "${REQUIRED_LABELS}"
+          runners_json="$(mktemp)"
+          runners_scope=""
+          if gh api --paginate \
+              "orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100" \
+              2>/dev/null \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="org"
+          else
+            if gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100" \
+                2>/dev/null \
+                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+              runners_scope="repo"
+            fi
+          fi
+          if [ -z "${runners_scope}" ]; then
+            org_url="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners"
+            repo_url="repos/${GITHUB_REPOSITORY}/actions/runners"
+            {
+              echo "::warning::Runner inventory unavailable from both ${org_url}"
+              echo "::warning::and ${repo_url} (likely 403: GITHUB_TOKEN lacks admin:org"
+              echo "::warning::or administration:read)."
+              echo "::warning::See docs/runbooks/unity-runners-after-transfer.md"
+              echo "::warning::for how to plumb a RUNNER_AUDIT_PAT secret to upgrade"
+              echo "::warning::this soft-pass to a hard-pass."
+            }
+            echo "Soft pass: skipping runner inventory check."
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "Runner inventory scope: ${runners_scope}"
+          total="$(jq 'length' < "${runners_json}")"
+          echo "Visible runners (${runners_scope} scope): ${total}"
+          matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
+            [ .[]
+              | select(.status == "online")
+              | select(($labels | all(. as $l | (.labels // []) | map(.name) | index($l) | type == "number")))
+            ] | length
+          ' < "${runners_json}")"
+          echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
+          if [ "${matched}" -lt 1 ]; then
+            {
+              echo "::error::No online self-hosted runner satisfies the required labels (${REQUIRED_LABELS})."
+              echo "The Unity matrix would queue forever."
+              echo "See docs/runbooks/unity-runners-after-transfer.md for the post-transfer runner-group ACL fix."
+            }
+            jq '[ .[] | {name, status, busy, labels: [(.labels // [])[].name]} ]' \
+              < "${runners_json}"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+  benchmarks:
+    name: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+    needs:
+      - matrix-config
+      - runner-preflight
+    # Skip the self-hosted matrix entirely when license/lock secrets are absent,
+    # so a secret-less repo does not queue forever on a nonexistent runner.
+    if: ${{ needs.matrix-config.outputs.has-required-secrets == 'true' }}
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    timeout-minutes: 660
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
+        test-mode:
+          - editmode
+          - playmode
+    steps:
+      - name: Enable Git long paths
+        shell: pwsh
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Print runner diagnostics
+        # Never use plain `shell: bash` on self-hosted Windows runners (the WSL
+        # stub at C:\Windows\System32\bash.exe can win PATH resolution and fail).
+        uses: ./.github/actions/print-self-hosted-runner-diagnostics
+        with:
+          matrix-note: "default (organization lock wraps the Unity section)"
+
+      - name: Cache Unity Library and package caches
+        uses: actions/cache@v5
+        env:
+          PACKAGE_HASH: >-
+            ${{ hashFiles(
+              'package.json',
+              'Runtime/**',
+              'Editor/**',
+              'Tests/**',
+              'scripts/unity/run-ci-tests.ps1',
+              'scripts/unity/lib/asmdef-discovery.js',
+              '.github/actions/compute-unity-assemblies/action.yml'
+            ) }}
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          key: Library-bench-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-${{ env.PACKAGE_HASH }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      # Single source of truth for the assembly include list: the same
+      # asmdef-discovery.js module. For benchmarks we OPT IN to the perf
+      # assemblies (*.Tests.Runtime.Performance) via include-perf.
+      - name: Compute benchmark assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          include-perf: "true"
+          target: "${{ matrix.test-mode }}"
+
+      - name: Validate Unity license secrets
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      # Skip provisioning, the org lock, and the run when the compute step
+      # resolved an empty assembly list. Mirrors unity-tests.yml. The benchmark
+      # list is structurally non-empty, so this is defense-in-depth.
+      - name: Provision Unity Editor
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        timeout-minutes: 180
+        shell: pwsh
+        run: |
+          $artifactsPath = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
+          $diagnosticsPath = Join-Path $artifactsPath 'provisioning'
+          $diagnosticsFile = Join-Path $diagnosticsPath 'ensure-editor-summary.json'
+          New-Item -ItemType Directory -Force -Path $diagnosticsPath | Out-Null
+          $editor = ./scripts/unity/ensure-editor.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -CiManagedOnly `
+            -RequireHealthyExisting `
+            -ProvisioningProfile EditorOnly `
+            -DiagnosticsPath $diagnosticsFile
+          "UNITY_EDITOR_PATH=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Unity provisioning diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-benchmark-provisioning-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Acquire organization Unity lock
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          timeout-minutes: "300"
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Run Unity Test Runner
+        id: run_tests
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        timeout-minutes: 120
+        shell: pwsh
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          # Run ONLY the perf/stress categories in this dedicated perf job (the
+          # inverse of unity-tests.yml, which excludes them).
+          UH_UNITY_TEST_CATEGORY: "Performance;Stress"
+          UH_PERF_COMMIT: ${{ github.sha }}
+        run: |
+          # Release (not Debug) code optimization for the editmode/playmode perf
+          # legs, mirroring the repo-wide Unity Release-mode contract so the
+          # weekly coverage run measures the same optimized hot path the docs do.
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode '${{ matrix.test-mode }}' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild
+
+      # The Random distribution tests are [Category("Fast")] and run in the main
+      # PR suite at the REDUCED default sample count (Tests/Runtime/Random/
+      # RandomTestBase.cs). This dedicated leg re-runs the Random assembly at the
+      # FULL statistical sample count so the thorough bias-detection coverage the
+      # fast default trades away is recovered weekly in CI. editmode-only (the
+      # Random tests are pure C# EditMode); runs inside the org-lock section.
+      # This is the ONLY place UH_RANDOM_SAMPLE_COUNT is consumed.
+      - name: Run Random suite at full sample count
+        id: run_random_thorough
+        if: ${{ matrix.test-mode == 'editmode' && steps.compute.outputs.is-empty != 'true' }}
+        timeout-minutes: 120
+        shell: pwsh
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          # No perf-category filter: run the Fast-tagged Random tests by assembly.
+          UH_UNITY_TEST_CATEGORY: ""
+          UH_RANDOM_SAMPLE_COUNT: "12750000"
+        run: |
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'editmode' `
+            -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.Runtime.Random' `
+            -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}'
+
+      - name: Return Unity license
+        if: always()
+        uses: ./.github/actions/return-unity-license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Release organization Unity lock
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Dump Unity log tail on failure or cancellation
+        if: ${{ failure() || cancelled() }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          label: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+
+      - name: Verify tests actually ran
+        if: >-
+          ${{
+            !cancelled() &&
+            steps.compute.outcome == 'success' &&
+            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+          }}
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          label: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          expected-empty: ${{ steps.compute.outputs.is-empty }}
+
+      # Stage the raw NUnit results for this leg into a deterministic path so
+      # the downstream commit job can collect every leg's results via
+      # download-artifact and commit them under perf-results/. We commit
+      # the raw results.xml (the source of truth) rather than a hand-formatted
+      # doc; unity-helpers has no NUnit->markdown perf-doc generator yet (the
+      # human-authored docs under docs/performance/*.md stay hand-maintained).
+      # TODO(unity-helpers): if a perf-doc generator is added, render the
+      # polished table here instead of copying raw XML.
+      - name: Stage perf results for commit
+        if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $src = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
+          $stageDir = 'perf-staging'
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+          if (Test-Path -LiteralPath $src -PathType Leaf) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir 'results-${{ matrix.unity-version }}-${{ matrix.test-mode }}.xml') -Force
+            Write-Host "::notice::Staged perf results for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
+          } else {
+            Write-Host "::warning::No results.xml to stage for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
+          }
+
+      - name: Upload staged perf results
+        if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-results-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          path: perf-staging
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-benchmarks-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          if-no-files-found: warn
+          retention-days: 90
+
+  commit-perf-results:
+    name: Commit refreshed perf results
+    needs: benchmarks
+    # schedule + workflow_dispatch only ever run on the canonical repo (scheduled
+    # runs fire only from the default branch; a dispatch requires write access),
+    # so no repo-slug guard is needed (avoids hardcoding a slug that breaks after
+    # an org transfer). Run even if some benchmark legs failed (!cancelled, not
+    # success()) so a partial result set is still captured; if there are no
+    # artifacts at all, git-auto-commit-action is a no-op.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Persist credentials so git-auto-commit-action can push.
+          persist-credentials: true
+
+      - name: Download staged perf results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: perf-results-*
+          path: perf-download
+          merge-multiple: true
+
+      - name: Assemble perf-results
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Commit raw NUnit results to a TOP-LEVEL perf-results/ dir (NOT under
+          # docs/ or any other Unity-asset source root), so they need no Unity
+          # .meta companions and fall outside the prettier/markdown/cspell scan
+          # globs (none scan .xml). Committing under docs/** would break
+          # meta-file-lint (every tracked docs file/dir requires a .meta) on the
+          # next push; perf-results/ sidesteps that entirely.
+          dest="perf-results"
+          mkdir -p "${dest}"
+          if [ -d perf-download ] && [ -n "$(ls -A perf-download 2>/dev/null || true)" ]; then
+            find perf-download -type f -name '*.xml' -exec cp -f {} "${dest}/" \;
+            echo "Assembled $(find "${dest}" -name '*.xml' | wc -l) result file(s) under ${dest}."
+          else
+            echo "::notice::No staged perf results were downloaded; nothing to commit."
+          fi
+
+      # git-auto-commit-action is a no-op when there is no diff, so a run that
+      # produced no new results does not create an empty commit.
+      #
+      # TODO(unity-helpers): if the default branch is protected such that the
+      # built-in GITHUB_TOKEN cannot push (branch protection / required reviews),
+      # this direct commit will be REJECTED. DxMessaging's perf-numbers.yml hit
+      # exactly this and switched to a GitHub App installation token
+      # (actions/create-github-app-token@v3) that opens an auto-merge PR instead.
+      # If that happens here, provision an App token and mirror that rationale;
+      # the default below is the simplest path that works on an UNprotected
+      # default branch.
+      - name: Commit perf results
+        uses: stefanzweifel/git-auto-commit-action@v7.1.0
+        with:
+          commit_message: "chore(perf): refresh CI perf results [skip ci]"
+          file_pattern: perf-results/*.xml
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"

@@ -1,0 +1,519 @@
+name: Stuck Job Watchdog
+
+# cspell:ignore pushd popd
+
+# Recovery automation for the known GitHub Actions self-hosted dispatcher bug
+# documented at https://github.com/orgs/community/discussions/186811:
+# self-hosted runners report Online/Idle but `runner_id` stays at 0 for
+# 7+ minutes, so a queued job whose label set is satisfied by an idle runner
+# nonetheless waits indefinitely until manually re-run.
+#
+# Detection requires ALL of the following to be true:
+#   * The workflow run is `status: queued` AND older than MIN_QUEUE_AGE_SECONDS
+#     (default 300s / 5 min; round-2 false-positive guards below -- zero
+#     in-progress jobs, self-run exclusion, excluded-workflow list -- make
+#     the previous conservative 600s buffer unnecessary).
+#   * No job in the run is `status: in_progress` - a run with even one
+#     in-progress job is by definition holding/using a runner, not
+#     dispatcher-stuck. This is what prevents false positives for matrix cells
+#     or jobs waiting while another job from the same run is actively running.
+#   * At least one job in the run is `status: queued`.
+#   * At least one idle runner's labels satisfy a queued job's label
+#     requirements (superset match).
+#   * The run's workflow file is NOT in the exclusion list (`release.yml`
+#     is hard-excluded by default; additional entries may be added via the
+#     `WATCHDOG_EXCLUDED_WORKFLOWS` repo variable, whitespace-separated).
+#   * The run id is NOT the watchdog's own run id.
+#
+# Recovery action (per cli/cli#9221 and the gh-run-rerun manual,
+# `gh run rerun --failed` cannot be used on a `status: queued` run because
+# the run never reached `failed`; the documented workaround is cancel +
+# redispatch / cancel + operator-managed re-run):
+#   * `gh run cancel <id>` kills the stuck dispatch.
+#   * If the run was triggered by push/schedule/workflow_dispatch on a
+#     branch (not a tag) AND the workflow file declares `workflow_dispatch:`,
+#     re-dispatch via REST API
+#     (`POST repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches`).
+#   * Otherwise (pull_request, tag, no workflow_dispatch trigger), emit a
+#     clear `GITHUB_STEP_SUMMARY` line instructing the operator to click
+#     "Re-run all jobs" in the GitHub UI. Do NOT push a commit, comment on
+#     the PR, or escalate any other automatic action.
+#
+# Cancel attempts are capped at 2 per run-id per 24h via a small state file
+# on the `watchdog-state` orphan branch. State is pushed immediately after each
+# successful cancel, with a single rebase+retry on push failure.
+#
+# Workflow-level concurrency guarantees only one watchdog instance ever runs;
+# newer schedules must not cancel an in-flight audit after it has cancelled a
+# stuck run but before it persists the state-branch counter.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: stuck-job-watchdog
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  audit-queue:
+    name: Audit queued runs and recover dispatcher-stuck ones
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Audit + cancel-and-redispatch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          SELF_RUN_ID: ${{ github.run_id }}
+          STATE_BRANCH: watchdog-state
+          STATE_DIR: .watchdog-state
+          MAX_CANCELS_PER_DAY: "2"
+          MIN_QUEUE_AGE_SECONDS: "300"
+          DEFAULT_EXCLUDED_WORKFLOWS: "release.yml"
+          EXTRA_EXCLUDED_WORKFLOWS: ${{ vars.WATCHDOG_EXCLUDED_WORKFLOWS }}
+        run: |
+          set -euo pipefail
+
+          summary_file="$(mktemp)"
+          : > "${summary_file}"
+          log_summary() {
+            printf '%s\n' "$1" | tee -a "${summary_file}"
+          }
+
+          flush_summary_and_exit() {
+            local code="${1:-0}"
+            {
+              echo "## Watchdog summary"
+              cat "${summary_file}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit "${code}"
+          }
+
+          # Category buckets for the final step-summary table.
+          healthy_runs_file="$(mktemp)"
+          : > "${healthy_runs_file}"
+          stuck_runs_file="$(mktemp)"
+          : > "${stuck_runs_file}"
+          excluded_runs_file="$(mktemp)"
+          : > "${excluded_runs_file}"
+
+          log_summary "## Stuck-job watchdog audit ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+          log_summary "Repo: ${REPO}"
+          log_summary "Owner: ${OWNER}"
+          log_summary "Self run id (will skip): ${SELF_RUN_ID}"
+
+          # Build the workflow-file exclusion list (default + repo variable).
+          declare -A EXCLUDED_BY_FILE=()
+          for wf in ${DEFAULT_EXCLUDED_WORKFLOWS} ${EXTRA_EXCLUDED_WORKFLOWS:-}; do
+            [[ -z "${wf}" ]] && continue
+            # Normalize: strip any leading .github/workflows/ if present.
+            base="${wf##*/}"
+            EXCLUDED_BY_FILE["${base}"]=1
+          done
+          excluded_list=""
+          for k in "${!EXCLUDED_BY_FILE[@]}"; do
+            excluded_list+="${k} "
+          done
+          log_summary "Excluded workflows: ${excluded_list:-<none>}"
+
+          # ------------------------------------------------------------------
+          # 1. Bootstrap or check out the watchdog-state orphan branch.
+          # ------------------------------------------------------------------
+          work_dir="$(mktemp -d)"
+          pushd "${work_dir}" > /dev/null
+          # Scope credentials to the exact remote commands that need them; the
+          # cloned repo keeps a plain HTTPS origin with no tokenized remote.
+          auth_header="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
+          git_auth() {
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" "$@"
+          }
+          git_auth clone --depth 1 "https://github.com/${REPO}.git" repo
+          cd repo
+          GIT_AUTHOR_ID=(-c "user.email=actions@github.com" -c "user.name=stuck-job-watchdog")
+
+          # Decoupled probe + bootstrap: ls-remote distinguishes
+          # "branch missing" (zero rows + exit 0) from "transient fetch
+          # failure" (non-zero exit). We MUST NOT bootstrap on transient
+          # failure - that would push-corrupt an existing branch by
+          # rewriting it as a fresh orphan.
+          state_branch_probe="$(mktemp)"
+          if ! git_auth ls-remote --heads origin "${STATE_BRANCH}" > "${state_branch_probe}" 2>/dev/null; then
+            log_summary "WARN: 'git ls-remote --heads origin ${STATE_BRANCH}' failed (transient?); refusing to bootstrap. Skipping this cycle."
+            popd > /dev/null
+            flush_summary_and_exit 0
+          fi
+
+          if [[ -s "${state_branch_probe}" ]]; then
+            if ! git_auth fetch origin "${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}"; then
+              log_summary "WARN: state branch '${STATE_BRANCH}' exists per ls-remote but fetch failed; skipping this cycle."
+              popd > /dev/null
+              flush_summary_and_exit 0
+            fi
+            git checkout -B "${STATE_BRANCH}" "refs/remotes/origin/${STATE_BRANCH}"
+            log_summary "State branch '${STATE_BRANCH}' checked out."
+          else
+            log_summary "State branch '${STATE_BRANCH}' missing -- bootstrapping orphan branch."
+            git checkout --orphan "${STATE_BRANCH}"
+            git rm -rf . > /dev/null 2>&1 || true
+            mkdir -p "${STATE_DIR}"
+            touch "${STATE_DIR}/.gitkeep"
+            git add "${STATE_DIR}/.gitkeep"
+            git "${GIT_AUTHOR_ID[@]}" commit -m "Initialize watchdog state" || true
+            if ! git_auth push origin "${STATE_BRANCH}"; then
+              log_summary "WARN: bootstrap push failed; will retry on next run."
+              popd > /dev/null
+              flush_summary_and_exit 0
+            fi
+          fi
+          mkdir -p "${STATE_DIR}"
+          state_dirty=0
+
+          persist_state_changes() {
+            local reason="${1:-state update}"
+            if (( state_dirty != 1 )); then
+              return 0
+            fi
+
+            git add "${STATE_DIR}"
+            if git diff-index --cached --quiet HEAD --; then
+              if git rev-parse --verify "refs/remotes/origin/${STATE_BRANCH}" > /dev/null 2>&1 \
+                  && [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/remotes/origin/${STATE_BRANCH}")" ]]; then
+                state_dirty=0
+                return 0
+              fi
+            else
+              if ! git "${GIT_AUTHOR_ID[@]}" commit -m "Watchdog: ${reason} at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"; then
+                log_summary "WARN: state commit failed; counters may double-count next run."
+                return 1
+              fi
+            fi
+
+            if git_auth push origin "${STATE_BRANCH}"; then
+              log_summary "State branch updated (${reason})."
+              state_dirty=0
+              return 0
+            fi
+
+            log_summary "WARN: state push failed; attempting fetch + rebase + retry."
+            if git_auth fetch origin "${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}" \
+                && git rebase "refs/remotes/origin/${STATE_BRANCH}" \
+                && git_auth push origin "${STATE_BRANCH}"; then
+              log_summary "State branch updated on second attempt (${reason}, after rebase)."
+              state_dirty=0
+              return 0
+            fi
+
+            log_summary "WARN: state push failed twice; counters may double-count next run."
+            return 1
+          }
+
+          is_nonnegative_integer() {
+            [[ "${1:-}" =~ ^[0-9]+$ ]]
+          }
+
+          # ------------------------------------------------------------------
+          # 2. Enumerate queued runs older than MIN_QUEUE_AGE_SECONDS.
+          # ------------------------------------------------------------------
+          now_epoch="$(date -u +%s)"
+          queued_runs_json="$(mktemp)"
+          # `gh api --paginate` over the runs endpoint returns one JSON object
+          # per page; `jq -s '[.[] | .workflow_runs[]?]'` flattens all pages
+          # into a single array. Equivalent to using `--slurp` on newer gh
+          # versions but works on all gh versions shipped with ubuntu-latest.
+          if ! gh api --paginate "repos/${REPO}/actions/runs?status=queued&per_page=100" \
+              | jq -s '[.[] | (.workflow_runs // [])[]]' > "${queued_runs_json}"; then
+            log_summary "ERROR: failed to list queued runs."
+            popd > /dev/null
+            flush_summary_and_exit 0
+          fi
+
+          mapfile -t queued_ids < <(jq -r --argjson now "${now_epoch}" --argjson min "${MIN_QUEUE_AGE_SECONDS}" '
+            .[]
+            | select(.created_at != null)
+            | (.created_at | fromdateiso8601) as $created
+            | select(($now - $created) >= $min)
+            | .id
+          ' < "${queued_runs_json}" | sort -u)
+
+          log_summary "Queued runs older than ${MIN_QUEUE_AGE_SECONDS}s: ${#queued_ids[@]}"
+          if [[ ${#queued_ids[@]} -eq 0 ]]; then
+            log_summary "Queue is clean. No action."
+            popd > /dev/null
+            flush_summary_and_exit 0
+          fi
+
+          # ------------------------------------------------------------------
+          # 3. Fetch idle runners (org first, fall back to repo on 403).
+          #    `gh api --paginate` over an object-shaped endpoint returns one
+          #    object per page; without `jq -s`, downstream evaluation runs
+          #    against only the last page (silent false negatives once the
+          #    org grows past 100 runners - see cli/cli#1268).
+          # ------------------------------------------------------------------
+          runners_json="$(mktemp)"
+          runners_scope="org"
+          if ! gh api --paginate "orgs/${OWNER}/actions/runners?per_page=100" \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="repo"
+            log_summary "WARN: org-level runner list unavailable (likely 403). Falling back to repo runners."
+            if ! gh api --paginate "repos/${REPO}/actions/runners?per_page=100" \
+                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}"; then
+              log_summary "ERROR: repo-level runner list also failed; cannot evaluate idle runners. No action issued."
+              popd > /dev/null
+              flush_summary_and_exit 0
+            fi
+          fi
+          log_summary "Runner inventory scope: ${runners_scope}"
+
+          idle_runners_json="$(mktemp)"
+          jq '
+            [ .[]
+              | select(.status == "online")
+              | select(.busy == false)
+              | { id: .id, name: .name, labels: ([(.labels // [])[].name]) } ]
+          ' < "${runners_json}" > "${idle_runners_json}"
+          idle_count="$(jq 'length' < "${idle_runners_json}")"
+          log_summary "Idle runners (online + not busy): ${idle_count}"
+
+          # ------------------------------------------------------------------
+          # 4. For each queued run, decide stuck vs healthy vs excluded.
+          # ------------------------------------------------------------------
+          state_dirty=0
+          for run_id in "${queued_ids[@]}"; do
+            # Skip the watchdog's own run id (defense in depth - the watchdog
+            # workflow file is excluded by name above, but if someone renames
+            # the file or runs ad-hoc the id check still protects us).
+            if [[ "${run_id}" == "${SELF_RUN_ID}" ]]; then
+              log_summary "run ${run_id}: this is the watchdog's own run; skipping."
+              continue
+            fi
+
+            # Pull the run metadata we need from the cached list (workflow
+            # file path, event, head_branch).
+            run_meta="$(
+              jq -c --argjson id "${run_id}" '
+                .[]
+                | select(.id == $id)
+                | {
+                    path: (.path // ""),
+                    event: (.event // ""),
+                    workflow_id: (.workflow_id // 0),
+                    head_branch: (.head_branch // ""),
+                    html_url: (.html_url // "")
+                  }
+              ' < "${queued_runs_json}" | head -n 1
+            )"
+            if [[ -z "${run_meta}" ]]; then
+              log_summary "run ${run_id}: metadata unavailable; skipping."
+              continue
+            fi
+            run_path="$(jq -r '.path' <<< "${run_meta}")"
+            run_event="$(jq -r '.event' <<< "${run_meta}")"
+            run_workflow_id="$(jq -r '.workflow_id' <<< "${run_meta}")"
+            run_head_branch="$(jq -r '.head_branch' <<< "${run_meta}")"
+            run_html_url="$(jq -r '.html_url' <<< "${run_meta}")"
+            run_path_base="${run_path##*/}"
+
+            # Workflow-file exclusion (must NOT cancel release.yml).
+            if [[ -n "${EXCLUDED_BY_FILE[${run_path_base}]+x}" ]]; then
+              log_summary "run ${run_id} (${run_path_base}, event=${run_event}): workflow is excluded; operator action needed if stuck."
+              printf '* run %s (%s, event=%s) -- %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${excluded_runs_file}"
+              continue
+            fi
+
+            jobs_json="$(mktemp)"
+            if ! gh api --paginate "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" \
+                | jq -s '[.[] | (.jobs // [])[]]' > "${jobs_json}" 2>/dev/null; then
+              log_summary "run ${run_id}: failed to list jobs; skipping."
+              continue
+            fi
+
+            in_progress_count="$(jq '[ .[] | select(.status == "in_progress") ] | length' < "${jobs_json}")"
+            queued_count="$(jq '[ .[] | select(.status == "queued") ] | length' < "${jobs_json}")"
+
+            if (( in_progress_count > 0 )); then
+              # A run with even one in-progress job is by definition not
+              # dispatcher-stuck. This covers matrix cells or later jobs
+              # waiting while another job from the same run is active, and the
+              # general case of a run that has at least one runner.
+              log_summary "run ${run_id} (${run_path_base}, event=${run_event}): healthy queued (${in_progress_count} in_progress, ${queued_count} queued -- waiting on concurrency/matrix slot)."
+              printf '* run %s (%s, event=%s) -- %d in_progress, %d queued\n' "${run_id}" "${run_path_base}" "${run_event}" "${in_progress_count}" "${queued_count}" >> "${healthy_runs_file}"
+              continue
+            fi
+
+            if (( queued_count == 0 )); then
+              # No queued jobs at all - the run is in some other transitional
+              # state, not the dispatcher-stuck pattern.
+              log_summary "run ${run_id} (${run_path_base}, event=${run_event}): no queued jobs yet (early state); skipping."
+              continue
+            fi
+
+            mapfile -t queued_job_labels < <(jq -c '
+              .[]
+              | select(.status == "queued")
+              | (.labels // [])
+            ' < "${jobs_json}")
+
+            matched=0
+            for labels_csv in "${queued_job_labels[@]}"; do
+              # labels_csv is a JSON array like ["self-hosted","Windows","RAM-64GB"]
+              if jq -e --argjson labels "${labels_csv}" '
+                map(
+                  . as $r
+                  | ($labels | all(. as $l | $r.labels | index($l) | type == "number"))
+                ) | any
+              ' < "${idle_runners_json}" > /dev/null; then
+                matched=1
+                break
+              fi
+            done
+
+            if [[ ${matched} -eq 0 ]]; then
+              log_summary "run ${run_id} (${run_path_base}, event=${run_event}): no matching idle runner -- investigate label config. No action."
+              continue
+            fi
+
+            # ------------------------------------------------------------------
+            # 5. Genuinely stuck. Cap at MAX_CANCELS_PER_DAY per run-id.
+            # ------------------------------------------------------------------
+            state_file="${STATE_DIR}/${run_id}.json"
+            cancels=0
+            last_cancel=0
+            if [[ -f "${state_file}" ]]; then
+              state_ok=1
+              state_content="$(cat "${state_file}" 2>/dev/null)" || state_ok=0
+              if [[ ${state_ok} -eq 1 ]]; then
+                parsed_cancels="$(jq -r '.cancels // .reruns // 0' <<< "${state_content}" 2>/dev/null)" || state_ok=0
+                parsed_last="$(jq -r '.last_cancel // .last_rerun // 0' <<< "${state_content}" 2>/dev/null)" || state_ok=0
+              fi
+              if [[ ${state_ok} -eq 1 ]]; then
+                if is_nonnegative_integer "${parsed_cancels}" && is_nonnegative_integer "${parsed_last}"; then
+                  cancels="${parsed_cancels}"
+                  last_cancel="${parsed_last}"
+                else
+                  state_ok=0
+                fi
+              fi
+              if [[ ${state_ok} -ne 1 ]]; then
+                log_summary "run ${run_id}: state file corrupt; resetting."
+              else
+                log_summary "run ${run_id}: loaded cancel state (cancels=${cancels}, last_cancel=${last_cancel})."
+              fi
+            fi
+            # Reset counter if last action was >24h ago.
+            if (( now_epoch - last_cancel > 86400 )); then
+              cancels=0
+            fi
+
+            if (( cancels >= MAX_CANCELS_PER_DAY )); then
+              log_summary "run ${run_id} (${run_path_base}, event=${run_event}): cancel cap (${MAX_CANCELS_PER_DAY}/24h) reached; skipping. Manual intervention required."
+              printf '* run %s (%s, event=%s) -- cap reached, operator action: %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${stuck_runs_file}"
+              continue
+            fi
+
+            log_summary "run ${run_id} (${run_path_base}, event=${run_event}): dispatcher-stuck; cancelling (attempt $((cancels + 1))/${MAX_CANCELS_PER_DAY})."
+            if ! gh run cancel "${run_id}" --repo "${REPO}" 2>&1 | tee -a "${summary_file}"; then
+              log_summary "run ${run_id}: 'gh run cancel' failed; will try again next cycle."
+              continue
+            fi
+
+            cancels=$((cancels + 1))
+            printf '{"cancels": %d, "last_cancel": %d}\n' "${cancels}" "${now_epoch}" > "${state_file}"
+            git add "${state_file}"
+            state_dirty=1
+            persist_state_changes "record cancel for run ${run_id}" || true
+
+            # Decide redispatch path based on event + workflow_dispatch trigger.
+            workflow_def="$(mktemp)"
+            workflow_supports_dispatch=0
+            if gh api "repos/${REPO}/actions/workflows/${run_workflow_id}" > "${workflow_def}" 2>/dev/null; then
+              workflow_path="$(jq -r '.path // ""' < "${workflow_def}")"
+              if [[ -n "${workflow_path}" ]]; then
+                # Look at the contents of the workflow file to see if it
+                # declares `workflow_dispatch:` (the trigger we need to use
+                # the dispatches REST API).
+                workflow_file_raw="$(mktemp)"
+                if gh api "repos/${REPO}/contents/${workflow_path}" --jq '.content' 2>/dev/null \
+                    | base64 -d > "${workflow_file_raw}" 2>/dev/null; then
+                  if grep -Eq '^[[:space:]]*workflow_dispatch:' "${workflow_file_raw}"; then
+                    workflow_supports_dispatch=1
+                  fi
+                fi
+              fi
+            fi
+
+            case "${run_event}" in
+              push|schedule|workflow_dispatch)
+                if [[ -n "${run_head_branch}" && ${workflow_supports_dispatch} -eq 1 ]]; then
+                  log_summary "run ${run_id}: re-dispatching workflow ${run_workflow_id} on ref '${run_head_branch}'."
+                  if gh api -X POST "repos/${REPO}/actions/workflows/${run_workflow_id}/dispatches" \
+                      -f "ref=${run_head_branch}" 2>&1 | tee -a "${summary_file}"; then
+                    printf '* run %s (%s, event=%s) -- cancelled and re-dispatched on %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_head_branch}" >> "${stuck_runs_file}"
+                  else
+                    log_summary "run ${run_id}: re-dispatch failed; operator action: ${run_html_url}"
+                    printf '* run %s (%s, event=%s) -- cancelled; re-dispatch FAILED, operator action: %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${stuck_runs_file}"
+                  fi
+                else
+                  log_summary "run ${run_id}: workflow does not support workflow_dispatch on ref '${run_head_branch}'; operator action: click 'Re-run all jobs' at ${run_html_url}"
+                  printf \
+                    '* run %s (%s, event=%s) -- cancelled; operator action: click "Re-run all jobs" at %s\n' \
+                    "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${stuck_runs_file}"
+                fi
+                ;;
+              pull_request|pull_request_target)
+                # No safe API path: the dispatches endpoint cannot re-trigger
+                # a pull_request run, and pushing a no-op commit to the head
+                # ref would tamper with the PR. Operator-visible cancel +
+                # explicit step-summary instruction is the supported path.
+                log_summary "run ${run_id}: pull_request-triggered; operator action: click 'Re-run all jobs' at ${run_html_url}"
+                printf '* run %s (%s, event=%s) -- cancelled; operator action: click "Re-run all jobs" at %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${stuck_runs_file}"
+                ;;
+              *)
+                log_summary "run ${run_id}: event '${run_event}' has no automatic recovery path; operator action: click 'Re-run all jobs' at ${run_html_url}"
+                printf '* run %s (%s, event=%s) -- cancelled; operator action: click "Re-run all jobs" at %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${stuck_runs_file}"
+                ;;
+            esac
+          done
+
+          # ------------------------------------------------------------------
+          # 6. Commit + push state changes with a single rebase+retry.
+          # ------------------------------------------------------------------
+          persist_state_changes "final state sync" || true
+
+          popd > /dev/null
+
+          # ------------------------------------------------------------------
+          # Final categorized step-summary table.
+          # ------------------------------------------------------------------
+          {
+            echo "## Watchdog summary"
+            cat "${summary_file}"
+            echo ""
+            echo "### Healthy queued (waiting on concurrency / matrix slot)"
+            if [[ -s "${healthy_runs_file}" ]]; then
+              cat "${healthy_runs_file}"
+            else
+              echo "_(none)_"
+            fi
+            echo ""
+            echo "### Stuck (auto-cancelled)"
+            if [[ -s "${stuck_runs_file}" ]]; then
+              cat "${stuck_runs_file}"
+            else
+              echo "_(none)_"
+            fi
+            echo ""
+            echo "### Stuck but excluded (operator action needed)"
+            if [[ -s "${excluded_runs_file}" ]]; then
+              cat "${excluded_runs_file}"
+            else
+              echo "_(none)_"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"

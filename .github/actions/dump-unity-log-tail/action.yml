@@ -1,0 +1,181 @@
+name: Dump Unity log tail on failure or cancellation
+description: >-
+  Surface the tail of <results-dir>/unity.log and rescan it for catastrophic
+  compile-time failure patterns when an upstream Unity step fails OR is
+  cancelled. Gives operators something concrete to look at when the
+  test-runner step timed out or was cancelled and verify-unity-results
+  (which gates on !cancelled()) would otherwise skip.
+inputs:
+  results-dir:
+    description: "Directory the Unity runner wrote artifacts (and unity.log) into."
+    required: true
+  label:
+    description: "Human label used in the group annotation."
+    required: false
+    default: "Unity tests"
+  tail-lines:
+    description: "Number of trailing log lines to print."
+    required: false
+    default: "200"
+runs:
+  using: composite
+  steps:
+    # IMPORTANT: this step is gated by the workflow caller's `if:` clause
+    # (which must include both `failure()` AND `cancelled()`); the inner
+    # guards here only protect against the log being absent (cancellation
+    # before Unity launched, or a different upstream failure that never
+    # wrote unity.log). This step itself NEVER fails -- it is purely a
+    # best-effort diagnostic. A throw here would mask the upstream failure
+    # the operator is actually trying to investigate.
+    - name: Dump Unity log tail and rescan for catastrophic patterns
+      shell: pwsh
+      run: |
+        $dir = "${{ inputs.results-dir }}"
+        $label = "${{ inputs.label }}"
+        $tailLines = [int]"${{ inputs.tail-lines }}"
+        if ($tailLines -lt 1) { $tailLines = 200 }
+
+        function Add-UnityDiagnosticLogFile {
+          param(
+            [Parameter(Mandatory = $true)]$LogFiles,
+            [Parameter(Mandatory = $true)]$Seen,
+            [string]$Path
+          )
+
+          if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            return
+          }
+
+          try {
+            $fullPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+          } catch {
+            return
+          }
+
+          if ($Seen.Add($fullPath)) {
+            $LogFiles.Add($fullPath)
+          }
+        }
+
+        function Get-UnityDiagnosticLogFiles {
+          param([string]$ResultsDir)
+
+          $logFiles = New-Object System.Collections.Generic.List[string]
+          $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+          if (-not $ResultsDir) {
+            return @($logFiles)
+          }
+
+          Add-UnityDiagnosticLogFile `
+            -LogFiles $logFiles `
+            -Seen $seen `
+            -Path (Join-Path $ResultsDir 'unity.log')
+
+          if (Test-Path -LiteralPath $ResultsDir -PathType Container) {
+            Get-ChildItem -LiteralPath $ResultsDir -File -Recurse -Filter '*.log' -ErrorAction SilentlyContinue |
+              Sort-Object FullName |
+              ForEach-Object {
+                Add-UnityDiagnosticLogFile `
+                  -LogFiles $logFiles `
+                  -Seen $seen `
+                  -Path $_.FullName
+              }
+          }
+
+          return @($logFiles)
+        }
+
+        $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $dir)
+        $log = if ($dir) { Join-Path $dir 'unity.log' } else { $null }
+        if (-not $log -or -not (Test-Path -LiteralPath $log -PathType Leaf)) {
+          # Cancellation before Unity launched leaves no unity.log; this is
+          # NOT an error condition for this diagnostic helper.
+          Write-Host "::notice::${label}: no unity.log under '$dir' to dump (Unity may not have started, or the run was cancelled before launch)."
+        } else {
+          Write-Host "::group::Unity log tail (last $tailLines lines) -- $label"
+          try {
+            Get-Content -LiteralPath $log -Tail $tailLines | ForEach-Object {
+              Write-Host $_
+            }
+          } catch {
+            # Best-effort: a partially-written log (Unity killed mid-flush)
+            # may surface an IO error. Surface a notice + continue so the
+            # downstream catastrophic-pattern scan still runs.
+            Write-Host "::notice::Unable to read tail of '$log': $($_.Exception.Message)"
+          }
+          Write-Host "::endgroup::"
+        }
+
+        # STANDALONE: the test player runs as a SEPARATE process and writes its own
+        # log (player.log), not unity.log. On a standalone failure the player log
+        # carries the actual test output and quit diagnostics, so tail it too when
+        # present (no-op for editmode/playmode, which write only unity.log).
+        $playerLog = if ($dir) { Join-Path $dir 'player.log' } else { $null }
+        if ($playerLog -and (Test-Path -LiteralPath $playerLog -PathType Leaf)) {
+          Write-Host "::group::Standalone player log tail (last $tailLines lines) -- $label"
+          try {
+            Get-Content -LiteralPath $playerLog -Tail $tailLines | ForEach-Object {
+              Write-Host $_
+            }
+          } catch {
+            Write-Host "::notice::Unable to read tail of '$playerLog': $($_.Exception.Message)"
+          }
+          Write-Host "::endgroup::"
+        }
+
+        if ($logFiles.Count -lt 1) {
+          return
+        }
+
+        # Rerun the catastrophic-pattern scan over every available Unity
+        # diagnostic log, including retry logs saved as *.first-attempt.log.
+        # The pattern list MUST stay in sync with verify-unity-results/
+        # action.yml's $patterns array and run-ci-tests.ps1's
+        # $script:CatastrophicPatterns -- all three call sites must use the
+        # same labels (kept in sync by convention; update all three together).
+        $patterns = @(
+          @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
+          @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
+          @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
+          @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
+          @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
+        )
+
+        $maxPerPattern = 5
+        foreach ($entry in $patterns) {
+          $hits = New-Object System.Collections.Generic.List[object]
+          foreach ($logFile in $logFiles) {
+            try {
+              if ($entry.UseSimple) {
+                Select-String -LiteralPath $logFile -SimpleMatch -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                  ForEach-Object {
+                    if ($hits.Count -lt $maxPerPattern) {
+                      $hits.Add($_)
+                    }
+                  }
+              } else {
+                Select-String -LiteralPath $logFile -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                  ForEach-Object {
+                    if ($hits.Count -lt $maxPerPattern) {
+                      $hits.Add($_)
+                    }
+                  }
+              }
+            } catch {
+              # Never throw from a diagnostic helper.
+            }
+            if ($hits.Count -ge $maxPerPattern) {
+              break
+            }
+          }
+
+          if ($hits.Count -gt 0) {
+            Write-Host "::group::Catastrophic pattern: $($entry.Label) -- $label"
+            foreach ($hit in $hits) {
+              $line = $hit.Line.Trim()
+              Write-Host "::error::Pattern detected -- $($entry.Label):: $line"
+              Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
+            }
+            Write-Host "::endgroup::"
+          }
+        }

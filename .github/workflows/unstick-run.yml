@@ -1,0 +1,330 @@
+name: Unstick Run
+
+# Manual one-click recovery for a single GitHub Actions run stuck on the
+# known self-hosted dispatcher bug
+# (https://github.com/orgs/community/discussions/186811).
+#
+# This workflow is the operator-driven sibling of stuck-job-watchdog.yml:
+# the watchdog auto-scans every 5 minutes from the default branch, while
+# this workflow targets ONE explicit run id on demand. Use this when:
+#   * The watchdog is not yet on the default branch (GitHub `schedule:`
+#     cron triggers fire only from the repo default branch, so a watchdog
+#     committed to a feature branch is inactive until merged to master).
+#   * You want immediate recovery and do not want to wait for the next
+#     cron tick or the queue-age threshold.
+#
+# Behavior mirrors the watchdog's per-run logic:
+#   * Confirm the run exists, is `status: queued`, and is older than
+#     MIN_AGE_SECONDS=30 (guards against accidental cancellation of fresh
+#     runs).
+#   * Honor the same workflow-file exclusion list (release.yml +
+#     `vars.WATCHDOG_EXCLUDED_WORKFLOWS`) unless `bypass_exclusion=true`.
+#   * `gh run cancel` the run.
+#   * If `force_redispatch=true` AND the run was push/schedule/
+#     workflow_dispatch on a branch AND the workflow file declares
+#     `workflow_dispatch:`, REST-redispatch via
+#     `POST repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches`.
+#   * Otherwise, surface a step-summary line instructing the operator to
+#     click "Re-run all jobs" in the UI (the only safe recovery path for
+#     pull_request runs).
+#
+# This workflow does NOT touch the watchdog state branch and does NOT
+# count against the watchdog's per-run cancel cap.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "GitHub Actions run id to recover (digits only)."
+        required: true
+        type: string
+      force_redispatch:
+        description: "Attempt REST re-dispatch after cancel (push/schedule/workflow_dispatch on a branch only)."
+        required: false
+        type: boolean
+        default: false
+      bypass_exclusion:
+        description: "Operate on a run whose workflow file is in the exclusion list (e.g., release.yml). Use deliberately."
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: unstick-run-${{ inputs.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  unstick:
+    name: Unstick a single dispatcher-stuck run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate, cancel, and optionally re-dispatch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+          INPUT_FORCE_REDISPATCH: ${{ inputs.force_redispatch }}
+          INPUT_BYPASS_EXCLUSION: ${{ inputs.bypass_exclusion }}
+          MIN_AGE_SECONDS: "30"
+          DEFAULT_EXCLUDED_WORKFLOWS: "release.yml"
+          EXTRA_EXCLUDED_WORKFLOWS: ${{ vars.WATCHDOG_EXCLUDED_WORKFLOWS }}
+        run: |
+          set -euo pipefail
+
+          summary_file="$(mktemp)"
+          : > "${summary_file}"
+          log_summary() {
+            printf '%s\n' "$1" | tee -a "${summary_file}"
+          }
+
+          flush_summary_and_exit() {
+            local code="${1:-0}"
+            {
+              echo "## Unstick-run summary"
+              cat "${summary_file}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit "${code}"
+          }
+
+          run_id="${INPUT_RUN_ID}"
+          force_redispatch="${INPUT_FORCE_REDISPATCH:-false}"
+          bypass_exclusion="${INPUT_BYPASS_EXCLUSION:-false}"
+
+          log_summary "## Unstick-run audit ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+          log_summary "Repo: ${REPO}"
+          log_summary "Requested run id: ${run_id}"
+          log_summary "force_redispatch: ${force_redispatch}"
+          log_summary "bypass_exclusion: ${bypass_exclusion}"
+
+          # --------------------------------------------------------------
+          # 1. Validate run_id is a positive integer (string input from
+          #    workflow_dispatch is free-form; reject anything else).
+          # --------------------------------------------------------------
+          if ! [[ "${run_id}" =~ ^[0-9]+$ ]]; then
+            log_summary "ERROR: run_id '${run_id}' is not a positive integer."
+            flush_summary_and_exit 1
+          fi
+
+          # --------------------------------------------------------------
+          # 1b. Defense-in-depth: refuse to act on this workflow's own
+          #     run id. The watchdog has the same SELF_RUN_ID guard for
+          #     the same reason -- a self-cancel mid-run produces a
+          #     confusing partial step-summary and leaves the operator
+          #     uncertain whether the target run was actually touched.
+          # --------------------------------------------------------------
+          if [[ "${run_id}" == "${GITHUB_RUN_ID}" ]]; then
+            log_summary "ERROR: cannot unstick this workflow's own run (run_id == GITHUB_RUN_ID == ${GITHUB_RUN_ID})."
+            flush_summary_and_exit 1
+          fi
+
+          # --------------------------------------------------------------
+          # 2. Fetch the run. 404 => either the id is bogus or it belongs
+          #    to a different repository (gh api scopes the call to REPO).
+          # --------------------------------------------------------------
+          run_json="$(mktemp)"
+          if ! gh api "repos/${REPO}/actions/runs/${run_id}" > "${run_json}" 2>/dev/null; then
+            log_summary "ERROR: run ${run_id} not found in ${REPO} (404). Confirm the run id and that it belongs to this repository."
+            flush_summary_and_exit 1
+          fi
+
+          run_status="$(jq -r '.status // ""' < "${run_json}")"
+          run_event="$(jq -r '.event // ""' < "${run_json}")"
+          run_head_branch="$(jq -r '.head_branch // ""' < "${run_json}")"
+          run_workflow_id="$(jq -r '.workflow_id // 0' < "${run_json}")"
+          run_path="$(jq -r '.path // ""' < "${run_json}")"
+          run_name="$(jq -r '.name // ""' < "${run_json}")"
+          run_html_url="$(jq -r '.html_url // ""' < "${run_json}")"
+          run_created_at="$(jq -r '.created_at // ""' < "${run_json}")"
+          run_path_base="${run_path##*/}"
+
+          log_summary "Run name: ${run_name}"
+          log_summary "Workflow file: ${run_path_base}"
+          log_summary "Status (pre-cancel): ${run_status}"
+          log_summary "Event: ${run_event}"
+          log_summary "Head branch: ${run_head_branch:-<none>}"
+          log_summary "URL: ${run_html_url}"
+
+          # --------------------------------------------------------------
+          # 3. Cheap safety guard: only operate on queued runs.
+          # --------------------------------------------------------------
+          if [[ "${run_status}" != "queued" ]]; then
+            log_summary "Run is not currently queued (status: ${run_status}). Skipping cancel; nothing to recover."
+            flush_summary_and_exit 0
+          fi
+
+          # --------------------------------------------------------------
+          # 4. Cheap safety guard: ensure the run is at least
+          #    MIN_AGE_SECONDS old so a manual misclick does not nuke a
+          #    fresh, legitimately-queued run.
+          # --------------------------------------------------------------
+          if [[ -z "${run_created_at}" ]]; then
+            log_summary "ERROR: run ${run_id} has no created_at timestamp; refusing to act."
+            flush_summary_and_exit 1
+          fi
+          created_epoch="$(date -u -d "${run_created_at}" +%s 2>/dev/null || echo 0)"
+          if [[ "${created_epoch}" -eq 0 ]]; then
+            log_summary "ERROR: could not parse created_at '${run_created_at}'."
+            flush_summary_and_exit 1
+          fi
+          now_epoch="$(date -u +%s)"
+          age=$(( now_epoch - created_epoch ))
+          log_summary "Run age: ${age}s (min: ${MIN_AGE_SECONDS}s)"
+          if (( age < MIN_AGE_SECONDS )); then
+            log_summary "Run is younger than MIN_AGE_SECONDS=${MIN_AGE_SECONDS}; skipping. Re-invoke after the run has had time to dispatch normally."
+            flush_summary_and_exit 0
+          fi
+
+          # --------------------------------------------------------------
+          # 5. Workflow-file exclusion check (release.yml + repo variable).
+          # NOTE: This exclusion-list construction is duplicated from
+          # stuck-job-watchdog.yml. Kept intentionally duplicated so each
+          # workflow file is self-contained; if you change the rules here,
+          # update the watchdog too.
+          # --------------------------------------------------------------
+          declare -A EXCLUDED_BY_FILE=()
+          for wf in ${DEFAULT_EXCLUDED_WORKFLOWS} ${EXTRA_EXCLUDED_WORKFLOWS:-}; do
+            [[ -z "${wf}" ]] && continue
+            base="${wf##*/}"
+            EXCLUDED_BY_FILE["${base}"]=1
+          done
+          excluded_list=""
+          for k in "${!EXCLUDED_BY_FILE[@]}"; do
+            excluded_list+="${k} "
+          done
+          log_summary "Excluded workflows: ${excluded_list:-<none>}"
+
+          if [[ -n "${EXCLUDED_BY_FILE[${run_path_base}]+x}" ]]; then
+            if [[ "${bypass_exclusion}" != "true" ]]; then
+              log_summary "Workflow '${run_path_base}' is in the exclusion list; pass bypass_exclusion=true to operate on it. Skipping."
+              flush_summary_and_exit 0
+            fi
+            log_summary "Workflow '${run_path_base}' is excluded but bypass_exclusion=true; proceeding."
+          fi
+
+          # --------------------------------------------------------------
+          # 6. Cancel the run. From here on, this is the recovery action.
+          # --------------------------------------------------------------
+          log_summary "Cancelling run ${run_id}..."
+          # TOCTOU note: if the run transitions out of `queued` between status check and
+          # cancel, gh run cancel returns non-zero. We let the step fail loudly so the
+          # operator notices; watchdog has the same intentional pattern.
+          if ! gh run cancel "${run_id}" --repo "${REPO}" 2>&1 | tee -a "${summary_file}"; then
+            log_summary "ERROR: 'gh run cancel ${run_id}' failed."
+            flush_summary_and_exit 1
+          fi
+          log_summary "Cancel issued."
+
+          # Re-fetch status post-cancel for the summary. If the re-fetch
+          # fails (transient API hiccup, run vanished), surface that
+          # explicitly rather than logging the stale pre-cancel status as
+          # though it were the post-cancel value.
+          post_status="unknown (status re-fetch failed)"
+          if gh api "repos/${REPO}/actions/runs/${run_id}" > "${run_json}" 2>/dev/null; then
+            post_status="$(jq -r '.status // ""' < "${run_json}")"
+          fi
+          log_summary "Status (post-cancel): ${post_status}"
+
+          # --------------------------------------------------------------
+          # 7. Optional REST re-dispatch.
+          # --------------------------------------------------------------
+          redispatched="no"
+          redispatch_reason=""
+          if [[ "${force_redispatch}" == "true" ]]; then
+            case "${run_event}" in
+              push|schedule|workflow_dispatch)
+                if [[ -z "${run_head_branch}" ]]; then
+                  redispatch_reason="event=${run_event} but head_branch is empty (likely a tag); cannot REST-dispatch."
+                else
+                  # Parse the workflow file to confirm it declares
+                  # `workflow_dispatch:` (required by the dispatches API).
+                  workflow_file_raw="$(mktemp)"
+                  has_dispatch=0
+                  if [[ -n "${run_path}" ]]; then
+                    set +e
+                    gh api "repos/${REPO}/contents/${run_path}" --jq '.content' 2>/dev/null \
+                      | base64 -d > "${workflow_file_raw}" 2>/dev/null
+                    contents_rc=$?
+                    set -e
+                    if [[ "${contents_rc}" -eq 0 && -s "${workflow_file_raw}" ]]; then
+                      set +e
+                      grep -Eq '^[[:space:]]*workflow_dispatch:' "${workflow_file_raw}"
+                      grep_rc=$?
+                      set -e
+                      if [[ "${grep_rc}" -eq 0 ]]; then
+                        has_dispatch=1
+                      fi
+                    fi
+                  fi
+
+                  if [[ "${has_dispatch}" -eq 1 ]]; then
+                    log_summary "Re-dispatching workflow ${run_workflow_id} on ref '${run_head_branch}'..."
+                    if gh api -X POST \
+                        "repos/${REPO}/actions/workflows/${run_workflow_id}/dispatches" \
+                        -f "ref=${run_head_branch}" 2>&1 | tee -a "${summary_file}"; then
+                      redispatched="yes"
+                    else
+                      redispatch_reason="REST dispatches call failed (see log above)."
+                    fi
+                  else
+                    redispatch_reason="workflow file '${run_path_base}' does not declare 'workflow_dispatch:' (or could not be read)."
+                  fi
+                fi
+                ;;
+              *)
+                redispatch_reason="event='${run_event}' has no safe REST re-dispatch path (only push/schedule/workflow_dispatch on a branch are supported). Operator must use the UI."
+                ;;
+            esac
+          else
+            redispatch_reason="force_redispatch=false (default)."
+          fi
+
+          if [[ "${redispatched}" == "yes" ]]; then
+            log_summary "Re-dispatch: succeeded."
+          else
+            log_summary "Re-dispatch: skipped (${redispatch_reason})"
+          fi
+
+          # --------------------------------------------------------------
+          # 8. Operator next-step guidance.
+          # --------------------------------------------------------------
+          if [[ "${redispatched}" == "yes" ]]; then
+            log_summary "Next step: the workflow has been re-dispatched. Watch ${run_html_url%/runs/*} for the new run."
+          else
+            case "${run_event}" in
+              pull_request|pull_request_target)
+                log_summary "Next step: open ${run_html_url} and click 'Re-run all jobs' (PR-triggered runs cannot be REST-dispatched)."
+                ;;
+              *)
+                # When force_redispatch=true was requested but the re-dispatch
+                # was skipped (event/branch/workflow_dispatch trigger guard),
+                # re-suggesting force_redispatch=true would just repeat the
+                # path the operator already tried. Branch the guidance.
+                if [[ "${force_redispatch}" == "true" ]]; then
+                  log_summary "Next step: force_redispatch was attempted but skipped (see reason above). Click 'Re-run all jobs' on the run's UI page (${run_html_url}) to recover."
+                else
+                  log_summary "Next step: open ${run_html_url} and click 'Re-run all jobs', OR re-invoke this workflow with force_redispatch=true if the event supports it."
+                fi
+                ;;
+            esac
+          fi
+
+          # --------------------------------------------------------------
+          # 9. Rate-limit guidance (this workflow has NO automatic cap).
+          # --------------------------------------------------------------
+          # Unlike the watchdog (MAX_CANCELS_PER_DAY=2 per run-id via
+          # state branch), unstick-run.yml is operator-driven and relies on
+          # the implicit gate of a human clicking "Run workflow". That
+          # means rapid repeat invocations on the same run-id are not
+          # blocked here -- the operator must self-pace. GitHub's
+          # dispatcher state can take time to settle after a cancel, so a
+          # second attempt within seconds may race the previous one.
+          log_summary "Rate-limit note: unstick-run.yml has no automatic per-run cap (operator-driven)."
+          log_summary "If a single run id needs another recovery attempt, wait at least 5 minutes between invocations to let GitHub's dispatcher state settle."
+
+          flush_summary_and_exit 0
