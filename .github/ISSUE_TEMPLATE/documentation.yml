@@ -13,7 +13,7 @@ body:
     attributes:
       label: Page URL or Section
       description: Link to the documentation page or describe the section.
-      placeholder: "https://wallstop.github.io/unity-helpers/... or 'Getting Started > Installation'"
+      placeholder: "https://ambiguous-interactive.github.io/unity-helpers/... or 'Getting Started > Installation'"
     validations:
       required: true
 

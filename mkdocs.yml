@@ -12,7 +12,7 @@ not_in_nav: |
   404.md
   readme.md
   includes/abbreviations.md
-site_url: https://wallstop.github.io/unity-helpers/
+site_url: https://ambiguous-interactive.github.io/unity-helpers/
 site_description: >-
   Production-ready Unity utilities: 10-15x faster PRNGs, O(log n) spatial queries,
   zero-allocation pooling, Odin-level inspector tooling, and data-driven effects.

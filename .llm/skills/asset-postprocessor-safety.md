@@ -32,7 +32,7 @@ Use this skill when:
 
 Any call we make that forces deserialization, component inspection, or user-callback invocation while we are still inside the callback can trigger this warning. The fix is to **defer the work one editor tick** via `EditorApplication.delayCall`, which lands after the import phase completes.
 
-See issue [#234](https://github.com/wallstop/unity-helpers/issues/234) for the motivating bug.
+See [#234](https://github.com/wallstop/unity-helpers/pull/234) for the motivating bug.
 
 ---
 

@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         /// <summary>
         /// Shortcut for the specific warning described in
-        /// <see href="https://github.com/wallstop/unity-helpers/issues/234">#234</see>.
+        /// <see href="https://github.com/wallstop/unity-helpers/pull/234">#234</see>.
         /// </summary>
         public void AssertNoSendMessageWarnings()
         {

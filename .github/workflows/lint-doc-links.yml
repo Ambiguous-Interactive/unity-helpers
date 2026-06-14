@@ -1,17 +1,37 @@
 name: Lint Docs Links
 
+# Link checking is split by reliability, NOT by file:
+#   * INTERNAL / relative links (do the linked files and anchors exist?) are
+#     deterministic and entirely within this repo's control, so they gate every
+#     PR via the PowerShell linters below.
+#   * EXTERNAL links (third-party sites, GitHub issue/PR pages) fail for reasons
+#     OUTSIDE a contributor's control -- rate limits (HTTP 429), org/repo
+#     transfers, and ordinary link rot. Gating PRs on them punishes contributors
+#     for the internet's flakiness and grows an endless manual exclude list, so
+#     the lychee external sweep runs on a SCHEDULE instead. A failing scheduled
+#     run notifies the maintainers about rot without ever blocking a PR.
 on:
   push:
     branches:
       - main
   # Run on every PR: doc-link rot can be introduced by changes to any file type.
   pull_request:
+  schedule:
+    # Weekly external-link rot sweep (Mondays 12:00 UTC). Offset from the Unity
+    # Tests cron so the two do not contend for scheduler capacity.
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  lint:
+  # ── INTERNAL links + linter self-tests: gates every PR ──────────────────────
+  internal-links:
+    name: Internal doc links
+    # Skip on the scheduled trigger; the external sweep is the only thing the
+    # cron needs to run.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,7 +53,17 @@ jobs:
         shell: pwsh
         run: ./scripts/lint-doc-links.ps1 -VerboseOutput
 
-      - name: Check dead links (lychee)
+  # ── EXTERNAL links: scheduled rot sweep, never blocks a PR ──────────────────
+  external-links:
+    name: External link rot sweep (scheduled)
+    # Run only on the weekly cron or an explicit manual dispatch -- never on a PR.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check external links (lychee)
         uses: lycheeverse/lychee-action@v2.8.0
         with:
           args: >-
@@ -43,8 +73,8 @@ jobs:
             --verbose
             --
             "./**/*.md"
-          # Fail workflow only for actual broken links, not transient server errors
-          # The .lychee.toml config already accepts 5xx as valid to handle outages
+          # A red scheduled run is the rot NOTIFICATION; .lychee.toml already
+          # accepts 429/5xx so only genuine, persistent 404s surface here.
           fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

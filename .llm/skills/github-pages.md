@@ -130,7 +130,7 @@ This `baseurl` is prepended to all site URLs when deployed. For example:
 
 ```text
 Repository file:  docs/overview/getting-started      (with extension)
-Deployed URL:     https://wallstop-studios.github.io/unity-helpers/docs/overview/getting-started/
+Deployed URL:     https://ambiguous-interactive.github.io/unity-helpers/docs/overview/getting-started/
 ```
 
 When copying URLs from the live site or using Jekyll's `absolute_url` filter, you get paths starting with `/unity-helpers/`. **These paths are deployment artifacts, not source file references.**

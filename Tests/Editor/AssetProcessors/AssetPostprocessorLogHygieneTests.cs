@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using Object = UnityEngine.Object;
 
     /// <summary>
-    /// Regression tests for <see href="https://github.com/wallstop/unity-helpers/issues/234">#234</see>.
+    /// Regression tests for <see href="https://github.com/wallstop/unity-helpers/pull/234">#234</see>.
     /// Exercises the asset-import phase paths that used to emit
     /// "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate"
     /// warnings, and asserts the processors' deferral machinery suppresses them.

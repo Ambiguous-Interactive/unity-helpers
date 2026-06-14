@@ -50,6 +50,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # Fail FAST on a bad test-project module manifest before any (expensive,
+      # self-hosted) Unity leg starts. A non-existent UPM id here -- e.g. the
+      # bogus 'com.unity.modules.grid' (declare com.unity.modules.tilemap for
+      # Grid) -- makes every matrix leg fail ~30 min later with no NUnit
+      # results.xml and no clearly-named cause. This
+      # hosted-runner check turns that whole class into an instant, self-
+      # describing red on the PR. run-ci-tests.ps1's catastrophic-pattern scan is
+      # the in-Unity backstop for the same failure.
+      - name: Validate Unity test-project module manifest
+        shell: pwsh
+        run: ./scripts/lint-unity-test-modules.ps1 -VerboseOutput
+
       # NOTE: DxMessaging had a "ci-owned docs-only PR" detection here that
       # skipped the licensed matrix when a PR touched ONLY its perf-numbers doc
       # + baseline. unity-helpers has no such CI-owned perf-doc auto-commit on

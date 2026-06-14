@@ -41,9 +41,9 @@
   },
   "signature": "unsigned",
   "author": "wallstop studios <wallstop@wallstopstudios.com> (https://wallstopstudios.com)",
-  "homepage": "https://wallstop.github.io/unity-helpers",
-  "documentationUrl": "https://wallstop.github.io/unity-helpers",
-  "licensesUrl": "https://wallstop.github.io/unity-helpers/project/license/",
+  "homepage": "https://ambiguous-interactive.github.io/unity-helpers",
+  "documentationUrl": "https://ambiguous-interactive.github.io/unity-helpers",
+  "licensesUrl": "https://ambiguous-interactive.github.io/unity-helpers/project/license/",
   "samples": [
     {
       "displayName": "DI – VContainer",

@@ -136,11 +136,45 @@ $deprecatedLinkCases = @(
         ReplacementUrl = 'https://opensource.org/license/MIT'
         Reason = 'Use the current opensource.org canonical MIT URL to avoid redirects.'
     }
+    # PR references must use /pull/N, not /issues/N. These numbers are pull
+    # requests; the issues/N -> pull/N redirect does NOT fire through the
+    # wallstop -> Ambiguous-Interactive org-transfer redirect, so the /issues/
+    # form 404s for a reader while the /pull/ form resolves. Guarding the exact
+    # known-bad URLs keeps them from creeping back into docs or source comments.
     [pscustomobject]@{
-        Name = 'UnityRandomArticleUsesCurrentBlogUrl'
+        Name = 'Pr234UsesPullPath'
+        DeprecatedUrl = 'https://github.com/wallstop/unity-helpers/issues/234'
+        ReplacementUrl = 'https://github.com/wallstop/unity-helpers/pull/234'
+        Reason = 'PR #234: /issues/234 404s through the org-transfer redirect; use the /pull/ path.'
+    }
+    [pscustomobject]@{
+        Name = 'Pr209UsesPullPath'
+        DeprecatedUrl = 'https://github.com/wallstop/unity-helpers/issues/209'
+        ReplacementUrl = 'https://github.com/wallstop/unity-helpers/pull/209'
+        Reason = 'PR #209: /issues/209 404s through the org-transfer redirect; use the /pull/ path.'
+    }
+    [pscustomobject]@{
+        Name = 'Pr175UsesPullPath'
+        DeprecatedUrl = 'https://github.com/wallstop/unity-helpers/issues/175'
+        ReplacementUrl = 'https://github.com/wallstop/unity-helpers/pull/175'
+        Reason = 'PR #175: /issues/175 404s through the org-transfer redirect; use the /pull/ path.'
+    }
+    [pscustomobject]@{
+        Name = 'UnityRandomArticleUsesScriptReference'
+        # Unity removed this blog article on BOTH the old (blog.unity.com) and new
+        # (unity.com/blog) domains -- every variant now 404s. Steer authors to the
+        # stable UnityEngine.Random scripting reference, which is the authoritative
+        # live source for the type the perf table cites. Both dead variants are
+        # listed so either one is caught.
+        DeprecatedUrl = 'https://unity.com/blog/technology/random-numbers-on-the-gpu'
+        ReplacementUrl = 'https://docs.unity3d.com/ScriptReference/Random.html'
+        Reason = 'The Unity blog article was removed (all domain variants 404); link the stable UnityEngine.Random scripting reference instead.'
+    }
+    [pscustomobject]@{
+        Name = 'UnityRandomArticleOldBlogDomainUsesScriptReference'
         DeprecatedUrl = 'https://blog.unity.com/technology/random-numbers-on-the-gpu'
-        ReplacementUrl = 'https://unity.com/blog/technology/random-numbers-on-the-gpu'
-        Reason = 'Use the current Unity blog domain to avoid redirects.'
+        ReplacementUrl = 'https://docs.unity3d.com/ScriptReference/Random.html'
+        Reason = 'The Unity blog article was removed (all domain variants 404); link the stable UnityEngine.Random scripting reference instead.'
     }
     [pscustomobject]@{
         Name = 'ManagedCodeStrippingUsesCanonicalManualPath'

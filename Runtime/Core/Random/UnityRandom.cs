@@ -50,8 +50,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [RandomGeneratorMetadata(
         RandomQuality.Fair,
         "Mirrors UnityEngine.Random (Xorshift196 + additive); suitable for legacy compatibility but not high-stakes simulation.",
-        "Unity Random Internals",
-        "https://unity.com/blog/technology/random-numbers-on-the-gpu"
+        "UnityEngine.Random",
+        "https://docs.unity3d.com/ScriptReference/Random.html"
     )]
     [Serializable]
     [DataContract]

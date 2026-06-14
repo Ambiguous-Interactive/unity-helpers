@@ -124,12 +124,22 @@ function Write-CiNotice {
 #   - error CS\d+ -- compiler errors (CS0246, CS0103, CS0117, etc).
 #   - warning CS8032 -- "An instance of analyzer cannot be created" (analyzer
 #     failed to instantiate; same class of issue).
+#   - Package [id] cannot be found -- the test-project manifest declares a
+#     UPM package id that does not exist (e.g. the non-existent
+#     'com.unity.modules.grid'; declare com.unity.modules.tilemap for Grid usage).
+#     UPM aborts resolution BEFORE compilation, so Unity exits non-zero with no
+#     results.xml and no CS#### line. This pattern NAMES the offending id so the
+#     operator does not have to read the raw Unity log; the fast
+#     scripts/lint-unity-test-modules.ps1 lint is the pre-Unity guard that should
+#     catch it first. NON-transient (a bad manifest, not a flaky UPM channel), so
+#     it is a catastrophic pattern, not a retry signal.
 $script:CatastrophicPatterns = @(
     @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
     @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
     @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
     @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
     @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
+    @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \[[^\]]+\] cannot be found'; UseSimple = $false }
 )
 
 # CLASS-OF-ISSUE DIAGNOSTIC: when Unity exits non-zero, the operator's next
@@ -208,11 +218,27 @@ function Write-UnityMissingModuleAnnotations {
         return
     }
 
+    # The "UnityEngine.<X>Module -> com.unity.modules.<x>" lowercase rule holds for
+    # almost every module, but a handful of module assemblies have NO matching
+    # com.unity.modules.<x> package id. Suggesting the naive lowercase id for those
+    # (e.g. 'com.unity.modules.grid') tells the operator to add a non-existent id,
+    # which makes UPM fail resolution ('Package [id] cannot be found') -- the exact
+    # failure this diagnostic exists to prevent. Map those assemblies to the real
+    # package id instead. See https://docs.unity3d.com/Manual/pack-build.html for
+    # the authoritative list of real built-in package ids.
+    $moduleAssemblyToPackage = @{
+        'grid' = 'com.unity.modules.tilemap'  # UnityEngine.GridModule (Grid/GridLayout): no com.unity.modules.grid exists; declare com.unity.modules.tilemap.
+    }
     $found = New-Object 'System.Collections.Generic.HashSet[string]'
     try {
         foreach ($hit in @(Select-String -LiteralPath $LogPath -Pattern 'forwarded to assembly [''"]?UnityEngine\.(\w+)Module' -ErrorAction SilentlyContinue)) {
             foreach ($m in $hit.Matches) {
-                [void]$found.Add('com.unity.modules.' + $m.Groups[1].Value.ToLowerInvariant())
+                $assembly = $m.Groups[1].Value.ToLowerInvariant()
+                if ($moduleAssemblyToPackage.ContainsKey($assembly)) {
+                    [void]$found.Add($moduleAssemblyToPackage[$assembly])
+                } else {
+                    [void]$found.Add('com.unity.modules.' + $assembly)
+                }
             }
         }
         # UnityEngine.UI (Image/Slider/ColorBlock) lives in the bundled com.unity.ugui

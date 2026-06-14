@@ -124,7 +124,7 @@ Any of the following called synchronously from an AssetPostprocessor callback wi
 
 > `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate`
 
-warnings in the Unity console (see [#234](https://github.com/wallstop/unity-helpers/issues/234)):
+warnings in the Unity console (see [#234](https://github.com/wallstop/unity-helpers/pull/234)):
 
 - `AssetDatabase.LoadAssetAtPath` / `LoadAllAssetsAtPath` / `LoadMainAssetAtPath`
 - `GetComponentsInChildren` / `GetComponents<T>` on loaded prefabs or scene roots

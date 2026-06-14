@@ -6,7 +6,7 @@ description: >-
   Treasure chest of Unity developer tools. Professional inspector tooling,
   high-performance utilities, spatial queries, and 20+ editor tools.
 baseurl: "/unity-helpers"
-url: "https://wallstop.github.io"
+url: "https://ambiguous-interactive.github.io"
 
 # Theme
 remote_theme: pages-themes/minimal@v0.2.0
