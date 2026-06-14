@@ -835,5 +835,86 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreSame(instance, backgroundInstance);
         }
+
+        [Test]
+        public void ClearInstanceWhenNeverAccessedDoesNotThrow()
+        {
+            Assert.DoesNotThrow(() => TestRuntimeSingleton.ClearInstance());
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+        }
+
+        [Test]
+        public void ClearInstanceWhenCalledTwiceDoesNotThrow()
+        {
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            Track(instance.gameObject);
+
+            Assert.DoesNotThrow(() =>
+            {
+                TestRuntimeSingleton.ClearInstance();
+                TestRuntimeSingleton.ClearInstance();
+            });
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearInstanceDestroysGameObjectAndClearsReference()
+        {
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            GameObject gameObject = instance.gameObject;
+
+            TestRuntimeSingleton.ClearInstance();
+            yield return null;
+
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+            Assert.IsTrue(gameObject == null);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearInstanceResetsInitializeCount()
+        {
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            Track(instance.gameObject);
+
+            yield return null;
+
+            Assert.Greater(TestRuntimeSingleton.InitializeCount, 0);
+
+            TestRuntimeSingleton.ClearInstance();
+            yield return null;
+
+            Assert.AreEqual(0, TestRuntimeSingleton.InitializeCount);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearInstanceAllowsFreshInstanceAfterClear()
+        {
+            TestRuntimeSingleton first = TestRuntimeSingleton.Instance;
+            Track(first.gameObject);
+            first.testValue = 99;
+
+            TestRuntimeSingleton.ClearInstance();
+            yield return null;
+
+            TestRuntimeSingleton second = TestRuntimeSingleton.Instance;
+            Track(second.gameObject);
+
+            Assert.IsTrue(first == null);
+            Assert.AreNotSame(first, second);
+            Assert.AreEqual(42, second.testValue);
+        }
+
+        [UnityTest]
+        public IEnumerator RegistryClearAllDestroysRegisteredSingletonInstances()
+        {
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            GameObject gameObject = instance.gameObject;
+
+            RuntimeSingletonRegistry.ClearAllRegisteredInstances();
+            yield return null;
+
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+            Assert.IsTrue(gameObject == null);
+        }
     }
 }

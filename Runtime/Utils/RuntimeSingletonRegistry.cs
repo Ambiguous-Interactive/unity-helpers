@@ -33,7 +33,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void ClearAllInstances()
+        private static void OnBeforeSceneLoad()
+        {
+            ClearAllRegisteredInstances();
+        }
+
+        /// <summary>
+        /// Clears every registered <see cref="RuntimeSingleton{T}"/> instance.
+        /// Invoked automatically before scene load and available for manual editor/runtime resets.
+        /// </summary>
+        internal static void ClearAllRegisteredInstances()
         {
             lock (_clearActions)
             {

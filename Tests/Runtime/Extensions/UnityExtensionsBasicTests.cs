@@ -147,10 +147,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             GameObject go = Track(new GameObject("RigidBodyTest", typeof(Rigidbody2D)));
 
             Rigidbody2D body = go.GetComponent<Rigidbody2D>();
-            body.velocity = new Vector2(10f, 5f);
+            body.linearVelocity = new Vector2(10f, 5f);
             body.angularVelocity = 15f;
             body.Stop();
-            Assert.AreEqual(Vector2.zero, body.velocity);
+            Assert.AreEqual(Vector2.zero, body.linearVelocity);
             Assert.AreEqual(0f, body.angularVelocity);
         }
 

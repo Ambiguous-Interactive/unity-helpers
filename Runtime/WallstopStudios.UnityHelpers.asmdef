@@ -5,7 +5,7 @@
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
-  "overrideReferences": false,
+  "overrideReferences": true,
   "precompiledReferences": [
     "System.Text.Json.dll",
     "System.Text.Encodings.Web.dll",

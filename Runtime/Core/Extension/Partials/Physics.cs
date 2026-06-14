@@ -21,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            rigidBody.velocity = Vector2.zero;
+            rigidBody.linearVelocity = Vector2.zero;
             rigidBody.angularVelocity = 0;
             rigidBody.Sleep();
         }

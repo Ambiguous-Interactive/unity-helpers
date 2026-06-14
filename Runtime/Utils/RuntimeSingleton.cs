@@ -27,7 +27,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// - In <see cref="Awake"/>, sets the static instance and, when <see cref="Preserve"/> is true and in play mode,
     ///   detaches and calls <see cref="Object.DontDestroyOnLoad(Object)"/> to persist across scene loads.
     /// - In <see cref="Start"/>, detects duplicate instances and destroys the newer one.
-    /// - Instance cache is cleared on domain reload before scene load.
+    /// - Instance cache is cleared on domain reload before scene load via <see cref="RuntimeSingletonRegistry"/>.
+    /// - Call <see cref="ClearInstance"/> to manually drop a stale reference in editor tooling or at runtime.
     ///
     /// ODIN compatibility: When the <c>ODIN_INSPECTOR</c> symbol is defined, this class derives from
     /// <c>Sirenix.OdinInspector.SerializedMonoBehaviour</c> for richer serialization; otherwise it derives from
@@ -111,8 +112,23 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        internal static void ClearInstance()
+        /// <summary>
+        /// Clears the cached singleton instance, destroying its <see cref="GameObject"/> when present.
+        /// Safe to call unconditionally; no-op when <see cref="HasInstance"/> is false.
+        /// </summary>
+        /// <remarks>
+        /// Use when editor tooling or runtime code needs to drop a stale reference and force a fresh
+        /// instance on the next <see cref="Instance"/> access. Automatic clearing on domain reload is
+        /// handled by <see cref="RuntimeSingletonRegistry"/> because Unity disallows
+        /// <c>[RuntimeInitializeOnLoadMethod]</c> on methods in generic classes.
+        /// </remarks>
+        public static void ClearInstance()
         {
+            if (_instance == null)
+            {
+                return;
+            }
+
             _instance.Destroy();
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
