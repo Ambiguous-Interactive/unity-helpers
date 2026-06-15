@@ -731,46 +731,65 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             FatalError,
         }
 
-        private TextureImporter ProcessSprite(
-            string assetPath,
-            out ProcessOutcome outcome,
-            Dictionary<string, bool> originalReadable
-        )
+        /// <summary>
+        /// Pure result of the crop geometry computation (no Unity asset I/O), so the
+        /// dimension/padding/pivot behavior can be unit-tested without importing textures.
+        /// </summary>
+        internal readonly struct CropComputation
         {
-            outcome = ProcessOutcome.FatalError;
-            string assetDirectory = Path.GetDirectoryName(assetPath);
-            if (string.IsNullOrWhiteSpace(assetDirectory))
-            {
-                outcome = ProcessOutcome.FatalError;
-                return null;
-            }
+            public readonly bool HasVisible;
+            public readonly bool ShouldSkipNoChange;
+            public readonly int VisibleMinX;
+            public readonly int VisibleMinY;
+            public readonly int VisibleMaxX;
+            public readonly int VisibleMaxY;
+            public readonly int CropWidth;
+            public readonly int CropHeight;
+            public readonly Vector2 NewPivot;
 
-            if (
-                AssetImporter.GetAtPath(assetPath)
-                is not TextureImporter { textureType: TextureImporterType.Sprite } importer
+            public CropComputation(
+                bool hasVisible,
+                bool shouldSkipNoChange,
+                int visibleMinX,
+                int visibleMinY,
+                int visibleMaxX,
+                int visibleMaxY,
+                int cropWidth,
+                int cropHeight,
+                Vector2 newPivot
             )
             {
-                outcome = ProcessOutcome.FatalError;
-                return null;
+                HasVisible = hasVisible;
+                ShouldSkipNoChange = shouldSkipNoChange;
+                VisibleMinX = visibleMinX;
+                VisibleMinY = visibleMinY;
+                VisibleMaxX = visibleMaxX;
+                VisibleMaxY = visibleMaxY;
+                CropWidth = cropWidth;
+                CropHeight = cropHeight;
+                NewPivot = newPivot;
             }
+        }
 
-            if (importer.spriteImportMode != SpriteImportMode.Single)
-            {
-                this.LogWarn($"Skipping texture with Multiple sprite mode: {assetPath}");
-                outcome = ProcessOutcome.SkippedNoChange;
-                return null;
-            }
-
-            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-            if (tex == null)
-            {
-                outcome = ProcessOutcome.RetryableError;
-                return null;
-            }
-
-            Color32[] pixels = tex.GetPixels32();
-            int width = tex.width;
-            int height = tex.height;
+        /// <summary>
+        /// Computes the tight alpha-bounded crop rect (with padding) and the adjusted sprite
+        /// pivot for a source image. Pure: depends only on pixels + parameters, performs NO
+        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests
+        /// (<c>SpriteCropperMathTests</c>) instead of full texture-import round-trips.
+        /// </summary>
+        internal static CropComputation ComputeCrop(
+            Color32[] pixels,
+            int width,
+            int height,
+            int leftPadding,
+            int rightPadding,
+            int topPadding,
+            int bottomPadding,
+            float alphaThreshold,
+            Vector2 origPivot,
+            bool onlyNecessary
+        )
+        {
             int minX = width;
             int minY = height;
             int maxX = 0;
@@ -778,7 +797,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool hasVisible = false;
             object lockObject = new();
             byte alphaByteThreshold = (byte)
-                Mathf.Clamp(Mathf.RoundToInt(AlphaThreshold * 255f), 0, 255);
+                Mathf.Clamp(Mathf.RoundToInt(alphaThreshold * 255f), 0, 255);
             Parallel.For(
                 0,
                 width * height,
@@ -822,10 +841,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (hasVisible)
             {
-                visibleMinX -= _leftPadding;
-                visibleMinY -= _bottomPadding;
-                visibleMaxX += _rightPadding;
-                visibleMaxY += _topPadding;
+                visibleMinX -= leftPadding;
+                visibleMinY -= bottomPadding;
+                visibleMaxX += rightPadding;
+                visibleMaxY += topPadding;
             }
             else
             {
@@ -836,11 +855,99 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int cropWidth = visibleMaxX - visibleMinX + 1;
             int cropHeight = visibleMaxY - visibleMinY + 1;
 
-            if (_onlyNecessary && (!hasVisible || (cropWidth == width && cropHeight == height)))
+            bool shouldSkip =
+                onlyNecessary && (!hasVisible || (cropWidth == width && cropHeight == height));
+
+            Vector2 origCenter = new(width * origPivot.x, height * origPivot.y);
+            Vector2 newPivotPixels = origCenter - new Vector2(visibleMinX, visibleMinY);
+            Vector2 newPivotNorm = new(
+                cropWidth > 0 ? newPivotPixels.x / cropWidth : 0.5f,
+                cropHeight > 0 ? newPivotPixels.y / cropHeight : 0.5f
+            );
+
+            if (!hasVisible)
+            {
+                newPivotNorm = new Vector2(0.5f, 0.5f);
+            }
+
+            return new CropComputation(
+                hasVisible,
+                shouldSkip,
+                visibleMinX,
+                visibleMinY,
+                visibleMaxX,
+                visibleMaxY,
+                cropWidth,
+                cropHeight,
+                newPivotNorm
+            );
+        }
+
+        private TextureImporter ProcessSprite(
+            string assetPath,
+            out ProcessOutcome outcome,
+            Dictionary<string, bool> originalReadable
+        )
+        {
+            outcome = ProcessOutcome.FatalError;
+            string assetDirectory = Path.GetDirectoryName(assetPath);
+            if (string.IsNullOrWhiteSpace(assetDirectory))
+            {
+                outcome = ProcessOutcome.FatalError;
+                return null;
+            }
+
+            if (
+                AssetImporter.GetAtPath(assetPath)
+                is not TextureImporter { textureType: TextureImporterType.Sprite } importer
+            )
+            {
+                outcome = ProcessOutcome.FatalError;
+                return null;
+            }
+
+            if (importer.spriteImportMode != SpriteImportMode.Single)
+            {
+                this.LogWarn($"Skipping texture with Multiple sprite mode: {assetPath}");
+                outcome = ProcessOutcome.SkippedNoChange;
+                return null;
+            }
+
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (tex == null)
+            {
+                outcome = ProcessOutcome.RetryableError;
+                return null;
+            }
+
+            Color32[] pixels = tex.GetPixels32();
+            int width = tex.width;
+            int height = tex.height;
+            CropComputation crop = ComputeCrop(
+                pixels,
+                width,
+                height,
+                _leftPadding,
+                _rightPadding,
+                _topPadding,
+                _bottomPadding,
+                AlphaThreshold,
+                GetSpritePivot(importer),
+                _onlyNecessary
+            );
+
+            if (crop.ShouldSkipNoChange)
             {
                 outcome = ProcessOutcome.SkippedNoChange;
                 return null;
             }
+
+            int visibleMinX = crop.VisibleMinX;
+            int visibleMinY = crop.VisibleMinY;
+            int visibleMaxX = crop.VisibleMaxX;
+            int visibleMaxY = crop.VisibleMaxY;
+            int cropWidth = crop.CropWidth;
+            int cropHeight = crop.CropHeight;
 
             Texture2D cropped = new(cropWidth, cropHeight, TextureFormat.RGBA32, false);
             int pixelCount = cropWidth * cropHeight;
@@ -927,18 +1034,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             TextureImporterSettings newSettings = new();
             importer.ReadTextureSettings(newSettings);
-            Vector2 origPivot = GetSpritePivot(importer);
-            Vector2 origCenter = new(width * origPivot.x, height * origPivot.y);
-            Vector2 newPivotPixels = origCenter - new Vector2(visibleMinX, visibleMinY);
-            Vector2 newPivotNorm = new(
-                cropWidth > 0 ? newPivotPixels.x / cropWidth : 0.5f,
-                cropHeight > 0 ? newPivotPixels.y / cropHeight : 0.5f
-            );
-
-            if (!hasVisible)
-            {
-                newPivotNorm = new Vector2(0.5f, 0.5f);
-            }
+            Vector2 newPivotNorm = crop.NewPivot;
 
             // Adjust 9-slice borders based on trimming from edges
             Vector4 border = newSettings.spriteBorder;
