@@ -1,6 +1,6 @@
 # Skill: Serialization Safety
 
-<!-- trigger: serialization, serialize, deserialize, proto, json, binaryformatter, memorystream | Serializer exception contract — every entry point throws SerializationFailureException or has a Try sibling | Core -->
+<!-- trigger: serialization, serialize, deserialize, proto, json, binaryformatter, memorystream | Serializer exception contract - every entry point throws SerializationFailureException or has a Try sibling | Core -->
 
 **Trigger**: When writing ANY code that calls or extends the `Serializer` class, or when reviewing PRs that touch `Runtime/Core/Serialization/**`.
 

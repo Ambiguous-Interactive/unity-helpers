@@ -167,21 +167,18 @@ See [forbidden-patterns reference](../references/forbidden-patterns.md).
 
 ## Index Maintenance
 
-After ANY skill change, regenerate the index:
+After ANY skill change, regenerate the standalone index:
 
 ```bash
 pwsh -NoProfile -File scripts/generate-skills-index.ps1
 ```
 
-This updates the Skills Reference table in the context file between the marker comments:
-
-```markdown
-<!-- BEGIN GENERATED SKILLS INDEX -->
-
-...generated content...
-
-<!-- END GENERATED SKILLS INDEX -->
-```
+This rewrites the generated [Skills Index](./index.md) catalog (linked from the
+[LLM context file](../context.md)). The file is byte-for-byte deterministic across every OS
+(ordinal sort, UTF-8 without BOM, LF line endings) and is excluded from Prettier — never
+hand-edit it; always regenerate. Trigger descriptions MUST be ASCII (use `-`, not an
+em-dash, and straight quotes): a non-ASCII description is the cross-OS drift class, and
+`scripts/lint-llm-instructions.ps1` rejects it.
 
 ---
 

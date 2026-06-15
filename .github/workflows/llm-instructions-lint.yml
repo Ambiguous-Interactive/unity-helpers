@@ -27,7 +27,16 @@ permissions:
 
 jobs:
   lint-llm-instructions:
-    runs-on: ubuntu-latest
+    # Run on BOTH Ubuntu and Windows so the skills-index generator's cross-OS
+    # determinism (ordinal sort, UTF-8 no BOM, LF) is actually enforced in CI, not
+    # just assumed. A Windows-only drift (e.g. a BOM from Set-Content -Encoding
+    # UTF8 on PowerShell 5.1) would fail the Windows leg.
+    name: lint-llm-instructions (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,6 +56,9 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
+        # Explicit bash so the POSIX `if [ -f ... ]` works on the Windows runner
+        # (whose default `run:` shell is pwsh). Git for Windows provides bash.
+        shell: bash
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -71,13 +83,23 @@ jobs:
         run: ./scripts/lint-skill-sizes.ps1 -VerboseOutput
 
       - name: Validate skills index is up-to-date
+        # Regenerate the file and fail if it differs from the committed bytes. This
+        # is the cross-OS guard: if Windows and Ubuntu generate different content,
+        # one leg's git diff is non-empty. The lint step above also asserts this,
+        # plus encoding (no BOM / LF) and generator determinism.
         shell: pwsh
         run: |
-          ./scripts/generate-skills-index.ps1 -VerboseOutput
-          $diff = git diff -- .llm/context.md
-          if ($diff) {
-            Write-Host "::error::Skills index in .llm/context.md is out of date. Run: pwsh -NoProfile -File scripts/generate-skills-index.ps1"
-            Write-Host $diff
+          ./scripts/generate-skills-index.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::generate-skills-index.ps1 failed (exit $LASTEXITCODE)."
+            exit 1
+          }
+          # --porcelain catches BOTH a drifted (modified) and a never-committed
+          # (untracked) index.md, unlike `git diff` which ignores untracked files.
+          $status = git status --porcelain -- .llm/skills/index.md
+          if ($status) {
+            Write-Host "::error::.llm/skills/index.md is out of date or uncommitted. Run: pwsh -NoProfile -File scripts/generate-skills-index.ps1 and commit it."
+            git diff -- .llm/skills/index.md
             exit 1
           }
           Write-Host "Skills index is up-to-date."

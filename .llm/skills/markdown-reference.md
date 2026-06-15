@@ -248,7 +248,7 @@ More text.
 | MD025 | Multiple top-level headings  | Only one `#` heading per document (see note below) |
 | MD009 | Trailing spaces              | Remove trailing whitespace                         |
 
-> **MD025 — Generated Content Warning**: Documents like the [LLM context file](../context.md) have a single `#` title. Generated content (e.g., the skills index) must use `###` or lower — never `#` or `##`. The LLM instructions lint script (`scripts/lint-llm-instructions.ps1`) enforces this; run with `-Fix` to auto-correct violations.
+> **MD025 — Single Title**: Each document has exactly one `#` title. The [LLM context file](../context.md) has one `#`, and the generated [skills index](./index.md) is its own file with its own single `#` heading (it is no longer embedded in that file). The LLM instructions lint (`scripts/lint-llm-instructions.ps1`) verifies the context file keeps exactly one H1 and that the index matches the generator; run with `-Fix` to regenerate the index.
 
 Plain ASCII/Unicode flow diagrams or command output examples use `text`.
 Use `mermaid` only for blocks that contain valid Mermaid syntax such as

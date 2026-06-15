@@ -1,198 +1,178 @@
+<#
+.SYNOPSIS
+    Generates the deterministic skills index at .llm/skills/index.md.
+
+.DESCRIPTION
+    Scans .llm/skills/*.md (excluding the generated index.md itself) for the
+    trigger comment:
+
+        <!-- trigger: keyword1, keyword2 | Description | Category -->
+
+    and writes a stable, cross-OS-identical markdown index grouped by category
+    (Core / Performance / Feature). Output is byte-for-byte deterministic on
+    every OS and PowerShell edition:
+
+      - Entries are sorted ORDINALLY (System.String.CompareOrdinal), never with
+        the culture-sensitive Sort-Object default.
+      - No timestamp is emitted (a Get-Date header would churn every run).
+      - The file is written as UTF-8 WITHOUT a BOM and with LF line endings via
+        [System.IO.File]::WriteAllText, so Windows PowerShell 5.1 (Set-Content
+        -Encoding UTF8 emits a BOM) and PS Core produce identical bytes.
+
+    Descriptions MUST be ASCII; scripts/lint-llm-instructions.ps1 enforces this
+    so a stray em-dash/smart-quote can never reintroduce cross-OS drift.
+
+.PARAMETER OutputPath
+    Destination file. Defaults to <repo>/.llm/skills/index.md. The linter passes
+    a temp path here and compares the result to the committed file.
+
+.PARAMETER Stdout
+    Write the generated content to stdout instead of a file (for inspection).
+
+.PARAMETER VerboseOutput
+    Emit progress messages.
+
+.EXAMPLE
+    pwsh -NoProfile -File scripts/generate-skills-index.ps1
+    pwsh -NoProfile -File scripts/generate-skills-index.ps1 -Stdout
+#>
 Param(
-  [switch]$VerboseOutput
+    [string]$OutputPath,
+    [switch]$Stdout,
+    [switch]$VerboseOutput
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# The single generated file inside .llm/skills/. Excluded from skill enumeration
+# everywhere (here, the linter, and the size linter) so it is never treated as an
+# authored skill needing a trigger comment.
+$script:SkillsIndexFileName = 'index.md'
+
 function Write-Info($msg) {
-  if ($VerboseOutput) { Write-Host "[skills-index] $msg" -ForegroundColor Cyan }
+    if ($VerboseOutput) { Write-Host "[skills-index] $msg" -ForegroundColor Cyan }
 }
 
-function Write-WarningMsg($msg) {
-  Write-Host "[skills-index] WARNING: $msg" -ForegroundColor Yellow
+# Authored skill files: every .md under .llm/skills/ EXCEPT the generated index.
+function Get-SkillSourceFiles {
+    param([Parameter(Mandatory = $true)][string]$SkillsDir)
+    return Get-ChildItem -LiteralPath $SkillsDir -Filter '*.md' |
+        Where-Object { $_.Name -ne $script:SkillsIndexFileName } |
+        Sort-Object Name
 }
 
-function Write-ErrorMsg($msg) {
-  Write-Host "[skills-index] ERROR: $msg" -ForegroundColor Red
-}
+# Parse the trigger comment of each skill into { Filename, Description, Category }.
+# Skills without a trigger comment are skipped here (the linter reports them).
+function Get-SkillIndexEntries {
+    param([Parameter(Mandatory = $true)][string]$SkillsDir)
 
-function Write-SuccessMsg($msg) {
-  Write-Host "[skills-index] $msg" -ForegroundColor Green
-}
+    $entries = New-Object System.Collections.Generic.List[object]
+    foreach ($file in Get-SkillSourceFiles -SkillsDir $SkillsDir) {
+        $content = Get-Content -LiteralPath $file.FullName -Raw
 
-# Convert kebab-case to Title Case
-function ConvertTo-TitleCase($kebab) {
-  $words = $kebab -split '-'
-  $titled = $words | ForEach-Object {
-    if ($_.Length -gt 0) {
-      $_.Substring(0, 1).ToUpper() + $_.Substring(1).ToLower()
+        $description = $null
+        $category = 'Feature'
+
+        # Preferred 3-field form: keywords | description | category.
+        if ($content -match '<!--\s*trigger:\s*([^|]+)\s*\|\s*([^|]+?)\s*\|\s*(\w+)\s*-->') {
+            $description = $Matches[2].Trim()
+            $category = $Matches[3].Trim()
+        }
+        # 2-field fallback: keywords | description (category defaults to Feature).
+        elseif ($content -match '<!--\s*trigger:\s*([^|]+)\s*\|\s*(.+?)\s*-->') {
+            $description = $Matches[2].Trim()
+        }
+        else {
+            Write-Info "No trigger comment in $($file.Name) - skipping"
+            continue
+        }
+
+        $entries.Add(
+            [PSCustomObject]@{
+                Filename    = $file.BaseName
+                Description = $description
+                Category    = $category
+            }
+        )
     }
-  }
-  return $titled -join ' '
+    return , $entries.ToArray()
 }
 
-Write-Info "Starting skills index generation..."
+# Ordinal sort by Filename. Ordinal (not culture) guarantees the same order on
+# every OS/culture - the culture default would reorder hyphens/digits per locale.
+function Sort-SkillEntries {
+    param([object[]]$Entries)
+
+    $items = @($Entries)
+    if ($items.Count -le 1) {
+        return , $items
+    }
+    $byName = @{}
+    foreach ($entry in $items) { $byName[$entry.Filename] = $entry }
+    $names = [string[]]@($items | ForEach-Object { $_.Filename })
+    [Array]::Sort($names, [System.StringComparer]::Ordinal)
+    return , @($names | ForEach-Object { $byName[$_] })
+}
+
+# Build the full, canonical index.md content with explicit LF line endings.
+function Get-SkillsIndexContent {
+    param([Parameter(Mandatory = $true)][string]$SkillsDir)
+
+    $entries = Get-SkillIndexEntries -SkillsDir $SkillsDir
+
+    $lf = "`n"
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append("<!-- DO NOT EDIT - generated by scripts/generate-skills-index.ps1. -->$lf")
+    [void]$sb.Append("<!-- Regenerate: pwsh -NoProfile -File scripts/generate-skills-index.ps1 -->$lf")
+    [void]$sb.Append($lf)
+    [void]$sb.Append("# Skills Index$lf")
+    [void]$sb.Append($lf)
+    [void]$sb.Append("Invoke these skills for specific tasks.$lf")
+
+    $sections = @(
+        [PSCustomObject]@{ Title = 'Core Skills (Always Consider)'; Category = 'Core' }
+        [PSCustomObject]@{ Title = 'Performance Skills'; Category = 'Performance' }
+        [PSCustomObject]@{ Title = 'Feature Skills'; Category = 'Feature' }
+    )
+
+    foreach ($section in $sections) {
+        $items = Sort-SkillEntries (@($entries | Where-Object { $_.Category -eq $section.Category }))
+        if ($items.Count -eq 0) { continue }
+
+        [void]$sb.Append($lf)
+        [void]$sb.Append("## $($section.Title)$lf")
+        [void]$sb.Append($lf)
+        [void]$sb.Append("| Skill | When to Use |$lf")
+        [void]$sb.Append("| --- | --- |$lf")
+        foreach ($item in $items) {
+            [void]$sb.Append("| [$($item.Filename)](./$($item.Filename).md) | $($item.Description) |$lf")
+        }
+    }
+
+    return $sb.ToString()
+}
 
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $skillsDir = Join-Path -Path $repoRoot -ChildPath '.llm/skills'
 
-if (-not (Test-Path $skillsDir)) {
-  Write-ErrorMsg "Skills directory not found at: $skillsDir"
-  exit 1
-}
-
-Write-Info "Found skills directory at: $skillsDir"
-
-$skillFiles = Get-ChildItem -Path $skillsDir -Filter '*.md' | Sort-Object Name
-Write-Info "Found $($skillFiles.Count) skill files"
-
-$skills = @()
-$warnings = @()
-
-foreach ($file in $skillFiles) {
-  $filename = $file.BaseName
-  $content = Get-Content -Path $file.FullName -Raw
-  $lines = Get-Content -Path $file.FullName
-
-  Write-Info "Processing: $filename"
-
-  # Look for trigger comment: <!-- trigger: keywords | description -->
-  $triggerComment = $null
-  $keywords = @()
-  $description = $null
-  $category = 'Feature'  # Default category
-
-  # Pattern to match the trigger comment
-  if ($content -match '<!--\s*trigger:\s*([^|]+)\s*\|\s*([^-]+)\s*-->' -or
-      $content -match '<!--\s*trigger:\s*([^|]+)\s*\|\s*(.+?)\s*-->') {
-    $keywordsRaw = $Matches[1].Trim()
-    $description = $Matches[2].Trim()
-    $keywords = ($keywordsRaw -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-    Write-Info "  Found trigger comment: keywords=[$keywordsRaw], desc=[$description]"
-  }
-  else {
-    $warnings += "No trigger comment in: $filename.md"
-    Write-WarningMsg "No trigger comment in: $filename.md"
-
-    # Fallback: try to extract from **Trigger**: line
-    foreach ($line in $lines) {
-      if ($line -match '^\*\*Trigger\*\*:\s*(.+)$') {
-        $description = $Matches[1].Trim()
-        # Remove markdown formatting
-        $description = $description -replace '\*\*', ''
-        # Truncate if too long
-        if ($description.Length -gt 80) {
-          $description = $description.Substring(0, 77) + '...'
-        }
-        Write-Info "  Fallback: extracted description from **Trigger**: line"
-        break
-      }
-    }
-
-    if (-not $description) {
-      $description = '(No description)'
-    }
-  }
-
-  # Determine category from trigger comment if present
-  # Format can be: <!-- trigger: keywords | description | category -->
-  if ($content -match '<!--\s*trigger:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*(\w+)\s*-->') {
-    $keywordsRaw = $Matches[1].Trim()
-    $description = $Matches[2].Trim()
-    $category = $Matches[3].Trim()
-    $keywords = ($keywordsRaw -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-    Write-Info "  Found category: $category"
-  }
-
-  $skills += @{
-    Filename = $filename
-    DisplayName = ConvertTo-TitleCase $filename
-    Keywords = $keywords
-    Description = $description
-    Category = $category
-    FilePath = "./skills/$filename.md"
-  }
-}
-
-# Group skills by category
-$coreSkills = @($skills | Where-Object { $_.Category -eq 'Core' })
-$perfSkills = @($skills | Where-Object { $_.Category -eq 'Performance' })
-$featureSkills = @($skills | Where-Object { $_.Category -eq 'Feature' })
-
-# Generate output
-$output = @()
-
-$output += "<!-- BEGIN GENERATED SKILLS INDEX -->"
-$output += "<!-- Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC -->"
-$output += "<!-- Command: pwsh -NoProfile -File scripts/generate-skills-index.ps1 -->"
-$output += ""
-
-# Core Skills section
-if ($coreSkills.Count -gt 0) {
-  $output += "### Core Skills (Always Consider)"
-  $output += ""
-  $output += "| Skill | When to Use |"
-  $output += "| ----- | ----------- |"
-  foreach ($skill in $coreSkills | Sort-Object { $_.Filename }) {
-    $link = "[$($skill.Filename)]($($skill.FilePath))"
-    $output += "| $link | $($skill.Description) |"
-  }
-  $output += ""
-}
-
-# Performance Skills section
-if ($perfSkills.Count -gt 0) {
-  $output += "### Performance Skills"
-  $output += ""
-  $output += "| Skill | When to Use |"
-  $output += "| ----- | ----------- |"
-  foreach ($skill in $perfSkills | Sort-Object { $_.Filename }) {
-    $link = "[$($skill.Filename)]($($skill.FilePath))"
-    $output += "| $link | $($skill.Description) |"
-  }
-  $output += ""
-}
-
-# Feature Skills section
-if ($featureSkills.Count -gt 0) {
-  $output += "### Feature Skills"
-  $output += ""
-  $output += "| Skill | When to Use |"
-  $output += "| ----- | ----------- |"
-  foreach ($skill in $featureSkills | Sort-Object { $_.Filename }) {
-    $link = "[$($skill.Filename)]($($skill.FilePath))"
-    $output += "| $link | $($skill.Description) |"
-  }
-  $output += ""
-}
-
-$output += "<!-- END GENERATED SKILLS INDEX -->"
-
-# Validate no accidental H1/H2 headings in output
-$badHeadings = $output | Where-Object { $_ -match '^#{1,2}\s' -and $_ -notmatch '^###' }
-if ($badHeadings) {
-    Write-ErrorMsg "Generated index contains unexpected headings:"
-    $badHeadings | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+if (-not (Test-Path -LiteralPath $skillsDir)) {
+    Write-Host "[skills-index] ERROR: Skills directory not found at: $skillsDir" -ForegroundColor Red
     exit 1
 }
 
-# Output to stdout
-$output | ForEach-Object { Write-Output $_ }
-
-# Summary to stderr (use [Console]::Error.WriteLine to avoid polluting stdout when called as child process)
-[Console]::Error.WriteLine("=" * 60)
-if ($warnings.Count -gt 0) {
-  [Console]::Error.WriteLine("")
-  [Console]::Error.WriteLine("[skills-index] WARNING: Found $($warnings.Count) skill(s) without trigger comments:")
-  foreach ($w in $warnings) {
-    [Console]::Error.WriteLine("  - $w")
-  }
+if (-not $OutputPath) {
+    $OutputPath = Join-Path -Path $skillsDir -ChildPath $script:SkillsIndexFileName
 }
-[Console]::Error.WriteLine("")
-[Console]::Error.WriteLine("[skills-index] Generated skills index:")
-[Console]::Error.WriteLine("  Core skills: $($coreSkills.Count)")
-[Console]::Error.WriteLine("  Performance skills: $($perfSkills.Count)")
-[Console]::Error.WriteLine("  Feature skills: $($featureSkills.Count)")
-[Console]::Error.WriteLine("  Total: $($skills.Count)")
-[Console]::Error.WriteLine("=" * 60)
+
+$content = Get-SkillsIndexContent -SkillsDir $skillsDir
+
+if ($Stdout) {
+    [Console]::Out.Write($content)
+}
+else {
+    # UTF-8 WITHOUT BOM + LF: identical bytes on Windows PowerShell 5.1 and PS Core.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($OutputPath, $content, $utf8NoBom)
+    Write-Info "Wrote $OutputPath"
+}

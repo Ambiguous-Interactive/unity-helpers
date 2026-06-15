@@ -4,21 +4,21 @@ Param(
 
 <#
 .SYNOPSIS
-    Test runner for generate-skills-index.ps1 and lint-llm-instructions.ps1
+    Tests for generate-skills-index.ps1 and lint-llm-instructions.ps1.
 
 .DESCRIPTION
-    Tests that:
-    - generate-skills-index.ps1 produces valid output (no H1, correct markers, no diagnostics, valid lines)
-    - lint-llm-instructions.ps1 passes on the current repo
-    - context.md has exactly one H1 heading
-    - context.md contains skills index markers
-    - Known-bad heading patterns do not appear in generator output
-
-.PARAMETER VerboseOutput
-    Show detailed output during test execution
+    Validates the file-based, cross-OS-deterministic skills index:
+    - The generator is deterministic (two runs => identical bytes).
+    - .llm/skills/index.md matches the generator and is UTF-8 no-BOM / LF.
+    - Generated output has the expected shape (single H1, category sections,
+      ./<name>.md links) and is ordinally sorted within each section.
+    - .llm/context.md links to ./skills/index.md, carries no stale embedded-index
+      markers, and has exactly one H1.
+    - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger
+      and on index drift (each mutation is restored in a finally block).
+    - Get-MarkdownH1Lines remains code-block-aware.
 
 .EXAMPLE
-    ./scripts/tests/test-llm-instructions-lint.ps1
     ./scripts/tests/test-llm-instructions-lint.ps1 -VerboseOutput
 #>
 
@@ -34,20 +34,14 @@ function Write-Info($msg) {
 }
 
 function Write-TestResult {
-  param(
-    [string]$TestName,
-    [bool]$Passed,
-    [string]$Message = ""
-  )
-
+  param([string]$TestName, [bool]$Passed, [string]$Message = "")
   if ($Passed) {
     Write-Host "  [PASS] $TestName" -ForegroundColor Green
     $script:TestsPassed++
-  } else {
+  }
+  else {
     Write-Host "  [FAIL] $TestName" -ForegroundColor Red
-    if ($Message) {
-      Write-Host "         $Message" -ForegroundColor Yellow
-    }
+    if ($Message) { Write-Host "         $Message" -ForegroundColor Yellow }
     $script:TestsFailed++
     $script:FailedTests += $TestName
   }
@@ -60,451 +54,209 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $generateScript = Join-Path $repoRoot 'scripts' 'generate-skills-index.ps1'
 $lintScript = Join-Path $repoRoot 'scripts' 'lint-llm-instructions.ps1'
 $contextFile = Join-Path $repoRoot '.llm' 'context.md'
+$skillsDir = Join-Path $repoRoot '.llm' 'skills'
+$indexFile = Join-Path $skillsDir 'index.md'
 
 Write-Host "Testing generate-skills-index.ps1 and lint-llm-instructions.ps1..." -ForegroundColor White
 
-# =============================================================================
-# Generate the skills index output once and reuse for multiple tests
-# =============================================================================
-Write-Info "Running generate-skills-index.ps1 to capture output..."
-$rawGeneratorOutput = & pwsh -NoProfile -File $generateScript 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  [FAIL] generate-skills-index.ps1 failed with exit code $LASTEXITCODE" -ForegroundColor Red
-    exit 1
-}
-$allCapturedLines = @($rawGeneratorOutput)
-Write-Info "Generator captured $($allCapturedLines.Count) total lines"
-
-# Extract only the generated index (between BEGIN and END markers, inclusive)
-# Write-Host summary lines from the generator appear outside the markers
-$beginMarkerText = '<!-- BEGIN GENERATED SKILLS INDEX -->'
-$endMarkerText = '<!-- END GENERATED SKILLS INDEX -->'
-$inIndex = $false
-$generatorLines = @()
-foreach ($line in $allCapturedLines) {
-  if ($line -eq $beginMarkerText) { $inIndex = $true }
-  if ($inIndex) { $generatorLines += $line }
-  if ($line -eq $endMarkerText) { $inIndex = $false }
-}
-Write-Info "Generator produced $($generatorLines.Count) index lines"
-
-# =============================================================================
-# Test 1: Generated output has no H1 headings
-# Uses raw regex (not Get-MarkdownH1Lines) because generator output is flat text,
-# not a markdown document with fenced code blocks.
-# =============================================================================
-Write-Host "`n  Section: Generator output validation" -ForegroundColor White
-
-$h1Lines = @($generatorLines | Where-Object { $_ -match '^# ' })
-Write-TestResult "GeneratedOutput.NoH1Headings" ($h1Lines.Count -eq 0) `
-  "Found $($h1Lines.Count) H1 heading(s): $($h1Lines -join ' | ')"
-
-# =============================================================================
-# Test 2: Generated output has correct markers
-# =============================================================================
-$beginMarker = '<!-- BEGIN GENERATED SKILLS INDEX -->'
-$endMarker = '<!-- END GENERATED SKILLS INDEX -->'
-
-$hasBegin = @($generatorLines | Where-Object { $_ -eq $beginMarker }).Count -gt 0
-$hasEnd = @($generatorLines | Where-Object { $_ -eq $endMarker }).Count -gt 0
-
-Write-TestResult "GeneratedOutput.HasBeginMarker" $hasBegin "Missing BEGIN marker in output"
-Write-TestResult "GeneratedOutput.HasEndMarker" $hasEnd "Missing END marker in output"
-
-# =============================================================================
-# Test 3: Generated output has no diagnostic messages
-# =============================================================================
-$diagnosticLines = @($generatorLines | Where-Object { $_ -match '\[skills-index\]' })
-Write-TestResult "GeneratedOutput.NoDiagnosticMessages" ($diagnosticLines.Count -eq 0) `
-  "Found $($diagnosticLines.Count) diagnostic line(s): $($diagnosticLines -join ' | ')"
-
-# =============================================================================
-# Test 4: All output lines are valid
-# =============================================================================
-# Valid lines: empty, HTML comment, ### heading, table row (starts with |), table separator (starts with |)
-$invalidLines = @()
-foreach ($line in $generatorLines) {
-  $trimmed = $line.TrimEnd()
-  if ($trimmed -eq '') { continue }
-  if ($trimmed -match '^<!--.*-->$') { continue }
-  if ($trimmed -match '^### ') { continue }
-  if ($trimmed -match '^\|') { continue }
-  $invalidLines += $trimmed
+function Get-NormalizedText {
+  param([string]$Path)
+  return ([System.IO.File]::ReadAllText($Path) -replace "`r`n", "`n")
 }
 
-Write-TestResult "GeneratedOutput.AllLinesValid" ($invalidLines.Count -eq 0) `
-  "Found $($invalidLines.Count) invalid line(s): $($invalidLines -join ' | ')"
+# Generate to a temp file once and reuse the "expected" content/bytes.
+$expectedTemp = [System.IO.Path]::GetTempFileName()
+$determinismTemp = [System.IO.Path]::GetTempFileName()
+try {
+  & pwsh -NoProfile -File $generateScript -OutputPath $expectedTemp | Out-Null
+  $genExit1 = $LASTEXITCODE
+  & pwsh -NoProfile -File $generateScript -OutputPath $determinismTemp | Out-Null
+  $genExit2 = $LASTEXITCODE
 
-# =============================================================================
-# Test 5: Lint passes on current repo
-# =============================================================================
-Write-Host "`n  Section: Lint script validation" -ForegroundColor White
+  # ===========================================================================
+  Write-Host "`n  Section: Generator determinism + encoding" -ForegroundColor White
 
-Write-Info "Running lint-llm-instructions.ps1 on repo..."
-$lintOutput = & pwsh -NoProfile -File $lintScript 2>&1
-$lintExitCode = $LASTEXITCODE
+  Write-TestResult "Generator.ExitsZero" (($genExit1 -eq 0) -and ($genExit2 -eq 0)) `
+    "Generator exit codes: $genExit1 / $genExit2"
 
-Write-TestResult "Lint.PassesOnCurrentRepo" ($lintExitCode -eq 0) `
-  "Expected exit code 0, got $lintExitCode. Output: $($lintOutput | Out-String)"
+  $bytesA = [System.IO.File]::ReadAllBytes($expectedTemp)
+  $bytesB = [System.IO.File]::ReadAllBytes($determinismTemp)
+  $identical = ($bytesA.Length -eq $bytesB.Length)
+  if ($identical) {
+    for ($i = 0; $i -lt $bytesA.Length; $i++) { if ($bytesA[$i] -ne $bytesB[$i]) { $identical = $false; break } }
+  }
+  Write-TestResult "Generator.Deterministic" $identical `
+    "Two generator runs produced different bytes ($($bytesA.Length) vs $($bytesB.Length))."
 
-# =============================================================================
-# Test 6: context.md has exactly one H1
-# =============================================================================
-Write-Host "`n  Section: context.md validation" -ForegroundColor White
+  # ===========================================================================
+  Write-Host "`n  Section: index.md presence, match, encoding" -ForegroundColor White
 
-$contextLines = @(Get-Content -Path $contextFile)
-$contextH1Lines = @(Get-MarkdownH1Lines -Lines $contextLines)
+  $indexExists = Test-Path -LiteralPath $indexFile
+  Write-TestResult "Index.Exists" $indexExists "Expected $indexFile to exist"
 
-$h1Diagnostic = ($contextH1Lines | ForEach-Object { "L$($_.LineNumber): $($_.Text)" }) -join ' | '
-Write-TestResult "ContextMd.ExactlyOneH1" ($contextH1Lines.Count -eq 1) `
-  "Expected 1 H1 heading, found $($contextH1Lines.Count): $h1Diagnostic"
+  if ($indexExists) {
+    $expectedContent = Get-NormalizedText -Path $expectedTemp
+    $currentContent = Get-NormalizedText -Path $indexFile
+    Write-TestResult "Index.MatchesGenerator" `
+      ([string]::Equals($expectedContent, $currentContent, [System.StringComparison]::Ordinal)) `
+      "index.md does not match generator output; run generate-skills-index.ps1"
 
-# =============================================================================
-# Test 7: Skills index markers exist in context.md
-# =============================================================================
-$contextContent = Get-Content -Path $contextFile -Raw
-$contextHasBegin = $contextContent -match [regex]::Escape($beginMarker)
-$contextHasEnd = $contextContent -match [regex]::Escape($endMarker)
-
-Write-TestResult "ContextMd.HasBeginMarker" $contextHasBegin "Missing BEGIN marker in context.md"
-Write-TestResult "ContextMd.HasEndMarker" $contextHasEnd "Missing END marker in context.md"
-
-# =============================================================================
-# Test 7b: Marker extraction semantics regression tests
-# =============================================================================
-Write-Host "`n  Section: Marker extraction semantics" -ForegroundColor White
-
-function Invoke-TestMarkerExtract {
-  param(
-    [string]$Raw,
-    [string]$Begin,
-    [string]$End
-  )
-
-  if ($null -eq $Raw) {
-    return $null
+    $indexBytes = [System.IO.File]::ReadAllBytes($indexFile)
+    $hasBom = $indexBytes.Length -ge 3 -and $indexBytes[0] -eq 0xEF -and $indexBytes[1] -eq 0xBB -and $indexBytes[2] -eq 0xBF
+    Write-TestResult "Index.NoBom" (-not $hasBom) "index.md must not start with a UTF-8 BOM"
+    Write-TestResult "Index.LfOnly" (-not ($indexBytes -contains 0x0D)) "index.md must use LF line endings (no CR)"
   }
 
-  $normalized = $Raw -replace "`r`n", "`n"
-  $pattern = "(?s)$([regex]::Escape($Begin))(?<content>.*?)$([regex]::Escape($End))"
-  if ($normalized -match $pattern) {
-    return $Matches['content'].Trim()
+  # ===========================================================================
+  Write-Host "`n  Section: Generated output shape" -ForegroundColor White
+
+  $genLines = (Get-NormalizedText -Path $expectedTemp) -split "`n"
+
+  $h1 = @($genLines | Where-Object { $_ -match '^# ' })
+  Write-TestResult "Output.ExactlyOneH1" ($h1.Count -eq 1) "Expected 1 H1, found $($h1.Count): $($h1 -join ' | ')"
+
+  $invalid = @()
+  foreach ($line in $genLines) {
+    $t = $line.TrimEnd()
+    if ($t -eq '') { continue }
+    if ($t -match '^<!--.*-->$') { continue }
+    if ($t -match '^#{1,2} ') { continue }
+    if ($t -match '^\|') { continue }
+    if ($t -eq 'Invoke these skills for specific tasks.') { continue }  # the single intro paragraph
+    $invalid += $t
+  }
+  Write-TestResult "Output.AllLinesValid" ($invalid.Count -eq 0) "Invalid line(s): $($invalid -join ' | ')"
+
+  # All link rows must be [name](./name.md) with link text == filename.
+  $linkRows = @($genLines | Where-Object { $_ -match '^\| \[' })
+  $badLinks = @($linkRows | Where-Object { $_ -notmatch '^\| \[([a-z0-9][a-z0-9-]*)\]\(\./\1\.md\) \| .+ \|$' })
+  Write-TestResult "Output.LinksAreLocalAndConsistent" ($badLinks.Count -eq 0) `
+    "Rows with malformed links: $($badLinks -join ' | ')"
+
+  Write-TestResult "Output.HasCoreSection" (@($genLines | Where-Object { $_ -eq '## Core Skills (Always Consider)' }).Count -eq 1) "Missing Core section"
+  Write-TestResult "Output.NoStaleMarkers" (@($genLines | Where-Object { $_ -match 'GENERATED SKILLS INDEX' }).Count -eq 0) "Output still emits old BEGIN/END markers"
+
+  # Ordinal sort within EVERY section: collect each section's filenames, then emit a
+  # single affirmative pass/fail covering all sections (no fail-only-never-pass path).
+  $sectionNames = @()
+  $names = New-Object System.Collections.Generic.List[string]
+  foreach ($line in $genLines) {
+    if ($line -match '^## ') {
+      if ($names.Count -gt 0) { $sectionNames += , ($names.ToArray()) }
+      $names = New-Object System.Collections.Generic.List[string]
+    }
+    elseif ($line -match '^\| \[([a-z0-9][a-z0-9-]*)\]') {
+      $names.Add($Matches[1])
+    }
+  }
+  if ($names.Count -gt 0) { $sectionNames += , ($names.ToArray()) }
+
+  $allOrdered = $true
+  $offender = ''
+  foreach ($arr in $sectionNames) {
+    $sorted = [string[]]$arr.Clone()
+    [Array]::Sort($sorted, [System.StringComparer]::Ordinal)
+    for ($i = 0; $i -lt $arr.Count; $i++) {
+      if ($arr[$i] -ne $sorted[$i]) { $allOrdered = $false; $offender = ($arr -join ', '); break }
+    }
+    if (-not $allOrdered) { break }
+  }
+  Write-TestResult "Output.OrdinalSortAllSections" (($sectionNames.Count -ge 3) -and $allOrdered) `
+    "Expected >=3 ordinally-sorted sections; found $($sectionNames.Count), ordered=$allOrdered, offender=[$offender]"
+
+  # ===========================================================================
+  Write-Host "`n  Section: context.md" -ForegroundColor White
+
+  $contextRaw = Get-Content -LiteralPath $contextFile -Raw
+  Write-TestResult "Context.LinksToIndex" ($contextRaw -match '\]\(\./skills/index\.md\)') "context.md must link to ./skills/index.md"
+  Write-TestResult "Context.NoBeginMarker" (-not $contextRaw.Contains('<!-- BEGIN GENERATED SKILLS INDEX -->')) "context.md still has a stale BEGIN marker"
+  Write-TestResult "Context.NoEndMarker" (-not $contextRaw.Contains('<!-- END GENERATED SKILLS INDEX -->')) "context.md still has a stale END marker"
+
+  $contextH1 = @(Get-MarkdownH1Lines -Lines @(Get-Content -LiteralPath $contextFile))
+  Write-TestResult "Context.ExactlyOneH1" ($contextH1.Count -eq 1) "Expected 1 H1, found $($contextH1.Count)"
+
+  # ===========================================================================
+  Write-Host "`n  Section: Linter green path" -ForegroundColor White
+
+  & pwsh -NoProfile -File $lintScript | Out-Null
+  Write-TestResult "Lint.PassesOnCleanRepo" ($LASTEXITCODE -eq 0) "Expected exit 0 from lint-llm-instructions.ps1"
+
+  # ===========================================================================
+  Write-Host "`n  Section: Linter red paths (mutate + restore)" -ForegroundColor White
+
+  # Red 1: a non-ASCII character in a trigger comment must fail the lint.
+  $victim = Join-Path $skillsDir 'serialization-safety.md'
+  if (Test-Path -LiteralPath $victim) {
+    $backup = [System.IO.File]::ReadAllBytes($victim)
+    try {
+      $text = [System.IO.File]::ReadAllText($victim)
+      $emDash = [char]0x2014
+      $mutated = $text -replace 'exception contract - every', "exception contract $emDash every"
+      [System.IO.File]::WriteAllText($victim, $mutated, (New-Object System.Text.UTF8Encoding($false)))
+      & pwsh -NoProfile -File $lintScript | Out-Null
+      Write-TestResult "Lint.FailsOnNonAsciiTrigger" ($LASTEXITCODE -ne 0) "Lint should fail when a trigger has a non-ASCII character"
+    }
+    finally {
+      [System.IO.File]::WriteAllBytes($victim, $backup)
+    }
+  }
+  else {
+    Write-TestResult "Lint.FailsOnNonAsciiTrigger" $false "Expected fixture serialization-safety.md to exist"
   }
 
-  return $null
+  # Red 2: drift in index.md must fail the lint.
+  if ($indexExists) {
+    $idxBackup = [System.IO.File]::ReadAllBytes($indexFile)
+    try {
+      Add-Content -LiteralPath $indexFile -Value '| [bogus](./bogus.md) | injected drift |'
+      & pwsh -NoProfile -File $lintScript | Out-Null
+      Write-TestResult "Lint.FailsOnIndexDrift" ($LASTEXITCODE -ne 0) "Lint should fail when index.md drifts from generator output"
+    }
+    finally {
+      [System.IO.File]::WriteAllBytes($indexFile, $idxBackup)
+    }
+  }
+
+  # Red 3: an unknown / typo'd category must fail the lint.
+  if (Test-Path -LiteralPath $victim) {
+    $backup3 = [System.IO.File]::ReadAllBytes($victim)
+    try {
+      $text3 = [System.IO.File]::ReadAllText($victim)
+      $mutated3 = $text3 -replace '\| Core -->', '| Core Skills -->'
+      [System.IO.File]::WriteAllText($victim, $mutated3, (New-Object System.Text.UTF8Encoding($false)))
+      & pwsh -NoProfile -File $lintScript | Out-Null
+      Write-TestResult "Lint.FailsOnUnknownCategory" ($LASTEXITCODE -ne 0) "Lint should fail on an unknown/typo'd category"
+    }
+    finally {
+      [System.IO.File]::WriteAllBytes($victim, $backup3)
+    }
+  }
+
+  # Confirm clean again after restores.
+  & pwsh -NoProfile -File $lintScript | Out-Null
+  Write-TestResult "Lint.GreenAfterRestore" ($LASTEXITCODE -eq 0) "Lint should pass again after restoring mutated files"
 }
-
-$mBegin = '<!-- BEGIN GENERATED SKILLS INDEX -->'
-$mEnd = '<!-- END GENERATED SKILLS INDEX -->'
-
-$validRaw = @(
-  'Header',
-  $mBegin,
-  'Line A',
-  'Line B',
-  $mEnd,
-  'Footer'
-) -join "`n"
-$validExtract = Invoke-TestMarkerExtract -Raw $validRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.ValidContent" ($validExtract -eq "Line A`nLine B") `
-  "Expected 'Line A\\nLine B', got '$validExtract'"
-
-$missingBeginRaw = @('x', 'y', $mEnd) -join "`n"
-$missingBeginExtract = Invoke-TestMarkerExtract -Raw $missingBeginRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.MissingBeginReturnsNull" ($null -eq $missingBeginExtract) `
-  "Expected null when BEGIN marker missing"
-
-$malformedOrderRaw = @($mEnd, 'middle', $mBegin) -join "`n"
-$malformedOrderExtract = Invoke-TestMarkerExtract -Raw $malformedOrderRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.MalformedOrderReturnsNull" ($null -eq $malformedOrderExtract) `
-  "Expected null when END appears before BEGIN"
-
-$emptyRaw = @($mBegin, $mEnd) -join "`n"
-$emptyExtract = Invoke-TestMarkerExtract -Raw $emptyRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.EmptyContentExtractsEmpty" ($emptyExtract -eq '') `
-  "Expected empty string for empty marker content, got '$emptyExtract'"
-
-$crlfRaw = "head`r`n$mBegin`r`nLine 1`r`nLine 2`r`n$mEnd`r`ntail"
-$crlfExtract = Invoke-TestMarkerExtract -Raw $crlfRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.CRLFNormalization" ($crlfExtract -eq "Line 1`nLine 2") `
-  "Expected normalized LF content, got '$crlfExtract'"
-
-$multiMarkerRaw = @(
-  $mBegin,
-  'first',
-  $mEnd,
-  'between',
-  $mBegin,
-  'second',
-  $mEnd
-) -join "`n"
-$multiMarkerExtract = Invoke-TestMarkerExtract -Raw $multiMarkerRaw -Begin $mBegin -End $mEnd
-Write-TestResult "MarkerExtract.NonGreedyFirstBlock" ($multiMarkerExtract -eq 'first') `
-  "Expected first block only (non-greedy), got '$multiMarkerExtract'"
-
-# =============================================================================
-# Test 8: Data-driven — known-bad patterns do not appear in generator output
-# =============================================================================
-Write-Host "`n  Section: Data-driven bad-pattern validation" -ForegroundColor White
-
-$badPatterns = @(
-  @{ Line = '# <!-- END GENERATED SKILLS INDEX -->'; Description = 'H1 wrapping END marker' }
-  @{ Line = '# [skills-index] Generated skills index'; Description = 'H1 wrapping diagnostic' }
-  @{ Line = '# Some random heading'; Description = 'Arbitrary H1 heading' }
-  @{ Line = '## Some H2 heading'; Description = 'Arbitrary H2 heading' }
-)
-
-foreach ($case in $badPatterns) {
-  $found = $generatorLines -contains $case.Line
-  $testName = "BadPattern.NotInOutput.$($case.Description -replace '\s+','_')"
-
-  Write-TestResult $testName (-not $found) `
-    "Bad pattern found in output: '$($case.Line)'"
-
-  # Also verify the generator's own validation would catch H1/H2
-  # The generator rejects lines matching '^#{1,2}\s' that don't start with '###'
-  $wouldBeRejected = ($case.Line -match '^#{1,2}\s') -and ($case.Line -notmatch '^###')
-  $validationTestName = "BadPattern.ValidatorWouldCatch.$($case.Description -replace '\s+','_')"
-
-  Write-TestResult $validationTestName $wouldBeRejected `
-    "Generator validation would not catch: '$($case.Line)'"
+finally {
+  Remove-Item -LiteralPath $expectedTemp, $determinismTemp -Force -ErrorAction SilentlyContinue
 }
 
 # =============================================================================
-# Test 9: Injected H1 violation is detected by validation logic
-# =============================================================================
-Write-Host "`n  Section: Negative-path detection tests" -ForegroundColor White
-
-$syntheticContent = @(
-  '# Original H1 Heading',
-  '',
-  '## Some Section',
-  '',
-  '# Bad H1 Heading',
-  '',
-  'Some content here.'
-)
-$syntheticH1Lines = @(Get-MarkdownH1Lines -Lines $syntheticContent)
-
-Write-TestResult "NegativePath.InjectedH1Detected" ($syntheticH1Lines.Count -gt 1) `
-  "Expected >1 H1 heading in synthetic content, found $($syntheticH1Lines.Count)"
-
-# =============================================================================
-# Test 10: Single H1 content passes validation logic
-# =============================================================================
-$validContent = @(
-  '# Only H1 Heading',
-  '',
-  '## Some Section',
-  '',
-  'Some content here.'
-)
-$validH1Lines = @(Get-MarkdownH1Lines -Lines $validContent)
-
-Write-TestResult "NegativePath.SingleH1Passes" ($validH1Lines.Count -eq 1) `
-  "Expected exactly 1 H1 heading in valid content, found $($validH1Lines.Count)"
-
-# =============================================================================
-# Test 11: Rollback scenario — multiple H1 headings correctly identified
-# =============================================================================
-$rollbackContent = @(
-  '# AI Agent Guidelines',
-  '',
-  '## Overview',
-  '',
-  '# Duplicate From Generator',
-  '',
-  '### Some skill entry',
-  '',
-  '# Another Bad H1'
-)
-$rollbackH1Lines = @(Get-MarkdownH1Lines -Lines $rollbackContent)
-
-Write-TestResult "NegativePath.RollbackMultipleH1" ($rollbackH1Lines.Count -eq 3) `
-  "Expected 3 H1 headings in rollback content, found $($rollbackH1Lines.Count)"
-
-# =============================================================================
-# Test 12: Generator output with injected bad line is caught by validation
-# =============================================================================
-# These tests use raw regex (not Get-MarkdownH1Lines) because they validate
-# the generator's own H1 rejection logic against flat output, not markdown documents.
-Write-Host "`n  Section: Generator output injection tests" -ForegroundColor White
-
-$injectedOutput = @($generatorLines) + @('# Injected Bad H1 Line')
-$injectedH1Lines = @($injectedOutput | Where-Object { $_ -match '^# ' })
-
-Write-TestResult "Injection.BadH1CaughtInGeneratorOutput" ($injectedH1Lines.Count -gt 0) `
-  "Expected injected H1 to be detected, found $($injectedH1Lines.Count) H1 line(s)"
-
-# Verify the injected line would be rejected by the generator's own validation
-$injectedLine = '# Injected Bad H1 Line'
-$wouldReject = ($injectedLine -match '^#{1,2}\s') -and ($injectedLine -notmatch '^###')
-
-Write-TestResult "Injection.GeneratorValidationRejectsBadH1" $wouldReject `
-  "Generator validation should reject: '$injectedLine'"
-
-# =============================================================================
-# Test 13: Injected H2 line in generator output is caught
-# =============================================================================
-$injectedH2Output = @($generatorLines) + @('## Injected Bad H2 Line')
-$injectedBadLines = @($injectedH2Output | Where-Object { $_ -match '^#{1,2}\s' -and $_ -notmatch '^###' })
-
-Write-TestResult "Injection.BadH2CaughtInGeneratorOutput" ($injectedBadLines.Count -gt 0) `
-  "Expected injected H2 to be detected, found $($injectedBadLines.Count) bad line(s)"
-
-# =============================================================================
-# Test 14: Code-block-aware H1 detection
+# Get-MarkdownH1Lines remains code-block-aware (helper used by the linter).
 # =============================================================================
 Write-Host "`n  Section: Code-block-aware H1 detection" -ForegroundColor White
 
 $codeBlockCases = @(
-  @{
-    Name = 'BashCommentsInCodeBlock'
-    Lines = @(
-      '# Real H1 Heading',
-      '',
-      '```bash',
-      '# this is a bash comment',
-      '# another bash comment',
-      '```',
-      '',
-      'Some content.'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'TildeCodeBlock'
-    Lines = @(
-      '# Real H1',
-      '',
-      '~~~sh',
-      '# not a heading',
-      '~~~',
-      '',
-      'End.'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'MultipleCodeBlocksOneH1'
-    Lines = @(
-      '# Only H1',
-      '',
-      '```',
-      '# inside fence 1',
-      '```',
-      '',
-      '```python',
-      '# inside fence 2',
-      '```'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'NoCodeBlocksTwoH1'
-    Lines = @(
-      '# First H1',
-      '',
-      '# Second H1'
-    )
-    ExpectedCount = 2
-  }
-  @{
-    Name = 'H1AfterCodeBlock'
-    Lines = @(
-      '```',
-      '# fenced comment',
-      '```',
-      '# Real H1 Outside'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'UnclosedFenceSwallowsRemainder'
-    Lines = @(
-      '# Real H1',
-      '',
-      '```bash',
-      '# bash comment',
-      '# swallowed H1'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'IndentedFence'
-    Lines = @(
-      '# Real H1',
-      '   ```bash',
-      '   # indented code comment',
-      '   ```'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'EmptyCodeBlock'
-    Lines = @(
-      '# H1 Before',
-      '```',
-      '```',
-      '# H1 After'
-    )
-    ExpectedCount = 2
-  }
-  @{
-    Name = 'AdjacentCodeBlocksWithH1Between'
-    Lines = @(
-      '```',
-      '# inside',
-      '```',
-      '# Between blocks',
-      '```',
-      '# inside again',
-      '```'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'MixedFenceCharsNotClosed'
-    Lines = @(
-      '# Real H1',
-      '```bash',
-      '# inside backtick fence',
-      '~~~',
-      '# still inside backtick fence (tilde does not close backtick)',
-      '```'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'NestedFourBacktickFence'
-    Lines = @(
-      '# Real H1',
-      '````',
-      '```',
-      '# inside outer fence (inner triple does not close)',
-      '```',
-      '````'
-    )
-    ExpectedCount = 1
-  }
-  @{
-    Name = 'ClosingFenceWithTrailingContent'
-    Lines = @(
-      '# Real H1',
-      '```',
-      '# inside fence',
-      '``` not a valid close',
-      '# still inside fence',
-      '```'
-    )
-    ExpectedCount = 1
-  }
+  @{ Name = 'BashCommentsInCodeBlock'; ExpectedCount = 1; Lines = @('# Real H1', '', '```bash', '# bash comment', '```', '', 'x') }
+  @{ Name = 'TildeCodeBlock'; ExpectedCount = 1; Lines = @('# Real H1', '', '~~~sh', '# not a heading', '~~~') }
+  @{ Name = 'NoCodeBlocksTwoH1'; ExpectedCount = 2; Lines = @('# First', '', '# Second') }
+  @{ Name = 'H1AfterCodeBlock'; ExpectedCount = 1; Lines = @('```', '# fenced', '```', '# Real H1') }
+  @{ Name = 'UnclosedFenceSwallowsRemainder'; ExpectedCount = 1; Lines = @('# Real H1', '```bash', '# swallowed') }
+  @{ Name = 'NestedFourBacktickFence'; ExpectedCount = 1; Lines = @('# Real H1', '````', '```', '# inside', '```', '````') }
 )
-
 foreach ($case in $codeBlockCases) {
   $h1Results = @(Get-MarkdownH1Lines -Lines $case.Lines)
   Write-TestResult "CodeBlockAware.$($case.Name)" ($h1Results.Count -eq $case.ExpectedCount) `
-    "Expected $($case.ExpectedCount) H1, found $($h1Results.Count): $(($h1Results | ForEach-Object { "L$($_.LineNumber): $($_.Text)" }) -join ' | ')"
+    "Expected $($case.ExpectedCount) H1, found $($h1Results.Count)"
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────
@@ -512,14 +264,10 @@ Write-Host ""
 Write-Host ("=" * 60)
 Write-Host ("Tests passed: {0}" -f $script:TestsPassed) -ForegroundColor Green
 Write-Host ("Tests failed: {0}" -f $script:TestsFailed) -ForegroundColor $(if ($script:TestsFailed -gt 0) { "Red" } else { "Green" })
-
 if ($script:FailedTests.Count -gt 0) {
   Write-Host "Failed tests:" -ForegroundColor Red
-  foreach ($t in $script:FailedTests) {
-    Write-Host "  - $t" -ForegroundColor Red
-  }
+  foreach ($t in $script:FailedTests) { Write-Host "  - $t" -ForegroundColor Red }
 }
-
 Write-Host ("=" * 60)
 
 exit $script:TestsFailed

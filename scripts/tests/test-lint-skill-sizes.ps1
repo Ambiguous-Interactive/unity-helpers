@@ -371,6 +371,18 @@ Write-TestResult "FailOnCritical_CriticalSkill_ExitCode1" ($result19.ExitCode -e
 Write-TestResult "FailOnCritical_CriticalMessagePresent" ($result19.Output -match '\[skill-sizes\] CRITICAL:') "Expected CRITICAL message in output"
 Remove-Item -Path $tempDir19 -Recurse -Force -ErrorAction SilentlyContinue
 
+# Test 20: the generated index.md is EXEMPT from the size limit (machine-written,
+# not an authored skill). A 600-line index.md must NOT fail the linter.
+Write-Host "`nTest group: Generated index.md exemption" -ForegroundColor Magenta
+$tempDir20 = Join-Path ([System.IO.Path]::GetTempPath()) "skill-test-index-exempt-$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
+New-Item -ItemType Directory -Path $tempDir20 -Force | Out-Null
+New-SkillFixture -Dir $tempDir20 -FileName "small-skill.md" -LineCount 100
+New-SkillFixture -Dir $tempDir20 -FileName "index.md" -LineCount 600
+$result20 = Invoke-Linter -SkillsDir $tempDir20
+Write-TestResult "GeneratedIndexExempt_ExitCode0" ($result20.ExitCode -eq 0) "Expected exit 0 (index.md exempt), got $($result20.ExitCode): $($result20.Output)"
+Write-TestResult "GeneratedIndexExempt_NotFlagged" (-not ($result20.Output -match 'index\.md')) "index.md must not appear in size-lint output (it is exempt), got: $($result20.Output)"
+Remove-Item -Path $tempDir20 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---- Summary ----
 
 Write-Host ""

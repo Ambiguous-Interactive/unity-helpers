@@ -21,6 +21,11 @@ Samples~/
 # scope so a generated file can never trip `run-prettier.js --check` in CI.
 perf-results/**
 
+# Generated, deterministic skills index (scripts/generate-skills-index.ps1). Keep it
+# out of Prettier so a formatting pass can never reshape the canonical bytes the
+# linter enforces (UTF-8 no BOM, LF, ordinal order, unpadded table cells).
+.llm/skills/index.md
+
 # Only format supported text/assets; Prettier globbing will still be constrained by scripts
 **/*.meta
 **/*.unity

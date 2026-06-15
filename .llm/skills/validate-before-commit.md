@@ -272,14 +272,14 @@ npm run lint:markdown
 ### LLM Instructions Changes ([LLM context](../context.md), skills index)
 
 ```bash
-# 🚨 MANDATORY: After ANY change to .llm/context.md or skills index generation:
+# 🚨 MANDATORY: After ANY change to .llm/context.md, a skill trigger, or the index:
 pwsh -NoProfile -File scripts/lint-llm-instructions.ps1
 
-# Auto-fix mode (rolls back MD025 violations from generated content):
+# Auto-fix mode (regenerates .llm/skills/index.md):
 pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
 ```
 
-**CRITICAL**: The skills index must NEVER introduce H1 or H2 headings into the [LLM context file](../context.md). Generated skill entries must use H3 or lower. The LLM instructions lint script validates this and the `-Fix` flag can auto-correct violations.
+**CRITICAL**: The skills index is the generated [Skills Index](./index.md) file (linked from the [LLM context file](../context.md)), NOT an embedded block. It is byte-for-byte deterministic across OS (ordinal sort, UTF-8 no BOM, LF) and Prettier-ignored — regenerate it with the generator, never hand-edit it. Trigger descriptions MUST be ASCII (use `-`, not an em-dash); a non-ASCII trigger is the cross-OS drift class the lint rejects. The lint also verifies the context file keeps exactly one H1 and links to the index.
 
 **Tests**: Run `pwsh -NoProfile -File scripts/tests/test-llm-instructions-lint.ps1` to verify the lint script itself (test cases covering generator output validation, lint correctness, H1/H2 detection, and pattern matching).
 

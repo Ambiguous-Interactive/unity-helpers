@@ -3,23 +3,30 @@
     Validates LLM instruction files (.llm/) are correct and up-to-date.
 
 .DESCRIPTION
-    This script validates:
-    1. All skill files have proper trigger comments
-    2. The skills index in context.md is up-to-date
-    3. All referenced skill files exist
-    4. No orphaned skill files (skills not in index)
+    Validates:
+    1. Every authored skill file (.llm/skills/*.md except the generated index.md)
+       has a trigger comment.
+    2. Every trigger comment is ASCII-only (a stray em-dash / smart quote is the
+       exact cross-OS drift that previously broke CI - see serialization-safety).
+    3. The generated skills index .llm/skills/index.md is up-to-date (matches the
+       generator output) AND is byte-stable: UTF-8 without BOM, LF line endings.
+    4. The generator is deterministic (two runs produce identical bytes).
+    5. .llm/context.md links to ./skills/index.md, carries no stale embedded
+       BEGIN/END index markers, and still has exactly one H1.
 
 .PARAMETER Fix
-    If specified, regenerates the skills index to fix out-of-date issues.
+    Regenerate .llm/skills/index.md to fix an out-of-date index.
 
 .PARAMETER VerboseOutput
-    If specified, outputs detailed information during validation.
+    Emit detailed progress.
 
 .EXAMPLE
     pwsh -NoProfile -File scripts/lint-llm-instructions.ps1
     pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
 #>
-# lint-pwsh-invocations: allow-subprocess-pwsh generate-skills-index.ps1 produces structured stdout captured into $expectedIndex; subprocess isolation keeps the captured text free of parent-session side-output and preserves the child's `exit` semantics.
+# lint-pwsh-invocations: allow-subprocess-pwsh generate-skills-index.ps1 is invoked
+# as an isolated child writing to a temp -OutputPath; file-vs-file comparison avoids
+# stdout-encoding nondeterminism and preserves the child's `exit` semantics.
 Param(
     [switch]$Fix,
     [switch]$VerboseOutput
@@ -50,367 +57,249 @@ $markdownHelpersPath = Join-Path -Path $PSScriptRoot -ChildPath 'markdown-helper
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $skillsDir = Join-Path -Path $repoRoot -ChildPath '.llm/skills'
 $contextFile = Join-Path -Path $repoRoot -ChildPath '.llm/context.md'
+$generateScript = Join-Path -Path $repoRoot -ChildPath 'scripts/generate-skills-index.ps1'
+$indexFileName = 'index.md'
+$indexFile = Join-Path -Path $skillsDir -ChildPath $indexFileName
 
 $exitCode = 0
 
 # =============================================================================
-# 1. Validate skills directory exists
+# 1. Required paths exist
 # =============================================================================
-Write-Info "Checking skills directory..."
-if (-not (Test-Path $skillsDir)) {
-    Write-ErrorMsg "Skills directory not found at: $skillsDir"
-    exit 1
+Write-Info "Checking skills directory and context.md..."
+foreach ($required in @(
+        @{ Path = $skillsDir; Label = 'Skills directory' }
+        @{ Path = $contextFile; Label = 'context.md' }
+        @{ Path = $generateScript; Label = 'generate-skills-index.ps1' }
+    )) {
+    if (-not (Test-Path -LiteralPath $required.Path)) {
+        Write-ErrorMsg "$($required.Label) not found at: $($required.Path)"
+        exit 1
+    }
 }
 
-# =============================================================================
-# 2. Validate context.md exists
-# =============================================================================
-Write-Info "Checking context.md..."
-if (-not (Test-Path $contextFile)) {
-    Write-ErrorMsg "context.md not found at: $contextFile"
-    exit 1
-}
+# Authored skill files: every *.md EXCEPT the generated index.
+$skillFiles = Get-ChildItem -LiteralPath $skillsDir -Filter '*.md' |
+    Where-Object { $_.Name -ne $indexFileName } |
+    Sort-Object Name
 
 # =============================================================================
-# 3. Validate all skill files have trigger comments
+# 2. Trigger comments present + ASCII-only
 # =============================================================================
 Write-Host ""
 Write-Host "Validating skill trigger comments..." -ForegroundColor Blue
 
-$skillFiles = Get-ChildItem -Path $skillsDir -Filter '*.md' | Sort-Object Name
+# Capture the whole single-line trigger comment (non-greedy up to the first -->),
+# so a description containing '>' is captured rather than mis-reported as missing.
+$triggerPattern = '<!--\s*trigger:\s*(.+?)\s*-->'
+$validCategories = @('Core', 'Performance', 'Feature')
 $missingTriggers = @()
+$nonAsciiTriggers = @()
+$malformedTriggers = @()
 
 foreach ($file in $skillFiles) {
-    $content = Get-Content -Path $file.FullName -Raw
-    
-    # Check for trigger comment: <!-- trigger: keywords | description --> or <!-- trigger: keywords | description | category -->
-    # Description may contain dashes and other characters
-    # Pattern: <!-- trigger: <keywords> | <description> [| <category>] -->
-    if ($content -notmatch '<!--\s*trigger:\s*[^|]+\|[^>]+-->') {
+    $content = Get-Content -LiteralPath $file.FullName -Raw
+    $match = [regex]::Match($content, $triggerPattern)
+    if (-not $match.Success) {
         $missingTriggers += $file.Name
+        continue
+    }
+
+    # Non-ASCII (em-dash, en-dash, smart quotes, ellipsis, ...) in a trigger is the
+    # cross-OS drift class; flag the exact offending characters.
+    $badChars = [regex]::Matches($match.Value, '[^\x00-\x7F]')
+    if ($badChars.Count -gt 0) {
+        $shown = ($badChars | ForEach-Object { $_.Value } | Select-Object -Unique) -join ' '
+        $nonAsciiTriggers += "$($file.Name): non-ASCII character(s) [$shown]"
+    }
+
+    # Structure: keywords | description [| category]. Enforce 2-3 '|'-separated
+    # fields (a literal '|' in the description would silently corrupt the generated
+    # row) and a KNOWN category (a typo like 'Core Skills' must not fall through to
+    # the Feature default unnoticed).
+    $fields = $match.Groups[1].Value -split '\|'
+    if ($fields.Count -lt 2 -or $fields.Count -gt 3) {
+        $malformedTriggers += "$($file.Name): trigger must have 2 or 3 '|'-separated fields (found $($fields.Count)); a literal '|' in the description is not allowed"
+    }
+    elseif ($fields.Count -eq 3 -and ($fields[2].Trim() -notin $validCategories)) {
+        $malformedTriggers += "$($file.Name): unknown category '$($fields[2].Trim())' (expected: $($validCategories -join ', '))"
     }
 }
 
 if ($missingTriggers.Count -gt 0) {
     Write-ErrorMsg "The following skill files are missing trigger comments:"
-    foreach ($file in $missingTriggers) {
-        Write-Host "  - $file" -ForegroundColor Red
-    }
-    Write-Host ""
+    foreach ($file in $missingTriggers) { Write-Host "  - $file" -ForegroundColor Red }
     Write-Host "Required format: <!-- trigger: keyword1, keyword2 | Description | Category -->" -ForegroundColor Yellow
     Write-Host "Categories: Core, Performance, Feature (default: Feature)" -ForegroundColor Yellow
     $exitCode = 1
 }
-else {
-    Write-SuccessMsg "All $($skillFiles.Count) skill files have trigger comments"
-}
 
-# =============================================================================
-# 4. Validate skills index is up-to-date
-# =============================================================================
-Write-Host ""
-Write-Host "Validating skills index..." -ForegroundColor Blue
-
-# Generate expected index
-$generateScript = Join-Path -Path $repoRoot -ChildPath 'scripts/generate-skills-index.ps1'
-if (-not (Test-Path $generateScript)) {
-    Write-ErrorMsg "generate-skills-index.ps1 not found at: $generateScript"
-    exit 1
-}
-
-# Run the generator and capture output
-$expectedIndex = & pwsh -NoProfile -File $generateScript 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-ErrorMsg "Generator script failed with exit code $LASTEXITCODE"
-    exit 1
-}
-
-# Read current context.md
-$contextContent = Get-Content -Path $contextFile -Raw
-
-# Extract current index from context.md
-$beginMarker = '<!-- BEGIN GENERATED SKILLS INDEX -->'
-$endMarker = '<!-- END GENERATED SKILLS INDEX -->'
-
-# Returns marker presence/order diagnostics to make extraction failures actionable.
-function Get-MarkerDiagnostics($raw, $beginMarkerLocal, $endMarkerLocal) {
-    if ($null -eq $raw) {
-        return @{
-            IsNull = $true
-            BeginCount = 0
-            EndCount = 0
-            BeginIndex = -1
-            EndIndex = -1
-            OrderValid = $false
-        }
-    }
-
-    $normalized = $raw -replace "`r`n", "`n"
-    $beginCount = [regex]::Matches($normalized, [regex]::Escape($beginMarkerLocal)).Count
-    $endCount = [regex]::Matches($normalized, [regex]::Escape($endMarkerLocal)).Count
-    $beginIndex = $normalized.IndexOf($beginMarkerLocal)
-    $endIndex = $normalized.IndexOf($endMarkerLocal)
-
-    return @{
-        IsNull = $false
-        BeginCount = $beginCount
-        EndCount = $endCount
-        BeginIndex = $beginIndex
-        EndIndex = $endIndex
-        OrderValid = ($beginIndex -ge 0 -and $endIndex -ge 0 -and $beginIndex -lt $endIndex)
-    }
-}
-
-function Test-MarkerShape($diag, $sourceName) {
-    if ($diag.IsNull) {
-        Write-ErrorMsg "$sourceName content is null"
-        return $false
-    }
-
-    $isValid = $true
-    if ($diag.BeginCount -ne 1) {
-        Write-ErrorMsg "$sourceName has $($diag.BeginCount) BEGIN markers (expected exactly 1)"
-        $isValid = $false
-    }
-    if ($diag.EndCount -ne 1) {
-        Write-ErrorMsg "$sourceName has $($diag.EndCount) END markers (expected exactly 1)"
-        $isValid = $false
-    }
-    if (-not $diag.OrderValid) {
-        Write-ErrorMsg "$sourceName marker order is invalid (beginIndex=$($diag.BeginIndex), endIndex=$($diag.EndIndex))"
-        $isValid = $false
-    }
-
-    return $isValid
-}
-
-# Extract content between BEGIN/END markers from a raw string.
-# IMPORTANT: capture semantics are explicit via named group `content`.
-function Extract-MarkerContent($raw, $beginMarkerLocal, $endMarkerLocal) {
-    if ($null -eq $raw) {
-        return $null
-    }
-
-    # Normalize CRLF to LF for cross-platform consistency
-    $normalized = $raw -replace "`r`n", "`n"
-    $escapedBegin = [regex]::Escape($beginMarkerLocal)
-    $escapedEnd = [regex]::Escape($endMarkerLocal)
-    $pattern = "(?s)$escapedBegin(?<content>.*?)$escapedEnd"
-
-    if ($normalized -match $pattern) {
-        return $Matches['content'].Trim()
-    }
-
-    return $null
-}
-
-if ($contextContent -notmatch [regex]::Escape($beginMarker)) {
-    Write-ErrorMsg "Missing BEGIN marker in context.md"
-    exit 1
-}
-
-if ($contextContent -notmatch [regex]::Escape($endMarker)) {
-    Write-ErrorMsg "Missing END marker in context.md"
-    exit 1
-}
-
-# Extract current index via the single shared extraction path
-$contextDiag = Get-MarkerDiagnostics $contextContent $beginMarker $endMarker
-if (-not (Test-MarkerShape $contextDiag 'context.md')) {
-    exit 1
-}
-
-$currentIndex = Extract-MarkerContent $contextContent $beginMarker $endMarker
-if ($null -eq $currentIndex) {
-    Write-ErrorMsg "Could not extract skills index from context.md"
-    Write-ErrorMsg "Diagnostics: beginCount=$($contextDiag.BeginCount), endCount=$($contextDiag.EndCount), beginIndex=$($contextDiag.BeginIndex), endIndex=$($contextDiag.EndIndex), orderValid=$($contextDiag.OrderValid)"
-    exit 1
-}
-
-# Normalize for comparison (remove timestamps, normalize whitespace)
-function Normalize-Index($indexContent) {
-    # Normalize CRLF to LF for cross-platform consistency
-    $indexContent = $indexContent -replace "`r`n", "`n"
-    $lines = $indexContent -split "`n" | 
-        Where-Object { 
-            $_ -notmatch '<!-- Generated:' -and 
-            $_ -notmatch '<!-- Command:'
-        } |
-        ForEach-Object { 
-            $line = $_.TrimEnd()
-            # Normalize table rows: collapse multiple spaces to single space around pipe separators
-            $line = $line -replace '\s+\|\s+', ' | '
-            $line = $line -replace '\|\s+', '| '
-            $line = $line -replace '\s+\|', ' |'
-            # Collapse multiple consecutive dashes in separator rows
-            $line = $line -replace '-{2,}', '-'
-            $line
-        } |
-        Where-Object { $_ -ne '' }
-    return ($lines -join "`n").Trim()
-}
-
-# Extract only the content between markers from the generated output
-$expectedRaw = $expectedIndex -join "`n"
-$expectedDiag = Get-MarkerDiagnostics $expectedRaw $beginMarker $endMarker
-if (-not (Test-MarkerShape $expectedDiag 'generated output')) {
-    exit 1
-}
-
-$expectedContent = Extract-MarkerContent $expectedRaw $beginMarker $endMarker
-if ($null -eq $expectedContent) {
-    Write-ErrorMsg "Generated output missing BEGIN/END markers"
-    Write-ErrorMsg "Diagnostics: beginCount=$($expectedDiag.BeginCount), endCount=$($expectedDiag.EndCount), beginIndex=$($expectedDiag.BeginIndex), endIndex=$($expectedDiag.EndIndex), orderValid=$($expectedDiag.OrderValid)"
-    exit 1
-}
-
-if ($expectedContent.Trim().Length -eq 0) {
-    Write-ErrorMsg "Generated output between markers is empty"
-    exit 1
-}
-
-$normalizedExpected = Normalize-Index $expectedContent
-$normalizedCurrent = Normalize-Index $currentIndex
-
-if ($normalizedExpected -ne $normalizedCurrent) {
-    Write-ErrorMsg "Skills index in context.md is out of date!"
-    Write-Host ""
-    
-    # Show first few differences to help diagnose
-    $expectedLines = $normalizedExpected -split "`n"
-    $currentLines = $normalizedCurrent -split "`n"
-    $maxLines = [Math]::Max($expectedLines.Count, $currentLines.Count)
-    $diffCount = 0
-    for ($i = 0; $i -lt $maxLines -and $diffCount -lt 5; $i++) {
-        $exp = if ($i -lt $expectedLines.Count) { $expectedLines[$i] } else { "(missing)" }
-        $cur = if ($i -lt $currentLines.Count) { $currentLines[$i] } else { "(missing)" }
-        if ($exp -ne $cur) {
-            Write-Host "  Line $($i+1):" -ForegroundColor Yellow
-            Write-Host "    Expected: $exp" -ForegroundColor Green
-            Write-Host "    Current:  $cur" -ForegroundColor Red
-            $diffCount++
-        }
-    }
-    if ($diffCount -eq 0) {
-        Write-Host "  Expected line count: $($expectedLines.Count)" -ForegroundColor Yellow
-        Write-Host "  Current line count:  $($currentLines.Count)" -ForegroundColor Yellow
-    }
-    
-    if ($Fix) {
-        Write-Host "Regenerating skills index..." -ForegroundColor Yellow
-        
-        # Build the new content - expectedIndex already contains BEGIN/END markers
-        # Filter to only lines between BEGIN and END markers (inclusive) to exclude
-        # any summary/diagnostic output from the generator script
-        $inBlock = $false
-        $filteredLines = @()
-        foreach ($line in $expectedIndex) {
-            if ($line -eq $beginMarker) { $inBlock = $true }
-            if ($inBlock) { $filteredLines += $line }
-            if ($line -eq $endMarker) { $inBlock = $false; break }
-        }
-        $expectedFull = $filteredLines -join "`n"
-        # Replace the entire block including markers with the new generated content
-        $replacePattern = "(?s)$([regex]::Escape($beginMarker)).*?$([regex]::Escape($endMarker))"
-        $newContent = $contextContent -replace $replacePattern, $expectedFull
-
-        # Trim trailing whitespace and add exactly one LF (Markdown files require LF per .editorconfig)
-        $newContent = $newContent.TrimEnd() + "`n"
-        Set-Content -Path $contextFile -Value $newContent -NoNewline -Encoding UTF8
-        Write-SuccessMsg "Skills index has been regenerated in context.md"
-        
-        # Re-run prettier to format
-        Write-Info "Running prettier to format context.md..."
-        Push-Location $repoRoot
-        try {
-            $prettierOutput = node scripts/run-prettier.js --write -- .llm/context.md 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-ErrorMsg "Prettier formatting failed (exit code $LASTEXITCODE):"
-                Write-Host $prettierOutput -ForegroundColor Red
-                Write-ErrorMsg "Rolling back changes..."
-                Set-Content -Path $contextFile -Value $contextContent -NoNewline -Encoding UTF8
-                exit 1
-            }
-        }
-        catch {
-            Write-ErrorMsg "Prettier formatting failed: $_. Rolling back changes..."
-            Set-Content -Path $contextFile -Value $contextContent -NoNewline -Encoding UTF8
-            exit 1
-        }
-        finally {
-            Pop-Location
-        }
-
-        # Post-fix validation: ensure no NEW H1 headings were introduced (MD025)
-        $originalH1Count = @(Get-MarkdownH1Lines -Lines @($contextContent -split "`n")).Count
-        $fixedContent = @(Get-Content -Path $contextFile)
-        $h1Lines = @(Get-MarkdownH1Lines -Lines $fixedContent)
-        if ($h1Lines.Count -gt $originalH1Count) {
-            Write-ErrorMsg "Fix introduced new H1 headings (MD025 violation):"
-            $h1Lines | ForEach-Object { Write-Host "  L$($_.LineNumber): $($_.Text)" -ForegroundColor Red }
-            Write-ErrorMsg "Rolling back changes..."
-            Set-Content -Path $contextFile -Value $contextContent -NoNewline -Encoding UTF8
-            exit 1
-        }
-    }
-    else {
-        Write-Host "Run with -Fix to regenerate, or manually run:" -ForegroundColor Yellow
-        Write-Host "  pwsh -NoProfile -File scripts/generate-skills-index.ps1" -ForegroundColor Cyan
-        Write-Host "Then update context.md with the generated content." -ForegroundColor Yellow
-        $exitCode = 1
-    }
-}
-else {
-    Write-SuccessMsg "Skills index is up to date"
-}
-
-# =============================================================================
-# 5. Validate all skills in index exist as files
-# =============================================================================
-Write-Host ""
-Write-Host "Validating skill file references..." -ForegroundColor Blue
-
-$skillFileNames = $skillFiles | ForEach-Object { $_.BaseName }
-$missingFiles = @()
-$orphanedFiles = @()
-
-# Extract skill names from the current index
-$indexSkillPattern = '\[([a-z0-9-]+)\]\(\.\/skills\/([a-z0-9-]+)\.md\)'
-$indexMatches = [regex]::Matches($currentIndex, $indexSkillPattern)
-$indexedSkills = $indexMatches | ForEach-Object { $_.Groups[2].Value } | Sort-Object -Unique
-
-# Check for missing files (referenced in index but don't exist)
-foreach ($skill in $indexedSkills) {
-    if ($skill -notin $skillFileNames) {
-        $missingFiles += $skill
-    }
-}
-
-# Check for orphaned files (exist but not in index)
-foreach ($skillFile in $skillFileNames) {
-    if ($skillFile -notin $indexedSkills) {
-        $orphanedFiles += $skillFile
-    }
-}
-
-if ($missingFiles.Count -gt 0) {
-    Write-ErrorMsg "Skills referenced in index but files don't exist:"
-    foreach ($skill in $missingFiles) {
-        Write-Host "  - $skill.md" -ForegroundColor Red
-    }
+if ($nonAsciiTriggers.Count -gt 0) {
+    Write-ErrorMsg "Trigger comments must be ASCII-only (use '-' not em-dash, straight quotes):"
+    foreach ($t in $nonAsciiTriggers) { Write-Host "  - $t" -ForegroundColor Red }
+    Write-Host "Non-ASCII descriptions cause cross-OS index drift (the failure this lint prevents)." -ForegroundColor Yellow
     $exitCode = 1
 }
 
-if ($orphanedFiles.Count -gt 0) {
-    Write-WarningMsg "Skill files exist but not in index (may need trigger comments):"
-    foreach ($skill in $orphanedFiles) {
-        Write-Host "  - $skill.md" -ForegroundColor Yellow
-    }
-    # This is a warning, not an error - the trigger comment check above will catch it
+if ($malformedTriggers.Count -gt 0) {
+    Write-ErrorMsg "Malformed trigger comments:"
+    foreach ($t in $malformedTriggers) { Write-Host "  - $t" -ForegroundColor Red }
+    Write-Host "Required format: <!-- trigger: keyword1, keyword2 | Description | Category -->" -ForegroundColor Yellow
+    $exitCode = 1
 }
 
-if ($missingFiles.Count -eq 0 -and $orphanedFiles.Count -eq 0) {
-    Write-SuccessMsg "All skill references are valid"
+if ($missingTriggers.Count -eq 0 -and $nonAsciiTriggers.Count -eq 0 -and $malformedTriggers.Count -eq 0) {
+    Write-SuccessMsg "All $($skillFiles.Count) skill files have valid ASCII trigger comments"
+}
+
+# =============================================================================
+# 3 & 4. Index is up-to-date + deterministic
+# =============================================================================
+Write-Host ""
+Write-Host "Validating skills index ($indexFileName)..." -ForegroundColor Blue
+
+# Read CRLF->LF-normalized text for cross-platform-safe content comparison.
+function Get-NormalizedText {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    return ([System.IO.File]::ReadAllText($Path) -replace "`r`n", "`n")
+}
+
+$tempA = [System.IO.Path]::GetTempFileName()
+$tempB = [System.IO.Path]::GetTempFileName()
+try {
+    & pwsh -NoProfile -File $generateScript -OutputPath $tempA | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMsg "Generator failed (exit $LASTEXITCODE) writing expected index."
+        exit 1
+    }
+    & pwsh -NoProfile -File $generateScript -OutputPath $tempB | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMsg "Generator failed (exit $LASTEXITCODE) on determinism re-run."
+        exit 1
+    }
+
+    # 4. Determinism: two independent runs must be byte-identical.
+    $bytesA = [System.IO.File]::ReadAllBytes($tempA)
+    $bytesB = [System.IO.File]::ReadAllBytes($tempB)
+    $deterministic = ($bytesA.Length -eq $bytesB.Length)
+    if ($deterministic) {
+        for ($i = 0; $i -lt $bytesA.Length; $i++) {
+            if ($bytesA[$i] -ne $bytesB[$i]) { $deterministic = $false; break }
+        }
+    }
+    if (-not $deterministic) {
+        Write-ErrorMsg "Generator is NON-deterministic: two runs produced different bytes."
+        $exitCode = 1
+    }
+    else {
+        Write-Info "Generator is deterministic (identical bytes across two runs)."
+    }
+
+    $expected = Get-NormalizedText -Path $tempA
+
+    if (-not (Test-Path -LiteralPath $indexFile)) {
+        if ($Fix) {
+            & pwsh -NoProfile -File $generateScript | Out-Null
+            Write-SuccessMsg "Generated missing $indexFileName"
+        }
+        else {
+            Write-ErrorMsg "$indexFileName does not exist. Run: pwsh -NoProfile -File scripts/generate-skills-index.ps1"
+            exit 1
+        }
+    }
+
+    $current = Get-NormalizedText -Path $indexFile
+
+    if (-not [string]::Equals($expected, $current, [System.StringComparison]::Ordinal)) {
+        if ($Fix) {
+            & pwsh -NoProfile -File $generateScript | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-ErrorMsg "Generator failed during -Fix (exit $LASTEXITCODE)."
+                exit 1
+            }
+            Write-SuccessMsg "Regenerated $indexFileName"
+            $current = Get-NormalizedText -Path $indexFile
+        }
+        else {
+            Write-ErrorMsg "Skills index $indexFileName is out of date!"
+            $expectedLines = $expected -split "`n"
+            $currentLines = $current -split "`n"
+            $maxLines = [Math]::Max($expectedLines.Count, $currentLines.Count)
+            $shown = 0
+            for ($i = 0; $i -lt $maxLines -and $shown -lt 5; $i++) {
+                $exp = if ($i -lt $expectedLines.Count) { $expectedLines[$i] } else { '(missing)' }
+                $cur = if ($i -lt $currentLines.Count) { $currentLines[$i] } else { '(missing)' }
+                if ($exp -ne $cur) {
+                    Write-Host "  Line $($i + 1):" -ForegroundColor Yellow
+                    Write-Host "    Expected: $exp" -ForegroundColor Green
+                    Write-Host "    Current:  $cur" -ForegroundColor Red
+                    $shown++
+                }
+            }
+            Write-Host "Run: pwsh -NoProfile -File scripts/generate-skills-index.ps1" -ForegroundColor Cyan
+            $exitCode = 1
+        }
+    }
+    else {
+        Write-SuccessMsg "Skills index is up to date"
+    }
+}
+finally {
+    Remove-Item -LiteralPath $tempA, $tempB -Force -ErrorAction SilentlyContinue
+}
+
+# =============================================================================
+# 5. Encoding contract on the committed index: UTF-8 no BOM, LF only
+# =============================================================================
+if (Test-Path -LiteralPath $indexFile) {
+    $indexBytes = [System.IO.File]::ReadAllBytes($indexFile)
+    $hasBom = $indexBytes.Length -ge 3 -and $indexBytes[0] -eq 0xEF -and $indexBytes[1] -eq 0xBB -and $indexBytes[2] -eq 0xBF
+    $hasCr = $indexBytes -contains 0x0D
+    if ($hasBom) {
+        Write-ErrorMsg "$indexFileName has a UTF-8 BOM; it must be written without a BOM (cross-OS stability)."
+        $exitCode = 1
+    }
+    if ($hasCr) {
+        Write-ErrorMsg "$indexFileName contains CR (CRLF); it must use LF line endings."
+        $exitCode = 1
+    }
+    if (-not $hasBom -and -not $hasCr) {
+        Write-Info "$indexFileName encoding OK (UTF-8 no BOM, LF)."
+    }
+}
+
+# =============================================================================
+# 6. context.md links to the index, has no stale markers, single H1
+# =============================================================================
+Write-Host ""
+Write-Host "Validating context.md..." -ForegroundColor Blue
+
+$contextContent = Get-Content -LiteralPath $contextFile -Raw
+
+foreach ($staleMarker in @('<!-- BEGIN GENERATED SKILLS INDEX -->', '<!-- END GENERATED SKILLS INDEX -->')) {
+    if ($contextContent.Contains($staleMarker)) {
+        Write-ErrorMsg "context.md still contains a stale embedded-index marker: $staleMarker"
+        Write-Host "The index now lives in .llm/skills/index.md; remove the embedded block." -ForegroundColor Yellow
+        $exitCode = 1
+    }
+}
+
+# Match by URL (not link text) so the doc-link rule's "human-readable text"
+# requirement and this check don't conflict.
+if ($contextContent -notmatch '\]\(\./skills/index\.md\)') {
+    Write-ErrorMsg "context.md must link to the generated index (a link to ./skills/index.md)."
+    $exitCode = 1
+}
+
+$contextH1Lines = @(Get-MarkdownH1Lines -Lines @(Get-Content -LiteralPath $contextFile))
+if ($contextH1Lines.Count -ne 1) {
+    Write-ErrorMsg "context.md must have exactly one H1 (found $($contextH1Lines.Count))."
+    $contextH1Lines | ForEach-Object { Write-Host "  L$($_.LineNumber): $($_.Text)" -ForegroundColor Red }
+    $exitCode = 1
+}
+
+if ($exitCode -eq 0) {
+    Write-SuccessMsg "context.md links to the index, has no stale markers, single H1"
 }
 
 # =============================================================================

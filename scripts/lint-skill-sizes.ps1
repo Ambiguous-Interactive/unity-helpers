@@ -76,7 +76,13 @@ if (-not (Test-Path $skillsDir)) {
     exit 1
 }
 
-$skillFiles = @(Get-ChildItem -Path $skillsDir -Filter '*.md' -Recurse | Sort-Object FullName)
+# Exclude the generated index.md: it is machine-written (scripts/generate-skills-index.ps1),
+# not an authored skill, so the authored-skill line limits do not apply to it.
+$skillFiles = @(
+    Get-ChildItem -Path $skillsDir -Filter '*.md' -Recurse |
+        Where-Object { $_.Name -ne 'index.md' } |
+        Sort-Object FullName
+)
 $checkContext = $true
 
 if ($null -ne $Paths -and $Paths.Count -gt 0) {
@@ -100,7 +106,7 @@ if ($null -ne $Paths -and $Paths.Count -gt 0) {
             continue
         }
 
-        if ($relativePath -like '.llm/skills/*.md') {
+        if ($relativePath -like '.llm/skills/*.md' -and $relativePath -ne '.llm/skills/index.md') {
             $fullPath = Join-Path -Path $repoRoot -ChildPath $relativePath
             if ((Test-Path -Path $fullPath) -and $seen.Add($fullPath)) {
                 $selectedSkillFiles.Add((Get-Item -LiteralPath $fullPath)) | Out-Null
