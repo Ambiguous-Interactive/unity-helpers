@@ -148,7 +148,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public string FullPath { get; set; }
             public string FileName { get; set; }
             public string RelativeDirectory { get; set; }
-            public string Hash { get; set; }
             public AnimationStatus Status { get; set; } = AnimationStatus.Unknown;
             public string DestinationRelativePath { get; set; }
             public bool Selected { get; set; } = true;
@@ -591,7 +590,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 _animationSourcePathRelative,
                                 directoryName.SanitizePath()
                             ),
-                            Hash = GetDependencyHashString(sourceRelPath),
                         };
                         fileInfo.DestinationRelativePath = Path.Combine(
                                 _animationDestinationPathRelative,
@@ -606,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             ShowProgress(
                                 "Analyzing Animations",
-                                $"Hashing: {fileInfo.FileName}",
+                                $"Gathering: {fileInfo.FileName}",
                                 current / total
                             );
                         }
@@ -699,7 +697,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     _animationDestinationPathRelative,
                                     Path.GetDirectoryName(destRelPath).SanitizePath()
                                 ),
-                                Hash = GetDependencyHashString(destRelPath),
                                 Status = AnimationStatus.Unknown,
                                 DestinationRelativePath = destRelPath,
                                 Selected = true,
@@ -1137,23 +1134,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return string.Empty;
         }
 
-        private string GetDependencyHashString(string assetPath)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(assetPath))
-                {
-                    return string.Empty;
-                }
-                Hash128 hash = AssetDatabase.GetAssetDependencyHash(assetPath);
-                return hash.ToString();
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error getting dependency hash for {assetPath}.", e);
-                return string.Empty;
-            }
-        }
+        // Content comparison passes tolerance 0 so WallMath.Approximately falls back to its built-in
+        // relative fudge (~1e-6 * magnitude): tight enough to catch real animation edits (a looser
+        // tolerance would mask changes and skip a needed re-copy) while ignoring float round-trip noise.
+        private const float ContentEqualityTolerance = 0f;
 
         /// <summary>
         /// Compares the content of two animation clips to determine if they are functionally identical.
@@ -1218,11 +1202,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // Compare basic clip properties
-            if (!Mathf.Approximately(sourceClip.frameRate, destClip.frameRate))
+            if (!sourceClip.frameRate.Approximately(destClip.frameRate, ContentEqualityTolerance))
             {
                 return false;
             }
-            if (!Mathf.Approximately(sourceClip.length, destClip.length))
+            if (!sourceClip.length.Approximately(destClip.length, ContentEqualityTolerance))
             {
                 return false;
             }
@@ -1305,7 +1289,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 return false;
             }
-            if (a.cycleOffset != b.cycleOffset)
+            if (!a.cycleOffset.Approximately(b.cycleOffset, ContentEqualityTolerance))
             {
                 return false;
             }
@@ -1329,11 +1313,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 return false;
             }
-            if (!Mathf.Approximately(a.startTime, b.startTime))
+            if (!a.startTime.Approximately(b.startTime, ContentEqualityTolerance))
             {
                 return false;
             }
-            if (!Mathf.Approximately(a.stopTime, b.stopTime))
+            if (!a.stopTime.Approximately(b.stopTime, ContentEqualityTolerance))
             {
                 return false;
             }
@@ -1358,7 +1342,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 AnimationEvent evtA = a[i];
                 AnimationEvent evtB = b[i];
-                if (!Mathf.Approximately(evtA.time, evtB.time))
+                if (!evtA.time.Approximately(evtB.time, ContentEqualityTolerance))
                 {
                     return false;
                 }
@@ -1366,7 +1350,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(evtA.floatParameter, evtB.floatParameter))
+                if (
+                    !evtA.floatParameter.Approximately(
+                        evtB.floatParameter,
+                        ContentEqualityTolerance
+                    )
+                )
                 {
                     return false;
                 }
@@ -1592,27 +1581,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 Keyframe kA = keysA[i];
                 Keyframe kB = keysB[i];
-                if (!Mathf.Approximately(kA.time, kB.time))
+                if (!kA.time.Approximately(kB.time, ContentEqualityTolerance))
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(kA.value, kB.value))
+                if (!kA.value.Approximately(kB.value, ContentEqualityTolerance))
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(kA.inTangent, kB.inTangent))
+                if (!kA.inTangent.Approximately(kB.inTangent, ContentEqualityTolerance))
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(kA.outTangent, kB.outTangent))
+                if (!kA.outTangent.Approximately(kB.outTangent, ContentEqualityTolerance))
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(kA.inWeight, kB.inWeight))
+                if (!kA.inWeight.Approximately(kB.inWeight, ContentEqualityTolerance))
                 {
                     return false;
                 }
-                if (!Mathf.Approximately(kA.outWeight, kB.outWeight))
+                if (!kA.outWeight.Approximately(kB.outWeight, ContentEqualityTolerance))
                 {
                     return false;
                 }
@@ -1646,7 +1635,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 ObjectReferenceKeyframe kA = a[i];
                 ObjectReferenceKeyframe kB = b[i];
-                if (!Mathf.Approximately(kA.time, kB.time))
+                if (!kA.time.Approximately(kB.time, ContentEqualityTolerance))
                 {
                     return false;
                 }

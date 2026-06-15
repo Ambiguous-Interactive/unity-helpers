@@ -299,6 +299,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
         }
 
+        [Test]
+        public void SubToleranceCycleOffsetDifferenceIsTreatedAsEqual()
+        {
+            // Floating-point round-trip noise (a cycleOffset delta well below the approximation
+            // tolerance) must NOT be flagged as a change. This is RED while cycleOffset uses an exact
+            // `!=` compare and GREEN once it uses the project's WallMath.Approximately like the sibling
+            // float fields.
+            AnimationClip a = NewClip();
+            AnimationClip b = NewClip();
+            AnimationClipSettings sa = AnimationUtility.GetAnimationClipSettings(a);
+            AnimationClipSettings sb = AnimationUtility.GetAnimationClipSettings(b);
+            sa.cycleOffset = 1.0f;
+            sb.cycleOffset = 1.0000005f; // a few bits above 1.0; within the relative fudge, above float epsilon
+            AnimationUtility.SetAnimationClipSettings(a, sa);
+            AnimationUtility.SetAnimationClipSettings(b, sb);
+            Assert.IsTrue(
+                Equal(a, b),
+                "A sub-tolerance cycleOffset delta must be treated as equal."
+            );
+        }
+
         // ===================== Animation events (return false) =====================
 
         [Test]
