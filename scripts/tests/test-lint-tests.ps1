@@ -1318,6 +1318,114 @@ namespace WallstopStudios.UnityHelpers.Tests
 $r = Invoke-LintOnFixture -FixtureRelativePath 'RefreshBatchedTest.cs' -FixtureContent $unh009Neg
 Write-TestResult "UNH009.SkipsBatchedBase" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH009')) "Exit: $($r.ExitCode), Output: $($r.Output)"
 
+# ── Test: UNH010 (advisory, non-blocking real-time waits) ────────────────────
+Write-Host "`n  Section: UNH010 advisory" -ForegroundColor White
+
+$unh010Wait = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class WaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitFixture.cs' -FixtureContent $unh010Wait
+Write-TestResult "UNH010.FlagsWaitForSeconds" (($r.ExitCode -eq 0) -and ($r.Output -match 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh010Delay = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Threading.Tasks;
+    using NUnit.Framework;
+
+    public sealed class DelayFixture : CommonTestBase
+    {
+        [Test]
+        public async Task Delays()
+        {
+            await Task.Delay(50);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'DelayFixture.cs' -FixtureContent $unh010Delay
+Write-TestResult "UNH010.FlagsTaskDelayLiteral" (($r.ExitCode -eq 0) -and ($r.Output -match 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# Cancellation fodder: Task.Delay(n, ct) is NOT a blocking wait and must NOT flag.
+$unh010Cancel = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Threading;
+    using System.Threading.Tasks;
+    using NUnit.Framework;
+
+    public sealed class CancelFixture : CommonTestBase
+    {
+        [Test]
+        public async Task Cancels()
+        {
+            CancellationToken cancellationToken = default;
+            await Task.Delay(5000, cancellationToken);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'CancelFixture.cs' -FixtureContent $unh010Cancel
+Write-TestResult "UNH010.SkipsCancellationDelay" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# UNH-SUPPRESS on the wait line suppresses the advisory.
+$unh010Suppress = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Threading;
+    using NUnit.Framework;
+
+    public sealed class SleepFixture : CommonTestBase
+    {
+        [Test]
+        public void Sleeps()
+        {
+            Thread.Sleep(100); // UNH-SUPPRESS: intentional poll yield
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'SleepFixture.cs' -FixtureContent $unh010Suppress
+Write-TestResult "UNH010.HonorsSuppress" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# Performance-category fixtures may use real-time waits (excluded from main matrix).
+$unh010Perf = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    [Category("Performance")]
+    public sealed class WaitPerfFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitPerfFixture.cs' -FixtureContent $unh010Perf
+Write-TestResult "UNH010.SkipsPerfCategory" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
 } finally {
   # ── Cleanup ──────────────────────────────────────────────────────────────────
   Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue

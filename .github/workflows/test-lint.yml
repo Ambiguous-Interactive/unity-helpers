@@ -10,6 +10,8 @@ on:
       - "scripts/lint-tests.ps1"
       - "scripts/tests/test-comment-stripping.ps1"
       - "scripts/tests/test-lint-tests.ps1"
+      - "scripts/unity/report-slow-tests.ps1"
+      - "scripts/tests/test-report-slow-tests.ps1"
       - ".github/workflows/test-lint.yml"
   pull_request:
     paths:
@@ -18,6 +20,8 @@ on:
       - "scripts/lint-tests.ps1"
       - "scripts/tests/test-comment-stripping.ps1"
       - "scripts/tests/test-lint-tests.ps1"
+      - "scripts/unity/report-slow-tests.ps1"
+      - "scripts/tests/test-report-slow-tests.ps1"
       - ".github/workflows/test-lint.yml"
 
 permissions:
@@ -37,6 +41,10 @@ jobs:
       - name: Test test linter
         shell: pwsh
         run: ./scripts/tests/test-lint-tests.ps1 -VerboseOutput
+
+      - name: Test slow-test reporter
+        shell: pwsh
+        run: ./scripts/tests/test-report-slow-tests.ps1 -VerboseOutput
 
       - name: Lint tests
         shell: pwsh

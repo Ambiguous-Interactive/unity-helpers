@@ -944,6 +944,35 @@ foreach ($file in $filesToScan) {
     }
   }
 
+  # UNH010 (ADVISORY, non-blocking): real-time waits block the serial test clock.
+  # A literal `new WaitForSeconds(x)` / `Task.Delay(n)` / `Thread.Sleep(n)` burns
+  # wall-clock on EVERY run; prefer frame-stepping (`yield return null`), a
+  # deterministic completion signal (TaskCompletionSource / ManualResetEventSlim),
+  # or an injectable clock. Reported as guidance (legitimate frame-timing exists and
+  # conversion must be validated in the editor); the per-fixture wall-clock budget
+  # (scripts/unity/report-slow-tests.ps1 -FailOverBudget) is the HARD gate.
+  # `Task.Delay(n, ct)` is intentionally NOT matched (cancellation-test fodder, not a
+  # blocking wait). Infra/base files (Tests/Core/**, *TestBase.cs) are skipped.
+  if ($isTestFile -and -not $perfCategory -and -not $isInfra) {
+    # Only LITERAL durations are matched. Leading-dot literals (`.5f`), const/variable
+    # args (`WaitForSeconds(delay)`), and expression args (`Task.Delay(1000 * 5)`) are
+    # intentionally out of scope - they are rarer and need human judgement, and this
+    # rule is advisory (the wall-clock budget gate is the hard backstop).
+    $waitRegex = 'new\s+WaitForSeconds(?:Realtime)?\s*\(\s*[0-9][0-9.]*f?\s*\)|\bThread\.Sleep\s*\(\s*[0-9]+\s*\)|\bTask\.Delay\s*\(\s*[0-9]+\s*\)'
+    $lineIndex = 0
+    foreach ($line in $content) {
+      $lineIndex++
+      if ($line -match 'UNH-SUPPRESS') { continue }
+      $scrubbedLine = $scrubbedContent[$lineIndex - 1]
+      $waitMatch = [regex]::Match($scrubbedLine, $waitRegex)
+      if ($waitMatch.Success) {
+        $advisories += (@{
+          Path=$rel; Line=$lineIndex; Message="UNH010: real-time wait '$($waitMatch.Value.Trim())' blocks the serial test clock; prefer frame-stepping/deterministic completion/injectable clock (advisory)"
+        })
+      }
+    }
+  }
+
   # UNH007: an enormous literal loop bound in a non-perf test belongs in a
   # Performance/Stress fixture (excluded from the fast suite) or should be
   # reduced. Const/field bounds (e.g. `< SampleCount`) are intentionally NOT

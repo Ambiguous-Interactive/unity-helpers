@@ -389,6 +389,20 @@ jobs:
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
+      # Surface the slowest fixtures/cases every run (the measurement backbone for
+      # keeping the suite fast). Report-only for now; pass -FixtureBudgetSeconds N
+      # -FailOverBudget here to turn it into a hard wall-clock gate once baselined.
+      - name: Report slowest tests
+        if: ${{ always() && steps.compute.outputs.is-empty != 'true' }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
       - name: Return Unity license
         if: always()
         uses: ./.github/actions/return-unity-license
@@ -616,6 +630,19 @@ jobs:
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
+
+      # Surface the slowest fixtures/cases for the SINGLE_THREADED leg (the 40-min
+      # leg the optimization targets). Report-only; see the main job's note.
+      - name: Report slowest tests
+        if: ${{ always() && steps.compute.outputs.is-empty != 'true' }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
 
       - name: Return Unity license
         if: always()

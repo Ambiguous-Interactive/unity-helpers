@@ -33,6 +33,37 @@ tagged `[Category("Performance")]` or `[Category("Stress")]` is **excluded from 
 - **UNH009** (advisory, non-blocking): per-test `AssetDatabase.Refresh()` / `SaveAndReimport()` churns the
   importer. Prefer `BatchedEditorTestBase`. Reported every run so churn stays visible; it does not fail the
   build because converting a fixture to a batched base can change timing-dependent behaviour.
+- **UNH010** (advisory, non-blocking): a literal real-time wait — `new WaitForSeconds(x)`, `Task.Delay(n)`,
+  or `Thread.Sleep(n)` — blocks the serial test clock on every run. Prefer frame-stepping
+  (`yield return null`), a deterministic completion signal (`TaskCompletionSource` / `ManualResetEventSlim`),
+  or an injectable clock. `Task.Delay(n, ct)` (cancellation fodder, not a blocking wait) is NOT matched;
+  `// UNH-SUPPRESS` with a reason exempts a justified case.
+
+## Split logic from I/O (the biggest EditMode lever)
+
+The slow EditMode fixtures are dominated by the **system under test's own asset I/O**, not test
+setup — measure before optimizing (reducing source-texture setup imports was measured to save ~0s;
+the cost was the crop+output import). When a fixture runs the same pure computation through many
+expensive asset round-trips, extract that computation into an `internal static` pure function (no
+AssetDatabase/import), unit-test it directly for all the parameterized cases (microseconds), and keep
+a few integration tests for the actual I/O wiring. Coverage is retained (math tested purely + I/O
+tested by the kept integration tests), redundancy drops, and the suite gets dramatically faster.
+
+Worked example (MCP-verified): `Editor/Sprites/SpriteCropper.cs` `ComputeCrop` was extracted from
+`ProcessSprite`; the 23 dimension/padding/edge `[TestCase]`s moved from full texture round-trips
+(~6s each) to pure `SpriteCropperMathTests` (microseconds), keeping 8 integration tests —
+`SpriteCropperAdditionalTests` went **185s → 53s** with coverage retained. Prefer this over trimming
+cases; only trim when cases are genuinely redundant.
+
+## Measuring & budgets
+
+Per-test FIXED overhead is negligible; the slow legs are explained by a few expensive fixtures, so MEASURE,
+don't guess. Every CI test run prints the slowest fixtures/cases (NUnit `duration`) via
+`scripts/unity/report-slow-tests.ps1` and writes a GitHub step-summary table; the devcontainer runner
+(`scripts/unity/run-tests.sh`) prints it automatically. Run it on any results XML:
+`pwsh -NoProfile -File scripts/unity/report-slow-tests.ps1 -ResultsPath <results.xml>`. To make it a HARD
+wall-clock gate, add `-FixtureBudgetSeconds <N> -FailOverBudget` (start lenient, tighten as fixtures are
+optimized) — this is the durable guarantee that the suite stays fast regardless of HOW a fixture got slow.
 
 ## Smarter coverage, not brute force
 

@@ -174,6 +174,11 @@ run_test_mode() {
     # Parse NUnit XML results if the file exists
     if [[ -f "${local_results_file}" ]]; then
         parse_nunit_results "${local_results_file}" "${platform}"
+        # Surface the slowest fixtures/cases so local runs see what to optimize.
+        if command -v pwsh > /dev/null 2>&1; then
+            pwsh -NoProfile -File "${SCRIPT_DIR}/report-slow-tests.ps1" \
+                -ResultsPath "${local_results_file}" -Top 20 || true
+        fi
     else
         echo "    WARNING: Results file not found at ${local_results_file}"
     fi
