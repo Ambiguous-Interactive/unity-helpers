@@ -168,6 +168,142 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
+        /// Snapshot of the texture-import values that <see cref="WouldTextureSettingsChange"/>
+        /// compares against a profile. Captures both the live <see cref="TextureImporter"/>
+        /// properties and the <see cref="TextureImporterSettings"/> fields read during a
+        /// change check, so the decision can be exercised by fast unit tests
+        /// (<c>SpriteSettingsApplierLogicTests</c>) without importing a texture asset.
+        /// </summary>
+        internal readonly struct TextureSettingsState
+        {
+            // Read from the live TextureImporter.
+            public readonly float SpritePixelsPerUnit;
+            public readonly Vector2 SpritePivot;
+            public readonly bool MipmapEnabled;
+            public readonly bool CrunchedCompression;
+            public readonly TextureImporterCompression TextureCompression;
+            public readonly TextureImporterType TextureType;
+            public readonly SpriteImportMode SpriteImportMode;
+
+            // Read from TextureImporterSettings (ReadTextureSettings buffer).
+            public readonly int SpriteAlignment;
+            public readonly bool AlphaIsTransparency;
+            public readonly bool Readable;
+            public readonly int SpriteMode;
+            public readonly uint SpriteExtrude;
+            public readonly TextureWrapMode WrapMode;
+            public readonly FilterMode FilterMode;
+
+            public TextureSettingsState(
+                float spritePixelsPerUnit,
+                Vector2 spritePivot,
+                bool mipmapEnabled,
+                bool crunchedCompression,
+                TextureImporterCompression textureCompression,
+                TextureImporterType textureType,
+                SpriteImportMode spriteImportMode,
+                int spriteAlignment,
+                bool alphaIsTransparency,
+                bool readable,
+                int spriteMode,
+                uint spriteExtrude,
+                TextureWrapMode wrapMode,
+                FilterMode filterMode
+            )
+            {
+                SpritePixelsPerUnit = spritePixelsPerUnit;
+                SpritePivot = spritePivot;
+                MipmapEnabled = mipmapEnabled;
+                CrunchedCompression = crunchedCompression;
+                TextureCompression = textureCompression;
+                TextureType = textureType;
+                SpriteImportMode = spriteImportMode;
+                SpriteAlignment = spriteAlignment;
+                AlphaIsTransparency = alphaIsTransparency;
+                Readable = readable;
+                SpriteMode = spriteMode;
+                SpriteExtrude = spriteExtrude;
+                WrapMode = wrapMode;
+                FilterMode = filterMode;
+            }
+        }
+
+        /// <summary>
+        /// Pure decision: given a snapshot of the current texture-import state and a matched
+        /// profile, returns whether applying the profile would change any value. Performs NO
+        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests instead of full
+        /// texture-import round-trips. This is the behavior previously inlined in
+        /// <see cref="WillTextureSettingsChange"/>.
+        /// </summary>
+        internal static bool WouldTextureSettingsChange(
+            in TextureSettingsState current,
+            SpriteSettings spriteData
+        )
+        {
+            if (spriteData == null)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            if (spriteData.applyPixelsPerUnit)
+            {
+                changed |= current.SpritePixelsPerUnit != spriteData.pixelsPerUnit;
+            }
+            if (spriteData.applyPivot)
+            {
+                changed |= current.SpritePivot != spriteData.pivot;
+            }
+            if (spriteData.applyGenerateMipMaps)
+            {
+                changed |= current.MipmapEnabled != spriteData.generateMipMaps;
+            }
+            if (spriteData.applyCrunchCompression)
+            {
+                changed |= current.CrunchedCompression != spriteData.useCrunchCompression;
+            }
+            if (spriteData.applyCompression)
+            {
+                changed |= current.TextureCompression != spriteData.compressionLevel;
+            }
+
+            if (spriteData.applyTextureType)
+            {
+                changed |= current.TextureType != spriteData.textureType;
+            }
+            if (spriteData.applyPivot)
+            {
+                changed |= current.SpriteAlignment != (int)SpriteAlignment.Custom;
+            }
+            if (spriteData.applyAlphaIsTransparency)
+            {
+                changed |= current.AlphaIsTransparency != spriteData.alphaIsTransparency;
+            }
+            if (spriteData.applyReadWriteEnabled)
+            {
+                changed |= current.Readable != spriteData.readWriteEnabled;
+            }
+            if (spriteData.applySpriteMode)
+            {
+                changed |= current.SpriteImportMode != spriteData.spriteMode;
+                changed |= current.SpriteMode != (int)spriteData.spriteMode;
+            }
+            if (spriteData.applyExtrudeEdges)
+            {
+                changed |= current.SpriteExtrude != spriteData.extrudeEdges;
+            }
+            if (spriteData.applyWrapMode)
+            {
+                changed |= current.WrapMode != spriteData.wrapMode;
+            }
+            if (spriteData.applyFilterMode)
+            {
+                changed |= current.FilterMode != spriteData.filterMode;
+            }
+            return changed;
+        }
+
+        /// <summary>
         /// Determines if applying sprite settings would change texture import settings.
         /// </summary>
         /// <param name="assetPath">The asset path to check. Returns false if null/empty/missing.</param>
@@ -195,64 +331,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            bool changed = false;
-            if (spriteData.applyPixelsPerUnit)
-            {
-                changed |= textureImporter.spritePixelsPerUnit != spriteData.pixelsPerUnit;
-            }
-            if (spriteData.applyPivot)
-            {
-                changed |= textureImporter.spritePivot != spriteData.pivot;
-            }
-            if (spriteData.applyGenerateMipMaps)
-            {
-                changed |= textureImporter.mipmapEnabled != spriteData.generateMipMaps;
-            }
-            if (spriteData.applyCrunchCompression)
-            {
-                changed |= textureImporter.crunchedCompression != spriteData.useCrunchCompression;
-            }
-            if (spriteData.applyCompression)
-            {
-                changed |= textureImporter.textureCompression != spriteData.compressionLevel;
-            }
-
             buffer ??= new TextureImporterSettings();
             textureImporter.ReadTextureSettings(buffer);
-            if (spriteData.applyTextureType)
-            {
-                changed |= textureImporter.textureType != spriteData.textureType;
-            }
-            if (spriteData.applyPivot)
-            {
-                changed |= buffer.spriteAlignment != (int)SpriteAlignment.Custom;
-            }
-            if (spriteData.applyAlphaIsTransparency)
-            {
-                changed |= buffer.alphaIsTransparency != spriteData.alphaIsTransparency;
-            }
-            if (spriteData.applyReadWriteEnabled)
-            {
-                changed |= buffer.readable != spriteData.readWriteEnabled;
-            }
-            if (spriteData.applySpriteMode)
-            {
-                changed |= textureImporter.spriteImportMode != spriteData.spriteMode;
-                changed |= buffer.spriteMode != (int)spriteData.spriteMode;
-            }
-            if (spriteData.applyExtrudeEdges)
-            {
-                changed |= buffer.spriteExtrude != spriteData.extrudeEdges;
-            }
-            if (spriteData.applyWrapMode)
-            {
-                changed |= buffer.wrapMode != spriteData.wrapMode;
-            }
-            if (spriteData.applyFilterMode)
-            {
-                changed |= buffer.filterMode != spriteData.filterMode;
-            }
-            return changed;
+
+            TextureSettingsState current = new(
+                textureImporter.spritePixelsPerUnit,
+                textureImporter.spritePivot,
+                textureImporter.mipmapEnabled,
+                textureImporter.crunchedCompression,
+                textureImporter.textureCompression,
+                textureImporter.textureType,
+                textureImporter.spriteImportMode,
+                buffer.spriteAlignment,
+                buffer.alphaIsTransparency,
+                buffer.readable,
+                buffer.spriteMode,
+                buffer.spriteExtrude,
+                buffer.wrapMode,
+                buffer.filterMode
+            );
+
+            return WouldTextureSettingsChange(in current, spriteData);
         }
 
         /// <summary>
