@@ -1187,90 +1187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     destinationAssetPath
                 );
 
-                if (sourceClip == null || destClip == null)
-                {
-                    return false;
-                }
-
-                // Compare basic clip properties
-                if (!Mathf.Approximately(sourceClip.frameRate, destClip.frameRate))
-                {
-                    return false;
-                }
-                if (!Mathf.Approximately(sourceClip.length, destClip.length))
-                {
-                    return false;
-                }
-                if (sourceClip.wrapMode != destClip.wrapMode)
-                {
-                    return false;
-                }
-                if (sourceClip.isLooping != destClip.isLooping)
-                {
-                    return false;
-                }
-                if (sourceClip.legacy != destClip.legacy)
-                {
-                    return false;
-                }
-
-                // Compare animation clip settings
-                AnimationClipSettings sourceSettings = AnimationUtility.GetAnimationClipSettings(
-                    sourceClip
-                );
-                AnimationClipSettings destSettings = AnimationUtility.GetAnimationClipSettings(
-                    destClip
-                );
-                if (!AreAnimationClipSettingsEqual(sourceSettings, destSettings))
-                {
-                    return false;
-                }
-
-                // Compare animation events
-                AnimationEvent[] sourceEvents = AnimationUtility.GetAnimationEvents(sourceClip);
-                AnimationEvent[] destEvents = AnimationUtility.GetAnimationEvents(destClip);
-                if (!AreAnimationEventsEqual(sourceEvents, destEvents))
-                {
-                    return false;
-                }
-
-                // Compare float curve bindings
-                EditorCurveBinding[] sourceFloatBindings = AnimationUtility.GetCurveBindings(
-                    sourceClip
-                );
-                EditorCurveBinding[] destFloatBindings = AnimationUtility.GetCurveBindings(
-                    destClip
-                );
-                if (
-                    !AreCurveBindingsEqual(
-                        sourceClip,
-                        destClip,
-                        sourceFloatBindings,
-                        destFloatBindings
-                    )
-                )
-                {
-                    return false;
-                }
-
-                // Compare object reference curve bindings (for sprites, etc.)
-                EditorCurveBinding[] sourceObjBindings =
-                    AnimationUtility.GetObjectReferenceCurveBindings(sourceClip);
-                EditorCurveBinding[] destObjBindings =
-                    AnimationUtility.GetObjectReferenceCurveBindings(destClip);
-                if (
-                    !AreObjectReferenceCurveBindingsEqual(
-                        sourceClip,
-                        destClip,
-                        sourceObjBindings,
-                        destObjBindings
-                    )
-                )
-                {
-                    return false;
-                }
-
-                return true;
+                return AreAnimationClipsContentEqual(sourceClip, destClip);
             }
             catch (Exception e)
             {
@@ -1280,6 +1197,99 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Compares the content of two already-loaded animation clips to determine if they are
+        /// functionally identical. Pure (no asset I/O): operates on in-memory
+        /// <see cref="AnimationClip"/> instances, so it is unit-testable without importing assets.
+        /// </summary>
+        /// <param name="sourceClip">The source animation clip (may be null).</param>
+        /// <param name="destClip">The destination animation clip (may be null).</param>
+        /// <returns>True if the animation clips have identical content, false otherwise.</returns>
+        internal static bool AreAnimationClipsContentEqual(
+            AnimationClip sourceClip,
+            AnimationClip destClip
+        )
+        {
+            if (sourceClip == null || destClip == null)
+            {
+                return false;
+            }
+
+            // Compare basic clip properties
+            if (!Mathf.Approximately(sourceClip.frameRate, destClip.frameRate))
+            {
+                return false;
+            }
+            if (!Mathf.Approximately(sourceClip.length, destClip.length))
+            {
+                return false;
+            }
+            if (sourceClip.wrapMode != destClip.wrapMode)
+            {
+                return false;
+            }
+            if (sourceClip.isLooping != destClip.isLooping)
+            {
+                return false;
+            }
+            if (sourceClip.legacy != destClip.legacy)
+            {
+                return false;
+            }
+
+            // Compare animation clip settings
+            AnimationClipSettings sourceSettings = AnimationUtility.GetAnimationClipSettings(
+                sourceClip
+            );
+            AnimationClipSettings destSettings = AnimationUtility.GetAnimationClipSettings(
+                destClip
+            );
+            if (!AreAnimationClipSettingsEqual(sourceSettings, destSettings))
+            {
+                return false;
+            }
+
+            // Compare animation events
+            AnimationEvent[] sourceEvents = AnimationUtility.GetAnimationEvents(sourceClip);
+            AnimationEvent[] destEvents = AnimationUtility.GetAnimationEvents(destClip);
+            if (!AreAnimationEventsEqual(sourceEvents, destEvents))
+            {
+                return false;
+            }
+
+            // Compare float curve bindings
+            EditorCurveBinding[] sourceFloatBindings = AnimationUtility.GetCurveBindings(
+                sourceClip
+            );
+            EditorCurveBinding[] destFloatBindings = AnimationUtility.GetCurveBindings(destClip);
+            if (
+                !AreCurveBindingsEqual(sourceClip, destClip, sourceFloatBindings, destFloatBindings)
+            )
+            {
+                return false;
+            }
+
+            // Compare object reference curve bindings (for sprites, etc.)
+            EditorCurveBinding[] sourceObjBindings =
+                AnimationUtility.GetObjectReferenceCurveBindings(sourceClip);
+            EditorCurveBinding[] destObjBindings = AnimationUtility.GetObjectReferenceCurveBindings(
+                destClip
+            );
+            if (
+                !AreObjectReferenceCurveBindingsEqual(
+                    sourceClip,
+                    destClip,
+                    sourceObjBindings,
+                    destObjBindings
+                )
+            )
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool AreAnimationClipSettingsEqual(
