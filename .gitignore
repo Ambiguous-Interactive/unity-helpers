@@ -384,3 +384,5 @@ pre-push.txt*
 benchmarks/
 pr-description.md*
 test-results*
+.artifacts/
+.artifacts.meta
