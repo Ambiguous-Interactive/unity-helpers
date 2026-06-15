@@ -656,89 +656,18 @@ namespace WallstopStudios.UnityHelpers.Editor
                     textureImporter.GetSourceTextureWidthAndHeight(out int width, out int height);
 
                     int currentTextureSize = textureImporter.maxTextureSize;
-                    int targetTextureSize = currentTextureSize;
-                    bool needsChange = false;
-                    bool grew = false;
-                    bool shrank = false;
-
-                    if (_fitMode == FitMode.RoundToNearest)
-                    {
-                        int largest = Mathf.Max(width, height);
-                        int upper = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
-                        int lower = upper == largest ? upper : (upper >> 1);
-                        int diffDown = largest - lower;
-                        int diffUp = upper - largest;
-                        int nearest = diffDown < diffUp ? lower : upper;
-                        if (nearest != targetTextureSize)
-                        {
-                            targetTextureSize = nearest;
-                            needsChange = true;
-                        }
-                    }
-                    else if (_fitMode == FitMode.GrowAndShrink)
-                    {
-                        // GrowAndShrink: Calculate smallest POT >= max(width, height)
-                        // Then grow or shrink current size to match that target
-                        int largest = Mathf.Max(width, height);
-                        int target = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
-                        if (currentTextureSize != target)
-                        {
-                            targetTextureSize = target;
-                            needsChange = true;
-                        }
-                    }
-                    else if (_fitMode == FitMode.GrowOnly)
-                    {
-                        // GrowOnly: Only increase to next POT if current size is below what's needed
-                        int size = Mathf.Max(width, height);
-                        int tempSize = targetTextureSize;
-                        while (tempSize < size)
-                        {
-                            tempSize <<= 1;
-                        }
-                        if (tempSize != targetTextureSize)
-                        {
-                            targetTextureSize = tempSize;
-                            needsChange = true;
-                        }
-                    }
-                    else if (_fitMode == FitMode.ShrinkOnly)
-                    {
-                        // ShrinkOnly: Find the smallest POT that fits (>=) the source size,
-                        // then shrink to that if current size is larger. Never grow.
-                        int size = Mathf.Max(width, height);
-                        int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
-                        int tempSize = targetTextureSize;
-                        // Only shrink if current size is above the needed POT
-                        if (tempSize > neededPot)
-                        {
-                            tempSize = neededPot;
-                        }
-                        if (tempSize != targetTextureSize)
-                        {
-                            targetTextureSize = tempSize;
-                            needsChange = true;
-                        }
-                    }
-
-                    // Clamp to allowed bounds (commonly Unity caps at 8192, expose as user setting)
-                    if (targetTextureSize < _minAllowedTextureSize)
-                    {
-                        targetTextureSize = _minAllowedTextureSize;
-                        needsChange = needsChange || (currentTextureSize != targetTextureSize);
-                    }
-                    if (targetTextureSize > _maxAllowedTextureSize)
-                    {
-                        targetTextureSize = _maxAllowedTextureSize;
-                        needsChange = needsChange || (currentTextureSize != targetTextureSize);
-                    }
-
-                    // After clamping, determine net direction of change for counts
-                    if (needsChange)
-                    {
-                        grew = targetTextureSize > currentTextureSize;
-                        shrank = targetTextureSize < currentTextureSize;
-                    }
+                    FitComputation fit = ComputeFit(
+                        width,
+                        height,
+                        currentTextureSize,
+                        _fitMode,
+                        _minAllowedTextureSize,
+                        _maxAllowedTextureSize
+                    );
+                    int targetTextureSize = fit.TargetSize;
+                    bool needsChange = fit.NeedsChange;
+                    bool grew = fit.Grew;
+                    bool shrank = fit.Shrank;
 
                     if (!needsChange || currentTextureSize == targetTextureSize)
                     {
@@ -810,6 +739,129 @@ namespace WallstopStudios.UnityHelpers.Editor
             _potentialShrinkCount = shrinkCount;
             _potentialUnchangedCount = unchangedCount;
             return changedCount;
+        }
+
+        /// <summary>
+        /// Pure result of the fit-size computation (no Unity asset I/O), so the
+        /// power-of-two / clamp / direction behavior can be unit-tested without importing
+        /// textures.
+        /// </summary>
+        internal readonly struct FitComputation
+        {
+            public readonly int TargetSize;
+            public readonly bool NeedsChange;
+            public readonly bool Grew;
+            public readonly bool Shrank;
+
+            public FitComputation(int targetSize, bool needsChange, bool grew, bool shrank)
+            {
+                TargetSize = targetSize;
+                NeedsChange = needsChange;
+                Grew = grew;
+                Shrank = shrank;
+            }
+        }
+
+        /// <summary>
+        /// Computes the target <c>maxTextureSize</c> for a source texture given its dimensions,
+        /// its current max size, the fit mode, and the allowed min/max bounds. Pure: depends only
+        /// on integers, performs NO AssetDatabase/importer I/O, so it is exercised by fast unit
+        /// tests (<c>FitTextureSizeMathTests</c>) instead of full texture-import round-trips.
+        /// </summary>
+        internal static FitComputation ComputeFit(
+            int width,
+            int height,
+            int currentTextureSize,
+            FitMode fitMode,
+            int minAllowedTextureSize,
+            int maxAllowedTextureSize
+        )
+        {
+            int targetTextureSize = currentTextureSize;
+            bool needsChange = false;
+            bool grew = false;
+            bool shrank = false;
+
+            if (fitMode == FitMode.RoundToNearest)
+            {
+                int largest = Mathf.Max(width, height);
+                int upper = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
+                int lower = upper == largest ? upper : (upper >> 1);
+                int diffDown = largest - lower;
+                int diffUp = upper - largest;
+                int nearest = diffDown < diffUp ? lower : upper;
+                if (nearest != targetTextureSize)
+                {
+                    targetTextureSize = nearest;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.GrowAndShrink)
+            {
+                // GrowAndShrink: Calculate smallest POT >= max(width, height)
+                // Then grow or shrink current size to match that target
+                int largest = Mathf.Max(width, height);
+                int target = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
+                if (currentTextureSize != target)
+                {
+                    targetTextureSize = target;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.GrowOnly)
+            {
+                // GrowOnly: Only increase to next POT if current size is below what's needed
+                int size = Mathf.Max(width, height);
+                int tempSize = targetTextureSize;
+                while (tempSize < size)
+                {
+                    tempSize <<= 1;
+                }
+                if (tempSize != targetTextureSize)
+                {
+                    targetTextureSize = tempSize;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.ShrinkOnly)
+            {
+                // ShrinkOnly: Find the smallest POT that fits (>=) the source size,
+                // then shrink to that if current size is larger. Never grow.
+                int size = Mathf.Max(width, height);
+                int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
+                int tempSize = targetTextureSize;
+                // Only shrink if current size is above the needed POT
+                if (tempSize > neededPot)
+                {
+                    tempSize = neededPot;
+                }
+                if (tempSize != targetTextureSize)
+                {
+                    targetTextureSize = tempSize;
+                    needsChange = true;
+                }
+            }
+
+            // Clamp to allowed bounds (commonly Unity caps at 8192, expose as user setting)
+            if (targetTextureSize < minAllowedTextureSize)
+            {
+                targetTextureSize = minAllowedTextureSize;
+                needsChange = needsChange || (currentTextureSize != targetTextureSize);
+            }
+            if (targetTextureSize > maxAllowedTextureSize)
+            {
+                targetTextureSize = maxAllowedTextureSize;
+                needsChange = needsChange || (currentTextureSize != targetTextureSize);
+            }
+
+            // After clamping, determine net direction of change for counts
+            if (needsChange)
+            {
+                grew = targetTextureSize > currentTextureSize;
+                shrank = targetTextureSize < currentTextureSize;
+            }
+
+            return new FitComputation(targetTextureSize, needsChange, grew, shrank);
         }
 
         private void ApplyPlatformOverride(TextureImporter importer, string platform, int target)
