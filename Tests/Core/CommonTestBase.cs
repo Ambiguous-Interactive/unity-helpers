@@ -231,38 +231,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 _trackedDisposables.Clear();
             }
 
-            if (!Application.isPlaying && _trackedObjects.Count > 0)
+            if (!Application.isPlaying)
             {
-#if UNITY_EDITOR
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-#endif
-                {
-                    Object[] snapshot = _trackedObjects.ToArray();
-                    foreach (Object obj in snapshot)
-                    {
-                        if (obj != null)
-                        {
-#if UNITY_EDITOR
-                            // If the object is a persisted asset, use AssetDatabase.DeleteAsset
-                            // DestroyImmediate without allowDestroyingAssets=true will fail for assets
-                            if (UnityEditor.EditorUtility.IsPersistent(obj))
-                            {
-                                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
-                                if (!string.IsNullOrEmpty(assetPath))
-                                {
-                                    UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-                                    continue;
-                                }
-                            }
-#endif
-                            Object.DestroyImmediate(obj); // UNH-SUPPRESS: Required for EditMode test cleanup
-                        }
-                    }
-                    _trackedObjects.Clear();
-                }
+                DestroyTrackedObjects();
             }
 
             DisposeDispatcherScope();
+        }
+
+        /// <summary>
+        /// Destroys every currently tracked <see cref="Object"/> and clears the tracking list.
+        /// </summary>
+        /// <remarks>
+        /// In the editor, an object backed by a persisted asset is removed with
+        /// <see cref="UnityEditor.AssetDatabase.DeleteAsset"/> (which also removes its <c>.meta</c>);
+        /// anything else is destroyed with <c>allowDestroyingAssets: true</c>. That overload is the
+        /// asset-safe one: it can never trigger Unity's "Destroying assets is not permitted to avoid
+        /// data loss" error -- a <see cref="LogType.Error"/> that fails the running test in teardown
+        /// AND leaks the object -- even when an asset path can no longer be resolved (e.g. a subclass
+        /// already deleted the asset, leaving an orphaned persistent wrapper, or
+        /// <c>EditorUtility.IsPersistent</c> and <c>GetAssetPath</c> momentarily disagree). The flag
+        /// is a harmless no-op for in-memory objects, which -- together with the path-based
+        /// <c>DeleteAsset</c> -- covers every kind of object these fixtures track (in-memory objects
+        /// and standalone assets).
+        /// </remarks>
+        protected void DestroyTrackedObjects()
+        {
+            if (_trackedObjects.Count == 0)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+#endif
+            {
+                Object[] snapshot = _trackedObjects.ToArray();
+                foreach (Object obj in snapshot)
+                {
+                    if (obj == null)
+                    {
+                        continue;
+                    }
+#if UNITY_EDITOR
+                    string assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        UnityEditor.AssetDatabase.DeleteAsset(assetPath);
+                        continue;
+                    }
+                    Object.DestroyImmediate(obj, true); // UNH-SUPPRESS: asset-safe test cleanup
+#else
+                    Object.DestroyImmediate(obj); // UNH-SUPPRESS: Required for test cleanup
+#endif
+                }
+                _trackedObjects.Clear();
+            }
         }
 
         [UnityTearDown]
@@ -523,36 +547,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 #endif
 
-            if (_trackedObjects.Count > 0)
-            {
-#if UNITY_EDITOR
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-#endif
-                {
-                    Object[] snapshot = _trackedObjects.ToArray();
-                    foreach (Object obj in snapshot)
-                    {
-                        if (obj != null)
-                        {
-#if UNITY_EDITOR
-                            // If the object is a persisted asset, use AssetDatabase.DeleteAsset
-                            // DestroyImmediate without allowDestroyingAssets=true will fail for assets
-                            if (UnityEditor.EditorUtility.IsPersistent(obj))
-                            {
-                                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
-                                if (!string.IsNullOrEmpty(assetPath))
-                                {
-                                    UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-                                    continue;
-                                }
-                            }
-#endif
-                            Object.DestroyImmediate(obj); // UNH-SUPPRESS: Required for final test cleanup
-                        }
-                    }
-                    _trackedObjects.Clear();
-                }
-            }
+            DestroyTrackedObjects();
 
 #if UNITY_EDITOR
             // Asset deletions above can schedule AssetPostprocessor drains. Flush them

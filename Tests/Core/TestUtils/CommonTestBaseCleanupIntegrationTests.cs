@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
@@ -454,19 +455,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         /// <summary>
-        ///     Helper method to create a test folder and track it for cleanup.
+        ///     Verifies the common cleanup path: a tracked, fully-persisted asset (resolvable path) is
+        ///     removed via <see cref="AssetDatabase.DeleteAsset"/> with no error and no leak. Pairs
+        ///     with <see cref="DestroyTrackedObjectsHandlesDeferredDeletedAssetWithoutError"/>, which
+        ///     covers the persistent-but-pathless fall-through that actually regressed in CI.
         /// </summary>
-        private void CreateTestFolder()
+        [Test]
+        public void DestroyTrackedObjectsRemovesPersistedAssetWithoutError()
         {
-            string folderName = $"TestFolder_{Guid.NewGuid():N}";
-            string folderPath = $"{TestFolderRoot}/{folderName}";
+            EnsureTestRoot();
+            string assetPath = $"{TestFolderRoot}/Tracked_{Guid.NewGuid():N}.asset";
+            ScriptableObject asset = ScriptableObject.CreateInstance<ScriptableObject>();
+            AssetDatabase.CreateAsset(asset, assetPath);
+            AssetDatabase.SaveAssets();
+            Track(asset);
 
-            // Ensure the root exists
+            Assert.That(
+                EditorUtility.IsPersistent(asset),
+                Is.True,
+                "Pre-condition: the tracked object should be a persisted asset"
+            );
+
+            DestroyTrackedObjects();
+            LogAssert.NoUnexpectedReceived();
+
+            Assert.That(
+                AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath),
+                Is.Null,
+                "Cleanup should delete the persisted asset"
+            );
+        }
+
+        /// <summary>
+        ///     Reproduces the exact CI failure mode. <see cref="BatchedEditorTestBase"/> keeps a
+        ///     fixture-wide <c>StartAssetEditing</c> batch open across every test, so an
+        ///     <see cref="AssetDatabase.DeleteAsset"/> issued by a subclass teardown is DEFERRED: the
+        ///     C# wrapper stays non-null while its asset path is already cleared. The base cleanup then
+        ///     iterates a persistent object with no resolvable path -- the old single-argument
+        ///     <c>Object.DestroyImmediate(obj)</c> fell through to the asset-unsafe overload here and
+        ///     logged "Destroying assets is not permitted to avoid data loss" (a
+        ///     <see cref="LogType.Error"/>, which fails the test in teardown and leaks the object). The
+        ///     asset-safe overload must not.
+        /// </summary>
+        [Test]
+        public void DestroyTrackedObjectsHandlesDeferredDeletedAssetWithoutError()
+        {
+            EnsureTestRoot();
+            string assetPath = $"{TestFolderRoot}/Orphan_{Guid.NewGuid():N}.asset";
+
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                ScriptableObject asset = ScriptableObject.CreateInstance<ScriptableObject>();
+                AssetDatabase.CreateAsset(asset, assetPath);
+                Track(asset);
+
+                // Deferred under the active batch: the wrapper survives non-null while the
+                // asset path is cleared -- the persistent-but-pathless state that broke CI.
+                AssetDatabase.DeleteAsset(assetPath);
+
+                DestroyTrackedObjects();
+                LogAssert.NoUnexpectedReceived();
+            }
+
+            Assert.That(
+                AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath),
+                Is.Null,
+                "The deferred-deleted asset must not be resurrected"
+            );
+        }
+
+        /// <summary>
+        ///     Ensures the shared test root folder exists in the AssetDatabase.
+        /// </summary>
+        private void EnsureTestRoot()
+        {
             if (!AssetDatabase.IsValidFolder(TestFolderRoot))
             {
                 string[] parts = TestFolderRoot.Split('/');
                 string currentPath = parts[0]; // "Assets"
-
                 for (int i = 1; i < parts.Length; i++)
                 {
                     string nextPath = $"{currentPath}/{parts[i]}";
@@ -477,6 +543,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     currentPath = nextPath;
                 }
             }
+        }
+
+        /// <summary>
+        ///     Helper method to create a test folder and track it for cleanup.
+        /// </summary>
+        private void CreateTestFolder()
+        {
+            string folderName = $"TestFolder_{Guid.NewGuid():N}";
+            string folderPath = $"{TestFolderRoot}/{folderName}";
+
+            EnsureTestRoot();
 
             // Create the test folder
             if (!AssetDatabase.IsValidFolder(folderPath))

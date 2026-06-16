@@ -83,7 +83,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.VerboseLogging = true;
             // Allow explicit calls to EnsureSingletonAssets during tests
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
             // Bypass compilation state check - Unity may report isCompiling/isUpdating
