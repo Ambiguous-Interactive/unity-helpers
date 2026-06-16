@@ -2140,37 +2140,46 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static class PopupStyles
         {
-            public static readonly GUIStyle OptionButton;
-            public static readonly GUIStyle SelectedOptionButton;
-            public static readonly GUIStyle PaginationButtonLeft;
-            public static readonly GUIStyle PaginationButtonRight;
-            public static readonly GUIStyle PaginationLabel;
+            // Built lazily on first GUI access. A static constructor that touches EditorStyles
+            // throws a NullReferenceException when the type is first loaded outside an active
+            // IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
+            // to actual rendering, where the editor skin is ready.
+            private static GUIStyle _optionButton;
+            private static GUIStyle _selectedOptionButton;
+            private static GUIStyle _paginationButtonLeft;
+            private static GUIStyle _paginationButtonRight;
+            private static GUIStyle _paginationLabel;
 
-            static PopupStyles()
-            {
-                OptionButton = new GUIStyle("Button")
+            public static GUIStyle OptionButton =>
+                _optionButton ??= new GUIStyle("Button")
                 {
                     alignment = TextAnchor.MiddleLeft,
                     padding = new RectOffset(6, 6, 1, 1),
                 };
-                SelectedOptionButton = new GUIStyle(OptionButton) { fontStyle = FontStyle.Bold };
-                float paginationHeight = PaginationButtonHeight;
-                PaginationButtonLeft = new GUIStyle(EditorStyles.miniButtonLeft)
+
+            public static GUIStyle SelectedOptionButton =>
+                _selectedOptionButton ??= new GUIStyle(OptionButton) { fontStyle = FontStyle.Bold };
+
+            public static GUIStyle PaginationButtonLeft =>
+                _paginationButtonLeft ??= new GUIStyle(EditorStyles.miniButtonLeft)
                 {
-                    fixedHeight = paginationHeight,
+                    fixedHeight = PaginationButtonHeight,
                     padding = new RectOffset(6, 6, 0, 0),
                 };
-                PaginationButtonRight = new GUIStyle(EditorStyles.miniButtonRight)
+
+            public static GUIStyle PaginationButtonRight =>
+                _paginationButtonRight ??= new GUIStyle(EditorStyles.miniButtonRight)
                 {
-                    fixedHeight = paginationHeight,
+                    fixedHeight = PaginationButtonHeight,
                     padding = new RectOffset(6, 6, 0, 0),
                 };
-                PaginationLabel = new GUIStyle(EditorStyles.centeredGreyMiniLabel)
+
+            public static GUIStyle PaginationLabel =>
+                _paginationLabel ??= new GUIStyle(EditorStyles.centeredGreyMiniLabel)
                 {
                     alignment = TextAnchor.MiddleCenter,
                     padding = new RectOffset(0, 0, 0, 0),
                 };
-            }
         }
 
         private static string GetTypeMismatchMessage(

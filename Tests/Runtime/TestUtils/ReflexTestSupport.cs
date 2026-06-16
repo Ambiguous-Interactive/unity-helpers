@@ -1,7 +1,11 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#if REFLEX_PRESENT
+// NOTE: intentionally NOT guarded by #if REFLEX_PRESENT. This helper is reflection-only
+// (it resolves every Reflex type by string name and no-ops when Reflex is absent) and lives
+// in the WallstopStudios.UnityHelpers.Tests.Runtime assembly, which never defines
+// REFLEX_PRESENT. The VContainer/Zenject integration test assemblies reference it, so guarding
+// it on a define its home assembly cannot set would exclude the type and break their compile.
 namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 {
     using System;
@@ -123,4 +127,3 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         }
     }
 }
-#endif

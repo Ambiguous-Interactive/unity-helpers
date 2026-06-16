@@ -4,6 +4,7 @@
 namespace Samples.UnityHelpers.DI.Reflex
 {
     using Reflex.Core;
+    using Reflex.Extensions;
     using UnityEngine;
 
     /// <summary>

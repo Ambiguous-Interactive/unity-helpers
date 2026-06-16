@@ -60,21 +60,28 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly object NullComparable = new();
         private static readonly Dictionary<(int, int, int), string> RangeLabelCache = new();
 
-        private static readonly GUIStyle AddButtonStyle = CreateSolidButtonStyle(
-            new Color(0.22f, 0.62f, 0.29f)
-        );
-        private static readonly GUIStyle ClearAllActiveButtonStyle = CreateSolidButtonStyle(
-            new Color(0.82f, 0.27f, 0.27f)
-        );
-        private static readonly GUIStyle ClearAllInactiveButtonStyle = CreateSolidButtonStyle(
-            new Color(0.55f, 0.55f, 0.55f)
-        );
-        private static readonly GUIStyle RemoveButtonStyle = CreateSolidButtonStyle(
-            new Color(0.86f, 0.23f, 0.23f)
-        );
-        private static readonly GUIStyle MoveButtonStyle = CreateSolidButtonStyle(
-            new Color(0.98f, 0.95f, 0.65f)
-        );
+        // GUIStyles are built lazily on first GUI access (see the *ButtonStyle properties below).
+        // Building them in static field initializers / a static constructor would touch
+        // EditorStyles at type-load time, which throws a NullReferenceException (cascading as a
+        // TypeInitializationException) whenever the type is first loaded outside an active IMGUI
+        // context -- e.g. in batch-mode test runs. Lazy initialization defers all EditorStyles
+        // access to actual rendering, where the editor skin is guaranteed to be ready.
+        private static GUIStyle _addButtonStyle;
+        private static GUIStyle _clearAllActiveButtonStyle;
+        private static GUIStyle _clearAllInactiveButtonStyle;
+        private static GUIStyle _removeButtonStyle;
+        private static GUIStyle _moveButtonStyle;
+
+        private static GUIStyle AddButtonStyle =>
+            _addButtonStyle ??= BuildButtonStyle(new Color(0.22f, 0.62f, 0.29f));
+        private static GUIStyle ClearAllActiveButtonStyle =>
+            _clearAllActiveButtonStyle ??= BuildButtonStyle(new Color(0.82f, 0.27f, 0.27f));
+        private static GUIStyle ClearAllInactiveButtonStyle =>
+            _clearAllInactiveButtonStyle ??= BuildButtonStyle(new Color(0.55f, 0.55f, 0.55f));
+        private static GUIStyle RemoveButtonStyle =>
+            _removeButtonStyle ??= BuildRemoveButtonStyle(new Color(0.86f, 0.23f, 0.23f));
+        private static GUIStyle MoveButtonStyle =>
+            _moveButtonStyle ??= BuildMoveButtonStyle(new Color(0.98f, 0.95f, 0.65f));
         private static readonly Color DuplicatePrimaryColor = new(0.99f, 0.82f, 0.35f, 0.55f);
         private static readonly Color DuplicateSecondaryColor = new(0.96f, 0.45f, 0.45f, 0.65f);
         private static readonly Color DuplicateOutlineColor = new(0.65f, 0.18f, 0.18f, 0.9f);
@@ -626,18 +633,27 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Full,
         }
 
-        static SerializableSetPropertyDrawer()
+        private static GUIStyle BuildButtonStyle(Color baseColor)
         {
-            float lineHeight = EditorGUIUtility.singleLineHeight;
-            ConfigureButtonStyle(AddButtonStyle, lineHeight);
-            ConfigureButtonStyle(ClearAllActiveButtonStyle, lineHeight);
-            ConfigureButtonStyle(ClearAllInactiveButtonStyle, lineHeight);
-            ConfigureButtonStyle(RemoveButtonStyle, lineHeight);
-            ConfigureButtonStyle(MoveButtonStyle, lineHeight);
-            SetButtonTextColor(MoveButtonStyle, Color.black);
-            RemoveButtonStyle.fixedWidth = 0f;
-            RemoveButtonStyle.padding = new RectOffset(3, 3, 1, 1);
-            RemoveButtonStyle.margin = new RectOffset(0, 0, 1, 1);
+            GUIStyle style = CreateSolidButtonStyle(baseColor);
+            ConfigureButtonStyle(style, EditorGUIUtility.singleLineHeight);
+            return style;
+        }
+
+        private static GUIStyle BuildMoveButtonStyle(Color baseColor)
+        {
+            GUIStyle style = BuildButtonStyle(baseColor);
+            SetButtonTextColor(style, Color.black);
+            return style;
+        }
+
+        private static GUIStyle BuildRemoveButtonStyle(Color baseColor)
+        {
+            GUIStyle style = BuildButtonStyle(baseColor);
+            style.fixedWidth = 0f;
+            style.padding = new RectOffset(3, 3, 1, 1);
+            style.margin = new RectOffset(0, 0, 1, 1);
+            return style;
         }
 
         private static GUIStyle CreateSolidButtonStyle(Color baseColor)

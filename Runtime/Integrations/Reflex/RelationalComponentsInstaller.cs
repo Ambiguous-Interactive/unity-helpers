@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Integrations.Reflex
 {
     using global::Reflex.Core;
+    using global::Reflex.Extensions;
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Attributes;
