@@ -366,12 +366,16 @@ jobs:
       - name: Run Unity Test Runner
         id: run_tests
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        # 150: the standalone leg builds a NON-development IL2CPP player with
-        # the Release C++ configuration, and a run-ci-tests.ps1 change rotates
-        # the Library cache key, so first runs build cold. The editmode/playmode
-        # legs finish far below this; stays well under the job timeout (660) so
-        # the step clock fires first and releases the shared Unity seat.
-        timeout-minutes: 150
+        # Per-mode timeout. 150: ONLY the standalone leg needs it -- it builds a
+        # NON-development IL2CPP player with the Release C++ configuration, and a
+        # run-ci-tests.ps1 change rotates the Library cache key, so first runs
+        # build cold. editmode/playmode are in-editor runs whose healthy worst case
+        # is the ~40-min SINGLE_THREADED EditMode baseline, so 90 gives >2x headroom
+        # yet fails a hang ~60 min sooner than the old blanket 150 (a dead Unity
+        # Accelerator once stalled EditMode for the full 150 and produced no
+        # results.xml). All values stay under the job timeout (660) so the step
+        # clock fires first and releases the shared Unity seat.
+        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 150) || 90 }}
         shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -610,9 +614,12 @@ jobs:
       - name: Run Unity Test Runner
         id: run_tests
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        # editmode/playmode in-editor runs finish well below this; stays under the
-        # job timeout (660) so the step clock fires first and releases the seat.
-        timeout-minutes: 150
+        # This job is editmode + playmode ONLY (no standalone IL2CPP build), so 90
+        # min -- >2x the ~40-min healthy SINGLE_THREADED EditMode baseline -- is the
+        # fail-fast cap. The old 150 let a dead-Accelerator EditMode stall burn the
+        # full window and emit no results.xml; 90 surfaces that ~60 min sooner and
+        # releases the shared Unity seat. Stays under the job timeout (660).
+        timeout-minutes: 90
         shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}

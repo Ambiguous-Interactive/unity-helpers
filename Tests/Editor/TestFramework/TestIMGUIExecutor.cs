@@ -16,26 +16,66 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 
         internal static IEnumerator Run(Action action)
         {
+            return Run(action, TestIMGUIExecutorBudget.Default);
+        }
+
+        // The terminating signal is an EditorWindow Repaint event. Under
+        // -batchmode -nographics that event can be delayed indefinitely or never
+        // arrive (and a flaky Unity Accelerator reconnect can stall each editor
+        // tick for minutes), so an un-bounded wait here can hang the WHOLE test
+        // run -- which is exactly the 2.5h CI timeout this budget exists to
+        // prevent. The budget converts that hang into a fast, descriptive
+        // per-test failure; a healthy editor repaints within a few frames so the
+        // budget is never reached on the success path.
+        internal static IEnumerator Run(Action action, TestIMGUIExecutorBudget budget)
+        {
             if (action == null)
             {
                 yield break;
             }
 
             TestIMGUIExecutor window = CreateInstance<TestIMGUIExecutor>();
-            window.hideFlags = HideFlags.HideAndDontSave;
-            window.minSize = new Vector2(100f, 50f);
-            window._action = action;
-            window._hasRun = false;
-            window.ShowUtility();
-            window.Focus();
 
-            while (!window._hasRun)
+            // try/finally (not catch -- C# allows yield only with finally) guarantees
+            // the window is closed on EVERY exit: normal completion, the budget throw,
+            // a throw during show/focus, and enumerator Dispose() when the test runner
+            // aborts the coroutine after the action throws inside OnGUI. The
+            // action-exception path previously leaked the window.
+            try
             {
-                window.Repaint();
-                yield return null;
-            }
+                window.hideFlags = HideFlags.HideAndDontSave;
+                window.minSize = new Vector2(100f, 50f);
+                window._action = action;
+                window._hasRun = false;
+                window.ShowUtility();
+                window.Focus();
 
-            window.Close();
+                int framesPumped = 0;
+                double startTime = EditorApplication.timeSinceStartup;
+                while (!window._hasRun)
+                {
+                    double elapsedSeconds = EditorApplication.timeSinceStartup - startTime;
+                    if (framesPumped >= budget.MaxFrames || elapsedSeconds >= budget.MaxSeconds)
+                    {
+                        throw new TestIMGUIExecutorTimeoutException(
+                            framesPumped,
+                            elapsedSeconds,
+                            budget
+                        );
+                    }
+
+                    window.Repaint();
+                    framesPumped++;
+                    yield return null;
+                }
+            }
+            finally
+            {
+                if (window != null)
+                {
+                    window.Close();
+                }
+            }
         }
 
         private void OnGUI()
