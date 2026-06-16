@@ -89,11 +89,17 @@ jobs:
         # plus encoding (no BOM / LF) and generator determinism.
         shell: pwsh
         run: |
+          # generate-skills-index.ps1 is pure PowerShell (it runs no native process),
+          # so on success it leaves $LASTEXITCODE unset ($null) in this fresh pwsh step.
+          # The old `if ($LASTEXITCODE -ne 0)` fired a phantom failure ($null -ne 0 is
+          # $true in PowerShell), logged as "failed (exit )." with an empty code. Gate on
+          # truthiness instead: `if ($LASTEXITCODE)` is false for BOTH $null and 0, and
+          # true only for a real non-zero code (the generator's `exit 1` on a missing
+          # skills dir), which we then surface. A thrown / ErrorActionPreference='Stop'
+          # error already aborts the step before this line; the git-status check below is
+          # the substantive assertion (drift / never-committed index.md).
           ./scripts/generate-skills-index.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "::error::generate-skills-index.ps1 failed (exit $LASTEXITCODE)."
-            exit 1
-          }
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           # --porcelain catches BOTH a drifted (modified) and a never-committed
           # (untracked) index.md, unlike `git diff` which ignores untracked files.
           $status = git status --porcelain -- .llm/skills/index.md

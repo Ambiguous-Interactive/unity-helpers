@@ -250,7 +250,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         public LiquidProgressBar()
         {
             AddToClassList(USSClassName);
+#if UNITY_2022_1_OR_NEWER
             generateVisualContent += OnGenerateVisualContent;
+#endif
             RegisterCallback<CustomStyleResolvedEvent>(OnCustomStyleResolved);
             RegisterCallback<AttachToPanelEvent>(OnAttachToPanel);
             RegisterCallback<DetachFromPanelEvent>(OnDetachFromPanel);
@@ -342,6 +344,8 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if UNITY_2022_1_OR_NEWER
+        // Painter2D vector API requires Unity 2022.1+; on 2021.3 this element renders no custom content.
         private void OnGenerateVisualContent(MeshGenerationContext mgc)
         {
             Painter2D painter = mgc.painter2D;
@@ -631,5 +635,6 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             painter.ClosePath();
             painter.Fill();
         }
+#endif
     }
 }

@@ -25,8 +25,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.AddSingleton(assigner, typeof(IRelationalComponentAssigner));
-            builder.AddSingleton(CreateCacheFor(typeof(ReflexRelationalTester)));
+            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
+            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             ReflexRelationalTester tester = CreateHierarchy();
@@ -144,8 +144,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.AddSingleton(assigner, typeof(IRelationalComponentAssigner));
-            builder.AddSingleton(CreateCacheFor(typeof(ReflexRelationalTester)));
+            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
+            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             GameObject parent = Track(new GameObject("ReflexComponentParent"));
@@ -218,8 +218,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.AddSingleton(assigner, typeof(IRelationalComponentAssigner));
-            builder.AddSingleton(CreateCacheFor(typeof(ReflexRelationalTester)));
+            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
+            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             GameObject parent = Track(new GameObject("ReflexGameObjectParent"));

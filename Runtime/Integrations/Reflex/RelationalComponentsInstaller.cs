@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Integrations.Reflex
 {
     using global::Reflex.Core;
+    using global::Reflex.Enums;
     using global::Reflex.Extensions;
     using UnityEngine;
     using UnityEngine.SceneManagement;
@@ -45,15 +46,20 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
             AttributeMetadataCache cacheInstance = AttributeMetadataCache.Instance;
             if (cacheInstance != null && !builder.HasBinding(typeof(AttributeMetadataCache)))
             {
-                builder.AddSingleton(cacheInstance, typeof(AttributeMetadataCache));
+                builder.RegisterValue(cacheInstance, new[] { typeof(AttributeMetadataCache) });
             }
 
             if (!builder.HasBinding(typeof(IRelationalComponentAssigner)))
             {
-                builder.AddSingleton(
+                builder.RegisterType(
                     typeof(RelationalComponentAssigner),
-                    typeof(IRelationalComponentAssigner),
-                    typeof(RelationalComponentAssigner)
+                    new[]
+                    {
+                        typeof(IRelationalComponentAssigner),
+                        typeof(RelationalComponentAssigner),
+                    },
+                    Lifetime.Singleton,
+                    Resolution.Lazy
                 );
             }
 
@@ -63,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
             );
             if (!builder.HasBinding(typeof(RelationalSceneAssignmentOptions)))
             {
-                builder.AddSingleton(options);
+                builder.RegisterValue(options);
             }
 
             Scene installerScene = gameObject.scene;

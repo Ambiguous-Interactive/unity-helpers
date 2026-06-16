@@ -299,7 +299,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             _trackElement.style.top = 0;
             _trackElement.style.width = Length.Percent(100);
             _trackElement.style.height = Length.Percent(100);
+#if UNITY_2022_1_OR_NEWER
             _trackElement.generateVisualContent += DrawTrackOrFill;
+#endif
             Add(_trackElement);
             _fillContainer = new VisualElement
             {
@@ -319,7 +321,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             _fillElement.style.position = Position.Absolute;
             _fillElement.style.left = 0;
             _fillElement.style.top = 0;
+#if UNITY_2022_1_OR_NEWER
             _fillElement.generateVisualContent += DrawTrackOrFill;
+#endif
             _fillContainer.Add(_fillElement);
             RegisterCallbacks();
             UpdateFillContainerSize();
@@ -515,6 +519,8 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if UNITY_2022_1_OR_NEWER
+        // Painter2D vector API requires Unity 2022.1+; on 2021.3 this element renders no custom content.
         private void DrawTrackOrFill(MeshGenerationContext mgc)
         {
             Painter2D painter = mgc.painter2D;
@@ -623,6 +629,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
             painter.Stroke();
         }
+#endif
 
         private void CalculatePathPoints(Rect r, float borderRadius)
         {

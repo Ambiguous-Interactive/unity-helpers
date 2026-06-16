@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -23,6 +24,23 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private const float TestLeftPadding = 12f;
         private const float TestRightPadding = 12f;
         private const float TestHorizontalPadding = 24f;
+
+        [SetUp]
+        public void TolerateHeadlessWindowErrorsSetUp()
+        {
+            // These tests drive a real EditorWindow (ShowUtility). Under -batchmode
+            // -nographics, initializing its view logs the benign "No graphic device is
+            // available to initialize the view." error (Unity 6+), which the Unity Test
+            // Framework treats as a failure. Tolerate it in headless CI only; on a
+            // machine with a graphics device this is inert. The framework resets
+            // ignoreFailingMessages after each test, so no teardown restore is needed
+            // (and restoring it would re-catch the same error if the window closes
+            // during teardown).
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+            {
+                LogAssert.ignoreFailingMessages = true;
+            }
+        }
 
         private sealed class PropertyDrawerClickWindow : EditorWindow
         {

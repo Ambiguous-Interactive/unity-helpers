@@ -7008,6 +7008,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     break;
                 case SerializedPropertyType.ManagedReference:
                 case SerializedPropertyType.Generic:
+#if UNITY_2022_1_OR_NEWER
+                    // SerializedProperty.boxedValue did not exist before Unity 2022.1;
+                    // on 2021.3 fall back to the property path (the same degraded
+                    // identity the catch below already uses for unreadable values).
                     try
                     {
                         object boxed = property.boxedValue;
@@ -7019,6 +7023,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         data.value = property.propertyPath;
                         data.comparable = property.propertyPath;
                     }
+#else
+                    data.value = property.propertyPath;
+                    data.comparable = property.propertyPath;
+#endif
                     break;
                 default:
                     data.value = property.propertyPath;
@@ -7174,6 +7182,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     break;
                 case SerializedPropertyType.ManagedReference:
                 case SerializedPropertyType.Generic:
+#if UNITY_2022_1_OR_NEWER
+                    // SerializedProperty.boxedValue is unavailable before Unity 2022.1;
+                    // the managed/generic value is simply not written back on 2021.3.
                     try
                     {
                         property.boxedValue = data.value;
@@ -7182,6 +7193,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     {
                         // Swallow
                     }
+#endif
                     break;
             }
         }

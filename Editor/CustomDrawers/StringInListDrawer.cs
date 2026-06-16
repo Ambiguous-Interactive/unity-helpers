@@ -1097,7 +1097,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 };
                 _listView.itemIndexChanged += OnItemIndexChanged;
                 _listView.itemsRemoved += OnItemsRemoved;
+                // ListView.onSelectionChange was renamed to selectionChanged in Unity
+                // 2022.2; the legacy event still exists (deprecated) on 2021.3.
+#if UNITY_2022_2_OR_NEWER
                 _listView.selectionChanged += OnSelectionChanged;
+#else
+                _listView.onSelectionChange += OnSelectionChanged;
+#endif
                 _listView.RegisterCallback<KeyDownEvent>(OnListKeyDown);
                 Add(_listView);
 
