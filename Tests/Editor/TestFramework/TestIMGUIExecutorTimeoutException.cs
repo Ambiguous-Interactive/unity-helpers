@@ -7,9 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     using System;
     using System.Globalization;
 
-    // Thrown when TestIMGUIExecutor.Run exhausts its budget before the terminating
-    // Repaint event. Naming the frame/time budget makes the otherwise-silent
-    // "no graphic device" hang an actionable, single-test failure.
+    // Thrown when TestIMGUIExecutor.Run exhausts its budget before completing its
+    // IMGUI passes. Naming the frame/time budget makes a runaway pump an actionable,
+    // single-test failure rather than a silent stall.
     internal sealed class TestIMGUIExecutorTimeoutException : Exception
     {
         internal TestIMGUIExecutorTimeoutException(
@@ -27,11 +27,9 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "TestIMGUIExecutor pumped {0} frame(s) over {1:0.000}s without receiving the "
-                    + "terminating Repaint event (budget: {2} frames / {3:0.###}s). This usually "
-                    + "means the editor is running -nographics with no repaint, or an editor tick "
-                    + "stalled (e.g. an unreachable Unity Accelerator). Failing fast so a single "
-                    + "IMGUI test cannot hang the whole run.",
+                "TestIMGUIExecutor ran {0} IMGUI pass(es) over {1:0.000}s without completing "
+                    + "(budget: {2} passes / {3:0.###}s). Failing fast so a single IMGUI test "
+                    + "cannot stall the whole run.",
                 framesPumped,
                 secondsElapsed,
                 budget.MaxFrames,

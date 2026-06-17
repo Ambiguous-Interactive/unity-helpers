@@ -1426,6 +1426,104 @@ namespace WallstopStudios.UnityHelpers.Tests
 $r = Invoke-LintOnFixture -FixtureRelativePath 'WaitPerfFixture.cs' -FixtureContent $unh010Perf
 Write-TestResult "UNH010.SkipsPerfCategory" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
 
+# ── UNH011: editor-only refs in player-compiled test code ────────────────────
+Write-Host "`n  Section: UNH011 editor-reference guard" -ForegroundColor White
+
+# UNH011 only governs PLAYER-compiled trees (everything under Tests/ EXCEPT
+# Tests/Editor), so these fixtures live under a Tests/Runtime path.
+$tempRuntimeDir = Join-Path $tempDir 'Tests' 'Runtime'
+New-Item -ItemType Directory -Path $tempRuntimeDir -Force | Out-Null
+function Invoke-LintOnRuntimeFixture {
+  param([string]$FixtureRelativePath, [string]$FixtureContent)
+  $path = Join-Path $tempRuntimeDir $FixtureRelativePath
+  Set-Content -Path $path -Value $FixtureContent -NoNewline
+  try {
+    Push-Location $tempDir
+    $out = & $lintScriptPath -Paths (Join-Path 'Tests' 'Runtime' $FixtureRelativePath) *>&1
+    $exit = $LASTEXITCODE
+    Pop-Location
+    return [pscustomobject]@{ ExitCode = $exit; Output = ($out | Out-String) }
+  } catch {
+    Pop-Location
+    return [pscustomobject]@{ ExitCode = -1; Output = "Exception: $_" }
+  }
+}
+
+# Unguarded UnityEditor reference in a player-compiled file -> CS0234 -> must fail.
+$unh011Bad = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using UnityEditor;
+
+    public static class BadEditorRef
+    {
+        public static double Now() { return EditorApplication.timeSinceStartup; }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'BadEditorRef.cs' -FixtureContent $unh011Bad
+Write-TestResult "UNH011.DetectsUnguardedEditorRef" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH011')) "Expected non-zero exit with UNH011. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# Guarded refs, a comment naming UnityEditor, an InternalsVisibleTo("...Editor")
+# string literal, AND the editor branch of an #if !UNITY_EDITOR/#else are all legal.
+$unh011Good = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    // This comment mentions UnityEditor and must be ignored.
+    using System.Runtime.CompilerServices;
+
+    [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Editor")]
+#if UNITY_EDITOR
+    using UnityEditor;
+#endif
+
+    public static class GoodEditorRef
+    {
+#if UNITY_EDITOR
+        public static double Now() { return EditorApplication.timeSinceStartup; }
+#endif
+#if !UNITY_EDITOR
+        public static int Fallback() { return 0; }
+#else
+        public static double Else() { return EditorApplication.timeSinceStartup; }
+#endif
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'GoodEditorRef.cs' -FixtureContent $unh011Good
+Write-TestResult "UNH011.AllowsGuardedAndScrubbedRefs" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH011')) "Expected exit 0 and no UNH011. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# Same unguarded ref under Tests/Editor (editor-only assembly) is allowed.
+$unh011EditorTreeFile = Join-Path $tempTestDir 'EditorTreeRef.cs'
+Set-Content -Path $unh011EditorTreeFile -Value $unh011Bad -NoNewline
+try {
+  Push-Location $tempDir
+  $out = & $lintScriptPath -Paths (Join-Path 'Tests' 'Editor' 'EditorTreeRef.cs') *>&1
+  $exit = $LASTEXITCODE
+  Pop-Location
+  $outStr = ($out | Out-String)
+  Write-TestResult "UNH011.SkipsEditorTree" (($exit -eq 0) -and ($outStr -notmatch 'UNH011')) "Expected exit 0 and no UNH011 under Tests/Editor. Exit: $exit, Output: $outStr"
+} catch {
+  Pop-Location
+  Write-TestResult "UNH011.SkipsEditorTree" $false "Exception: $_"
+}
+
+# A // UNH-SUPPRESS UNH011 escape hatch is honored.
+$unh011Suppress = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    // UNH-SUPPRESS UNH011: justified
+    using UnityEditor;
+
+    public static class SuppressedEditorRef
+    {
+        public static double Now() { return EditorApplication.timeSinceStartup; }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'SuppressedEditorRef.cs' -FixtureContent $unh011Suppress
+Write-TestResult "UNH011.HonorsSuppress" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH011')) "Exit: $($r.ExitCode), Output: $($r.Output)"
+
 } finally {
   # ── Cleanup ──────────────────────────────────────────────────────────────────
   Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue

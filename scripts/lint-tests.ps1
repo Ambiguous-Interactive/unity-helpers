@@ -973,6 +973,58 @@ foreach ($file in $filesToScan) {
     }
   }
 
+  # UNH011: editor-only references in PLAYER-compiled test code must be guarded by
+  # `#if UNITY_EDITOR`. The Runtime test assemblies (Tests/Core, Tests/Runtime — every
+  # tree EXCEPT Tests/Editor) compile into the standalone player; the editor-only
+  # assemblies (UnityEditor.*, WallstopStudios.UnityHelpers.Editor) are stripped there,
+  # so any unguarded reference is a CS0234 that aborts the WHOLE standalone leg before a
+  # single test runs (no results.xml). This catches that class in <1s without a player
+  # build. The standalone leg remains the ultimate backstop.
+  #   A line is "editor-guarded" when enclosed by an `#if`/`#elif` whose condition
+  # mentions UNITY_EDITOR (positively), or by the `#else` of an `#if !UNITY_EDITOR`.
+  # Directive + token detection both run on the comment/string-SCRUBBED view, so a
+  # `// uses UnityEditor` comment or an `InternalsVisibleTo("…Editor")` string literal
+  # (both legal in player code) cannot trip the rule.
+  if (($rel -notmatch '(^|/)Tests/Editor/') -and ($text -notmatch 'UNH-SUPPRESS.*UNH011')) {
+    $editorStack = New-Object System.Collections.Generic.List[object]
+    $lineIndex = 0
+    foreach ($line in $content) {
+      $lineIndex++
+      $sl = $scrubbedContent[$lineIndex - 1]
+      $t = $sl.Trim()
+      if ($t -match '^#\s*if\s+(.+)$' -or $t -match '^#\s*elif\s+(.+)$') {
+        $cond = $Matches[1]
+        $negated = ($cond -cmatch '!\s*UNITY_EDITOR')
+        $frame = @{ Active = (($cond -cmatch 'UNITY_EDITOR') -and -not $negated); Negated = $negated }
+        if ($t -match '^#\s*elif' -and $editorStack.Count -gt 0) {
+          $editorStack[$editorStack.Count - 1] = $frame
+        } else {
+          $editorStack.Add($frame) | Out-Null
+        }
+        continue
+      }
+      if ($t -match '^#\s*else\b') {
+        if ($editorStack.Count -gt 0) {
+          $editorStack[$editorStack.Count - 1] = @{ Active = $editorStack[$editorStack.Count - 1].Negated; Negated = $false }
+        }
+        continue
+      }
+      if ($t -match '^#\s*endif\b') {
+        if ($editorStack.Count -gt 0) { $editorStack.RemoveAt($editorStack.Count - 1) }
+        continue
+      }
+      $guarded = $false
+      foreach ($frame in $editorStack) { if ($frame.Active) { $guarded = $true; break } }
+      if ($guarded) { continue }
+      if ($line -match 'UNH-SUPPRESS') { continue }
+      if ($sl -cmatch '\bUnityEditor' -or $sl -cmatch 'WallstopStudios\.UnityHelpers\.Editor\b') {
+        $violations += (@{
+          Path=$rel; Line=$lineIndex; Message='UNH011: editor-only reference in player-compiled test code must be inside #if UNITY_EDITOR (else CS0234 aborts the standalone leg)'
+        })
+      }
+    }
+  }
+
   # UNH007: an enormous literal loop bound in a non-perf test belongs in a
   # Performance/Stress fixture (excluded from the fast suite) or should be
   # reduced. Const/field bounds (e.g. `< SampleCount`) are intentionally NOT

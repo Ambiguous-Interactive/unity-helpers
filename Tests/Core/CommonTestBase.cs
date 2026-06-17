@@ -8,19 +8,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
-    using System.Reflection;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
-    using AssetDatabaseBatchHelper = WallstopStudios.UnityHelpers.Editor.Utils.AssetDatabaseBatchHelper;
     using Object = UnityEngine.Object;
 #if UNITY_EDITOR
     using UnityEditor.SceneManagement;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core.TestUtils;
+    using AssetDatabaseBatchHelper = WallstopStudios.UnityHelpers.Editor.Utils.AssetDatabaseBatchHelper;
 #endif
 
     /// <summary>
@@ -70,9 +69,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [SetUp]
         public virtual void BaseSetUp()
         {
-#if REFLEX_PRESENT
-            EnsureReflexSettings();
-#endif
 #if UNITY_EDITOR
             CleanupPackageRootGeneratedArtifacts();
             _previousEditorUiSuppress = EditorUi.Suppress;
@@ -603,21 +599,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             DisposeDispatcherScope();
             UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
         }
-
-#if REFLEX_PRESENT
-        private static void EnsureReflexSettings()
-        {
-            Type supportType = Type.GetType(
-                "WallstopStudios.UnityHelpers.Tests.TestUtils.ReflexTestSupport, WallstopStudios.UnityHelpers.Tests.Runtime",
-                throwOnError: false
-            );
-            MethodInfo ensureMethod = supportType?.GetMethod(
-                "EnsureReflexSettings",
-                BindingFlags.Public | BindingFlags.Static
-            );
-            ensureMethod?.Invoke(null, null);
-        }
-#endif
 
         private void InitializeDispatcherScope()
         {

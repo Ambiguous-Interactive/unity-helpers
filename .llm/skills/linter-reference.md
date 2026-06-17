@@ -329,6 +329,10 @@ pwsh -NoProfile -File scripts/lint-tests.ps1
 4. **UNH003**: Test classes missing `CommonTestBase` inheritance
 5. **UNH004**: Underscores in test names
 6. **UNH005**: `Assert.IsNull`/`Assert.IsNotNull` (should use `Assert.IsTrue` for Unity null checks)
+7. **UNH011**: Editor-only references (`UnityEditor`, `WallstopStudios.UnityHelpers.Editor`) in
+   player-compiled test code (anything under `Tests/` except `Tests/Editor/`) must be inside
+   `#if UNITY_EDITOR`. Otherwise the editor assembly is stripped from the standalone player build
+   and the leg fails with `CS0234` before any test runs. Add `// UNH-SUPPRESS UNH011` to opt out.
 
 All Unity object creation in tests must use `Track()`:
 
