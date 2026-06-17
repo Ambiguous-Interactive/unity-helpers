@@ -25,8 +25,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
-            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
+            RegisterInstance(builder, assigner, typeof(IRelationalComponentAssigner));
+            RegisterInstance(builder, CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             ReflexRelationalTester tester = CreateHierarchy();
@@ -144,8 +144,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
-            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
+            RegisterInstance(builder, assigner, typeof(IRelationalComponentAssigner));
+            RegisterInstance(builder, CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             GameObject parent = Track(new GameObject("ReflexComponentParent"));
@@ -218,8 +218,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         {
             ContainerBuilder builder = new();
             RecordingAssigner assigner = new();
-            builder.RegisterValue(assigner, new[] { typeof(IRelationalComponentAssigner) });
-            builder.RegisterValue(CreateCacheFor(typeof(ReflexRelationalTester)));
+            RegisterInstance(builder, assigner, typeof(IRelationalComponentAssigner));
+            RegisterInstance(builder, CreateCacheFor(typeof(ReflexRelationalTester)));
             Container container = builder.Build();
 
             GameObject parent = Track(new GameObject("ReflexGameObjectParent"));
@@ -377,6 +377,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
             cache._relationalTypeMetadata = relationalTypes;
             cache.ForceRebuildForTests();
             return cache;
+        }
+
+        // Reflex's builder registration API changed at the 14.0.0 major bump
+        // (AddSingleton -> RegisterValue), gated by REFLEX_14_0_OR_NEWER from the
+        // integration asmdef's versionDefine so the fixture compiles against both a
+        // 13.x vendored copy and CI's pinned 14.3.0. The no-contract overload binds
+        // the instance to its own concrete type in BOTH APIs (RegisterValue(value)
+        // and AddSingleton(value)); passing an empty contract array would instead
+        // bind to nothing, so the contract-count branch is required, not cosmetic.
+        private static void RegisterInstance(
+            ContainerBuilder builder,
+            object instance,
+            params Type[] contracts
+        )
+        {
+#if REFLEX_14_0_OR_NEWER
+            if (contracts.Length == 0)
+            {
+                builder.RegisterValue(instance);
+            }
+            else
+            {
+                builder.RegisterValue(instance, contracts);
+            }
+#else
+            if (contracts.Length == 0)
+            {
+                builder.AddSingleton(instance);
+            }
+            else
+            {
+                builder.AddSingleton(instance, contracts);
+            }
+#endif
         }
 
         private sealed class RecordingAssigner : IRelationalComponentAssigner

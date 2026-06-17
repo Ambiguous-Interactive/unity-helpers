@@ -2311,6 +2311,36 @@ function Write-UnityResultFailureDiagnostics {
             if ($logText -match 'Exiting batchmode successfully') {
                 Write-CiError "Unity exited with code 0 but did not write NUnit results. Check the selected assembly list, test platform, and TestRunner log lines above."
             }
+            # A C# compile error aborts batchmode BEFORE results.xml is written.
+            # Unity prints "Aborting batchmode due to failure:" immediately followed
+            # by the offending diagnostics. Surface a CRISP, leg-named "Compilation
+            # failed" message with the first few CS errors so the operator sees the
+            # ACTUAL root cause instead of inferring "compile failed" from the
+            # generic missing-results throw. (e.g. the CS0104 Reflex-integration
+            # ambiguity that aborted every integration leg in run 74473484398.)
+            if ($logText -match 'Aborting batchmode due to failure') {
+                $csErrors = @(
+                    Select-String -LiteralPath $LogPath -Pattern 'error CS\d+' -ErrorAction SilentlyContinue |
+                        Select-Object -First 5
+                )
+                if ($csErrors.Count -gt 0) {
+                    $firstErrors = (
+                        $csErrors | ForEach-Object { ConvertTo-SingleLineDiagnostic -Text $_.Line }
+                    ) -join ' | '
+                    Write-CiError "Compilation failed for ${Label}: Unity aborted batchmode before writing NUnit results. First C# error(s): $firstErrors"
+                } else {
+                    Write-CiError "Compilation/startup failed for ${Label}: Unity aborted batchmode before writing NUnit results (no 'error CS####' line found; see the selected log lines above)."
+                }
+            }
+            # EditMode GUI tests require a real graphics device (we drop -nographics
+            # for editmode for this reason). If the editor still could not initialize
+            # a device -- the classic symptom of a self-hosted runner started as a
+            # session-0 Windows SERVICE (no interactive desktop / no D3D), even with a
+            # capable GPU installed -- name that as the actionable cause instead of
+            # leaving ~350 IMGUI timeouts looking like genuine test failures.
+            if ($logText -match 'No graphic device is available to initialize the view') {
+                Write-CiError "Editor ran without a usable graphics device for ${Label} ('No graphic device is available to initialize the view'). EditMode IMGUI/GUI tests need a real device: ensure the self-hosted runner runs in an INTERACTIVE desktop session (not as a session-0 Windows service) with the GPU accessible. The TestIMGUIExecutor budget converts the resulting no-Repaint stall into per-test failures rather than a hang."
+            }
             if (Test-UnityPackageManagerTransientFailure -LogPath $LogPath) {
                 Write-CiError "Unity Package Manager canceled package resolution before tests started. This is a CI/Unity package-resolution failure, not a unity-helpers test assertion."
                 Write-UnityPackageManagerDiagnostics -Project $Project -LogPath $LogPath
@@ -2532,6 +2562,24 @@ function Test-NUnitResults {
 
     Write-Host "Results: total=$total passed=$passed failed=$failed skipped=$skipped"
     if ($total -lt 1) {
+        # total=0 has TWO very different causes; the producing process's exit code
+        # disambiguates them. A non-zero exit with a valid <test-run> but zero
+        # executed cases means the run ABORTED before any test case ran -- a
+        # [OneTimeSetUp]/assembly-load/domain-reload/static-init failure (NUnit
+        # still writes result="Failed" with total=0). That is a REAL failure, not
+        # an empty assembly selection, so naming it "check assembly selection"
+        # (the exit==0 case) sends the operator down the wrong path. Split them.
+        if ($UnityExitCode -ne 0) {
+            # GetAttribute (not the dynamic $run.result accessor) so a malformed
+            # <test-run> with no 'result' attribute returns '' instead of THROWING
+            # under Set-StrictMode -Version Latest -- the throw would suppress the
+            # very diagnostics this branch exists to emit, on exactly the abort path
+            # where the attribute is most likely missing.
+            $resultState = $run.GetAttribute('result')
+            Write-CiError "Unity exited $UnityExitCode (tests failed) but results.xml at $Path has total=0 (result='$resultState') for $Label. This usually means the run aborted before any test case executed -- suspect a [OneTimeSetUp]/assembly-load/domain-reload/static-init failure rather than an empty assembly list.$exitNote"
+            Write-UnityResultFailureDiagnostics -LogPath $LogPath -Project $Project -Label $Label
+            throw "Test run for $Label produced zero executed tests with a non-zero Unity exit ($UnityExitCode); likely aborted before any test ran."
+        }
         Write-CiError "0 tests ran for $Label -- check assembly selection and package testables.$exitNote"
         throw "0 tests ran for $Label."
     }
@@ -2982,9 +3030,29 @@ try {
         # Editor is running tests with -runTests, -quit causes it to QUIT IMMEDIATELY
         # before in-progress tests can complete -- the editor exits 0 having written
         # no results.xml.
+        # GRAPHICS DEVICE: EditMode needs a REAL one; PlayMode does not.
+        # The EditMode suite renders IMGUI property drawers in a live EditorWindow
+        # (TestIMGUIExecutor + the ShowUtility/SendEvent interaction fixtures). On
+        # Unity 6 under '-nographics' the window's host view fails to initialize
+        # ("No graphic device is available to initialize the view"), so OnGUI never
+        # receives the terminating Repaint event -- the pump spins out its frame
+        # budget and ~350 GUI tests fail (the 283-failure editmode leg in run
+        # 74473484398). The headless tolerance already shipped (LogAssert.ignore on
+        # graphicsDeviceType==Null + the frame/time budget) only MUTES the benign
+        # log and BOUNDS the hang; it cannot make the view init or a Repaint fire,
+        # so it does not make these pass headless -- a real device is required.
+        # 2021.3/2022.3 tolerated headless IMGUI; Unity 6 does not. The self-hosted
+        # runners have capable GPUs, so EditMode runs WITH the graphics subsystem
+        # (still '-batchmode': no main window / non-interactive). The GUI fixtures
+        # are Editor-only asmdefs, so PlayMode has none of them and stays
+        # '-nographics' -- giving PlayMode a device buys nothing and only adds a
+        # game-view/PlayerLoop graphics surface. If a runner ever lacks a usable
+        # device (e.g. a session-0 service), the graphicsDeviceType==Null guards
+        # stay as an inert safety net and the post-run diagnostics name it (below).
+        $graphicsArgs = if ($TestMode -eq 'editmode') { @() } else { @('-nographics') }
         $testArgs = @(
-            '-batchmode',
-            '-nographics',
+            '-batchmode'
+        ) + $graphicsArgs + @(
             '-projectPath', $ProjectPath,
             '-runTests',
             '-testPlatform', $testPlatform,

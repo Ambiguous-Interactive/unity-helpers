@@ -5,7 +5,6 @@
 namespace WallstopStudios.UnityHelpers.Integrations.Reflex
 {
     using global::Reflex.Core;
-    using global::Reflex.Enums;
     using global::Reflex.Extensions;
     using UnityEngine;
     using UnityEngine.SceneManagement;
@@ -43,14 +42,29 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
         /// <inheritdoc />
         public void InstallBindings(ContainerBuilder builder)
         {
+            // Reflex's ContainerBuilder registration API changed at the 14.0.0 major
+            // bump: <14 exposes AddSingleton/AddTransient/AddScoped (lifetime encoded
+            // in the method name, no Resolution concept); >=14 replaced those with
+            // RegisterType/RegisterValue + the Lifetime/Resolution enums. The asmdef's
+            // versionDefine sets REFLEX_14_0_OR_NEWER only for a UPM Reflex >= 14.0.0,
+            // so both APIs compile (CI's pinned 14.3.0 and a 13.x vendored copy alike).
+            // AddSingleton(type, contracts) is the exact equivalent of
+            // RegisterType(type, contracts, Singleton, Lazy) -- a Reflex singleton is
+            // lazily resolved by default -- and AddSingleton(instance, contracts) of
+            // RegisterValue(instance, contracts).
             AttributeMetadataCache cacheInstance = AttributeMetadataCache.Instance;
             if (cacheInstance != null && !builder.HasBinding(typeof(AttributeMetadataCache)))
             {
+#if REFLEX_14_0_OR_NEWER
                 builder.RegisterValue(cacheInstance, new[] { typeof(AttributeMetadataCache) });
+#else
+                builder.AddSingleton(cacheInstance, typeof(AttributeMetadataCache));
+#endif
             }
 
             if (!builder.HasBinding(typeof(IRelationalComponentAssigner)))
             {
+#if REFLEX_14_0_OR_NEWER
                 builder.RegisterType(
                     typeof(RelationalComponentAssigner),
                     new[]
@@ -58,9 +72,16 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                         typeof(IRelationalComponentAssigner),
                         typeof(RelationalComponentAssigner),
                     },
-                    Lifetime.Singleton,
-                    Resolution.Lazy
+                    global::Reflex.Enums.Lifetime.Singleton,
+                    global::Reflex.Enums.Resolution.Lazy
                 );
+#else
+                builder.AddSingleton(
+                    typeof(RelationalComponentAssigner),
+                    typeof(IRelationalComponentAssigner),
+                    typeof(RelationalComponentAssigner)
+                );
+#endif
             }
 
             RelationalSceneAssignmentOptions options = new(
@@ -69,7 +90,11 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
             );
             if (!builder.HasBinding(typeof(RelationalSceneAssignmentOptions)))
             {
+#if REFLEX_14_0_OR_NEWER
                 builder.RegisterValue(options);
+#else
+                builder.AddSingleton(options);
+#endif
             }
 
             Scene installerScene = gameObject.scene;

@@ -23,7 +23,22 @@ namespace Samples.UnityHelpers.DI.Reflex
 
         public void InstallBindings(ContainerBuilder builder)
         {
+            // Reflex's factory-registration API changed at the 14.0.0 major bump
+            // (AddSingleton(factory, contracts) -> RegisterFactory(factory, contracts,
+            // Lifetime, Resolution)); REFLEX_14_0_OR_NEWER comes from this sample
+            // asmdef's versionDefine so the sample builds against both. A Reflex
+            // singleton factory is lazily resolved, matching Lifetime.Singleton/
+            // Resolution.Lazy.
+#if REFLEX_14_0_OR_NEWER
+            builder.RegisterFactory(
+                CreatePaletteService,
+                new[] { typeof(ReflexPaletteService) },
+                global::Reflex.Enums.Lifetime.Singleton,
+                global::Reflex.Enums.Resolution.Lazy
+            );
+#else
             builder.AddSingleton(CreatePaletteService, typeof(ReflexPaletteService));
+#endif
         }
 
         private ReflexPaletteService CreatePaletteService(Container container)

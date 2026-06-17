@@ -219,8 +219,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TestDetectableAsset payload = Track(
                 ScriptableObject.CreateInstance<TestDetectableAsset>()
             );
-            AssetDatabase.CreateAsset(payload, assetPath);
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            CreateAndImportAsset(payload, assetPath);
         }
 
         /// <summary>
@@ -241,8 +240,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TestAlternateDetectableAsset payload = Track(
                 ScriptableObject.CreateInstance<TestAlternateDetectableAsset>()
             );
-            AssetDatabase.CreateAsset(payload, assetPath);
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            CreateAndImportAsset(payload, assetPath);
         }
 
         /// <summary>
@@ -259,8 +257,54 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             T handler = Track(ScriptableObject.CreateInstance<T>());
-            AssetDatabase.CreateAsset(handler, assetPath);
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            CreateAndImportAsset(handler, assetPath);
+        }
+
+        /// <summary>
+        /// Creates an asset and forces it to be imported and indexed by the
+        /// AssetDatabase BEFORE control returns, even while the fixture-wide
+        /// <see cref="BatchedEditorTestBase"/> <c>StartAssetEditing</c> batch is open.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// These fixtures derive from <see cref="BatchedEditorTestBase"/>, which holds a
+        /// single <c>StartAssetEditing</c> batch open for the whole fixture. While that
+        /// batch is open, <see cref="AssetDatabase.CreateAsset(Object, string)"/> DEFERS
+        /// the import, and <see cref="AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching"/>
+        /// is a no-op (it only refreshes when NOT batching). The newly-created asset is
+        /// therefore not yet importable: <see cref="AssetDatabase.GetMainAssetTypeAtPath"/>
+        /// and <see cref="AssetDatabase.LoadAssetAtPath"/> return <c>null</c> under
+        /// <c>-batchmode</c>. The change processor's <c>AppendCreatedAssets</c> resolves a
+        /// created asset only through those calls, so it sees ZERO created assets and the
+        /// handler never fires -- which is exactly the "0 invocations" mass failure these
+        /// fixtures hit in CI.
+        /// </para>
+        /// <para>
+        /// <see cref="CommonTestBase.ExecuteWithImmediateImport(Action, bool)"/> pauses the
+        /// batch, force-imports synchronously, runs the create, then force-imports again so
+        /// the asset is fully indexed before the batch resumes. The post-create load is a
+        /// diagnostic tripwire: if a future change re-breaks the import contract, the test
+        /// fails immediately with a clear cause instead of a cryptic "0 invocations".
+        /// </para>
+        /// </remarks>
+        private void CreateAndImportAsset(Object asset, string assetPath)
+        {
+            ExecuteWithImmediateImport(
+                () => AssetDatabase.CreateAsset(asset, assetPath),
+                refreshAfter: true
+            );
+
+            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) == null)
+            {
+                throw new InvalidOperationException(
+                    $"Asset at '{assetPath}' was created but is not loadable from the "
+                        + "AssetDatabase after a forced synchronous import. The change "
+                        + "processor cannot resolve a created asset it cannot load, so "
+                        + "every handler-invocation assertion would fail with 0 "
+                        + "invocations. This indicates the batch-pause/import contract "
+                        + "in ExecuteWithImmediateImport regressed under -batchmode."
+                );
+            }
         }
 
         /// <summary>
