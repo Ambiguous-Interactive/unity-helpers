@@ -7,12 +7,17 @@ on:
     paths:
       - "**.asmdef"
       - "**.asmref"
+      # .cs is in scope: the cross-assembly check verifies that any `#if <versionDefine>`
+      # lives in an assembly whose asmdef declares that symbol, so a code-only change can
+      # introduce (or fix) a finding without touching an asmdef.
+      - "**.cs"
       - "scripts/lint-asmdef.ps1"
       - ".github/workflows/asmdef-lint.yml"
   pull_request:
     paths:
       - "**.asmdef"
       - "**.asmref"
+      - "**.cs"
       - "scripts/lint-asmdef.ps1"
       - ".github/workflows/asmdef-lint.yml"
 

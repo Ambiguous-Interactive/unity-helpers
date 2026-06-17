@@ -380,9 +380,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
         }
 
         // Reflex's builder registration API changed at the 14.0.0 major bump
-        // (AddSingleton -> RegisterValue), gated by REFLEX_14_0_OR_NEWER from the
-        // integration asmdef's versionDefine so the fixture compiles against both a
-        // 13.x vendored copy and CI's pinned 14.3.0. The no-contract overload binds
+        // (AddSingleton -> RegisterValue), gated by REFLEX_14_0_OR_NEWER from THIS
+        // test asmdef's own versionDefine -- Unity defines are per-assembly, so the
+        // integration asmdef's copy is not visible here -- so the fixture compiles
+        // against both a 13.x vendored copy and CI's pinned 14.3.0. The no-contract overload binds
         // the instance to its own concrete type in BOTH APIs (RegisterValue(value)
         // and AddSingleton(value)); passing an empty contract array would instead
         // bind to nothing, so the contract-count branch is required, not cosmetic.

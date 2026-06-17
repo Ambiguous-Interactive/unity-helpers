@@ -17,7 +17,7 @@
     },
     {
       "name": "com.gustavopsantos.reflex",
-      "expression": "[14.0.0,)",
+      "expression": "14.0.0",
       "define": "REFLEX_14_0_OR_NEWER"
     }
   ],
