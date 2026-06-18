@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -71,9 +72,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 // Fallback: scan all components in the active scene and assign when type has relational fields
                 bool includeInactiveAll = _options.IncludeInactive;
                 Scene active = SceneManager.GetActiveScene();
-                Component[] allComponents = includeInactiveAll
-                    ? UnityEngine.Object.FindObjectsOfType<Component>(true)
-                    : UnityEngine.Object.FindObjectsOfType<Component>(false);
+                Component[] allComponents = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                    includeInactiveAll
+                );
 
                 for (int i = 0; i < allComponents.Length; i++)
                 {
@@ -107,9 +108,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                     }
                 }
 
-                Component[] all = includeInactive
-                    ? UnityEngine.Object.FindObjectsOfType<Component>(true)
-                    : UnityEngine.Object.FindObjectsOfType<Component>(false);
+                Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                    includeInactive
+                );
 
                 foreach (Component c in all)
                 {
@@ -139,9 +140,10 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                         continue;
                     }
 
-                    UnityEngine.Object[] located = includeInactive
-                        ? UnityEngine.Object.FindObjectsOfType(componentType, true)
-                        : UnityEngine.Object.FindObjectsOfType(componentType, false);
+                    UnityEngine.Object[] located = UnityObjectExtensions.FindObjectsOfTypeShim(
+                        componentType,
+                        includeInactive
+                    );
 
                     foreach (UnityEngine.Object candidate in located)
                     {

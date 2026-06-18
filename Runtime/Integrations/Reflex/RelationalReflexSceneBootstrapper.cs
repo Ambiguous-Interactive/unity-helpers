@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -186,9 +187,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 }
             }
 
-            Component[] allComponents = includeInactive
-                ? UnityEngine.Object.FindObjectsOfType<Component>(true)
-                : UnityEngine.Object.FindObjectsOfType<Component>(false);
+            Component[] allComponents = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                includeInactive
+            );
 
             for (int i = 0; i < allComponents.Length; i++)
             {

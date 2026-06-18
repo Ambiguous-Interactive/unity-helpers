@@ -410,55 +410,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 );
             }
 
-            // Create the asset ourselves
+            // Create the asset ourselves. Route folder creation through the single batch-safe
+            // helper, which pauses any active batch and creates each missing segment via
+            // AssetDatabase.CreateFolder so the parent folder is registered before CreateAsset runs.
             string directory = System.IO.Path.GetDirectoryName(assetPath);
-            if (!string.IsNullOrEmpty(directory))
+            if (
+                !string.IsNullOrEmpty(directory)
+                && !AssetDatabaseBatchHelper.EnsureAssetFolder(directory)
+            )
             {
-                directory = directory.SanitizePath();
-
-                // First, ensure the folder exists on disk. This prevents Unity's internal
-                // "Moving file failed" modal dialog when CreateAsset tries to move a temp file
-                // to a destination folder that doesn't exist.
-                string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
-                if (!string.IsNullOrEmpty(projectRoot))
-                {
-                    string absoluteDirectory = System.IO.Path.Combine(projectRoot, directory);
-                    try
-                    {
-                        if (!System.IO.Directory.Exists(absoluteDirectory))
-                        {
-                            System.IO.Directory.CreateDirectory(absoluteDirectory);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning(
-                            $"AttributeMetadataCacheGenerator: Failed to create directory on disk '{absoluteDirectory}': {ex.Message}"
-                        );
-                        return null;
-                    }
-                }
-
-                if (!AssetDatabase.IsValidFolder(directory))
-                {
-                    using (AssetDatabaseBatchHelper.PauseBatch())
-                    {
-                        string[] segments = directory.Split(
-                            '/',
-                            StringSplitOptions.RemoveEmptyEntries
-                        );
-                        string current = segments[0];
-                        for (int i = 1; i < segments.Length; i++)
-                        {
-                            string next = $"{current}/{segments[i]}";
-                            if (!AssetDatabase.IsValidFolder(next))
-                            {
-                                AssetDatabase.CreateFolder(current, segments[i]);
-                            }
-                            current = next;
-                        }
-                    }
-                }
+                Debug.LogWarning(
+                    $"AttributeMetadataCacheGenerator: Failed to ensure folder '{directory.SanitizePath()}'. Skipping cache asset creation."
+                );
+                return null;
             }
 
             cache = ScriptableObject.CreateInstance<AttributeMetadataCache>();

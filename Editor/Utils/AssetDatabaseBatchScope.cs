@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using System;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     ///     A disposable scope that batches AssetDatabase operations for improved performance.
@@ -327,6 +328,136 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         public static AssetDatabaseBatchScope BeginBatch(bool refreshOnDispose = true)
         {
             return new AssetDatabaseBatchScope(refreshOnDispose);
+        }
+
+        /// <summary>
+        ///     Ensures that every folder segment of <paramref name="assetFolderPath"/> exists and is
+        ///     registered with the <see cref="AssetDatabase"/>, creating any missing segments through
+        ///     <see cref="AssetDatabase.CreateFolder(string, string)"/> only. This is the single,
+        ///     batch-safe way to guarantee a parent folder is present before
+        ///     <see cref="AssetDatabase.CreateAsset(Object, string)"/>.
+        /// </summary>
+        /// <param name="assetFolderPath">
+        ///     A Unity-relative folder path rooted at <c>Assets</c> (e.g. <c>Assets/Resources/Tests/Foo</c>).
+        ///     A path that points at an asset file is not valid input; pass the asset's parent folder.
+        /// </param>
+        /// <returns>
+        ///     <see langword="true"/> if the folder exists in the AssetDatabase after the call;
+        ///     otherwise <see langword="false"/>.
+        /// </returns>
+        /// <remarks>
+        ///     <para>
+        ///     <strong>Why this exists:</strong> while a batch opened by <see cref="BeginBatch"/> (or by
+        ///     a fixture-wide <see cref="AssetDatabase.StartAssetEditing"/>) is active, folder creation is
+        ///     deferred and <see cref="AssetDatabase.Refresh()"/> is a no-op, so the parent folder is not
+        ///     registered when <see cref="AssetDatabase.CreateAsset(Object, string)"/> runs. Unity then
+        ///     fails with "Parent directory must exist before creating asset". This method
+        ///     <see cref="PauseBatch"/>es first so each <see cref="AssetDatabase.CreateFolder(string, string)"/>
+        ///     takes effect immediately, then resumes the batch on return.
+        ///     </para>
+        ///     <para>
+        ///     It deliberately uses <see cref="AssetDatabase.CreateFolder(string, string)"/> rather than
+        ///     <see cref="System.IO.Directory.CreateDirectory"/>: raw disk creation leaves the
+        ///     AssetDatabase out of sync and makes a later <see cref="AssetDatabase.CreateFolder(string, string)"/>
+        ///     spawn numbered duplicates such as "Foo 1". Following defensive-programming rules, invalid input is
+        ///     handled gracefully (returns <see langword="false"/>) instead of throwing.
+        ///     </para>
+        /// </remarks>
+        public static bool EnsureAssetFolder(string assetFolderPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetFolderPath))
+            {
+                return false;
+            }
+
+            string normalized = assetFolderPath.SanitizePath().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            if (AssetDatabase.IsValidFolder(normalized))
+            {
+                return true;
+            }
+
+            string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+            {
+                return false;
+            }
+
+            // Only the Assets tree can be created through the AssetDatabase. Other roots
+            // (e.g. Packages) are read-only here, so refuse rather than fabricate folders.
+            if (!string.Equals(segments[0], "Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            // Pausing guarantees CreateFolder is applied synchronously even when a fixture-wide
+            // StartAssetEditing batch is open. PauseBatch is a no-op when nothing is batching.
+            using (PauseBatch())
+            {
+                string current = segments[0];
+                for (int i = 1; i < segments.Length; i++)
+                {
+                    string next = current + "/" + segments[i];
+                    if (!AssetDatabase.IsValidFolder(next))
+                    {
+                        string createdGuid = AssetDatabase.CreateFolder(current, segments[i]);
+                        if (string.IsNullOrEmpty(createdGuid) && !AssetDatabase.IsValidFolder(next))
+                        {
+                            Debug.LogWarning(
+                                $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(EnsureAssetFolder)} failed to create folder '{next}'."
+                            );
+                            return false;
+                        }
+                    }
+
+                    current = next;
+                }
+
+                return AssetDatabase.IsValidFolder(normalized);
+            }
+        }
+
+        /// <summary>
+        ///     Ensures the parent folder of <paramref name="assetPath"/> exists in the AssetDatabase
+        ///     (creating missing segments through <see cref="AssetDatabase.CreateFolder(string, string)"/>)
+        ///     so a subsequent <see cref="AssetDatabase.CreateAsset(Object, string)"/> at that path cannot
+        ///     fail with "Parent directory must exist".
+        /// </summary>
+        /// <param name="assetPath">A Unity-relative asset path rooted at <c>Assets</c> (e.g. <c>Assets/Foo/Bar.asset</c>).</param>
+        /// <returns>
+        ///     <see langword="true"/> if the parent folder exists in the AssetDatabase after the call,
+        ///     or if <paramref name="assetPath"/> sits directly under <c>Assets</c> (no folder to create);
+        ///     otherwise <see langword="false"/>.
+        /// </returns>
+        /// <remarks>See <see cref="EnsureAssetFolder"/> for the batch-pause and AssetDatabase-only rationale.</remarks>
+        public static bool EnsureAssetParentFolder(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return false;
+            }
+
+            string normalized = assetPath.SanitizePath();
+            int lastSlash = normalized.LastIndexOf('/');
+            if (lastSlash <= 0)
+            {
+                // No parent segment (e.g. "Bar.asset"); nothing to create.
+                return true;
+            }
+
+            string parentFolder = normalized.Substring(0, lastSlash);
+
+            // A bare "Assets" parent always exists and is not creatable via CreateFolder.
+            if (string.Equals(parentFolder, "Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return EnsureAssetFolder(parentFolder);
         }
 
         /// <summary>

@@ -33,11 +33,23 @@ runs:
     - name: Verify tests actually ran
       if: ${{ !cancelled() }}
       shell: pwsh
+      # Pass EVERY caller-supplied value through env: (NOT inline ${{ }} expansion
+      # in the run script). A run: block that contains even one ${{ }} interpolation
+      # is compiled by GitHub as a single template expression, and THIS block's body
+      # is ~26 KB -- well over the hard 21,000-character per-expression limit, which
+      # made every Unity leg fail to start with "Exceeded max expression length 21000"
+      # (Line 38 = this run:). Reading the inputs from $env:* keeps the run body a
+      # plain literal (no template compilation, no length limit) and is also safer:
+      # a label/dir containing a quote can no longer break the script. scripts/lint-
+      # workflow-run-expression-length.ps1 enforces this for every action/workflow
+      # run block.
       env:
         UH_EXPECTED_EMPTY: ${{ inputs.expected-empty }}
+        UH_RESULTS_DIR: ${{ inputs.results-dir }}
+        UH_LABEL: ${{ inputs.label }}
       run: |
-        $dir = "${{ inputs.results-dir }}"
-        $label = "${{ inputs.label }}"
+        $dir = $env:UH_RESULTS_DIR
+        $label = $env:UH_LABEL
         # When the caller resolved an empty unity-helpers test-assembly list for
         # this target it skips the Unity run entirely (see compute-unity-assemblies
         # and unity-tests.yml). There are then no results to verify, so treat it

@@ -107,6 +107,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // sprite-lifecycle SendMessage relays — the exact setup reproducing #234.
             ExecuteWithImmediateImport(() =>
             {
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(prefabPath);
                 GameObject prefabSource = new("HygienePrefabSubscriber");
                 try
                 {
@@ -138,6 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // sequence that emitted SendMessage warnings pre-fix.
             ExecuteWithImmediateImport(() =>
             {
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(payloadPath);
                 TestDetectableAsset payload = Track(
                     ScriptableObject.CreateInstance<TestDetectableAsset>()
                 );
@@ -168,6 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // prefabs — another #234 trigger path).
             ExecuteWithImmediateImport(() =>
             {
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(prefabPath);
                 GameObject prefabSource = new("HygieneSpriteConsumerPrefab");
                 try
                 {
@@ -190,6 +193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ExecuteWithImmediateImport(() =>
             {
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(texturePath);
                 WriteSolidColorTexture(texturePath, 32, 32, Color.white);
                 AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
 
@@ -221,23 +225,15 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static void EnsureTestFolder()
         {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
+            // Route through the single batch-safe helper. It pauses the fixture-wide batch and
+            // creates the folder through the AssetDatabase synchronously, avoiding the raw
+            // Directory.CreateDirectory path that left the AssetDatabase out of sync (and could
+            // spawn numbered duplicate folders) while the batch was open.
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
             {
-                string absolute = Path.Combine(projectRoot, TestRoot);
-                if (!Directory.Exists(absolute))
-                {
-                    Directory.CreateDirectory(absolute);
-                }
-            }
-
-            if (!AssetDatabase.IsValidFolder(TestRoot))
-            {
-                AssetDatabase.CreateFolder(
-                    "Assets",
-                    Path.GetFileName(TestRoot) ?? "__AssetPostprocessorHygieneTests__"
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
                 );
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
         }
 

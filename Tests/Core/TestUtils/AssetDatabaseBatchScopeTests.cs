@@ -3272,6 +3272,213 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 );
             }
         }
+
+        private const string EnsureFolderTestRoot = "Assets/__EnsureAssetFolderTests__";
+
+        private static void DeleteEnsureFolderTestRoot()
+        {
+            if (AssetDatabase.IsValidFolder(EnsureFolderTestRoot))
+            {
+                AssetDatabase.DeleteAsset(EnsureFolderTestRoot);
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderCreatesSingleLevelFolder()
+        {
+            DeleteEnsureFolderTestRoot();
+            try
+            {
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot),
+                    Is.False,
+                    "Precondition: test root should not exist."
+                );
+
+                bool created = AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot);
+
+                Assert.That(created, Is.True, "EnsureAssetFolder should report success.");
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot),
+                    Is.True,
+                    "Folder should be registered with the AssetDatabase."
+                );
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderCreatesNestedFolders()
+        {
+            DeleteEnsureFolderTestRoot();
+            try
+            {
+                string nested = EnsureFolderTestRoot + "/Level1/Level2/Level3";
+
+                bool created = AssetDatabaseBatchHelper.EnsureAssetFolder(nested);
+
+                Assert.That(created, Is.True, "EnsureAssetFolder should create the full chain.");
+                Assert.That(
+                    AssetDatabase.IsValidFolder(nested),
+                    Is.True,
+                    "Deepest nested folder should be valid."
+                );
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot + "/Level1"),
+                    Is.True,
+                    "Intermediate folder should also be valid."
+                );
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderIsIdempotentWhenFolderExists()
+        {
+            DeleteEnsureFolderTestRoot();
+            try
+            {
+                Assert.That(
+                    AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot),
+                    Is.True,
+                    "First call should create the folder."
+                );
+                Assert.That(
+                    AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot),
+                    Is.True,
+                    "Second call on an existing folder should still report success."
+                );
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot),
+                    Is.True,
+                    "Folder should remain valid after the idempotent second call."
+                );
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderCreatesFolderWhileBatchIsOpen()
+        {
+            DeleteEnsureFolderTestRoot();
+            try
+            {
+                // The core regression: while a StartAssetEditing batch is open, a folder created
+                // through the helper must be immediately registered (it pauses the batch internally)
+                // so a subsequent CreateAsset cannot fail with "Parent directory must exist".
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    bool created = AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot);
+
+                    Assert.That(
+                        created,
+                        Is.True,
+                        "EnsureAssetFolder should succeed even inside an open batch."
+                    );
+                    Assert.That(
+                        AssetDatabase.IsValidFolder(EnsureFolderTestRoot),
+                        Is.True,
+                        "Folder should be registered immediately, before the batch is disposed."
+                    );
+                }
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderRejectsNonAssetsRoot()
+        {
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetFolder("Packages/com.example/Foo"),
+                Is.False,
+                "Only the Assets tree is creatable via the AssetDatabase."
+            );
+        }
+
+        [Test]
+        public void EnsureAssetFolderRejectsNullOrEmpty()
+        {
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetFolder(null),
+                Is.False,
+                "Null input should be handled gracefully."
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetFolder(string.Empty),
+                Is.False,
+                "Empty input should be handled gracefully."
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetFolder("   "),
+                Is.False,
+                "Whitespace input should be handled gracefully."
+            );
+        }
+
+        [Test]
+        public void EnsureAssetFolderTreatsBareAssetsAsExisting()
+        {
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetFolder("Assets"),
+                Is.True,
+                "The Assets root always exists."
+            );
+        }
+
+        [Test]
+        public void EnsureAssetParentFolderCreatesParentForNestedAssetPath()
+        {
+            DeleteEnsureFolderTestRoot();
+            try
+            {
+                string assetPath = EnsureFolderTestRoot + "/Sub/Payload.asset";
+
+                bool ensured = AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath);
+
+                Assert.That(ensured, Is.True, "Parent folder chain should be created.");
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot + "/Sub"),
+                    Is.True,
+                    "The asset's parent folder should be valid."
+                );
+                Assert.That(
+                    AssetDatabase.IsValidFolder(assetPath),
+                    Is.False,
+                    "The asset path itself must NOT be created as a folder."
+                );
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetParentFolderReturnsTrueForAssetDirectlyUnderAssets()
+        {
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder("Assets/Payload.asset"),
+                Is.True,
+                "An asset directly under Assets has no folder to create."
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder("Payload.asset"),
+                Is.True,
+                "A bare file name has no parent segment to create."
+            );
+        }
     }
 
 #endif

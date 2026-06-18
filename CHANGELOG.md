@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 See [the roadmap](./docs/overview/roadmap.md) for details
 
+### Added
+
+- **`AssetDatabaseBatchHelper.EnsureAssetFolder` / `EnsureAssetParentFolder`**: batch-safe helpers that register every missing folder segment with the `AssetDatabase` (never via raw disk, which can leave the database out of sync and spawn numbered duplicate folders) and pause any open `StartAssetEditing` batch first, so a subsequent `AssetDatabase.CreateAsset` cannot fail with "Parent directory must exist".
+
+### Fixed
+
+- **`AssetDatabase.CreateAsset` failing with "Parent directory must exist" / "Creating asset at path … failed"**: editor utilities that create assets — `ScriptableObjectSingletonCreator`, `ScriptableObjectSingletonMetadataUtility`, `AttributeMetadataCacheGenerator`, `PersistentDirectorySettings`, and the sprite/atlas/animation creator windows — now ensure the parent folder is registered with the `AssetDatabase` before creating the asset, including while an `AssetDatabase` batch is open (common under `-batchmode`). Previously, creating an asset in a not-yet-registered folder could fail or be skipped.
+- **Unity 6 deprecation warnings from `Object.FindObjectsOfType` / `FindObjectOfType`**: runtime DI-integration code (Reflex / VContainer / Zenject) now routes object lookups through a version-gated shim that uses `FindObjectsByType` / `FindFirstObjectByType` on Unity 2022.2+ (including Unity 6) and the legacy API below it, eliminating the deprecation warnings while preserving behavior.
+
 ## [3.3.0]
 
 ### Added

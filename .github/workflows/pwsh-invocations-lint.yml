@@ -8,6 +8,7 @@ on:
       - ".githooks/**"
       - ".github/workflows/**.yml"
       - ".github/workflows/**.yaml"
+      - ".github/actions/**"
       - "**/*.sh"
       - "scripts/**.ps1"
       - "package.json"
@@ -16,6 +17,7 @@ on:
       - ".githooks/**"
       - ".github/workflows/**.yml"
       - ".github/workflows/**.yaml"
+      - ".github/actions/**"
       - "**/*.sh"
       - "scripts/**.ps1"
       - "package.json"
@@ -39,3 +41,11 @@ jobs:
       - name: Lint PowerShell invocations
         shell: pwsh
         run: ./scripts/lint-pwsh-invocations.ps1 -VerboseOutput
+
+      - name: Test workflow run-expression-length linter
+        shell: pwsh
+        run: ./scripts/tests/test-lint-workflow-run-expression-length.ps1 -VerboseOutput
+
+      - name: Lint workflow run-expression length
+        shell: pwsh
+        run: ./scripts/lint-workflow-run-expression-length.ps1 -VerboseOutput

@@ -5679,11 +5679,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return _waitInstructionBufferSettingsAsset;
             }
 
-            string directory = Path.GetDirectoryName(UnityHelpersBufferSettingsAsset.AssetPath);
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            // Ensure the parent folder is registered with the AssetDatabase (batch-safe, recursive,
+            // AssetDatabase-only) so CreateAsset cannot fail with "Parent directory must exist".
+            AssetDatabaseBatchHelper.EnsureAssetParentFolder(
+                UnityHelpersBufferSettingsAsset.AssetPath
+            );
 
             UnityHelpersBufferSettingsAsset created =
                 CreateInstance<UnityHelpersBufferSettingsAsset>();

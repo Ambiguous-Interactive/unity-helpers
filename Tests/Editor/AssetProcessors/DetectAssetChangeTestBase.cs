@@ -47,99 +47,42 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         protected static readonly string[] FixtureAllowlist = { TestRoot + "/" };
 
         /// <summary>
-        /// Cleans up all test folders including any duplicates created due to AssetDatabase issues.
-        /// This handles scenarios like "__DetectAssetChangedTests__ 1", "__DetectAssetChangedTests__ 2", etc.
+        /// Deletes the test root folder (and anything under it) through the AssetDatabase.
         /// </summary>
+        /// <remarks>
+        /// Folder creation now goes exclusively through
+        /// <see cref="AssetDatabaseBatchHelper.EnsureAssetFolder"/> (AssetDatabase-only, never raw
+        /// disk), so Unity can no longer spawn "__DetectAssetChangedTests__ 1" duplicates and there
+        /// are never orphaned on-disk folders to scrub. A single recursive
+        /// <see cref="AssetDatabase.DeleteAsset(string)"/> on <see cref="TestRoot"/> is therefore
+        /// sufficient to leave NO files under <c>Assets</c> after teardown.
+        /// </remarks>
         protected static void CleanupTestFolders()
         {
-            // Delete the main test folder
             if (AssetDatabase.IsValidFolder(TestRoot))
             {
                 AssetDatabase.DeleteAsset(TestRoot);
             }
-
-            // Clean up any duplicate folders that may have been created
-            // These can be created when AssetDatabase.CreateFolder fails but Unity creates the folder anyway
-            string[] allFolders = AssetDatabase.GetSubFolders("Assets");
-            if (allFolders != null)
-            {
-                foreach (string folder in allFolders)
-                {
-                    string folderName = Path.GetFileName(folder);
-                    if (
-                        folderName != null
-                        && folderName.StartsWith(
-                            "__DetectAssetChangedTests__",
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        AssetDatabase.DeleteAsset(folder);
-                    }
-                }
-            }
-
-            // Also clean up from disk to handle orphaned folders
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
-            {
-                string assetsFolder = Path.Combine(projectRoot, "Assets");
-                if (Directory.Exists(assetsFolder))
-                {
-                    try
-                    {
-                        foreach (
-                            string dir in Directory.GetDirectories(
-                                assetsFolder,
-                                "__DetectAssetChangedTests__*"
-                            )
-                        )
-                        {
-                            try
-                            {
-                                Directory.Delete(dir, recursive: true);
-                            }
-                            catch
-                            {
-                                // Ignore - folder may be locked
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore enumeration errors
-                    }
-                }
-            }
         }
 
         /// <summary>
-        /// Ensures the test folder exists both on disk and in the AssetDatabase.
+        /// Ensures the test folder is registered with the AssetDatabase.
         /// </summary>
+        /// <remarks>
+        /// Delegates to <see cref="AssetDatabaseBatchHelper.EnsureAssetFolder"/>, which pauses the
+        /// fixture-wide <see cref="BatchedEditorTestBase"/> batch so the folder is created through
+        /// the AssetDatabase synchronously. This avoids the raw <see cref="Directory.CreateDirectory"/>
+        /// path that previously left the AssetDatabase out of sync (the cause of the
+        /// "__DetectAssetChangedTests__ 1" duplicate folders) and never registered the folder while
+        /// the batch was open.
+        /// </remarks>
         protected static void EnsureTestFolder()
         {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
             {
-                string absoluteDirectory = Path.Combine(projectRoot, TestRoot);
-                if (!Directory.Exists(absoluteDirectory))
-                {
-                    Directory.CreateDirectory(absoluteDirectory);
-                }
-            }
-
-            if (!AssetDatabase.IsValidFolder(TestRoot))
-            {
-                string result = AssetDatabase.CreateFolder("Assets", "__DetectAssetChangedTests__");
-                if (string.IsNullOrEmpty(result))
-                {
-                    Debug.LogWarning(
-                        $"EnsureTestFolder: Failed to create folder '{TestRoot}' in AssetDatabase"
-                    );
-                }
-
-                // Refresh to ensure Unity recognizes the new folder
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
+                );
             }
         }
 
@@ -269,20 +212,23 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <para>
         /// These fixtures derive from <see cref="BatchedEditorTestBase"/>, which holds a
         /// single <c>StartAssetEditing</c> batch open for the whole fixture. While that
-        /// batch is open, <see cref="AssetDatabase.CreateAsset(Object, string)"/> DEFERS
-        /// the import, and <see cref="AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching"/>
-        /// is a no-op (it only refreshes when NOT batching). The newly-created asset is
-        /// therefore not yet importable: <see cref="AssetDatabase.GetMainAssetTypeAtPath"/>
-        /// and <see cref="AssetDatabase.LoadAssetAtPath"/> return <c>null</c> under
-        /// <c>-batchmode</c>. The change processor's <c>AppendCreatedAssets</c> resolves a
-        /// created asset only through those calls, so it sees ZERO created assets and the
-        /// handler never fires -- which is exactly the "0 invocations" mass failure these
-        /// fixtures hit in CI.
+        /// batch is open, <see cref="AssetDatabase.CreateFolder(string, string)"/> is DEFERRED
+        /// and <see cref="AssetDatabase.Refresh()"/> is a no-op, so the parent folder is NOT
+        /// registered with the AssetDatabase when <see cref="AssetDatabase.CreateAsset(Object, string)"/>
+        /// runs. Unity then fails the create with "Parent directory must exist before creating
+        /// asset" -- the exact mass failure these fixtures hit in CI. Likewise
+        /// <see cref="AssetDatabase.CreateAsset(Object, string)"/> DEFERS the import, and the
+        /// newly-created asset is not yet importable: <see cref="AssetDatabase.LoadAssetAtPath"/>
+        /// returns <c>null</c> under <c>-batchmode</c>, so the change processor's
+        /// <c>AppendCreatedAssets</c> sees ZERO created assets and the handler never fires.
         /// </para>
         /// <para>
         /// <see cref="CommonTestBase.ExecuteWithImmediateImport(Action, bool)"/> pauses the
-        /// batch, force-imports synchronously, runs the create, then force-imports again so
-        /// the asset is fully indexed before the batch resumes. The post-create load is a
+        /// batch, force-imports synchronously, runs the supplied action, then force-imports
+        /// again before the batch resumes. Ensuring the parent folder via
+        /// <see cref="AssetDatabaseBatchHelper.EnsureAssetParentFolder"/> INSIDE that same paused
+        /// action is what makes the folder real in the AssetDatabase before
+        /// <see cref="AssetDatabase.CreateAsset(Object, string)"/> runs. The post-create load is a
         /// diagnostic tripwire: if a future change re-breaks the import contract, the test
         /// fails immediately with a clear cause instead of a cryptic "0 invocations".
         /// </para>
@@ -290,7 +236,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private void CreateAndImportAsset(Object asset, string assetPath)
         {
             ExecuteWithImmediateImport(
-                () => AssetDatabase.CreateAsset(asset, assetPath),
+                () =>
+                {
+                    // Register the parent folder while the batch is paused so the
+                    // synchronous CreateFolder takes effect before CreateAsset runs.
+                    AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath);
+                    AssetDatabase.CreateAsset(asset, assetPath);
+                },
                 refreshAfter: true
             );
 
@@ -314,14 +266,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <returns>The full path to the created subfolder.</returns>
         protected static string CreateTestSubFolder(string subFolderName)
         {
-            EnsureTestFolder();
             string subFolderPath = TestRoot + "/" + subFolderName;
-
-            if (!AssetDatabase.IsValidFolder(subFolderPath))
-            {
-                AssetDatabase.CreateFolder(TestRoot, subFolderName);
-            }
-
+            // EnsureAssetFolder recursively registers TestRoot and the subfolder through the
+            // AssetDatabase while pausing the fixture batch, so the subfolder is immediately valid.
+            AssetDatabaseBatchHelper.EnsureAssetFolder(subFolderPath);
             return subFolderPath;
         }
 

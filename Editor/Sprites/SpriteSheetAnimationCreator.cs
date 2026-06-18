@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -1547,6 +1548,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string assetPath = Path.Combine(animationsFolder, $"{animName}.anim");
                 assetPath = AssetDatabase.GenerateUniqueAssetPath(assetPath);
 
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath);
                 AssetDatabase.CreateAsset(clip, assetPath);
                 createdCount++;
             }

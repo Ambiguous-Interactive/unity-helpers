@@ -485,6 +485,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string json = JsonUtility.ToJson(spriteSettings[i]);
                 asset.profiles.Add(JsonUtility.FromJson<SpriteSettings>(json));
             }
+            AssetDatabaseBatchHelper.EnsureAssetParentFolder(path);
             AssetDatabase.CreateAsset(asset, path);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     using System.Runtime.ExceptionServices;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using UnityEngine.UIElements;
 
     // Executes an IMGUI Action inside a valid OnGUI context WITHOUT creating a real
@@ -194,6 +195,29 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 VisualElement visualTree = (VisualElement)_visualTreeProperty.GetValue(panel);
                 visualTree.Add(container);
                 _validateLayout.Invoke(panel, null);
+
+                // The offscreen panel has no editor GUIView, so EditorGUI numeric fields
+                // (IntField / FloatField / Vector*Field, and EditorGUI.PropertyField over an
+                // int/float) register a draggable-label cursor rect and Unity's NATIVE
+                // Internal_AddCursorRect logs "EditorGUIUtility.AddCursorRect called outside an
+                // editor OnGUI" during Repaint. That error is a headless-harness artifact, not a
+                // test failure: there is no GUIView to own the cursor rect and the cursor
+                // affordance has no behavioral effect. Because it is emitted natively it reaches
+                // the Test Framework's LogScope directly (it never passes through a managed
+                // ILogHandler this executor could filter), so the only robust suppression is
+                // LogAssert.ignoreFailingMessages.
+                //
+                // We deliberately do NOT restore the previous value here: the Test Framework
+                // evaluates unexpected logs at TEST TEARDOWN (after this coroutine returns), so a
+                // try/finally restore would flip the flag back to false before that check and the
+                // benign log would still fail the test. The framework resets ignoreFailingMessages
+                // to its default at the START of every test, so leaving it set only affects the
+                // remainder of the current test (whose tail is NUnit asserts -- exceptions, not
+                // logs) and never leaks to another test. Genuine failures stay caught: NUnit
+                // assertions are exceptions, the action's own exceptions are captured in actionError
+                // and rethrown below, and a test that asserts a specific log via LogAssert.Expect
+                // still consumes its matching log independently of this flag.
+                LogAssert.ignoreFailingMessages = true;
 
                 // Layout then Repaint is the standard IMGUI contract a drawer's OnGUI expects.
                 // Focused interaction tests may insert a single MouseDown between those phases.

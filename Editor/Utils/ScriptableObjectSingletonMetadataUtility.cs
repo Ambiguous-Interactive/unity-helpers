@@ -353,63 +353,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            directory = directory.SanitizePath();
-
-            // First, ensure the folder exists on disk. This prevents Unity's internal
-            // "Moving file failed" modal dialog when CreateAsset tries to move a temp file
-            // to a destination folder that doesn't exist.
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
+            // Route through the single batch-safe folder helper. It pauses any active batch and
+            // creates each missing segment via AssetDatabase.CreateFolder (no raw disk creation,
+            // which would leave the AssetDatabase out of sync and spawn numbered duplicates).
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(directory))
             {
-                string absoluteDirectory = Path.Combine(projectRoot, directory);
-                try
-                {
-                    if (!Directory.Exists(absoluteDirectory))
-                    {
-                        Directory.CreateDirectory(absoluteDirectory);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning(
-                        $"ScriptableObjectSingletonMetadataUtility: Failed to create directory on disk '{absoluteDirectory}': {ex.Message}"
-                    );
-                    return false;
-                }
+                Debug.LogError(
+                    $"ScriptableObjectSingletonMetadataUtility: Failed to ensure folder '{directory.SanitizePath()}'."
+                );
+                return false;
             }
 
-            if (AssetDatabase.IsValidFolder(directory))
-            {
-                return true;
-            }
-
-            // If we're inside a batch scope, temporarily exit to ensure folder creation is immediate
-            using (AssetDatabaseBatchHelper.PauseBatch())
-            {
-                string[] segments = directory.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                string current = segments[0];
-                for (int i = 1; i < segments.Length; i++)
-                {
-                    string next = $"{current}/{segments[i]}";
-                    if (!AssetDatabase.IsValidFolder(next))
-                    {
-                        string result = AssetDatabase.CreateFolder(current, segments[i]);
-                        if (string.IsNullOrEmpty(result))
-                        {
-                            Debug.LogError(
-                                $"ScriptableObjectSingletonMetadataUtility: Failed to create folder '{next}'"
-                            );
-                            return false;
-                        }
-                    }
-                    current = next;
-                }
-
-                // Note: Do NOT call AssetDatabase.Refresh here - it causes issues during
-                // Unity initialization and can trigger "Unable to import newly created asset" errors.
-                // The folders are immediately available after CreateFolder.
-                return true;
-            }
+            return true;
         }
 
         /// <summary>

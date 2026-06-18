@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
@@ -1747,6 +1748,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         string finalPath = AssetDatabase.GenerateUniqueAssetPath(
                             $"{assetPath}{animationName}.anim"
                         );
+                        AssetDatabaseBatchHelper.EnsureAssetParentFolder(finalPath);
                         AssetDatabase.CreateAsset(animationClip, finalPath);
                         this.Log($"Created animation at '{finalPath}'.");
                     }

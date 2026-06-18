@@ -1086,7 +1086,8 @@
     "nographics",
     "tzf",
     "nogit",
-    "Dups"
+    "Dups",
+    "WFL"
   ],
   "flagWords": [],
   "minWordLength": 3,

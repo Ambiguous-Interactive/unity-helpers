@@ -573,6 +573,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Path.Combine(NewAtlasConfigDirectory, "NewScriptableSpriteAtlas.asset")
             );
 
+            AssetDatabaseBatchHelper.EnsureAssetParentFolder(path);
             AssetDatabase.CreateAsset(newAtlasConfig, path);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -1486,6 +1487,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (newAtlas)
             {
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(outputPath);
                 AssetDatabase.CreateAsset(atlas, outputPath);
             }
             else

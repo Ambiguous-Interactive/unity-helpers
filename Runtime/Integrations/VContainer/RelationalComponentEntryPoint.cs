@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -77,9 +78,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
             {
                 // Fallback: scan all components once and assign when type has relational fields
                 bool includeInactiveAll = _options.IncludeInactive;
-                Component[] allComponents = includeInactiveAll
-                    ? Object.FindObjectsOfType<Component>(true)
-                    : Object.FindObjectsOfType<Component>(false);
+                Component[] allComponents = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                    includeInactiveAll
+                );
 
                 for (int i = 0; i < allComponents.Length; i++)
                 {
@@ -114,9 +115,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                     }
                 }
 
-                Component[] all = includeInactive
-                    ? Object.FindObjectsOfType<Component>(true)
-                    : Object.FindObjectsOfType<Component>(false);
+                Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                    includeInactive
+                );
 
                 for (int i = 0; i < all.Length; i++)
                 {
@@ -147,9 +148,10 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                         continue;
                     }
 
-                    Object[] located = includeInactive
-                        ? Object.FindObjectsOfType(componentType, true)
-                        : Object.FindObjectsOfType(componentType, false);
+                    Object[] located = UnityObjectExtensions.FindObjectsOfTypeShim(
+                        componentType,
+                        includeInactive
+                    );
 
                     foreach (Object t in located)
                     {

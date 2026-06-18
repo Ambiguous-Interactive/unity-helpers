@@ -304,6 +304,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         ScriptableObject instance = ScriptableObject.CreateInstance(derivedType);
                         try
                         {
+                            // The fixture-wide batch opened above defers CreateFolder, so the
+                            // resolved target folder may not be registered with the AssetDatabase
+                            // at this point. Re-assert the parent folder through the pause-aware
+                            // helper so CreateAsset cannot fail with "Parent directory must exist".
+                            AssetDatabaseBatchHelper.EnsureAssetParentFolder(targetAssetPath);
                             AssetDatabase.CreateAsset(instance, targetAssetPath);
                             // Force Unity to import the asset synchronously so LoadAssetAtPath works immediately.
                             // This avoids the race condition where the file exists on disk but

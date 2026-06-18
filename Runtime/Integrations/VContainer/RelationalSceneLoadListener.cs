@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -66,9 +67,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
             if (relationalTypes.Count == 0)
             {
                 // Fallback: scan all components once and assign when type has relational fields
-                Component[] all = includeInactive
-                    ? UnityEngine.Object.FindObjectsOfType<Component>(true)
-                    : UnityEngine.Object.FindObjectsOfType<Component>(false);
+                Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                    includeInactive
+                );
 
                 for (int i = 0; i < all.Length; i++)
                 {
@@ -195,9 +196,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 }
             }
 
-            Component[] all = includeInactive
-                ? UnityEngine.Object.FindObjectsOfType<Component>(true)
-                : UnityEngine.Object.FindObjectsOfType<Component>(false);
+            Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
+                includeInactive
+            );
 
             foreach (Component component in all)
             {

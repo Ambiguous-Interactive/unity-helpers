@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor
     using UnityEngine.Serialization;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Debug = UnityEngine.Debug;
 
@@ -756,81 +757,14 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            folderPath = SanitizePath(folderPath);
-
-            // Check if the folder already exists in the AssetDatabase
-            if (AssetDatabase.IsValidFolder(folderPath))
+            // Route through the single batch-safe folder helper. It pauses any active batch and
+            // creates each missing segment via AssetDatabase.CreateFolder (never raw disk, which
+            // would leave the AssetDatabase out of sync and spawn numbered duplicate folders).
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(folderPath))
             {
-                return;
-            }
-
-            string[] parts = folderPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0)
-            {
-                return;
-            }
-
-            string current = parts[0];
-            if (!string.Equals(current, "Assets", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string next = current + "/" + parts[i];
-                if (!AssetDatabase.IsValidFolder(next))
-                {
-                    // Ensure the parent folder exists on disk first to prevent Unity modal dialogs
-                    if (!string.IsNullOrEmpty(projectRoot))
-                    {
-                        string absoluteParent = Path.Combine(projectRoot, current);
-                        try
-                        {
-                            if (!Directory.Exists(absoluteParent))
-                            {
-                                Directory.CreateDirectory(absoluteParent);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            UnityEngine.Debug.LogWarning(
-                                $"PersistentDirectorySettings: Failed to create parent directory on disk '{absoluteParent}': {ex.Message}"
-                            );
-                        }
-                    }
-
-                    string result = AssetDatabase.CreateFolder(current, parts[i]);
-                    if (string.IsNullOrEmpty(result))
-                    {
-                        // CreateFolder failed - try ensuring the folder exists on disk and importing it
-                        if (!string.IsNullOrEmpty(projectRoot))
-                        {
-                            string absoluteDirectory = Path.Combine(projectRoot, next);
-                            try
-                            {
-                                if (!Directory.Exists(absoluteDirectory))
-                                {
-                                    Directory.CreateDirectory(absoluteDirectory);
-                                }
-                                // Import the folder to register it with AssetDatabase
-                                AssetDatabase.ImportAsset(
-                                    next,
-                                    ImportAssetOptions.ForceSynchronousImport
-                                );
-                            }
-                            catch (Exception ex)
-                            {
-                                UnityEngine.Debug.LogWarning(
-                                    $"PersistentDirectorySettings: Failed to create/import directory '{next}': {ex.Message}"
-                                );
-                            }
-                        }
-                    }
-                }
-                current = next;
+                UnityEngine.Debug.LogWarning(
+                    $"PersistentDirectorySettings: Failed to ensure folder '{SanitizePath(folderPath)}'."
+                );
             }
         }
 
