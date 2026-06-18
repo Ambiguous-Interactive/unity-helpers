@@ -757,6 +757,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly GUIContent PaginationPageLabelContent = new();
         private static readonly GUIContent PaginationRangeContent = new();
         private static readonly GUIContent UnsupportedTypeContent = new();
+        private static readonly GUIContent SuppressedFieldValueContent = new();
         private static readonly Dictionary<Type, string> UnsupportedTypeMessageCache = new();
         private static readonly Dictionary<(int, int, int), string> RangeLabelCache = new();
 
@@ -792,6 +793,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static bool HasLastPendingHeaderRect { get; private set; }
         internal static Rect LastPendingHeaderRect { get; private set; }
         internal static Rect LastPendingFoldoutToggleRect { get; private set; }
+        internal static Rect LastPendingLabelHitRect { get; private set; }
+        internal static Rect LastPendingAbsoluteLabelHitRect { get; private set; }
         internal static bool HasLastMainFoldoutRect { get; private set; }
         internal static Rect LastMainFoldoutRect { get; private set; }
         internal static bool HasLastPendingFieldRects { get; private set; }
@@ -849,6 +852,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static void ResetLayoutTrackingForTests()
         {
             HasLastPendingHeaderRect = false;
+            LastPendingHeaderRect = default;
+            LastPendingFoldoutToggleRect = default;
+            LastPendingLabelHitRect = default;
+            LastPendingAbsoluteLabelHitRect = default;
             HasLastPendingFieldRects = false;
             HasLastMainFoldoutRect = false;
             LastMainFoldoutRect = default;
@@ -1326,12 +1333,78 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return EventType.Ignore;
             }
 
-            if (currentEvent.type == EventType.Used)
+            return GetEffectiveMouseEventType(currentEvent.type, currentEvent.rawType);
+        }
+
+        internal static EventType GetEffectiveMouseEventTypeForTests(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            return GetEffectiveMouseEventType(eventType, rawEventType);
+        }
+
+        private static EventType GetEffectiveMouseEventType(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            if (eventType == EventType.Used)
             {
-                return currentEvent.rawType;
+                return rawEventType;
             }
 
-            return currentEvent.type;
+            return eventType;
+        }
+
+        internal static bool TryTogglePendingFoldoutLabelForTests(
+            Event currentEvent,
+            Rect labelHitRect,
+            Rect absoluteLabelHitRect,
+            ref bool expanded
+        )
+        {
+            return TryTogglePendingFoldoutLabel(
+                currentEvent,
+                labelHitRect,
+                absoluteLabelHitRect,
+                ref expanded
+            );
+        }
+
+        private static bool TryTogglePendingFoldoutLabel(
+            Event currentEvent,
+            Rect labelHitRect,
+            Rect absoluteLabelHitRect,
+            ref bool expanded
+        )
+        {
+            if (currentEvent == null)
+            {
+                return false;
+            }
+
+            EventType effectiveEventType = GetEffectiveMouseEventType(currentEvent);
+            bool mouseInLabelRect =
+                labelHitRect.Contains(currentEvent.mousePosition)
+                || absoluteLabelHitRect.Contains(currentEvent.mousePosition);
+            if (
+                effectiveEventType != EventType.MouseDown
+                || currentEvent.button != 0
+                || !mouseInLabelRect
+            )
+            {
+                return false;
+            }
+
+            expanded = !expanded;
+            GUI.changed = true;
+            if (currentEvent.type != EventType.Used)
+            {
+                currentEvent.Use();
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -4067,33 +4140,31 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 );
 
                 Event currentEvent = Event.current;
-                EventType effectiveEventType = GetEffectiveMouseEventType(currentEvent);
                 bool expanded = pending.isExpanded;
 
                 // Log mouse events for debugging click handling in WGroup contexts
                 Rect absoluteLabelHitRect = ConvertGroupRectToAbsolute(labelHitRect, containerRect);
+                LastPendingLabelHitRect = labelHitRect;
+                LastPendingAbsoluteLabelHitRect = absoluteLabelHitRect;
                 bool mouseInLabelRect =
                     labelHitRect.Contains(currentEvent.mousePosition)
                     || absoluteLabelHitRect.Contains(currentEvent.mousePosition);
+                bool labelClickToggled = false;
                 SerializableCollectionTweenDiagnostics.LogMouseEvent(
                     "PendingLabelClick",
                     propertyPath,
-                    effectiveEventType,
+                    GetEffectiveMouseEventType(currentEvent),
                     currentEvent.mousePosition,
                     absoluteLabelHitRect,
                     mouseInLabelRect
                 );
 
-                if (
-                    effectiveEventType == EventType.MouseDown
-                    && currentEvent.button == 0
-                    && mouseInLabelRect
-                )
-                {
-                    expanded = !expanded;
-                    GUI.changed = true;
-                    currentEvent.Use();
-                }
+                labelClickToggled = TryTogglePendingFoldoutLabel(
+                    currentEvent,
+                    labelHitRect,
+                    absoluteLabelHitRect,
+                    ref expanded
+                );
 
                 EditorGUI.BeginChangeCheck();
                 bool arrowExpanded = EditorGUI.Foldout(
@@ -4102,13 +4173,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     GUIContent.none,
                     toggleOnLabelClick: false
                 );
-                if (EditorGUI.EndChangeCheck())
+                if (EditorGUI.EndChangeCheck() && !labelClickToggled)
                 {
                     expanded = arrowExpanded;
                 }
 
                 GUIStyle pendingLabelStyle = GetPendingFoldoutLabelStyle();
-                EditorGUIUtility.AddCursorRect(labelHitRect, MouseCursor.Link);
+                if (!EditorUi.Suppress)
+                {
+                    EditorGUIUtility.AddCursorRect(labelHitRect, MouseCursor.Link);
+                }
                 EditorGUI.LabelField(labelRect, PendingFoldoutContent, pendingLabelStyle);
 
                 if (expanded != pending.isExpanded)
@@ -6146,7 +6220,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Common case: single target - use static cache to avoid string allocation
             if (targets.Length == 1 && targets[0] != null)
             {
-                int instanceId = targets[0].GetInstanceID();
+                int instanceId = targets[0].GetUnityObjectId();
                 PropertyCacheKey cacheKey = new(instanceId, propertyPath);
 
                 if (SingleTargetPropertyKeyCache.TryGetValue(cacheKey, out string cached))
@@ -6183,7 +6257,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             for (int index = 0; index < targets.Length; index++)
             {
-                int id = targets[index] != null ? targets[index].GetInstanceID() : 0;
+                int id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
                 if (index < targets.Length - 1)
                 {
@@ -6739,7 +6813,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             int instanceId =
                 serializedObject?.targetObject != null
-                    ? serializedObject.targetObject.GetInstanceID()
+                    ? serializedObject.targetObject.GetUnityObjectId()
                     : 0;
             return new MainFoldoutCacheKey(instanceId, propertyPath);
         }
@@ -7208,6 +7282,25 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return UnsupportedTypeContent;
         }
 
+        private static GUIContent GetSuppressedFieldValueContent(object current)
+        {
+            string text = string.Empty;
+            if (current is Object unityObject)
+            {
+                if (unityObject != null)
+                {
+                    text = unityObject.name;
+                }
+            }
+            else if (current != null)
+            {
+                text = current.ToString() ?? string.Empty;
+            }
+
+            SuppressedFieldValueContent.text = text;
+            return SuppressedFieldValueContent;
+        }
+
         internal static object DrawFieldForType(
             Rect rect,
             string label,
@@ -7233,6 +7326,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (!IsTypeSupported(type))
             {
                 EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
+                return current;
+            }
+
+            if (EditorUi.Suppress)
+            {
+                EditorGUI.LabelField(rect, content, GetSuppressedFieldValueContent(current));
                 return current;
             }
 

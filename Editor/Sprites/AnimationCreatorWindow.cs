@@ -2093,7 +2093,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 for (int i = 0; i < animationSources.Count; i++)
                 {
                     Object src = animationSources[i];
-                    int id = src != null ? src.GetInstanceID() : 0;
+                    int id = src != null ? src.GetUnityObjectId() : 0;
                     string path = src != null ? AssetDatabase.GetAssetPath(src) : string.Empty;
                     yield return (id, path);
                 }

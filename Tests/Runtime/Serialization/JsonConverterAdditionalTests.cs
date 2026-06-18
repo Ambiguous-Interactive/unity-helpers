@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text.Json;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -17,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void GameObjectConverterWritesStructuredJson()
         {
             GameObject go = Track(new GameObject("ConverterTestObject"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             string json = Serializer.JsonStringify(go);
             Assert.IsFalse(string.IsNullOrWhiteSpace(json));
 

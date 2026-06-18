@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
@@ -60,6 +61,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 }
                 yield return null;
             }
+        }
+
+        private static void ExpectWButtonExceptionLog(string exceptionMessage)
+        {
+            LogAssert.Expect(
+                LogType.Exception,
+                new Regex(
+                    "^(System\\.)?InvalidOperationException: " + Regex.Escape(exceptionMessage)
+                )
+            );
         }
 
         // ==================== Custom Inspector Integration Tests ====================
@@ -735,7 +746,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             context.MarkTriggered();
-            LogAssert.ignoreFailingMessages = true;
+            ExpectWButtonExceptionLog("Test exception from WButton");
             Assert.DoesNotThrow(
                 () =>
                 {
@@ -745,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 },
                 "Exception should be caught and not propagate"
             );
-            LogAssert.ignoreFailingMessages = false;
 
             Assert.DoesNotThrow(
                 () => helper.DrawAllButtonsAndProcessInvocations(editor),
@@ -775,11 +785,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             context.MarkTriggered();
-            LogAssert.ignoreFailingMessages = true;
+            ExpectWButtonExceptionLog("Test exception from WButton");
             WButtonInvocationController.ProcessTriggeredMethods(
                 new List<WButtonMethodContext> { context }
             );
-            LogAssert.ignoreFailingMessages = false;
 
             Assert.That(methodState.HasHistory, Is.True, "Should have history entry for exception");
             WButtonResultEntry entry = methodState.History[^1];
@@ -810,11 +819,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             context.MarkTriggered();
-            LogAssert.ignoreFailingMessages = true;
+            ExpectWButtonExceptionLog("Test exception from WButton");
             WButtonInvocationController.ProcessTriggeredMethods(
                 new List<WButtonMethodContext> { context }
             );
-            LogAssert.ignoreFailingMessages = false;
 
             for (int i = 0; i < 5; i++)
             {
@@ -849,13 +857,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             context.MarkTriggered();
-            LogAssert.ignoreFailingMessages = true;
+            ExpectWButtonExceptionLog("Test async exception from WButton");
             WButtonInvocationController.ProcessTriggeredMethods(
                 new List<WButtonMethodContext> { context }
             );
 
             yield return WaitUntil(() => methodState.ActiveInvocation == null, 5f);
-            LogAssert.ignoreFailingMessages = false;
 
             Assert.That(
                 methodState.HasHistory,

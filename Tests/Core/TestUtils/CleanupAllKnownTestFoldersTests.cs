@@ -368,19 +368,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Assets/Resources/Wallstop Studios/Unity Helpers",
             };
 
-            // Ensure protected folders exist and wait for recognition
-            yield return CreateAndWaitForFolders(protectedFolders);
+            bool resourcesExisted = AssetDatabase.IsValidFolder("Assets/Resources");
+            bool wallstopStudiosExisted = AssetDatabase.IsValidFolder(
+                "Assets/Resources/Wallstop Studios"
+            );
+            bool unityHelpersExisted = AssetDatabase.IsValidFolder(
+                "Assets/Resources/Wallstop Studios/Unity Helpers"
+            );
 
-            // Act: Run cleanup and wait
-            yield return CleanupAndWait();
-
-            // Assert: Protected folders should still exist
-            foreach (string folder in protectedFolders)
+            try
             {
-                Assert.IsTrue(
-                    AssetDatabase.IsValidFolder(folder),
-                    $"Protected folder '{folder}' should NOT be removed by cleanup"
+                // Ensure protected folders exist and wait for recognition
+                yield return CreateAndWaitForFolders(protectedFolders);
+
+                // Act: Run cleanup and wait
+                yield return CleanupAndWait();
+
+                // Assert: Protected folders should still exist
+                foreach (string folder in protectedFolders)
+                {
+                    Assert.IsTrue(
+                        AssetDatabase.IsValidFolder(folder),
+                        $"Protected folder '{folder}' should NOT be removed by cleanup"
+                    );
+                }
+            }
+            finally
+            {
+                DeleteFolderCreatedByThisTest(
+                    "Assets/Resources/Wallstop Studios/Unity Helpers",
+                    unityHelpersExisted
                 );
+                DeleteFolderCreatedByThisTest(
+                    "Assets/Resources/Wallstop Studios",
+                    wallstopStudiosExisted
+                );
+                DeleteFolderCreatedByThisTest("Assets/Resources", resourcesExisted);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
         }
 
@@ -469,6 +493,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             yield return null;
             Assert.Pass("UnityTest with IEnumerator is functioning correctly");
+        }
+
+        private static void DeleteFolderCreatedByThisTest(string folderPath, bool existedBefore)
+        {
+            if (existedBefore || !AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
         }
     }
 

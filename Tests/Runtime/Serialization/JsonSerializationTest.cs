@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void UnityEngineObjectSerializationWorks()
         {
             GameObject testGo = Track(new GameObject("Test GameObject", typeof(SpriteRenderer)));
-            int expectedId = testGo.GetInstanceID();
+            int expectedId = testGo.GetUnityObjectId();
             string json = testGo.ToJson();
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
             Assert.AreNotEqual("{}", json);

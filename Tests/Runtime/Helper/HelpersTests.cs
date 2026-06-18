@@ -273,41 +273,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             child.transform.SetParent(parent.transform);
             grandChild.transform.SetParent(child.transform);
 
-            bool originalIgnore = LogAssert.ignoreFailingMessages;
-            try
-            {
-                // Suppress possible tag-not-defined errors
-                LogAssert.ignoreFailingMessages = true;
+            grandChild.tag = "Player";
 
-                bool playerTagSet = true;
-                try
-                {
-                    // May throw if tag does not exist in this project
-                    grandChild.tag = "Player";
-                }
-                catch (UnityException)
-                {
-                    playerTagSet = false;
-                }
+            GameObject foundPlayer = parent.FindChildGameObjectWithTag("Player");
+            Assert.AreSame(grandChild, foundPlayer);
 
-                GameObject foundPlayer = parent.FindChildGameObjectWithTag("Player");
-                if (playerTagSet)
-                {
-                    Assert.AreSame(grandChild, foundPlayer);
-                }
-                else
-                {
-                    Assert.IsTrue(foundPlayer == null);
-                }
-
-                // Whether the tag "NonExistentTag" exists or not, there should be no matching child
-                GameObject foundNonExistent = parent.FindChildGameObjectWithTag("NonExistentTag");
-                Assert.IsTrue(foundNonExistent == null);
-            }
-            finally
-            {
-                LogAssert.ignoreFailingMessages = originalIgnore;
-            }
+            GameObject foundMissingBuiltinTag = parent.FindChildGameObjectWithTag("EditorOnly");
+            Assert.IsTrue(foundMissingBuiltinTag == null);
 
             yield break;
         }
@@ -800,44 +772,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             child.transform.SetParent(parent.transform);
 
-            bool originalIgnore = LogAssert.ignoreFailingMessages;
-            try
-            {
-                // Suppress possible tag-not-defined errors
-                LogAssert.ignoreFailingMessages = true;
+            child.tag = "Player";
 
-                bool playerTagSet = true;
-                try
-                {
-                    // May throw if tag does not exist in this project
-                    child.tag = "Player";
-                }
-                catch (UnityException)
-                {
-                    playerTagSet = false;
-                }
+            GameObject foundPlayerDirect = parent.GetPlayerObjectInChildHierarchy();
+            GameObject foundPlayerTag = parent.GetTagObjectInChildHierarchy("Player");
 
-                GameObject foundPlayerDirect = parent.GetPlayerObjectInChildHierarchy();
-                GameObject foundPlayerTag = parent.GetTagObjectInChildHierarchy("Player");
+            Assert.AreSame(child, foundPlayerDirect);
+            Assert.AreSame(child, foundPlayerTag);
 
-                if (playerTagSet)
-                {
-                    Assert.AreSame(child, foundPlayerDirect);
-                    Assert.AreSame(child, foundPlayerTag);
-                }
-                else
-                {
-                    Assert.IsTrue(foundPlayerDirect == null);
-                    Assert.IsTrue(foundPlayerTag == null);
-                }
-
-                GameObject foundNonExistent = parent.GetTagObjectInChildHierarchy("NonExistent");
-                Assert.IsTrue(foundNonExistent == null);
-            }
-            finally
-            {
-                LogAssert.ignoreFailingMessages = originalIgnore;
-            }
+            GameObject foundMissingBuiltinTag = parent.GetTagObjectInChildHierarchy("EditorOnly");
+            Assert.IsTrue(foundMissingBuiltinTag == null);
 
             yield break;
         }

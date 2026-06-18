@@ -87,6 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTearDown]
         public override IEnumerator UnityTearDown()
         {
+            LogAssert.ignoreFailingMessages = false;
             yield return base.UnityTearDown();
             yield return null;
             DeleteAssetIfExists(TargetAssetPath);
@@ -453,8 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             // Unity may or may not log an error when trying to load an invalid asset file
             // (depends on Unity version and whether the file has been indexed).
-            // We use ignoreFailingMessages to avoid test failures from Unity's internal errors.
-            LogAssert.ignoreFailingMessages = true;
+            IgnoreVersionSpecificInvalidAssetImportLogs();
 
             // Expect the "on-disk asset" warning OR the "target path already occupied" warning
             // (depends on whether Unity has a GUID for the path)
@@ -468,7 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
 
-            // Re-enable log assertions
             LogAssert.ignoreFailingMessages = false;
 
             Assert.IsTrue(
@@ -476,10 +475,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"The invalid file should still exist. Pre-call state: existingGuid='{existingGuid}', fileExistsBefore={fileExistsBefore}"
             );
 
-            // Suppress the error from LoadAssetAtPath on invalid file during assertion
-            LogAssert.ignoreFailingMessages = true;
-            Object loadedAsset = AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath);
-            LogAssert.ignoreFailingMessages = false;
+            Object loadedAsset;
+            bool previousIgnore = LogAssert.ignoreFailingMessages;
+            try
+            {
+                IgnoreVersionSpecificInvalidAssetImportLogs();
+                loadedAsset = AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath);
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnore;
+            }
 
             Assert.IsTrue(
                 loadedAsset == null,
@@ -501,6 +507,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) != null,
                 "Valid singleton asset should be created after removing the invalid file"
             );
+        }
+
+        private static void IgnoreVersionSpecificInvalidAssetImportLogs()
+        {
+            // This test intentionally writes an invalid .asset file. Unity's importer logs
+            // different internal errors across editor versions before production code emits
+            // the stable warning asserted by the test.
+            LogAssert.ignoreFailingMessages = true;
         }
 
         [UnityTest]

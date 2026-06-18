@@ -150,10 +150,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Should have exactly one StartTracker before attempting to add another"
             );
 
-            // Suppress the expected Unity error log to keep test output clean
-            LogAssert.ignoreFailingMessages = true;
+            LogAssert.Expect(
+                LogType.Error,
+                new System.Text.RegularExpressions.Regex(
+                    "^Can't add 'StartTracker' to Tracker because a 'StartTracker' is already added to the game object!$"
+                )
+            );
             StartTracker second = go.AddComponent<StartTracker>();
-            LogAssert.ignoreFailingMessages = false;
 
             // Verify the actual behavior: second component was not added
             Assert.IsTrue(

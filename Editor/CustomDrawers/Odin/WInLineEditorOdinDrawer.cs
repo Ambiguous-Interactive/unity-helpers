@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int parentId = 0;
             if (parent is Object unityObject)
             {
-                parentId = unityObject.GetInstanceID();
+                parentId = unityObject.GetUnityObjectId();
             }
             else if (parent != null)
             {

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using UnityEditor;
     using UnityEditor.AnimatedValues;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -949,8 +950,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             // Cache key should include the instance ID
-            int instanceIdA = hostA.GetInstanceID();
-            int instanceIdB = hostB.GetInstanceID();
+            int instanceIdA = hostA.GetUnityObjectId();
+            int instanceIdB = hostB.GetUnityObjectId();
 
             Assert.IsTrue(
                 cacheKeyA.Contains(instanceIdA.ToString()),
@@ -1002,8 +1003,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             // Cache key should include the instance ID
-            int instanceIdA = hostA.GetInstanceID();
-            int instanceIdB = hostB.GetInstanceID();
+            int instanceIdA = hostA.GetUnityObjectId();
+            int instanceIdB = hostB.GetUnityObjectId();
 
             Assert.IsTrue(
                 cacheKeyA.Contains(instanceIdA.ToString()),

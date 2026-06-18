@@ -738,7 +738,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             );
 
             EditorGUI.DrawRect(splitterRect, new Color(0.2f, 0.2f, 0.2f));
-            EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
+            if (!EditorUi.Suppress)
+            {
+                EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
+            }
 
             if (
                 Event.current.type == EventType.MouseDown

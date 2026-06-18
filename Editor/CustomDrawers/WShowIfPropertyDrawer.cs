@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedObject serializedObject = property.serializedObject;
             UnityEngine.Object target = serializedObject?.targetObject;
             int serializedObjectHash = serializedObject?.GetHashCode() ?? 0;
-            int instanceId = target != null ? target.GetInstanceID() : 0;
+            int instanceId = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath ?? string.Empty;
             (int, int, string, string) cacheKey = (
                 serializedObjectHash,

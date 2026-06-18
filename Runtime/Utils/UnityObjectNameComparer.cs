@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using System.Collections.Generic;
     using System.Text.RegularExpressions;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
@@ -53,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
             if (comparison == 0)
             {
-                return x.GetInstanceID().CompareTo(y.GetInstanceID());
+                return x.GetUnityObjectId().CompareTo(y.GetUnityObjectId());
             }
 
             return comparison;

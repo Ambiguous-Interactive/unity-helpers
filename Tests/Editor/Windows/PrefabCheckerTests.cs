@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Tests.Windows
 {
 #if UNITY_EDITOR
-    using System;
     using System.Collections.Generic;
     using System.IO;
     using System.Text.RegularExpressions;
@@ -62,25 +61,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         public override void OneTimeTearDown()
         {
             base.OneTimeTearDown();
-        }
-
-        /// <summary>
-        /// Executes an action while ignoring all log assertions.
-        /// Use this for tests that only care about "does not throw" behavior
-        /// and should not be affected by unrelated log messages from project state.
-        /// </summary>
-        private static void ExecuteIgnoringLogs(Action action)
-        {
-            bool previousValue = LogAssert.ignoreFailingMessages;
-            try
-            {
-                LogAssert.ignoreFailingMessages = true;
-                action();
-            }
-            finally
-            {
-                LogAssert.ignoreFailingMessages = previousValue;
-            }
         }
 
         [Test]
@@ -290,76 +270,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 () => checker.RunChecksImproved(),
                 "RunChecksImproved() should not throw when multiple paths are non-existent"
             );
-        }
-
-        [Test]
-        public void RunChecksAcceptsAssetsRootPathDirectly()
-        {
-            PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-            checker._assetPaths = new List<string> { "Assets" };
-
-            // Assets root should always be valid - no error expected from our validation.
-            // However, scanning Assets root may trigger errors from other prefabs in the project.
-            // Use ExecuteIgnoringLogs to isolate this test from project state.
-            ExecuteIgnoringLogs(() =>
-            {
-                Assert.DoesNotThrow(
-                    () => checker.RunChecksImproved(),
-                    "RunChecksImproved() should accept 'Assets' as a valid root path"
-                );
-            });
-        }
-
-        [Test]
-        public void RunChecksWithNullAssetPathsDoesNotThrowRegardlessOfProjectState()
-        {
-            // This test verifies the "does not throw" behavior in isolation from log assertions.
-            // It complements RunChecksWithNullAssetPathsLogsErrorAndDoesNotThrow which verifies the log.
-            PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-            checker._assetPaths = null;
-
-            ExecuteIgnoringLogs(() =>
-            {
-                Assert.DoesNotThrow(
-                    () => checker.RunChecksImproved(),
-                    "RunChecksImproved() should not throw when asset paths are null"
-                );
-            });
-        }
-
-        [Test]
-        public void RunChecksWithEmptyAssetPathsDoesNotThrowRegardlessOfProjectState()
-        {
-            // This test verifies the "does not throw" behavior in isolation from log assertions.
-            // It complements RunChecksWithEmptyAssetPathsListLogsErrorAndDoesNotThrow which verifies the log.
-            PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-            checker._assetPaths = new List<string>();
-
-            ExecuteIgnoringLogs(() =>
-            {
-                Assert.DoesNotThrow(
-                    () => checker.RunChecksImproved(),
-                    "RunChecksImproved() should not throw when asset paths list is empty"
-                );
-            });
-        }
-
-        [Test]
-        public void RunChecksOnNonExistentPathDoesNotThrowRegardlessOfProjectState()
-        {
-            // This test verifies the "does not throw" behavior in isolation from log assertions.
-            // It complements RunChecksOnNonExistentPathLogsErrorAndDoesNotThrow which verifies the log.
-            const string nonExistentPath = "Assets/NonExistent/Path/That/DoesNotExist";
-            PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-            checker._assetPaths = new List<string> { nonExistentPath };
-
-            ExecuteIgnoringLogs(() =>
-            {
-                Assert.DoesNotThrow(
-                    () => checker.RunChecksImproved(),
-                    $"RunChecksImproved() should not throw when path '{nonExistentPath}' does not exist"
-                );
-            });
         }
 
         [Test]

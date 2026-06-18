@@ -5,63 +5,142 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 {
     using System;
     using System.Collections;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
-    using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
+    using WallstopStudios.UnityHelpers.Tests.EditorFramework;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
-    [NUnit.Framework.Category("Slow")]
-    [NUnit.Framework.Category("Integration")]
+    [NUnit.Framework.Category("Fast")]
     public sealed class SerializableCollectionPendingFoldoutInteractionTests : CommonTestBase
     {
-        private const float TestLeftPadding = 12f;
-        private const float TestRightPadding = 12f;
-        private const float TestHorizontalPadding = 24f;
+        private static readonly Rect LocalLabelRect = new(12f, 8f, 140f, 18f);
+        private static readonly Rect AbsoluteLabelRect = new(52f, 68f, 140f, 18f);
 
-        [SetUp]
-        public void TolerateHeadlessWindowErrorsSetUp()
+        public static IEnumerable<TestCaseData> DictionaryPendingFoldoutClickCases()
         {
-            // These tests drive a real EditorWindow (ShowUtility). Under -batchmode
-            // -nographics, initializing its view logs the benign "No graphic device is
-            // available to initialize the view." error (Unity 6+), which the Unity Test
-            // Framework treats as a failure. Tolerate it in headless CI only; on a
-            // machine with a graphics device this is inert. The framework resets
-            // ignoreFailingMessages after each test, so no teardown restore is needed
-            // (and restoring it would re-catch the same error if the window closes
-            // during teardown).
-            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
-            {
-                LogAssert.ignoreFailingMessages = true;
-            }
+            yield return new TestCaseData(LocalLabelRect.center).SetName(
+                "DictionaryPendingFoldoutLabelClickHonorsLocalRect"
+            );
+            yield return new TestCaseData(AbsoluteLabelRect.center).SetName(
+                "DictionaryPendingFoldoutLabelClickHonorsGroupOffsetRect"
+            );
         }
 
-        private sealed class PropertyDrawerClickWindow : EditorWindow
+        public static IEnumerable<TestCaseData> SetPendingFoldoutClickCases()
         {
-            internal Action OnGUIDraw;
+            yield return new TestCaseData(LocalLabelRect.center).SetName(
+                "SetPendingFoldoutLabelClickHonorsLocalRect"
+            );
+        }
 
-            internal EventType LastEventType { get; private set; }
+        [TestCaseSource(nameof(DictionaryPendingFoldoutClickCases))]
+        public void DictionaryPendingFoldoutLabelClickToggles(Vector2 mousePosition)
+        {
+            bool expanded = false;
+            Event mouseDown = CreateMouseDown(mousePosition);
 
-            private void OnGUI()
+            bool toggled =
+                SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
+                    mouseDown,
+                    LocalLabelRect,
+                    AbsoluteLabelRect,
+                    ref expanded
+                );
+
+            Assert.IsTrue(toggled, BuildToggleFailureMessage(mousePosition));
+            Assert.IsTrue(expanded, BuildExpandedFailureMessage(mousePosition));
+        }
+
+        [TestCaseSource(nameof(SetPendingFoldoutClickCases))]
+        public void SetPendingFoldoutLabelClickToggles(Vector2 mousePosition)
+        {
+            bool expanded = false;
+            Event mouseDown = CreateMouseDown(mousePosition);
+
+            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabelForTests(
+                mouseDown,
+                LocalLabelRect,
+                ref expanded
+            );
+
+            Assert.IsTrue(toggled, BuildToggleFailureMessage(mousePosition));
+            Assert.IsTrue(expanded, BuildExpandedFailureMessage(mousePosition));
+        }
+
+        [Test]
+        public void PendingFoldoutLabelClickIgnoresNonPrimaryButton()
+        {
+            bool expanded = false;
+            Event mouseDown = new()
             {
-                if (OnGUIDraw == null)
-                {
-                    return;
-                }
+                type = EventType.MouseDown,
+                mousePosition = LocalLabelRect.center,
+                button = 1,
+            };
 
-                OnGUIDraw.Invoke();
-                LastEventType = Event.current.type;
-            }
+            bool toggled =
+                SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
+                    mouseDown,
+                    LocalLabelRect,
+                    AbsoluteLabelRect,
+                    ref expanded
+                );
+
+            Assert.IsFalse(toggled);
+            Assert.IsFalse(expanded);
+        }
+
+        [Test]
+        public void PendingFoldoutLabelClickIgnoresMiss()
+        {
+            bool expanded = false;
+            Event mouseDown = CreateMouseDown(new Vector2(400f, 400f));
+
+            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabelForTests(
+                mouseDown,
+                LocalLabelRect,
+                ref expanded
+            );
+
+            Assert.IsFalse(toggled);
+            Assert.IsFalse(expanded);
+        }
+
+        [TestCase(EventType.MouseDown, EventType.MouseDown, EventType.MouseDown)]
+        [TestCase(EventType.Used, EventType.MouseDown, EventType.MouseDown)]
+        [TestCase(EventType.Used, EventType.Used, EventType.Used)]
+        public void EffectiveMouseEventTypeHonorsRawMouseDown(
+            EventType eventType,
+            EventType rawEventType,
+            EventType expectedEventType
+        )
+        {
+            Assert.AreEqual(
+                expectedEventType,
+                SerializableDictionaryPropertyDrawer.GetEffectiveMouseEventTypeForTests(
+                    eventType,
+                    rawEventType
+                )
+            );
+            Assert.AreEqual(
+                expectedEventType,
+                SerializableSetPropertyDrawer.GetEffectiveMouseEventTypeForTests(
+                    eventType,
+                    rawEventType
+                )
+            );
         }
 
         [UnityTest]
-        public IEnumerator DictionaryPendingFoldoutLabelClickHonorsGroupOffset()
+        public IEnumerator DictionaryPendingFoldoutDrawerLabelClickTogglesProductionState()
         {
             GroupGUIWidthUtility.ResetForTests();
             SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
@@ -69,8 +148,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             FoldoutInteractionDictionaryHost host =
                 CreateScriptableObject<FoldoutInteractionDictionaryHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
             SerializedProperty property = serializedObject.FindProperty(
                 nameof(FoldoutInteractionDictionaryHost.dictionary)
             );
@@ -83,86 +160,47 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(FoldoutInteractionDictionaryHost.dictionary)
             );
 
-            Rect controlRect = new(40f, 60f, 500f, 240f);
-            PropertyDrawerClickWindow window = Track(
-                ScriptableObject.CreateInstance<PropertyDrawerClickWindow>()
-            );
-            window.OnGUIDraw = () =>
+            Action draw = () =>
             {
                 serializedObject.Update();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        TestHorizontalPadding,
-                        TestLeftPadding,
-                        TestRightPadding
-                    )
-                )
-                {
-                    drawer.OnGUI(controlRect, property, GUIContent.none);
-                }
-
+                drawer.OnGUI(new Rect(40f, 60f, 500f, 240f), property, GUIContent.none);
                 serializedObject.ApplyModifiedProperties();
             };
 
-            window.ShowUtility();
-            window.Repaint();
-
-            int guard = 0;
-            while (!SerializableDictionaryPropertyDrawer.HasLastPendingHeaderRect && guard < 50)
-            {
-                window.Repaint();
-                yield return null;
-                guard++;
-            }
+            yield return TestIMGUIExecutor.Run(draw);
 
             Assert.IsTrue(
                 SerializableDictionaryPropertyDrawer.HasLastPendingHeaderRect,
-                "Pending header rect should be recorded after initial draw."
+                "Pending header rect should be recorded by the actual drawer OnGUI path."
             );
 
-            Rect headerRect = SerializableDictionaryPropertyDrawer.LastPendingHeaderRect;
-            Rect toggleRect = SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect;
-            float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
-            Rect labelHitRect = new(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
-
-            Event mouseDown = new()
-            {
-                type = EventType.MouseDown,
-                mousePosition = labelHitRect.center,
-                button = 0,
-            };
-            window.SendEvent(mouseDown);
-
-            window.Repaint();
-            yield return null;
-            window.Repaint();
-            yield return null;
-
-            bool found = drawer.TryGetPendingAnimationStateForTests(
+            Rect labelRect = SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect;
+            Assert.Greater(labelRect.width, 0f, "Dictionary label hit rect should have width.");
+            AssertDictionaryPendingState(
+                drawer,
                 property,
-                out bool isExpanded,
-                out float animProgress,
-                out bool hasAnimBool
+                expectedExpanded: false,
+                "before label click"
             );
 
-            Assert.IsTrue(found, "Pending animation state should be retrievable after click.");
-            Assert.IsTrue(isExpanded, "Pending foldout should expand after label click.");
-            Assert.IsTrue(hasAnimBool, "Tween AnimBool should exist after expansion.");
-            Assert.Greater(animProgress, 0f, "Animation progress should advance after expansion.");
+            yield return TestIMGUIExecutor.RunMouseDown(draw, labelRect.center);
 
-            window.Close();
+            AssertDictionaryPendingState(
+                drawer,
+                property,
+                expectedExpanded: true,
+                "after label click"
+            );
         }
 
         [UnityTest]
-        public IEnumerator SetPendingFoldoutLabelClickHonorsGroupOffset()
+        public IEnumerator SetPendingFoldoutDrawerLabelClickTogglesProductionState()
         {
             GroupGUIWidthUtility.ResetForTests();
             SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
 
             FoldoutInteractionSetHost host = CreateScriptableObject<FoldoutInteractionSetHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
             SerializedProperty property = serializedObject.FindProperty(
                 nameof(FoldoutInteractionSetHost.set)
             );
@@ -175,259 +213,125 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(FoldoutInteractionSetHost.set)
             );
 
-            Rect controlRect = new(35f, 55f, 480f, 220f);
-            PropertyDrawerClickWindow window = Track(
-                ScriptableObject.CreateInstance<PropertyDrawerClickWindow>()
-            );
-            window.OnGUIDraw = () =>
+            Action draw = () =>
             {
                 serializedObject.Update();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        TestHorizontalPadding,
-                        TestLeftPadding,
-                        TestRightPadding
-                    )
-                )
-                {
-                    drawer.OnGUI(controlRect, property, GUIContent.none);
-                }
-
+                drawer.OnGUI(new Rect(35f, 55f, 480f, 220f), property, GUIContent.none);
                 serializedObject.ApplyModifiedProperties();
             };
 
-            window.ShowUtility();
-            window.Repaint();
-
-            int guard = 0;
-            while (!SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect && guard < 50)
-            {
-                window.Repaint();
-                yield return null;
-                guard++;
-            }
+            yield return TestIMGUIExecutor.Run(draw);
 
             Assert.IsTrue(
                 SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Manual entry header rect should be recorded after initial draw."
+                "Manual entry header rect should be recorded by the actual drawer OnGUI path."
             );
 
-            Rect headerRect = SerializableSetPropertyDrawer.LastManualEntryHeaderRect;
-            Rect toggleRect = SerializableSetPropertyDrawer.LastManualEntryToggleRect;
-            float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
-            Rect labelHitRect = new(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
-
-            Event mouseDown = new()
-            {
-                type = EventType.MouseDown,
-                mousePosition = labelHitRect.center,
-                button = 0,
-            };
-            window.SendEvent(mouseDown);
-
-            window.Repaint();
-            yield return null;
-            window.Repaint();
-            yield return null;
-
-            bool found = drawer.TryGetPendingAnimationStateForTests(
-                property,
-                out bool isExpanded,
-                out float animProgress,
-                out bool hasAnimBool
+            Rect labelRect = BuildLabelRect(
+                SerializableSetPropertyDrawer.LastManualEntryHeaderRect,
+                SerializableSetPropertyDrawer.LastManualEntryToggleRect
             );
+            AssertSetPendingState(drawer, property, expectedExpanded: false, "before label click");
 
-            Assert.IsTrue(found, "Pending animation state should be retrievable after click.");
-            Assert.IsTrue(isExpanded, "Manual entry foldout should expand after label click.");
-            Assert.IsTrue(hasAnimBool, "Tween AnimBool should exist after expansion.");
-            Assert.Greater(animProgress, 0f, "Animation progress should advance after expansion.");
+            yield return TestIMGUIExecutor.RunMouseDown(draw, labelRect.center);
 
-            window.Close();
+            AssertSetPendingState(drawer, property, expectedExpanded: true, "after label click");
         }
 
-        [UnityTest]
-        public IEnumerator DictionaryPendingFoldoutExpandsWhenRawEventTypeIsMouseDown()
+        private static Event CreateMouseDown(Vector2 mousePosition)
         {
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-
-            FoldoutInteractionDictionaryHost host =
-                CreateScriptableObject<FoldoutInteractionDictionaryHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty property = serializedObject.FindProperty(
-                nameof(FoldoutInteractionDictionaryHost.dictionary)
-            );
-            property.isExpanded = true;
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            PropertyDrawerTestHelper.AssignFieldInfo(
-                drawer,
-                typeof(FoldoutInteractionDictionaryHost),
-                nameof(FoldoutInteractionDictionaryHost.dictionary)
-            );
-
-            Rect controlRect = new(40f, 60f, 500f, 240f);
-            PropertyDrawerClickWindow window = Track(
-                ScriptableObject.CreateInstance<PropertyDrawerClickWindow>()
-            );
-            window.OnGUIDraw = () =>
-            {
-                serializedObject.Update();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        TestHorizontalPadding,
-                        TestLeftPadding,
-                        TestRightPadding
-                    )
-                )
-                {
-                    drawer.OnGUI(controlRect, property, GUIContent.none);
-                }
-
-                serializedObject.ApplyModifiedProperties();
-            };
-
-            window.ShowUtility();
-            window.Repaint();
-
-            int guard = 0;
-            while (!SerializableDictionaryPropertyDrawer.HasLastPendingHeaderRect && guard < 50)
-            {
-                window.Repaint();
-                yield return null;
-                guard++;
-            }
-
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.HasLastPendingHeaderRect,
-                "Pending header rect should be recorded after initial draw."
-            );
-
-            Rect headerRect = SerializableDictionaryPropertyDrawer.LastPendingHeaderRect;
-            Rect toggleRect = SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect;
-            float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
-            Rect labelHitRect = new(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
-
-            Event mouseDown = new()
+            return new Event
             {
                 type = EventType.MouseDown,
-                mousePosition = labelHitRect.center,
+                mousePosition = mousePosition,
                 button = 0,
             };
-            window.SendEvent(mouseDown);
-
-            window.Repaint();
-            yield return null;
-            window.Repaint();
-            yield return null;
-
-            bool found = drawer.TryGetPendingAnimationStateForTests(
-                property,
-                out bool isExpanded,
-                out float animProgress,
-                out bool hasAnimBool
-            );
-
-            Assert.IsTrue(found, "Pending animation state should be retrievable after click.");
-            Assert.IsTrue(isExpanded, "Pending foldout should expand after label click.");
-            Assert.IsTrue(hasAnimBool, "Tween AnimBool should exist after expansion.");
-            Assert.Greater(animProgress, 0f, "Animation progress should advance after expansion.");
-
-            window.Close();
         }
 
-        [UnityTest]
-        public IEnumerator SetPendingFoldoutExpandsWhenRawEventTypeIsMouseDown()
+        private static Rect BuildLabelRect(Rect headerRect, Rect toggleRect)
         {
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-
-            FoldoutInteractionSetHost host = CreateScriptableObject<FoldoutInteractionSetHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty property = serializedObject.FindProperty(
-                nameof(FoldoutInteractionSetHost.set)
-            );
-            property.isExpanded = true;
-
-            SerializableSetPropertyDrawer drawer = new();
-            PropertyDrawerTestHelper.AssignFieldInfo(
-                drawer,
-                typeof(FoldoutInteractionSetHost),
-                nameof(FoldoutInteractionSetHost.set)
-            );
-
-            Rect controlRect = new(35f, 55f, 480f, 220f);
-            PropertyDrawerClickWindow window = Track(
-                ScriptableObject.CreateInstance<PropertyDrawerClickWindow>()
-            );
-            window.OnGUIDraw = () =>
-            {
-                serializedObject.Update();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        TestHorizontalPadding,
-                        TestLeftPadding,
-                        TestRightPadding
-                    )
-                )
-                {
-                    drawer.OnGUI(controlRect, property, GUIContent.none);
-                }
-
-                serializedObject.ApplyModifiedProperties();
-            };
-
-            window.ShowUtility();
-            window.Repaint();
-
-            int guard = 0;
-            while (!SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect && guard < 50)
-            {
-                window.Repaint();
-                yield return null;
-                guard++;
-            }
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Manual entry header rect should be recorded after initial draw."
-            );
-
-            Rect headerRect = SerializableSetPropertyDrawer.LastManualEntryHeaderRect;
-            Rect toggleRect = SerializableSetPropertyDrawer.LastManualEntryToggleRect;
             float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
-            Rect labelHitRect = new(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
+            return new Rect(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
+        }
 
-            Event mouseDown = new()
-            {
-                type = EventType.MouseDown,
-                mousePosition = labelHitRect.center,
-                button = 0,
-            };
-            window.SendEvent(mouseDown);
-
-            window.Repaint();
-            yield return null;
-            window.Repaint();
-            yield return null;
-
-            bool found = drawer.TryGetPendingAnimationStateForTests(
-                property,
-                out bool isExpanded,
-                out float animProgress,
-                out bool hasAnimBool
+        private static void AssertDictionaryPendingState(
+            SerializableDictionaryPropertyDrawer drawer,
+            SerializedProperty property,
+            bool expectedExpanded,
+            string phase
+        )
+        {
+            Assert.IsTrue(
+                drawer.TryGetPendingAnimationStateForTests(
+                    property,
+                    out bool isExpanded,
+                    out float animProgress,
+                    out bool hasAnimBool
+                ),
+                $"Expected dictionary pending state to exist {phase}."
             );
+            Assert.AreEqual(
+                expectedExpanded,
+                isExpanded,
+                $"Unexpected dictionary pending foldout state {phase}. "
+                    + BuildDictionaryLayoutDiagnostics()
+            );
+            Assert.IsTrue(hasAnimBool, $"Expected dictionary pending AnimBool {phase}.");
+            Assert.GreaterOrEqual(
+                animProgress,
+                0f,
+                $"Expected non-negative dictionary animation progress {phase}."
+            );
+        }
 
-            Assert.IsTrue(found, "Pending animation state should be retrievable after click.");
-            Assert.IsTrue(isExpanded, "Manual entry foldout should expand after label click.");
-            Assert.IsTrue(hasAnimBool, "Tween AnimBool should exist after expansion.");
-            Assert.Greater(animProgress, 0f, "Animation progress should advance after expansion.");
+        private static void AssertSetPendingState(
+            SerializableSetPropertyDrawer drawer,
+            SerializedProperty property,
+            bool expectedExpanded,
+            string phase
+        )
+        {
+            Assert.IsTrue(
+                drawer.TryGetPendingAnimationStateForTests(
+                    property,
+                    out bool isExpanded,
+                    out float animProgress,
+                    out bool hasAnimBool
+                ),
+                $"Expected set pending state to exist {phase}."
+            );
+            Assert.AreEqual(
+                expectedExpanded,
+                isExpanded,
+                $"Unexpected set pending foldout state {phase}."
+            );
+            Assert.IsTrue(hasAnimBool, $"Expected set pending AnimBool {phase}.");
+            Assert.GreaterOrEqual(
+                animProgress,
+                0f,
+                $"Expected non-negative set animation progress {phase}."
+            );
+        }
 
-            window.Close();
+        private static string BuildToggleFailureMessage(Vector2 mousePosition)
+        {
+            return $"Expected label click to toggle at mouse={mousePosition}. "
+                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
+        }
+
+        private static string BuildExpandedFailureMessage(Vector2 mousePosition)
+        {
+            return $"Expected pending foldout to expand at mouse={mousePosition}. "
+                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
+        }
+
+        private static string BuildDictionaryLayoutDiagnostics()
+        {
+            return "Recorded dictionary rects: "
+                + $"header={SerializableDictionaryPropertyDrawer.LastPendingHeaderRect}, "
+                + $"toggle={SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect}, "
+                + $"localLabel={SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect}, "
+                + $"absoluteLabel={SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect}.";
         }
     }
 }

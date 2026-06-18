@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -288,7 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator InstanceCanBeAccessedAfterDestruction()
         {
             TestRuntimeSingleton instance1 = TestRuntimeSingleton.Instance;
-            int instanceId1 = instance1.GetInstanceID();
+            int instanceId1 = instance1.GetUnityObjectId();
 
             Object.DestroyImmediate(instance1.gameObject); // UNH-SUPPRESS: Test verifies singleton recreation after destruction
 
@@ -297,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton instance2 = TestRuntimeSingleton.Instance;
 
             Assert.IsTrue(instance2 != null);
-            Assert.AreNotEqual(instanceId1, instance2.GetInstanceID());
+            Assert.AreNotEqual(instanceId1, instance2.GetUnityObjectId());
         }
 
         [Test]
@@ -561,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator InstanceSurvivesMultipleFrames()
         {
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
-            int instanceId = instance.GetInstanceID();
+            int instanceId = instance.GetUnityObjectId();
 
             for (int i = 0; i < 10; i++)
             {
@@ -570,7 +571,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TestRuntimeSingleton sameInstance = TestRuntimeSingleton.Instance;
 
-            Assert.AreEqual(instanceId, sameInstance.GetInstanceID());
+            Assert.AreEqual(instanceId, sameInstance.GetUnityObjectId());
         }
 
         [Test]

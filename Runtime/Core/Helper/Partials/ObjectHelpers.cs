@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (log)
             {
                 component.LogWarn(
-                    $"Failed to find {typeof(T).Name} on {tag} (name: {gameObject.name}), id [{gameObject.GetInstanceID()}]."
+                    $"Failed to find {typeof(T).Name} on {tag} (name: {gameObject.name}), id [{gameObject.GetUnityObjectId()}]."
                 );
             }
 

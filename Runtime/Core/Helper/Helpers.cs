@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static string[] CachedLayerNames = Array.Empty<string>();
         private static bool LayerCacheInitialized;
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
         internal static Func<string[]> LayerNameProvider
         {
             get => _layerNameProvider ?? DefaultLayerNameProvider;
@@ -63,8 +63,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static Func<string[]> _layerNameProvider;
 
+#if UNITY_EDITOR
         private static readonly Func<string[]> DefaultLayerNameProvider = () =>
             InternalEditorUtility.layers;
+#else
+        private static readonly Func<string[]> DefaultLayerNameProvider = () => Array.Empty<string>();
+#endif
 
         internal static void ResetLayerNameProvider()
         {
@@ -361,10 +365,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return CachedLayerNames;
             }
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
             try
             {
-                // Prefer the editor API when available
+                // Prefer the editor API or an injected test provider when available.
                 string[] editorLayers = LayerNameProvider?.Invoke();
                 if (editorLayers is { Length: > 0 })
                 {

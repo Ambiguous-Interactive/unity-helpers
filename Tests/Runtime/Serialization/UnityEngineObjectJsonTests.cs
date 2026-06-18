@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -22,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void GameObjectSerializationContainsExpectedFields()
         {
             GameObject go = Track(new GameObject("GO_Main"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             string json = Serializer.JsonStringify(go);
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
 
@@ -51,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ObjectTypedSerializationUsesRuntimeTypeConverter()
         {
             GameObject go = Track(new GameObject("ObjectTypedGO"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             object goAsObject = go;
             string json = Serializer.JsonStringify(goAsObject);
             using JsonDocument doc = JsonDocument.Parse(json);
@@ -65,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void GameObjectSerializationPrettyPrintFormatsAndParses()
         {
             GameObject go = Track(new GameObject("Pretty ☃ Object ✓"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             string json = Serializer.JsonStringify(go, pretty: true);
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
             StringAssert.Contains("\n", json);
@@ -82,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void GameObjectSerializationStableInstanceIdAcrossSerializations()
         {
             GameObject go = Track(new GameObject("StableId"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             string j1 = Serializer.JsonStringify(go);
             string j2 = Serializer.JsonStringify(go);
 
@@ -110,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public System.Collections.IEnumerator GameObjectArraySerializationWorksWithNullAndDestroyed()
         {
             GameObject alive = Track(new GameObject("Alive"));
-            int aliveId = alive.GetInstanceID();
+            int aliveId = alive.GetUnityObjectId();
             GameObject dead = Track(new GameObject("Dead"));
             dead.Destroy();
             yield return null; // ensure Unity nullification
@@ -138,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public System.Collections.IEnumerator GameObjectDictionarySerializationWorksWithNullAndDestroyed()
         {
             GameObject alive = Track(new GameObject("Alive_Dict"));
-            int aliveId = alive.GetInstanceID();
+            int aliveId = alive.GetUnityObjectId();
             GameObject dead = Track(new GameObject("Dead_Dict"));
             dead.Destroy();
             yield return null; // ensure Unity nullification
@@ -183,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void NestedObjectSerializationWithGameObjectProperty()
         {
             GameObject go = Track(new GameObject("Nested"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             GoHolder holder = new() { Go = go };
             string json = Serializer.JsonStringify(holder);
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
@@ -199,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void NestedObjectSerializationWithGameObjectField()
         {
             GameObject go = Track(new GameObject("NestedField"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             GoFieldHolder holder = new() { go = go };
             string json = Serializer.JsonStringify(holder);
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
@@ -215,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void FastSerializerProducesValidGameObjectJson()
         {
             GameObject go = Track(new GameObject("FastGO"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             byte[] bytes = Serializer.JsonSerializeFast(go);
             Assert.NotNull(bytes);
             string json = Encoding.UTF8.GetString(bytes);
@@ -231,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void SerializeIntoCallerBufferProducesValidGameObjectJson()
         {
             GameObject go = Track(new GameObject("BufferedGO"));
-            int expectedId = go.GetInstanceID();
+            int expectedId = go.GetUnityObjectId();
             byte[] buffer = null;
             int len = Serializer.JsonSerialize(
                 go,

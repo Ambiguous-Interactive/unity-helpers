@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     public sealed class GameObjectConverter : JsonConverter<GameObject>
     {
@@ -40,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             // Use AssemblyQualifiedName to disambiguate type for diagnostics
             writer.WriteString("type", value.GetType().AssemblyQualifiedName);
             // Emit the actual Unity instance ID without transformation for correctness.
-            writer.WriteNumber("instanceId", value.GetInstanceID());
+            writer.WriteNumber("instanceId", value.GetUnityObjectId());
             writer.WriteEndObject();
         }
     }

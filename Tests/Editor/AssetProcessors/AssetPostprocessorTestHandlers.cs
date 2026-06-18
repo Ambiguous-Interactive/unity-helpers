@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using Object = UnityEngine.Object;
 
@@ -880,7 +881,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             if (instance is Object unityObject && unityObject != null)
             {
-                return unityObject.GetInstanceID().ToString();
+                return unityObject.GetUnityObjectId().ToString();
             }
 
             return "null";

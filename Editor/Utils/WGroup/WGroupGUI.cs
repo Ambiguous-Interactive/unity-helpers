@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
     using UnityEditor;
     using UnityEditor.AnimatedValues;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Settings;
@@ -200,7 +201,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 bool headerHasFoldout = HeaderHasFoldout(definition);
                 AnimBool foldoutAnim = null;
 
-                int targetInstanceId = serializedObject?.targetObject?.GetInstanceID() ?? 0;
+                UnityEngine.Object targetObject =
+                    serializedObject != null ? serializedObject.targetObject : null;
+                int targetInstanceId = targetObject.GetUnityObjectId();
 
                 if (headerHasFoldout)
                 {

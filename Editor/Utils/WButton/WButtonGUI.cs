@@ -1671,7 +1671,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             for (int i = 0; i < targets.Length; i++)
             {
                 UnityEngine.Object target = targets[i];
-                instanceIds[i] = target != null ? target.GetInstanceID() : 0;
+                instanceIds[i] = target != null ? target.GetUnityObjectId() : 0;
             }
 
             return Objects.SpanHashCode<int>(instanceIds);

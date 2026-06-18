@@ -828,8 +828,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Rect gripRect = new Rect(splitterRect.center.x - 20f, centerY - 1f, 40f, 2f);
             EditorGUI.DrawRect(gripRect, new Color(0.5f, 0.5f, 0.5f, 1f));
 
-            // Set cursor
-            EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
+            // Set cursor in interactive editor windows only.
+            if (!EditorUi.Suppress)
+            {
+                EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
+            }
         }
 
         /// <summary>
@@ -3116,7 +3119,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 case EventType.Repaint:
                     if (_isHoveringPivot || _isDraggingPivot)
                     {
-                        EditorGUIUtility.AddCursorRect(textureRect, MouseCursor.Pan);
+                        if (!EditorUi.Suppress)
+                        {
+                            EditorGUIUtility.AddCursorRect(textureRect, MouseCursor.Pan);
+                        }
                     }
                     break;
             }

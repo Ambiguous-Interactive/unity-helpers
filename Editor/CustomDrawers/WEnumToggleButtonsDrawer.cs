@@ -1576,7 +1576,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string instancePart = target
-                .GetInstanceID()
+                .GetUnityObjectId()
                 .ToString("X8", CultureInfo.InvariantCulture);
             string pathPart = property.propertyPath ?? string.Empty;
             return instancePart + ":" + pathPart;
@@ -1734,7 +1734,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string instancePart = target
-                .GetInstanceID()
+                .GetUnityObjectId()
                 .ToString("X8", CultureInfo.InvariantCulture);
             string pathPart = property.propertyPath ?? string.Empty;
             return instancePart + ":" + pathPart;

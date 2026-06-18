@@ -125,6 +125,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly GUIContent NullEntryTooltipContent = new();
         private static readonly GUIContent FoldoutLabelContent = new();
         private static readonly GUIContent UnsupportedTypeContent = new();
+        private static readonly GUIContent SuppressedFieldValueContent = new();
         private static readonly Dictionary<Type, string> UnsupportedTypeMessageCache = new();
         private static readonly Dictionary<string, Type> PropertyTypeResolutionCache = new(
             StringComparer.Ordinal
@@ -194,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             int instanceId =
                 serializedObject?.targetObject != null
-                    ? serializedObject.targetObject.GetInstanceID()
+                    ? serializedObject.targetObject.GetUnityObjectId()
                     : 0;
             return new MainFoldoutCacheKey(instanceId, propertyPath);
         }
@@ -1203,6 +1204,77 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             MainFoldoutAnimations.Clear();
         }
 
+        internal static bool TryToggleManualEntryFoldoutLabelForTests(
+            Event currentEvent,
+            Rect labelHitRect,
+            ref bool expanded
+        )
+        {
+            return TryToggleManualEntryFoldoutLabel(currentEvent, labelHitRect, ref expanded);
+        }
+
+        private static bool TryToggleManualEntryFoldoutLabel(
+            Event currentEvent,
+            Rect labelHitRect,
+            ref bool expanded
+        )
+        {
+            if (currentEvent == null)
+            {
+                return false;
+            }
+
+            EventType effectiveEventType = GetEffectiveMouseEventType(currentEvent);
+            if (
+                effectiveEventType != EventType.MouseDown
+                || currentEvent.button != 0
+                || !labelHitRect.Contains(currentEvent.mousePosition)
+            )
+            {
+                return false;
+            }
+
+            expanded = !expanded;
+            GUI.changed = true;
+            if (currentEvent.type != EventType.Used)
+            {
+                currentEvent.Use();
+            }
+
+            return true;
+        }
+
+        private static EventType GetEffectiveMouseEventType(Event currentEvent)
+        {
+            if (currentEvent == null)
+            {
+                return EventType.Ignore;
+            }
+
+            return GetEffectiveMouseEventType(currentEvent.type, currentEvent.rawType);
+        }
+
+        internal static EventType GetEffectiveMouseEventTypeForTests(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            return GetEffectiveMouseEventType(eventType, rawEventType);
+        }
+
+        private static EventType GetEffectiveMouseEventType(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            if (eventType == EventType.Used)
+            {
+                return rawEventType;
+            }
+
+            return eventType;
+        }
+
         /// <summary>
         /// Signals that a child property drawer's height has changed and the parent
         /// SerializableSetPropertyDrawer should invalidate its row height cache.
@@ -1595,7 +1667,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Common case: single target - use static cache to avoid string allocation
             if (targets.Length == 1 && targets[0] != null)
             {
-                int instanceId = targets[0].GetInstanceID();
+                int instanceId = targets[0].GetUnityObjectId();
                 PropertyCacheKey cacheKey = new(instanceId, propertyPath);
 
                 if (SingleTargetPropertyKeyCache.TryGetValue(cacheKey, out string cached))
@@ -1632,7 +1704,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             for (int index = 0; index < targets.Length; index++)
             {
-                int id = targets[index] != null ? targets[index].GetInstanceID() : 0;
+                int id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
                 if (index < targets.Length - 1)
                 {
@@ -2417,22 +2489,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SerializableCollectionTweenDiagnostics.LogMouseEvent(
                     "ManualEntryLabelClick",
                     propertyPath ?? "(null)",
-                    currentEvent.type,
+                    GetEffectiveMouseEventType(currentEvent),
                     currentEvent.mousePosition,
                     labelHitRect,
                     mouseInLabelRect
                 );
 
-                if (
-                    currentEvent.type == EventType.MouseDown
-                    && currentEvent.button == 0
-                    && mouseInLabelRect
-                )
-                {
-                    expanded = !expanded;
-                    GUI.changed = true;
-                    currentEvent.Use();
-                }
+                bool labelClickToggled = TryToggleManualEntryFoldoutLabel(
+                    currentEvent,
+                    labelHitRect,
+                    ref expanded
+                );
 
                 EditorGUI.BeginChangeCheck();
                 bool arrowExpanded = EditorGUI.Foldout(
@@ -2441,13 +2508,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     GUIContent.none,
                     toggleOnLabelClick: false
                 );
-                if (EditorGUI.EndChangeCheck())
+                if (EditorGUI.EndChangeCheck() && !labelClickToggled)
                 {
                     expanded = arrowExpanded;
                 }
 
                 GUIStyle manualEntryLabelStyle = GetManualEntryFoldoutLabelStyle();
-                EditorGUIUtility.AddCursorRect(labelHitRect, MouseCursor.Link);
+                if (!EditorUi.Suppress)
+                {
+                    EditorGUIUtility.AddCursorRect(labelHitRect, MouseCursor.Link);
+                }
                 EditorGUI.LabelField(labelRect, ManualEntryFoldoutContent, manualEntryLabelStyle);
 
                 if (expanded != pending.isExpanded)
@@ -3695,6 +3765,25 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return UnsupportedTypeContent;
         }
 
+        private static GUIContent GetSuppressedFieldValueContent(object current)
+        {
+            string text = string.Empty;
+            if (current is Object unityObject)
+            {
+                if (unityObject != null)
+                {
+                    text = unityObject.name;
+                }
+            }
+            else if (current != null)
+            {
+                text = current.ToString() ?? string.Empty;
+            }
+
+            SuppressedFieldValueContent.text = text;
+            return SuppressedFieldValueContent;
+        }
+
         internal static object DrawFieldForType(
             Rect rect,
             GUIContent content,
@@ -3711,6 +3800,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (!IsTypeSupported(type))
             {
                 EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
+                return current;
+            }
+
+            if (EditorUi.Suppress)
+            {
+                EditorGUI.LabelField(rect, content, GetSuppressedFieldValueContent(current));
                 return current;
             }
 

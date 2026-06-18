@@ -794,7 +794,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _lastInspectorHeightCacheFrame = currentFrame;
             }
 
-            int instanceId = value.GetInstanceID();
+            int instanceId = value.GetUnityObjectId();
             // Round width to avoid cache misses from floating point variations
             float roundedWidth = Mathf.Round(availableWidth);
             (int, float) cacheKey = (instanceId, roundedWidth);
@@ -1373,7 +1373,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Object target =
                 property.serializedObject != null ? property.serializedObject.targetObject : null;
-            int id = target != null ? target.GetInstanceID() : 0;
+            int id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (int, string) cacheKey = (id, propertyPath);
             if (!FoldoutKeyCache.TryGetValue(cacheKey, out string key))
@@ -1388,7 +1388,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Object target =
                 property.serializedObject != null ? property.serializedObject.targetObject : null;
-            int id = target != null ? target.GetInstanceID() : 0;
+            int id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (int, string) cacheKey = (id, propertyPath);
             if (!ScrollKeyCache.TryGetValue(cacheKey, out string key))

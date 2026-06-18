@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestAssets;
@@ -306,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 TestNestedPrefabHandler.RecordedContexts.Count,
                 $"Expected nested prefab handler to be invoked. "
                     + $"RecordedContexts=[{string.Join(", ", TestNestedPrefabHandler.RecordedContexts.Select(c => $"Flags={c.Flags}"))}], "
-                    + $"InstanceIDs=[{string.Join(", ", TestNestedPrefabHandler.RecordedInstances.Select(i => i.GetInstanceID()))}]"
+                    + $"InstanceIDs=[{string.Join(", ", TestNestedPrefabHandler.RecordedInstances.Select(i => i.GetUnityObjectId()))}]"
             );
         }
 
@@ -349,7 +350,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 Assert.IsTrue(
                     TestPrefabAssetChangeHandler.RecordedInstances.Contains(handler),
-                    $"Expected handler {handler.GetInstanceID()} from MultipleHandlers to be invoked"
+                    $"Expected handler {handler.GetUnityObjectId()} from MultipleHandlers to be invoked"
                 );
             }
         }
@@ -444,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 TestSceneAssetChangeHandler.RecordedInstances.Count,
                 $"Expected no scene handlers invoked from prefab since it lacks SearchPrefabs option. "
                     + $"RecordedContexts=[{string.Join(", ", TestSceneAssetChangeHandler.RecordedContexts.Select(c => $"Flags={c.Flags}"))}], "
-                    + $"InstanceIDs=[{string.Join(", ", TestSceneAssetChangeHandler.RecordedInstances.Select(i => i.GetInstanceID()))}]"
+                    + $"InstanceIDs=[{string.Join(", ", TestSceneAssetChangeHandler.RecordedInstances.Select(i => i.GetUnityObjectId()))}]"
             );
         }
 
@@ -576,7 +577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Expected nested scene handler to be invoked exactly once. "
                     + $"HandlerInvocations={handlerInvocationCount}, "
                     + $"TotalRecordedInstances={TestSceneAssetChangeHandler.RecordedInstances.Count}, "
-                    + $"ExpectedHandlerID={handler.GetInstanceID()}"
+                    + $"ExpectedHandlerID={handler.GetUnityObjectId()}"
             );
             Assert.IsTrue(
                 TestSceneAssetChangeHandler.RecordedInstances.Contains(handler),
@@ -620,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Expected both scene handlers to be invoked exactly once each. "
                     + $"HandlerInvocations={handlerInvocationCount}, "
                     + $"TotalRecordedInstances={TestSceneAssetChangeHandler.RecordedInstances.Count}, "
-                    + $"ExpectedHandler1ID={handler1.GetInstanceID()}, ExpectedHandler2ID={handler2.GetInstanceID()}"
+                    + $"ExpectedHandler1ID={handler1.GetUnityObjectId()}, ExpectedHandler2ID={handler2.GetUnityObjectId()}"
             );
             Assert.IsTrue(
                 TestSceneAssetChangeHandler.RecordedInstances.Contains(handler1),
@@ -665,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Expected inactive scene handler to be invoked exactly once. "
                     + $"HandlerInvocations={handlerInvocationCount}, "
                     + $"TotalRecordedInstances={TestSceneAssetChangeHandler.RecordedInstances.Count}, "
-                    + $"ExpectedHandlerID={handler.GetInstanceID()}"
+                    + $"ExpectedHandlerID={handler.GetUnityObjectId()}"
             );
             Assert.IsTrue(
                 TestSceneAssetChangeHandler.RecordedInstances.Contains(handler),
@@ -722,7 +723,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Expected both prefab and scene handlers to be invoked exactly once each. "
                     + $"HandlerInvocations={handlerInvocationCount}, "
                     + $"TotalRecordedInstances={TestCombinedSearchHandler.RecordedInstances.Count}, "
-                    + $"PrefabHandlerID={prefabHandler.GetInstanceID()}, SceneHandlerID={sceneHandler.GetInstanceID()}"
+                    + $"PrefabHandlerID={prefabHandler.GetUnityObjectId()}, SceneHandlerID={sceneHandler.GetUnityObjectId()}"
             );
             Assert.IsTrue(
                 TestCombinedSearchHandler.RecordedInstances.Contains(prefabHandler),
@@ -946,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + $"HandlerInvocations={handlerInvocationCount}, "
                     + $"TotalRecordedInstances={TestCombinedSearchHandler.RecordedInstances.Count}, "
                     + $"usePrefab={usePrefab}, createSceneObject={createSceneObject}, "
-                    + $"PrefabHandlerID={prefabHandler?.GetInstanceID()}, SceneHandlerID={sceneHandler?.GetInstanceID()}"
+                    + $"PrefabHandlerID={prefabHandler.GetUnityObjectId()}, SceneHandlerID={sceneHandler.GetUnityObjectId()}"
             );
         }
 
@@ -1051,14 +1052,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 if (instance != null)
                 {
-                    expectedIds.Add(instance.GetInstanceID());
+                    expectedIds.Add(instance.GetUnityObjectId());
                 }
             }
 
             int count = 0;
             foreach (T recorded in recordedInstances)
             {
-                if (recorded != null && expectedIds.Contains(recorded.GetInstanceID()))
+                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
                 {
                     count++;
                 }
@@ -1083,7 +1084,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 if (instance != null)
                 {
-                    expectedIds.Add(instance.GetInstanceID());
+                    expectedIds.Add(instance.GetUnityObjectId());
                 }
             }
 
@@ -1091,7 +1092,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             for (int i = 0; i < recordedInstances.Count && i < recordedContexts.Count; i++)
             {
                 T recorded = recordedInstances[i];
-                if (recorded != null && expectedIds.Contains(recorded.GetInstanceID()))
+                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
                 {
                     result.Add(recordedContexts[i]);
                 }

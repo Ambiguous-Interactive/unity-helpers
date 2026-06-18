@@ -42,6 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public void FixtureSetUp()
         {
             AssetDatabaseBatchHelper.ResetCountersOnly();
+            CleanupIntegrationTestFolders();
         }
 
         [SetUp]
@@ -56,13 +57,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             base.TearDown();
 
-            // Clean up any test folders that might have been created
-            if (AssetDatabase.IsValidFolder(TestFolderRoot))
-            {
-                AssetDatabase.DeleteAsset(TestFolderRoot);
-            }
-
+            CleanupIntegrationTestFolders();
             AssetDatabaseBatchHelper.ResetBatchDepth();
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupIntegrationTestFolders();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
         }
 
         /// <summary>
@@ -563,6 +572,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             // Track the folder for cleanup (including root if we created it)
             TrackFolder(folderPath);
+        }
+
+        private static void CleanupIntegrationTestFolders()
+        {
+            CleanupAllKnownTestFolders();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         }
     }
 

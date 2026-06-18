@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 #if UNITY_EDITOR
     using System.Collections;
     using NUnit.Framework;
+    using UnityEngine;
     using UnityEngine.TestTools;
 
     [TestFixture]
@@ -47,6 +48,41 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         {
             IEnumerator runner = TestIMGUIExecutor.Run(null);
             Assert.DoesNotThrow(() => DrainEnumerator(runner));
+        }
+
+        [UnityTest]
+        public IEnumerator RunMouseDownPumpsMouseDownBetweenLayoutAndRepaint()
+        {
+            bool sawLayout = false;
+            bool sawMouseDown = false;
+            bool sawRepaint = false;
+            Vector2 mousePosition = new(12f, 34f);
+
+            yield return TestIMGUIExecutor.RunMouseDown(
+                () =>
+                {
+                    Event currentEvent = Event.current;
+                    if (currentEvent.type == EventType.Layout)
+                    {
+                        sawLayout = true;
+                    }
+                    else if (currentEvent.type == EventType.MouseDown)
+                    {
+                        sawMouseDown = true;
+                        Assert.AreEqual(mousePosition, currentEvent.mousePosition);
+                        Assert.AreEqual(0, currentEvent.button);
+                    }
+                    else if (currentEvent.type == EventType.Repaint)
+                    {
+                        sawRepaint = true;
+                    }
+                },
+                mousePosition
+            );
+
+            Assert.IsTrue(sawLayout, "Expected the offscreen pump to run Layout first.");
+            Assert.IsTrue(sawMouseDown, "Expected the offscreen pump to run MouseDown.");
+            Assert.IsTrue(sawRepaint, "Expected the offscreen pump to run Repaint last.");
         }
 
         private static void DrainEnumerator(IEnumerator enumerator)

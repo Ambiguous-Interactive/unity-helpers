@@ -906,7 +906,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         continue;
                     }
 
-                    int instanceId = component.GetInstanceID();
+                    int instanceId = component.GetUnityObjectId();
                     if (yieldedInstanceIds.Add(instanceId))
                     {
                         yield return component;
@@ -950,7 +950,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             continue;
                         }
 
-                        int instanceId = component.GetInstanceID();
+                        int instanceId = component.GetUnityObjectId();
                         if (yieldedInstanceIds.Add(instanceId))
                         {
                             yield return component;

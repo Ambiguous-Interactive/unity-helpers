@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 {
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
 
     public sealed class RecordingEffectBehavior : EffectBehavior
@@ -43,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
         private void OnEnable()
         {
-            _ = InstanceIds.Add(GetInstanceID());
+            _ = InstanceIds.Add(this.GetUnityObjectId());
         }
 
         public override void OnApply(EffectBehaviorContext context)

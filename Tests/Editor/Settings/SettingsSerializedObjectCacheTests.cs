@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Settings;
 
@@ -353,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
-            int instanceId = cached.targetObject.GetInstanceID();
+            int instanceId = cached.targetObject.GetUnityObjectId();
 
             Assert.AreNotEqual(
                 0,
@@ -362,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
 
             SerializedObject cachedAgain = GetCachedSerializedObject(settings);
-            int sameInstanceId = cachedAgain.targetObject.GetInstanceID();
+            int sameInstanceId = cachedAgain.targetObject.GetUnityObjectId();
 
             Assert.AreEqual(
                 instanceId,
@@ -835,7 +836,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             SerializedObject firstCached = GetCachedSerializedObject(settings);
             Assert.IsTrue(firstCached != null, "First cached SerializedObject should not be null.");
 
-            int originalTargetInstanceId = firstCached.targetObject.GetInstanceID();
+            int originalTargetInstanceId = firstCached.targetObject.GetUnityObjectId();
             Assert.AreNotEqual(
                 0,
                 originalTargetInstanceId,
@@ -863,7 +864,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
 
             // Verify the new SerializedObject targets the same underlying settings object
-            int newTargetInstanceId = secondCached.targetObject.GetInstanceID();
+            int newTargetInstanceId = secondCached.targetObject.GetUnityObjectId();
             Assert.AreEqual(
                 originalTargetInstanceId,
                 newTargetInstanceId,

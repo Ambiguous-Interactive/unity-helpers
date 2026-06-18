@@ -57,13 +57,50 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         {
             if (action != null)
             {
-                Execute(action, budget);
+                Execute(
+                    action,
+                    budget,
+                    CreateLayoutRepaintEvents(),
+                    overrideMouseDownPosition: false,
+                    mouseDownPosition: default
+                );
             }
 
             yield break;
         }
 
-        private static void Execute(Action action, TestIMGUIExecutorBudget budget)
+        internal static IEnumerator RunMouseDown(Action action, Vector2 mousePosition)
+        {
+            return RunMouseDown(action, mousePosition, TestIMGUIExecutorBudget.Default);
+        }
+
+        internal static IEnumerator RunMouseDown(
+            Action action,
+            Vector2 mousePosition,
+            TestIMGUIExecutorBudget budget
+        )
+        {
+            if (action != null)
+            {
+                Execute(
+                    action,
+                    budget,
+                    CreateLayoutMouseDownRepaintEvents(mousePosition),
+                    overrideMouseDownPosition: true,
+                    mouseDownPosition: mousePosition
+                );
+            }
+
+            yield break;
+        }
+
+        private static void Execute(
+            Action action,
+            TestIMGUIExecutorBudget budget,
+            Event[] events,
+            bool overrideMouseDownPosition,
+            Vector2 mouseDownPosition
+        )
         {
             if (!TryResolveMechanism(out string resolveError))
             {
@@ -87,6 +124,19 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 handlerRan = true;
                 try
                 {
+                    Event currentEvent = Event.current;
+                    if (
+                        overrideMouseDownPosition
+                        && currentEvent != null
+                        && (
+                            currentEvent.type == EventType.MouseDown
+                            || currentEvent.rawType == EventType.MouseDown
+                        )
+                    )
+                    {
+                        currentEvent.mousePosition = mouseDownPosition;
+                    }
+
                     action();
                 }
                 catch (Exception e)
@@ -145,13 +195,12 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 visualTree.Add(container);
                 _validateLayout.Invoke(panel, null);
 
-                // Layout then Repaint is the standard IMGUI contract a drawer's OnGUI expects:
-                // the Layout pass builds the layout, the Repaint pass renders it. A healthy run
-                // never approaches the budget; the budget only bounds a pathological pump.
+                // Layout then Repaint is the standard IMGUI contract a drawer's OnGUI expects.
+                // Focused interaction tests may insert a single MouseDown between those phases.
+                // A healthy run never approaches the budget; the budget only bounds a pathological pump.
                 int passes = 0;
                 double start = EditorApplication.timeSinceStartup;
-                EventType[] phases = { EventType.Layout, EventType.Repaint };
-                foreach (EventType phase in phases)
+                foreach (Event evt in events)
                 {
                     double elapsed = EditorApplication.timeSinceStartup - start;
                     if (passes >= budget.MaxFrames || elapsed >= budget.MaxSeconds)
@@ -159,7 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                         throw new TestIMGUIExecutorTimeoutException(passes, elapsed, budget);
                     }
 
-                    Event evt = new Event { type = phase };
                     try
                     {
                         _handleIMGUIEvent.Invoke(container, new object[] { evt, wrapped, true });
@@ -228,6 +276,31 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     UnityEngine.Object.DestroyImmediate(owner); // UNH-SUPPRESS UNH001
                 }
             }
+        }
+
+        private static Event[] CreateLayoutRepaintEvents()
+        {
+            return new[]
+            {
+                new Event { type = EventType.Layout },
+                new Event { type = EventType.Repaint },
+            };
+        }
+
+        private static Event[] CreateLayoutMouseDownRepaintEvents(Vector2 mousePosition)
+        {
+            return new[]
+            {
+                new Event { type = EventType.Layout },
+                new Event
+                {
+                    type = EventType.MouseDown,
+                    mousePosition = mousePosition,
+                    button = 0,
+                    clickCount = 1,
+                },
+                new Event { type = EventType.Repaint },
+            };
         }
 
         // ---- Reflection mechanism (resolved once) ----------------------------------------

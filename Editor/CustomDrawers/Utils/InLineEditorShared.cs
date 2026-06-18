@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -329,7 +330,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return null;
             }
 
-            int key = value.GetInstanceID();
+            int key = value.GetUnityObjectId();
 
             // Check if we have a valid cached editor (TryGet marks it as accessed for LRU)
             if (EditorCache.TryGet(key, out Editor cachedEditor) && cachedEditor != null)

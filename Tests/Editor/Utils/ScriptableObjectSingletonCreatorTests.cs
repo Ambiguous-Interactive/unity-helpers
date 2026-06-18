@@ -202,7 +202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             string assetPath = "Assets/Resources/cASEtest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(assetPath);
-            LogAssert.ignoreFailingMessages = true;
 
             // Verify folder setup before running ensure
             bool wrongCasedFolderExists = AssetDatabase.IsValidFolder("Assets/Resources/cASEtest");
@@ -1056,8 +1055,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             yield return null;
 
-            LogAssert.ignoreFailingMessages = true;
-
             // Verify folder setup
             Assert.IsTrue(
                 AssetDatabase.IsValidFolder(existingFolder),
@@ -1217,8 +1214,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ImportAssetOptions.ForceSynchronousImport
             );
             yield return null;
-
-            LogAssert.ignoreFailingMessages = true;
 
             // Run singleton creation
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();

@@ -10,7 +10,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Threading;
-    using UnityEngine;
 
     /// <summary>
     /// Provides size estimation for pool item types to enable size-aware purging policies.
@@ -296,11 +295,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch (Exception e)
             {
                 // Non-blittable types - estimate based on fields
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogWarning(
-                    $"[PoolSizeEstimator] Failed to get Marshal.SizeOf for {type.Name}, using field-based estimate: {e.Message}"
-                );
-#endif
                 _ = e;
                 return EstimateFieldBasedSize(type);
             }
@@ -360,11 +354,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             catch (Exception e)
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogWarning(
-                    $"[PoolSizeEstimator] Failed to estimate field-based size for {type.Name}: {e.Message}"
-                );
-#endif
                 _ = e;
                 // If reflection fails, use a conservative estimate
                 size = PointerSize * 4;
@@ -506,11 +495,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             catch (Exception e)
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.Log(
-                    $"[PoolSizeEstimator] Failed to get element size for {type.Name}, using field-based estimate: {e.Message}"
-                );
-#endif
                 _ = e;
                 // Non-blittable struct - estimate based on fields
                 return EstimateFieldBasedSize(type);
