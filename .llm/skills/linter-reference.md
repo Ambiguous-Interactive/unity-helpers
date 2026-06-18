@@ -13,13 +13,8 @@ Use this reference when you need:
 - Complete linter command documentation
 - Configuration file locations and settings
 - Understanding what specific rules check
-- Details about npm script internals
 
 For the quick validation workflow, see [validate-before-commit](./validate-before-commit.md).
-For fixing common errors, see [validation-troubleshooting](./validation-troubleshooting.md).
-
-> **Note:** This is a comprehensive reference for linter details. For the quick pre-commit workflow,
-> see [validate-before-commit](./validate-before-commit.md).
 
 ---
 
@@ -99,7 +94,7 @@ The config linter catches case-redundant dictionary entries (error, blocking) an
 
 ### Lint-Error-Code Coverage (Contract)
 
-`npm run validate:lint-error-codes` enforces that every `^[A-Z]{2,}\d{3}$` token emitted by `scripts/lint-*.{ps1,js}`, `scripts/tests/test-lint-*.{ps1,js,sh}`, or `.githooks/*` has its prefix registered with cspell; on drift it prints a copy-pasteable JSON patch. Regression test: `scripts/tests/test-validate-lint-error-codes.ps1`. Wired into `validate:content`, `validate:tests`, and pre-push (when any file in those three scan roots, `cspell.json`, the validator, or its test changes).
+`npm run validate:lint-error-codes` enforces that every `^[A-Z]{2,}\d{3}$` token emitted by `scripts/lint-*.{ps1,js}`, `scripts/tests/test-lint-*.{ps1,js,sh}`, or `.githooks/*` has its prefix registered with cspell; on drift it prints a copy-pasteable JSON patch. Regression test: `scripts/tests/test-validate-lint-error-codes.ps1`. Wired into `validate:content`, `validate:tests`, and CI; run it before pushing when any file in those scan roots, `cspell.json`, the validator, or its test changes.
 
 ### Inline Ignores
 

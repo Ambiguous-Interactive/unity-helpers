@@ -50,8 +50,8 @@ pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test
 ```
 
 The pre-commit hook runs the auto-fix for staged test files automatically.
-
-This linter is also run by the pre-push git hook. Failing to run it locally will result in rejected pushes.
+`npm run agent:preflight`, `npm run validate:prepush`, and CI also run the
+linter before push-time last-resort checks are involved.
 
 ---
 

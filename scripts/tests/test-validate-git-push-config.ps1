@@ -122,6 +122,20 @@ finally {
     Remove-Item -Path $repo2 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+Write-Host "`nTest group: non-hook .githooks txt files are ignored by artifact scan" -ForegroundColor Magenta
+$repo3 = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('.githooks/*.txt')
+try {
+    $artifactPath = Join-Path $repo3 '.githooks/notes.txt'
+    Set-Content -Path $artifactPath -Value 'local note' -Encoding UTF8
+
+    $result3 = Invoke-Validator -RepoPath $repo3
+    Write-TestResult 'Pass_NonHookGithooksTxtExitCodeZero' ($result3.ExitCode -eq 0) "Expected exit code 0, got $($result3.ExitCode). Output: $($result3.Output)"
+    Write-TestResult 'Pass_NonHookGithooksTxtNotReported' (-not ($result3.Output -match 'notes\.txt')) "Expected output not to mention .githooks/notes.txt. Output: $($result3.Output)"
+}
+finally {
+    Remove-Item -Path $repo3 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host ''
 Write-Host ('=' * 60)
 Write-Host ("Tests passed: {0}" -f $script:TestsPassed) -ForegroundColor Green

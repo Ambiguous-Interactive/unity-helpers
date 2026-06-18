@@ -50,6 +50,10 @@ $lfPathPatterns = @(
     '^_includes/.*\.html$'  # Jekyll includes (_includes/*.html)
 )
 
+$trackedTextPathPatterns = @(
+    '^\.gitignore$'
+)
+
 function Test-ShouldUseLf([string]$path) {
     # Normalize path separators to forward slashes for consistent matching
     $normalizedPath = $path -replace '\\', '/'
@@ -70,12 +74,25 @@ function Test-ShouldUseLf([string]$path) {
     return $false
 }
 
+function Test-ShouldCheckPath([string]$path) {
+    $normalizedPath = $path -replace '\\', '/'
+    $ext = [System.IO.Path]::GetExtension($path).TrimStart('.').ToLowerInvariant()
+    if ($extensions -contains $ext) {
+        return $true
+    }
+
+    foreach ($pattern in $trackedTextPathPatterns) {
+        if ($normalizedPath -match $pattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-TrackedFiles {
     $files = (& git -C $repoRoot ls-files -z) -split "`0" | Where-Object { $_ -ne '' }
-    return $files | Where-Object {
-        $ext = [System.IO.Path]::GetExtension($_).TrimStart('.').ToLowerInvariant()
-        $extensions -contains $ext
-    }
+    return $files | Where-Object { Test-ShouldCheckPath $_ }
 }
 
 function Get-TargetFiles([string[]]$paths, [string[]]$trackedFiles) {
@@ -94,9 +111,7 @@ function Get-TargetFiles([string[]]$paths, [string[]]$trackedFiles) {
 
         $relative = [System.IO.Path]::GetRelativePath($repoRoot, $fullPath)
         $normalized = $relative -replace '\\', '/'
-        $ext = [System.IO.Path]::GetExtension($normalized).TrimStart('.').ToLowerInvariant()
-
-        if ($extensions -contains $ext) {
+        if (Test-ShouldCheckPath $normalized) {
             $targets.Add($normalized) | Out-Null
         }
     }

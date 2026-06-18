@@ -38,7 +38,7 @@ This executes all linting, formatting, and convention checks (including `lint:sp
 
 **Blocker rule — do NOT push if any of these fail:**
 
-- `lint:spelling` — a spelling failure blocks both pre-push (local) and CI. Fix at Step 1, never at push time.
+- `lint:spelling` — a spelling failure blocks `agent:preflight`, `validate:prepush`, and CI. Fix at Step 1, never at push time.
 - `lint:spelling:config` — cspell.json itself must be clean.
 - `eol:check`, `validate:content`, `validate:tests`, `lint:csharp-naming` — all mandatory.
 
@@ -136,13 +136,14 @@ Rules when pushing:
 | Rule                           | Why                                                                          |
 | ------------------------------ | ---------------------------------------------------------------------------- |
 | **Never redirect output**      | `git push 2> pre-push.txt` creates gitignored pollution that confuses agents |
-| **Never use `--no-verify`**    | Bypassing the pre-push hook defeats pre-push parity (see Step 1)             |
+| **Never use `--no-verify`**    | Bypassing the pre-push hook skips the last-resort local safety gate          |
 | **Let stderr stream normally** | Errors must be visible in the live output, not hidden in files               |
 
 If `fatal: The current branch <x> has no upstream branch` appears, the local
 config is missing. Remediation: `npm run agent:preflight:fix` (restores
-`push.autoSetupRemote=true` and removes any stray `<hook-name>.{txt,log,tmp}`
-artifact files). Do **not** work around it with `git push -u origin <branch>`
+`push.autoSetupRemote=true` and removes any stray
+`<hook-name>.{txt,log,out,err,tmp}` artifact files). Do **not** work around it
+with `git push -u origin <branch>`
 — fix the config once so every future push is clean.
 
 If a push is rejected for non-fast-forward reasons, prefer

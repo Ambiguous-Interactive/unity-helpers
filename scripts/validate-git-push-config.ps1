@@ -77,7 +77,7 @@ $strayFiles = New-Object System.Collections.Generic.List[string]
 if (Test-Path -LiteralPath $hooksDir -PathType Container) {
     $hookNames = @(
         Get-ChildItem -LiteralPath $hooksDir -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notlike '*.sample' } |
+            Where-Object { $_.Name -notlike '*.sample' -and $_.Extension -notin @('.txt', '.log', '.out', '.err', '.tmp') } |
             ForEach-Object {
                 if ($_.Name -like '*.*') {
                     [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
@@ -97,14 +97,11 @@ if (Test-Path -LiteralPath $hooksDir -PathType Container) {
             if (Test-Path -LiteralPath $candidate -PathType Leaf) {
                 $strayFiles.Add($candidate) | Out-Null
             }
-        }
-    }
 
-    $hooksScanExts = @('txt', 'tmp', 'log', 'out', 'err')
-    foreach ($ext in $hooksScanExts) {
-        $matched = Get-ChildItem -LiteralPath $hooksDir -Filter "*.$ext" -File -ErrorAction SilentlyContinue
-        foreach ($file in $matched) {
-            $strayFiles.Add($file.FullName) | Out-Null
+            $hookCandidate = Join-Path $hooksDir "$hook.$ext"
+            if (Test-Path -LiteralPath $hookCandidate -PathType Leaf) {
+                $strayFiles.Add($hookCandidate) | Out-Null
+            }
         }
     }
 }

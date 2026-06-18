@@ -28,7 +28,7 @@
 
 ## CSharpier (C# Files)
 
-> **CRITICAL**: Pre-push hooks and CI/CD will REJECT commits with CSharpier formatting issues.
+> **CRITICAL**: `npm run agent:preflight`, `npm run validate:prepush`, and CI/CD will REJECT commits with CSharpier formatting issues. The local pre-push hook stays fast and does not run formatters.
 
 ### When to Run
 
@@ -68,7 +68,7 @@ dotnet tool restore
 
 ## Prettier (Non-C# Files)
 
-> **CRITICAL**: Pre-push hooks REJECT commits with Prettier issues. Run Prettier IMMEDIATELY after editing ANY non-C# file.
+> **CRITICAL**: `npm run agent:preflight`, `npm run validate:prepush`, and CI/CD REJECT commits with Prettier issues. The local pre-push hook stays fast and does not run formatters. Run Prettier IMMEDIATELY after editing ANY non-C# file.
 
 ### When to Run
 
@@ -276,17 +276,17 @@ Always verify with `--check` to confirm formatting succeeded.
 
 ---
 
-## Pre-Push Hook Enforcement
+## Push-Prep Enforcement
 
-The pre-push hook enforces all formatting. Commits will be REJECTED if files are not formatted.
+`npm run agent:preflight`, `npm run validate:prepush`, and CI enforce formatting. The local pre-push hook intentionally stays fast and does not run formatters.
 
-If push fails:
+If validation fails:
 
 1. Run `node scripts/run-prettier.js --write -- .` to fix non-C# files
 2. Run `dotnet tool run csharpier format .` to fix C# files
 3. Run `npm run eol:fix` to fix line endings
 4. Commit the formatting changes
-5. Push again
+5. Validate again
 
 ---
 

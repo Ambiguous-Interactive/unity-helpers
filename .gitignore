@@ -379,8 +379,41 @@ artifacts.meta
 # MkDocs build output
 site/
 
+# Git hook output artifacts created by accidental redirection, e.g.
+# `git push 2> pre-push.txt`. These are auto-removed by pre-push and
+# `npm run agent:preflight:fix` only after git confirms they are ignored.
 pre-commit.txt*
+pre-commit.out
+pre-commit.err
+pre-merge-commit.txt*
+pre-merge-commit.out
+pre-merge-commit.err
 pre-push.txt*
+pre-push.out
+pre-push.err
+post-rewrite.txt*
+post-rewrite.out
+post-rewrite.err
+.githooks/pre-commit.txt
+.githooks/pre-commit.log
+.githooks/pre-commit.out
+.githooks/pre-commit.err
+.githooks/pre-commit.tmp
+.githooks/pre-merge-commit.txt
+.githooks/pre-merge-commit.log
+.githooks/pre-merge-commit.out
+.githooks/pre-merge-commit.err
+.githooks/pre-merge-commit.tmp
+.githooks/pre-push.txt
+.githooks/pre-push.log
+.githooks/pre-push.out
+.githooks/pre-push.err
+.githooks/pre-push.tmp
+.githooks/post-rewrite.txt
+.githooks/post-rewrite.log
+.githooks/post-rewrite.out
+.githooks/post-rewrite.err
+.githooks/post-rewrite.tmp
 benchmarks/
 pr-description.md*
 test-results*

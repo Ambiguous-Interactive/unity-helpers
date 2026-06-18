@@ -41,15 +41,17 @@ python scripts/wiki/prepare_wiki.py \
 
 **Both test suites MUST pass.** The bash tests validate that the Python scripts use correct Markdown link syntax. The Python tests validate the actual logic of link transformations, sidebar generation, etc.
 
-### Pre-Push Hook Integration
+### Validation Integration
 
-The pre-push hook automatically runs wiki tests when wiki-related files change:
+`npm run validate:prepush` runs the bash wiki test, and CI runs the full wiki test set when wiki-related files change:
 
 - `scripts/wiki/*.py` — Python wiki scripts
 - `scripts/tests/test-wiki-generation.sh` — Bash validation tests
 - `.github/workflows/deploy-wiki.yml` — Wiki deployment workflow
 
-If you modify any of these files, the pre-push hook will run both bash and Python wiki tests automatically.
+If you modify any of these files, run the wiki tests before pushing. The local
+pre-push hook stays limited to fast changed-file validation and does not run
+wiki regression suites.
 
 ---
 
@@ -266,11 +268,11 @@ Tests cover:
 
 ### When Tests Run
 
-| Trigger            | Bash Tests | Python Tests             |
-| ------------------ | ---------- | ------------------------ |
-| Pre-push hook      | ✅         | ✅ (if pytest installed) |
-| CI (PR/push)       | ✅         | ✅                       |
-| Manual (`npm run`) | ✅         | ✅                       |
+- `npm run test:wiki-generation` runs the bash tests only.
+- `python -m pytest scripts/wiki/test_wiki_scripts.py -v` runs the Python
+  tests only.
+- `npm run validate:tests` runs the bash tests only.
+- CI runs both suites for PRs and pushes touching wiki files.
 
 ---
 
@@ -288,7 +290,7 @@ Tests cover:
 | `scripts/wiki/generate_wiki_footer.py`      | Footer generation               |
 | `scripts/wiki/test_wiki_scripts.py`         | Python test suite (50+ tests)   |
 | `scripts/tests/test-wiki-generation.sh`     | Bash syntax validation tests    |
-| `.githooks/pre-push`                        | Pre-push hook (runs wiki tests) |
+| `.githooks/pre-push`                        | Fast changed-file pre-push hook |
 | `docs/`                                     | Source documentation files      |
 
 <!-- markdownlint-enable MD013 -->
@@ -305,8 +307,10 @@ When refactoring wiki generation scripts (e.g., moving from inline bash to Pytho
    AND Python tests (`test_wiki_scripts.py`)
 2. **Bash tests validate Python scripts** — The bash tests grep Python
    files for correct patterns
-3. **Run both locally before pushing** — Pre-push hook runs both, but
-   manual verification is faster
+3. **Run both locally before pushing** — use `npm run test:wiki-generation`
+   for bash coverage and `python -m pytest scripts/wiki/test_wiki_scripts.py -v`
+   for Python coverage. The local pre-push hook does not run wiki regression
+   suites.
 
 **Example failure scenario (what caused this issue):**
 

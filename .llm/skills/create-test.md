@@ -184,7 +184,7 @@ For complete naming rules, see [test-naming-conventions](./test-naming-conventio
 
 > **WARNING: UNH005 Lint Check Enforced**
 >
-> The pre-commit and pre-push hooks enforce UNH005, which flags `Assert.IsNull` and `Assert.IsNotNull` usage.
+> The pre-commit hook, `npm run agent:preflight`, `npm run validate:prepush`, and CI enforce UNH005, which flags `Assert.IsNull` and `Assert.IsNotNull` usage.
 > These assertions use `ReferenceEquals` internally, which bypasses Unity's custom `==` operator and fails to detect Unity's "fake null" (destroyed objects that are not yet garbage collected).
 
 1. **Unity object null checks** — Use `== null` / `!= null`, never `Assert.IsNull` / `Assert.IsNotNull`

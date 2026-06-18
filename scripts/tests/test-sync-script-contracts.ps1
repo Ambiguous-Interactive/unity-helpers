@@ -208,7 +208,7 @@ function Run-CspellContractTests {
 
 function Run-AgentValidationContractTests {
   Write-Host ""
-  Write-Host "Agent/pre-push spelling contract checks:" -ForegroundColor Magenta
+  Write-Host "Agent spelling contract checks:" -ForegroundColor Magenta
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
@@ -282,11 +282,17 @@ function Run-PowerShellPathBindingContractTests {
     $hasRemainingArgs = $content -match 'ValueFromRemainingArguments\s*=\s*\$true' -and
       $content -match '\$AdditionalPaths'
     $usesEffectivePaths = $content -match '\$effectivePaths'
+    $coversGitignore = $content -match '\^\\\.gitignore\$'
 
     Write-TestResult `
       -TestName "$($scriptInfo.Name) captures trailing -Paths arguments under pwsh -File" `
       -Passed ($hasRemainingArgs -and $usesEffectivePaths) `
       -Message 'Expected ValueFromRemainingArguments AdditionalPaths and effective path merging.'
+
+    Write-TestResult `
+      -TestName "$($scriptInfo.Name) covers extensionless .gitignore EOL policy" `
+      -Passed $coversGitignore `
+      -Message 'Expected .gitignore in trackedTextPathPatterns so extensionless git config files are checked.'
   }
 }
 
@@ -405,7 +411,7 @@ function Run-RepoLocalPrettierContractTests {
       -Message "LF override files: $($lfOverrideFiles -join ', ')"
   }
 
-  $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath, $preCommitPath, $prePushPath)
+  $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath, $preCommitPath)
   $requiredFiles = @($formatStagedPath, $lintStagedMarkdownPath, $agentPreflightPath, $validateLintErrorCodesPath, $preCommitPath, $prePushPath)
   $launcherDrift = @()
   foreach ($file in $prettierRequiredFiles) {
@@ -421,7 +427,7 @@ function Run-RepoLocalPrettierContractTests {
   }
 
   Write-TestResult `
-    -TestName 'hooks and preflight route Prettier through repo-local launcher' `
+    -TestName 'Prettier validation surfaces route through repo-local launcher' `
     -Passed ($launcherDrift.Count -eq 0) `
     -Message "Missing launcher reference: $($launcherDrift -join '; ')"
 
@@ -519,6 +525,78 @@ function Run-RepoLocalPrettierContractTests {
     -TestName 'LLM guidance does not teach host-PATH pinned Node tool invocations' `
     -Passed ($llmForbiddenHits.Count -eq 0) `
     -Message "Forbidden LLM guidance: $($llmForbiddenHits -join '; ')"
+}
+
+function Run-PrePushLastResortGuidanceContractTests {
+  Write-Host ""
+  Write-Host "Pre-push last-resort guidance contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $prePushPath = Join-Path $repoRoot '.githooks/pre-push'
+
+  if (-not (Test-Path $prePushPath)) {
+    Write-TestResult `
+      -TestName 'pre-push hook exists for last-resort contract' `
+      -Passed $false `
+      -Message "Missing file: $prePushPath"
+  }
+  else {
+    $prePushContent = Get-Content -Path $prePushPath -Raw
+
+    Write-TestResult `
+      -TestName 'pre-push declares last-resort fast-hook scope' `
+      -Passed ($prePushContent -match 'last-resort' -and $prePushContent -match 'must stay fast') `
+      -Message 'Expected the hook header to describe the last-resort fast-hook contract.'
+
+    $forbiddenHookChecks = @(
+      'audit-license-years\.sh',
+      'run-prettier\.js',
+      'cspell\s+lint',
+      'run-doc-link-lint',
+      'lint-meta-files',
+      'run_conditional_tests',
+      'test-wiki-generation',
+      'test_wiki_scripts'
+    )
+    $hookViolations = @()
+    foreach ($pattern in $forbiddenHookChecks) {
+      if ($prePushContent -match $pattern) {
+        $hookViolations += $pattern
+      }
+    }
+
+    Write-TestResult `
+      -TestName 'pre-push does not run routine lint, formatting, license, or regression suites' `
+      -Passed ($hookViolations.Count -eq 0) `
+      -Message "Forbidden hook checks: $($hookViolations -join ', ')"
+  }
+
+  $staleGuidancePatterns = @(
+    'pre-push hooks?\s+(and\s+CI/CD\s+)?will\s+REJECT',
+    'pre-push hooks?\s+REJECT',
+    'pre-push hook:\s+Check\s+#[0-9]+\s+runs',
+    'pre-push hook runs both'
+  )
+  $staleGuidanceHits = @()
+  $llmFiles = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot '.llm') -Recurse -File -Filter '*.md')
+  foreach ($file in $llmFiles) {
+    $lines = @(Get-Content -Path $file.FullName)
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+      foreach ($pattern in $staleGuidancePatterns) {
+        if ($lines[$i] -match $pattern) {
+          $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $file.FullName).Replace('\', '/')
+          $staleGuidanceHits += "${relativePath}:$($i + 1): $($lines[$i].Trim())"
+          break
+        }
+      }
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'LLM guidance does not claim pre-push runs slow routine validators' `
+    -Passed ($staleGuidanceHits.Count -eq 0) `
+    -Message "Stale guidance: $($staleGuidanceHits -join '; ')"
 }
 
 function Run-ReleaseDrafterChangelogVersionContractTests {
@@ -680,5 +758,6 @@ Run-AgentValidationContractTests
 Run-PowerShellPathBindingContractTests
 Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
+Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Print-SummaryAndExit

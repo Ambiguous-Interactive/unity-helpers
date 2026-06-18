@@ -58,6 +58,7 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1') (Join-Path $scriptsDir 'validate-lint-error-codes.ps1') -Force
     # configure-git-defaults.ps1 is preserved as a CLI entry point; it also
     # depends on git-push-defaults-helpers.ps1 (already copied above).
     Copy-Item (Join-Path $repoRoot 'scripts/configure-git-defaults.ps1') (Join-Path $scriptsDir 'configure-git-defaults.ps1') -Force
@@ -627,12 +628,30 @@ finally {
     Remove-Item -Path $repo10b -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Test 10c: Changed C# license year drift should fail, and -Fix should repair/stage
-Write-Host "`nTest group: license header auto-fix" -ForegroundColor Magenta
+# Test 10c: lint-error-code contract should run before pre-push when lint scripts change
+Write-Host "`nTest group: lint-error-code preflight contract" -ForegroundColor Magenta
 $repo10c = New-TestRepo -ConfigurePushDefaults
 try {
+    $hooksDir = Join-Path $repo10c '.githooks'
+    New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
+    Set-Content -Path (Join-Path $hooksDir 'pre-push') -Value '#!/usr/bin/env bash
+echo "UNH001"
+' -Encoding UTF8
+
+    $result10c = Invoke-Preflight -RepoPath $repo10c -Arguments @('-Paths', '.githooks/pre-push')
+    Write-TestResult 'LintErrorCodeContract_ExitCode0' ($result10c.ExitCode -eq 0) "Expected exit code 0, got $($result10c.ExitCode). Output: $($result10c.Output)"
+    Write-TestResult 'LintErrorCodeContract_RunsValidator' ($result10c.Output -match 'Validating lint-error-code cspell coverage') 'Expected agent-preflight to run lint-error-code coverage before pre-push'
+}
+finally {
+    Remove-Item -Path $repo10c -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10d: Changed C# license year drift should fail, and -Fix should repair/stage
+Write-Host "`nTest group: license header auto-fix" -ForegroundColor Magenta
+$repo10cLicense = New-TestRepo -ConfigurePushDefaults
+try {
     $currentYear = (Get-Date).Year
-    $filePath = Join-Path $repo10c 'Loose.cs'
+    $filePath = Join-Path $repo10cLicense 'Loose.cs'
     Set-Content -Path $filePath -Value @'
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
@@ -640,11 +659,11 @@ try {
 public sealed class Loose {}
 '@ -Encoding UTF8
 
-    $result10c = Invoke-Preflight -RepoPath $repo10c -Arguments @('-Paths', 'Loose.cs')
-    Write-TestResult 'LicenseHeaderDrift_ExitCode1' ($result10c.ExitCode -eq 1) "Expected exit code 1 for mismatched license year, got $($result10c.ExitCode). Output: $($result10c.Output)"
-    Write-TestResult 'LicenseHeaderDrift_Message' ($result10c.Output -match 'License year header issues detected') 'Expected license header drift diagnostic'
+    $result10cLicense = Invoke-Preflight -RepoPath $repo10cLicense -Arguments @('-Paths', 'Loose.cs')
+    Write-TestResult 'LicenseHeaderDrift_ExitCode1' ($result10cLicense.ExitCode -eq 1) "Expected exit code 1 for mismatched license year, got $($result10cLicense.ExitCode). Output: $($result10cLicense.Output)"
+    Write-TestResult 'LicenseHeaderDrift_Message' ($result10cLicense.Output -match 'License year header issues detected') 'Expected license header drift diagnostic'
 
-    Push-Location $repo10c
+    Push-Location $repo10cLicense
     try {
         git add Loose.cs
     }
@@ -652,12 +671,12 @@ public sealed class Loose {}
         Pop-Location
     }
 
-    $result10cFix = Invoke-Preflight -RepoPath $repo10c -Arguments @('-Fix', '-Paths', 'Loose.cs')
+    $result10cFix = Invoke-Preflight -RepoPath $repo10cLicense -Arguments @('-Fix', '-Paths', 'Loose.cs')
     Write-TestResult 'LicenseHeaderFix_ExitCode0' ($result10cFix.ExitCode -eq 0) "Expected exit code 0 after license fix, got $($result10cFix.ExitCode). Output: $($result10cFix.Output)"
     $fixedContent = Get-Content -Path $filePath -Raw
     Write-TestResult 'LicenseHeaderFix_WorktreeUpdated' ($fixedContent -match "Copyright \(c\) $currentYear wallstop") "Expected worktree header year $currentYear"
 
-    Push-Location $repo10c
+    Push-Location $repo10cLicense
     try {
         $stagedContent = git show ':Loose.cs'
     }
@@ -667,10 +686,10 @@ public sealed class Loose {}
     Write-TestResult 'LicenseHeaderFix_StagedUpdatedBlob' (($stagedContent -join "`n") -match "Copyright \(c\) $currentYear wallstop") "Expected staged header year $currentYear"
 }
 finally {
-    Remove-Item -Path $repo10c -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $repo10cLicense -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Test 10d: PathList recovery should work even when the worktree starts clean
+# Test 10e: PathList recovery should work even when the worktree starts clean
 Write-Host "`nTest group: path-list recovery from clean worktree" -ForegroundColor Magenta
 $repo10d = New-TestRepo -ConfigurePushDefaults
 try {
@@ -715,7 +734,7 @@ finally {
     Remove-Item -Path $repo10d -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Test 10e: EOL drift should be auto-fixed and re-staged
+# Test 10f: EOL drift should be auto-fixed and re-staged
 Write-Host "`nTest group: EOL auto-fix" -ForegroundColor Magenta
 $repo10e = New-TestRepo -ConfigurePushDefaults
 try {
@@ -876,6 +895,44 @@ try {
 }
 finally {
     Remove-Item -Path $repo14 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 14b: .githooks/pre-push.txt should fail and -Fix removes it (gitignored)
+Write-Host "`nTest group: stray hook txt artifact detection" -ForegroundColor Magenta
+$repo14b = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('.githooks/*.txt')
+try {
+    $hooksDir = Join-Path $repo14b '.githooks'
+    New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
+    Set-Content -Path (Join-Path $hooksDir 'pre-push') -Value '#!/usr/bin/env bash' -Encoding UTF8
+    Set-Content -Path (Join-Path $hooksDir 'pre-push.txt') -Value 'redirected output' -Encoding UTF8
+
+    $result14b = Invoke-Preflight -RepoPath $repo14b -Arguments @('-Paths', 'nonexistent/should-not-match')
+    Write-TestResult 'StrayHookTxt_ExitCode1' ($result14b.ExitCode -eq 1) "Expected exit code 1 when hook .txt exists, got $($result14b.ExitCode). Output: $($result14b.Output)"
+    Write-TestResult 'StrayHookTxt_ListsPath' ($result14b.Output -match 'pre-push\.txt') 'Expected .githooks/pre-push.txt in output'
+
+    $result14bfix = Invoke-Preflight -RepoPath $repo14b -Arguments @('-Fix', '-Paths', 'nonexistent/should-not-match')
+    Write-TestResult 'StrayHookTxtFix_ExitCode0' ($result14bfix.ExitCode -eq 0) "Expected exit code 0 after -Fix, got $($result14bfix.ExitCode). Output: $($result14bfix.Output)"
+    Write-TestResult 'StrayHookTxtFix_FileDeleted' (-not (Test-Path (Join-Path $hooksDir 'pre-push.txt'))) 'Expected pre-push.txt to be deleted by -Fix'
+}
+finally {
+    Remove-Item -Path $repo14b -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 14c: .githooks/notes.txt should not be treated as an artifact when notes is not a hook name
+Write-Host "`nTest group: non-hook .githooks artifact pattern safety" -ForegroundColor Magenta
+$repo14c = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('.githooks/*.txt')
+try {
+    $hooksDir = Join-Path $repo14c '.githooks'
+    New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
+    Set-Content -Path (Join-Path $hooksDir 'pre-push') -Value '#!/usr/bin/env bash' -Encoding UTF8
+    Set-Content -Path (Join-Path $hooksDir 'notes.txt') -Value 'local note' -Encoding UTF8
+
+    $result14c = Invoke-Preflight -RepoPath $repo14c -Arguments @('-Fix', '-Paths', 'nonexistent/should-not-match')
+    Write-TestResult 'NonHookGithooksTxt_ExitCode0' ($result14c.ExitCode -eq 0) "Expected exit code 0 when ignored .githooks/notes.txt is not hook-named, got $($result14c.ExitCode). Output: $($result14c.Output)"
+    Write-TestResult 'NonHookGithooksTxt_Preserved' (Test-Path (Join-Path $hooksDir 'notes.txt')) 'Expected .githooks/notes.txt to be preserved'
+}
+finally {
+    Remove-Item -Path $repo14c -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 15: Generalized discovery - a custom hook file drives detection of <name>.txt

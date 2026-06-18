@@ -75,7 +75,7 @@ bash scripts/update-license-headers.sh --dry-run
 ### CI Enforcement
 
 - **Workflow**: `license-year-audit.yml` runs on any push/PR touching `.cs` or `LICENSE` files
-- **Pre-push hook**: Check #12 runs the audit before allowing push
+- **Local validation**: `npm run agent:preflight`, `npm run validate:prepush`, and CI provide the license-header safety net before push
 
 ### What the Audit Checks
 
@@ -123,9 +123,9 @@ git log --follow --diff-filter=A --format=%ad --date=format:%Y -- path/to/File.c
 ## Prevention
 
 1. **Always use the file template** from [create-csharp-file](./create-csharp-file.md) — it includes the correct header with `{CURRENT_YEAR}`
-2. **Pre-push hook** catches mismatches before they reach CI
-3. **Pre-commit hook** does NOT check license years (too slow for per-commit), but CSharpier formatting and other checks run
-4. **CI workflow** is the final safety net
+2. **Pre-commit hook** runs the staged C# license audit and scoped auto-fix before commit
+3. **`npm run agent:preflight`** checks changed C# files before push-time last-resort hooks are involved
+4. **`npm run validate:prepush` / CI** provide full-repo safety nets
 
 ---
 

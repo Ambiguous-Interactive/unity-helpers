@@ -74,7 +74,7 @@ if (-not (Test-Path $prePushPath)) {
 $prePushContent = Get-Content $prePushPath -Raw
 
 # The pre-push hook MUST read stdin to determine changed files.
-# Without this, all checks scan the entire repository (~60s).
+# Without this, last-resort checks can drift into broad repository scans.
 $requiredPrePushPatterns = @(
     @{ Pattern = 'while read'; Description = 'reads stdin (while read loop)' },
     @{ Pattern = 'local_sha'; Description = 'parses local SHA from stdin' },

@@ -200,6 +200,10 @@ try {
     if (-not (Test-Path -LiteralPath $indexFile)) {
         if ($Fix) {
             & pwsh -NoProfile -File $generateScript | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-ErrorMsg "Generator failed while creating missing $indexFileName (exit $LASTEXITCODE)."
+                exit 1
+            }
             Write-SuccessMsg "Generated missing $indexFileName"
         }
         else {

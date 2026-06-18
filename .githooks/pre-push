@@ -10,28 +10,16 @@ set -euo pipefail
 # Performance: Targets <1s for typical warm pushes by:
 #   - Parsing stdin to detect exactly which files changed
 #   - Running checks only on changed files (not the whole repo)
-#   - Executing independent checks in parallel
-#   - Skipping irrelevant checks (e.g. no .cs files changed → skip license audit)
-#   - Using cached license year data
+#   - Skipping irrelevant checks (e.g. no .cs files changed → skip C# guards)
 #
-# Checks performed (when relevant files change):
-#   1. Prettier formatting (Markdown, JSON, asmdef/asmref, YAML, JS)
-#   2. Markdownlint
-#   3. Spell checking (cspell)
-#   4. Doc link lint
-#   5. Gitignore docs safety (no docs/ files accidentally gitignored)
-#   6. Unity meta file lint (missing/orphaned .meta files)
-#   7. EOL verification
-#   8. CHANGELOG structure lint (when CHANGELOG.md changes)
-#   9. yamllint (if installed)
-#  10. actionlint (if installed and workflow files changed)
-#  11. External link check with lychee (if installed)
-#  12. Test lifecycle lint
-#  13. Duplicate C# using directive lint
-#  14. License year audit (with cache)
-#  15. #region guard on changed C# files
-#  16. Hook pattern tests (if hook files changed)
-#  17. LLM instructions validation
+# Last-resort checks performed (when relevant files change):
+#   0. Safe cleanup of gitignored hook-output artifacts
+#   1. #region guard on changed C# files
+#
+# Formatting, spelling, docs, EOL, meta, license-year, and regression-suite
+# checks belong in npm run agent:preflight, npm run validate:prepush, and CI.
+# This hook is a last-resort gate and must stay fast on native developer
+# machines.
 #
 # To skip in emergencies: git push --no-verify
 #   (CI will still validate all checks)
@@ -41,9 +29,13 @@ set -euo pipefail
 # Pre-push stdin format: <local-ref> <local-sha> <remote-ref> <remote-sha>
 # Multiple lines possible when pushing multiple refs at once.
 ZERO_SHA="0000000000000000000000000000000000000000"
+CS_GREP_PATHSPEC_THRESHOLD=128
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT"
 HAS_REFS=false
 ALL_CHANGED_FILES=()
-DOC_LINK_FULL_SCAN_REQUIRED=0
+CS_SCAN_SHAS=()
+CS_SCAN_PATHS=()
 
 array_contains_exact() {
   local needle="$1"
@@ -57,15 +49,121 @@ array_contains_exact() {
   return 1
 }
 
+collect_hook_artifact_candidates() {
+  local repo_root="$1"
+  local hooks_dir="$repo_root/.githooks"
+  local hook_path
+  local hook
+  local ext
+  local candidate
+
+  if [ ! -d "$hooks_dir" ]; then
+    return 0
+  fi
+
+  for hook_path in "$hooks_dir"/*; do
+    [ -f "$hook_path" ] || continue
+    hook="${hook_path##*/}"
+    case "$hook" in
+      *.sample|*.txt|*.log|*.out|*.err|*.tmp)
+        continue
+        ;;
+    esac
+    if [[ "$hook" == *.* ]]; then
+      hook="${hook%.*}"
+    fi
+
+    for ext in txt log out err tmp; do
+      candidate="$repo_root/$hook.$ext"
+      [ -f "$candidate" ] || continue
+      printf '%s\n' "$hook.$ext"
+
+      candidate="$hooks_dir/$hook.$ext"
+      [ -f "$candidate" ] || continue
+      printf '%s\n' ".githooks/$hook.$ext"
+    done
+  done
+}
+
+clean_gitignored_hook_artifacts() {
+  local repo_root="$1"
+  local rel
+  local absolute
+  local ignored=()
+  local unignored=()
+  local errors=()
+  local unique=()
+  local check_exit
+
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if ! array_contains_exact "$rel" "${unique[@]}"; then
+      unique+=("$rel")
+    fi
+  done < <(collect_hook_artifact_candidates "$repo_root")
+
+  if [ ${#unique[@]} -eq 0 ]; then
+    return 0
+  fi
+
+  for rel in "${unique[@]}"; do
+    check_exit=0
+    git -C "$repo_root" check-ignore -q -- "$rel" || check_exit=$?
+    case "$check_exit" in
+      0)
+        ignored+=("$rel")
+        ;;
+      1)
+        unignored+=("$rel")
+        ;;
+      *)
+        errors+=("$rel (git check-ignore exit $check_exit)")
+        ;;
+    esac
+  done
+
+  if [ ${#ignored[@]} -gt 0 ]; then
+    echo "Pre-push: removing stray gitignored hook artifact file(s)..."
+    for rel in "${ignored[@]}"; do
+      absolute="$repo_root/$rel"
+      rm -f -- "$absolute"
+      echo "  removed: $rel"
+    done
+  fi
+
+  if [ ${#unignored[@]} -gt 0 ] || [ ${#errors[@]} -gt 0 ]; then
+    echo "Pre-push checks FAILED."
+    echo "Stray hook-output artifact file(s) matched the cleanup pattern but were not safe to auto-delete:"
+    for rel in "${unignored[@]}"; do
+      echo "  not gitignored: $rel"
+    done
+    for rel in "${errors[@]}"; do
+      echo "  check failed: $rel"
+    done
+    echo "Add the artifact pattern to .gitignore or remove the stale file, then retry."
+    return 1
+  fi
+
+  return 0
+}
+
 add_changed_file() {
   local file="$1"
   if [[ -z "$file" ]]; then
     return 0
   fi
 
-  if ! array_contains_exact "$file" "${ALL_CHANGED_FILES[@]}"; then
-    ALL_CHANGED_FILES+=("$file")
-  fi
+  ALL_CHANGED_FILES+=("$file")
+}
+
+add_cs_scan_path() {
+  local sha="$1"
+  local file="$2"
+
+  [[ "$file" =~ \.cs$ ]] || return 0
+
+  CS_SCAN_SHAS+=("$sha")
+  CS_SCAN_PATHS+=("$file")
 }
 
 write_agent_preflight_path_list() {
@@ -92,50 +190,15 @@ print_agent_preflight_fix_hint() {
 }
 
 collect_changed_files() {
+  local scan_sha="$1"
   local file
   while IFS= read -r -d '' file; do
     add_changed_file "$file"
+    add_cs_scan_path "$scan_sha" "$file"
   done
 }
 
-mark_doc_link_full_scan_path() {
-  case "$1" in
-    *.md|*.markdown)
-      DOC_LINK_FULL_SCAN_REQUIRED=1
-      ;;
-  esac
-}
-
-collect_doc_link_full_scan_triggers() {
-  local status
-  local deleted_path
-  local old_path
-  local new_path
-
-  while IFS= read -r -d '' status; do
-    case "$status" in
-      D*)
-        IFS= read -r -d '' deleted_path || true
-        mark_doc_link_full_scan_path "$deleted_path"
-        ;;
-      R*)
-        IFS= read -r -d '' old_path || true
-        IFS= read -r -d '' new_path || true
-        mark_doc_link_full_scan_path "$old_path"
-        ;;
-    esac
-  done
-}
-
-# Cleanup on exit/interrupt (defined before while read so temp file is always cleaned up)
-PID_NODE="" PID_PWSH="" PID_BASH=""
-cleanup() {
-  # Kill background processes if any
-  for pid in $PID_NODE $PID_PWSH $PID_BASH; do
-    kill "$pid" 2>/dev/null || true
-  done
-}
-trap cleanup EXIT INT TERM
+clean_gitignored_hook_artifacts "$REPO_ROOT"
 
 while read -r _local_ref local_sha _remote_ref remote_sha; do
   # Skip delete pushes (local_sha is all zeros)
@@ -148,21 +211,19 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     # New branch: compare against default branch merge-base
     merge_base=$(git merge-base main "$local_sha" 2>/dev/null || echo "")
     if [ -n "$merge_base" ]; then
-      collect_changed_files < <(git diff --name-only -z --diff-filter=ACMRTUXB "$merge_base".."$local_sha" 2>/dev/null || true)
-      collect_doc_link_full_scan_triggers < <(git diff --name-status -z -M --diff-filter=DR "$merge_base".."$local_sha" 2>/dev/null || true)
+      collect_changed_files "$local_sha" < <(git diff --name-only -z --diff-filter=ACMRTUXB "$merge_base".."$local_sha" 2>/dev/null || true)
     else
       # No merge-base (orphan branch or no main): compare against the full tree.
-      collect_changed_files < <(git ls-tree -r -z --name-only "$local_sha" 2>/dev/null || true)
+      collect_changed_files "$local_sha" < <(git ls-tree -r -z --name-only "$local_sha" 2>/dev/null || true)
     fi
   else
     # Normal push: diff between remote and local
-    collect_changed_files < <(git diff --name-only -z --diff-filter=ACMRTUXB "$remote_sha".."$local_sha" 2>/dev/null || true)
-    collect_doc_link_full_scan_triggers < <(git diff --name-status -z -M --diff-filter=DR "$remote_sha".."$local_sha" 2>/dev/null || true)
+    collect_changed_files "$local_sha" < <(git diff --name-only -z --diff-filter=ACMRTUXB "$remote_sha".."$local_sha" 2>/dev/null || true)
   fi
 done
 
 # If no refs to push (delete-only) or stdin was empty (no-op), skip all checks
-if [ "$HAS_REFS" = "false" ] || { [ ${#ALL_CHANGED_FILES[@]} -eq 0 ] && [ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 0 ]; }; then
+if [ "$HAS_REFS" = "false" ] || [ ${#ALL_CHANGED_FILES[@]} -eq 0 ]; then
   echo "No files changed in push, skipping checks."
   exit 0
 fi
@@ -170,333 +231,91 @@ fi
 CHANGED_COUNT=${#ALL_CHANGED_FILES[@]}
 echo "Pre-push: checking $CHANGED_COUNT changed file(s)..."
 
-# ---- Pre-compute changed file sets ----
-CHANGED_MD=()
-CHANGED_JSON=()
-CHANGED_YAML=()
-CHANGED_JS=()
-CHANGED_CS=()
-CHANGED_META=()
-CHANGED_TESTS=()
-CHANGED_SCRIPTS=()
-CHANGED_DOCS=()
-CHANGED_LLM=()
-CHANGED_WORKFLOWS=()
-CHANGED_WIKI=()
-CHANGED_HOOK_FILES=()
-CHANGED_LINT_TEST=()
-CHANGED_LINT_DUPLICATE_USINGS=()
-CHANGED_GITIGNORE_DOCS_LINT=()
-CHANGED_SYNC_SCRIPT_CONTRACTS=()
-CHANGED_LINT_ERROR_CODE_SCRIPTS=()
-CHANGED_DOC_LINK=()
-
-for file in "${ALL_CHANGED_FILES[@]}"; do
-  [[ "$file" =~ \.(md|markdown)$ ]] && CHANGED_MD+=("$file")
-  [[ "$file" =~ \.(json|jsonc|asmdef|asmref)$ ]] && CHANGED_JSON+=("$file")
-  [[ "$file" =~ \.(yml|yaml)$ ]] && CHANGED_YAML+=("$file")
-  [[ "$file" =~ \.js$ ]] && CHANGED_JS+=("$file")
-  [[ "$file" =~ \.cs$ ]] && CHANGED_CS+=("$file")
-  [[ "$file" =~ \.meta$ ]] && CHANGED_META+=("$file")
-  [[ "$file" =~ ^Tests/ ]] && CHANGED_TESTS+=("$file")
-  [[ "$file" =~ ^scripts/ ]] && CHANGED_SCRIPTS+=("$file")
-  [[ "$file" =~ ^docs/ ]] && CHANGED_DOCS+=("$file")
-  [[ "$file" =~ ^\.llm/ ]] && CHANGED_LLM+=("$file")
-  [[ "$file" =~ ^\.github/workflows/ ]] && CHANGED_WORKFLOWS+=("$file")
-  [[ "$file" =~ ^(scripts/wiki/.*|scripts/tests/test-wiki-generation\.sh|\.github/workflows/deploy-wiki\.yml)$ ]] && CHANGED_WIKI+=("$file")
-  [[ "$file" =~ ^(\.githooks/.*|scripts/tests/test-hook-patterns\.sh)$ ]] && CHANGED_HOOK_FILES+=("$file")
-  [[ "$file" =~ ^(scripts/lint-tests\.ps1|scripts/tests/test-lint-tests\.ps1)$ ]] && CHANGED_LINT_TEST+=("$file")
-  [[ "$file" =~ ^(scripts/lint-duplicate-usings\.ps1|scripts/tests/test-lint-duplicate-usings\.ps1)$ ]] && CHANGED_LINT_DUPLICATE_USINGS+=("$file")
-  [[ "$file" =~ ^(scripts/lint-gitignore-docs\.ps1|scripts/tests/test-gitignore-docs\.ps1)$ ]] && CHANGED_GITIGNORE_DOCS_LINT+=("$file")
-  [[ "$file" =~ ^(scripts/sync-doc-counts\.ps1|scripts/sync-banner-version\.ps1|scripts/lint-cspell-config\.js|scripts/tests/test-sync-script-contracts\.ps1)$ ]] && CHANGED_SYNC_SCRIPT_CONTRACTS+=("$file")
-  # Run the lint-error-code cspell contract test whenever any file in the
-  # harvester's scan scope is touched. The harvester in
-  # scripts/validate-lint-error-codes.ps1 scans THREE roots:
-  #   1. scripts/lint-*.{ps1,js}                -- where new PWS/UNH/DEP
-  #      prefixes are born.
-  #   2. scripts/tests/test-lint-*.{ps1,js,sh}  -- test assertions that cite
-  #      codes (a new prefix may first surface in a test).
-  #   3. .githooks/*                            -- hook error messages cite
-  #      codes (e.g. UNH004 in a pre-commit failure block).
-  # Plus: cspell.json itself (prefix registry changes) and the validator /
-  # its regression test. The `.githooks/` anchor uses `^\.githooks/` to avoid
-  # accidentally matching the similarly-prefixed `.github/` directory.
-  [[ "$file" =~ ^(scripts/lint-[^/]+\.(ps1|js)|scripts/tests/test-lint-[^/]+\.(ps1|js|sh)|\.githooks/[^/]+|scripts/validate-lint-error-codes\.ps1|scripts/tests/test-validate-lint-error-codes\.ps1|cspell\.json)$ ]] && CHANGED_LINT_ERROR_CODE_SCRIPTS+=("$file")
-  case "$file" in
-    *.md|*.markdown|*.cs|*.csproj|*.props|*.targets|*.ps1|*.psm1|*.psd1|*.py|*.ts|*.tsx|*.js|*.jsx|*.json|*.yml|*.yaml|*.sh|*.cmd)
-      CHANGED_DOC_LINK+=("$file")
-      ;;
-  esac
-done
-
-CHANGED_PRETTIER=("${CHANGED_MD[@]}" "${CHANGED_JSON[@]}" "${CHANGED_YAML[@]}" "${CHANGED_JS[@]}")
-# Spell-check scope MUST mirror pre-commit's SPELL_FILES_ARRAY (MD + JSON +
-# YAML + JS + CS). Keeping the two hooks in strict parity prevents the class
-# of failure where a commit slips past pre-commit (different host, wrong
-# hooksPath, --no-verify) and only surfaces at pre-push with a narrower
-# safety net. cspell.json's `files` glob still governs which of these are
-# actually linted, so widening the pass-through list is free speed-wise.
-CHANGED_SPELL=("${CHANGED_MD[@]}" "${CHANGED_JSON[@]}" "${CHANGED_YAML[@]}" "${CHANGED_JS[@]}" "${CHANGED_CS[@]}")
-CHANGED_EOL=("${ALL_CHANGED_FILES[@]}")
-
-# ---- Track parallel job failures ----
 HOOK_FAILED=0
 
-# ---- Group A: Node-based checks (run in parallel) ----
-run_node_checks() {
-  run_node_tool() {
-    node scripts/run-node-bin.js "$@"
-  }
-
-  require_node() {
-    local purpose="$1"
-    if ! command -v node >/dev/null 2>&1; then
-      echo "Node.js is required for $purpose. Install Node.js/npm and run npm install." >&2
-      return 1
-    fi
-  }
-
-  require_node_tool() {
-    local tool="$1"
-    local purpose="$2"
-    require_node "$purpose" || return 1
-    if ! run_node_tool "$tool" --version >/dev/null 2>&1; then
-      echo "Repo-local $tool is unavailable for $purpose. Run 'npm install' on the same host that runs git hooks." >&2
-      return 1
-    fi
-  }
-
-  # 1) Prettier (validation only — no auto-fix in pre-push)
-  if [ ${#CHANGED_PRETTIER[@]} -gt 0 ]; then
-    require_node_tool prettier "Prettier validation" || return 1
-    echo "Checking formatting on changed files..."
-    if ! node scripts/run-prettier.js --check -- "${CHANGED_PRETTIER[@]}"; then
-      echo ""
-      echo "=== Prettier formatting issues detected ==="
-      echo "Run the path-scoped recovery command printed at the end of this hook."
-      echo ""
-      return 1
-    fi
-    echo "✓ Prettier formatting OK"
-  fi
-
-  # 2) Markdownlint
-  if [ ${#CHANGED_MD[@]} -gt 0 ]; then
-    require_node_tool markdownlint "markdownlint validation" || return 1
-    run_node_tool markdownlint --config .markdownlint.json --ignore-path .markdownlintignore -- "${CHANGED_MD[@]}" || return 1
-  fi
-
-  # 3) Spell checking (only if spell-relevant files changed)
-  if [ ${#CHANGED_SPELL[@]} -gt 0 ]; then
-    require_node_tool cspell "spell checking" || return 1
-      echo "Checking spelling on changed files..."
-      # Capture cspell output via a temp file so we can BOTH surface the raw
-      # diagnostics (tee to stderr) AND post-process them for lint-error-code
-      # prefixes that need cspell registration. Keeping the tee ensures the
-      # developer still sees file:line:column diagnostics.
-      PREPUSH_SPELL_CAPTURE="$(mktemp 2>/dev/null || true)"
-      if [ -z "$PREPUSH_SPELL_CAPTURE" ]; then
-        echo "Error: Failed to create temporary file for spell check output." >&2
-        return 1
-      fi
-      # AR-1: trap-based cleanup guarantees this temp is deleted on every exit
-      # path from run_node_checks — including signals. Scoped to RETURN so
-      # failures downstream in the function still clean up.
-      # shellcheck disable=SC2064  # We intend immediate expansion of the temp path.
-      trap "rm -f '$PREPUSH_SPELL_CAPTURE'" RETURN
-      # Explicit-exit-code form mirrors pre-commit's P0-1 fix: capture exit
-      # status separately from the pipeline so a future revert of pipefail
-      # cannot silently mask a failure. pre-push has `set -euo pipefail`
-      # today, but defense-in-depth is cheap here.
-      PREPUSH_SPELL_EXIT=0
-      run_node_tool cspell lint --no-must-find-files --no-progress --show-suggestions -- "${CHANGED_SPELL[@]}" >"$PREPUSH_SPELL_CAPTURE" 2>&1 || PREPUSH_SPELL_EXIT=$?
-      cat "$PREPUSH_SPELL_CAPTURE"
-      if [ "$PREPUSH_SPELL_EXIT" -ne 0 ]; then
-        echo "" >&2
-        echo "=== Spelling errors detected ===" >&2
-        echo "Fix typos or add valid terms to the appropriate dictionary in cspell.json:" >&2
-        echo "  unity-terms   -- Unity Engine APIs, components, lifecycle" >&2
-        echo "  csharp-terms  -- C# language features, .NET types" >&2
-        echo "  package-terms -- This package's public API and type names" >&2
-        echo "  tech-terms    -- General programming/tooling terms (CRLF, NUL, ASCII, etc.)" >&2
-        echo "  words (root)  -- Project-specific words that don't fit a category" >&2
-        echo "" >&2
-        # Synthesize a copy-pasteable patch when the failure is specifically an
-        # unregistered lint-error-code-shaped token. This makes the error
-        # message itself the fix rather than a pointer to documentation.
-        # Width note: unbounded upper bound (`{2,}`) mirrors the pre-commit
-        # P0-3 widening so prefixes longer than 5 chars are still surfaced.
-        UNKNOWN_CODE_PREFIXES="$(grep -oE 'Unknown word \([A-Z]{2,}\)' "$PREPUSH_SPELL_CAPTURE" 2>/dev/null | grep -oE '[A-Z]{2,}' | sort -u || true)"
-        if [ -n "$UNKNOWN_CODE_PREFIXES" ]; then
-          echo "=== Detected unregistered lint-error-code prefix(es) ===" >&2
-          echo "Copy-paste this patch into the root 'words' array in cspell.json" >&2
-          echo "(append each quoted prefix as a new array element):" >&2
-          echo "" >&2
-          while IFS= read -r prefix; do
-            [ -z "$prefix" ] && continue
-            echo "    \"$prefix\"," >&2
-          done <<< "$UNKNOWN_CODE_PREFIXES"
-          echo "" >&2
-          echo "See scripts/validate-lint-error-codes.ps1 for the contract that" >&2
-          echo "enforces this requirement once the prefix is registered." >&2
-          echo "" >&2
-        fi
-        echo "Re-run locally: npm run lint:spelling" >&2
-        echo "" >&2
-        return 1
-      fi
-      echo "✓ Spell check OK"
-
-      # 3b) cspell.json config lint
-      if array_contains_exact "cspell.json" "${ALL_CHANGED_FILES[@]}"; then
-        echo "Checking cspell.json configuration..."
-        if ! node scripts/lint-cspell-config.js; then
-          echo ""
-          echo "=== cspell.json configuration issues ==="
-          echo "Run the path-scoped recovery command printed at the end of this hook."
-          echo ""
-          return 1
-        fi
-        echo "✓ cspell.json config OK"
-      fi
-  fi
-
-  # 4) Doc link lint (only if docs or markdown changed)
-  if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ] || [ ${#CHANGED_DOC_LINK[@]} -gt 0 ]; then
-    require_node "documentation link lint" || return 1
-    echo "Checking documentation links..."
-    if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ]; then
-      node ./scripts/run-doc-link-lint.js || return 1
-    else
-      node ./scripts/run-doc-link-lint.js -Paths "${CHANGED_DOC_LINK[@]}" || return 1
-    fi
-    echo "✓ Doc links OK"
-  fi
-
-  return 0
-}
-
-# ---- Group B: PowerShell-based checks (run in parallel) ----
-run_pwsh_checks() {
-  PWSH_CMD=()
-  if command -v pwsh >/dev/null 2>&1; then
-    PWSH_CMD=(pwsh -NoProfile -File)
-  elif command -v powershell >/dev/null 2>&1; then
-    PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-  else
-    echo "PowerShell not found; skipping PowerShell checks. CI will validate." >&2
-    return 0
-  fi
-
-  # 5) Gitignore docs safety (repo-wide, but batched & fast)
-  if [ ${#CHANGED_DOCS[@]} -gt 0 ] || [ ${#CHANGED_LLM[@]} -gt 0 ] || array_contains_exact ".gitignore" "${ALL_CHANGED_FILES[@]}"; then
-    echo "Checking gitignore docs safety..."
-    "${PWSH_CMD[@]}" scripts/lint-gitignore-docs.ps1 || {
-      echo ""
-      echo "=== Gitignore docs safety check failed ==="
-      echo "Fix .gitignore patterns to avoid excluding documentation files."
-      echo ""
-      return 1
-    }
-    echo "✓ Gitignore docs safety OK"
-  fi
-
-  # 6) Unity meta file lint (repo-wide, but optimized via git ls-files)
-  if [ ${#CHANGED_CS[@]} -gt 0 ] || [ ${#CHANGED_META[@]} -gt 0 ] || [ ${#CHANGED_DOCS[@]} -gt 0 ] || [ ${#CHANGED_SCRIPTS[@]} -gt 0 ]; then
-    echo "Checking Unity meta files..."
-    "${PWSH_CMD[@]}" scripts/lint-meta-files.ps1 || {
-      echo ""
-      echo "=== Unity meta file lint failed ==="
-      echo "Run './scripts/generate-meta.sh <path>' to generate missing meta files."
-      echo ""
-      return 1
-    }
-    echo "✓ Unity meta files OK"
-  fi
-
-  # 7) EOL verification (validation only — no normalize in pre-push)
-  if [ ${#CHANGED_EOL[@]} -gt 0 ]; then
-    "${PWSH_CMD[@]}" scripts/check-eol.ps1 -VerboseOutput -Paths "${CHANGED_EOL[@]}" || {
-      echo ""
-      echo "=== EOL check failed ==="
-      echo "Run the path-scoped recovery command printed at the end of this hook."
-      echo ""
-      return 1
-    }
-  fi
-
-  # 8) CHANGELOG lint when CHANGELOG.md is part of the push
-  if array_contains_exact "CHANGELOG.md" "${ALL_CHANGED_FILES[@]}"; then
-    echo "Checking CHANGELOG structure..."
-    "${PWSH_CMD[@]}" scripts/lint-changelog.ps1 || {
-      echo ""
-      echo "=== CHANGELOG lint failed ==="
-      echo "Fix CHANGELOG.md structure issues before pushing."
-      echo ""
-      return 1
-    }
-    echo "✓ CHANGELOG structure OK"
-  fi
-
-  # 12) Test lifecycle lint (only if test files changed)
-  if [ ${#CHANGED_TESTS[@]} -gt 0 ]; then
-    "${PWSH_CMD[@]}" scripts/lint-tests.ps1 -VerboseOutput -Paths "${CHANGED_TESTS[@]}" || {
-      echo ""
-      echo "=== Test lint failed ==="
-      echo "Fix the issues or add // UNH-SUPPRESS comments for valid exceptions."
-      echo ""
-      return 1
-    }
-  fi
-
-  # 13) Duplicate using directive lint (only if C# files changed)
-  if [ ${#CHANGED_CS[@]} -gt 0 ]; then
-    echo "Checking duplicate C# using directives..."
-    "${PWSH_CMD[@]}" scripts/lint-duplicate-usings.ps1 -Paths "${CHANGED_CS[@]}" || {
-      echo ""
-      echo "=== Duplicate using directive lint failed (UNH007) ==="
-      echo "Remove duplicate using directives within each namespace/file scope."
-      echo ""
-      return 1
-    }
-    echo "✓ Duplicate using directives OK"
-  fi
-
-  # LLM instructions validation (only if .llm or skills changed)
-  if [ ${#CHANGED_LLM[@]} -gt 0 ]; then
-    echo "Validating LLM instructions..."
-    "${PWSH_CMD[@]}" scripts/lint-llm-instructions.ps1 || {
-      echo ""
-      echo "=== LLM instructions validation failed ==="
-      echo "Run the path-scoped recovery command printed at the end of this hook."
-      echo ""
-      return 1
-    }
-    echo "✓ LLM instructions OK"
-  fi
-
-  return 0
-}
-
-# ---- Group C: Bash/native checks (run in parallel) ----
-run_bash_checks() {
-  # 14) License year audit (only if .cs files changed, uses cache)
-  if [ ${#CHANGED_CS[@]} -gt 0 ]; then
-    echo "Checking license year headers..."
-    if ! bash scripts/audit-license-years.sh --summary --paths "${CHANGED_CS[@]}"; then
-      echo ""
-      echo "=== License year audit failed ==="
-      echo "Run the path-scoped recovery command printed at the end of this hook."
-      echo ""
-      return 1
-    fi
-    echo "✓ License year headers OK"
-  fi
-
-  # 15) Check for #region directives (only in changed .cs files)
-  if [ ${#CHANGED_CS[@]} -gt 0 ]; then
+run_fast_checks() {
+  # Check for #region directives (only in changed .cs files)
+  if [ ${#CS_SCAN_PATHS[@]} -gt 0 ]; then
     echo "Checking for forbidden #region directives..."
-    REGION_VIOLATIONS=$(grep -E -n -i '^[[:space:]]*#[[:space:]]*(region|endregion)' -- "${CHANGED_CS[@]}" 2>/dev/null || true)
+    REGION_VIOLATIONS=""
+    local unique_shas=()
+    local sha
+    local index
+    local cs_paths
+    local literal_paths
+    local matches
+    local match_line
+    local match_file
+    local match_prefix
+    local match_path
+    local match_text
+    local grep_output
+    local grep_exit
+
+    for sha in "${CS_SCAN_SHAS[@]}"; do
+      if ! array_contains_exact "$sha" "${unique_shas[@]}"; then
+        unique_shas+=("$sha")
+      fi
+    done
+
+    for sha in "${unique_shas[@]}"; do
+      cs_paths=()
+      for index in "${!CS_SCAN_PATHS[@]}"; do
+        if [[ "${CS_SCAN_SHAS[$index]}" == "$sha" ]]; then
+          cs_paths+=("${CS_SCAN_PATHS[$index]}")
+        fi
+      done
+
+      [ ${#cs_paths[@]} -gt 0 ] || continue
+
+      if [ ${#cs_paths[@]} -le "$CS_GREP_PATHSPEC_THRESHOLD" ]; then
+        literal_paths=()
+        for index in "${!cs_paths[@]}"; do
+          literal_paths+=(":(literal)${cs_paths[$index]}")
+        done
+
+        grep_exit=0
+        matches=$(git grep -H -n -i -E '^[[:space:]]*#[[:space:]]*(region|endregion)' "$sha" -- "${literal_paths[@]}" 2>/dev/null) || grep_exit=$?
+        case "$grep_exit" in
+          0)
+            REGION_VIOLATIONS+="$matches"$'\n'
+            ;;
+          1)
+            ;;
+          *)
+            echo "git grep failed while scanning pushed C# files for #region directives (exit $grep_exit)."
+            return 1
+            ;;
+        esac
+        continue
+      fi
+
+      grep_output=$(git rev-parse --git-path "pre-push-region-grep.$$.bin")
+      rm -f -- "$grep_output"
+      grep_exit=0
+      git grep -z -H -n -i -E '^[[:space:]]*#[[:space:]]*(region|endregion)' "$sha" -- '*.cs' > "$grep_output" 2>/dev/null || grep_exit=$?
+      case "$grep_exit" in
+        0)
+          match_prefix="${sha}:"
+          while IFS= read -r -d '' match_file && IFS= read -r -d '' match_line && IFS= read -r match_text; do
+            match_path="${match_file#$match_prefix}"
+            [ "$match_path" != "$match_file" ] || continue
+            if array_contains_exact "$match_path" "${cs_paths[@]}"; then
+              REGION_VIOLATIONS+="${match_path}:${match_line}:${match_text}"$'\n'
+            fi
+          done < "$grep_output"
+          ;;
+        1)
+          ;;
+        *)
+          rm -f -- "$grep_output"
+          echo "git grep failed while scanning pushed C# files for #region directives (exit $grep_exit)."
+          return 1
+          ;;
+      esac
+      rm -f -- "$grep_output"
+    done
+    REGION_VIOLATIONS="${REGION_VIOLATIONS%$'\n'}"
     if [ -n "$REGION_VIOLATIONS" ]; then
       echo ""
       echo "=== Error: C# regions (#region/#endregion) are forbidden ==="
@@ -509,158 +328,10 @@ run_bash_checks() {
     echo "✓ No #region directives found"
   fi
 
-  # Optional YAML lint (only if YAML files changed)
-  if [ ${#CHANGED_YAML[@]} -gt 0 ]; then
-    if command -v yamllint >/dev/null 2>&1; then
-      echo "Running yamllint on changed YAML files..."
-      yamllint -c .yamllint.yaml -- "${CHANGED_YAML[@]}" || return 1
-      echo "✓ yamllint OK"
-    fi
-  fi
-
-  # Optional external link check (only if markdown changed)
-  if [ ${#CHANGED_MD[@]} -gt 0 ]; then
-    if command -v lychee >/dev/null 2>&1; then
-      lychee -c .lychee.toml --no-progress --verbose -- "${CHANGED_MD[@]}" || return 1
-    fi
-  fi
-
   return 0
 }
 
-# ---- Conditional test suites (run sequentially, only when relevant) ----
-run_conditional_tests() {
-  # Wiki generation tests
-  if [ ${#CHANGED_WIKI[@]} -gt 0 ]; then
-    echo "Running wiki generation tests..."
-    bash scripts/tests/test-wiki-generation.sh || return 1
-    echo "✓ Wiki generation tests OK"
-
-    if command -v python3 >/dev/null 2>&1 && python3 -c "import pytest" 2>/dev/null; then
-      python3 -m pytest scripts/wiki/test_wiki_scripts.py -v || return 1
-      echo "✓ Python wiki tests OK"
-    fi
-  fi
-
-  # Lint test suite
-  if [ ${#CHANGED_LINT_TEST[@]} -gt 0 ]; then
-    PWSH_CMD=()
-    if command -v pwsh >/dev/null 2>&1; then
-      PWSH_CMD=(pwsh -NoProfile -File)
-    elif command -v powershell >/dev/null 2>&1; then
-      PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-    fi
-    if [ ${#PWSH_CMD[@]} -gt 0 ]; then
-      echo "Running lint-tests.ps1 test suite..."
-      "${PWSH_CMD[@]}" scripts/tests/test-lint-tests.ps1 || return 1
-      echo "✓ Lint test suite OK"
-    fi
-  fi
-
-  # Duplicate-using linter test suite
-  if [ ${#CHANGED_LINT_DUPLICATE_USINGS[@]} -gt 0 ]; then
-    PWSH_CMD=()
-    if command -v pwsh >/dev/null 2>&1; then
-      PWSH_CMD=(pwsh -NoProfile -File)
-    elif command -v powershell >/dev/null 2>&1; then
-      PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-    fi
-    if [ ${#PWSH_CMD[@]} -gt 0 ]; then
-      echo "Running lint-duplicate-usings.ps1 test suite..."
-      "${PWSH_CMD[@]}" scripts/tests/test-lint-duplicate-usings.ps1 || return 1
-      echo "✓ Duplicate-using linter test suite OK"
-    fi
-  fi
-
-  # Gitignore docs lint test suite
-  if [ ${#CHANGED_GITIGNORE_DOCS_LINT[@]} -gt 0 ]; then
-    PWSH_CMD=()
-    if command -v pwsh >/dev/null 2>&1; then
-      PWSH_CMD=(pwsh -NoProfile -File)
-    elif command -v powershell >/dev/null 2>&1; then
-      PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-    fi
-    if [ ${#PWSH_CMD[@]} -gt 0 ]; then
-      echo "Running lint-gitignore-docs.ps1 test suite..."
-      "${PWSH_CMD[@]}" scripts/tests/test-gitignore-docs.ps1 || return 1
-      echo "✓ Gitignore docs lint test suite OK"
-    fi
-  fi
-
-  # Hook pattern tests
-  if [ ${#CHANGED_HOOK_FILES[@]} -gt 0 ]; then
-    echo "Running hook pattern tests..."
-    bash scripts/tests/test-hook-patterns.sh || return 1
-    echo "✓ Hook pattern tests OK"
-  fi
-
-  # Sync script and cspell contract tests
-  if [ ${#CHANGED_SYNC_SCRIPT_CONTRACTS[@]} -gt 0 ]; then
-    PWSH_CMD=()
-    if command -v pwsh >/dev/null 2>&1; then
-      PWSH_CMD=(pwsh -NoProfile -File)
-    elif command -v powershell >/dev/null 2>&1; then
-      PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-    fi
-    if [ ${#PWSH_CMD[@]} -gt 0 ]; then
-      echo "Running sync script contract tests..."
-      "${PWSH_CMD[@]}" scripts/tests/test-sync-script-contracts.ps1 || return 1
-      echo "✓ Sync script contract tests OK"
-    fi
-  fi
-
-  # Lint-error-code cspell contract: when any lint-*.ps1|.js, cspell.json,
-  # the validator, or its test changes, enforce that every lint-error-code
-  # prefix emitted by the lint family is registered with cspell. This closes
-  # the loop that let the PWS001/PWS002 regression ship in April 2026.
-  if [ ${#CHANGED_LINT_ERROR_CODE_SCRIPTS[@]} -gt 0 ]; then
-    PWSH_CMD=()
-    if command -v pwsh >/dev/null 2>&1; then
-      PWSH_CMD=(pwsh -NoProfile -File)
-    elif command -v powershell >/dev/null 2>&1; then
-      PWSH_CMD=(powershell -NoProfile -ExecutionPolicy Bypass -File)
-    fi
-    if [ ${#PWSH_CMD[@]} -gt 0 ]; then
-      echo "Validating lint-error-code cspell coverage..."
-      "${PWSH_CMD[@]}" scripts/validate-lint-error-codes.ps1 || return 1
-      echo "✓ Lint-error-code cspell coverage OK"
-
-      echo "Running lint-error-code validator test suite..."
-      "${PWSH_CMD[@]}" scripts/tests/test-validate-lint-error-codes.ps1 || return 1
-      echo "✓ Lint-error-code validator test suite OK"
-    fi
-  fi
-
-  # actionlint (only if workflow files changed)
-  if [ ${#CHANGED_WORKFLOWS[@]} -gt 0 ]; then
-    if command -v actionlint >/dev/null 2>&1; then
-      echo "Running actionlint..."
-      actionlint || return 1
-      echo "✓ actionlint OK"
-    fi
-  fi
-
-  return 0
-}
-
-# ---- Execute parallel groups ----
-# Run Groups A, B, C in parallel with proper error propagation
-run_node_checks &
-PID_NODE=$!
-run_pwsh_checks &
-PID_PWSH=$!
-run_bash_checks &
-PID_BASH=$!
-
-# Wait for all groups, collect exit codes
-wait $PID_NODE || HOOK_FAILED=1
-wait $PID_PWSH || HOOK_FAILED=1
-wait $PID_BASH || HOOK_FAILED=1
-
-# Run conditional tests sequentially (they depend on having seen parallel output)
-if [ $HOOK_FAILED -eq 0 ]; then
-  run_conditional_tests || HOOK_FAILED=1
-fi
+run_fast_checks || HOOK_FAILED=1
 
 # ============================================================================
 # FINAL RESULT

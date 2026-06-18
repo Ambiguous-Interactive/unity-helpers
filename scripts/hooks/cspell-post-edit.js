@@ -3,13 +3,13 @@
 // Claude Code PostToolUse hook: auto-run cspell on the file Claude just touched.
 // =============================================================================
 // Why this exists:
-//   Pre-push and pre-commit hooks cspell-lint a wide set of extensions (md,
+//   Pre-commit and agent-preflight cspell-lint a wide set of extensions (md,
 //   markdown, cs, yml, yaml, json, jsonc, asmdef, asmref, js). Previously the
 //   skill guidance told the LLM to run `npm run lint:spelling` after every
-//   edit, but the repository's cspell.json `files` glob silently under-covered
-//   the hook set -- so lint:spelling could PASS while pre-push rejected the
-//   push. This hook turns "remember to spell-check" into "spell-check happens
-//   automatically after every Edit/Write/MultiEdit/NotebookEdit".
+//   edit, but cspell.json drift could make one validation surface scan less
+//   than another. This hook turns "remember to spell-check" into
+//   "spell-check happens automatically after every Edit/Write/MultiEdit/
+//   NotebookEdit".
 //
 // Contract (see https://code.claude.com/docs/en/hooks):
 //   - stdin: Claude Code PostToolUse event JSON.

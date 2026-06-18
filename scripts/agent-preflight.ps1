@@ -274,7 +274,7 @@ function Test-StrayArtifactFiles {
 
     $hookNames = @(
         Get-ChildItem -LiteralPath $hooksDir -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notlike '*.sample' } |
+            Where-Object { $_.Name -notlike '*.sample' -and $_.Extension -notin @('.txt', '.log', '.out', '.err', '.tmp') } |
             ForEach-Object {
                 if ($_.Name -like '*.*') {
                     [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
@@ -296,14 +296,11 @@ function Test-StrayArtifactFiles {
             if (Test-Path -LiteralPath $candidate -PathType Leaf) {
                 $strayFiles.Add($candidate) | Out-Null
             }
-        }
-    }
 
-    $hooksScanExts = @('tmp', 'log', 'out', 'err')
-    foreach ($ext in $hooksScanExts) {
-        $matched = Get-ChildItem -LiteralPath $hooksDir -Filter "*.$ext" -File -ErrorAction SilentlyContinue
-        foreach ($file in $matched) {
-            $strayFiles.Add($file.FullName) | Out-Null
+            $hookCandidate = Join-Path $hooksDir "$hook.$ext"
+            if (Test-Path -LiteralPath $hookCandidate -PathType Leaf) {
+                $strayFiles.Add($hookCandidate) | Out-Null
+            }
         }
     }
 
@@ -983,6 +980,11 @@ $testFiles = @($csharpTargets | Where-Object { $_ -like 'Tests/*.cs' })
 $metaRelevantPaths = @($relativePaths | Where-Object { Test-MetaRequiredPath -RelativePath $_ })
 $eolTargets = @($relativePaths)
 $cspellConfigChanged = $dedupedPaths.Contains('cspell.json')
+$lintErrorCodeContractTargets = @(
+    $relativePaths | Where-Object {
+        $_ -match '^(scripts/lint-[^/]+\.(ps1|js)|scripts/tests/test-lint-[^/]+\.(ps1|js|sh)|\.githooks/[^/]+|scripts/validate-lint-error-codes\.ps1|scripts/tests/test-validate-lint-error-codes\.ps1|cspell\.json)$'
+    }
+)
 
 $requiredNodeTools = [ordered]@{}
 if ($markdownTargets.Count -gt 0) {
@@ -1281,6 +1283,14 @@ if ($cspellConfigChanged) {
             Write-Host 'Run: npm run agent:preflight:fix' -ForegroundColor Cyan
             $failureCount++
         }
+    }
+}
+
+if ($lintErrorCodeContractTargets.Count -gt 0) {
+    Write-Host '[agent-preflight] Validating lint-error-code cspell coverage...' -ForegroundColor Blue
+    & (Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1') -VerboseOutput:$VerboseOutput
+    if ($LASTEXITCODE -ne 0) {
+        $failureCount++
     }
 }
 
