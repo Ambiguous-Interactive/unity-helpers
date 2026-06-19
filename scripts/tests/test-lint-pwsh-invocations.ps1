@@ -10,6 +10,7 @@
     - Exits 1 and emits PWS001 for a bad invocation in a .yml workflow fixture.
     - Exits 1 and emits PWS001 for a bad invocation in a .githooks/* fixture.
     - Exits 1 and emits PWS002 for in-process bad invocation in tests/*.ps1 fixture.
+    - Exits 1 and emits PWS004 for `pwsh -File .githooks/<extensionless-hook>`.
     - Does NOT flag the correct -Paths invocation pattern.
     - Does NOT flag the bad pattern when it only appears inside a PowerShell help
       comment block.
@@ -160,6 +161,222 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-dependabot.ps1 
     $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-ps\.sh'
     Write-TestResult "Fail_BadInvocationPowershellCommand" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 for powershell.exe form. Exit: $($result.ExitCode). Output: $($result.Output)"
 
+    # --- Fail_BadInvocationPwshExeShortFileAlias ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-pwsh-exe-short-file.sh') -Value @'
+#!/usr/bin/env bash
+pwsh.exe -NoProfile -f scripts/lint-dependabot.ps1 -- arg
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-pwsh-exe-short-file\.sh'
+    Write-TestResult "Fail_BadInvocationPwshExeShortFileAlias" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 for pwsh.exe -f form. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationAfterPwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-after-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'Write-Host ok'; pwsh -NoProfile -File scripts/foo.ps1 -- arg
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-after-command\.sh'
+    Write-TestResult "Fail_BadInvocationAfterPwshCommand" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 when real -File command follows pwsh -Command. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationInsidePwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-inside-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'pwsh -NoProfile -File scripts/foo.ps1 -- arg'
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-inside-command\.sh'
+    Write-TestResult "Fail_BadInvocationInsidePwshCommand" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 when bad -File invocation is inside pwsh -Command payload. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationAfterOutputInsidePwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-after-output-inside-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'Write-Host ok; pwsh -NoProfile -File scripts/foo.ps1 -- arg'
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-after-output-inside-command\.sh'
+    Write-TestResult "Fail_BadInvocationAfterOutputInsidePwshCommand" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 when bad -File invocation follows output inside pwsh -Command payload. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationQuotedDoubleDash ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-quoted-double-dash.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -File scripts/lint-dependabot.ps1 "--" arg
+powershell.exe -NoProfile -ExecutionPolicy Bypass -f scripts/lint-dependabot.ps1 '--' arg
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'bad-quoted-double-dash\.sh'
+    Write-TestResult "Fail_BadInvocationQuotedDoubleDash" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 for quoted -- tokens under -File/-f. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTarget ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-file.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -File .githooks/pre-commit
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-file\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTarget" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for extensionless git hook -File target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetDotSlash ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-file-dotslash.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -File ./.githooks/pre-push
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-file-dotslash\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetDotSlash" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for dot-slash extensionless hook target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetPwshExeShortFileAlias ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-file-pwsh-exe-short-file.sh') -Value @'
+#!/usr/bin/env bash
+pwsh.exe -NoProfile -f .githooks/pre-push
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-file-pwsh-exe-short-file\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetPwshExeShortFileAlias" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for pwsh.exe -f extensionless hook target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetAfterPwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-after-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'Write-Host ok'; pwsh -NoProfile -File .githooks/pre-commit
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-after-command\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetAfterPwshCommand" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 when extensionless hook -File command follows pwsh -Command. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetInsidePwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-inside-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'pwsh -NoProfile -File .githooks/pre-commit'
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-inside-command\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetInsidePwshCommand" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 when extensionless hook -File invocation is inside pwsh -Command payload. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetAfterOutputInsidePwshCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-after-output-inside-command.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'Write-Host ok; pwsh -NoProfile -File .githooks/pre-commit'
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-after-output-inside-command\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetAfterOutputInsidePwshCommand" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 when extensionless hook -File invocation follows output inside pwsh -Command payload. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetRepoRoot ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-file-reporoot.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -File "$REPO_ROOT/.githooks/pre-merge-commit"
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-file-reporoot\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetRepoRoot" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for repo-root-prefixed extensionless hook target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetPowerShellQuotedArg ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-bad-hook-file.ps1') -Value @'
+param()
+pwsh -NoProfile -File "$PSScriptRoot/../../.githooks/post-rewrite"
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'test-bad-hook-file\.ps1'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetPowerShellQuotedArg" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for quoted PowerShell extensionless hook target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetNestedPowerShell ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/bad-hook-file.ps1') -Value @'
+param()
+pwsh -NoProfile -File .githooks/pre-commit
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'scripts/unity/bad-hook-file\.ps1'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetNestedPowerShell" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 in nested scripts/**/*.ps1. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetPackageJsonWindowsEscaped ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'package.json') -Value @'
+{
+  "scripts": {
+    "bad": "pwsh -NoProfile -File .githooks\\pre-commit"
+  }
+}
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'package\.json'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetPackageJsonWindowsEscaped" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for JSON-escaped Windows hook separator. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetPackageJsonEscapedQuotedPath ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'package.json') -Value @'
+{
+  "scripts": {
+    "bad": "powershell.exe -NoProfile -ExecutionPolicy Bypass -f \".githooks\\pre-commit\""
+  }
+}
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'package\.json'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetPackageJsonEscapedQuotedPath" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for JSON-escaped quoted Windows hook path. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetArrayIndirection ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-hook-array.sh') -Value @'
+#!/usr/bin/env bash
+PWSH_CMD=(pwsh -NoProfile -File)
+"${PWSH_CMD[@]}" .githooks/pre-commit
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-array\.sh'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetArrayIndirection" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for PowerShell-named bash-array invocation targeting extensionless hook. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetVariableAssignment ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/bad-hook-variable.ps1') -Value @'
+param()
+$hook = Join-Path $PSScriptRoot '../../.githooks/pre-commit'
+pwsh -NoProfile -File $hook
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-variable\.ps1'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetVariableAssignment" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for variable assigned to extensionless hook path and passed to -File. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ExtensionlessHookFileTargetJoinPathVariableAssignment ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/bad-hook-joinpath-variable.ps1') -Value @'
+param()
+$hook = Join-Path $PSScriptRoot '.githooks' 'pre-commit'
+pwsh -NoProfile -File $hook
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws004 = $result.Output -match 'PWS004' -and $result.Output -match 'bad-hook-joinpath-variable\.ps1'
+    Write-TestResult "Fail_ExtensionlessHookFileTargetJoinPathVariableAssignment" ($result.ExitCode -ne 0 -and $hasPws004) "Expected exit != 0 + PWS004 for variable assigned by split Join-Path to extensionless hook path and passed to -File. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_ArrayIndirectionPackageJsonEscapedQuotedInvocation ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'package.json') -Value @'
+{
+  "scripts": {
+    "bad": "\\\"${PWSH_CMD[@]}\\\" scripts/thing.ps1 -- arg"
+  }
+}
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'package\.json'
+    Write-TestResult "Fail_ArrayIndirectionPackageJsonEscapedQuotedInvocation" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001 for JSON-escaped quoted bash-array invocation. Exit: $($result.ExitCode). Output: $($result.Output)"
+
     # --- Fail_BadInvocationInTestsInProcess ---
     $root = New-FixtureRoot
     Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-foo.ps1') -Value @'
@@ -170,6 +387,38 @@ $output = & $lint -- $fixturePath *>&1
     $result = Invoke-LintInFixture $root
     $hasPws002 = $result.Output -match 'PWS002' -and $result.Output -match 'test-foo\.ps1'
     Write-TestResult "Fail_BadInvocationInTestsInProcess" ($result.ExitCode -ne 0 -and $hasPws002) "Expected exit != 0 + PWS002 for in-process '& script --'. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationInTestsInProcessQuotedDoubleDash ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-foo-quoted-dash.ps1') -Value @'
+param()
+$lint = "./scripts/lint-foo.ps1"
+$output = & $lint '--' $fixturePath *>&1
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws002 = $result.Output -match 'PWS002' -and $result.Output -match 'test-foo-quoted-dash\.ps1'
+    Write-TestResult "Fail_BadInvocationInTestsInProcessQuotedDoubleDash" ($result.ExitCode -ne 0 -and $hasPws002) "Expected exit != 0 + PWS002 for in-process '& script ''--'''. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationInTestsInProcessDelayedDoubleDash ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-foo-delayed-dash.ps1') -Value @'
+param()
+$script = "./scripts/lint-foo.ps1"
+$output = & $script -Verbose '--' $fixturePath *>&1
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws002 = $result.Output -match 'PWS002' -and $result.Output -match 'test-foo-delayed-dash\.ps1'
+    Write-TestResult "Fail_BadInvocationInTestsInProcessDelayedDoubleDash" ($result.ExitCode -ne 0 -and $hasPws002) "Expected exit != 0 + PWS002 when '& script' passes options before quoted --. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_BadInvocationInTestsInProcessParenthesizedScript ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-foo-parenthesized.ps1') -Value @'
+param()
+$output = & (Join-Path $PSScriptRoot '..' 'lint-foo.ps1') -- $fixturePath *>&1
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws002 = $result.Output -match 'PWS002' -and $result.Output -match 'test-foo-parenthesized\.ps1'
+    Write-TestResult "Fail_BadInvocationInTestsInProcessParenthesizedScript" ($result.ExitCode -ne 0 -and $hasPws002) "Expected exit != 0 + PWS002 for parenthesized in-process script target. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     Write-Host "`n  Section: False-positive guards" -ForegroundColor White
 
@@ -182,6 +431,157 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-dependabot.ps1 
 '@
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_CorrectPathsPattern" ($result.ExitCode -eq 0) "Expected exit 0 for correct -Paths invocation. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_GithookPs1ImplementationFileTarget ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/good-hook-debug.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -File .githooks/pre-commit.ps1
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_GithookPs1ImplementationFileTarget" ($result.ExitCode -eq 0) "Expected exit 0 for .ps1 git hook implementation target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_GithookPs1ImplementationVariableTarget ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/good-hook-variable.ps1') -Value @'
+param()
+$hook = Join-Path $PSScriptRoot '../../.githooks/pre-commit.ps1'
+pwsh -NoProfile -File $hook
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_GithookPs1ImplementationVariableTarget" ($result.ExitCode -eq 0) "Expected exit 0 for variable assigned to .ps1 hook implementation target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_GithookPs1ImplementationJoinPathVariableTarget ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/good-hook-joinpath-variable.ps1') -Value @'
+param()
+$hook = Join-Path $PSScriptRoot '.githooks' 'pre-commit.ps1'
+pwsh -NoProfile -File $hook
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_GithookPs1ImplementationJoinPathVariableTarget" ($result.ExitCode -eq 0) "Expected exit 0 for variable assigned by split Join-Path to .ps1 hook implementation target. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_GithookPs1ImplementationVariableTargetWithCommentMention ---
+    $root = New-FixtureRoot
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts/unity') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/unity/good-hook-variable-comment.ps1') -Value @'
+param()
+$hook = Join-Path $PSScriptRoot '../../.githooks/pre-commit.ps1' # companion for .githooks/pre-commit
+pwsh -NoProfile -File $hook
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_GithookPs1ImplementationVariableTargetWithCommentMention" ($result.ExitCode -eq 0) "Expected exit 0 when .ps1 implementation variable line has trailing comment mentioning extensionless hook. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ExtensionlessHookMentionInPowerShellInlineComment ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-hook-inline-comment.ps1') -Value @'
+param()
+$ok = $true # do not run pwsh -NoProfile -File .githooks/pre-commit
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ExtensionlessHookMentionInPowerShellInlineComment" ($result.ExitCode -eq 0) "Expected exit 0 when extensionless hook command is only a PowerShell inline comment. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ExtensionlessHookMentionInPowerShellString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-hook-help.ps1') -Value @'
+param()
+Write-Host "For debugging, do not run pwsh -NoProfile -File .githooks/pre-commit"
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ExtensionlessHookMentionInPowerShellString" ($result.ExitCode -eq 0) "Expected exit 0 when extensionless hook command is only PowerShell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ExtensionlessHookMentionInShellEcho ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/help-text.sh') -Value @'
+#!/usr/bin/env bash
+echo "For debugging, do not run pwsh -NoProfile -File .githooks/pre-commit"
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ExtensionlessHookMentionInShellEcho" ($result.ExitCode -eq 0) "Expected exit 0 when extensionless hook command is only shell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_DoubleDashMentionInPowerShellString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-pws001-help.ps1') -Value @'
+param()
+Write-Host "Do not run pwsh -NoProfile -File scripts/foo.ps1 -- arg"
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_DoubleDashMentionInPowerShellString" ($result.ExitCode -eq 0) "Expected exit 0 when PWS001 command text is only PowerShell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_DoubleDashMentionInShellEcho ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/pws001-help-text.sh') -Value @'
+#!/usr/bin/env bash
+echo "Do not run pwsh -NoProfile -File scripts/foo.ps1 -- arg"
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_DoubleDashMentionInShellEcho" ($result.ExitCode -eq 0) "Expected exit 0 when PWS001 command text is only shell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ArrayIndirectionMentionInPowerShellString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-pws001-array-help.ps1') -Value @'
+param()
+Write-Host 'Do not run "${PWSH_CMD[@]}" scripts/thing.ps1 -- arg'
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ArrayIndirectionMentionInPowerShellString" ($result.ExitCode -eq 0) "Expected exit 0 when array-indirection PWS001 text is only PowerShell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ArrayIndirectionMentionInShellEcho ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/pws001-array-help-text.sh') -Value @'
+#!/usr/bin/env bash
+echo 'Do not run "${PWSH_CMD[@]}" scripts/thing.ps1 -- arg'
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ArrayIndirectionMentionInShellEcho" ($result.ExitCode -eq 0) "Expected exit 0 when array-indirection PWS001 text is only shell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_ArrayIndirectionMentionInWorkflowEcho ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root '.github/workflows/pws001-array-help.yml') -Value @'
+name: Help Text
+on: [push]
+jobs:
+  help:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Do not run "${PWSH_CMD[@]}" scripts/thing.ps1 -- arg'
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ArrayIndirectionMentionInWorkflowEcho" ($result.ExitCode -eq 0) "Expected exit 0 when array-indirection PWS001 text is only workflow echo help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_InProcessDoubleDashMentionInPowerShellString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-pws002-help.ps1') -Value @'
+param()
+Write-Host "Do not run & scripts/foo.ps1 -- arg"
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_InProcessDoubleDashMentionInPowerShellString" ($result.ExitCode -eq 0) "Expected exit 0 when PWS002 command text is only PowerShell help text. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_InvocationMentionInPowerShellHereString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/tests/test-here-string-help.ps1') -Value @'
+param()
+$help = @"
+Do not run pwsh -NoProfile -File scripts/foo.ps1 -- arg
+Do not run & scripts/foo.ps1 -- arg
+Do not run pwsh -NoProfile -File .githooks/pre-commit
+"@
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_InvocationMentionInPowerShellHereString" ($result.ExitCode -eq 0) "Expected exit 0 when invocation text appears only in a PowerShell here-string. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_InvocationMentionInPwshCommandHelpText ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/pwsh-command-help.sh') -Value @'
+#!/usr/bin/env bash
+pwsh -NoProfile -Command 'Write-Host "do not run pwsh -NoProfile -File scripts/foo.ps1 -- arg"'
+pwsh -NoProfile -Command 'Write-Host "do not run pwsh -NoProfile -File .githooks/pre-commit"'
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_InvocationMentionInPwshCommandHelpText" ($result.ExitCode -eq 0) "Expected exit 0 when invocation text appears only inside a pwsh -Command help string. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Pass_DoubleDashInCommentedHelp ---
     # Anti-pattern appears inside a <# ... #> help block -> must NOT be flagged.
@@ -496,6 +896,18 @@ PWSH_CMD=(pwsh -NoProfile -File)
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_ArrayIndirectionWithPaths" ($result.ExitCode -eq 0) "Expected exit 0 on array-indirection with -Paths. Exit: $($result.ExitCode). Output: $($result.Output)"
 
+    # --- Pass_ArrayIndirectionNonPowerShellCommand ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/array-node.sh') -Value @'
+#!/usr/bin/env bash
+NODE_CMD=(node)
+"${NODE_CMD[@]}" scripts/thing.ps1 -- arg
+CMD=(node)
+"${CMD[@]}" scripts/thing.ps1 -- arg
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_ArrayIndirectionNonPowerShellCommand" ($result.ExitCode -eq 0) "Expected exit 0 for non-PowerShell command arrays. Exit: $($result.ExitCode). Output: $($result.Output)"
+
     Write-Host "`n  Section: PWS003 — subprocess pwsh from scripts/*.ps1" -ForegroundColor White
 
     # --- Fail_Pws003SubprocessPwshInScriptPs1 ---
@@ -547,6 +959,75 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 '@
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_Pws003AllowlistMarker" ($result.ExitCode -eq 0) "Expected exit 0 when the allowlist marker is present. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003AllowlistMarkerMissingRationale ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-marker-no-rationale.ps1') -Value @'
+# lint-pwsh-invocations: allow-subprocess-pwsh
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$sibling = Join-Path $PSScriptRoot 'sibling.ps1'
+& pwsh -NoProfile -File $sibling
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'bad-marker-no-rationale\.ps1'
+    Write-TestResult "Fail_Pws003AllowlistMarkerMissingRationale" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 when the allowlist marker has no rationale. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003AllowlistMarkerInString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-marker-string.ps1') -Value @'
+Set-StrictMode -Version Latest
+Write-Host "lint-pwsh-invocations: allow-subprocess-pwsh not a real marker"
+$sibling = Join-Path $PSScriptRoot 'sibling.ps1'
+& pwsh -NoProfile -File $sibling
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'bad-marker-string\.ps1'
+    Write-TestResult "Fail_Pws003AllowlistMarkerInString" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 when marker text appears only in a string. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003AllowlistMarkerInlineComment ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-marker-inline.ps1') -Value @'
+Set-StrictMode -Version Latest # lint-pwsh-invocations: allow-subprocess-pwsh not a real marker
+$sibling = Join-Path $PSScriptRoot 'sibling.ps1'
+& pwsh -NoProfile -File $sibling
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'bad-marker-inline\.ps1'
+    Write-TestResult "Fail_Pws003AllowlistMarkerInlineComment" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 when marker text appears only in an inline comment. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003AllowlistMarkerInCommentBlock ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-marker-help-block.ps1') -Value @'
+<#
+# lint-pwsh-invocations: allow-subprocess-pwsh not a real marker
+#>
+Set-StrictMode -Version Latest
+$sibling = Join-Path $PSScriptRoot 'sibling.ps1'
+& pwsh -NoProfile -File $sibling
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'bad-marker-help-block\.ps1'
+    Write-TestResult "Fail_Pws003AllowlistMarkerInCommentBlock" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 when marker text appears only in a comment-based help block. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003AllowlistMarkerInHereString ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/bad-marker-here-string.ps1') -Value @'
+$help = @"
+# lint-pwsh-invocations: allow-subprocess-pwsh not a real marker
+"@
+Set-StrictMode -Version Latest
+$sibling = Join-Path $PSScriptRoot 'sibling.ps1'
+& pwsh -NoProfile -File $sibling
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'bad-marker-here-string\.ps1'
+    Write-TestResult "Fail_Pws003AllowlistMarkerInHereString" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 when marker text appears only in a here-string. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_Pws003AllowlistMarkerMalformedUnderscores ---
     # Negative test for the allowlist marker contract: the canonical form is
@@ -609,6 +1090,16 @@ $example = "Run: pwsh -NoProfile -File scripts/yet-another.ps1"
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_Pws003StringLiteralNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 — pwsh inside a quoted string literal must not trigger PWS003. Exit: $($result.ExitCode). Output: $($result.Output)"
 
+    # --- Pass_Pws003InlineCommentNotFlagged ---
+    # pwsh invocation text appearing inside an inline comment must NOT trigger PWS003.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/pws003-inline-comment.ps1') -Value @'
+param()
+Set-StrictMode -Version Latest # historical: pwsh -NoProfile -File scripts/sibling.ps1
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws003InlineCommentNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 — pwsh inside an inline comment must not trigger PWS003. Exit: $($result.ExitCode). Output: $($result.Output)"
+
     # --- Pass_Pws003CommentBlockExempt ---
     # PowerShell comment-based-help blocks that DOCUMENT the anti-pattern
     # must NOT trigger PWS003 (they're documentation, not an invocation).
@@ -636,6 +1127,16 @@ Set-StrictMode -Version Latest
     $result = Invoke-LintInFixture $root
     $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'runs-psexe\.ps1'
     Write-TestResult "Fail_Pws003PowerShellCommandAlsoCovered" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 for 'powershell -File' form. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws003PowerShellExeShortFileAliasCovered ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/runs-psexe-short-file.ps1') -Value @'
+Set-StrictMode -Version Latest
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -f scripts/sibling.ps1
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'runs-psexe-short-file\.ps1'
+    Write-TestResult "Fail_Pws003PowerShellExeShortFileAliasCovered" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 for 'powershell.exe -f' form. Exit: $($result.ExitCode). Output: $($result.Output)"
 
 } finally {
     Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue

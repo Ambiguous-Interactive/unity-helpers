@@ -11,7 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
-    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
@@ -20,7 +19,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [NUnit.Framework.Category("Integration")]
     public sealed class ManualRecompileTests
     {
-        private static readonly string TempFolderRelativePath = ResolveTempFolderRelativePath();
+        // Temp recompile fixtures live under Assets/ (always writable and AssetDatabase-visible),
+        // NOT next to this test's own source. When the package is CONSUMED -- CI's "file:" local
+        // package (project nested at <root>/.artifacts/..., package at file:<root>), a registry
+        // package, or Library/PackageCache -- the package source folder is outside the project
+        // root or read-only, so creating + recompiling temp scripts there is impossible. An
+        // Assets/ path is layout-independent and removes the prior DirectoryHelper resolution that
+        // returned empty in CI and threw from this fixture's static initializer (failing all 17
+        // tests in OneTimeSetUp).
+        private const string TempFolderRelativePath = "Assets/__ManualRecompileTests__";
 
         private readonly List<string> createdAssetPaths = new();
 
@@ -696,19 +703,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             string normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
             return Path.Combine(projectRoot, normalizedRelativePath);
-        }
-
-        private static string ResolveTempFolderRelativePath()
-        {
-            string testsFolder = DirectoryHelper.FindAbsolutePathToDirectory("Tests/Editor/Tools");
-            if (string.IsNullOrEmpty(testsFolder))
-            {
-                throw new InvalidOperationException(
-                    "Unable to resolve Tests/Editor/Tools folder via DirectoryHelper. Ensure the test file lives inside the package."
-                );
-            }
-
-            return $"{testsFolder.TrimEnd('/')}/TempManualRecompile";
         }
     }
 }

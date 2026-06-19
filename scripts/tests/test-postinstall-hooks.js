@@ -16,6 +16,7 @@
 //   - npm_config_ignore_scripts=true (lowercase; npm's canonical form) also
 //     triggers the ignore-scripts skip reason.
 //   - HUSKY=0 prints the husky reason.
+//   - Missing pwsh skips without configuring core.hooksPath.
 //   - Running in a non-git directory prints "not a git work tree — skipping"
 //     and exits 0 without attempting to configure hooks.
 //   - All skip triggers exit 0 (never fail npm install).
@@ -103,6 +104,24 @@ function createCopiedRepoHarness(prefix) {
   assert.strictEqual(init.status, 0, `git init failed: ${init.stderr || ""}`);
 
   return { tempDir, copiedScript };
+}
+
+function createFakePwshPath(tempDir) {
+  const binDir = path.join(tempDir, "bin");
+  fs.mkdirSync(binDir);
+  const fakePwsh = path.join(binDir, process.platform === "win32" ? "pwsh.cmd" : "pwsh");
+  if (process.platform === "win32") {
+    fs.writeFileSync(fakePwsh, "@echo PowerShell 7.0.0\r\n", "utf8");
+  } else {
+    fs.writeFileSync(fakePwsh, "#!/usr/bin/env sh\necho 'PowerShell 7.0.0'\n", "utf8");
+    fs.chmodSync(fakePwsh, 0o755);
+  }
+
+  return `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+}
+
+function isExecutable(filePath) {
+  return (fs.statSync(filePath).mode & 0o111) !== 0;
 }
 
 console.log("Testing scripts/postinstall-hooks.js skip triggers...");
@@ -255,6 +274,77 @@ runTest("Pass_CustomHooksPathStillLeftUnchanged", () => {
     assert.ok(
       r.stdout.includes('core.hooksPath is ".husky"') && r.stdout.includes("leaving unchanged"),
       `custom hooksPath should be preserved with warning. stdout: ${r.stdout}`
+    );
+  } finally {
+    fs.rmSync(harness.tempDir, { recursive: true, force: true });
+  }
+});
+
+runTest("Pass_MissingPwshSkipsWithoutConfiguringHooks", () => {
+  const harness = createCopiedRepoHarness("postinstall-hooks-missing-pwsh-");
+  try {
+    const r = runScriptAtPath(
+      harness.copiedScript,
+      { POSTINSTALL_HOOKS_PWSH_COMMAND: "definitely-missing-pwsh-for-test" },
+      harness.tempDir
+    );
+    assert.strictEqual(r.status, 0, `exit ${r.status}`);
+    assert.ok(
+      r.stdout.includes("definitely-missing-pwsh-for-test not found") &&
+        r.stdout.includes("skipping hook install"),
+      `missing pwsh should skip with remediation. stdout: ${r.stdout}`
+    );
+
+    const hooksPath = spawnSync("git", ["config", "--get", "core.hooksPath"], {
+      cwd: harness.tempDir,
+      encoding: "utf8"
+    });
+    assert.notStrictEqual(
+      hooksPath.stdout.trim(),
+      ".githooks",
+      `missing pwsh must not configure core.hooksPath=.githooks. stdout: ${r.stdout}`
+    );
+  } finally {
+    fs.rmSync(harness.tempDir, { recursive: true, force: true });
+  }
+});
+
+runTest("Pass_AllExtensionlessHooksBecomeExecutableOnUnix", () => {
+  if (process.platform === "win32") {
+    return;
+  }
+
+  const harness = createCopiedRepoHarness("postinstall-hooks-chmod-");
+  const hookNames = ["pre-commit", "pre-merge-commit", "pre-push", "post-rewrite"];
+  try {
+    for (const hookName of hookNames) {
+      const hookPath = path.join(harness.tempDir, ".githooks", hookName);
+      fs.writeFileSync(hookPath, "#!/usr/bin/env sh\n", "utf8");
+      fs.chmodSync(hookPath, 0o644);
+    }
+    fs.writeFileSync(path.join(harness.tempDir, ".githooks", "pre-commit.ps1"), "", "utf8");
+    fs.chmodSync(path.join(harness.tempDir, ".githooks", "pre-commit.ps1"), 0o644);
+
+    const r = runScriptAtPath(
+      harness.copiedScript,
+      { PATH: createFakePwshPath(harness.tempDir) },
+      harness.tempDir
+    );
+    assert.strictEqual(r.status, 0, `exit ${r.status} (stderr: ${r.stderr})`);
+    assert.ok(
+      r.stdout.includes("git hooks installed"),
+      `expected install message. stdout: ${r.stdout}`
+    );
+
+    for (const hookName of hookNames) {
+      assert.ok(
+        isExecutable(path.join(harness.tempDir, ".githooks", hookName)),
+        `${hookName} should be executable after postinstall`
+      );
+    }
+    assert.ok(
+      !isExecutable(path.join(harness.tempDir, ".githooks", "pre-commit.ps1")),
+      "implementation files should not be made executable as hook entrypoints"
     );
   } finally {
     fs.rmSync(harness.tempDir, { recursive: true, force: true });

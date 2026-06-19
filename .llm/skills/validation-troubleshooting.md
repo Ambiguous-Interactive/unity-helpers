@@ -188,6 +188,26 @@ Run `npm run test:sync-script-contracts` after editing sync scripts to catch reg
 
 **Prevention**: Every PowerShell script must end with explicit `exit 0` (success) or `exit 1` (failure) on all code paths. Never let a script fall through without an explicit exit.
 
+### 13a. PowerShell Rejects Extensionless Git Hook
+
+**Symptom**: Hook output contains:
+
+```text
+Processing -File '.githooks/pre-commit' failed because the file does not have a '.ps1' extension.
+```
+
+**Cause**: Something invoked an extensionless git hook launcher with
+`pwsh -File`. Git hooks are named without extensions; PowerShell `-File` should
+target the companion `.ps1` implementation.
+
+**Fix**: Let Git run the hook during `git commit`, run `.githooks/pre-commit`
+directly as an executable, or debug the implementation with
+`pwsh -NoProfile -File .githooks/pre-commit.ps1`. Run
+`npm run agent:preflight:fix` first so routine repairs happen before the hook.
+
+**Prevention**: `scripts/lint-pwsh-invocations.ps1` emits `PWS004` for
+automation that calls `pwsh -File .githooks/<hook>`.
+
 ### 14. Missing cspell Dictionary Entry for Valid Abbreviation
 
 **Symptom**: `npm run lint:spelling` fails on a technical abbreviation or domain term that is valid.
@@ -206,10 +226,10 @@ Run `npm run test:sync-script-contracts` after editing sync scripts to catch reg
 
 **Symptom**: CI fails on issues hooks should have caught locally.
 
-**Cause**: Hook files in `.githooks/` are not executable.
+**Cause**: Extensionless hook entrypoints in `.githooks/` are not executable.
 
 **Fix**: See [`fix_hook_permissions`](../code-samples/patterns/ValidationFixPatterns.sh) for the full sequence, or run:
-`chmod +x .githooks/* && git update-index --chmod=+x .githooks/pre-commit .githooks/pre-push`
+`chmod +x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite && git update-index --chmod=+x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite`
 
 ### 17. Dead Link Failures (External URLs)
 
@@ -371,7 +391,7 @@ Several `scripts/*.ps1` files end without an explicit `exit 0` on their success 
 
 **Simple heuristic**: Parse each `.ps1`, skip trailing whitespace/comments/closing braces, and verify the last meaningful statement is `exit $something` or `exit <number>`. Scripts ending with a closing `}` from an `if` block that contains `exit` on both branches pass, but scripts that fall through after a conditional exit fail.
 
-**Current state**: The bash pre-commit hook (`|| { exit 1; }`) catches non-zero exits from PowerShell scripts. The primary risk is in CI workflows that invoke `.ps1` scripts directly. Most lint scripts already have proper `exit 0/1` on all paths. Monitor for future regressions.
+**Current state**: The extensionless pre-commit launcher delegates to `.githooks/pre-commit.ps1`, which treats non-zero child script exits as hook failures. The primary remaining risk is direct CI or developer invocation of `.ps1` scripts that fall through without an explicit success exit. Most lint scripts already have proper `exit 0/1` on all paths. Monitor for future regressions.
 
 ---
 

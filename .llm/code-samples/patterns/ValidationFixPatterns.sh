@@ -32,10 +32,10 @@ fix_line_endings() {
 }
 
 # --- Fix Git Hook Permissions ---
-# Hook files must be executable or git silently skips them.
+# Extensionless hook entrypoints must be executable or git silently skips them.
 fix_hook_permissions() {
-    chmod +x .githooks/*
-    git update-index --chmod=+x .githooks/pre-commit .githooks/pre-push
+    chmod +x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite
+    git update-index --chmod=+x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite
     npm run validate:hook-perms
 }
 

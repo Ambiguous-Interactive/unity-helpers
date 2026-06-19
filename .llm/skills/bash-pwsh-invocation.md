@@ -10,6 +10,10 @@
 
 When calling a `.ps1` script from bash using `pwsh -File` or `powershell -File`, **always use explicit named parameters** (e.g. `-Paths "${ARR[@]}"`).
 
+PowerShell `-File` targets must be `.ps1` scripts. Extensionless git hook
+launchers such as `.githooks/pre-commit` run directly through Git/shell; for
+PowerShell debugging, invoke `.githooks/pre-commit.ps1`.
+
 **NEVER** use the POSIX `--` end-of-options separator:
 
 ```bash
@@ -21,9 +25,9 @@ pwsh -NoProfile -File scripts/lint-foo.ps1 -- "${FILES[@]}"
 pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${FILES[@]}"
 ```
 
-This rule is enforced by:
+These rules are enforced by:
 
-1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/tests/*.ps1`, and `package.json` for `-File <script> --` (code `PWS001`).
+1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`).
 2. `.github/workflows/pwsh-invocations-lint.yml` — runs the lint on every PR that touches hook/workflow/script files.
 3. `scripts/tests/test-precommit-integration.sh` — smoke-tests that each pwsh-invoked hook branch works.
 4. `scripts/validate-lint-error-codes.ps1` — enforces that the `PWS` prefix (and any other lint-error-code prefix introduced by a new lint script) is registered in `cspell.json`, so the skill/doc tokens `PWS001`/`PWS002` do not trip the spell checker.
@@ -85,12 +89,11 @@ See [`lint-skill-sizes.ps1`](../../scripts/lint-skill-sizes.ps1) and [`lint-depe
 
 ## What The Lint Catches
 
-| Code   | Pattern                                                               | File types                                       |
-| ------ | --------------------------------------------------------------------- | ------------------------------------------------ |
-| PWS001 | `pwsh -File <script> --` or `powershell -File ... --`                 | `*.sh`, `.githooks/*`, workflows, `package.json` |
-| PWS001 | `"${PWSH_CMD[@]}" <script>.ps1 --` (bash array indirection)           | `*.sh`, `.githooks/*`, workflows, `package.json` |
-| PWS002 | `& <script-var-or-path>.ps1 --` in tests                              | `scripts/tests/*.ps1`                            |
-| PWS003 | `scripts/*.ps1` invokes `pwsh\|powershell -NoProfile -File <sibling>` | `scripts/*.ps1` (excludes `scripts/tests/*`)     |
+- `PWS001`: `pwsh[.exe] -File|-f <script> --` or `powershell[.exe] -File|-f ... --`, including quoted `"--"` / `'--'`, in `*.sh`, `.githooks/*`, workflows, `scripts/**/*.ps1`, and `package.json`.
+- `PWS001`: `"${PWSH_CMD[@]}" <script>.ps1 --` bash array indirection for PowerShell-named arrays such as `PWSH_CMD` or `POWERSHELL_CMD` in `*.sh`, `.githooks/*`, workflows, and `package.json`.
+- `PWS002`: `& <script-var-or-path>.ps1 --` in `scripts/tests/*.ps1`.
+- `PWS003`: top-level `scripts/*.ps1` invokes `pwsh[.exe]|powershell[.exe] -File|-f <sibling>`. Nested scripts and tests are excluded for this rule.
+- `PWS004`: `pwsh[.exe]|powershell[.exe] -File|-f .githooks/<extensionless-hook>` in `*.sh`, `.githooks/*`, workflows, `scripts/**/*.ps1`, and `package.json`.
 
 Detection beyond a single physical line:
 
@@ -98,7 +101,7 @@ Detection beyond a single physical line:
 - **YAML folded scalars (`run: >`)** — indented block bodies are folded into one command and scanned.
 - **Comment exclusions** — a physical line whose first non-whitespace char is `#` (in `.sh`, `.yml`, `.yaml`, `.ps1`) is skipped.
 
-Strings inside `<# ... #>` comment-based help blocks in `.ps1` files are exempt (so documentation can still show historical bad patterns). PWS003 additionally skips matches inside `"..."` / `'...'` string literals so `Write-Host` help text that references an invocation is not flagged.
+Strings inside `<# ... #>` comment-based help blocks and here-strings in `.ps1` files are exempt (so documentation can still show historical bad patterns). PWS001, PWS002, PWS003, and PWS004 skip matches inside `"..."` / `'...'` PowerShell string literals so `Write-Host` help text that references an invocation is not flagged. PWS001 and PWS004 also skip shell/YAML `echo` and `printf` help text.
 
 ---
 
@@ -139,6 +142,8 @@ The rationale is required — the marker without an explanation is a maintenance
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Single file, hook           | `pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "$file"`                                                               |
 | Bash array, hook            | `pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${ARR[@]}"`                                                           |
+| Git hook launcher           | `.githooks/pre-commit` or `.githooks/pre-push`                                                                            |
+| Git hook PowerShell debug   | `pwsh -NoProfile -File .githooks/pre-commit.ps1`                                                                          |
 | Windows powershell fallback | `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-foo.ps1 -Paths "${ARR[@]}"`                             |
 | Test harness                | `& pwsh -NoProfile -File $lintScriptPath -Paths $fixturePath *>&1`                                                        |
 | Positional flag-style       | `pwsh -NoProfile -File scripts/format-staged-csharp.ps1 "${ARR[@]}"` (if the script declares a positional string[] param) |
@@ -157,3 +162,4 @@ The rationale is required — the marker without an explanation is a maintenance
 
 - **2026-04-19**: Skill created after the `-- "${DEPENDABOT_FILES_ARRAY[@]}"` regression in `.githooks/pre-commit`. The bug reached production because `scripts/tests/test-lint-dependabot.ps1` used the in-process `&` operator (which tolerates `--`), while the hook used `pwsh -File` (which does not). Fix + prevention infrastructure: `scripts/lint-pwsh-invocations.ps1`, `.github/workflows/pwsh-invocations-lint.yml`, `scripts/tests/test-precommit-integration.sh`.
 - **2026-04-23**: Added **PWS003** — flags `scripts/*.ps1` that shell out to sibling scripts via `pwsh -NoProfile -File`. Motivated by Copilot feedback on `scripts/install-hooks.ps1` and `scripts/agent-preflight.ps1`: both ran `& pwsh -NoProfile -File scripts/configure-git-defaults.ps1`, which fails on Windows PowerShell 5.1 hosts (no `pwsh` on PATH). Fix: extracted `Set-RepoGitPushDefaults` into `scripts/git-push-defaults-helpers.ps1` and switched both callers to dot-source. Allowlist marker added for the three scripts whose callees legitimately need subprocess isolation (structured stdout / heavy `exit` use). Regression coverage in `scripts/tests/test-lint-pwsh-invocations.ps1`.
+- **2026-06-19**: Added **PWS004** — flags `pwsh -File .githooks/<hook>` because extensionless hook launchers are not portable PowerShell `-File` targets. Fix: invoke the hook directly through Git/shell, or invoke `.githooks/<hook>.ps1` for PowerShell debugging. Coverage includes nested `scripts/**/*.ps1`, Windows `pwsh.exe`/`powershell.exe`, `-f`, and JSON-escaped package scripts.

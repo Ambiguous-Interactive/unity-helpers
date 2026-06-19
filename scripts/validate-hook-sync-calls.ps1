@@ -24,10 +24,10 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit'
+$preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit.ps1'
 
 if (-not (Test-Path $preCommitPath)) {
-    Write-Error "pre-commit hook not found at: $preCommitPath"
+    Write-Error "pre-commit PowerShell implementation not found at: $preCommitPath"
     exit 1
 }
 
@@ -55,7 +55,7 @@ if ($missing.Count -gt 0) {
         Write-Warning "  - $m"
     }
     Write-Host ''
-    Write-Error "Pre-commit hook is missing $($missing.Count) required sync script call(s). Add them to step 0 in .githooks/pre-commit."
+    Write-Error "Pre-commit hook is missing $($missing.Count) required sync script call(s). Add them to .githooks/pre-commit.ps1."
     exit 1
 }
 
@@ -64,10 +64,10 @@ if ($VerboseOutput) {
 }
 
 # ---- Validate pre-push hook reads stdin for changed-file detection ----
-$prePushPath = Join-Path $repoRoot '.githooks' 'pre-push'
+$prePushPath = Join-Path $repoRoot '.githooks' 'pre-push.ps1'
 
 if (-not (Test-Path $prePushPath)) {
-    Write-Error "pre-push hook not found at: $prePushPath"
+    Write-Error "pre-push PowerShell implementation not found at: $prePushPath"
     exit 1
 }
 
@@ -76,10 +76,10 @@ $prePushContent = Get-Content $prePushPath -Raw
 # The pre-push hook MUST read stdin to determine changed files.
 # Without this, last-resort checks can drift into broad repository scans.
 $requiredPrePushPatterns = @(
-    @{ Pattern = 'while read'; Description = 'reads stdin (while read loop)' },
-    @{ Pattern = 'local_sha'; Description = 'parses local SHA from stdin' },
-    @{ Pattern = 'remote_sha'; Description = 'parses remote SHA from stdin' },
-    @{ Pattern = 'ALL_CHANGED_FILES'; Description = 'stores changed files in array' }
+    @{ Pattern = '[Console]::In.ReadToEnd'; Description = 'reads stdin from git pre-push' },
+    @{ Pattern = 'localSha'; Description = 'parses local SHA from stdin' },
+    @{ Pattern = 'remoteSha'; Description = 'parses remote SHA from stdin' },
+    @{ Pattern = 'allChanged'; Description = 'stores changed files in a set' }
 )
 
 $prePushMissing = @()
@@ -106,22 +106,22 @@ if ($VerboseOutput) {
 
 # ---- Validate pre-merge-commit hook delegates to pre-commit ----
 # Git does not run pre-commit for merge commits; the pre-merge-commit hook is
-# the merge-time equivalent. Without delegation, any file introduced through a
-# merge bypasses spell check, lint, EOL normalization, etc. — a real incident
-# in April 2026 (skill file added during merge resolution introduced a lint-
-# error-code prefix that never reached cspell, surfacing only at pre-push).
-$preMergeCommitPath = Join-Path $repoRoot '.githooks' 'pre-merge-commit'
+# the merge-time equivalent. Without delegation, merge commits bypass fast
+# last-resort checks such as EOL, metadata, LLM instruction, and C# region
+# validation.
+$preMergeCommitPath = Join-Path $repoRoot '.githooks' 'pre-merge-commit.ps1'
 
 if (-not (Test-Path $preMergeCommitPath)) {
-    Write-Error "pre-merge-commit hook not found at: $preMergeCommitPath. Merge commits will bypass pre-commit validation."
+    Write-Error "pre-merge-commit PowerShell implementation not found at: $preMergeCommitPath. Merge commits will bypass pre-commit validation."
     exit 1
 }
 
 $preMergeContent = Get-Content $preMergeCommitPath -Raw
 
 $requiredMergePatterns = @(
-    @{ Pattern = 'pre-commit'; Description = 'references pre-commit hook path' },
-    @{ Pattern = 'exec '; Description = 'exec-delegates so merge commits run full pre-commit validation' }
+    @{ Pattern = 'pre-commit.ps1'; Description = 'references pre-commit PowerShell implementation' },
+    @{ Pattern = '& $preCommit @HookArgs'; Description = 'delegates in-process so merge commits run pre-commit validation' },
+    @{ Pattern = 'exit $LASTEXITCODE'; Description = 'preserves pre-commit exit code' }
 )
 
 $mergeMissing = @()
@@ -139,6 +139,31 @@ if ($mergeMissing.Count -gt 0) {
     }
     Write-Host ''
     Write-Error "Pre-merge-commit hook is missing $($mergeMissing.Count) required pattern(s). Without delegation, merge commits bypass pre-commit validation."
+    exit 1
+}
+
+$forbiddenMergePatterns = @(
+    @{ Pattern = 'Get-Process -Id $PID'; Description = 'resolves current PowerShell executable for a second startup' },
+    @{ Pattern = 'Get-Command pwsh'; Description = 'searches for a second PowerShell executable' },
+    @{ Pattern = '& $pwshPath'; Description = 'spawns another PowerShell process' },
+    @{ Pattern = '$invokeArgs +='; Description = 'builds subprocess PowerShell arguments' }
+)
+
+$mergeForbidden = @()
+foreach ($entry in $forbiddenMergePatterns) {
+    if ($preMergeContent -match [regex]::Escape($entry.Pattern)) {
+        $mergeForbidden += $entry
+    }
+}
+
+if ($mergeForbidden.Count -gt 0) {
+    Write-Host ''
+    Write-Warning "The pre-merge-commit hook still contains second-startup delegation patterns:"
+    foreach ($m in $mergeForbidden) {
+        Write-Warning "  - $($m.Description) (forbidden: '$($m.Pattern)')"
+    }
+    Write-Host ''
+    Write-Error "Pre-merge-commit hook must delegate to pre-commit.ps1 in-process to keep merge hooks fast."
     exit 1
 }
 

@@ -56,7 +56,7 @@ This catches hook-class failures early for changed files:
 
 After creating any file/folder under Unity meta-required roots (`Runtime/`, `Editor/`, `Tests/`, `Samples~/`, `Shaders/`, `Styles/`, `URP/`, `docs/`, `scripts/`):
 
-1. Generate `.meta` immediately with `./scripts/generate-meta.sh <path>`.
+1. Generate `.meta` immediately with `./scripts/generate-meta.sh <path>` for new or empty folders, or `npm run agent:preflight:fix` for changed files discovered by Git.
 2. Run `npm run agent:preflight:fix` before continuing work.
 
 Run `agent:preflight:fix` after staging candidate files (right before commit prep) so staged `.meta` companion drift is corrected before hooks run.
@@ -116,7 +116,7 @@ For detailed workflow patterns and more examples, see [formatting](./formatting.
 
 ### Rule 4: Spell-Check EVERY Change cspell Covers
 
-**MANDATORY, NOT just for docs.** cspell's `files` glob in [cspell.json](../../cspell.json) covers every file extension that pre-commit and agent preflight spell-check:
+**MANDATORY, NOT just for docs.** cspell's `files` glob in [cspell.json](../../cspell.json) covers every file extension that agent preflight and full validation spell-check:
 
 - Markdown: `**/*.{md,markdown}` (docs tree, root README/CHANGELOG/PLAN/AGENTS/CLAUDE, LLM instruction tree, GitHub templates)
 - C#: `**/*.cs` (every source file under `Runtime/`, `Editor/`, `Tests/`, samples, and scripts)

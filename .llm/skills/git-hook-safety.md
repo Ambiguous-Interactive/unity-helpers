@@ -126,12 +126,15 @@ git diff --name-only -- "path/to/dir/"
 
 ## Hook File Permissions (Critical)
 
-Git silently skips hook files that are not executable. If `.githooks/*` files are tracked with `100644` (non-executable) permissions, hooks will never run and all pre-commit validation is bypassed.
+Git silently skips hook entrypoints that are not executable. In this repository,
+entrypoints are the extensionless `.githooks/<hook>` files; companion
+`.githooks/<hook>.ps1` implementations are invoked through PowerShell and do
+not need executable git metadata.
 
 - The `hooks:install` script sets executable permissions automatically
 - If hooks are not running, check permissions: `git ls-files -s .githooks/`
-- Fix tracked permissions: `git update-index --chmod=+x .githooks/pre-commit .githooks/pre-push`
-- Fix local permissions: `chmod +x .githooks/*`
+- Fix tracked permissions: `git update-index --chmod=+x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite`
+- Fix local permissions: `chmod +x .githooks/pre-commit .githooks/pre-merge-commit .githooks/pre-push .githooks/post-rewrite`
 - Use `npm run validate:hook-perms` to verify hook file permissions
 
 ---

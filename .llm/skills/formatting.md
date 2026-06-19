@@ -169,7 +169,7 @@ npm run eol:fix
 ### When to Run
 
 - After creating ANY new file
-- Before committing (auto-runs in pre-commit hook)
+- Before committing (`npm run agent:preflight:fix`; pre-commit intentionally does not run EOL normalization)
 - When CI fails with "LF issues" error
 
 > **Why CRLF?** Unity projects require consistent line endings. Linux dev containers create files with LF by default, causing diffs and CI failures.
@@ -232,7 +232,7 @@ See [Rule 4: Spell-Check Every Change cspell Covers](./validate-before-commit.md
 
 ### Wrong: Missing Final Newline
 
-Files must end with a newline character. Prettier will reject files without one. The pre-commit hook (step 5) auto-fixes this, but if you're editing files outside of git hooks:
+Files must end with a newline character. Prettier will reject files without one. The pre-commit hook may add a missing final newline to staged text files, but run the normal checks before relying on hooks:
 
 ```bash
 # Check for missing final newlines

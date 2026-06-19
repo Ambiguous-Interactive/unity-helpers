@@ -45,7 +45,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 AUDIT_SCRIPT="$REPO_ROOT/scripts/audit-license-years.sh"
 POST_REWRITE="$REPO_ROOT/.githooks/post-rewrite"
+POST_REWRITE_IMPL="$REPO_ROOT/.githooks/post-rewrite.ps1"
 PRE_COMMIT="$REPO_ROOT/.githooks/pre-commit"
+PRE_COMMIT_IMPL="$REPO_ROOT/.githooks/pre-commit.ps1"
 
 cd "$REPO_ROOT"
 CACHE_FILE="$(git rev-parse --git-path license-year-cache)"
@@ -89,7 +91,7 @@ else
 fi
 
 run_test
-if grep -q 'git rev-parse --git-path license-year-cache' "$AUDIT_SCRIPT" && grep -q 'git rev-parse --git-path license-year-cache' "$POST_REWRITE"; then
+if grep -q 'git rev-parse --git-path license-year-cache' "$AUDIT_SCRIPT" && grep -q 'rev-parse --git-path license-year-cache' "$POST_REWRITE_IMPL"; then
     pass "License cache path is worktree-safe"
 else
     fail "License cache path is worktree-safe" "git rev-parse --git-path license-year-cache" "not found"
@@ -145,10 +147,10 @@ else
 fi
 
 run_test
-if grep -q 'audit-license-years.sh --summary --paths' "$PRE_COMMIT" && grep -q 'update-license-headers.sh --paths' "$PRE_COMMIT"; then
-    pass "Pre-commit runs staged C# license audit and scoped auto-fix"
+if ! grep -q 'audit-license-years.sh' "$PRE_COMMIT" "$PRE_COMMIT_IMPL" && grep -q 'Test-LicenseYearHeaders' "$REPO_ROOT/scripts/agent-preflight.ps1"; then
+    pass "License recovery is delegated out of pre-commit"
 else
-    fail "Pre-commit license recovery wiring" "audit-license-years.sh and update-license-headers.sh path-scoped calls" "not found"
+    fail "License recovery is delegated out of pre-commit" "no pre-commit license audit and agent-preflight coverage" "drift detected"
 fi
 
 run_test
@@ -255,7 +257,7 @@ else
 fi
 
 run_test
-if grep -q 'license-year-cache' "$POST_REWRITE"; then
+if grep -q 'license-year-cache' "$POST_REWRITE_IMPL"; then
     pass "post-rewrite references cache file"
 else
     fail "post-rewrite references cache file" "license-year-cache" "not found"
@@ -265,7 +267,7 @@ fi
 if [ -f "$CACHE_FILE" ]; then
     # Ensure a cache file exists
     run_test
-    bash "$POST_REWRITE" amend 2>/dev/null || true
+    "$POST_REWRITE" amend >/dev/null 2>&1 || true
     if [ ! -f "$CACHE_FILE" ]; then
         pass "post-rewrite hook deletes cache"
     else

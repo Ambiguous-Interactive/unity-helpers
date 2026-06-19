@@ -171,6 +171,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(100, 2048, 1024, 2048).SetName(
                 "GrowOnly.100x2048.Portrait.Grows2048"
             );
+            // Oversize source whose next power-of-two (16384) exceeds the 8192 max cap is
+            // clamped to the cap. This is the pure equivalent of the former
+            // ClampMaxCapsOversize integration test, which was removed because it created a
+            // 9001px graphics Texture2D that the headless CI null-graphics device rejects with
+            // "Failed to create texture because of invalid parameters". ComputeFit needs no
+            // graphics device, so the clamp is exercised here deterministically.
+            yield return new TestCaseData(9001, 10, 128, 8192).SetName(
+                "GrowOnly.9001x10.Current128.ClampsToMax8192"
+            );
             // Additional edge cases
             yield return new TestCaseData(256, 256, 256, 256).SetName(
                 "GrowOnly.256x256.Current256.ExactPOTNoChange"

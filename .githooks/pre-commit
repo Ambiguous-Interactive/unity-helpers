@@ -1,912 +1,102 @@
-#!/usr/bin/env bash
-# Upgrade from `set -e` to include pipefail so that pipelines fail when any
-# stage exits non-zero (not just the last). Without `pipefail`, a construct
-# like `cspell ... | tee "$capture"` silently passes when cspell fails because
-# tee's exit status is 0 — the exact regression seen when the Round 1 work
-# gated the spell-check failure path on `if ! ... | tee`. `-u` (nounset) is
-# intentionally omitted here: pre-commit legitimately dereferences arrays that
-# may be empty (e.g. `${STAGED_FILES_ARRAY[@]}` under `bash -u` + old bash).
-set -eo pipefail
+#!/usr/bin/env sh
+set -eu
 
-# Source git staging helpers for safe index.lock handling
-# This prevents "fatal: Unable to create '.git/index.lock': File exists" errors
-# when using interactive git tools like lazygit that may hold locks
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-HELPERS_PATH="$SCRIPT_DIR/scripts/git-staging-helpers.sh"
-if [[ -f "$HELPERS_PATH" ]]; then
-    # shellcheck source=../scripts/git-staging-helpers.sh
-    source "$HELPERS_PATH"
-else
-    echo "Error: git-staging-helpers.sh not found at $HELPERS_PATH" >&2
-    echo "Pre-commit cannot safely stage files without lock-aware helpers." >&2
-    echo "Restore scripts/git-staging-helpers.sh before committing." >&2
-    exit 1
-fi
+repo_root_fast="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
-# CRITICAL: Wait for any external tool (lazygit, IDE, etc.) to release the index.lock
-# before starting hook operations. This is the primary fix for index.lock contention.
-# Without this, the hook may start while lazygit is still holding the lock.
-ensure_no_index_lock || {
-  echo "Error: index.lock still held after waiting." >&2
-  echo "Close competing git tools (GUI, IDE git operations, lazygit) and retry commit." >&2
-  exit 1
-}
+cleanup_ignored_hook_artifacts() {
+    cleanup_repo_root=$1
+    cleanup_hooks_dir="$cleanup_repo_root/.githooks"
+    cleanup_unsafe=""
+    cleanup_root_extensions="txt out err"
+    cleanup_hook_extensions="txt log out err tmp"
 
-# Stage files with retry and emit actionable diagnostics on failure.
-stage_with_retry_or_fail() {
-  local stage_context="$1"
-  shift
-
-  if [ "$#" -eq 0 ]; then
-    return 0
-  fi
-
-  if git_add_with_retry "$@"; then
-    return 0
-  fi
-
-  echo "" >&2
-  echo "=== Error: Failed to stage files ($stage_context) ===" >&2
-  echo "Files:" >&2
-  for path in "$@"; do
-    echo "  $path" >&2
-  done
-  echo "" >&2
-  echo "Recovery:" >&2
-  echo "  1. Close other git tools (GUI, IDE git operations, lazygit)." >&2
-  echo "  2. Retry the commit after a few seconds." >&2
-  echo "  3. Run npm run agent:preflight:fix before retrying to catch this earlier." >&2
-  echo "" >&2
-  exit 1
-}
-
-# 0) Sync version references (runs on every commit)
-#    a) Syncs banner version and .llm/context.md from package.json
-#    b) Syncs issue template package versions from package.json, CHANGELOG.md, and git tags
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoProfile -File scripts/sync-banner-version.ps1
-  pwsh -NoProfile -File scripts/sync-issue-template-versions.ps1
-elif command -v powershell >/dev/null 2>&1; then
-  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-banner-version.ps1
-  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-issue-template-versions.ps1
-else
-  echo "PowerShell not found. Skipping version sync." >&2
-fi
-
-# 1) Normalize line endings (LF -> CRLF for most files, LF for .sh)
-# This MUST run before any other formatting to prevent formatter diffs
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoProfile -File scripts/normalize-eol.ps1
-elif command -v powershell >/dev/null 2>&1; then
-  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/normalize-eol.ps1
-else
-  echo "PowerShell not found. Skipping EOL normalization." >&2
-fi
-
-# 2) Ensure .NET tools available (for CSharpier)
-if command -v dotnet >/dev/null 2>&1; then
-  dotnet tool restore >/dev/null 2>&1 || true
-fi
-
-# ============================================================================
-# SECURITY: Safe file list handling
-# ============================================================================
-# File lists are read using null-delimited (-z) output from git and stored in
-# bash arrays. This prevents shell injection attacks via crafted filenames
-# containing spaces, newlines, semicolons, or other special characters.
-#
-# Pattern: git diff -z | while IFS= read -r -d '' file; do array+=("$file"); done
-# This ensures each filename is treated as a single atomic argument, regardless
-# of what characters it contains.
-# ============================================================================
-
-# Read staged files into an array safely using null-delimited output
-STAGED_FILES_ARRAY=()
-while IFS= read -r -d '' file; do
-    STAGED_FILES_ARRAY+=("$file")
-done < <(git diff --cached --name-only --diff-filter=ACMR -z)
-
-DOC_LINK_FULL_SCAN_REQUIRED=0
-mark_doc_link_full_scan_path() {
-  case "$1" in
-    *.md|*.markdown)
-      DOC_LINK_FULL_SCAN_REQUIRED=1
-      ;;
-  esac
-}
-
-while IFS= read -r -d '' status; do
-  case "$status" in
-    D*)
-      IFS= read -r -d '' deleted_path || true
-      mark_doc_link_full_scan_path "$deleted_path"
-      ;;
-    R*)
-      IFS= read -r -d '' old_path || true
-      IFS= read -r -d '' _new_path || true
-      mark_doc_link_full_scan_path "$old_path"
-      ;;
-  esac
-done < <(git diff --cached --name-status -z -M --diff-filter=DR)
-
-# Early exit if no staged files (e.g., amend with no changes, or merge commit)
-if [ ${#STAGED_FILES_ARRAY[@]} -eq 0 ] && [ "$DOC_LINK_FULL_SCAN_REQUIRED" -eq 0 ]; then
-    echo "No staged files to check. Skipping pre-commit hooks."
-    exit 0
-fi
-
-# 3) Lint Markdown link text style (via Node wrapper -> PowerShell script)
-DOC_LINK_FILES_ARRAY=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-  case "$file" in
-    *.md|*.markdown|*.cs|*.csproj|*.props|*.targets|*.ps1|*.psm1|*.psd1|*.py|*.ts|*.tsx|*.js|*.jsx|*.json|*.yml|*.yaml|*.sh|*.cmd)
-      DOC_LINK_FILES_ARRAY+=("$file")
-      ;;
-  esac
-done
-
-if [ "$DOC_LINK_FULL_SCAN_REQUIRED" -ne 0 ]; then
-  if command -v node >/dev/null 2>&1; then
-    node ./scripts/run-doc-link-lint.js
-  elif command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-doc-links.ps1
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-doc-links.ps1
-  else
-    echo "PowerShell not found. Please install Node.js (preferred) or pwsh/powershell to run docs linter." >&2
-    exit 1
-  fi
-elif [ ${#DOC_LINK_FILES_ARRAY[@]} -gt 0 ]; then
-  if command -v node >/dev/null 2>&1; then
-    node ./scripts/run-doc-link-lint.js -Paths "${DOC_LINK_FILES_ARRAY[@]}"
-  else
-    run_pwsh() {
-      pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Paths "${DOC_LINK_FILES_ARRAY[@]}"
-    }
-
-    run_windows_ps() {
-      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-doc-links.ps1 -Paths "${DOC_LINK_FILES_ARRAY[@]}"
-    }
-
-    if command -v pwsh >/dev/null 2>&1; then
-      run_pwsh
-    elif command -v powershell >/dev/null 2>&1; then
-      run_windows_ps
-    else
-      echo "PowerShell not found. Please install Node.js (preferred) or pwsh/powershell to run docs linter." >&2
-      exit 1
+    if [ ! -d "$cleanup_hooks_dir" ]; then
+        return 0
     fi
-  fi
-else
-  echo "No staged files require documentation link lint."
-fi
 
-run_node_tool() {
-  node scripts/run-node-bin.js "$@"
-}
-
-run_prettier() {
-  node scripts/run-prettier.js "$@"
-}
-
-require_node_tool() {
-  local tool="$1"
-  local purpose="$2"
-  if ! command -v node >/dev/null 2>&1; then
-    echo "Node.js is required for $purpose. Install Node.js/npm and run npm install." >&2
-    exit 1
-  fi
-  if ! run_node_tool "$tool" --version >/dev/null 2>&1; then
-    echo "Repo-local $tool is unavailable for $purpose. Run 'npm install' on the same host that runs git hooks." >&2
-    exit 1
-  fi
-}
-
-# 5) Ensure staged text files end with a final newline
-# This MUST run before Prettier formatting to prevent missing-newline diffs
-
-# ============================================================================
-# CRLF Detection Helper
-# ============================================================================
-# Detects if a file uses CRLF (Windows) line endings by checking for carriage
-# return characters (0x0d). This is used to preserve the correct line ending
-# style when appending a final newline to files.
-#
-# Returns:
-#   0 (true)  - File uses CRLF line endings
-#   1 (false) - File uses LF line endings (or is empty)
-# ============================================================================
-file_uses_crlf() {
-    local file="$1"
-    # Check if file is non-empty and contains CR characters (part of CRLF)
-    if [[ -s "$file" ]] && grep -q $'\r' "$file" 2>/dev/null; then
-        return 0  # Uses CRLF
-    fi
-    return 1  # Uses LF
-}
-
-FINAL_NEWLINE_PATTERNS=('*.json' '*.jsonc' '*.asmdef' '*.asmref' '*.md' '*.markdown'
-    '*.yml' '*.yaml' '*.js' '*.ts' '*.cs' '*.sh' '*.ps1' '*.txt' '*.html' '*.css' '*.xml')
-NEWLINE_FIXED=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    # Check if file matches any of the text patterns
-    matched=0
-    for pat in "${FINAL_NEWLINE_PATTERNS[@]}"; do
-        # shellcheck disable=SC2254
-        case "$file" in
-            ${pat}) matched=1; break ;;
+    for cleanup_hook_path in "$cleanup_hooks_dir"/*; do
+        [ -f "$cleanup_hook_path" ] || continue
+        cleanup_hook_file=${cleanup_hook_path##*/}
+        case "$cleanup_hook_file" in
+            *.sample|*.txt|*.log|*.out|*.err|*.tmp)
+                continue
+                ;;
         esac
-    done
-    if [[ $matched -eq 1 ]] && [[ -s "$file" ]] && [[ "$(tail -c 1 -- "$file" | wc -l)" -eq 0 ]]; then
-        # Append the correct newline based on the file's line ending style
-        # CRLF files get \r\n, LF files get \n to avoid mixed line endings
-        if file_uses_crlf "$file"; then
-            printf '\r\n' >> "$file"
-        else
-            printf '\n' >> "$file"
+        cleanup_hook_name=${cleanup_hook_file%.*}
+        if [ -z "$cleanup_hook_name" ]; then
+            continue
         fi
-        NEWLINE_FIXED+=("$file")
-    fi
-done
-if [[ ${#NEWLINE_FIXED[@]} -gt 0 ]]; then
-    echo "Added final newline to ${#NEWLINE_FIXED[@]} file(s):"
-    for f in "${NEWLINE_FIXED[@]}"; do
-        echo "  $f"
-    done
-  stage_with_retry_or_fail "final newline normalization" "${NEWLINE_FIXED[@]}"
-fi
 
-# Filter files into type-specific arrays
-MD_FILES_ARRAY=()
-JSON_FILES_ARRAY=()
-YAML_FILES_ARRAY=()
-JS_FILES_ARRAY=()
-CS_FILES_ARRAY=()
-SPELL_FILES_ARRAY=()
-
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    case "$file" in
-        *.md|*.markdown)
-            MD_FILES_ARRAY+=("$file")
-            SPELL_FILES_ARRAY+=("$file")
-            ;;
-        *.json|*.jsonc|*.asmdef|*.asmref)
-            JSON_FILES_ARRAY+=("$file")
-            SPELL_FILES_ARRAY+=("$file")
-            ;;
-        *.yml|*.yaml)
-            YAML_FILES_ARRAY+=("$file")
-            SPELL_FILES_ARRAY+=("$file")
-            ;;
-        *.js)
-            JS_FILES_ARRAY+=("$file")
-            SPELL_FILES_ARRAY+=("$file")
-            ;;
-        *.cs)
-            CS_FILES_ARRAY+=("$file")
-            SPELL_FILES_ARRAY+=("$file")
-            ;;
-    esac
-done
-
-# ============================================================================
-# LINE ENDING CONFIGURATION
-# ============================================================================
-# Most files use CRLF (C#, JSON, Markdown) - see .gitattributes.
-# 
-# EXCEPTIONS that MUST use LF:
-#   - YAML files (.yml, .yaml) - cross-platform compatibility
-#   - Shell scripts (.sh) - Unix requirement
-#   - .github/** ALL files - GitHub Actions run on Linux, Dependabot commits LF
-#     This includes .github/*.md files (copilot-instructions.md, etc.)
-#
-# The normalize-eol.ps1 script (step 1) handles this automatically.
-# Prettier uses .prettierrc.json overrides for LF files.
-# If you see EOL-related CI failures, run: npm run fix:eol
-# ============================================================================
-
-# Prettier format and re-add using retry logic to handle index.lock contention
-if [ ${#MD_FILES_ARRAY[@]} -gt 0 ] || [ ${#JSON_FILES_ARRAY[@]} -gt 0 ] || [ ${#YAML_FILES_ARRAY[@]} -gt 0 ] || [ ${#JS_FILES_ARRAY[@]} -gt 0 ]; then
-  require_node_tool prettier "Prettier formatting"
-fi
-
-if [ ${#MD_FILES_ARRAY[@]} -gt 0 ]; then
-  run_prettier --write --log-level warn -- "${MD_FILES_ARRAY[@]}"
-  # Verify formatting was successful before re-staging
-  if ! run_prettier --check -- "${MD_FILES_ARRAY[@]}" >/dev/null 2>&1; then
-    echo "Error: Prettier formatting verification failed for Markdown files." >&2
-    exit 1
-  fi
-  # Use git_add_with_retry to handle concurrent git operations safely
-  stage_with_retry_or_fail "Prettier re-stage (Markdown)" "${MD_FILES_ARRAY[@]}"
-fi
-
-if [ ${#JSON_FILES_ARRAY[@]} -gt 0 ]; then
-  run_prettier --write --log-level warn -- "${JSON_FILES_ARRAY[@]}"
-  # Verify formatting was successful before re-staging
-  if ! run_prettier --check -- "${JSON_FILES_ARRAY[@]}" >/dev/null 2>&1; then
-    echo "Error: Prettier formatting verification failed for JSON files." >&2
-    exit 1
-  fi
-  # Use git_add_with_retry to handle concurrent git operations safely
-  stage_with_retry_or_fail "Prettier re-stage (JSON)" "${JSON_FILES_ARRAY[@]}"
-fi
-
-if [ ${#YAML_FILES_ARRAY[@]} -gt 0 ]; then
-  run_prettier --write --log-level warn -- "${YAML_FILES_ARRAY[@]}"
-  # Verify formatting was successful before re-staging
-  if ! run_prettier --check -- "${YAML_FILES_ARRAY[@]}" >/dev/null 2>&1; then
-    echo "Error: Prettier formatting verification failed for YAML files." >&2
-    exit 1
-  fi
-  # Use git_add_with_retry to handle concurrent git operations safely
-  stage_with_retry_or_fail "Prettier re-stage (YAML)" "${YAML_FILES_ARRAY[@]}"
-fi
-
-if [ ${#JS_FILES_ARRAY[@]} -gt 0 ]; then
-  run_prettier --write --log-level warn -- "${JS_FILES_ARRAY[@]}"
-  # Verify formatting was successful before re-staging
-  if ! run_prettier --check -- "${JS_FILES_ARRAY[@]}" >/dev/null 2>&1; then
-    echo "Error: Prettier formatting verification failed for JS files." >&2
-    exit 1
-  fi
-  # Use git_add_with_retry to handle concurrent git operations safely
-  stage_with_retry_or_fail "Prettier re-stage (JS)" "${JS_FILES_ARRAY[@]}"
-fi
-
-# 6) Format staged C# files with CSharpier (if available) and re-stage
-if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/format-staged-csharp.ps1
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/format-staged-csharp.ps1
-  else
-    echo "PowerShell not found. Skipping CSharpier formatting." >&2
-  fi
-fi
-
-# 6b) Audit and auto-fix staged C# license years before commit.
-if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Checking license year headers on staged C# files..."
-  if ! bash scripts/audit-license-years.sh --summary --paths "${CS_FILES_ARRAY[@]}"; then
-    echo "License year drift detected. Attempting auto-fix..." >&2
-    bash scripts/update-license-headers.sh --paths "${CS_FILES_ARRAY[@]}"
-    stage_with_retry_or_fail "license header auto-fix re-stage" "${CS_FILES_ARRAY[@]}"
-
-    if ! bash scripts/audit-license-years.sh --summary --paths "${CS_FILES_ARRAY[@]}"; then
-      echo "" >&2
-      echo "=== License year audit failed after auto-fix ===" >&2
-      echo "Run: npm run agent:preflight:fix" >&2
-      echo "" >&2
-      exit 1
-    fi
-  fi
-fi
-
-# 7) Auto-fix staged Markdown files, recover missing fence languages when needed, then lint
-if [ ${#MD_FILES_ARRAY[@]} -gt 0 ]; then
-  require_node_tool markdownlint "markdownlint validation"
-  # First, auto-fix what can be fixed
-  MARKDOWNLINT_FIX_CAPTURE="$(mktemp 2>/dev/null || true)"
-  if [ -z "$MARKDOWNLINT_FIX_CAPTURE" ]; then
-    echo "Error: Failed to create temporary file for markdownlint auto-fix output." >&2
-    exit 1
-  fi
-  MARKDOWNLINT_FIX_EXIT=0
-  run_node_tool markdownlint --fix --config .markdownlint.json --ignore-path .markdownlintignore -- "${MD_FILES_ARRAY[@]}" >"$MARKDOWNLINT_FIX_CAPTURE" 2>&1 || MARKDOWNLINT_FIX_EXIT=$?
-  if [ "$MARKDOWNLINT_FIX_EXIT" -ne 0 ] && grep -q 'MD040/fenced-code-language' -- "$MARKDOWNLINT_FIX_CAPTURE"; then
-    if command -v pwsh >/dev/null 2>&1; then
-      pwsh -NoProfile -File scripts/fix-markdown-fence-languages.ps1 -Paths "${MD_FILES_ARRAY[@]}"
-      stage_with_retry_or_fail "Markdown fence language auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
-    elif command -v powershell >/dev/null 2>&1; then
-      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-markdown-fence-languages.ps1 -Paths "${MD_FILES_ARRAY[@]}"
-      stage_with_retry_or_fail "Markdown fence language auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
-    else
-      echo "PowerShell not found. Skipping Markdown fence language auto-fix." >&2
-    fi
-  fi
-  rm -f "$MARKDOWNLINT_FIX_CAPTURE"
-  # Re-stage the fixed files
-  stage_with_retry_or_fail "markdownlint auto-fix re-stage" "${MD_FILES_ARRAY[@]}"
-  # Then run markdownlint again to catch any remaining unfixable issues
-  run_node_tool markdownlint --config .markdownlint.json --ignore-path .markdownlintignore -- "${MD_FILES_ARRAY[@]}"
-fi
-
-# 7b) CHANGELOG lint when CHANGELOG.md is staged
-CHANGELOG_STAGED=false
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-  if [[ "$file" == "CHANGELOG.md" ]]; then
-    CHANGELOG_STAGED=true
-    break
-  fi
-done
-
-if [ "$CHANGELOG_STAGED" = true ]; then
-  echo "Running CHANGELOG linter..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-changelog.ps1 || {
-      echo "" >&2
-      echo "=== CHANGELOG lint failed ===" >&2
-      echo "Fix CHANGELOG.md structure issues before committing." >&2
-      echo "" >&2
-      exit 1
-    }
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-changelog.ps1 || {
-      echo "" >&2
-      echo "=== CHANGELOG lint failed ===" >&2
-      echo "Fix CHANGELOG.md structure issues before committing." >&2
-      echo "" >&2
-      exit 1
-    }
-  else
-    echo "PowerShell not found. Skipping CHANGELOG lint." >&2
-  fi
-fi
-
-# 8) YAML lint on staged YAML files
-if [ ${#YAML_FILES_ARRAY[@]} -gt 0 ]; then
-  if command -v yamllint >/dev/null 2>&1; then
-    yamllint -c .yamllint.yaml -- "${YAML_FILES_ARRAY[@]}"
-  else
-    echo "yamllint not found; skipping YAML lint (run 'npm run verify:tools' to check setup)." >&2
-  fi
-fi
-
-# 8b) Dependabot config lint (if dependabot.yml is staged)
-# Check for dependabot.yml specifically since yamllint doesn't validate schema
-DEPENDABOT_FILES_ARRAY=()
-for f in "${YAML_FILES_ARRAY[@]}"; do
-  if [[ "$f" == *".github/dependabot.yml" ]]; then
-    DEPENDABOT_FILES_ARRAY+=("$f")
-  fi
-done
-if [ ${#DEPENDABOT_FILES_ARRAY[@]} -gt 0 ]; then
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-dependabot.ps1 -Paths "${DEPENDABOT_FILES_ARRAY[@]}"
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-dependabot.ps1 -Paths "${DEPENDABOT_FILES_ARRAY[@]}"
-  else
-    echo "PowerShell not found; skipping dependabot schema check." >&2
-  fi
-fi
-
-# 9) Spell check staged files with cspell
-# Runs on markdown, code, and config files
-if [ ${#SPELL_FILES_ARRAY[@]} -gt 0 ]; then
-  require_node_tool cspell "spell checking"
-  echo "Running spell check on staged files..."
-  # Use a temp file to avoid Windows command length limits with large staged sets
-  SPELL_FILE_LIST="$(mktemp 2>/dev/null || true)"
-  if [ -z "$SPELL_FILE_LIST" ]; then
-    echo "Error: Failed to create temporary file for spell check file list." >&2
-    exit 1
-  fi
-
-  trap 'rm -f "$SPELL_FILE_LIST"' EXIT
-  printf '%s\n' "${SPELL_FILES_ARRAY[@]}" > "$SPELL_FILE_LIST"
-  # Capture cspell output so we can both display it AND scan it for
-  # lint-error-code-shaped tokens (the most common source of regression;
-  # see 2026-04-19 PWS001 incident documented in .githooks/pre-merge-commit).
-  # Use --no-must-find-files to avoid errors when files are filtered by cspell config.
-  SPELL_CAPTURE="$(mktemp 2>/dev/null || true)"
-  if [ -z "$SPELL_CAPTURE" ]; then
-    echo "Error: Failed to create temporary file for spell check output." >&2
-    exit 1
-  fi
-  # Extend the existing trap so both temp files are cleaned up.
-  trap 'rm -f "$SPELL_FILE_LIST" "$SPELL_CAPTURE"' EXIT
-  # IMPORTANT: do NOT use `if ! cspell ... | tee "$SPELL_CAPTURE"; then`.
-  # Even with pipefail enabled on the top of the file, keeping the
-  # explicit-exit-code form below is the paranoid belt-and-braces guard
-  # against a future revert of pipefail in this hook. The pattern is:
-  #   1. capture cspell output directly to the temp file,
-  #   2. capture cspell's exit status in SPELL_EXIT,
-  #   3. cat the capture so the user still sees the diagnostics,
-  #   4. branch on SPELL_EXIT only.
-  # This is the regression guard against P0-1 (Round 1 shipped the tee form
-  # on a `set -e`-only hook and silently passed every spelling failure).
-  SPELL_EXIT=0
-  run_node_tool cspell lint --no-must-find-files --no-progress --show-suggestions --file-list "$SPELL_FILE_LIST" >"$SPELL_CAPTURE" 2>&1 || SPELL_EXIT=$?
-  cat "$SPELL_CAPTURE"
-  if [ "$SPELL_EXIT" -ne 0 ]; then
-      echo "" >&2
-      echo "=== Spelling errors detected ===" >&2
-      echo "Fix typos or add valid terms to the appropriate dictionary in cspell.json:" >&2
-      echo "  unity-terms   -- Unity Engine APIs, components, lifecycle" >&2
-      echo "  csharp-terms  -- C# language features, .NET types" >&2
-      echo "  package-terms -- This package's public API and type names" >&2
-      echo "  tech-terms    -- General programming/tooling terms (CRLF, NUL, ASCII, etc.)" >&2
-      echo "  words (root)  -- Project-specific words that don't fit a category" >&2
-      echo "" >&2
-      # Synthesize a copy-pasteable patch for lint-error-code-shaped unknowns.
-      # Extracts the "(TOKEN)" after "Unknown word" and keeps only tokens
-      # matching the lint-error-code prefix shape. This catches the common
-      # "new lint family -> new prefix -> missing cspell entry" regression.
-      # Width note: upper bound is unbounded (via {2,}) because cspell never
-      # emits monster tokens, and a narrow cap (originally 5) silently let
-      # longer prefixes like SHA256 or NOVELPFX slip past the patch emitter.
-      UNKNOWN_CODE_PREFIXES="$(grep -oE 'Unknown word \([A-Z]{2,}\)' "$SPELL_CAPTURE" 2>/dev/null | grep -oE '[A-Z]{2,}' | sort -u || true)"
-      if [ -n "$UNKNOWN_CODE_PREFIXES" ]; then
-        echo "=== Detected unregistered lint-error-code prefix(es) ===" >&2
-        echo "Copy-paste this patch into the root 'words' array in cspell.json" >&2
-        echo "(append each quoted prefix as a new array element):" >&2
-        echo "" >&2
-        while IFS= read -r prefix; do
-          [ -z "$prefix" ] && continue
-          echo "    \"$prefix\"," >&2
-        done <<< "$UNKNOWN_CODE_PREFIXES"
-        echo "" >&2
-        echo "See scripts/validate-lint-error-codes.ps1 for the contract that" >&2
-        echo "enforces this requirement once the prefix is registered." >&2
-        echo "" >&2
-      fi
-      echo "Re-run locally: npm run lint:spelling" >&2
-      echo "" >&2
-      exit 1
-  fi
-fi
-
-# 10) Validate LLM instructions if .llm/ files are staged
-LLM_FILES_ARRAY=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    case "$file" in
-        .llm/*)
-            LLM_FILES_ARRAY+=("$file")
-            ;;
-    esac
-done
-
-if [ ${#LLM_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Validating LLM instructions..."
-  if command -v pwsh >/dev/null 2>&1; then
-    if ! pwsh -NoProfile -File scripts/lint-llm-instructions.ps1; then
-      echo "LLM lint failed. Attempting auto-fix..." >&2
-      if pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix; then
-        stage_with_retry_or_fail "LLM auto-fix re-stage" .llm/context.md
-        echo "LLM instructions auto-fixed and re-staged."
-      else
-        echo "LLM instructions auto-fix also failed." >&2
-        exit 1
-      fi
-    fi
-  elif command -v powershell >/dev/null 2>&1; then
-    if ! powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-llm-instructions.ps1; then
-      echo "LLM lint failed. Attempting auto-fix..." >&2
-      if powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-llm-instructions.ps1 -Fix; then
-        stage_with_retry_or_fail "LLM auto-fix re-stage" .llm/context.md
-        echo "LLM instructions auto-fixed and re-staged."
-      else
-        echo "LLM instructions auto-fix also failed." >&2
-        exit 1
-      fi
-    fi
-  else
-    echo "PowerShell not found. Skipping LLM instructions validation." >&2
-  fi
-fi
-
-# 11) Check skill file sizes if .llm/skills/ markdown files or .llm/context.md are staged
-# Note: In bash case statements, * matches any character including /
-# so .llm/skills/*.md matches all depths (e.g., .llm/skills/sub/dir/file.md)
-LLM_SIZE_CHECK_ARRAY=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    case "$file" in
-        .llm/skills/*.md)
-            LLM_SIZE_CHECK_ARRAY+=("$file")
-            ;;
-        .llm/context.md)
-            LLM_SIZE_CHECK_ARRAY+=("$file")
-            ;;
-    esac
-done
-
-if [ ${#LLM_SIZE_CHECK_ARRAY[@]} -gt 0 ]; then
-  echo "Checking skill and context file sizes..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-skill-sizes.ps1 -Paths "${LLM_SIZE_CHECK_ARRAY[@]}" || {
-      echo "File size check failed. Some files exceed 500 lines and must be split or reduced." >&2
-      exit 1
-    }
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-skill-sizes.ps1 -Paths "${LLM_SIZE_CHECK_ARRAY[@]}" || {
-      echo "File size check failed. Some files exceed 500 lines and must be split or reduced." >&2
-      exit 1
-    }
-  else
-    echo "PowerShell not found. Skipping skill and context file size check." >&2
-  fi
-fi
-
-# 12) Run test linter on staged test files
-# Checks for Unity object lifecycle issues (UNH001-UNH003), naming conventions (UNH004), null checks (UNH005)
-TEST_FILES_ARRAY=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    case "$file" in
-        Tests/*.cs)
-            TEST_FILES_ARRAY+=("$file")
-            ;;
-    esac
-done
-
-# Auto-fix Unity null assertions (Assert.IsNotNull/IsNull) in staged test files before linting
-if [ ${#TEST_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Auto-fixing Unity null assertions in staged tests..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths "${TEST_FILES_ARRAY[@]}"
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-tests.ps1 -FixNullChecks -Paths "${TEST_FILES_ARRAY[@]}"
-  else
-    echo "PowerShell not found. Skipping test auto-fixes." >&2
-  fi
-
-  # Reformat and re-stage test files after auto-fixes
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/format-staged-csharp.ps1 "${TEST_FILES_ARRAY[@]}"
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/format-staged-csharp.ps1 "${TEST_FILES_ARRAY[@]}"
-  fi
-fi
-
-if [ ${#TEST_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Running test linter on staged test files..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths "${TEST_FILES_ARRAY[@]}" || {
-      echo "" >&2
-      echo "=== Test lint failed ===" >&2
-      echo "Fix the issues above or add // UNH-SUPPRESS comments for valid exceptions." >&2
-      echo "For naming convention errors (UNH004):" >&2
-      echo "  - Use PascalCase or dot notation in TestName/SetName (e.g., 'Input.Null.ReturnsFalse')" >&2
-      echo "  - Use PascalCase for TestCaseSource method names (e.g., 'EdgeCaseTestData')" >&2
-      echo "For null check errors (UNH005):" >&2
-      echo "  - Use Assert.IsTrue(x != null) instead of Assert.IsNotNull(x)" >&2
-      echo "  - Use Assert.IsTrue(x == null) instead of Assert.IsNull(x)" >&2
-      echo "  - Why: Unity's == operator performs special 'fake null' checking" >&2
-      echo "Auto-fix null asserts: pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <test files>" >&2
-      echo "" >&2
-      exit 1
-    }
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-tests.ps1 -Paths "${TEST_FILES_ARRAY[@]}" || {
-      echo "" >&2
-      echo "=== Test lint failed ===" >&2
-      echo "Fix the issues above or add // UNH-SUPPRESS comments for valid exceptions." >&2
-      echo "For naming convention errors (UNH004):" >&2
-      echo "  - Use PascalCase or dot notation in TestName/SetName (e.g., 'Input.Null.ReturnsFalse')" >&2
-      echo "  - Use PascalCase for TestCaseSource method names (e.g., 'EdgeCaseTestData')" >&2
-      echo "For null check errors (UNH005):" >&2
-      echo "  - Use Assert.IsTrue(x != null) instead of Assert.IsNotNull(x)" >&2
-      echo "  - Use Assert.IsTrue(x == null) instead of Assert.IsNull(x)" >&2
-      echo "  - Why: Unity's == operator performs special 'fake null' checking" >&2
-      echo "Auto-fix null asserts: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-tests.ps1 -FixNullChecks -Paths <test files>" >&2
-      echo "" >&2
-      exit 1
-    }
-  else
-    echo "PowerShell not found. Skipping test linter." >&2
-  fi
-fi
-
-# 13) Check for duplicate using directives in staged C# files
-if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Checking for duplicate C# using directives..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-duplicate-usings.ps1 -Paths "${CS_FILES_ARRAY[@]}" || {
-      echo "" >&2
-      echo "=== Duplicate using directive lint failed (UNH007) ===" >&2
-      echo "Remove duplicate using directives within each namespace/file scope." >&2
-      echo "" >&2
-      exit 1
-    }
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-duplicate-usings.ps1 -Paths "${CS_FILES_ARRAY[@]}" || {
-      echo "" >&2
-      echo "=== Duplicate using directive lint failed (UNH007) ===" >&2
-      echo "Remove duplicate using directives within each namespace/file scope." >&2
-      echo "" >&2
-      exit 1
-    }
-  else
-    echo "PowerShell not found. Skipping duplicate using directive lint." >&2
-  fi
-fi
-
-# 14) Check for forbidden #region/#endregion directives in C# files
-# Regions are forbidden in this codebase - see .llm/skills/no-regions.md
-if [ ${#CS_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Checking for forbidden #region directives..."
-  REGION_VIOLATIONS=""
-  for file in "${CS_FILES_ARRAY[@]}"; do
-    # Use grep to find #region or #endregion (case-insensitive for robustness)
-    # Match lines that have #region or #endregion as preprocessor directives
-    MATCHES=$(grep -n -iE '^[[:space:]]*#[[:space:]]*(region|endregion)' "$file" 2>/dev/null || true)
-    if [ -n "$MATCHES" ]; then
-      while IFS= read -r match; do
-        REGION_VIOLATIONS="${REGION_VIOLATIONS}  ${file}:${match}"$'\n'
-      done <<< "$MATCHES"
-    fi
-  done
-
-  if [ -n "$REGION_VIOLATIONS" ]; then
-    echo "" >&2
-    echo "=== Error: C# regions (#region/#endregion) are forbidden ===" >&2
-    echo "The following files contain regions:" >&2
-    echo "$REGION_VIOLATIONS" >&2
-    echo "Remove all #region and #endregion directives before committing." >&2
-    echo "See .llm/skills/no-regions.md for guidance on code organization alternatives." >&2
-    echo "" >&2
-    exit 1
-  fi
-fi
-
-# 15) Lint property drawers for multi-object editing issues (warnings only, non-blocking)
-DRAWER_FILES_ARRAY=()
-for file in "${CS_FILES_ARRAY[@]}"; do
-    case "$file" in
-        *Drawer.cs)
-            DRAWER_FILES_ARRAY+=("$file")
-            ;;
-    esac
-done
-
-if [ ${#DRAWER_FILES_ARRAY[@]} -gt 0 ]; then
-  echo "Checking property drawers for multi-object editing issues..."
-  if command -v pwsh >/dev/null 2>&1; then
-    pwsh -NoProfile -File scripts/lint-drawer-multiobject.ps1 -Paths "${DRAWER_FILES_ARRAY[@]}" || true
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-drawer-multiobject.ps1 -Paths "${DRAWER_FILES_ARRAY[@]}" || true
-  else
-    echo "PowerShell not found. Skipping drawer multi-object lint." >&2
-  fi
-fi
-
-# 16) Check Odin drawer Undo safety (WeakTargets must be null-filtered before Undo.RecordObjects)
-ODIN_DRAWER_FILES=()
-for file in "${CS_FILES_ARRAY[@]}"; do
-    case "$file" in
-        Editor/CustomDrawers/Odin/*.cs)
-            ODIN_DRAWER_FILES+=("$file")
-            ;;
-    esac
-done
-
-if [ ${#ODIN_DRAWER_FILES[@]} -gt 0 ]; then
-  echo "Checking Odin drawer Undo safety (UNH006)..."
-  if command -v pwsh >/dev/null 2>&1; then
-    if ! pwsh -NoProfile -File scripts/lint-odin-undo-safety.ps1 -Paths "${ODIN_DRAWER_FILES[@]}"; then
-      echo "" >&2
-      echo "=== Odin drawer Undo safety check failed (UNH006) ===" >&2
-      echo "See .llm/skills/odin-undo-safety.md for the safe pattern." >&2
-      exit 1
-    fi
-  elif command -v powershell >/dev/null 2>&1; then
-    if ! powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint-odin-undo-safety.ps1 -Paths "${ODIN_DRAWER_FILES[@]}"; then
-      echo "" >&2
-      echo "=== Odin drawer Undo safety check failed (UNH006) ===" >&2
-      echo "See .llm/skills/odin-undo-safety.md for the safe pattern." >&2
-      exit 1
-    fi
-  else
-    echo "PowerShell not found. Skipping Odin Undo safety lint." >&2
-  fi
-fi
-
-# 17) Check for missing .meta files on staged files
-# Files in source roots (Runtime, Editor, Tests, docs, scripts, etc.) require .meta companions
-META_REQUIRED_FILES=()
-for file in "${STAGED_FILES_ARRAY[@]}"; do
-    case "$file" in
-        Runtime/*|Editor/*|Tests/*|Samples~/*|Shaders/*|Styles/*|URP/*|docs/*|scripts/*)
-            # Skip .meta files, package-lock.json, Gemfile.lock, temp files, dot files
-            case "$file" in
-                *.meta|*/package-lock.json|*/Gemfile.lock|*.tmp|*/.gitkeep|*/.DS_Store|*/Thumbs.db|*.pyc|*.pyo|*.swp|*.swo)
-                    continue
-                    ;;
-            esac
-            META_REQUIRED_FILES+=("$file")
-            ;;
-    esac
-done
-
-if [ ${#META_REQUIRED_FILES[@]} -gt 0 ]; then
-    echo "Checking for missing .meta files on staged files..."
-
-    # Use exact array membership checks instead of newline buffers so staged-path
-    # matching remains correct for filenames with spaces or leading dashes.
-    is_file_staged_exact() {
-        local target="$1"
-        local staged_file
-        for staged_file in "${STAGED_FILES_ARRAY[@]}"; do
-            if [[ "$staged_file" == "$target" ]]; then
-                return 0
+        for cleanup_extension in $cleanup_root_extensions; do
+            cleanup_relative="$cleanup_hook_name.$cleanup_extension"
+            cleanup_full="$cleanup_repo_root/$cleanup_relative"
+            [ -f "$cleanup_full" ] || continue
+            if git -C "$cleanup_repo_root" check-ignore -q -- "$cleanup_relative"; then
+                rm -f "$cleanup_full"
+                echo "[pre-commit] Removed stray hook artifact: $cleanup_relative"
+            else
+                cleanup_unsafe="$cleanup_unsafe
+$cleanup_relative"
             fi
         done
+
+        for cleanup_extension in $cleanup_hook_extensions; do
+            cleanup_relative=".githooks/$cleanup_hook_name.$cleanup_extension"
+            cleanup_full="$cleanup_repo_root/$cleanup_relative"
+            [ -f "$cleanup_full" ] || continue
+            if git -C "$cleanup_repo_root" check-ignore -q -- "$cleanup_relative"; then
+                rm -f "$cleanup_full"
+                echo "[pre-commit] Removed stray hook artifact: $cleanup_relative"
+            else
+                cleanup_unsafe="$cleanup_unsafe
+$cleanup_relative"
+            fi
+        done
+    done
+
+    if [ -n "$cleanup_unsafe" ]; then
+        echo '[pre-commit] ERROR: Stray hook-output artifact file(s) were not confirmed gitignored:' >&2
+        printf '%s\n' "$cleanup_unsafe" | while IFS= read -r cleanup_relative; do
+            [ -n "$cleanup_relative" ] || continue
+            printf '  %s\n' "$cleanup_relative" >&2
+        done
+        echo 'Add the artifact pattern to .gitignore or remove the stale file, then retry.' >&2
         return 1
-    }
-
-    META_MISSING=()
-    META_UNSTAGED=()
-    for file in "${META_REQUIRED_FILES[@]}"; do
-        meta="${file}.meta"
-        if [ ! -f "$meta" ]; then
-            META_MISSING+=("$file")
-        elif ! is_file_staged_exact "$meta"; then
-            # .meta exists on disk but is not staged -- auto-stage it
-            META_UNSTAGED+=("$meta")
-        fi
-    done
-
-    # Also check for missing .meta files on new directories introduced by staged files
-    # Use associative-style dedup via sorted unique list
-    META_DIRS_TO_CHECK=()
-    for file in "${META_REQUIRED_FILES[@]}"; do
-        dir=$(dirname "$file")
-        while true; do
-            case "$dir" in
-                Runtime|Editor|Tests|Samples~|Shaders|Styles|URP|docs|scripts|.)
-                    break
-                    ;;
-            esac
-            META_DIRS_TO_CHECK+=("$dir")
-            dir=$(dirname "$dir")
-        done
-    done
-
-    # Deduplicate directories
-    if [ ${#META_DIRS_TO_CHECK[@]} -gt 0 ]; then
-        UNIQUE_DIRS=$(printf '%s\n' "${META_DIRS_TO_CHECK[@]}" | sort -u)
-        while IFS= read -r dir; do
-            [ -z "$dir" ] && continue
-            meta="${dir}.meta"
-            if [ -d "$dir" ] && [ ! -f "$meta" ]; then
-                META_MISSING+=("$dir")
-            elif [ -d "$dir" ] && [ -f "$meta" ] && ! is_file_staged_exact "$meta"; then
-                META_UNSTAGED+=("$meta")
-            fi
-        done <<< "$UNIQUE_DIRS"
     fi
 
-    # Auto-stage .meta files that exist on disk but weren't staged
-    if [ ${#META_UNSTAGED[@]} -gt 0 ]; then
-        echo "Auto-staging ${#META_UNSTAGED[@]} unstaged .meta file(s):"
-        for meta in "${META_UNSTAGED[@]}"; do
-            echo "  $meta"
-        done
-        if git_add_with_retry "${META_UNSTAGED[@]}"; then
-            echo "Successfully staged ${#META_UNSTAGED[@]} .meta file(s)."
-        else
-            echo "" >&2
-            echo "=== Error: Failed to auto-stage .meta files ===" >&2
-            echo "The hook could not stage one or more required .meta companions." >&2
-            echo "This is usually caused by git index.lock contention from another process." >&2
-            echo "" >&2
-            echo "Files that could not be staged:" >&2
-            for meta in "${META_UNSTAGED[@]}"; do
-                echo "  $meta" >&2
-            done
-            echo "" >&2
-            echo "Recovery:" >&2
-            echo "  1. Close other git tools (GUI, IDE git operations, lazygit)." >&2
-            echo "  2. Retry the commit after a few seconds." >&2
-            echo "  3. Run npm run agent:preflight:fix before retrying to catch this earlier." >&2
-            echo "" >&2
-            exit 1
-        fi
-    fi
+    return 0
+}
 
-    if [ ${#META_MISSING[@]} -gt 0 ]; then
-        echo "" >&2
-        echo "=== Missing .meta files for staged files ===" >&2
-        for file in "${META_MISSING[@]}"; do
-            echo "  $file" >&2
-        done
-        echo "" >&2
-        echo "Generate missing meta files:" >&2
-        echo "  ./scripts/generate-meta.sh <path>" >&2
-        echo "" >&2
-        exit 1
+if [ -n "$repo_root_fast" ]; then
+    cleanup_ignored_hook_artifacts "$repo_root_fast"
+    if git -C "$repo_root_fast" diff --cached --quiet --diff-filter=ACMR --; then
+        echo '[pre-commit] No staged files to check.'
+        exit 0
     fi
 fi
 
-echo "Pre-commit checks passed."
-exit 0
+hook_name="pre-commit"
+hook_impl="$hook_name.ps1"
+hook_dir="$(CDPATH= cd "$(dirname "$0")" && pwd -P)"
+hook_script="$hook_dir/$hook_impl"
+
+if [ ! -f "$hook_script" ]; then
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$repo_root" ] && [ -f "$repo_root/.githooks/$hook_impl" ]; then
+        hook_script="$repo_root/.githooks/$hook_impl"
+    fi
+fi
+
+if [ ! -f "$hook_script" ]; then
+    echo "Error: $hook_impl not found at $hook_script" >&2
+    echo "Run npm run hooks:install to restore tracked hooks." >&2
+    exit 1
+fi
+
+if ! command -v pwsh >/dev/null 2>&1; then
+    echo "Error: pwsh is required to run $hook_name." >&2
+    echo "Install PowerShell 7+ and run npm run hooks:install." >&2
+    exit 1
+fi
+
+exec pwsh -NoProfile -File "$hook_script" "$@"

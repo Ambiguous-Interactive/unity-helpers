@@ -1,62 +1,28 @@
-#!/usr/bin/env bash
-# ============================================================================
-# PRE-MERGE-COMMIT HOOK: Run pre-commit checks on auto-created merge commits
-# ============================================================================
-# Triggered by: `git merge` when git AUTO-CREATES a merge commit (i.e. the
-# merge succeeded without conflicts and there is nothing for the user to
-# resolve manually). In that case git does NOT fire pre-commit — this hook
-# is its substitute.
-#
-# SCOPE — what this hook DOES cover:
-#   - Non-fast-forward merge where the combined tree has no conflicts.
-#     Example: `git merge --no-ff feature` after both sides advanced.
-#
-# SCOPE — what this hook does NOT cover (and what does):
-#   - Conflict-resolution commits: when `git merge` produces conflicts, the
-#     user edits files and runs `git commit`. That fires pre-commit normally,
-#     not pre-merge-commit. So pre-commit remains the authority for conflict-
-#     resolved content.
-#   - Fast-forward merges: `git merge` that only advances HEAD fires NO
-#     hooks at all (no merge commit is created). The only guard is CI.
-#   - `git merge --squash`: creates an index state but requires a manual
-#     `git commit`. That fires pre-commit, not pre-merge-commit.
-#   - `git cherry-pick`, `git rebase`, `git rebase --continue`: bypass
-#     BOTH pre-commit AND pre-merge-commit. Only CI catches issues
-#     introduced by these paths.
-#
-# In every bypassed path above, CI is the final backstop. Specifically:
-#   - .github/workflows/lint-error-codes.yml enforces the cspell
-#     lint-error-code contract on every PR touching hook/lint surface.
-#   - scripts/validate-lint-error-codes.ps1 is the underlying validator
-#     that the CI workflow runs; it roundtrips every [A-Z]{2,}\d{3} prefix
-#     emitted by any lint/test/hook file through cspell.
-#
-# HISTORICAL CONTEXT:
-#   On 2026-04-19 a new skill file introduced 5 occurrences of the token
-#   `PWS` (part of lint-error-code names like `PWS001`). cspell had no
-#   entry for `PWS`. The change landed via a merge commit, so pre-commit
-#   did not run. The failure surfaced at pre-push and blocked the whole
-#   batch. This hook plus the CI workflow together close that gap.
-#
-# WHAT THIS HOOK DOES:
-#   Delegates (exec) to the pre-commit hook. pre-commit already derives the
-#   staged-file set from `git diff --cached --name-only --diff-filter=ACM`,
-#   which correctly reflects the pending merge commit's changed content.
-#
-# BYPASS:
-#   `git merge --no-verify` skips this hook, same as pre-commit. CI is the
-#   final backstop.
-# ============================================================================
+#!/usr/bin/env sh
+set -eu
 
-set -e
+hook_name="pre-merge-commit"
+hook_impl="$hook_name.ps1"
+hook_dir="$(CDPATH= cd "$(dirname "$0")" && pwd -P)"
+hook_script="$hook_dir/$hook_impl"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PRE_COMMIT="$SCRIPT_DIR/pre-commit"
-
-if [[ ! -x "$PRE_COMMIT" ]]; then
-  echo "Error: pre-commit hook not found or not executable at $PRE_COMMIT" >&2
-  echo "Run 'npm run hooks:install' to restore hook permissions." >&2
-  exit 1
+if [ ! -f "$hook_script" ]; then
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$repo_root" ] && [ -f "$repo_root/.githooks/$hook_impl" ]; then
+        hook_script="$repo_root/.githooks/$hook_impl"
+    fi
 fi
 
-exec "$PRE_COMMIT" "$@"
+if [ ! -f "$hook_script" ]; then
+    echo "Error: $hook_impl not found at $hook_script" >&2
+    echo "Run npm run hooks:install to restore tracked hooks." >&2
+    exit 1
+fi
+
+if ! command -v pwsh >/dev/null 2>&1; then
+    echo "Error: pwsh is required to run $hook_name." >&2
+    echo "Install PowerShell 7+ and run npm run hooks:install." >&2
+    exit 1
+fi
+
+exec pwsh -NoProfile -File "$hook_script" "$@"

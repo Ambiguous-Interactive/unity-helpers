@@ -2,9 +2,9 @@
 # =============================================================================
 # Git Hook Permissions Validation Script
 # =============================================================================
-# Checks that all files in .githooks/ are tracked with executable permissions
-# (100755) in git. Git silently skips non-executable hook files, which causes
-# CI/CD failures that are difficult to diagnose.
+# Checks that extensionless files in .githooks/ are tracked with executable
+# permissions (100755) in git. Git hook entrypoints are extensionless; companion
+# .ps1 implementation files are invoked by those entrypoints and do not need +x.
 #
 # Usage:
 #   ./scripts/validate-hook-permissions.sh          # Check permissions
@@ -12,8 +12,8 @@
 #   ./scripts/validate-hook-permissions.sh --help   # Show help
 #
 # Exit codes:
-#   0 - All hook files have executable permissions
-#   1 - One or more hook files lack executable permissions (or other error)
+#   0 - All hook entrypoints have executable permissions
+#   1 - One or more hook entrypoints lack executable permissions (or other error)
 # =============================================================================
 
 set -euo pipefail
@@ -62,8 +62,8 @@ show_help() {
     echo "  --help    Show this help message"
     echo ""
     echo "Checks:"
-    echo "  Verifies all files in $HOOKS_DIR/ are tracked as 100755 (executable)"
-    echo "  in the git index. Git silently skips non-executable hook files."
+    echo "  Verifies extensionless files in $HOOKS_DIR/ are tracked as 100755"
+    echo "  (executable) in the git index. Git silently skips non-executable hook files."
     echo ""
     echo "Fix manually:"
     echo "  git update-index --chmod=+x .githooks/<file>"
@@ -116,6 +116,13 @@ while IFS= read -r line; do
     mode="${line%% *}"
     file_path="${line#*$'\t'}"
 
+    base_name="${file_path##*/}"
+    case "$base_name" in
+        *.*)
+            continue
+            ;;
+    esac
+
     CHECKED=$((CHECKED + 1))
 
     if [ "$mode" = "100755" ]; then
@@ -133,7 +140,7 @@ while IFS= read -r line; do
             FAILED=$((FAILED + 1))
         fi
     fi
-done < <(git ls-files -s "$HOOKS_DIR/")
+done < <(git ls-files -s -- "$HOOKS_DIR")
 
 # Handle case where no files were found
 if [ "$CHECKED" -eq 0 ]; then
@@ -159,9 +166,9 @@ if [ "$FAILED" -gt 0 ]; then
     exit 1
 else
     if [ "$FIX_MODE" -eq 1 ]; then
-        echo -e "${GREEN}All hook file permissions are correct (fixed).${NC}"
+        echo -e "${GREEN}All hook entrypoint permissions are correct (fixed).${NC}"
     else
-        echo -e "${GREEN}All hook files have executable permissions.${NC}"
+        echo -e "${GREEN}All hook entrypoints have executable permissions.${NC}"
     fi
     exit 0
 fi

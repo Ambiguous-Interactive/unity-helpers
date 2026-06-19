@@ -40,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             void DestroyAll<T>()
                 where T : RuntimeSingleton<T>
             {
-                foreach (T inst in Object.FindObjectsOfType<T>(includeInactive: true))
+                foreach (T inst in UnityObjectExtensions.FindObjectsOfTypeShim<T>(true))
                 {
                     if (inst != null)
                     {
@@ -330,9 +330,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsFalse(hasInstance);
 
-            TestRuntimeSingleton[] allInstances = Object.FindObjectsOfType<TestRuntimeSingleton>(
-                includeInactive: true
-            );
+            TestRuntimeSingleton[] allInstances =
+                UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true);
             Assert.AreEqual(0, allInstances.Length);
         }
 
@@ -396,9 +395,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreSame(instance1, instance2);
             Assert.AreSame(instance2, instance3);
 
-            TestRuntimeSingleton[] allInstances = Object.FindObjectsOfType<TestRuntimeSingleton>(
-                includeInactive: true
-            );
+            TestRuntimeSingleton[] allInstances =
+                UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true);
             Assert.AreEqual(1, allInstances.Length);
         }
 

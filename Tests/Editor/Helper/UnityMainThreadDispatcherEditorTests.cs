@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     [TestFixture]
@@ -20,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void DispatcherUsesSceneFriendlyHideFlagsInEditMode()
         {
             UnityMainThreadDispatcher existing =
-                Object.FindObjectOfType<UnityMainThreadDispatcher>();
+                UnityObjectExtensions.FindObjectOfTypeShim<UnityMainThreadDispatcher>();
             if (existing != null)
             {
                 Object.DestroyImmediate(existing.gameObject); // UNH-SUPPRESS: Cleanup pre-existing dispatcher before test

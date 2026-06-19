@@ -8,6 +8,8 @@ Param(
     [string[]]$AdditionalPaths
 )
 
+# cspell:ignore aniso dxf fnt hlsl iff
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'git-staging-helpers.ps1')
@@ -28,6 +30,38 @@ function Write-WarningMsg($Message) {
     Write-Host "[agent-preflight] WARNING: $Message" -ForegroundColor Yellow
 }
 
+function Invoke-GitPathList {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.UseShellExecute = $false
+    $startInfo.WorkingDirectory = $RepoRoot
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEnd()
+    [void]$process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if ($process.ExitCode -ne 0) {
+        return @()
+    }
+
+    return @(Split-NulPathText -Text $stdout)
+}
+
 function Get-GitChangedPaths {
     param(
         [Parameter(Mandatory = $true)]
@@ -36,29 +70,15 @@ function Get-GitChangedPaths {
 
     $results = New-Object System.Collections.Generic.List[string]
     $commands = @(
-        @('diff', '--name-only', '--diff-filter=ACMRTUXB'),
-        @('diff', '--cached', '--name-only', '--diff-filter=ACMRTUXB'),
-        @('ls-files', '--others', '--exclude-standard')
+        @('diff', '--name-only', '-z', '--diff-filter=ACMRTUXB'),
+        @('diff', '--cached', '--name-only', '-z', '--diff-filter=ACMRTUXB'),
+        @('ls-files', '--others', '--exclude-standard', '-z')
     )
 
-    Push-Location $RepoRoot
-    try {
-        foreach ($command in $commands) {
-            $output = & git @command 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                continue
-            }
-
-            foreach ($line in $output) {
-                if ([string]::IsNullOrWhiteSpace($line)) {
-                    continue
-                }
-                $results.Add($line)
-            }
+    foreach ($command in $commands) {
+        foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments $command)) {
+            $results.Add($path) | Out-Null
         }
-    }
-    finally {
-        Pop-Location
     }
 
     return @($results)
@@ -72,27 +92,32 @@ function Get-GitStagedPaths {
 
     $stagedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 
-    Push-Location $RepoRoot
-    try {
-        $output = & git diff --cached --name-only --diff-filter=ACM 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            return ,$stagedPaths
-        }
-
-        foreach ($line in $output) {
-            if ([string]::IsNullOrWhiteSpace($line)) {
-                continue
-            }
-
-            $normalizedPath = $line.Replace('\', '/')
-            $stagedPaths.Add($normalizedPath) | Out-Null
-        }
-    }
-    finally {
-        Pop-Location
+    foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments @('diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'))) {
+        $stagedPaths.Add($path) | Out-Null
     }
 
     return ,$stagedPaths
+}
+
+function Get-GitUnstagedOrUntrackedPaths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $paths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $commands = @(
+        @('diff', '--name-only', '-z', '--diff-filter=ACMRTUXB'),
+        @('ls-files', '--others', '--exclude-standard', '-z')
+    )
+
+    foreach ($command in $commands) {
+        foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments $command)) {
+            $paths.Add($path) | Out-Null
+        }
+    }
+
+    return ,$paths
 }
 
 function Get-PathListEntries {
@@ -132,19 +157,259 @@ function Get-PathListEntries {
     return @($text -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
+function Get-NormalizedUniquePaths {
+    param(
+        [AllowNull()]
+        [string[]]$Paths
+    )
+
+    if ($null -eq $Paths -or $Paths.Count -eq 0) {
+        return @()
+    }
+
+    return @(
+        $Paths |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { ([string]$_).Replace('\', '/') } |
+            Sort-Object -Unique
+    )
+}
+
+function Split-NulPathText {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) {
+        return @()
+    }
+
+    return @(
+        $Text -split ([string][char]0) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { ([string]$_).Replace('\', '/') }
+    )
+}
+
+function Invoke-GitRawText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.UseShellExecute = $false
+    $startInfo.WorkingDirectory = $RepoRoot
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEnd()
+    [void]$process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    return [pscustomobject]@{
+        ExitCode = $process.ExitCode
+        Stdout   = $stdout
+    }
+}
+
+function ConvertTo-LiteralPathspec {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return ":(literal)$Path"
+}
+
+function ConvertFrom-GitGrepRegionOutput {
+    param([AllowNull()][string]$Text)
+
+    $violations = [System.Collections.Generic.List[string]]::new()
+    if ([string]::IsNullOrEmpty($Text)) {
+        return $violations
+    }
+
+    $cursor = 0
+    while ($cursor -lt $Text.Length) {
+        $pathEnd = $Text.IndexOf([char]0, $cursor)
+        if ($pathEnd -lt 0) {
+            break
+        }
+
+        $lineEnd = $Text.IndexOf([char]0, $pathEnd + 1)
+        if ($lineEnd -lt 0) {
+            break
+        }
+
+        $textEnd = $Text.IndexOf("`n", $lineEnd + 1)
+        if ($textEnd -lt 0) {
+            $textEnd = $Text.Length
+        }
+
+        $path = $Text.Substring($cursor, $pathEnd - $cursor)
+        $lineNumber = $Text.Substring($pathEnd + 1, $lineEnd - $pathEnd - 1)
+        $lineText = $Text.Substring($lineEnd + 1, $textEnd - $lineEnd - 1).TrimEnd("`r")
+        $violations.Add("${path}:$($lineNumber): $lineText") | Out-Null
+
+        $cursor = $textEnd + 1
+    }
+
+    return $violations
+}
+
+function Get-StagedRegionViolations {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [AllowNull()]
+        [string[]]$Paths
+    )
+
+    $violations = [System.Collections.Generic.List[string]]::new()
+    $pathspecs = @(
+        $Paths |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Sort-Object -Unique |
+            ForEach-Object { ConvertTo-LiteralPathspec -Path $_ }
+    )
+    if ($pathspecs.Count -eq 0) {
+        return $violations
+    }
+
+    $pattern = '^[[:space:]]*#[[:space:]]*(region|endregion)'
+    $chunkSize = 200
+    for ($offset = 0; $offset -lt $pathspecs.Count; $offset += $chunkSize) {
+        $end = [Math]::Min($offset + $chunkSize - 1, $pathspecs.Count - 1)
+        $chunk = @($pathspecs[$offset..$end])
+        $grep = Invoke-GitRawText -RepoRoot $RepoRoot -Arguments (@('grep', '--cached', '-n', '-I', '-E', '-z', $pattern, '--') + $chunk)
+        if ($grep.ExitCode -eq 0) {
+            foreach ($violation in @(ConvertFrom-GitGrepRegionOutput -Text $grep.Stdout)) {
+                $violations.Add($violation) | Out-Null
+            }
+        }
+        elseif ($grep.ExitCode -gt 1) {
+            throw 'git grep failed while checking staged C# regions.'
+        }
+    }
+
+    return $violations
+}
+
+function Get-UnsafeWholeFileAutoFixPaths {
+    param(
+        [AllowNull()]
+        [string[]]$Paths,
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[string]]$InitiallyUnstagedPaths = $null
+    )
+
+    if ($null -eq $InitiallyUnstagedPaths) {
+        return @()
+    }
+
+    return @(
+        Get-NormalizedUniquePaths -Paths $Paths |
+            Where-Object { $InitiallyUnstagedPaths.Contains($_) }
+    )
+}
+
+function Write-WholeFileAutoFixRefusal {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths,
+        [string]$Context = 'auto-fix',
+        [ValidateSet('before', 'after')]
+        [string]$Phase = 'before'
+    )
+
+    Write-ErrorMsg "Refusing to auto-stage whole file(s) with pre-existing unstaged changes ${Phase} ${Context}:"
+    foreach ($path in $Paths) {
+        Write-Host "  $path" -ForegroundColor Yellow
+    }
+    Write-Host 'Commit or stash the unstaged hunks, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+}
+
+function Test-CanRunWholeFileAutoFix {
+    param(
+        [AllowNull()]
+        [string[]]$Paths,
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[string]]$InitiallyUnstagedPaths = $null,
+        [string]$Context = 'auto-fix',
+        [ValidateSet('before', 'after')]
+        [string]$Phase = 'before'
+    )
+
+    $unsafePaths = @(Get-UnsafeWholeFileAutoFixPaths -Paths $Paths -InitiallyUnstagedPaths $InitiallyUnstagedPaths)
+    if ($unsafePaths.Count -eq 0) {
+        return $true
+    }
+
+    Write-WholeFileAutoFixRefusal -Paths $unsafePaths -Context $Context -Phase $Phase
+    return $false
+}
+
+function Test-CanRunWholeFileAutoFixOnStagedTargets {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [AllowNull()]
+        [string[]]$Paths,
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[string]]$InitiallyUnstagedPaths = $null,
+        [string]$Context = 'auto-fix'
+    )
+
+    $stagedPaths = Get-GitStagedPaths -RepoRoot $RepoRoot
+    $stagedTargets = @(
+        Get-NormalizedUniquePaths -Paths $Paths |
+            Where-Object { $stagedPaths.Contains($_) }
+    )
+
+    return (Test-CanRunWholeFileAutoFix `
+            -Paths $stagedTargets `
+            -InitiallyUnstagedPaths $InitiallyUnstagedPaths `
+            -Context $Context `
+            -Phase 'before')
+}
+
 function Add-PathsToGitIndexWithRetry {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RepoRoot,
         [Parameter(Mandatory = $true)]
-        [string[]]$Paths
+        [string[]]$Paths,
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[string]]$InitiallyUnstagedPaths = $null,
+        [string]$Context = 'auto-fix',
+        [switch]$AllowInitiallyUnstaged
     )
 
     if ($null -eq $Paths -or $Paths.Count -eq 0) {
         return $true
     }
 
-    $uniquePaths = @($Paths | Sort-Object -Unique)
+    $uniquePaths = @(Get-NormalizedUniquePaths -Paths $Paths)
+    if ($uniquePaths.Count -eq 0) {
+        return $true
+    }
+
+    if (
+        -not $AllowInitiallyUnstaged -and
+        -not (Test-CanRunWholeFileAutoFix `
+            -Paths $uniquePaths `
+            -InitiallyUnstagedPaths $InitiallyUnstagedPaths `
+            -Context $Context `
+            -Phase 'after')
+    ) {
+        return $false
+    }
+
     $indexLockPath = Join-Path -Path (Join-Path -Path $RepoRoot -ChildPath '.git') -ChildPath 'index.lock'
 
     Push-Location $RepoRoot
@@ -287,16 +552,20 @@ function Test-StrayArtifactFiles {
             Sort-Object -Unique
     )
 
-    $artifactExtensions = @('txt', 'log', 'out', 'err', 'tmp')
+    $rootArtifactExtensions = @('txt', 'out', 'err')
+    $hookArtifactExtensions = @('txt', 'log', 'out', 'err', 'tmp')
+    $artifactExtensions = @($rootArtifactExtensions + $hookArtifactExtensions | Sort-Object -Unique)
     $strayFiles = New-Object System.Collections.Generic.List[string]
 
     foreach ($hook in $hookNames) {
-        foreach ($ext in $artifactExtensions) {
+        foreach ($ext in $rootArtifactExtensions) {
             $candidate = Join-Path $RepoRoot "$hook.$ext"
             if (Test-Path -LiteralPath $candidate -PathType Leaf) {
                 $strayFiles.Add($candidate) | Out-Null
             }
+        }
 
+        foreach ($ext in $hookArtifactExtensions) {
             $hookCandidate = Join-Path $hooksDir "$hook.$ext"
             if (Test-Path -LiteralPath $hookCandidate -PathType Leaf) {
                 $strayFiles.Add($hookCandidate) | Out-Null
@@ -442,6 +711,378 @@ function Test-MetaRequiredPath {
     return $true
 }
 
+function New-UnityMetaContent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TargetPath,
+        [Parameter(Mandatory = $true)]
+        [string]$Guid
+    )
+
+    $targetName = Split-Path -Leaf $TargetPath
+    $extension = [System.IO.Path]::GetExtension($targetName).TrimStart('.').ToLowerInvariant()
+    $unixTime = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+
+    if (Test-Path -LiteralPath $TargetPath -PathType Container) {
+        return @"
+fileFormatVersion: 2
+guid: $Guid
+folderAsset: yes
+DefaultImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+    }
+
+    switch ($extension) {
+        'cs' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'asmdef' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'asmref' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+AssemblyDefinitionReferenceImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'shader' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('shadergraph', 'shadersubgraph', 'hlsl', 'cginc') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+  script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
+"@
+        }
+        'compute' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+ComputeShaderImporter:
+  externalObjects: {}
+  currentAPIMask: 0
+  currentBuildTarget: 0
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('uss', 'uxml', 'rsp') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+timeCreated: $unixTime
+"@
+        }
+        'mat' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'asset' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'anim' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'controller' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'prefab' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+PrefabImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        'json' {
+            $importer = if ($targetName -eq 'package.json') { 'PackageManifestImporter' } else { 'TextScriptImporter' }
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+${importer}:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('md', 'txt', 'xml', 'yaml', 'yml', 'html', 'htm', 'css', 'js', 'ts', 'log', 'cfg', 'ini', 'conf', 'gitignore', 'gitattributes') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+TextScriptImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('png', 'jpg', 'jpeg', 'tga', 'psd', 'gif', 'bmp', 'tif', 'tiff', 'iff', 'pict', 'exr', 'hdr') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  spriteMode: 1
+  textureType: 8
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('wav', 'mp3', 'ogg', 'aiff', 'aif', 'flac') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 7
+  defaultSettings:
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('fbx', 'obj', 'dae', '3ds', 'blend', 'dxf', 'max', 'mb', 'ma') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+ModelImporter:
+  serializedVersion: 22200
+  internalIDToNameTable: []
+  externalObjects: {}
+  materials:
+    materialImportMode: 2
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+  meshes:
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    importBlendShapes: 1
+  importAnimation: 1
+  animationType: 2
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        { $_ -in @('ttf', 'otf', 'fnt') } {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  includeFontData: 1
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+        default {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+DefaultImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
+    }
+}
+
+function New-UnityMetaFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath
+    )
+
+    $targetPath = Join-Path -Path $RepoRoot -ChildPath $RelativePath
+    if (-not (Test-Path -LiteralPath $targetPath)) {
+        return $false
+    }
+
+    $metaPath = "$targetPath.meta"
+    if (Test-Path -LiteralPath $metaPath) {
+        return $true
+    }
+
+    $guid = [guid]::NewGuid().ToString('N')
+    $content = (New-UnityMetaContent -TargetPath $targetPath -Guid $guid).TrimEnd() + "`n"
+    [System.IO.File]::WriteAllText($metaPath, $content, [System.Text.UTF8Encoding]::new($false))
+    Write-Info "Generated meta for $RelativePath"
+    return $true
+}
+
+function Invoke-NodeDependencyRepair {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    if ($script:NodeDependencyRepairAttempted) {
+        return $script:NodeDependencyRepairSucceeded
+    }
+
+    $script:NodeDependencyRepairAttempted = $true
+    $script:NodeDependencyRepairSucceeded = $false
+
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'package-lock.json') -PathType Leaf)) {
+        Write-WarningMsg 'Cannot auto-repair npm dependencies without package-lock.json; refusing non-deterministic install.'
+        return $false
+    }
+
+    $npmCommand = [Environment]::GetEnvironmentVariable('AGENT_PREFLIGHT_NPM_COMMAND')
+    if ([string]::IsNullOrWhiteSpace($npmCommand)) {
+        $npmCommand = 'npm'
+    }
+
+    if (-not (Get-Command $npmCommand -ErrorAction SilentlyContinue)) {
+        Write-WarningMsg "Cannot auto-repair npm dependencies because '$npmCommand' was not found."
+        return $false
+    }
+
+    Write-Host '[agent-preflight] Restoring repo-local npm tools with npm ci...' -ForegroundColor Blue
+    Push-Location $RepoRoot
+    try {
+        $output = & $npmCommand ci --ignore-scripts 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            Write-ErrorMsg "npm ci failed with exit code $exitCode."
+            foreach ($line in $output) {
+                Write-Host $line -ForegroundColor DarkGray
+            }
+            return $false
+        }
+
+        foreach ($line in $output) {
+            Write-Info $line
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $script:NodeDependencyRepairSucceeded = $true
+    return $true
+}
+
 function Test-NodeToolAvailable {
     param(
         [Parameter(Mandatory = $true)]
@@ -474,11 +1115,32 @@ function Test-NodeToolAvailable {
         Pop-Location
     }
 
+    if ($Fix) {
+        if (Invoke-NodeDependencyRepair -RepoRoot $RepoRoot) {
+            Push-Location $RepoRoot
+            try {
+                $toolOutput = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName --version 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Info "npm tool available for ${Purpose} after dependency repair: $ToolName"
+                    return $true
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
+    }
+
     Write-ErrorMsg "Required npm tool '$ToolName' is not installed for $Purpose."
     foreach ($line in $toolOutput) {
         Write-Host $line -ForegroundColor DarkGray
     }
-    Write-Host 'Run: npm install' -ForegroundColor Cyan
+    if ($Fix) {
+        Write-Host 'Automatic npm dependency repair failed. Run: npm ci' -ForegroundColor Cyan
+    }
+    else {
+        Write-Host 'Run: npm install' -ForegroundColor Cyan
+    }
     $rerunScript = if ($Fix) { 'agent:preflight:fix' } else { 'agent:preflight' }
     Write-Host "Then re-run: npm run $rerunScript" -ForegroundColor Cyan
     $FailureCount.Value++
@@ -588,8 +1250,23 @@ function Test-PrettierAvailable {
         return $true
     }
 
+    if ($Fix -and [string]::IsNullOrWhiteSpace($prettierCommand)) {
+        if (Invoke-NodeDependencyRepair -RepoRoot $RepoRoot) {
+            $exitCode = Invoke-Prettier -RepoRoot $RepoRoot -Arguments @('--version') -SuppressOutput
+            if ($exitCode -eq 0) {
+                Write-Info 'repo-local Prettier launcher is available after dependency repair.'
+                return $true
+            }
+        }
+    }
+
     Write-ErrorMsg 'Repo-local Prettier is unavailable.'
-    Write-Host 'Run: npm install' -ForegroundColor Cyan
+    if ($Fix) {
+        Write-Host 'Automatic npm dependency repair failed. Run: npm ci' -ForegroundColor Cyan
+    }
+    else {
+        Write-Host 'Run: npm install' -ForegroundColor Cyan
+    }
     $rerunScript = if ($Fix) { 'agent:preflight:fix' } else { 'agent:preflight' }
     Write-Host "Then re-run: npm run $rerunScript" -ForegroundColor Cyan
     $FailureCount.Value++
@@ -807,6 +1484,8 @@ function Test-LicenseYearHeaders {
         [string[]]$Paths,
         [Parameter(Mandatory = $true)]
         [ref]$FailureCount,
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[string]]$InitiallyUnstagedPaths = $null,
         [switch]$Fix
     )
 
@@ -837,26 +1516,42 @@ function Test-LicenseYearHeaders {
     }
 
     if ($Fix -and $issues.Count -gt 0) {
-        foreach ($path in $targets) {
-            $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
-            $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache
-            if (Set-LicenseHeader -Path $fullPath -Year $expectedYear) {
-                $updatedPaths.Add($path) | Out-Null
-            }
+        if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                    -RepoRoot $RepoRoot `
+                    -Paths $targets `
+                    -InitiallyUnstagedPaths $InitiallyUnstagedPaths `
+                    -Context 'license header fixes')) {
+            $FailureCount.Value++
         }
-
-        if ($updatedPaths.Count -gt 0) {
-            Write-Host "[agent-preflight] Updated $($updatedPaths.Count) license header(s)." -ForegroundColor Green
-
-            $stagedPaths = Get-GitStagedPaths -RepoRoot $RepoRoot
-            $stagedUpdatedPaths = @($updatedPaths | Where-Object { $stagedPaths.Contains($_) })
-            if ($stagedUpdatedPaths.Count -gt 0 -and -not (Add-PathsToGitIndexWithRetry -RepoRoot $RepoRoot -Paths $stagedUpdatedPaths)) {
-                Write-ErrorMsg 'Failed to stage license header fixes. Git index.lock contention or another git error is likely.'
-                foreach ($path in $stagedUpdatedPaths) {
-                    Write-Host "  $path" -ForegroundColor Yellow
+        else {
+            foreach ($path in $targets) {
+                $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
+                $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache
+                if (Set-LicenseHeader -Path $fullPath -Year $expectedYear) {
+                    $updatedPaths.Add($path) | Out-Null
                 }
-                Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
-                $FailureCount.Value++
+            }
+
+            if ($updatedPaths.Count -gt 0) {
+                Write-Host "[agent-preflight] Updated $($updatedPaths.Count) license header(s)." -ForegroundColor Green
+
+                $stagedPaths = Get-GitStagedPaths -RepoRoot $RepoRoot
+                $stagedUpdatedPaths = @($updatedPaths | Where-Object { $stagedPaths.Contains($_) })
+                if (
+                    $stagedUpdatedPaths.Count -gt 0 -and
+                    -not (Add-PathsToGitIndexWithRetry `
+                        -RepoRoot $RepoRoot `
+                        -Paths $stagedUpdatedPaths `
+                        -InitiallyUnstagedPaths $InitiallyUnstagedPaths `
+                        -Context 'license header fixes')
+                ) {
+                    Write-ErrorMsg 'Failed to stage license header fixes. Git index.lock contention or another git error is likely.'
+                    foreach ($path in $stagedUpdatedPaths) {
+                        Write-Host "  $path" -ForegroundColor Yellow
+                    }
+                    Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                    $FailureCount.Value++
+                }
             }
         }
 
@@ -894,6 +1589,8 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 $failureCount = 0
 $availableNodeTools = @{}
 $prettierAvailable = $false
+$script:NodeDependencyRepairAttempted = $false
+$script:NodeDependencyRepairSucceeded = $false
 
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
@@ -937,6 +1634,7 @@ if ($relativePaths.Count -eq 0) {
 
 Write-Info "Detected $($relativePaths.Count) changed path(s)."
 
+$initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
 $llmFiles = @($relativePaths | Where-Object { $_ -like '.llm/*' })
 $llmSizeTargets = @(
     $relativePaths | Where-Object {
@@ -1031,39 +1729,76 @@ if ($llmSizeTargets.Count -gt 0) {
 
 if ($llmFiles.Count -gt 0) {
     Write-Host '[agent-preflight] Validating LLM instruction consistency...' -ForegroundColor Blue
-    & (Join-Path $repoRoot 'scripts/lint-llm-instructions.ps1') -Fix:$Fix -VerboseOutput:$VerboseOutput
-    if ($LASTEXITCODE -ne 0) {
+    $canRunLlmFix = $true
+    if ($Fix) {
+        $canRunLlmFix = Test-CanRunWholeFileAutoFix `
+            -Paths @('.llm/context.md', '.llm/skills/index.md') `
+            -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+            -Context 'LLM instruction auto-fix' `
+            -Phase 'before'
+    }
+
+    if (-not $canRunLlmFix) {
         $failureCount++
+    }
+    else {
+        & (Join-Path $repoRoot 'scripts/lint-llm-instructions.ps1') -Fix:$Fix -VerboseOutput:$VerboseOutput
+        if ($LASTEXITCODE -ne 0) {
+            $failureCount++
+        }
+        elseif ($Fix) {
+            if (-not (Add-PathsToGitIndexWithRetry `
+                        -RepoRoot $repoRoot `
+                        -Paths @('.llm/context.md', '.llm/skills/index.md') `
+                        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                        -Context 'LLM instruction auto-fix')) {
+                $failureCount++
+            }
+        }
     }
 }
 
 if ($csharpTargets.Count -gt 0) {
-    Test-LicenseYearHeaders -RepoRoot $repoRoot -Paths $csharpTargets -FailureCount ([ref]$failureCount) -Fix:$Fix
+    Test-LicenseYearHeaders `
+        -RepoRoot $repoRoot `
+        -Paths $csharpTargets `
+        -FailureCount ([ref]$failureCount) `
+        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+        -Fix:$Fix
 }
 
 if ($prettierTargets.Count -gt 0) {
     if ($prettierAvailable) {
         if ($Fix) {
             Write-Host '[agent-preflight] Formatting changed Markdown/JSON/YAML/JavaScript files with Prettier...' -ForegroundColor Blue
-            $prettierExit = Invoke-PrettierOnPaths `
-                -RepoRoot $repoRoot `
-                -Arguments @('--write', '--log-level', 'warn') `
-                -Paths $prettierTargets
-            if ($prettierExit -ne 0) {
-                Write-ErrorMsg "Prettier formatting failed with exit code $prettierExit."
+            if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                        -RepoRoot $repoRoot `
+                        -Paths $prettierTargets `
+                        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                        -Context 'Prettier formatting')) {
                 $failureCount++
             }
             else {
-                $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
-                $stagedPrettierTargets = @($prettierTargets | Where-Object { $stagedPaths.Contains($_) })
-                if ($stagedPrettierTargets.Count -gt 0) {
-                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedPrettierTargets)) {
-                        Write-ErrorMsg 'Failed to stage Prettier-formatted files. Git index.lock contention or another git error is likely.'
-                        foreach ($path in $stagedPrettierTargets) {
-                            Write-Host "  $path" -ForegroundColor Yellow
+                $prettierExit = Invoke-PrettierOnPaths `
+                    -RepoRoot $repoRoot `
+                    -Arguments @('--write', '--log-level', 'warn') `
+                    -Paths $prettierTargets
+                if ($prettierExit -ne 0) {
+                    Write-ErrorMsg "Prettier formatting failed with exit code $prettierExit."
+                    $failureCount++
+                }
+                else {
+                    $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                    $stagedPrettierTargets = @($prettierTargets | Where-Object { $stagedPaths.Contains($_) })
+                    if ($stagedPrettierTargets.Count -gt 0) {
+                        if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedPrettierTargets -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'Prettier formatting')) {
+                            Write-ErrorMsg 'Failed to stage Prettier-formatted files. Git index.lock contention or another git error is likely.'
+                            foreach ($path in $stagedPrettierTargets) {
+                                Write-Host "  $path" -ForegroundColor Yellow
+                            }
+                            Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                            $failureCount++
                         }
-                        Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
-                        $failureCount++
                     }
                 }
             }
@@ -1086,50 +1821,59 @@ if ($prettierTargets.Count -gt 0) {
 if ($markdownTargets.Count -gt 0) {
     if ($availableNodeTools.ContainsKey('markdownlint') -and $availableNodeTools['markdownlint']) {
         if ($Fix) {
-            Write-Host '[agent-preflight] Adding missing Markdown fence languages where inferable...' -ForegroundColor Blue
-            $markdownFenceFixExit = 0
-            & (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') -Paths $markdownTargets -VerboseOutput:$VerboseOutput
-            $markdownFenceFixExit = $LASTEXITCODE
-            if ($markdownFenceFixExit -ne 0) {
-                Write-ErrorMsg "Markdown fence language auto-fix failed with exit code $markdownFenceFixExit."
+            if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                        -RepoRoot $repoRoot `
+                        -Paths $markdownTargets `
+                        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                        -Context 'Markdown fixes')) {
                 $failureCount++
             }
             else {
+                Write-Host '[agent-preflight] Adding missing Markdown fence languages where inferable...' -ForegroundColor Blue
+                $markdownFenceFixExit = 0
+                & (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') -Paths $markdownTargets -VerboseOutput:$VerboseOutput
+                $markdownFenceFixExit = $LASTEXITCODE
+                if ($markdownFenceFixExit -ne 0) {
+                    Write-ErrorMsg "Markdown fence language auto-fix failed with exit code $markdownFenceFixExit."
+                    $failureCount++
+                }
+                else {
+                    $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                    $stagedMarkdownTargets = @($markdownTargets | Where-Object { $stagedPaths.Contains($_) })
+                    if ($stagedMarkdownTargets.Count -gt 0) {
+                        if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'Markdown fence language fixes')) {
+                            Write-ErrorMsg 'Failed to stage Markdown fence language fixes. Git index.lock contention or another git error is likely.'
+                            foreach ($path in $stagedMarkdownTargets) {
+                                Write-Host "  $path" -ForegroundColor Yellow
+                            }
+                            Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                            $failureCount++
+                        }
+                    }
+                }
+
+                Write-Host '[agent-preflight] Auto-fixing changed Markdown files with markdownlint...' -ForegroundColor Blue
+                $markdownFixExit = Invoke-NodeToolOnPaths `
+                    -RepoRoot $repoRoot `
+                    -ToolName 'markdownlint' `
+                    -Arguments @('--fix', '--config', '.markdownlint.json', '--ignore-path', '.markdownlintignore') `
+                    -Paths $markdownTargets `
+                    -SuppressOutput
+                if ($markdownFixExit -ne 0) {
+                    Write-Info "markdownlint --fix exited $markdownFixExit; final validation will report remaining issues."
+                }
+
                 $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
                 $stagedMarkdownTargets = @($markdownTargets | Where-Object { $stagedPaths.Contains($_) })
                 if ($stagedMarkdownTargets.Count -gt 0) {
-                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets)) {
-                        Write-ErrorMsg 'Failed to stage Markdown fence language fixes. Git index.lock contention or another git error is likely.'
+                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'markdownlint fixes')) {
+                        Write-ErrorMsg 'Failed to stage markdownlint-fixed files. Git index.lock contention or another git error is likely.'
                         foreach ($path in $stagedMarkdownTargets) {
                             Write-Host "  $path" -ForegroundColor Yellow
                         }
                         Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
                         $failureCount++
                     }
-                }
-            }
-
-            Write-Host '[agent-preflight] Auto-fixing changed Markdown files with markdownlint...' -ForegroundColor Blue
-            $markdownFixExit = Invoke-NodeToolOnPaths `
-                -RepoRoot $repoRoot `
-                -ToolName 'markdownlint' `
-                -Arguments @('--fix', '--config', '.markdownlint.json', '--ignore-path', '.markdownlintignore') `
-                -Paths $markdownTargets `
-                -SuppressOutput
-            if ($markdownFixExit -ne 0) {
-                Write-Info "markdownlint --fix exited $markdownFixExit; final validation will report remaining issues."
-            }
-
-            $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
-            $stagedMarkdownTargets = @($markdownTargets | Where-Object { $stagedPaths.Contains($_) })
-            if ($stagedMarkdownTargets.Count -gt 0) {
-                if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedMarkdownTargets)) {
-                    Write-ErrorMsg 'Failed to stage markdownlint-fixed files. Git index.lock contention or another git error is likely.'
-                    foreach ($path in $stagedMarkdownTargets) {
-                        Write-Host "  $path" -ForegroundColor Yellow
-                    }
-                    Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
-                    $failureCount++
                 }
             }
         }
@@ -1231,38 +1975,47 @@ if ($cspellConfigChanged) {
     }
     else {
         if ($Fix) {
-            Push-Location $repoRoot
-            try {
-                $cspellFixOutput = & node (Join-Path $repoRoot 'scripts/lint-cspell-config.js') --fix 2>&1
-                $cspellFixExit = $LASTEXITCODE
-                foreach ($line in $cspellFixOutput) { Write-Host $line }
-            }
-            finally {
-                Pop-Location
-            }
-
-            if ($cspellFixExit -ne 0) {
-                Write-ErrorMsg "cspell.json configuration auto-fix failed with exit code $cspellFixExit."
+            if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                        -RepoRoot $repoRoot `
+                        -Paths @('cspell.json') `
+                        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                        -Context 'cspell.json configuration fixes')) {
                 $failureCount++
             }
             else {
-                if ($prettierAvailable) {
-                    $cspellPrettierExit = Invoke-PrettierOnPaths `
-                        -RepoRoot $repoRoot `
-                        -Arguments @('--write', '--log-level', 'warn') `
-                        -Paths @('cspell.json')
-                    if ($cspellPrettierExit -ne 0) {
-                        Write-ErrorMsg "Prettier formatting failed for cspell.json after configuration auto-fix with exit code $cspellPrettierExit."
-                        $failureCount++
-                    }
+                Push-Location $repoRoot
+                try {
+                    $cspellFixOutput = & node (Join-Path $repoRoot 'scripts/lint-cspell-config.js') --fix 2>&1
+                    $cspellFixExit = $LASTEXITCODE
+                    foreach ($line in $cspellFixOutput) { Write-Host $line }
+                }
+                finally {
+                    Pop-Location
                 }
 
-                $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
-                if ($stagedPaths.Contains('cspell.json')) {
-                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths @('cspell.json'))) {
-                        Write-ErrorMsg 'Failed to stage cspell.json after configuration auto-fix. Git index.lock contention or another git error is likely.'
-                        Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
-                        $failureCount++
+                if ($cspellFixExit -ne 0) {
+                    Write-ErrorMsg "cspell.json configuration auto-fix failed with exit code $cspellFixExit."
+                    $failureCount++
+                }
+                else {
+                    if ($prettierAvailable) {
+                        $cspellPrettierExit = Invoke-PrettierOnPaths `
+                            -RepoRoot $repoRoot `
+                            -Arguments @('--write', '--log-level', 'warn') `
+                            -Paths @('cspell.json')
+                        if ($cspellPrettierExit -ne 0) {
+                            Write-ErrorMsg "Prettier formatting failed for cspell.json after configuration auto-fix with exit code $cspellPrettierExit."
+                            $failureCount++
+                        }
+                    }
+
+                    $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                    if ($stagedPaths.Contains('cspell.json')) {
+                        if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths @('cspell.json') -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'cspell.json configuration fixes')) {
+                            Write-ErrorMsg 'Failed to stage cspell.json after configuration auto-fix. Git index.lock contention or another git error is likely.'
+                            Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                            $failureCount++
+                        }
                     }
                 }
             }
@@ -1297,32 +2050,60 @@ if ($lintErrorCodeContractTargets.Count -gt 0) {
 if ($eolTargets.Count -gt 0) {
     if ($Fix) {
         Write-Host '[agent-preflight] Normalizing line endings on changed files...' -ForegroundColor Blue
+        $plannedEolPathList = [System.IO.Path]::GetTempFileName()
         Push-Location $repoRoot
         try {
-            & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -Paths $eolTargets
-            $normalizeEolExit = $LASTEXITCODE
+            & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -DryRun -ModifiedPathList $plannedEolPathList -Paths $eolTargets
+            $normalizeEolDryRunExit = $LASTEXITCODE
         }
         finally {
             Pop-Location
         }
 
-        if ($normalizeEolExit -ne 0) {
+        if ($normalizeEolDryRunExit -ne 0 -and $normalizeEolDryRunExit -ne 2) {
             $failureCount++
         }
         else {
-            $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
-            $stagedEolTargets = @($eolTargets | Where-Object { $stagedPaths.Contains($_) })
-            if ($stagedEolTargets.Count -gt 0) {
-                if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedEolTargets)) {
-                    Write-ErrorMsg 'Failed to stage EOL-normalized files. Git index.lock contention or another git error is likely.'
-                    foreach ($path in $stagedEolTargets) {
-                        Write-Host "  $path" -ForegroundColor Yellow
-                    }
-                    Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+            $plannedEolText = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($plannedEolPathList))
+            $plannedEolTargets = @(Split-NulPathText -Text $plannedEolText)
+            if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                        -RepoRoot $repoRoot `
+                        -Paths $plannedEolTargets `
+                        -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                        -Context 'EOL normalization')) {
+                $failureCount++
+            }
+            else {
+                Push-Location $repoRoot
+                try {
+                    & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -Paths $eolTargets
+                    $normalizeEolExit = $LASTEXITCODE
+                }
+                finally {
+                    Pop-Location
+                }
+
+                if ($normalizeEolExit -ne 0) {
                     $failureCount++
+                }
+                else {
+                    $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                    $stagedEolTargets = @($plannedEolTargets | Where-Object { $stagedPaths.Contains($_) })
+                    if ($stagedEolTargets.Count -gt 0) {
+                        if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedEolTargets -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'EOL normalization')) {
+                            Write-ErrorMsg 'Failed to stage EOL-normalized files. Git index.lock contention or another git error is likely.'
+                            foreach ($path in $stagedEolTargets) {
+                                Write-Host "  $path" -ForegroundColor Yellow
+                            }
+                            Write-Host 'Close other git operations, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                            $failureCount++
+                        }
+                    }
                 }
             }
         }
+
+        Remove-Item -LiteralPath $plannedEolPathList -ErrorAction SilentlyContinue
     }
 
     Write-Host '[agent-preflight] Checking line endings on changed files...' -ForegroundColor Blue
@@ -1345,9 +2126,32 @@ if ($eolTargets.Count -gt 0) {
 if ($testFiles.Count -gt 0) {
     if ($Fix) {
         Write-Host '[agent-preflight] Auto-fixing Unity null assertions in changed tests...' -ForegroundColor Blue
-        & (Join-Path $repoRoot 'scripts/lint-tests.ps1') -FixNullChecks -Paths $testFiles
-        if ($LASTEXITCODE -ne 0) {
+        if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                    -RepoRoot $repoRoot `
+                    -Paths $testFiles `
+                    -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                    -Context 'Unity null assertion fixes')) {
             $failureCount++
+        }
+        else {
+            & (Join-Path $repoRoot 'scripts/lint-tests.ps1') -FixNullChecks -Paths $testFiles
+            if ($LASTEXITCODE -ne 0) {
+                $failureCount++
+            }
+            else {
+                $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                $stagedTestFiles = @($testFiles | Where-Object { $stagedPaths.Contains($_) })
+                if ($stagedTestFiles.Count -gt 0) {
+                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedTestFiles -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'Unity null assertion fixes')) {
+                        Write-ErrorMsg 'Failed to stage Unity null assertion fixes. Git index.lock contention, pre-existing unstaged hunks, or another git error is likely.'
+                        foreach ($path in $stagedTestFiles) {
+                            Write-Host "  $path" -ForegroundColor Yellow
+                        }
+                        Write-Host 'Close other git operations or commit/stash unstaged hunks, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                        $failureCount++
+                    }
+                }
+            }
         }
     }
 
@@ -1372,6 +2176,15 @@ if ($csharpTargets.Count -gt 0) {
     }
 
     $regionViolations = New-Object System.Collections.Generic.List[string]
+    $regionViolationSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+    $stagedCSharpTargets = @($csharpTargets | Where-Object { $stagedPaths.Contains($_) })
+    foreach ($violation in @(Get-StagedRegionViolations -RepoRoot $repoRoot -Paths $stagedCSharpTargets)) {
+        if ($regionViolationSet.Add($violation)) {
+            $regionViolations.Add($violation) | Out-Null
+        }
+    }
+
     foreach ($path in $csharpTargets) {
         $fullPath = Join-Path -Path $repoRoot -ChildPath $path
         if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
@@ -1380,7 +2193,10 @@ if ($csharpTargets.Count -gt 0) {
 
         $matches = Select-String -LiteralPath $fullPath -Pattern '^\s*#\s*(region|endregion)' -CaseSensitive:$false
         foreach ($match in $matches) {
-            $regionViolations.Add("${path}:$($match.LineNumber): $($match.Line.Trim())") | Out-Null
+            $violation = "${path}:$($match.LineNumber): $($match.Line.Trim())"
+            if ($regionViolationSet.Add($violation)) {
+                $regionViolations.Add($violation) | Out-Null
+            }
         }
     }
 
@@ -1438,32 +2254,25 @@ if ($metaRelevantPaths.Count -gt 0) {
     }
 
     if ($missingMetaTargets.Count -gt 0 -and $Fix) {
-        if (Get-Command bash -ErrorAction SilentlyContinue) {
-            foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
-                Write-Info "Generating meta for $target"
-                & bash (Join-Path $repoRoot 'scripts/generate-meta.sh') $target
-                if ($LASTEXITCODE -ne 0) {
-                    Write-ErrorMsg "Failed to auto-generate .meta for: $target"
-                    $failureCount++
-                }
-            }
-
-            # Re-check after generation
-            $remaining = @()
-            foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
-                $targetPath = Join-Path -Path $repoRoot -ChildPath $target
-                if (-not (Test-Path -LiteralPath "$targetPath.meta")) {
-                    $remaining += $target
-                }
-            }
-
-            $missingMetaTargets = New-Object System.Collections.Generic.List[string]
-            foreach ($target in $remaining) {
-                $missingMetaTargets.Add($target) | Out-Null
+        foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
+            if (-not (New-UnityMetaFile -RepoRoot $repoRoot -RelativePath $target)) {
+                Write-ErrorMsg "Failed to auto-generate .meta for: $target"
+                $failureCount++
             }
         }
-        else {
-            Write-WarningMsg 'bash not found; cannot auto-generate missing .meta files.'
+
+        # Re-check after generation
+        $remaining = @()
+        foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
+            $targetPath = Join-Path -Path $repoRoot -ChildPath $target
+            if (-not (Test-Path -LiteralPath "$targetPath.meta")) {
+                $remaining += $target
+            }
+        }
+
+        $missingMetaTargets = New-Object System.Collections.Generic.List[string]
+        foreach ($target in $remaining) {
+            $missingMetaTargets.Add($target) | Out-Null
         }
     }
 
@@ -1472,12 +2281,13 @@ if ($metaRelevantPaths.Count -gt 0) {
         foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
             Write-Host "  $target" -ForegroundColor Yellow
         }
-        Write-Host 'Generate with: ./scripts/generate-meta.sh <path>' -ForegroundColor Cyan
+        Write-Host 'Run: npm run agent:preflight:fix' -ForegroundColor Cyan
         $failureCount++
     }
 
         $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
     if ($stagedPaths.Count -gt 0) {
+        $unstagedOrUntrackedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
         $unstagedMetaCompanionsSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
         $pathScopedMetaRelevantSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
         foreach ($metaPath in $metaRelevantPaths) {
@@ -1500,7 +2310,11 @@ if ($metaRelevantPaths.Count -gt 0) {
 
             $fileMetaPath = "$stagedPath.meta"
             $fileMetaFullPath = Join-Path -Path $repoRoot -ChildPath $fileMetaPath
-            if ((Test-Path -LiteralPath $fileMetaFullPath) -and -not $stagedPaths.Contains($fileMetaPath)) {
+            if (
+                (Test-Path -LiteralPath $fileMetaFullPath) -and
+                -not $stagedPaths.Contains($fileMetaPath) -and
+                $unstagedOrUntrackedPaths.Contains($fileMetaPath)
+            ) {
                 $unstagedMetaCompanionsSet.Add($fileMetaPath) | Out-Null
             }
 
@@ -1518,7 +2332,11 @@ if ($metaRelevantPaths.Count -gt 0) {
 
                 $directoryMetaPath = "$directory.meta"
                 $directoryMetaFullPath = Join-Path -Path $repoRoot -ChildPath $directoryMetaPath
-                if ((Test-Path -LiteralPath $directoryMetaFullPath) -and -not $stagedPaths.Contains($directoryMetaPath)) {
+                if (
+                    (Test-Path -LiteralPath $directoryMetaFullPath) -and
+                    -not $stagedPaths.Contains($directoryMetaPath) -and
+                    $unstagedOrUntrackedPaths.Contains($directoryMetaPath)
+                ) {
                     $unstagedMetaCompanionsSet.Add($directoryMetaPath) | Out-Null
                 }
 
@@ -1533,7 +2351,7 @@ if ($metaRelevantPaths.Count -gt 0) {
         if ($unstagedMetaCompanions.Count -gt 0) {
             if ($Fix) {
                 Write-Host '[agent-preflight] Auto-staging unstaged .meta companions for staged files...' -ForegroundColor Blue
-                if (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $unstagedMetaCompanions) {
+                if (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $unstagedMetaCompanions -AllowInitiallyUnstaged -Context '.meta companion recovery') {
                     Write-Host "[agent-preflight] Staged $($unstagedMetaCompanions.Count) .meta companion file(s)." -ForegroundColor Green
                 }
                 else {

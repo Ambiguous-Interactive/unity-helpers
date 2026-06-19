@@ -14,12 +14,12 @@
     mistake at commit / CI time rather than during a rare hook branch.
 
     Error codes emitted:
-      PWS001 - `pwsh|powershell -File <script> --` (the core bug)
+      PWS001 - `pwsh|powershell[.exe] -File|-f <script> --` (the core bug)
       PWS002 - In-process `& <script>.ps1 --` inside scripts/tests/*.ps1
                (tests MUST exercise the same invocation path production uses;
                the in-process call operator masks CLI-binding bugs)
-      PWS003 - A scripts/<name>.ps1 file invokes `pwsh|powershell -NoProfile
-               -File scripts/<sibling>.ps1` via subprocess when it already
+      PWS003 - A scripts/<name>.ps1 file invokes `pwsh|powershell[.exe]
+               -NoProfile -File|-f scripts/<sibling>.ps1` via subprocess when it already
                runs inside a PowerShell host. Windows PowerShell 5.1 hosts
                may not have pwsh on PATH, and the subprocess boundary wastes
                startup time; dot-source a shared helper or use in-process
@@ -28,13 +28,16 @@
                `# lint-pwsh-invocations: allow-subprocess-pwsh` with a
                one-line rationale (e.g. "called script uses `exit` heavily;
                subprocess isolation required").
+      PWS004 - `pwsh|powershell[.exe] -File|-f .githooks/<extensionless-hook>`.
+               PowerShell -File targets must be .ps1 files on every supported
+               host; run the extensionless hook directly or invoke the
+               companion `.githooks/<hook>.ps1` implementation.
 
     Scanned paths:
       - *.sh
       - .githooks/*
       - .github/workflows/*.yml
-      - scripts/*.ps1                (for PWS003 only)
-      - scripts/tests/*.ps1
+      - scripts/**/*.ps1             (PWS003 only applies to top-level scripts/*.ps1)
       - package.json
 
     Multi-line invocation detection:
@@ -82,35 +85,37 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $selfRel = 'scripts/lint-pwsh-invocations.ps1'
 $selfTestRel = 'scripts/tests/test-lint-pwsh-invocations.ps1'
 
-# PWS001: `pwsh|powershell ... -File <script> ... --` (end of token, or followed by whitespace).
+$pwshExecutablePattern = 'pwsh(?:\.exe)?|powershell(?:\.exe)?'
+$pwshFileSwitchPattern = '-(?:File|f)\b'
+$doubleDashTokenPattern = '(?:--|\\*"--\\*"|''--'')'
+
+# PWS001: `pwsh|powershell[.exe] ... -File|-f <script> ... --` (end of token, or followed by whitespace).
 # The intermediate-args groups before AND after `-File` accept ANY
 # whitespace-separated tokens (flags, positionals, or quoted values). This is
 # pragmatic — we want the regex to tolerate real-world invocations like
-# `pwsh -NoProfile -File foo.ps1 positional -- arg` and `pwsh -File "path with spaces.ps1" -- arg`.
+# `pwsh -NoProfile -File foo.ps1 positional -- arg` and `pwsh -File "path with spaces.ps1" "--" arg`.
 # The script-path token accepts either a double-quoted string (possibly
 # containing spaces), a single-quoted string, or a bare token.
-$pws001Pattern = '(?:^|[\s;&|"''`(])(pwsh|powershell)\b(?:\s+\S+)*?\s+-File\s+(?:"[^"]+"|''[^'']+''|\S+)(?:\s+\S+)*?\s+--(?=\s|$|")'
+$pws001Pattern = '(?:^|[\s;&|"''`(])(' + $pwshExecutablePattern + ')\b(?:\s+\S+)*?\s+' + $pwshFileSwitchPattern + '\s+(?:"[^"]+"|''[^'']+''|\S+)(?:\s+\S+)*?\s+' + $doubleDashTokenPattern + '(?=\s|$|")'
 # PWS001-variant: array-indirection pwsh invocation. Catches the common
-# bash pattern where the pwsh command line is stored in an array and
-# expanded with "${PWSH_CMD[@]}" (or any array whose name ends with
-# _CMD / _PWSH / CMD — and by convention all-caps identifiers). Example:
+# bash pattern where the pwsh command line is stored in a PowerShell-named
+# array and expanded with "${PWSH_CMD[@]}" or "${POWERSHELL_CMD[@]}". Example:
 #   PWSH_CMD=(pwsh -NoProfile -File)
 #   "${PWSH_CMD[@]}" foo.ps1 -- arg     # BUG — still hits PowerShell -File mode
 # We match: a `"${NAME[@]}"` expansion followed later by a `.ps1` token and
-# eventually a standalone `--`. The name class is permissive (all-caps with
-# optional _ digits) to catch the common conventions while keeping false
-# positives low.
-$pws001ArrayPattern = '"\$\{[A-Z][A-Z0-9_]*\[@\]\}"\s+(?:\S+\s+)*?\S+\.ps1(?:\s+\S+)*?\s+--(?=\s|$|")'
+# eventually a standalone `--`.
+$pws001ArrayNamePattern = '[A-Z0-9_]*(?:PWSH|POWERSHELL)[A-Z0-9_]*'
+$pws001ArrayPattern = '(\\*"\$\{(?:' + $pws001ArrayNamePattern + ')\[@\]\}\\*")\s+(?:\S+\s+)*?\S+\.ps1(?:\s+\S+)*?\s+' + $doubleDashTokenPattern + '(?=\s|$|")'
 # PWS002: in-process `& <something> -- ...` inside test scripts. The `<something>`
 # is either a literal *.ps1 path (quoted or unquoted) or a variable whose name
 # ends with "Path" / "Script" or is obviously a script reference. We match the
 # narrower common forms deliberately — `&` also appears in many legitimate
 # contexts (Start-Job &, logical AND, etc.) so we over-index on call-style
 # invocations that take `--` as the first argument.
-$pws002Pattern = '&\s+(?:\$[A-Za-z_][A-Za-z0-9_]*(?:Path|Script|Ps1|Cmd|Tool)?|["''][^"'']*\.ps1["'']|[^\s"'']+\.ps1)\s+--(?=\s|$|")'
+$pws002Pattern = '(&)\s+(?:\([^)]*\.ps1[^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*(?:Path|Script|Ps1|Cmd|Tool)?|["''][^"'']*\.ps1["'']|[^\s"'']+\.ps1)(?:\s+\S+)*?\s+' + $doubleDashTokenPattern + '(?=\s|$|")'
 
-# PWS003: a scripts/<name>.ps1 file that invokes pwsh|powershell -NoProfile
-# -File scripts/<sibling>.ps1 via subprocess. On Windows PowerShell 5.1 hosts
+# PWS003: a scripts/<name>.ps1 file that invokes pwsh|powershell[.exe] -NoProfile
+# -File|-f scripts/<sibling>.ps1 via subprocess. On Windows PowerShell 5.1 hosts
 # this is a hard fail (no pwsh on PATH); even where it works, the subprocess
 # boundary wastes startup time and drops the parent session's variables.
 # Preferred alternatives: dot-source a shared helper module, or invoke an
@@ -119,9 +124,9 @@ $pws002Pattern = '&\s+(?:\$[A-Za-z_][A-Za-z0-9_]*(?:Path|Script|Ps1|Cmd|Tool)?|[
 #
 # Regex shape:
 #   - Optional leading `&` call operator or line-start whitespace.
-#   - pwsh OR powershell as a word.
+#   - pwsh OR powershell, with optional .exe, as a word.
 #   - Any combination of intervening flags (greedy-nonconsuming).
-#   - `-File` followed by a script path whose first segment is `scripts/` OR
+#   - `-File` or `-f` followed by a script path whose first segment is `scripts/` OR
 #     the fragment `$PSScriptRoot` (the canonical PS idiom for "this
 #     script's directory" — which IS scripts/ when the caller IS
 #     scripts/<name>.ps1).
@@ -138,14 +143,32 @@ $pws002Pattern = '&\s+(?:\$[A-Za-z_][A-Za-z0-9_]*(?:Path|Script|Ps1|Cmd|Tool)?|[
 # style assignments where a `.ps1` path shows up in a quoted STRING but no
 # `pwsh|powershell -File` precedes it — already excluded because we anchor on
 # `pwsh|powershell`.
-$pws003Pattern = '(?:^|[\s;&|`(])(pwsh|powershell)\b(?:\s+-[A-Za-z][A-Za-z0-9]*(?:\s+\S+)?)*?\s+-File\s+(?:"(?:[^"]*?[/\\])?(?:\$PSScriptRoot|scripts)[/\\][^"]+\.ps1"|''(?:[^'']*?[/\\])?(?:\$PSScriptRoot|scripts)[/\\][^'']+\.ps1''|(?:\S*[/\\])?(?:\$PSScriptRoot|scripts)[/\\]\S+\.ps1|\$\w+)'
+$pws003Pattern = '(?:^|[\s;&|`(])(' + $pwshExecutablePattern + ')\b(?:\s+-[A-Za-z][A-Za-z0-9]*(?:\s+\S+)?)*?\s+' + $pwshFileSwitchPattern + '\s+(?:"(?:[^"]*?[/\\])?(?:\$PSScriptRoot|scripts)[/\\][^"]+\.ps1"|''(?:[^'']*?[/\\])?(?:\$PSScriptRoot|scripts)[/\\][^'']+\.ps1''|(?:\S*[/\\])?(?:\$PSScriptRoot|scripts)[/\\]\S+\.ps1|\$\w+)'
+
+# PWS004: direct PowerShell -File invocation of extensionless git hook
+# entrypoints. Git hooks must be named without extensions, but PowerShell
+# -File is not a portable launcher for those extensionless files. Use the hook
+# executable directly, or use the .ps1 implementation path when debugging.
+$hookEntryNames = 'pre-commit|pre-push|pre-merge-commit|post-rewrite'
+$pathSeparatorPattern = '[/\\]+'
+$escapedDoubleQuotePattern = '\\*"'
+$pws004HookPathPattern = '(?:' + $escapedDoubleQuotePattern + '(?:[^"]*' + $pathSeparatorPattern + ')?\.githooks' + $pathSeparatorPattern + '(?:' + $hookEntryNames + ')' + $escapedDoubleQuotePattern + '|''(?:[^'']*' + $pathSeparatorPattern + ')?\.githooks' + $pathSeparatorPattern + '(?:' + $hookEntryNames + ')''|(?:\S*' + $pathSeparatorPattern + ')?\.githooks' + $pathSeparatorPattern + '(?:' + $hookEntryNames + '))'
+$pws004HookTargetPattern = $pws004HookPathPattern + '(?=$|[\s;&,"''`)])'
+$pws004Pattern = '(?:^|[\s;&|"''`(])(' + $pwshExecutablePattern + ')\b(?:\s+\S+)*?\s+' + $pwshFileSwitchPattern + '\s+' + $pws004HookTargetPattern
+# PWS004-variant: bash array-indirection `pwsh -File` invocation targeting an
+# extensionless hook. This mirrors the PWS001 array guard: if a PowerShell-named
+# array is expanded as the command, do not let `.githooks/<hook>` pass as a
+# positional target just because the actual `-File` switch lives in the array.
+$pws004ArrayPattern = '(\\*"\$\{(?:' + $pws001ArrayNamePattern + ')\[@\]\}\\*")\s+(?:\S+\s+)*?' + $pws004HookTargetPattern
+$pws004VariableAssignmentPattern = '(?:^|[;\s])(?:\[[^\]]+\]\s*)?\$(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*.*' + $pws004HookTargetPattern
+$pws004JoinPathVariableAssignmentPattern = '(?:^|[;\s])(?:\[[^\]]+\]\s*)?\$(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*.*\bJoin-Path\b.*(?:["'']\.githooks["'']|["''][^"'']*[/\\]\.githooks["'']).*["''](?:' + $hookEntryNames + ')["''](?=$|[\s;&,)])'
 
 # PWS003 opt-out marker: a single-line comment at the top of a scripts/<name>.ps1
 # file that explicitly acknowledges the subprocess boundary. Must appear on its
 # own line in the first 40 lines of the file. Rationale is required (callers
 # should explain WHY subprocess isolation is needed — e.g. the called script
 # uses `exit` heavily, or it must run in a fresh PS session).
-$pws003AllowMarker = 'lint-pwsh-invocations:\s*allow-subprocess-pwsh'
+$pws003AllowMarker = '^\s*#\s*lint-pwsh-invocations:\s*allow-subprocess-pwsh\s+\S+'
 
 # Strips PowerShell string literals (double-quoted and single-quoted) from a
 # line, replacing each literal with a same-length sequence of spaces so that
@@ -154,10 +177,8 @@ $pws003AllowMarker = 'lint-pwsh-invocations:\s*allow-subprocess-pwsh'
 # `Write-Host "  pwsh -NoProfile -File scripts/foo.ps1"`).
 #
 # Caveats:
-#   - Does NOT attempt to parse here-strings (@" ... "@ / @' ... '@) since
-#     those are not used for the Write-Host style help text we need to mask.
-#     A here-string containing the pattern would still be a false positive —
-#     accepted as a known-small edge case.
+#   - Does NOT attempt to parse here-strings (@" ... "@ / @' ... '@). Those
+#     lines are skipped separately by Get-PowerShellHereStringMap.
 #   - Does NOT model PowerShell escape semantics (``"` inside `"..."`) since
 #     we simply want to mask the visible text. A mismatched quote on a line
 #     leaves the tail unmasked; acceptable for our lint purposes.
@@ -197,6 +218,151 @@ function Hide-PowerShellStringLiterals {
     return -join $chars
 }
 
+function Test-IsIndexInsidePowerShellStringLiteral {
+    param(
+        [string]$Line,
+        [int]$Index
+    )
+
+    if ([string]::IsNullOrEmpty($Line) -or $Index -le 0) {
+        return $false
+    }
+
+    $chars = $Line.ToCharArray()
+    $limit = [Math]::Min($Index, $chars.Length)
+    $inDouble = $false
+    $inSingle = $false
+    for ($ci = 0; $ci -lt $limit; $ci++) {
+        $c = $chars[$ci]
+        if ($inDouble) {
+            if ($c -eq '"') {
+                $inDouble = $false
+            }
+            continue
+        }
+        if ($inSingle) {
+            if ($c -eq "'") {
+                $inSingle = $false
+            }
+            continue
+        }
+        if ($c -eq '"') {
+            $inDouble = $true
+            continue
+        }
+        if ($c -eq "'") {
+            $inSingle = $true
+        }
+    }
+
+    return ($inDouble -or $inSingle)
+}
+
+function Remove-PowerShellInlineComment {
+    param([string]$Line)
+
+    if ([string]::IsNullOrEmpty($Line)) {
+        return $Line
+    }
+
+    $chars = $Line.ToCharArray()
+    $inDouble = $false
+    $inSingle = $false
+    for ($ci = 0; $ci -lt $chars.Length; $ci++) {
+        $c = $chars[$ci]
+        if ($inDouble) {
+            if ($c -eq '"') {
+                $inDouble = $false
+            }
+            continue
+        }
+        if ($inSingle) {
+            if ($c -eq "'") {
+                $inSingle = $false
+            }
+            continue
+        }
+        if ($c -eq '"') {
+            $inDouble = $true
+            continue
+        }
+        if ($c -eq "'") {
+            $inSingle = $true
+            continue
+        }
+        if ($c -eq '#') {
+            return $Line.Substring(0, $ci)
+        }
+    }
+
+    return $Line
+}
+
+function Test-InvocationPattern {
+    param(
+        [string]$Line,
+        [string]$Pattern,
+        [bool]$IsPowerShell,
+        [bool]$SuppressShellHelpText
+    )
+
+    if ([string]::IsNullOrEmpty($Line)) {
+        return $false
+    }
+
+    $matches = [System.Text.RegularExpressions.Regex]::Matches(
+        $Line,
+        $Pattern,
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    foreach ($match in $matches) {
+        $invocationGroup = $match.Groups[1]
+        if (-not $invocationGroup.Success) {
+            continue
+        }
+        if (-not $IsPowerShell) {
+            $relativeFromInvocation = $Line.Substring($invocationGroup.Index)
+            $fileSwitchMatch = [System.Text.RegularExpressions.Regex]::Match(
+                $relativeFromInvocation,
+                '\s-(?:File|f)\b',
+                [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+            )
+            if ($fileSwitchMatch.Success) {
+                $fileSwitchIndex = $invocationGroup.Index + $fileSwitchMatch.Index
+                $beforeFileSwitch = $Line.Substring($invocationGroup.Index, $fileSwitchIndex - $invocationGroup.Index)
+                if (
+                    $beforeFileSwitch -match '\s-(?:Command|c)(?=\s|$)' -and
+                    (Test-IsIndexInsidePowerShellStringLiteral -Line $Line -Index $fileSwitchIndex) -and
+                    $beforeFileSwitch -match '\s-(?:Command|c)\s+\\?["'']?\s*(?:Write-(?:Host|Output|Warning|Error|Verbose|Information)|echo|printf)\b' -and
+                    $beforeFileSwitch -notmatch ';'
+                ) {
+                    continue
+                }
+            }
+            $insideStringLiteral = Test-IsIndexInsidePowerShellStringLiteral -Line $Line -Index $invocationGroup.Index
+            if ($insideStringLiteral) {
+                $beforeInvocation = $Line.Substring(0, $invocationGroup.Index)
+                if ($beforeInvocation -match '\s-(?:Command|c)(?=\s|$)') {
+                    continue
+                }
+            }
+            if (
+                $SuppressShellHelpText -and
+                $insideStringLiteral -and
+                ($Line -match '^\s*(?:-\s+)?(?:run\s*:\s*)?(?:echo|printf)\b')
+            ) {
+                continue
+            }
+            return $true
+        }
+        if (-not (Test-IsIndexInsidePowerShellStringLiteral -Line $Line -Index $invocationGroup.Index)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-RepoRelativePath {
     param([string]$FullPath)
     $normalized = $FullPath.Replace('\', '/')
@@ -234,19 +400,11 @@ function Get-TargetFiles {
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
     }
 
-    # scripts/*.ps1 (non-recursive top-level scripts, for PWS003 detection).
-    # scripts/tests/ files are captured below via an explicit recursive sweep of
-    # the tests directory.
+    # scripts/**/*.ps1. PWS003 remains scoped below to top-level scripts/*.ps1,
+    # but the other pwsh invocation checks should cover nested automation too.
     $scriptsDir = Join-Path $repoRoot 'scripts'
     if (Test-Path $scriptsDir) {
-        Get-ChildItem -Path $scriptsDir -File -Filter '*.ps1' -ErrorAction SilentlyContinue |
-            ForEach-Object { $results.Add($_.FullName) | Out-Null }
-    }
-
-    # scripts/tests/*.ps1
-    $testsDir = Join-Path (Join-Path $repoRoot 'scripts') 'tests'
-    if (Test-Path $testsDir) {
-        Get-ChildItem -Path $testsDir -File -Filter '*.ps1' -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path $scriptsDir -Recurse -File -Filter '*.ps1' -ErrorAction SilentlyContinue |
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
     }
 
@@ -305,6 +463,39 @@ function Get-CommentBlockMap {
     return , $map
 }
 
+function Get-PowerShellHereStringMap {
+    param([string[]]$Lines)
+
+    $map = New-Object bool[] $Lines.Length
+    $inHereString = $false
+    $terminatorPattern = $null
+    for ($i = 0; $i -lt $Lines.Length; $i++) {
+        $line = $Lines[$i]
+        if ($inHereString) {
+            $map[$i] = $true
+            if ($line -match $terminatorPattern) {
+                $inHereString = $false
+                $terminatorPattern = $null
+            }
+            continue
+        }
+
+        if ($line -match '@"\s*$') {
+            $map[$i] = $true
+            $inHereString = $true
+            $terminatorPattern = '^\s*"@'
+            continue
+        }
+
+        if ($line -match "@'\s*$") {
+            $map[$i] = $true
+            $inHereString = $true
+            $terminatorPattern = "^\s*'@"
+        }
+    }
+    return , $map
+}
+
 $targets = @(Get-TargetFiles)
 Write-Info "Scanning $($targets.Count) file(s)"
 
@@ -335,15 +526,17 @@ foreach ($file in $targets) {
     $isSh = $file.EndsWith('.sh', [System.StringComparison]::OrdinalIgnoreCase)
     $isYaml = $file.EndsWith('.yml', [System.StringComparison]::OrdinalIgnoreCase) `
         -or $file.EndsWith('.yaml', [System.StringComparison]::OrdinalIgnoreCase)
+    $isShellLike = $isSh -or ($rel -like '.githooks/*' -and -not $isPs1)
     $commentMap = $null
+    $hereStringMap = $null
     if ($isPs1) {
         $commentMap = Get-CommentBlockMap -Lines $lines
+        $hereStringMap = Get-PowerShellHereStringMap -Lines $lines
     }
 
-    # PWS003 applies ONLY to non-test scripts/*.ps1 files — i.e. repo-relative
-    # path begins with `scripts/` but does not also begin with `scripts/tests/`.
-    # The lint script and its own test are excluded above in the outer loop.
-    $pws003Applies = $isPs1 -and ($rel -like 'scripts/*.ps1') -and ($rel -notlike 'scripts/tests/*')
+    # PWS003 applies ONLY to top-level scripts/*.ps1 files. The lint script and
+    # its own test are excluded above in the outer loop.
+    $pws003Applies = $isPs1 -and ($rel -match '^scripts/[^/]+\.ps1$')
 
     # Detect the per-file allowlist marker for PWS003. Scan only the first
     # 40 physical lines — the marker is meant to be a top-of-file opt-out with
@@ -351,13 +544,52 @@ foreach ($file in $targets) {
     $pws003Allowed = $false
     if ($pws003Applies) {
         $scanLimit = [Math]::Min(40, $lines.Length)
+        $inPws003AllowHelpBlock = $false
+        $inPws003AllowHereString = $false
+        $pws003AllowHereStringTerminator = $null
         for ($m = 0; $m -lt $scanLimit; $m++) {
+            $markerLine = $lines[$m]
+            if ($inPws003AllowHereString) {
+                if ($markerLine -match $pws003AllowHereStringTerminator) {
+                    $inPws003AllowHereString = $false
+                    $pws003AllowHereStringTerminator = $null
+                }
+                continue
+            }
+            if ($inPws003AllowHelpBlock) {
+                if ($markerLine -match '#>') {
+                    $inPws003AllowHelpBlock = $false
+                }
+                continue
+            }
+            if ($markerLine -match '@"') {
+                if (-not ($markerLine -match '"@')) {
+                    $inPws003AllowHereString = $true
+                    $pws003AllowHereStringTerminator = '^\s*"@'
+                }
+                continue
+            }
+            if ($markerLine -match "@'") {
+                if (-not ($markerLine -match "'@")) {
+                    $inPws003AllowHereString = $true
+                    $pws003AllowHereStringTerminator = "^\s*'@"
+                }
+                continue
+            }
+            if ($markerLine -match '<#') {
+                if (-not ($markerLine -match '#>')) {
+                    $inPws003AllowHelpBlock = $true
+                }
+                continue
+            }
             if ($lines[$m] -match $pws003AllowMarker) {
                 $pws003Allowed = $true
                 break
             }
         }
     }
+
+    $pws004HookVariableNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
     # Build a "logically joined" view that merges physical lines ending in `\`
     # with their successor(s). This catches bash/YAML-run multi-line pwsh
@@ -422,7 +654,7 @@ foreach ($file in $targets) {
         $lineNum = $i + 1
 
         # Skip comment/help lines in .ps1 files.
-        if ($isPs1 -and $commentMap[$i]) {
+        if ($isPs1 -and ($commentMap[$i] -or $hereStringMap[$i])) {
             continue
         }
         # Skip full-line comments in shell and YAML files. Note: a `#` inside
@@ -432,7 +664,34 @@ foreach ($file in $targets) {
             continue
         }
 
-        if ($line -match $pws001Pattern) {
+        $scanLine = if ($isPs1) { Remove-PowerShellInlineComment -Line $line } else { $line }
+
+        if ($isPs1) {
+            $assignmentMatches = [System.Text.RegularExpressions.Regex]::Matches(
+                $scanLine,
+                $pws004VariableAssignmentPattern,
+                [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+            )
+            foreach ($assignmentMatch in $assignmentMatches) {
+                $nameGroup = $assignmentMatch.Groups['name']
+                if ($nameGroup.Success -and -not (Test-IsIndexInsidePowerShellStringLiteral -Line $scanLine -Index $nameGroup.Index)) {
+                    [void]$pws004HookVariableNames.Add($nameGroup.Value)
+                }
+            }
+            $joinPathAssignmentMatches = [System.Text.RegularExpressions.Regex]::Matches(
+                $scanLine,
+                $pws004JoinPathVariableAssignmentPattern,
+                [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+            )
+            foreach ($assignmentMatch in $joinPathAssignmentMatches) {
+                $nameGroup = $assignmentMatch.Groups['name']
+                if ($nameGroup.Success -and -not (Test-IsIndexInsidePowerShellStringLiteral -Line $scanLine -Index $nameGroup.Index)) {
+                    [void]$pws004HookVariableNames.Add($nameGroup.Value)
+                }
+            }
+        }
+
+        if (Test-InvocationPattern -Line $scanLine -Pattern $pws001Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
             $violations.Add(@{
                 Path = $rel
                 Line = $lineNum
@@ -443,7 +702,7 @@ foreach ($file in $targets) {
             continue
         }
 
-        if ($line -match $pws001ArrayPattern) {
+        if (Test-InvocationPattern -Line $scanLine -Pattern $pws001ArrayPattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
             $violations.Add(@{
                 Path = $rel
                 Line = $lineNum
@@ -454,7 +713,44 @@ foreach ($file in $targets) {
             continue
         }
 
-        if ($line -match $pws002Pattern) {
+        if (Test-InvocationPattern -Line $scanLine -Pattern $pws004ArrayPattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
+            $violations.Add(@{
+                Path = $rel
+                Line = $lineNum
+                Code = 'PWS004'
+                Message = "pwsh/powershell invocation via bash array indirection (""`${NAME[@]}"") targets an extensionless git hook. Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                Content = $line.Trim()
+            }) | Out-Null
+            continue
+        }
+
+        if (Test-InvocationPattern -Line $scanLine -Pattern $pws004Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
+            $violations.Add(@{
+                Path = $rel
+                Line = $lineNum
+                Code = 'PWS004'
+                Message = "pwsh/powershell -File targets an extensionless git hook. Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                Content = $line.Trim()
+            }) | Out-Null
+            continue
+        }
+
+        if ($isPs1 -and $pws004HookVariableNames.Count -gt 0) {
+            $variableAlternation = (@($pws004HookVariableNames) | ForEach-Object { [regex]::Escape($_) }) -join '|'
+            $pws004VariablePattern = '(?:^|[\s;&|"''`(])(' + $pwshExecutablePattern + ')\b(?:\s+\S+)*?\s+' + $pwshFileSwitchPattern + '\s+\$(?:' + $variableAlternation + ')(?=$|[\s;&,"''`)])'
+            if (Test-InvocationPattern -Line $scanLine -Pattern $pws004VariablePattern -IsPowerShell:$true -SuppressShellHelpText:$false) {
+                $violations.Add(@{
+                    Path = $rel
+                    Line = $lineNum
+                    Code = 'PWS004'
+                    Message = "pwsh/powershell -File targets a variable assigned to an extensionless git hook. Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                    Content = $line.Trim()
+                }) | Out-Null
+                continue
+            }
+        }
+
+        if (Test-InvocationPattern -Line $scanLine -Pattern $pws002Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:$false) {
             $isTest = $rel -like 'scripts/tests/*.ps1'
             if ($isTest) {
                 $violations.Add(@{
@@ -468,7 +764,7 @@ foreach ($file in $targets) {
         }
 
         if ($pws003Applies -and -not $pws003Allowed) {
-            $pws003Candidate = Hide-PowerShellStringLiterals -Line $line
+            $pws003Candidate = Hide-PowerShellStringLiterals -Line $scanLine
             if ($pws003Candidate -match $pws003Pattern) {
                 $violations.Add(@{
                     Path = $rel
@@ -490,10 +786,10 @@ foreach ($file in $targets) {
         $startIdx = $startLine - 1
 
         # Skip if the *physical* start line is a known comment.
-        if ($isPs1 -and $commentMap[$startIdx]) { continue }
+        if ($isPs1 -and ($commentMap[$startIdx] -or $hereStringMap[$startIdx])) { continue }
         if (($isSh -or $isYaml) -and ($lines[$startIdx] -match '^\s*#')) { continue }
 
-        if ($joined -match $pws001Pattern) {
+        if (Test-InvocationPattern -Line $joined -Pattern $pws001Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
             $violations.Add(@{
                 Path = $rel
                 Line = $startLine
@@ -504,7 +800,7 @@ foreach ($file in $targets) {
             continue
         }
 
-        if ($joined -match $pws001ArrayPattern) {
+        if (Test-InvocationPattern -Line $joined -Pattern $pws001ArrayPattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
             $violations.Add(@{
                 Path = $rel
                 Line = $startLine
@@ -515,7 +811,29 @@ foreach ($file in $targets) {
             continue
         }
 
-        if ($joined -match $pws002Pattern) {
+        if (Test-InvocationPattern -Line $joined -Pattern $pws004ArrayPattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
+            $violations.Add(@{
+                Path = $rel
+                Line = $startLine
+                Code = 'PWS004'
+                Message = "pwsh/powershell invocation via bash array indirection (""`${NAME[@]}"") targets an extensionless git hook (multi-line with '\' continuation). Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                Content = $joined.Trim()
+            }) | Out-Null
+            continue
+        }
+
+        if (Test-InvocationPattern -Line $joined -Pattern $pws004Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:($isShellLike -or $isYaml)) {
+            $violations.Add(@{
+                Path = $rel
+                Line = $startLine
+                Code = 'PWS004'
+                Message = "pwsh/powershell -File targets an extensionless git hook (multi-line with '\' continuation). Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                Content = $joined.Trim()
+            }) | Out-Null
+            continue
+        }
+
+        if (Test-InvocationPattern -Line $joined -Pattern $pws002Pattern -IsPowerShell:$isPs1 -SuppressShellHelpText:$false) {
             $isTest = $rel -like 'scripts/tests/*.ps1'
             if ($isTest) {
                 $violations.Add(@{
@@ -596,7 +914,7 @@ foreach ($file in $targets) {
             # we're just searching for the `-File <script> --` pattern.
             $blockJoined = ($bodyLines -join ' ') -replace '\s+', ' '
             $blockStartLine = $i + 1
-            if ($blockJoined -match $pws001Pattern) {
+            if (Test-InvocationPattern -Line $blockJoined -Pattern $pws001Pattern -IsPowerShell:$false -SuppressShellHelpText:$true) {
                 $violations.Add(@{
                     Path = $rel
                     Line = $blockStartLine
@@ -606,12 +924,32 @@ foreach ($file in $targets) {
                 }) | Out-Null
                 continue
             }
-            if ($blockJoined -match $pws001ArrayPattern) {
+            if (Test-InvocationPattern -Line $blockJoined -Pattern $pws001ArrayPattern -IsPowerShell:$false -SuppressShellHelpText:$true) {
                 $violations.Add(@{
                     Path = $rel
                     Line = $blockStartLine
                     Code = 'PWS001'
                     Message = "pwsh/powershell invocation via bash array indirection (""`${NAME[@]}"") inside YAML block scalar passes '--' as a separator; if the array expands to a `pwsh -File` command, PowerShell -File does not honor POSIX '--' and will fail with 'parameter name '' is ambiguous'. Use explicit named params like -Paths instead."
+                    Content = $blockJoined.Trim()
+                }) | Out-Null
+                continue
+            }
+            if (Test-InvocationPattern -Line $blockJoined -Pattern $pws004ArrayPattern -IsPowerShell:$false -SuppressShellHelpText:$true) {
+                $violations.Add(@{
+                    Path = $rel
+                    Line = $blockStartLine
+                    Code = 'PWS004'
+                    Message = "pwsh/powershell invocation via bash array indirection (""`${NAME[@]}"") targets an extensionless git hook inside YAML block scalar. Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
+                    Content = $blockJoined.Trim()
+                }) | Out-Null
+                continue
+            }
+            if (Test-InvocationPattern -Line $blockJoined -Pattern $pws004Pattern -IsPowerShell:$false -SuppressShellHelpText:$true) {
+                $violations.Add(@{
+                    Path = $rel
+                    Line = $blockStartLine
+                    Code = 'PWS004'
+                    Message = "pwsh/powershell -File targets an extensionless git hook inside YAML block scalar. Invoke .githooks/<hook> directly through Git/shell, or use .githooks/<hook>.ps1 for PowerShell debugging."
                     Content = $blockJoined.Trim()
                 }) | Out-Null
             }

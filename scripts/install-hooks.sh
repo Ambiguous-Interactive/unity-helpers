@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# cspell:ignore choco rhysd
 set -e
 
 # =============================================================================
@@ -134,13 +135,12 @@ check_status() {
         print_warning "dotnet: NOT FOUND (CSharpier won't work)"
     fi
     
-    # PowerShell
+    # PowerShell hook runtime
     if check_command pwsh; then
         print_success "pwsh: $(pwsh --version 2>/dev/null | head -1)"
-    elif check_command powershell; then
-        print_success "powershell: available"
     else
-        print_warning "PowerShell: NOT FOUND (some scripts won't work)"
+        print_error "pwsh: NOT FOUND (required git hook runtime)"
+        all_ok=false
     fi
     
     echo ""
@@ -281,6 +281,12 @@ check_status() {
 
 install_hooks() {
     print_header "Installing Git Hooks"
+
+    if ! check_command pwsh; then
+        print_error "pwsh is required because tracked git hook entrypoints delegate to .ps1 implementations"
+        print_info "Install PowerShell 7+: https://learn.microsoft.com/powershell/scripting/install/installing-powershell"
+        return 1
+    fi
     
     cd "$REPO_ROOT"
     
@@ -289,21 +295,18 @@ install_hooks() {
     git config core.hooksPath .githooks
     print_success "Git hooks path set to .githooks"
     
-    # Ensure hooks are executable
-    if [[ -f ".githooks/pre-commit" ]]; then
-        chmod +x .githooks/pre-commit
-        print_success "pre-commit hook is executable"
-    fi
-
-    if [[ -f ".githooks/pre-merge-commit" ]]; then
-        chmod +x .githooks/pre-merge-commit
-        print_success "pre-merge-commit hook is executable"
-    fi
-
-    if [[ -f ".githooks/pre-push" ]]; then
-        chmod +x .githooks/pre-push
-        print_success "pre-push hook is executable"
-    fi
+    # Ensure tracked extensionless hook entrypoints are executable. Companion
+    # .ps1 implementations are invoked through pwsh -File and do not need +x.
+    local hook_file hook_name
+    for hook_file in .githooks/*; do
+        [[ -f "$hook_file" ]] || continue
+        hook_name="${hook_file##*/}"
+        case "$hook_name" in
+            *.*|*.sample|*.txt|*.log|*.out|*.err|*.tmp) continue ;;
+        esac
+        chmod +x "$hook_file"
+    done
+    print_success "git hook files are executable"
 }
 
 configure_git_defaults() {
@@ -390,8 +393,8 @@ show_optional_tools() {
     echo "  Or:      brew install actionlint (macOS)"
     echo ""
     
-    echo "PowerShell (pwsh) - Required for some lint scripts"
-    echo "  Install: https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell"
+    echo "PowerShell 7+ (pwsh) - Required git hook runtime"
+    echo "  Install: https://learn.microsoft.com/powershell/scripting/install/installing-powershell"
     echo ""
 }
 

@@ -294,6 +294,53 @@ function Run-PowerShellPathBindingContractTests {
       -Passed $coversGitignore `
       -Message 'Expected .gitignore in trackedTextPathPatterns so extensionless git config files are checked.'
   }
+
+  $normalizePath = Join-Path $repoRoot 'scripts/normalize-eol.ps1'
+  if (Test-Path $normalizePath) {
+    $normalizeContent = Get-Content -Path $normalizePath -Raw
+    Write-TestResult `
+      -TestName 'normalize-eol.ps1 can emit modified paths for exact preflight restaging' `
+      -Passed ($normalizeContent -match '\$ModifiedPathList' -and $normalizeContent -match '\[char\]0') `
+      -Message 'Expected a NUL-delimited ModifiedPathList output contract for agent-preflight restaging.'
+  }
+
+  $preCommitPath = Join-Path $repoRoot '.githooks/pre-commit.ps1'
+  if (Test-Path $preCommitPath) {
+    $preCommitContent = Get-Content -Path $preCommitPath -Raw
+    Write-TestResult `
+      -TestName 'pre-commit delegates EOL normalization to agent-preflight' `
+      -Passed ($preCommitContent -notmatch 'normalize-eol\.ps1' -and $preCommitContent -notmatch 'Invoke-EolNormalization') `
+      -Message 'Expected pre-commit to avoid spawning EOL normalization; agent-preflight owns EOL repair.'
+
+    Write-TestResult `
+      -TestName 'pre-commit restages generated LLM instruction index after auto-fix' `
+      -Passed ($preCommitContent -match 'LLM instruction auto-fix' -and $preCommitContent -match '\.llm/skills/index\.md') `
+      -Message 'Expected pre-commit to stage both .llm/context.md and .llm/skills/index.md after lint-llm-instructions.ps1 -Fix.'
+  }
+
+  $agentPreflightPath = Join-Path $repoRoot 'scripts/agent-preflight.ps1'
+  if (Test-Path $agentPreflightPath) {
+    $agentPreflightContent = Get-Content -Path $agentPreflightPath -Raw
+    Write-TestResult `
+      -TestName 'agent-preflight reads git path lists as NUL-delimited process output' `
+      -Passed ($agentPreflightContent -match 'Invoke-GitPathList' -and $agentPreflightContent -match "'-z'") `
+      -Message 'Expected agent-preflight Git path discovery to avoid line-delimited path parsing.'
+
+    Write-TestResult `
+      -TestName 'agent-preflight staged path detection includes renames' `
+      -Passed ($agentPreflightContent -match "--diff-filter=ACMR") `
+      -Message 'Expected Get-GitStagedPaths to include renamed paths so auto-fixes can restage them.'
+
+    Write-TestResult `
+      -TestName 'agent-preflight owns EOL normalization and exact restaging' `
+      -Passed ($agentPreflightContent -match 'normalize-eol\.ps1' -and $agentPreflightContent -match 'ModifiedPathList') `
+      -Message 'Expected agent-preflight to run normalize-eol.ps1 and restage the NUL-delimited modified paths.'
+
+    Write-TestResult `
+      -TestName 'agent-preflight restages generated LLM instruction index after auto-fix' `
+      -Passed ($agentPreflightContent -match 'LLM instruction auto-fix' -and $agentPreflightContent -match '\.llm/skills/index\.md') `
+      -Message 'Expected agent-preflight -Fix to stage both .llm/context.md and .llm/skills/index.md after lint-llm-instructions.ps1 -Fix.'
+  }
 }
 
 function Run-HookInstallContractTests {
@@ -338,6 +385,78 @@ function Run-HookInstallContractTests {
       -Passed ($hasHooksOnlyParam -and $hasHooksOnlyBranch) `
       -Message 'Expected -HooksOnly param and branch configuring hooks plus push defaults.'
   }
+
+  $hookEntrypoints = @('pre-commit', 'pre-push', 'pre-merge-commit', 'post-rewrite')
+  $nonShellHooks = @()
+  foreach ($hook in $hookEntrypoints) {
+    $hookPath = Join-Path $repoRoot ".githooks/$hook"
+    if (-not (Test-Path $hookPath)) {
+      $nonShellHooks += "${hook}: missing"
+      continue
+    }
+
+    $firstLine = Get-Content -Path $hookPath -TotalCount 1
+    if ($firstLine -ne '#!/usr/bin/env sh') {
+      $nonShellHooks += "${hook}: $firstLine"
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'extensionless git hook entrypoints are POSIX launchers' `
+    -Passed ($nonShellHooks.Count -eq 0) `
+    -Message "Non-POSIX hook entrypoints: $($nonShellHooks -join '; ')"
+
+  $preMergeImplementationPath = Join-Path $repoRoot '.githooks/pre-merge-commit.ps1'
+  $preMergeImplementationContent = if (Test-Path $preMergeImplementationPath) {
+    Get-Content -Path $preMergeImplementationPath -Raw
+  }
+  else {
+    ''
+  }
+  $preMergeSpawnsPowerShell = $preMergeImplementationContent -match 'Get-Process -Id \$PID' -or
+    $preMergeImplementationContent -match 'Get-Command pwsh' -or
+    $preMergeImplementationContent -match '&\s*\$pwshPath\b' -or
+    $preMergeImplementationContent -match '\$invokeArgs\s*\+='
+
+  Write-TestResult `
+    -TestName 'pre-merge-commit delegates to pre-commit without a second PowerShell startup' `
+    -Passed (
+      $preMergeImplementationContent -match '&\s*\$preCommit\s+@HookArgs' -and
+      -not $preMergeSpawnsPowerShell
+    ) `
+    -Message 'Expected pre-merge-commit.ps1 to invoke pre-commit.ps1 in-process instead of spawning pwsh/powershell again.'
+
+  $installHooksShPath = Join-Path $repoRoot 'scripts/install-hooks.sh'
+  $installHooksShContent = if (Test-Path $installHooksShPath) {
+    Get-Content -Path $installHooksShPath -Raw
+  }
+  else {
+    ''
+  }
+
+  Write-TestResult `
+    -TestName 'install-hooks.sh requires pwsh for tracked hook runtime' `
+    -Passed (
+      $installHooksShContent -match 'pwsh is required because tracked git hook entrypoints delegate to \.ps1 implementations' -and
+      $installHooksShContent -notmatch 'elif check_command powershell'
+    ) `
+    -Message 'Expected Bash installer to require pwsh instead of accepting Windows PowerShell as a hook runtime.'
+
+  Write-TestResult `
+    -TestName 'install-hooks.sh filters hook entrypoints by basename before chmod' `
+    -Passed (
+      $installHooksShContent -match '\bhook_name="\$\{hook_file##\*/\}"' -and
+      $installHooksShContent -match 'case "\$hook_name" in'
+    ) `
+    -Message 'Expected Bash installer to skip .ps1/artifact companions by basename, not by .githooks/<file> path.'
+
+  Write-TestResult `
+    -TestName 'install-hooks.ps1 requires pwsh for tracked hook runtime' `
+    -Passed (
+      $installHooksContent -match 'pwsh: NOT FOUND \(required git hook runtime\)' -and
+      $installHooksContent -match 'Get-Command \$Command -ErrorAction SilentlyContinue'
+    ) `
+    -Message 'Expected PowerShell installer to detect missing pwsh accurately and fail hook installation.'
 }
 
 function Run-RepoLocalPrettierContractTests {
@@ -354,6 +473,7 @@ function Run-RepoLocalPrettierContractTests {
   $agentPreflightPath = Join-Path $repoRoot 'scripts/agent-preflight.ps1'
   $validateLintErrorCodesPath = Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1'
   $preCommitPath = Join-Path $repoRoot '.githooks/pre-commit'
+  $preCommitImplPath = Join-Path $repoRoot '.githooks/pre-commit.ps1'
   $prePushPath = Join-Path $repoRoot '.githooks/pre-push'
 
   Write-TestResult `
@@ -411,8 +531,8 @@ function Run-RepoLocalPrettierContractTests {
       -Message "LF override files: $($lfOverrideFiles -join ', ')"
   }
 
-  $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath, $preCommitPath)
-  $requiredFiles = @($formatStagedPath, $lintStagedMarkdownPath, $agentPreflightPath, $validateLintErrorCodesPath, $preCommitPath, $prePushPath)
+  $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath)
+  $requiredFiles = @($formatStagedPath, $lintStagedMarkdownPath, $agentPreflightPath, $validateLintErrorCodesPath, $prePushPath)
   $launcherDrift = @()
   foreach ($file in $prettierRequiredFiles) {
     if (-not (Test-Path $file)) {
@@ -445,12 +565,12 @@ function Run-RepoLocalPrettierContractTests {
   }
 
   Write-TestResult `
-    -TestName 'hooks and preflight route cspell/markdownlint through repo-local launcher' `
+    -TestName 'preflight and non-hook helpers route cspell/markdownlint through repo-local launcher' `
     -Passed ($nodeToolDrift.Count -eq 0) `
     -Message "Missing node-tool launcher reference: $($nodeToolDrift -join '; ')"
 
   $markdownFenceFixDrift = @()
-  foreach ($file in @($lintStagedMarkdownPath, $agentPreflightPath, $preCommitPath)) {
+  foreach ($file in @($lintStagedMarkdownPath, $agentPreflightPath)) {
     if (-not (Test-Path $file)) {
       $markdownFenceFixDrift += "missing: $file"
       continue
@@ -463,21 +583,73 @@ function Run-RepoLocalPrettierContractTests {
   }
 
   Write-TestResult `
-    -TestName 'Markdown hook/preflight paths run fence-language auto-fix before markdownlint' `
+    -TestName 'Markdown preflight paths run fence-language auto-fix before markdownlint' `
     -Passed ($markdownFenceFixDrift.Count -eq 0) `
     -Message "Missing fence fixer reference: $($markdownFenceFixDrift -join '; ')"
 
-  if (Test-Path $preCommitPath) {
-    $preCommitContent = Get-Content -Path $preCommitPath -Raw
+  if (Test-Path $preCommitImplPath) {
+    $preCommitContent = Get-Content -Path $preCommitImplPath -Raw
+    $forbiddenPreCommitWork = @(
+      'run-prettier\.js',
+      'markdownlint',
+      'cspell\s+(lint|--no-progress)',
+      'run-doc-link-lint',
+      'format-staged-csharp\.ps1',
+      'dotnet\s+tool\s+run\s+csharpier',
+      'lint-tests\.ps1',
+      'lint-duplicate-usings\.ps1',
+      'normalize-eol\.ps1'
+    )
+    $preCommitWorkHits = @()
+    foreach ($pattern in $forbiddenPreCommitWork) {
+      if ($preCommitContent -match $pattern) {
+        $preCommitWorkHits += $pattern
+      }
+    }
+
     Write-TestResult `
-      -TestName 'pre-commit runs fence-language fixer from markdownlint MD040 diagnostics' `
-      -Passed ($preCommitContent -match 'MD040/fenced-code-language' -and $preCommitContent -match 'MARKDOWNLINT_FIX_CAPTURE') `
-      -Message 'Expected pre-commit to invoke the fence fixer only after markdownlint reports MD040.'
+      -TestName 'pre-commit implementation excludes slow formatter/spelling/doc-link work' `
+      -Passed ($preCommitWorkHits.Count -eq 0) `
+      -Message "Forbidden pre-commit work: $($preCommitWorkHits -join ', ')"
+
+    Write-TestResult `
+      -TestName 'pre-commit refuses whole-file auto-stage on pre-existing unstaged hunks' `
+      -Passed ($preCommitContent -match 'InitiallyUnstagedPaths' -and $preCommitContent -match 'Refusing to auto-stage whole file') `
+      -Message 'Expected a partial-staging guard before hook auto-restages generated fixes.'
 
     Write-TestResult `
       -TestName 'pre-commit avoids line-only bare-fence pre-scan' `
       -Passed ($preCommitContent -notmatch 'MARKDOWN_FENCE_FIX_REQUIRED') `
       -Message 'A line-only bare-fence pre-scan mistakes normal closing fences for missing-language openings.'
+
+    $stagedBlobNeedle = "'grep', '--cached', '-n', '-I', '-E', '-z'"
+    Write-TestResult `
+      -TestName 'pre-commit C# region guard batch-reads staged blobs' `
+      -Passed ($preCommitContent.Contains($stagedBlobNeedle)) `
+      -Message 'Expected region validation to inspect staged index blobs through batched git grep, not per-file worktree reads.'
+  }
+
+  if (Test-Path $preCommitPath) {
+    $preCommitLauncherContent = Get-Content -Path $preCommitPath -Raw
+    $fastPathIndex = $preCommitLauncherContent.IndexOf('--diff-filter=ACMR')
+    $implementationLoadIndex = $preCommitLauncherContent.IndexOf('hook_impl=')
+
+    Write-TestResult `
+      -TestName 'pre-commit launcher exits before implementation load when no paths are staged' `
+      -Passed (
+        $preCommitLauncherContent -match 'diff\s+--cached\s+--quiet\s+--diff-filter=ACMR' -and
+        $preCommitLauncherContent -match 'No staged files to check' -and
+        $fastPathIndex -ge 0 -and
+        $implementationLoadIndex -ge 0 -and
+        $fastPathIndex -lt $implementationLoadIndex
+      ) `
+      -Message 'Expected the extensionless launcher to avoid loading full pre-commit.ps1 for an empty index.'
+  }
+  else {
+    Write-TestResult `
+      -TestName 'pre-commit launcher exits before implementation load when no paths are staged' `
+      -Passed $false `
+      -Message "Missing file: $preCommitPath"
   }
 
   $forbiddenHits = @()

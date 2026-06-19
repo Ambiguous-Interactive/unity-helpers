@@ -226,7 +226,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             guard = 10;
             while (
-                UnityEngine.Object.FindObjectsOfType<UnityMainThreadDispatcher>().Length > 0
+                UnityObjectExtensions.FindObjectsOfTypeShim<UnityMainThreadDispatcher>(false).Length
+                    > 0
                 && guard-- > 0
             )
             {
@@ -236,7 +237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(UnityMainThreadDispatcher.HasInstance);
             Assert.AreEqual(
                 0,
-                UnityEngine.Object.FindObjectsOfType<UnityMainThreadDispatcher>().Length
+                UnityObjectExtensions.FindObjectsOfTypeShim<UnityMainThreadDispatcher>(false).Length
             );
         }
 
@@ -620,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public IEnumerator TryDispatchToMainThreadReturnsFalseWhenInstanceMissing()
         {
             UnityMainThreadDispatcher existing =
-                UnityEngine.Object.FindObjectOfType<UnityMainThreadDispatcher>();
+                UnityObjectExtensions.FindObjectOfTypeShim<UnityMainThreadDispatcher>();
             if (existing != null)
             {
                 Track(existing.gameObject);
@@ -689,7 +690,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(UnityMainThreadDispatcher.HasInstance);
             Assert.AreEqual(
                 0,
-                UnityEngine.Object.FindObjectsOfType<UnityMainThreadDispatcher>().Length
+                UnityObjectExtensions.FindObjectsOfTypeShim<UnityMainThreadDispatcher>(false).Length
             );
         }
     }

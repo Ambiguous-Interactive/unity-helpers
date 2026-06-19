@@ -74,6 +74,23 @@ PlayerSettings:
   runInBackground: 1
 EOF
 
+# Step 3b: Force 2D Default Behavior Mode (EditorSettings.defaultBehaviorMode = Mode2D).
+# This is a 2D sprite-tooling package; its dev environment and entire validated test
+# suite run in 2D mode. Without this seed Unity creates a default 3D-mode project where
+# fresh PNGs import as TextureImporterType.Default with npotScale=ToNearest -- rounding
+# e.g. 10x6 -> 8x8 and importing without a Sprite sub-asset -- which silently breaks
+# texture/sprite tests in CI while they pass locally. A partial EditorSettings.asset
+# (mirroring the partial ProjectSettings.asset above) seeds the mode; Unity fills the
+# remaining fields with defaults. Kept in sync with run-ci-tests.ps1 (Initialize-Ephemeral-
+# Project) and guarded by ProjectBehaviorModeTests so it can never silently regress.
+cat > "${UNITY_TEST_PROJECT_DIR}/ProjectSettings/EditorSettings.asset" << 'EOF'
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!159 &1
+EditorSettings:
+  m_DefaultBehaviorMode: 1
+EOF
+
 # Step 4: Create Packages/manifest.json
 echo "    [4/4] Writing Packages/manifest.json..."
 # The UnityEngine built-in modules + com.unity.ugui that the package's Runtime/

@@ -1451,6 +1451,22 @@ function Initialize-EphemeralProject {
         Set-Content -LiteralPath (Join-Path $project 'Packages\manifest.json') -Encoding UTF8
     "m_EditorVersion: $Version`n" |
         Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\ProjectVersion.txt') -Encoding UTF8
+    # Force 2D Default Behavior Mode (kept in sync with create-test-project.sh Step 3b).
+    # unity-helpers is a 2D sprite-tooling package whose dev environment and entire
+    # validated test suite run in 2D mode. Without this seed the ephemeral project defaults
+    # to 3D, where fresh PNGs import as TextureImporterType.Default with npotScale=ToNearest
+    # -- rounding NPOT dimensions (e.g. 10x6 -> 8x8) and omitting the Sprite sub-asset -- so
+    # texture/sprite tests that pass locally fail in CI. A partial EditorSettings.asset seeds
+    # the mode (Unity fills the rest); UhCiTestConfigurator's later SaveAssets preserves it.
+    # ProjectBehaviorModeTests guards against silent regression.
+    @'
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!159 &1
+EditorSettings:
+  m_DefaultBehaviorMode: 1
+'@ |
+        Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\EditorSettings.asset') -Encoding UTF8
     New-ConfiguratorSource -Backend $Backend |
         Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
 

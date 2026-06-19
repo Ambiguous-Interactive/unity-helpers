@@ -1,10 +1,14 @@
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [string[]]$Paths,
+    [string]$ModifiedPathList,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AdditionalPaths,
     [switch]$DryRun,
     [switch]$VerboseOutput
 )
+
+# cspell:ignore hlsl sln
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
@@ -133,7 +137,7 @@ $eolFixed = 0
 $bomRemoved = 0
 $modified = New-Object System.Collections.Generic.List[string]
 
-$tracked = Get-TrackedFiles
+$tracked = if ($effectivePaths.Count -gt 0) { @() } else { Get-TrackedFiles }
 $targets = Get-TargetFiles $effectivePaths $tracked
 foreach ($path in $targets) {
     $fullPath = Join-Path $repoRoot $path
@@ -168,6 +172,19 @@ foreach ($path in $targets) {
         $modified.Add($path) | Out-Null
         if ($VerboseOutput) { Write-Host "Fixed: $path" }
     }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ModifiedPathList)) {
+    $modifiedText = if ($modified.Count -gt 0) {
+        ($modified -join ([string][char]0)) + ([string][char]0)
+    }
+    else {
+        ''
+    }
+    [System.IO.File]::WriteAllBytes(
+        $ModifiedPathList,
+        [System.Text.UTF8Encoding]::new($false).GetBytes($modifiedText)
+    )
 }
 
 Write-Host "Files fixed: $changed (EOL:$eolFixed, BOMRemoved:$bomRemoved)"

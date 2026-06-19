@@ -235,7 +235,38 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 directory.Replace('/', Path.DirectorySeparatorChar)
             );
 
-            return AbsoluteToUnityRelativePath(targetPathAbsolute);
+            // When the package is embedded under Assets/, the Assets-relative form is the
+            // Unity-loadable path.
+            string assetsRelative = AbsoluteToUnityRelativePath(targetPathAbsolute);
+            if (!string.IsNullOrEmpty(assetsRelative))
+            {
+                return assetsRelative;
+            }
+
+            // Otherwise the package is CONSUMED (a UPM "file:" local package, a registry
+            // package, or Library/PackageCache), where its source lives OUTSIDE the project
+            // root -- including the CI layout where the ephemeral test project is created
+            // INSIDE the checkout (project at <root>/.artifacts/..., package at file:<root>),
+            // so the package root is an ANCESTOR of the project, never under it.
+            // AbsoluteToUnityRelativePath returns empty for every such layout, which made this
+            // method (and DirectoryHelper-dependent tests like ManualRecompileTests,
+            // SceneHelperTests, and DirectoryHelperTests) fail for any normally-installed
+            // package. Unity exposes a consumed package under "Packages/<id>/...", so compose
+            // that loadable form from the package id -- valid for file:/registry/PackageCache
+            // consumption alike. AbsoluteToUnityLoadablePath cannot be reused here: it derives the
+            // path from the package's PHYSICAL location, which for a file:/local package contains
+            // no "Packages/" or "Library/PackageCache/" segment (the source IS the checkout), so it
+            // too returns empty for the CI layout.
+            string packageId = ReadPackageIdFromRoot(packageRootAbsolute);
+            if (string.IsNullOrEmpty(packageId))
+            {
+                return string.Empty;
+            }
+
+            string normalizedDirectory = directory.SanitizePath().Trim('/');
+            return normalizedDirectory.Length == 0
+                ? $"Packages/{packageId}"
+                : $"Packages/{packageId}/{normalizedDirectory}";
         }
 
         /// <summary>

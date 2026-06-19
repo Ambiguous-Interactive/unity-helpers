@@ -67,9 +67,9 @@ guid: $guid
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
         return
     fi
@@ -91,9 +91,9 @@ MonoImporter:
   defaultReferences: []
   executionOrder: 0
   icon: {instanceID: 0}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         asmdef)
@@ -102,9 +102,9 @@ fileFormatVersion: 2
 guid: $guid
 AssemblyDefinitionImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         asmref)
@@ -113,9 +113,9 @@ fileFormatVersion: 2
 guid: $guid
 AssemblyDefinitionReferenceImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         shader)
@@ -126,9 +126,9 @@ ShaderImporter:
   externalObjects: {}
   defaultTextures: []
   nonModifiableTextures: []
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         shadergraph|shadersubgraph|hlsl|cginc)
@@ -139,9 +139,9 @@ ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 2
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
   script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
 EOF
             ;;
@@ -153,9 +153,9 @@ ComputeShaderImporter:
   externalObjects: {}
   currentAPIMask: 0
   currentBuildTarget: 0
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         uss)
@@ -185,9 +185,9 @@ guid: $guid
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         asset)
@@ -197,9 +197,9 @@ guid: $guid
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 11400000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         prefab)
@@ -208,9 +208,9 @@ fileFormatVersion: 2
 guid: $guid
 PrefabImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         unity)
@@ -219,9 +219,9 @@ fileFormatVersion: 2
 guid: $guid
 DefaultImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         json)
@@ -232,9 +232,9 @@ fileFormatVersion: 2
 guid: $guid
 PackageManifestImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             else
                 cat <<EOF
@@ -242,9 +242,9 @@ fileFormatVersion: 2
 guid: $guid
 TextScriptImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             fi
             ;;
@@ -254,9 +254,9 @@ fileFormatVersion: 2
 guid: $guid
 TextScriptImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         rsp)
@@ -360,19 +360,19 @@ TextureImporter:
     outline: []
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID:
     internalID: 0
     vertices: []
-    indices: 
+    indices:
     edges: []
     weights: []
     secondaryTextures: []
     nameFileIdTable: {}
-  mipmapLimitGroupName: 
+  mipmapLimitGroupName:
   pSDRemoveMatte: 0
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         anim)
@@ -382,9 +382,9 @@ guid: $guid
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 7400000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         controller)
@@ -394,9 +394,9 @@ guid: $guid
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 9100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         wav|mp3|ogg|aiff|aif|flac)
@@ -419,9 +419,9 @@ AudioImporter:
   normalize: 1
   ambisonic: 0
   loadInBackground: 0
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         fbx|obj|dae|3ds|blend|dxf|max|mb|ma)
@@ -531,9 +531,9 @@ ModelImporter:
   importBlendShapeDeformPercent: 1
   remapMaterialsIfMaterialImportModeIsNone: 0
   additionalBone: 0
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         ttf|otf|fnt)
@@ -555,9 +555,9 @@ TrueTypeFontImporter:
   ascentCalculationMode: 1
   useLegacyBoundsCalculation: 0
   shouldRoundAdvanceValue: 1
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
         *)
@@ -567,9 +567,9 @@ fileFormatVersion: 2
 guid: $guid
 DefaultImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:
 EOF
             ;;
     esac

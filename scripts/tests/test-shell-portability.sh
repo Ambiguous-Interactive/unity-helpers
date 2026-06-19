@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# cspell:ignore EPF
 # =============================================================================
 # Test Script: Shell Script Portability & Hygiene
 # =============================================================================
@@ -57,6 +58,13 @@ while IFS= read -r -d '' f; do
     SHELL_FILES+=("$f")
 done < <(find "$REPO_ROOT/scripts" -name '*.sh' -print0 2>/dev/null)
 while IFS= read -r -d '' f; do
+    first_line="$(head -n 1 "$f" 2>/dev/null || true)"
+    case "$first_line" in
+        *pwsh*) continue ;;
+    esac
+    case "$f" in
+        *.ps1) continue ;;
+    esac
     SHELL_FILES+=("$f")
 done < <(find "$REPO_ROOT/.githooks" -type f -print0 2>/dev/null)
 
@@ -481,6 +489,9 @@ while IFS= read -r -d '' tracked_path; do
         *.sh|.githooks/*) ;;
         *) continue ;;
     esac
+    case "$tracked_path" in
+        .githooks/*.*) continue ;;
+    esac
 
     absolute_path="$REPO_ROOT/$tracked_path"
     [[ -f "$absolute_path" ]] || continue
@@ -505,6 +516,35 @@ if [[ -z "$f1_violations" ]]; then
     pass "All tracked shell entrypoints are executable in filesystem and git index"
 else
     fail "Found shell entrypoints without executable git metadata:" "$f1_violations"
+fi
+
+# =============================================================================
+# Section G: Unity .meta generator output hygiene
+# =============================================================================
+echo ""
+echo '=== Section G: Unity .meta generator output hygiene ==='
+
+echo ""
+echo '--- G1: generate-meta.sh emits no trailing whitespace ---'
+
+run_test
+g1_tempdir="$(mktemp -d)"
+g1_output=""
+if mkdir -p "$g1_tempdir/Tests/Editor/Validation" "$g1_tempdir/Tests/Editor/Textures" &&
+    printf 'namespace WallstopStudios.UnityHelpers.Tests { public sealed class MetaFixture { } }\n' > "$g1_tempdir/Tests/Editor/Validation/MetaFixture.cs" &&
+    : > "$g1_tempdir/Tests/Editor/Textures/TextureFixture.png" &&
+    "$REPO_ROOT/scripts/generate-meta.sh" "$g1_tempdir/Tests/Editor/Validation/MetaFixture.cs" >/dev/null 2>&1 &&
+    "$REPO_ROOT/scripts/generate-meta.sh" "$g1_tempdir/Tests/Editor/Textures/TextureFixture.png" >/dev/null 2>&1; then
+    g1_output="$(grep -nE '[[:blank:]]+$' "$g1_tempdir/Tests/Editor/Validation/MetaFixture.cs.meta" "$g1_tempdir/Tests/Editor/Textures/TextureFixture.png.meta" 2>/dev/null || true)"
+else
+    g1_output="generate-meta.sh failed while creating representative .meta fixtures"
+fi
+rm -rf "$g1_tempdir"
+
+if [[ -z "$g1_output" ]]; then
+    pass "generate-meta.sh emits no trailing whitespace in representative .meta files"
+else
+    fail "generate-meta.sh emitted trailing whitespace:" "$g1_output"
 fi
 
 # =============================================================================

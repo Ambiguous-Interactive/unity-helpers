@@ -262,7 +262,7 @@ $testCaseDataReturnsNullPattern = [regex]'(?ms)\.Returns\s*\(\s*null\s*\)'
 $unityTestAttributePattern = [regex]'\[\s*(?:global\s*::\s*)?(?:[A-Za-z_][\w\.]*\.)?UnityTest(?:Attribute)?(?:\s*\(|\s*\])'
 $coroutineMethodPattern = [regex]'\bIEnumerator\s+(?<name>\w+)\s*\('
 
-# Returns true if line contains an allowlisted helper file path
+# Returns true if the relative path matches an allowlisted helper file path.
 function Is-AllowlistedFile([string]$relPath) {
   $normalized = ($relPath -replace '\\','/') -replace '^\.\/', ''
   foreach ($a in $allowedHelperFiles) {
@@ -273,7 +273,133 @@ function Is-AllowlistedFile([string]$relPath) {
 
 function Get-RelativePath([string]$path) {
   $root = (Get-Location).Path
-  return ($path.Substring($root.Length).TrimStart([System.IO.Path]::DirectorySeparatorChar))
+  $trimChars = [char[]]@(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar,
+    [char]'\'
+  )
+  $relative = $path.Substring($root.Length).TrimStart($trimChars)
+  return (($relative -replace '\\','/') -replace '^\.\/', '')
+}
+
+$assemblyDefinitionEditorOnlyCache = @{}
+$assemblyReferenceIndex = $null
+
+function Test-AssemblyDefinitionEditorOnly([string]$asmdefPath) {
+  try {
+    $definition = Get-Content -LiteralPath $asmdefPath -Raw | ConvertFrom-Json
+    $includePlatforms = @()
+    if ($null -ne $definition.includePlatforms) {
+      $includePlatforms = @($definition.includePlatforms)
+    }
+
+    $nonEditorPlatforms = @($includePlatforms | Where-Object { $_ -ne 'Editor' })
+    return ($includePlatforms.Count -gt 0 -and $nonEditorPlatforms.Count -eq 0)
+  } catch {
+    return $false
+  }
+}
+
+function Get-AssemblyReferenceIndex {
+  if ($null -ne $script:assemblyReferenceIndex) {
+    return $script:assemblyReferenceIndex
+  }
+
+  $byName = @{}
+  $byGuid = @{}
+  $root = (Get-Location).Path
+  $asmdefs = @(Get-ChildItem -LiteralPath $root -Filter '*.asmdef' -Recurse -File -ErrorAction SilentlyContinue)
+  foreach ($asmdef in $asmdefs) {
+    try {
+      $definition = Get-Content -LiteralPath $asmdef.FullName -Raw | ConvertFrom-Json
+      $name = [string]$definition.name
+      $editorOnly = Test-AssemblyDefinitionEditorOnly $asmdef.FullName
+      if (-not [string]::IsNullOrWhiteSpace($name)) {
+        $byName[$name] = $editorOnly
+      }
+
+      $metaPath = "$($asmdef.FullName).meta"
+      if (Test-Path -LiteralPath $metaPath -PathType Leaf) {
+        $metaText = Get-Content -LiteralPath $metaPath -Raw
+        $guidMatch = [regex]::Match($metaText, '(?m)^guid:\s*(\S+)\s*$')
+        if ($guidMatch.Success) {
+          $byGuid[$guidMatch.Groups[1].Value] = $editorOnly
+        }
+      }
+    } catch {
+      continue
+    }
+  }
+
+  $script:assemblyReferenceIndex = @{
+    ByName = $byName
+    ByGuid = $byGuid
+  }
+  return $script:assemblyReferenceIndex
+}
+
+function Test-AssemblyReferenceEditorOnly([string]$asmrefPath) {
+  try {
+    $definition = Get-Content -LiteralPath $asmrefPath -Raw | ConvertFrom-Json
+    $reference = [string]$definition.reference
+    if ([string]::IsNullOrWhiteSpace($reference)) {
+      return $false
+    }
+
+    $index = Get-AssemblyReferenceIndex
+    if ($reference.StartsWith('GUID:')) {
+      $guid = $reference.Substring(5)
+      return ($index.ByGuid.ContainsKey($guid) -and $index.ByGuid[$guid])
+    }
+
+    return ($index.ByName.ContainsKey($reference) -and $index.ByName[$reference])
+  } catch {
+    return $false
+  }
+}
+
+function Test-EditorOnlyAssemblyDefinition([string]$filePath, [string]$relPath) {
+  $root = [System.IO.Path]::GetFullPath((Get-Location).Path).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
+  $directory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($filePath))
+
+  while (-not [string]::IsNullOrWhiteSpace($directory)) {
+    if ($assemblyDefinitionEditorOnlyCache.ContainsKey($directory)) {
+      return $assemblyDefinitionEditorOnlyCache[$directory]
+    }
+
+    $asmref = Get-ChildItem -LiteralPath $directory -Filter '*.asmref' -File -ErrorAction SilentlyContinue |
+      Sort-Object -Property Name |
+      Select-Object -First 1
+    if ($null -ne $asmref) {
+      $editorOnly = Test-AssemblyReferenceEditorOnly $asmref.FullName
+      $assemblyDefinitionEditorOnlyCache[$directory] = $editorOnly
+      return $editorOnly
+    }
+
+    $asmdef = Get-ChildItem -LiteralPath $directory -Filter '*.asmdef' -File -ErrorAction SilentlyContinue |
+      Sort-Object -Property Name |
+      Select-Object -First 1
+    if ($null -ne $asmdef) {
+      $editorOnly = Test-AssemblyDefinitionEditorOnly $asmdef.FullName
+      $assemblyDefinitionEditorOnlyCache[$directory] = $editorOnly
+      return $editorOnly
+    }
+
+    if ($directory -eq $root) {
+      break
+    }
+
+    $parent = [System.IO.Directory]::GetParent($directory)
+    if ($null -eq $parent) {
+      break
+    }
+    $directory = $parent.FullName
+  }
+
+  return ($relPath -match '(^|/)Tests/Editor/')
 }
 
 function Fix-UnityNullAssertions {
@@ -282,47 +408,632 @@ function Fix-UnityNullAssertions {
   )
 
   $originalText = $Text
+  $callPattern = [regex]'(?m)^(?<indent>[ \t]*)Assert\.(?<kind>IsNotNull|IsNull)\s*\('
+  $builder = [System.Text.StringBuilder]::new()
+  $cursor = 0
 
-  $patternNotNullWithMessage = [regex]'(?ms)^(?<indent>\s*)Assert\.IsNotNull\s*\(\s*(?<expr>[^,]+?)\s*,\s*(?<message>[^)]*?)\s*\);'
-  $patternNotNullNoMessage = [regex]'(?ms)^(?<indent>\s*)Assert\.IsNotNull\s*\(\s*(?<expr>[^\)]+?)\s*\);'
-  $patternNullWithMessage = [regex]'(?ms)^(?<indent>\s*)Assert\.IsNull\s*\(\s*(?<expr>[^,]+?)\s*,\s*(?<message>[^)]*?)\s*\);'
-  $patternNullNoMessage = [regex]'(?ms)^(?<indent>\s*)Assert\.IsNull\s*\(\s*(?<expr>[^\)]+?)\s*\);'
+  foreach ($match in $callPattern.Matches($Text)) {
+    if ($match.Index -lt $cursor) {
+      continue
+    }
 
-  $Text = $patternNotNullWithMessage.Replace($Text, {
-      param($m)
-      $indent = $m.Groups['indent'].Value
-      $expr = $m.Groups['expr'].Value.Trim()
-      $message = $m.Groups['message'].Value.Trim()
-      return "$indent" + "Assert.IsTrue($expr != null, $message);"
-    })
+    $openParenIndex = $match.Index + $match.Length - 1
+    $closeParenIndex = Get-MatchingCloseParenIndex -Text $Text -OpenParenIndex $openParenIndex
+    if ($closeParenIndex -lt 0) {
+      continue
+    }
 
-  $Text = $patternNotNullNoMessage.Replace($Text, {
-      param($m)
-      $indent = $m.Groups['indent'].Value
-      $expr = $m.Groups['expr'].Value.Trim()
-      return "$indent" + "Assert.IsTrue($expr != null);"
-    })
+    $semicolonIndex = $closeParenIndex + 1
+    while ($semicolonIndex -lt $Text.Length -and [char]::IsWhiteSpace($Text[$semicolonIndex])) {
+      $semicolonIndex++
+    }
+    if ($semicolonIndex -ge $Text.Length -or $Text[$semicolonIndex] -ne ';') {
+      continue
+    }
 
-  $Text = $patternNullWithMessage.Replace($Text, {
-      param($m)
-      $indent = $m.Groups['indent'].Value
-      $expr = $m.Groups['expr'].Value.Trim()
-      $message = $m.Groups['message'].Value.Trim()
-      return "$indent" + "Assert.IsTrue($expr == null, $message);"
-    })
+    $argumentText = $Text.Substring($openParenIndex + 1, $closeParenIndex - $openParenIndex - 1)
+    if (Test-HasAmbiguousLowercaseCommaAngle -Text $argumentText) {
+      continue
+    }
 
-  $Text = $patternNullNoMessage.Replace($Text, {
-      param($m)
-      $indent = $m.Groups['indent'].Value
-      $expr = $m.Groups['expr'].Value.Trim()
-      return "$indent" + "Assert.IsTrue($expr == null);"
-    })
+    $arguments = @(Split-TopLevelArguments -Text $argumentText)
+    if ($arguments.Count -eq 0) {
+      continue
+    }
+
+    $expr = ([string]$arguments[0]).Trim()
+    if ([string]::IsNullOrWhiteSpace($expr)) {
+      continue
+    }
+
+    $messageSuffix = ''
+    if ($arguments.Count -gt 1) {
+      $message = ([string]::Join(',', @($arguments[1..($arguments.Count - 1)]))).Trim()
+      if (-not [string]::IsNullOrWhiteSpace($message)) {
+        $messageSuffix = ", $message"
+      }
+    }
+
+    $operator = if ($match.Groups['kind'].Value -eq 'IsNotNull') { '!=' } else { '==' }
+    $replacement = $match.Groups['indent'].Value + "Assert.IsTrue($expr $operator null$messageSuffix);"
+    [void]$builder.Append($Text.Substring($cursor, $match.Index - $cursor))
+    [void]$builder.Append($replacement)
+    $cursor = $semicolonIndex + 1
+  }
+
+  if ($cursor -gt 0) {
+    [void]$builder.Append($Text.Substring($cursor))
+    $Text = $builder.ToString()
+  }
 
   $modified = ($originalText -ne $Text)
   return @{
     Text = $Text
     Modified = $modified
   }
+}
+
+function Get-MatchingCloseParenIndex {
+  Param(
+    [string]$Text,
+    [int]$OpenParenIndex
+  )
+
+  $depth = 0
+  $inString = $false
+  $stringQuote = [char]0
+  $verbatimString = $false
+
+  for ($i = $OpenParenIndex; $i -lt $Text.Length; $i++) {
+    $ch = $Text[$i]
+
+    if ($inString) {
+      if ($verbatimString -and $ch -eq '"') {
+        if ($i + 1 -lt $Text.Length -and $Text[$i + 1] -eq '"') {
+          $i++
+          continue
+        }
+        $inString = $false
+        continue
+      }
+
+      if (-not $verbatimString -and $ch -eq '\' -and $stringQuote -eq '"' -and $i + 1 -lt $Text.Length) {
+        $i++
+        continue
+      }
+
+      if ($ch -eq $stringQuote) {
+        $inString = $false
+      }
+      continue
+    }
+
+    if ($ch -eq '"' -or $ch -eq "'") {
+      $inString = $true
+      $stringQuote = $ch
+      $verbatimString = ($ch -eq '"' -and $i -gt 0 -and $Text[$i - 1] -eq '@')
+      continue
+    }
+
+    if ($ch -eq '/' -and $i + 1 -lt $Text.Length) {
+      if ($Text[$i + 1] -eq '/') {
+        $newline = $Text.IndexOf("`n", $i + 2)
+        if ($newline -lt 0) {
+          return -1
+        }
+        $i = $newline
+        continue
+      }
+
+      if ($Text[$i + 1] -eq '*') {
+        $commentEnd = $Text.IndexOf('*/', $i + 2, [System.StringComparison]::Ordinal)
+        if ($commentEnd -lt 0) {
+          return -1
+        }
+        $i = $commentEnd + 1
+        continue
+      }
+    }
+
+    if ($ch -eq '(') {
+      $depth++
+      continue
+    }
+
+    if ($ch -eq ')') {
+      $depth--
+      if ($depth -eq 0) {
+        return $i
+      }
+    }
+  }
+
+  return -1
+}
+
+function Split-TopLevelArguments {
+  Param(
+    [string]$Text,
+    [bool]$TrackGenericAngles = $true,
+    [AllowNull()]
+    [System.Collections.Generic.HashSet[int]]$IgnoredAngleStartIndices = $null
+  )
+
+  $arguments = [System.Collections.Generic.List[string]]::new()
+  $start = 0
+  $depth = 0
+  $angleDepth = 0
+  $angleStartStack = [System.Collections.Generic.List[int]]::new()
+  $inString = $false
+  $stringQuote = [char]0
+  $verbatimString = $false
+
+  for ($i = 0; $i -lt $Text.Length; $i++) {
+    $ch = $Text[$i]
+
+    if ($inString) {
+      if ($verbatimString -and $ch -eq '"') {
+        if ($i + 1 -lt $Text.Length -and $Text[$i + 1] -eq '"') {
+          $i++
+          continue
+        }
+        $inString = $false
+        continue
+      }
+
+      if (-not $verbatimString -and $ch -eq '\' -and $stringQuote -eq '"' -and $i + 1 -lt $Text.Length) {
+        $i++
+        continue
+      }
+
+      if ($ch -eq $stringQuote) {
+        $inString = $false
+      }
+      continue
+    }
+
+    if ($ch -eq '"' -or $ch -eq "'") {
+      $inString = $true
+      $stringQuote = $ch
+      $verbatimString = ($ch -eq '"' -and $i -gt 0 -and $Text[$i - 1] -eq '@')
+      continue
+    }
+
+    if ($ch -eq '/' -and $i + 1 -lt $Text.Length) {
+      if ($Text[$i + 1] -eq '/') {
+        $newline = $Text.IndexOf("`n", $i + 2)
+        if ($newline -lt 0) {
+          break
+        }
+        $i = $newline
+        continue
+      }
+
+      if ($Text[$i + 1] -eq '*') {
+        $commentEnd = $Text.IndexOf('*/', $i + 2, [System.StringComparison]::Ordinal)
+        if ($commentEnd -lt 0) {
+          break
+        }
+        $i = $commentEnd + 1
+        continue
+      }
+    }
+
+    if ($ch -eq '(' -or $ch -eq '[' -or $ch -eq '{') {
+      $depth++
+      continue
+    }
+
+    if ($ch -eq ')' -or $ch -eq ']' -or $ch -eq '}') {
+      if ($depth -gt 0) {
+        $depth--
+      }
+      continue
+    }
+
+    if (
+      $TrackGenericAngles -and
+      $depth -eq 0 -and
+      $ch -eq '<' -and
+      ($null -eq $IgnoredAngleStartIndices -or -not $IgnoredAngleStartIndices.Contains($i)) -and
+      (Test-LooksLikeGenericAngleStart -Text $Text -Index $i)
+    ) {
+      $angleDepth++
+      $angleStartStack.Add($i) | Out-Null
+      continue
+    }
+
+    if ($TrackGenericAngles -and $depth -eq 0 -and $ch -eq '>' -and $angleDepth -gt 0) {
+      $angleDepth--
+      $angleStartStack.RemoveAt($angleStartStack.Count - 1)
+      continue
+    }
+
+    if ($ch -eq ',' -and $depth -eq 0 -and $angleDepth -eq 0) {
+      $arguments.Add($Text.Substring($start, $i - $start)) | Out-Null
+      $start = $i + 1
+    }
+  }
+
+  if ($TrackGenericAngles -and $angleStartStack.Count -gt 0) {
+    $ignored = [System.Collections.Generic.HashSet[int]]::new()
+    if ($null -ne $IgnoredAngleStartIndices) {
+      foreach ($index in $IgnoredAngleStartIndices) {
+        $ignored.Add($index) | Out-Null
+      }
+    }
+    foreach ($index in $angleStartStack) {
+      $ignored.Add($index) | Out-Null
+    }
+    return @(Split-TopLevelArguments -Text $Text -TrackGenericAngles $true -IgnoredAngleStartIndices $ignored)
+  }
+
+  $arguments.Add($Text.Substring($start)) | Out-Null
+  return @($arguments)
+}
+
+function Test-LooksLikeGenericAngleStart {
+  Param(
+    [string]$Text,
+    [int]$Index
+  )
+
+  if ($Index -le 0 -or $Index + 1 -ge $Text.Length) {
+    return $false
+  }
+
+  $previousIndex = Get-PreviousNonTriviaIndex -Text $Text -Index ($Index - 1)
+  $nextIndex = Get-NextNonTriviaIndex -Text $Text -Index ($Index + 1)
+  if ($previousIndex -lt 0 -or $nextIndex -ge $Text.Length) {
+    return $false
+  }
+
+  $previous = $Text[$previousIndex]
+  $hasTriviaBeforeAngle = ($Index - $previousIndex - 1) -gt 0
+  $previousTokenStartsLower = $false
+  if ([char]::IsLetterOrDigit($previous) -or $previous -eq '_') {
+    $tokenStart = $previousIndex
+    while (
+      $tokenStart -gt 0 -and
+      ([char]::IsLetterOrDigit($Text[$tokenStart - 1]) -or $Text[$tokenStart - 1] -eq '_')
+    ) {
+      $tokenStart--
+    }
+    $previousTokenStartsLower = [char]::IsLower($Text[$tokenStart])
+    if ($hasTriviaBeforeAngle -and $previousTokenStartsLower) {
+      return $false
+    }
+  }
+
+  $hasGenericPrefix = (
+    [char]::IsLetterOrDigit($previous) -or
+    $previous -eq '_' -or
+    $previous -eq ')' -or
+    $previous -eq ']' -or
+    $previous -eq '>'
+  )
+  if (-not $hasGenericPrefix) {
+    return $false
+  }
+
+  $depth = 0
+  $inString = $false
+  $stringQuote = [char]0
+  $verbatimString = $false
+
+  for ($i = $Index; $i -lt $Text.Length; $i++) {
+    $ch = $Text[$i]
+
+    if ($inString) {
+      if ($verbatimString -and $ch -eq '"') {
+        if ($i + 1 -lt $Text.Length -and $Text[$i + 1] -eq '"') {
+          $i++
+          continue
+        }
+        $inString = $false
+        continue
+      }
+
+      if (-not $verbatimString -and $ch -eq '\' -and $stringQuote -eq '"' -and $i + 1 -lt $Text.Length) {
+        $i++
+        continue
+      }
+
+      if ($ch -eq $stringQuote) {
+        $inString = $false
+      }
+      continue
+    }
+
+    if ($ch -eq '"' -or $ch -eq "'") {
+      $inString = $true
+      $stringQuote = $ch
+      $verbatimString = ($ch -eq '"' -and $i -gt 0 -and $Text[$i - 1] -eq '@')
+      continue
+    }
+
+    if ($ch -eq '/' -and $i + 1 -lt $Text.Length) {
+      if ($Text[$i + 1] -eq '/') {
+        $newline = $Text.IndexOf("`n", $i + 2)
+        if ($newline -lt 0) {
+          return $false
+        }
+        $i = $newline
+        continue
+      }
+
+      if ($Text[$i + 1] -eq '*') {
+        $commentEnd = $Text.IndexOf('*/', $i + 2, [System.StringComparison]::Ordinal)
+        if ($commentEnd -lt 0) {
+          return $false
+        }
+        $i = $commentEnd + 1
+        continue
+      }
+    }
+
+    if ($ch -eq '<') {
+      $depth++
+      continue
+    }
+
+    if ($ch -ne '>') {
+      continue
+    }
+
+    $depth--
+    if ($depth -ne 0) {
+      continue
+    }
+
+    $nextIndex = Get-NextNonTriviaIndex -Text $Text -Index ($i + 1)
+    if ($nextIndex -ge $Text.Length) {
+      return $true
+    }
+
+    $angleContent = $Text.Substring($Index + 1, $i - $Index - 1)
+    if ($previousTokenStartsLower -and $angleContent.Contains(',')) {
+      return $false
+    }
+
+    return ('(', ')', '[', ']', '{', '}', '.', ',', ';', '?') -contains $Text[$nextIndex]
+  }
+
+  return $false
+}
+
+function Get-MatchingAngleCloseIndex {
+  Param(
+    [string]$Text,
+    [int]$OpenAngleIndex
+  )
+
+  $depth = 0
+  $inString = $false
+  $stringQuote = [char]0
+  $verbatimString = $false
+
+  for ($i = $OpenAngleIndex; $i -lt $Text.Length; $i++) {
+    $ch = $Text[$i]
+
+    if ($inString) {
+      if ($verbatimString -and $ch -eq '"') {
+        if ($i + 1 -lt $Text.Length -and $Text[$i + 1] -eq '"') {
+          $i++
+          continue
+        }
+        $inString = $false
+        continue
+      }
+
+      if (-not $verbatimString -and $ch -eq '\' -and $stringQuote -eq '"' -and $i + 1 -lt $Text.Length) {
+        $i++
+        continue
+      }
+
+      if ($ch -eq $stringQuote) {
+        $inString = $false
+      }
+      continue
+    }
+
+    if ($ch -eq '"' -or $ch -eq "'") {
+      $inString = $true
+      $stringQuote = $ch
+      $verbatimString = ($ch -eq '"' -and $i -gt 0 -and $Text[$i - 1] -eq '@')
+      continue
+    }
+
+    if ($ch -eq '/' -and $i + 1 -lt $Text.Length) {
+      if ($Text[$i + 1] -eq '/') {
+        $newline = $Text.IndexOf("`n", $i + 2)
+        if ($newline -lt 0) {
+          return -1
+        }
+        $i = $newline
+        continue
+      }
+
+      if ($Text[$i + 1] -eq '*') {
+        $commentEnd = $Text.IndexOf('*/', $i + 2, [System.StringComparison]::Ordinal)
+        if ($commentEnd -lt 0) {
+          return -1
+        }
+        $i = $commentEnd + 1
+        continue
+      }
+    }
+
+    if ($ch -eq '<') {
+      $depth++
+      continue
+    }
+
+    if ($ch -ne '>') {
+      continue
+    }
+
+    $depth--
+    if ($depth -eq 0) {
+      return $i
+    }
+
+    if ($depth -lt 0) {
+      return -1
+    }
+  }
+
+  return -1
+}
+
+function Test-HasAmbiguousLowercaseCommaAngle {
+  Param(
+    [string]$Text
+  )
+
+  for ($i = 0; $i -lt $Text.Length; $i++) {
+    if ($Text[$i] -ne '<') {
+      continue
+    }
+
+    $previousIndex = Get-PreviousNonTriviaIndex -Text $Text -Index ($i - 1)
+    if ($previousIndex -lt 0) {
+      continue
+    }
+
+    if (($i - $previousIndex - 1) -gt 0) {
+      continue
+    }
+
+    $previous = $Text[$previousIndex]
+    if (-not ([char]::IsLetterOrDigit($previous) -or $previous -eq '_')) {
+      continue
+    }
+
+    $tokenStart = $previousIndex
+    while (
+      $tokenStart -gt 0 -and
+      ([char]::IsLetterOrDigit($Text[$tokenStart - 1]) -or $Text[$tokenStart - 1] -eq '_')
+    ) {
+      $tokenStart--
+    }
+    if (-not [char]::IsLower($Text[$tokenStart])) {
+      continue
+    }
+
+    $closeIndex = Get-MatchingAngleCloseIndex -Text $Text -OpenAngleIndex $i
+    if ($closeIndex -lt 0) {
+      continue
+    }
+
+    $angleContent = $Text.Substring($i + 1, $closeIndex - $i - 1)
+    if (-not $angleContent.Contains(',')) {
+      continue
+    }
+
+    $nextIndex = Get-NextNonTriviaIndex -Text $Text -Index ($closeIndex + 1)
+    if ($nextIndex -ge $Text.Length) {
+      continue
+    }
+
+    if (('(', ')', '[', ']', '{', '}', '.', ',', ';', '?') -contains $Text[$nextIndex]) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Get-PreviousNonTriviaIndex {
+  Param(
+    [string]$Text,
+    [int]$Index
+  )
+
+  $cursor = $Index
+  while ($cursor -ge 0) {
+    while ($cursor -ge 0 -and [char]::IsWhiteSpace($Text[$cursor])) {
+      $cursor--
+    }
+
+    $lineStart = $Text.LastIndexOf("`n", [Math]::Max(0, $cursor))
+    $lineStart = if ($lineStart -lt 0) { 0 } else { $lineStart + 1 }
+    $lineCommentStart = $Text.LastIndexOf('//', [Math]::Max(0, $cursor), [System.StringComparison]::Ordinal)
+    if ($lineCommentStart -ge $lineStart) {
+      $cursor = $lineCommentStart - 1
+      continue
+    }
+
+    if ($cursor -le 0 -or $Text[$cursor] -ne '/' -or $Text[$cursor - 1] -ne '*') {
+      return $cursor
+    }
+
+    if ($cursor -lt 2) {
+      return $cursor
+    }
+
+    $commentStart = $Text.LastIndexOf('/*', $cursor - 2, [System.StringComparison]::Ordinal)
+    if ($commentStart -lt 0) {
+      return $cursor
+    }
+    $cursor = $commentStart - 1
+  }
+
+  return $cursor
+}
+
+function Get-NextNonTriviaIndex {
+  Param(
+    [string]$Text,
+    [int]$Index
+  )
+
+  $cursor = $Index
+  while ($cursor -lt $Text.Length) {
+    while ($cursor -lt $Text.Length -and [char]::IsWhiteSpace($Text[$cursor])) {
+      $cursor++
+    }
+
+    if ($cursor + 1 -ge $Text.Length -or $Text[$cursor] -ne '/') {
+      return $cursor
+    }
+
+    if ($Text[$cursor + 1] -eq '/') {
+      $newline = $Text.IndexOf("`n", $cursor + 2)
+      if ($newline -lt 0) {
+        return $Text.Length
+      }
+      $cursor = $newline + 1
+      continue
+    }
+
+    if ($Text[$cursor + 1] -eq '*') {
+      $commentEnd = $Text.IndexOf('*/', $cursor + 2, [System.StringComparison]::Ordinal)
+      if ($commentEnd -lt 0) {
+        return $cursor
+      }
+      $cursor = $commentEnd + 2
+      continue
+    }
+
+    return $cursor
+  }
+
+  return $cursor
+}
+
+function Get-LineNumberAtIndex {
+  Param(
+    [string]$Text,
+    [int]$Index
+  )
+
+  if ($Index -le 0) {
+    return 1
+  }
+
+  $prefix = $Text.Substring(0, [Math]::Min($Index, $Text.Length))
+  return (($prefix.ToCharArray() | Where-Object { $_ -eq "`n" }).Count + 1)
 }
 
 function Get-TestCaseSourceBody {
@@ -511,7 +1222,8 @@ $filesToScan = @()
 if ($Paths -and $Paths.Count -gt 0) {
   foreach ($p in $Paths) {
     try {
-      $resolved = Resolve-Path $p -ErrorAction Stop
+      $candidatePath = $p -replace '\\','/'
+      $resolved = Resolve-Path -LiteralPath $candidatePath -ErrorAction Stop
       if ($resolved -and ($resolved.Path -like '*.cs')) {
         $filesToScan += $resolved.Path
       }
@@ -541,13 +1253,18 @@ foreach ($file in $filesToScan) {
   $text = $content -join "`n"
 
   if ($FixNullChecks) {
-    $fixResult = Fix-UnityNullAssertions -Text $text
+    $rawText = [System.IO.File]::ReadAllText($file)
+    $fixResult = Fix-UnityNullAssertions -Text $rawText
     if ($fixResult.Modified) {
       Write-Info "Auto-fixed Unity null assertions in $rel"
-      [System.IO.File]::WriteAllText($file, $fixResult.Text)
-      $text = $fixResult.Text
-      $content = $fixResult.Text -split "`n"
+      [System.IO.File]::WriteAllText($file, $fixResult.Text, [System.Text.UTF8Encoding]::new($false))
     }
+    foreach ($remaining in @([regex]::Matches($fixResult.Text, '(?m)^\s*Assert\.Is(Not)?Null\s*\('))) {
+      $violations += (@{
+        Path=$rel; Line=(Get-LineNumberAtIndex -Text $fixResult.Text -Index $remaining.Index); Message='UNH005: Assert.IsNull/Assert.IsNotNull is forbidden and could not be auto-fixed; use Assert.IsTrue(expr == null) or Assert.IsTrue(expr != null)'
+      })
+    }
+    continue
   }
 
   # Scrubbed view: string literals and comments (including multi-line block
@@ -974,9 +1691,9 @@ foreach ($file in $filesToScan) {
   }
 
   # UNH011: editor-only references in PLAYER-compiled test code must be guarded by
-  # `#if UNITY_EDITOR`. The Runtime test assemblies (Tests/Core, Tests/Runtime — every
-  # tree EXCEPT Tests/Editor) compile into the standalone player; the editor-only
-  # assemblies (UnityEditor.*, WallstopStudios.UnityHelpers.Editor) are stripped there,
+  # `#if UNITY_EDITOR`. Assemblies without an editor-only asmdef includePlatforms list
+  # compile into the standalone player; the editor-only assemblies
+  # (UnityEditor.*, WallstopStudios.UnityHelpers.Editor) are stripped there,
   # so any unguarded reference is a CS0234 that aborts the WHOLE standalone leg before a
   # single test runs (no results.xml). This catches that class in <1s without a player
   # build. The standalone leg remains the ultimate backstop.
@@ -985,7 +1702,7 @@ foreach ($file in $filesToScan) {
   # Directive + token detection both run on the comment/string-SCRUBBED view, so a
   # `// uses UnityEditor` comment or an `InternalsVisibleTo("…Editor")` string literal
   # (both legal in player code) cannot trip the rule.
-  if (($rel -notmatch '(^|/)Tests/Editor/') -and ($text -notmatch 'UNH-SUPPRESS.*UNH011')) {
+  if ((-not (Test-EditorOnlyAssemblyDefinition $file $rel)) -and ($text -notmatch 'UNH-SUPPRESS.*UNH011')) {
     $editorStack = New-Object System.Collections.Generic.List[object]
     $lineIndex = 0
     foreach ($line in $content) {
@@ -1049,6 +1766,10 @@ foreach ($file in $filesToScan) {
   }
 }
 
+if ($FixNullChecks -and $violations.Count -eq 0) {
+  exit 0
+}
+
 if ($advisories.Count -gt 0) {
   Write-Host "Test performance advisories (non-blocking): $($advisories.Count)" -ForegroundColor DarkYellow
   foreach ($a in $advisories) {
@@ -1066,4 +1787,3 @@ if ($violations.Count -gt 0) {
   Write-Info "No issues found in test code."
   exit 0
 }
-

@@ -2,6 +2,7 @@
 # Git Hooks & Autofixers Installation Script (PowerShell)
 # =============================================================================
 # Installs git hooks and all required development tools for this repository.
+# cspell:ignore choco mdlint rhysd
 #
 # Usage:
 #   ./scripts/install-hooks.ps1           # Full installation
@@ -69,8 +70,7 @@ function Show-Help {
 
 function Test-Command {
     param([string]$Command)
-    $null = Get-Command $Command -ErrorAction SilentlyContinue
-    return $?
+    return ($null -ne (Get-Command $Command -ErrorAction SilentlyContinue))
 }
 
 function Test-ExecutableBit {
@@ -171,6 +171,14 @@ function Test-Status {
     }
     else {
         Write-Warning "dotnet: NOT FOUND (CSharpier won't work)"
+    }
+
+    if (Test-Command "pwsh") {
+        Write-Success "pwsh: $(Get-CommandVersion 'pwsh' @('--version'))"
+    }
+    else {
+        Write-ErrorMsg "pwsh: NOT FOUND (required git hook runtime)"
+        $allOk = $false
     }
     
     Write-Host ""
@@ -357,6 +365,10 @@ function Test-Status {
 
 function Install-GitHooks {
     Write-Header "Installing Git Hooks"
+
+    if (-not (Test-Command "pwsh")) {
+        throw "pwsh is required because tracked git hook entrypoints delegate to .ps1 implementations. Install PowerShell 7+ and rerun hooks installation."
+    }
     
     Push-Location $RepoRoot
     try {
@@ -383,13 +395,16 @@ function Install-GitHooks {
             [System.Runtime.InteropServices.OSPlatform]::Windows
         )
         if (-not $runningOnWindows) {
-            $hookFiles = @(
-                '.githooks/pre-commit',
-                '.githooks/pre-merge-commit',
-                '.githooks/pre-push',
-                '.githooks/post-rewrite'
+            $artifactExtensions = @('.txt', '.log', '.out', '.err', '.tmp')
+            $existingHookFiles = @(
+                Get-ChildItem -LiteralPath '.githooks' -File -ErrorAction SilentlyContinue |
+                    Where-Object {
+                        $_.Name -notlike '*.sample' -and
+                        $artifactExtensions -notcontains $_.Extension -and
+                        [string]::IsNullOrWhiteSpace($_.Extension)
+                    } |
+                    ForEach-Object { $_.FullName }
             )
-            $existingHookFiles = @($hookFiles | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
             $nonExecutableHookFiles = @($existingHookFiles | Where-Object { -not (Test-ExecutableBit -Path $_) })
             if ($nonExecutableHookFiles.Count -gt 0 -and (Get-Command chmod -ErrorAction SilentlyContinue)) {
                 & chmod +x -- @nonExecutableHookFiles

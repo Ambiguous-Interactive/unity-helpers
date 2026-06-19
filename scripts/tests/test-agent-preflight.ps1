@@ -30,6 +30,25 @@ function Write-TestResult {
     }
 }
 
+function Test-ByteArrayEqual {
+    param(
+        [byte[]]$Expected,
+        [byte[]]$Actual
+    )
+
+    if ($Expected.Length -ne $Actual.Length) {
+        return $false
+    }
+
+    for ($i = 0; $i -lt $Expected.Length; $i++) {
+        if ($Expected[$i] -ne $Actual[$i]) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function New-TestRepo {
     param(
         [switch]$ConfigurePushDefaults,
@@ -55,6 +74,8 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') (Join-Path $scriptsDir 'fix-markdown-fence-languages.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1') (Join-Path $scriptsDir 'lint-staged-markdown.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') (Join-Path $scriptsDir 'lint-duplicate-usings.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-tests.ps1') (Join-Path $scriptsDir 'lint-tests.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/comment-stripping.ps1') (Join-Path $scriptsDir 'comment-stripping.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
@@ -137,7 +158,7 @@ function Get-StagedPaths {
 
     Push-Location $RepoPath
     try {
-        $output = & git diff --cached --name-only --diff-filter=ACM 2>&1
+        $output = & git diff --cached --name-only --diff-filter=ACMR 2>&1
         if ($LASTEXITCODE -ne 0) {
             return @()
         }
@@ -216,6 +237,70 @@ process.exit(0);
     Set-Content -Path (Join-Path $binDir 'cspell.cjs') -Value $script -Encoding ascii
 }
 
+function Add-FakeNpmRepairCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoPath
+    )
+
+    $scriptPath = Join-Path $RepoPath 'fake-npm-repair.ps1'
+    $script = @'
+param(
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Arguments
+)
+
+if ($Arguments.Count -lt 1 -or $Arguments[0] -ne 'ci') {
+    Write-Error "Expected npm ci arguments, got: $($Arguments -join ' ')"
+    exit 2
+}
+
+$prettierBinDir = Join-Path (Get-Location).Path 'node_modules/prettier/bin'
+New-Item -ItemType Directory -Path $prettierBinDir -Force | Out-Null
+Set-Content -Path (Join-Path (Get-Location).Path 'node_modules/prettier/package.json') -Value '{"bin":"./bin/prettier.cjs"}' -Encoding ascii
+$prettierScript = @(
+    '#!/usr/bin/env node',
+    'if (process.argv.includes("--version")) {',
+    '  console.log("3.8.3");',
+    '}',
+    'process.exit(0);'
+) -join [Environment]::NewLine
+Set-Content -Path (Join-Path $prettierBinDir 'prettier.cjs') -Value $prettierScript -Encoding ascii
+
+$markdownlintDir = Join-Path (Get-Location).Path 'node_modules/markdownlint-cli'
+New-Item -ItemType Directory -Path $markdownlintDir -Force | Out-Null
+Set-Content -Path (Join-Path $markdownlintDir 'package.json') -Value '{"bin":{"markdownlint":"markdownlint.js"}}' -Encoding ascii
+$markdownlintScript = @(
+    '#!/usr/bin/env node',
+    'if (process.argv.includes("--version")) {',
+    '  console.log("0.48.0");',
+    '}',
+    'process.exit(0);'
+) -join [Environment]::NewLine
+Set-Content -Path (Join-Path $markdownlintDir 'markdownlint.js') -Value $markdownlintScript -Encoding ascii
+
+$cspellBinDir = Join-Path (Get-Location).Path 'node_modules/cspell/bin'
+New-Item -ItemType Directory -Path $cspellBinDir -Force | Out-Null
+Set-Content -Path (Join-Path (Get-Location).Path 'node_modules/cspell/package.json') -Value '{"bin":{"cspell":"bin/cspell.cjs"}}' -Encoding ascii
+$cspellScript = @(
+    '#!/usr/bin/env node',
+    'if (process.argv.includes("--version")) {',
+    '  console.log("10.0.0");',
+    '  process.exit(0);',
+    '}',
+    'if (process.argv.includes("lint")) {',
+    '  process.exit(0);',
+    '}',
+    'process.exit(0);'
+) -join [Environment]::NewLine
+Set-Content -Path (Join-Path $cspellBinDir 'cspell.cjs') -Value $cspellScript -Encoding ascii
+
+exit 0
+'@
+    Set-Content -Path $scriptPath -Value $script -Encoding UTF8
+    return $scriptPath
+}
+
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White
 
 # Test 1: No changed files should exit successfully
@@ -269,6 +354,10 @@ try {
     Write-TestResult 'FixMode_ExitCode0' ($result3.ExitCode -eq 0) "Expected exit code 0, got $($result3.ExitCode). Output: $($result3.Output)"
     Write-TestResult 'FixMode_FileMetaCreated' (Test-Path (Join-Path $repo3 'Editor/Nested/Tool.cs.meta')) 'Expected file .meta to be created'
     Write-TestResult 'FixMode_DirMetaCreated' (Test-Path (Join-Path $repo3 'Editor/Nested.meta')) 'Expected directory .meta to be created'
+    $fileMetaContent3 = Get-Content -Path (Join-Path $repo3 'Editor/Nested/Tool.cs.meta') -Raw
+    Write-TestResult 'FixMode_FileMetaUsesMonoImporter' ($fileMetaContent3 -match 'MonoImporter:') 'Expected C# .meta to use MonoImporter'
+    $agentPreflightContent3 = Get-Content -Path (Join-Path $repo3 'scripts/agent-preflight.ps1') -Raw
+    Write-TestResult 'FixMode_MetaRecoveryDoesNotRequireBash' ($agentPreflightContent3 -notmatch 'bash .*generate-meta\.sh') 'Expected native PowerShell .meta generation, not bash generate-meta.sh'
 
     $staged3 = Get-StagedPaths -RepoPath $repo3
     Write-TestResult 'FixMode_FileMetaStaged' ($staged3 -contains 'Editor/Nested/Tool.cs.meta') 'Expected file .meta to be staged by -Fix mode'
@@ -276,6 +365,48 @@ try {
 }
 finally {
     Remove-Item -Path $repo3 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 3.1: Git-discovered paths with embedded newlines must not be split
+$repo3Newline = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $runtimeDir = Join-Path $repo3Newline 'Runtime'
+    New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+    $newlineFileName = "New`nLine.cs"
+    $newlineRelativePath = "Runtime/New`nLine.cs"
+    $newlinePath = Join-Path $runtimeDir $newlineFileName
+    Set-Content -Path $newlinePath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class NewLinePath {}
+"@ -Encoding UTF8
+
+    Push-Location $repo3Newline
+    try {
+        git add -- $newlineRelativePath
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result3Newline = Invoke-Preflight -RepoPath $repo3Newline -Arguments @('-Fix')
+    Write-TestResult 'NewlinePathFix_ExitCode0' ($result3Newline.ExitCode -eq 0) "Expected exit code 0 for newline path recovery, got $($result3Newline.ExitCode). Output: $($result3Newline.Output)"
+    Write-TestResult 'NewlinePathFix_FileMetaCreated' (Test-Path -LiteralPath "$newlinePath.meta") 'Expected exact newline-path .meta companion to be created'
+
+    Push-Location $repo3Newline
+    try {
+        git cat-file -e ":$newlineRelativePath.meta" 2>$null
+        $newlineMetaStaged = $LASTEXITCODE -eq 0
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'NewlinePathFix_FileMetaStaged' $newlineMetaStaged 'Expected exact newline-path .meta companion to be staged'
+}
+finally {
+    Remove-Item -Path $repo3Newline -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 4: Preflight without -Fix should fail when staged source has unstaged .meta companion
@@ -431,6 +562,79 @@ MonoImporter:
 }
 finally {
     Remove-Item -Path $repo6 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 6b: modified tracked sources do not need unchanged .meta companions restaged
+Write-Host "`nTest group: unchanged tracked companion behavior" -ForegroundColor Magenta
+$repo6b = New-TestRepo -ConfigurePushDefaults
+try {
+    $editorDir = Join-Path $repo6b 'Editor/Tracked'
+    New-Item -ItemType Directory -Path $editorDir -Force | Out-Null
+    Set-Content -Path (Join-Path $repo6b 'Editor.meta') -Value @'
+fileFormatVersion: 2
+guid: 33333333333333333333333333333333
+DefaultImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@ -Encoding UTF8
+    Set-Content -Path (Join-Path $repo6b 'Editor/Tracked.meta') -Value @'
+fileFormatVersion: 2
+guid: 44444444444444444444444444444444
+DefaultImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@ -Encoding UTF8
+    Set-Content -Path (Join-Path $editorDir 'Existing.asset') -Value @'
+%YAML 1.1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_Name: Existing
+'@ -Encoding UTF8
+    Set-Content -Path (Join-Path $editorDir 'Existing.asset.meta') -Value @'
+fileFormatVersion: 2
+guid: 55555555555555555555555555555555
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@ -Encoding UTF8
+
+    Push-Location $repo6b
+    try {
+        git add Editor.meta Editor/Tracked.meta Editor/Tracked/Existing.asset Editor/Tracked/Existing.asset.meta
+        git -c user.email=test@example.com -c user.name=test commit -q -m 'add tracked editor asset'
+        Set-Content -Path (Join-Path $editorDir 'Existing.asset') -Value @'
+%YAML 1.1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_Name: Existing
+  m_EditorClassIdentifier: Changed
+'@ -Encoding UTF8
+        git add Editor/Tracked/Existing.asset
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result6b = Invoke-Preflight -RepoPath $repo6b -Arguments @('-Paths', 'Editor/Tracked/Existing.asset')
+    Write-TestResult 'TrackedCompanions_ExitCode0' ($result6b.ExitCode -eq 0) "Expected exit code 0, got $($result6b.ExitCode). Output: $($result6b.Output)"
+    Write-TestResult 'TrackedCompanions_NoUnstagedMetaError' (-not ($result6b.Output -match 'Unstaged \.meta companion files detected')) 'Did not expect unchanged tracked .meta companions to be reported'
+
+    $staged6b = Get-StagedPaths -RepoPath $repo6b
+    Write-TestResult 'TrackedCompanions_DoesNotRestageFileMeta' (-not ($staged6b -contains 'Editor/Tracked/Existing.asset.meta')) 'Did not expect unchanged file .meta companion to be staged'
+    Write-TestResult 'TrackedCompanions_DoesNotRestageDirMeta' (-not ($staged6b -contains 'Editor/Tracked.meta')) 'Did not expect unchanged directory .meta companion to be staged'
+}
+finally {
+    Remove-Item -Path $repo6b -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 7: -Fix should fail with clear diagnostics if index.lock contention blocks staging
@@ -613,6 +817,27 @@ finally {
     Remove-Item -Path $repo10 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test 10a: -Fix restores missing repo-local npm tools from package-lock.json
+Write-Host "`nTest group: npm dependency auto-repair" -ForegroundColor Magenta
+$repo10a = New-TestRepo -ConfigurePushDefaults -SkipFakeCspell
+try {
+    Set-Content -Path (Join-Path $repo10a 'README.md') -Value 'Spelling check baseline.' -Encoding UTF8
+    Set-Content -Path (Join-Path $repo10a 'package.json') -Value '{"name":"fixture","devDependencies":{"cspell":"10.0.0","markdownlint-cli":"0.48.0","prettier":"3.8.3"}}' -Encoding UTF8
+    Set-Content -Path (Join-Path $repo10a 'package-lock.json') -Value '{"name":"fixture","lockfileVersion":3,"packages":{}}' -Encoding UTF8
+    $fakeNpm = Add-FakeNpmRepairCommand -RepoPath $repo10a
+
+    $result10a = Invoke-Preflight -RepoPath $repo10a -Arguments @('-Fix', '-Paths', 'README.md') -EnvOverrides @{
+        AGENT_PREFLIGHT_NPM_COMMAND = $fakeNpm
+    }
+
+    Write-TestResult 'NpmRepair_ExitCode0' ($result10a.ExitCode -eq 0) "Expected exit code 0 after npm repair, got $($result10a.ExitCode). Output: $($result10a.Output)"
+    Write-TestResult 'NpmRepair_RunsNpmCi' ($result10a.Output -match 'Restoring repo-local npm tools with npm ci') 'Expected npm ci repair message'
+    Write-TestResult 'NpmRepair_CspellCreated' (Test-Path (Join-Path $repo10a 'node_modules/cspell/bin/cspell.cjs')) 'Expected fake cspell binary to be restored'
+}
+finally {
+    Remove-Item -Path $repo10a -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 10b: Missing Prettier should fail before hook-time formatting
 Write-Host "`nTest group: prettier missing dependency diagnostics" -ForegroundColor Magenta
 $repo10b = New-TestRepo -ConfigurePushDefaults
@@ -689,7 +914,334 @@ finally {
     Remove-Item -Path $repo10cLicense -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Test 10e: PathList recovery should work even when the worktree starts clean
+# Test 10e: staged test null assertion fixes must update the index, not only the worktree
+Write-Host "`nTest group: test null assertion auto-fix staging" -ForegroundColor Magenta
+$repo10cNullFix = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $testDir = Join-Path $repo10cNullFix 'Tests/Runtime'
+    New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+    $testPath = Join-Path $testDir 'NullAssertionTests.cs'
+    Set-Content -Path $testPath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+using NUnit.Framework;
+
+namespace Fixture.Tests
+{
+    public sealed class NullAssertionTests
+    {
+        [Test]
+        public void NullObjectReportsTrue()
+        {
+            object value = null;
+            object other = new object();
+
+            Assert.IsNull(value);
+            Assert.IsNotNull(other);
+        }
+    }
+}
+"@ -Encoding UTF8
+
+    Push-Location $repo10cNullFix
+    try {
+        git add Tests/Runtime/NullAssertionTests.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result10cNullFix = Invoke-Preflight -RepoPath $repo10cNullFix -Arguments @('-Fix', '-Paths', 'Tests\Runtime\NullAssertionTests.cs')
+    Write-TestResult 'NullAssertionFix_ExitCode0' ($result10cNullFix.ExitCode -eq 0) "Expected exit code 0 after null assertion fix, got $($result10cNullFix.ExitCode). Output: $($result10cNullFix.Output)"
+
+    $fixedTestContent = Get-Content -Path $testPath -Raw
+    Write-TestResult 'NullAssertionFix_WorktreeUpdated' ($fixedTestContent -match 'Assert\.IsTrue\(value == null\)' -and $fixedTestContent -match 'Assert\.IsTrue\(other != null\)') 'Expected worktree assertions to use Assert.IsTrue null comparisons'
+
+    Push-Location $repo10cNullFix
+    try {
+        $stagedTestContent = git show ':Tests/Runtime/NullAssertionTests.cs' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'NullAssertionFix_StagedUpdatedBlob' ($stagedTestContent -match 'Assert\.IsTrue\(value == null\)' -and $stagedTestContent -match 'Assert\.IsTrue\(other != null\)') 'Expected staged test blob to include null assertion fixes'
+}
+finally {
+    Remove-Item -Path $repo10cNullFix -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10e.1: staged renamed files must be re-staged after null assertion fixes
+$repo10cRenamedNullFix = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $testDir = Join-Path $repo10cRenamedNullFix 'Tests/Runtime'
+    New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+    $oldTestPath = Join-Path $testDir 'OldNullAssertionTests.cs'
+    Set-Content -Path $oldTestPath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+using NUnit.Framework;
+
+namespace Fixture.Tests
+{
+    public sealed class OldNullAssertionTests
+    {
+        [Test]
+        public void NullObjectReportsTrue()
+        {
+            object value = null;
+
+            Assert.IsNull(value);
+        }
+    }
+}
+"@ -Encoding UTF8
+
+    Push-Location $repo10cRenamedNullFix
+    try {
+        git add Tests/Runtime/OldNullAssertionTests.cs
+        git -c user.email=test@example.com -c user.name=test commit -q -m 'add old null assertion test'
+        git mv Tests/Runtime/OldNullAssertionTests.cs Tests/Runtime/RenamedNullAssertionTests.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result10cRenamedNullFix = Invoke-Preflight -RepoPath $repo10cRenamedNullFix -Arguments @('-Fix', '-Paths', 'Tests/Runtime/RenamedNullAssertionTests.cs')
+    Write-TestResult 'RenamedNullAssertionFix_ExitCode0' ($result10cRenamedNullFix.ExitCode -eq 0) "Expected exit code 0 after renamed null assertion fix, got $($result10cRenamedNullFix.ExitCode). Output: $($result10cRenamedNullFix.Output)"
+
+    Push-Location $repo10cRenamedNullFix
+    try {
+        $stagedRenamedTestContent = git show ':Tests/Runtime/RenamedNullAssertionTests.cs' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'RenamedNullAssertionFix_StagedUpdatedBlob' ($stagedRenamedTestContent -match 'Assert\.IsTrue\(value == null\)') 'Expected staged renamed test blob to include null assertion fix'
+}
+finally {
+    Remove-Item -Path $repo10cRenamedNullFix -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10e.2: region guard must inspect staged C# blobs, not only worktree files
+$repo10cStagedRegion = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $stagedRegionPath = Join-Path $repo10cStagedRegion 'StagedRegion.cs'
+    Set-Content -Path $stagedRegionPath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class StagedRegion
+{
+#region Bad
+#endregion
+}
+"@ -Encoding UTF8
+
+    Push-Location $repo10cStagedRegion
+    try {
+        git add StagedRegion.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    Set-Content -Path $stagedRegionPath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class StagedRegion
+{
+}
+"@ -Encoding UTF8
+
+    $result10cStagedRegion = Invoke-Preflight -RepoPath $repo10cStagedRegion -Arguments @('-Paths', 'StagedRegion.cs')
+    Write-TestResult 'StagedRegionGuard_ExitCode1' ($result10cStagedRegion.ExitCode -eq 1) "Expected exit code 1 for staged #region, got $($result10cStagedRegion.ExitCode). Output: $($result10cStagedRegion.Output)"
+    Write-TestResult 'StagedRegionGuard_ReportsStagedBlob' ($result10cStagedRegion.Output -match 'StagedRegion\.cs' -and $result10cStagedRegion.Output -match '#region') 'Expected staged #region diagnostic even though worktree removed it'
+}
+finally {
+    Remove-Item -Path $repo10cStagedRegion -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10f: -Fix must not sweep pre-existing unstaged hunks into staged whole-file fixes
+Write-Host "`nTest group: partial staging auto-fix guard" -ForegroundColor Magenta
+$repo10cPartial = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $previousYear = $currentYear - 1
+    $partialPath = Join-Path $repo10cPartial 'Partial.cs'
+    Set-Content -Path $partialPath -Value @"
+// MIT License - Copyright (c) $previousYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class Partial {}
+"@ -Encoding UTF8
+
+    Push-Location $repo10cPartial
+    try {
+        git add Partial.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    Add-Content -Path $partialPath -Value 'public sealed class UnstagedOnly {}' -Encoding UTF8
+    $partialContentBefore = Get-Content -Path $partialPath -Raw
+
+    $result10cPartial = Invoke-Preflight -RepoPath $repo10cPartial -Arguments @('-Fix', '-Paths', 'Partial.cs')
+    Write-TestResult 'PartialStageGuard_ExitCode1' ($result10cPartial.ExitCode -eq 1) "Expected exit code 1 for partial-staging refusal, got $($result10cPartial.ExitCode). Output: $($result10cPartial.Output)"
+    Write-TestResult 'PartialStageGuard_RefusalMessage' ($result10cPartial.Output -match 'Refusing to auto-stage whole file\(s\) with pre-existing unstaged changes') 'Expected explicit partial-staging refusal message'
+    $partialContentAfter = Get-Content -Path $partialPath -Raw
+    Write-TestResult 'PartialStageGuard_WorktreeUnchangedBeforeRefusal' ($partialContentAfter -ceq $partialContentBefore) 'Expected license fixer to refuse before mutating the partially staged worktree file'
+
+    Push-Location $repo10cPartial
+    try {
+        $stagedPartialContent = git show ':Partial.cs' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'PartialStageGuard_DoesNotStageUnstagedHunk' ($stagedPartialContent -notmatch 'UnstagedOnly') 'Expected staged blob to exclude pre-existing unstaged hunk'
+}
+finally {
+    Remove-Item -Path $repo10cPartial -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10f.1: null-assertion fixer must also refuse before mutating a partially staged test
+$repo10cPartialNull = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $testDir = Join-Path $repo10cPartialNull 'Tests/Runtime'
+    New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+    $testPath = Join-Path $testDir 'PartialNullAssertionTests.cs'
+    Set-Content -Path $testPath -Value @"
+// MIT License - Copyright (c) $currentYear wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+using NUnit.Framework;
+
+namespace Fixture.Tests
+{
+    public sealed class PartialNullAssertionTests
+    {
+        [Test]
+        public void NullObjectReportsTrue()
+        {
+            object value = null;
+
+            Assert.IsNull(value);
+        }
+    }
+}
+"@ -Encoding UTF8
+
+    Push-Location $repo10cPartialNull
+    try {
+        git add Tests/Runtime/PartialNullAssertionTests.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    Add-Content -Path $testPath -Value '// UnstagedOnly' -Encoding UTF8
+    $partialNullBefore = Get-Content -Path $testPath -Raw
+
+    $result10cPartialNull = Invoke-Preflight -RepoPath $repo10cPartialNull -Arguments @('-Fix', '-Paths', 'Tests/Runtime/PartialNullAssertionTests.cs')
+    Write-TestResult 'PartialStageGuard_NullFixExitCode1' ($result10cPartialNull.ExitCode -eq 1) "Expected exit code 1 for partial-staging refusal, got $($result10cPartialNull.ExitCode). Output: $($result10cPartialNull.Output)"
+    $partialNullAfter = Get-Content -Path $testPath -Raw
+    Write-TestResult 'PartialStageGuard_NullFixWorktreeUnchanged' ($partialNullAfter -ceq $partialNullBefore) 'Expected null assertion fixer to refuse before mutating the partially staged worktree file'
+}
+finally {
+    Remove-Item -Path $repo10cPartialNull -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10f.2: EOL fixer plans modified paths before writing partially staged files
+$repo10cPartialEol = New-TestRepo -ConfigurePushDefaults
+try {
+    $currentYear = (Get-Date).Year
+    $eolPartialPath = Join-Path $repo10cPartialEol 'EolPartial.cs'
+    [System.IO.File]::WriteAllBytes(
+        $eolPartialPath,
+        [System.Text.UTF8Encoding]::new($false).GetBytes("// MIT License - Copyright (c) $currentYear wallstop`n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE`n`npublic sealed class EolPartial {}`n")
+    )
+
+    Push-Location $repo10cPartialEol
+    try {
+        git add EolPartial.cs
+    }
+    finally {
+        Pop-Location
+    }
+
+    Add-Content -Path $eolPartialPath -Value '// UnstagedOnly' -Encoding UTF8
+    $partialEolBefore = [System.IO.File]::ReadAllBytes($eolPartialPath)
+
+    $result10cPartialEol = Invoke-Preflight -RepoPath $repo10cPartialEol -Arguments @('-Fix', '-Paths', 'EolPartial.cs')
+    Write-TestResult 'PartialStageGuard_EolFixExitCode1' ($result10cPartialEol.ExitCode -eq 1) "Expected exit code 1 for partial-staging refusal, got $($result10cPartialEol.ExitCode). Output: $($result10cPartialEol.Output)"
+    $partialEolAfter = [System.IO.File]::ReadAllBytes($eolPartialPath)
+    Write-TestResult 'PartialStageGuard_EolFixWorktreeUnchanged' (Test-ByteArrayEqual -Expected $partialEolBefore -Actual $partialEolAfter) 'Expected EOL fixer to refuse before mutating the partially staged worktree file'
+}
+finally {
+    Remove-Item -Path $repo10cPartialEol -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10f.3: LLM instruction fixer refuses before overwriting generated index with unstaged edits
+$repo10cPartialLlm = New-TestRepo -ConfigurePushDefaults
+try {
+    Add-FakePrettierPackage -RepoPath $repo10cPartialLlm
+    Add-FakeMarkdownlintPackage -RepoPath $repo10cPartialLlm
+
+    $llmDir = Join-Path $repo10cPartialLlm '.llm'
+    $skillsDir = Join-Path $llmDir 'skills'
+    New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
+    Set-Content -Path (Join-Path $llmDir 'context.md') -Value '# Context' -Encoding UTF8
+    Set-Content -Path (Join-Path $skillsDir 'index.md') -Value 'manual index edits' -Encoding UTF8
+    Set-Content -Path (Join-Path $repo10cPartialLlm 'scripts/lint-skill-sizes.ps1') -Value @'
+Param(
+    [string[]]$Paths,
+    [switch]$FailOnCritical,
+    [switch]$VerboseOutput
+)
+exit 0
+'@ -Encoding UTF8
+    Set-Content -Path (Join-Path $repo10cPartialLlm 'scripts/lint-llm-instructions.ps1') -Value @'
+Param(
+    [switch]$Fix,
+    [switch]$VerboseOutput
+)
+Set-Content -Path "llm-fix-ran.txt" -Value "ran" -Encoding UTF8
+Set-Content -Path ".llm/skills/index.md" -Value "generated index" -Encoding UTF8
+exit 0
+'@ -Encoding UTF8
+
+    Push-Location $repo10cPartialLlm
+    try {
+        git add .llm scripts/lint-skill-sizes.ps1 scripts/lint-llm-instructions.ps1
+        git -c user.email=test@example.com -c user.name=test commit -q -m 'add llm fixtures'
+        Set-Content -Path (Join-Path $llmDir 'context.md') -Value '# Context changed' -Encoding UTF8
+        git add .llm/context.md
+        Set-Content -Path (Join-Path $skillsDir 'index.md') -Value 'manual index edits plus unstaged work' -Encoding UTF8
+    }
+    finally {
+        Pop-Location
+    }
+
+    $partialLlmBefore = Get-Content -Path (Join-Path $skillsDir 'index.md') -Raw
+    $result10cPartialLlm = Invoke-Preflight -RepoPath $repo10cPartialLlm -Arguments @('-Fix', '-Paths', '.llm/context.md')
+    $partialLlmAfter = Get-Content -Path (Join-Path $skillsDir 'index.md') -Raw
+    Write-TestResult 'PartialStageGuard_LlmFixExitCode1' ($result10cPartialLlm.ExitCode -eq 1) "Expected exit code 1 for LLM partial-staging refusal, got $($result10cPartialLlm.ExitCode). Output: $($result10cPartialLlm.Output)"
+    Write-TestResult 'PartialStageGuard_LlmFixWorktreeUnchanged' ($partialLlmAfter -ceq $partialLlmBefore) 'Expected LLM fixer to refuse before mutating .llm/skills/index.md'
+    Write-TestResult 'PartialStageGuard_LlmFixNotInvoked' (-not (Test-Path (Join-Path $repo10cPartialLlm 'llm-fix-ran.txt'))) 'Expected lint-llm-instructions.ps1 -Fix not to run after pre-mutation refusal'
+}
+finally {
+    Remove-Item -Path $repo10cPartialLlm -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 10g: PathList recovery should work even when the worktree starts clean
 Write-Host "`nTest group: path-list recovery from clean worktree" -ForegroundColor Magenta
 $repo10d = New-TestRepo -ConfigurePushDefaults
 try {
@@ -910,8 +1462,8 @@ try {
     Write-TestResult 'StrayHookTxt_ExitCode1' ($result14b.ExitCode -eq 1) "Expected exit code 1 when hook .txt exists, got $($result14b.ExitCode). Output: $($result14b.Output)"
     Write-TestResult 'StrayHookTxt_ListsPath' ($result14b.Output -match 'pre-push\.txt') 'Expected .githooks/pre-push.txt in output'
 
-    $result14bfix = Invoke-Preflight -RepoPath $repo14b -Arguments @('-Fix', '-Paths', 'nonexistent/should-not-match')
-    Write-TestResult 'StrayHookTxtFix_ExitCode0' ($result14bfix.ExitCode -eq 0) "Expected exit code 0 after -Fix, got $($result14bfix.ExitCode). Output: $($result14bfix.Output)"
+    $result14bFix = Invoke-Preflight -RepoPath $repo14b -Arguments @('-Fix', '-Paths', 'nonexistent/should-not-match')
+    Write-TestResult 'StrayHookTxtFix_ExitCode0' ($result14bFix.ExitCode -eq 0) "Expected exit code 0 after -Fix, got $($result14bFix.ExitCode). Output: $($result14bFix.Output)"
     Write-TestResult 'StrayHookTxtFix_FileDeleted' (-not (Test-Path (Join-Path $hooksDir 'pre-push.txt'))) 'Expected pre-push.txt to be deleted by -Fix'
 }
 finally {
@@ -993,6 +1545,31 @@ finally {
     Remove-Item -Path $repo16 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test 16b: -Fix must not delete root hook-shaped logs just because a broad
+# global ignore pattern such as *.log matches them. Root auto-recovery is scoped
+# to explicit hook redirection extensions (.txt/.out/.err); .log/.tmp recovery
+# is only automatic under .githooks/<hook>.*.
+Write-Host "`nTest group: root hook-shaped log safety" -ForegroundColor Magenta
+$repo16b = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('*.log')
+try {
+    $hooksDir = Join-Path $repo16b '.githooks'
+    New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
+    Set-Content -Path (Join-Path $hooksDir 'pre-commit') -Value '#!/usr/bin/env bash' -Encoding UTF8
+    Set-Content -Path (Join-Path $hooksDir 'pre-push') -Value '#!/usr/bin/env bash' -Encoding UTF8
+    $rootCommitLog = Join-Path $repo16b 'pre-commit.log'
+    $rootPushLog = Join-Path $repo16b 'pre-push.log'
+    Set-Content -Path $rootCommitLog -Value 'local diagnostic log' -Encoding UTF8
+    Set-Content -Path $rootPushLog -Value 'local diagnostic log' -Encoding UTF8
+
+    $result16b = Invoke-Preflight -RepoPath $repo16b -Arguments @('-Fix', '-Paths', 'nonexistent/should-not-match')
+    Write-TestResult 'RootHookLogSafety_FixExitCode0' ($result16b.ExitCode -eq 0) "Expected -Fix exit 0 when only root hook-shaped logs exist, got $($result16b.ExitCode). Output: $($result16b.Output)"
+    Write-TestResult 'RootHookLogSafety_PreservedCommitLog' (Test-Path -LiteralPath $rootCommitLog) 'Expected root pre-commit.log to be preserved under broad *.log ignore'
+    Write-TestResult 'RootHookLogSafety_PreservedPushLog' (Test-Path -LiteralPath $rootPushLog) 'Expected root pre-push.log to be preserved under broad *.log ignore'
+}
+finally {
+    Remove-Item -Path $repo16b -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 17: git check-ignore path-normalization (gitignored strays are correctly
 # classified even when the stray artifact file lives in a directory whose name
 # case mismatches the gitignore pattern on case-insensitive filesystems, AND
@@ -1002,7 +1579,7 @@ finally {
 # cleaned up. The helper `ConvertTo-GitRelativePosixPath` normalizes once per
 # input path before hand-off.
 Write-Host "`nTest group: git check-ignore path normalization" -ForegroundColor Magenta
-$repo17 = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('pre-commit.log', 'pre-push.log')
+$repo17 = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('.githooks/pre-commit.log', '.githooks/pre-push.log')
 try {
     $hooksDir = Join-Path $repo17 '.githooks'
     New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
@@ -1012,8 +1589,8 @@ try {
     # must detect them, classify them as gitignored, and (with -Fix) delete
     # them. Without the path-normalization fix, git check-ignore could miss
     # them when called with absolute paths on Windows.
-    $strayCommit = Join-Path $repo17 'pre-commit.log'
-    $strayPush = Join-Path $repo17 'pre-push.log'
+    $strayCommit = Join-Path $hooksDir 'pre-commit.log'
+    $strayPush = Join-Path $hooksDir 'pre-push.log'
     Set-Content -Path $strayCommit -Value 'stale log' -Encoding UTF8
     Set-Content -Path $strayPush -Value 'stale log' -Encoding UTF8
 

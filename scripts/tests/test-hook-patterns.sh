@@ -15,7 +15,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PRE_COMMIT="$REPO_ROOT/.githooks/pre-commit"
+PRE_COMMIT_IMPL="$REPO_ROOT/.githooks/pre-commit.ps1"
 
 # Colors for output
 RED='\033[0;31m'
@@ -190,7 +190,7 @@ else
 fi
 
 run_test
-if grep -q -- '--diff-filter=ACMR' "$PRE_COMMIT"; then
+if grep -q -- '--diff-filter=ACMR' "$PRE_COMMIT_IMPL"; then
     pass "Pre-commit staged path collection includes renamed new paths"
 else
     fail "Pre-commit staged path collection includes renamed new paths" "--diff-filter=ACMR" "not found"

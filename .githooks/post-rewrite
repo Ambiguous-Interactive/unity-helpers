@@ -1,22 +1,20 @@
 #!/usr/bin/env sh
-# ============================================================================
-# POST-REWRITE HOOK: Invalidate caches after history rewrite
-# ============================================================================
-# Triggered by: git rebase, git commit --amend, git filter-branch
-# Purpose: Clear the license year cache since git log dates may have changed.
-# ============================================================================
+set -eu
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-if [ -z "$REPO_ROOT" ]; then
-  exit 0
+hook_name="post-rewrite"
+hook_impl="$hook_name.ps1"
+hook_dir="$(CDPATH= cd "$(dirname "$0")" && pwd -P)"
+hook_script="$hook_dir/$hook_impl"
+
+if [ ! -f "$hook_script" ]; then
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$repo_root" ] && [ -f "$repo_root/.githooks/$hook_impl" ]; then
+        hook_script="$repo_root/.githooks/$hook_impl"
+    fi
 fi
 
-CACHE_FILE=$(git rev-parse --git-path license-year-cache 2>/dev/null)
-case "$CACHE_FILE" in
-  /*) ;;
-  *) CACHE_FILE="$REPO_ROOT/$CACHE_FILE" ;;
-esac
-if [ -f "$CACHE_FILE" ]; then
-  rm -f "$CACHE_FILE"
-  echo "License year cache invalidated (history rewritten)."
+if [ ! -f "$hook_script" ] || ! command -v pwsh >/dev/null 2>&1; then
+    exit 0
 fi
+
+exec pwsh -NoProfile -File "$hook_script" "$@"

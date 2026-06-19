@@ -365,38 +365,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Assert.That(imp.maxTextureSize, Is.EqualTo(256));
         }
 
-        [Test]
-        public void ClampMaxCapsOversize()
-        {
-            string path = Path.Combine(Root, "clampMax.png").SanitizePath();
-            // Force next POT far above Unity cap to ensure clamp path is tested.
-            CreatePng(path, 9001, 10, Color.black);
-
-            ExecuteWithImmediateImport(() =>
-            {
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
-                TextureImporter imp = AssetImporter.GetAtPath(path) as TextureImporter;
-                Assert.IsTrue(imp != null, "Importer should exist after asset creation");
-                imp.maxTextureSize = 128;
-                imp.SaveAndReimport();
-            });
-
-            FitTextureSizeWindow window = GetResetWindow();
-            window._fitMode = FitMode.GrowOnly;
-            window._minAllowedTextureSize = 32;
-            window._maxAllowedTextureSize = 8192;
-            window._textureSourcePaths = new List<Object>
-            {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
-            };
-
-            int count = window.CalculateTextureChanges(true);
-            Assert.That(count, Is.GreaterThanOrEqualTo(1));
-
-            TextureImporter verifyImp = AssetImporter.GetAtPath(path) as TextureImporter;
-            Assert.IsTrue(verifyImp != null, "Importer should exist for verification");
-            Assert.That(verifyImp.maxTextureSize, Is.EqualTo(8192));
-        }
+        // NOTE: the >8192 clamp-to-cap path (formerly the ClampMaxCapsOversize integration
+        // test that created a 9001px graphics Texture2D the headless CI null-graphics device
+        // rejects with "Failed to create texture because of invalid parameters") is covered
+        // deterministically by FitTextureSizeMathTests' pure ComputeFit case
+        // "GrowOnly.9001x10.Current128.ClampsToMax8192". The window's application of a computed
+        // size to importer.maxTextureSize is covered by the other integration tests below.
 
         [Test]
         public void PlatformOverrideAndroidApplied()

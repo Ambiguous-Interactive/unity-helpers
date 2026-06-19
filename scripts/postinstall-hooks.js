@@ -13,6 +13,7 @@
 //   - NPM_CONFIG_IGNORE_SCRIPTS=true|1 (npm's --ignore-scripts, the standard
 //     way to opt out of postinstall logic)
 //   - HUSKY=0 (industry-standard opt-out popularized by Husky)
+//   - pwsh missing (tracked hooks delegate to `.ps1` implementations)
 //   - Not inside a git work tree
 //   - Never fails npm install: any error is logged and we exit 0.
 //
@@ -61,6 +62,13 @@ function isGitRepo(cwd) {
   return result.status === 0 && String(result.stdout).trim() === "true";
 }
 
+function commandExists(command) {
+  const result = spawnSync(command, ["--version"], {
+    stdio: ["ignore", "ignore", "ignore"]
+  });
+  return result.status === 0;
+}
+
 function currentHooksPath(cwd) {
   const result = spawnSync("git", ["config", "--get", "core.hooksPath"], {
     cwd,
@@ -91,6 +99,15 @@ function normalizeHooksPath(value) {
   return normalized;
 }
 
+function hookEntryPoints(hooksDir) {
+  return fs
+    .readdirSync(hooksDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .filter((name) => !name.includes("."))
+    .sort();
+}
+
 function main() {
   const reason = skipReason();
   if (reason) {
@@ -108,6 +125,15 @@ function main() {
 
   if (!isGitRepo(repoRoot)) {
     console.log("[postinstall-hooks] not a git work tree — skipping");
+    return;
+  }
+
+  const pwshCommand = process.env.POSTINSTALL_HOOKS_PWSH_COMMAND || "pwsh";
+  if (!commandExists(pwshCommand)) {
+    console.log(
+      `[postinstall-hooks] ${pwshCommand} not found — skipping hook install. ` +
+        "Install PowerShell 7+ and run 'npm run hooks:install' to enable hooks."
+    );
     return;
   }
 
@@ -134,15 +160,12 @@ function main() {
     execSync("git config core.hooksPath .githooks", { cwd: repoRoot, stdio: "inherit" });
     // Best-effort chmod on Unix; ignored on Windows.
     if (process.platform !== "win32") {
-      const hookFiles = ["pre-commit", "pre-merge-commit", "pre-push"];
-      for (const hook of hookFiles) {
+      for (const hook of hookEntryPoints(hooksDir)) {
         const full = path.join(hooksDir, hook);
-        if (fs.existsSync(full)) {
-          try {
-            fs.chmodSync(full, 0o755);
-          } catch (_err) {
-            // Non-fatal: user may already have correct permissions.
-          }
+        try {
+          fs.chmodSync(full, 0o755);
+        } catch (_err) {
+          // Non-fatal: user may already have correct permissions.
         }
       }
     }

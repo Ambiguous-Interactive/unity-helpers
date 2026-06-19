@@ -52,5 +52,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return Object.FindObjectsOfType(type, includeInactive);
 #endif
         }
+
+        // FindAnyObjectByType (2022.2+) is the single-object companion to FindObjectsByType and
+        // the non-obsolete replacement for FindObjectOfType. It returns an arbitrary matching
+        // object without the InstanceID sort the deprecated API implied; every caller here only
+        // needs "any one" (singleton discovery), so the unsorted variant is faithful and faster.
+        internal static T FindObjectOfTypeShim<T>(bool includeInactive = false)
+            where T : Object
+        {
+#if UNITY_2022_2_OR_NEWER
+            return Object.FindAnyObjectByType<T>(
+                includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude
+            );
+#else
+            return Object.FindObjectOfType<T>(includeInactive);
+#endif
+        }
     }
 }

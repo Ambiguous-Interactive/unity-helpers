@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Pre-commit hook integration test (surgical)
+# Pre-commit and hook-adjacent regression tests (surgical)
 # =============================================================================
 # APPROACH CHOICE:
-#   We extract each pwsh/powershell invocation line from .githooks/pre-commit
-#   and exercise it directly against realistic staged-file arguments, rather
-#   than running the full hook end-to-end. Rationale:
+#   This suite combines focused CLI smoke tests with end-to-end checks for the
+#   current fast pre-commit hook contract. Rationale:
 #
-#     1. The bug this test primarily guards against (PWS001 / the dependabot
-#        branch) is a CLI-arg-binding bug. Running the invocation line itself
-#        reproduces the failure exactly.
-#     2. Running the FULL hook requires pwsh + repo-local Node tools
-#        (Prettier, markdownlint, cspell) + yamllint + dotnet installed, and also mutates
-#        the working tree (files are formatted in place). That is fragile,
-#        slow, and noisy for a regression guard.
-#     3. This approach needs ZERO copying of config/source files and leaves
-#        the working tree untouched. A --cleanup trap guarantees no leftover
-#        state.
+#     1. Historical PWS001 regressions are CLI-arg-binding bugs. Invoking the
+#        target script directly reproduces the failure without pretending that
+#        the fast hook still owns every validation.
+#     2. The actual hook is exercised end-to-end only for fast, last-resort
+#        behavior that it still owns: launcher delegation, artifact cleanup,
+#        final-newline safety, LLM checks, and staged C# blob checks.
+#     3. This approach avoids starting slow tools in pre-commit coverage and
+#        leaves the working tree untouched. A cleanup trap guarantees no
+#        leftover temp state.
 #
-#   Trade-off: this test does NOT catch errors in the bash dispatch logic of
-#   the hook (which branch triggers on which file pattern). That is covered
-#   separately by scripts/tests/test-hook-patterns.sh.
+#   Trade-off: agent-preflight-owned tools such as spelling, Markdown lint,
+#   CSharpier formatting, drawer lint, duplicate-using lint, and test lint are
+#   covered here only as standalone CLI smoke tests where useful.
 #
-# Scope: one smoke-test per pwsh-invoked hook branch. Missing sub-tool
-#        dependencies cause the corresponding test to SKIP, not FAIL.
+# Scope: current pre-commit behavior plus hook-adjacent CLI regression guards.
+#        Missing sub-tool dependencies cause the corresponding CLI smoke test
+#        to SKIP, not FAIL.
 #
 # Run:   bash scripts/tests/test-precommit-integration.sh
 # Exit:  0 on all-pass/skip, non-zero on any failure.
@@ -89,10 +88,7 @@ skip() {
 # It has been removed and all call sites deleted.
 
 # -----------------------------------------------------------------------------
-# Test: dependabot.yml branch (THIS is the regression that triggered this work)
-#
-# The hook invokes:
-#   pwsh -NoProfile -File scripts/lint-dependabot.ps1 -Paths "${DEPENDABOT_FILES_ARRAY[@]}"
+# Test: dependabot.yml CLI binding regression.
 # -----------------------------------------------------------------------------
 # Write a synthetic, known-good Dependabot v2 fixture to TEMPDIR and echo the
 # path. Using a synthetic fixture decouples this regression test from the live
@@ -119,7 +115,7 @@ EOF
 }
 
 test_dependabot_branch() {
-    local name="dependabot.yml branch (PWS001 regression)"
+    local name="dependabot.yml CLI binding (PWS001 regression)"
 
     # Synthetic fixture — intentionally decoupled from the live file.
     local target
@@ -134,9 +130,7 @@ test_dependabot_branch() {
 }
 
 # -----------------------------------------------------------------------------
-# Test: YAML lint invocation (shape only — verify pwsh parses and runs the script)
-# The hook branch calls yamllint directly, not pwsh, so here we just ensure
-# lint-yaml.ps1 is invokable (a sibling pwsh script loaded on CI).
+# Test: YAML lint invocation shape.
 # -----------------------------------------------------------------------------
 test_yaml_lint_invocation() {
     local name="lint-yaml.ps1 invocation"
@@ -155,11 +149,10 @@ test_yaml_lint_invocation() {
 }
 
 # -----------------------------------------------------------------------------
-# Test: lint-skill-sizes.ps1 with staged .llm/skills/*.md file (hook branch 11)
-# The hook uses: -Paths "${LLM_SIZE_CHECK_ARRAY[@]}"
+# Test: lint-skill-sizes.ps1 accepts explicit -Paths.
 # -----------------------------------------------------------------------------
 test_skill_sizes_branch() {
-    local name="skill-sizes branch (.llm/skills/*.md staged)"
+    local name="lint-skill-sizes.ps1 CLI binding"
 
     # Use an arbitrary existing skill file as the "staged" fixture.
     local target
@@ -176,11 +169,10 @@ test_skill_sizes_branch() {
 }
 
 # -----------------------------------------------------------------------------
-# Test: lint-tests.ps1 with staged Tests/*.cs file (hook branch 12)
-# The hook uses: -Paths "${TEST_FILES_ARRAY[@]}"
+# Test: lint-tests.ps1 accepts explicit -Paths.
 # -----------------------------------------------------------------------------
 test_lint_tests_branch() {
-    local name="lint-tests.ps1 branch (Tests/*.cs staged)"
+    local name="lint-tests.ps1 CLI binding"
     if [[ ! -f "$REPO_ROOT/scripts/lint-tests.ps1" ]]; then
         skip "$name" "no scripts/lint-tests.ps1"; return
     fi
@@ -221,12 +213,12 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
-# Test: format-staged-csharp.ps1 accepts staged-file arguments (hook branch 12 re-format)
-# The hook uses the positional form: format-staged-csharp.ps1 "${TEST_FILES_ARRAY[@]}"
-# Ensure this passes without a parameter binding error on a single .cs file.
+# Test: format-staged-csharp.ps1 accepts staged-file arguments.
+# Pre-commit no longer runs CSharpier, but this script remains part of the
+# agentic formatting workflow and must not regress parameter binding.
 # -----------------------------------------------------------------------------
 test_format_staged_csharp_branch() {
-    local name="format-staged-csharp.ps1 branch (positional args)"
+    local name="format-staged-csharp.ps1 CLI binding"
     if [[ ! -f "$REPO_ROOT/scripts/format-staged-csharp.ps1" ]]; then
         skip "$name" "no scripts/format-staged-csharp.ps1"; return
     fi
@@ -244,10 +236,10 @@ test_format_staged_csharp_branch() {
 }
 
 # -----------------------------------------------------------------------------
-# Test: lint-drawer-multiobject.ps1 invocation (hook branch 14)
+# Test: lint-drawer-multiobject.ps1 accepts explicit -Paths.
 # -----------------------------------------------------------------------------
 test_drawer_branch() {
-    local name="lint-drawer-multiobject.ps1 branch (*Drawer.cs staged)"
+    local name="lint-drawer-multiobject.ps1 CLI binding"
     if [[ ! -f "$REPO_ROOT/scripts/lint-drawer-multiobject.ps1" ]]; then
         skip "$name" "no scripts/lint-drawer-multiobject.ps1"; return
     fi
@@ -272,10 +264,10 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
-# Test: lint-duplicate-usings.ps1 invocation (hook branch 13)
+# Test: lint-duplicate-usings.ps1 accepts explicit -Paths.
 # -----------------------------------------------------------------------------
 test_duplicate_usings_branch() {
-    local name="lint-duplicate-usings.ps1 branch (*.cs staged)"
+    local name="lint-duplicate-usings.ps1 CLI binding"
     if [[ ! -f "$REPO_ROOT/scripts/lint-duplicate-usings.ps1" ]]; then
         skip "$name" "no scripts/lint-duplicate-usings.ps1"; return
     fi
@@ -305,7 +297,7 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
-# Test: sync scripts invoked by the hook do not fail to bind params
+# Test: sync scripts remain parseable for direct invocation.
 # -----------------------------------------------------------------------------
 test_sync_scripts_branch() {
     local name="sync scripts (banner + issue templates)"
@@ -350,135 +342,126 @@ test_original_failing_command() {
 }
 
 # -----------------------------------------------------------------------------
-# Test (P1-4): Pre-commit spell-check regression guard (the P0-1 regression).
+# Test (P1-4): Pre-commit spell-check speed boundary.
 #
-# Background: Round 1 refactored the cspell block in .githooks/pre-commit to
-# `if ! cspell ... | tee "$cap"; then`. Because pre-commit was running under
-# `set -e` (not `set -eo pipefail`), a pipeline's exit status is the status
-# of its LAST command (`tee`, always 0) and the failure branch never fired.
-# A commit introducing an unknown word silently passed pre-commit.
-#
-# Test strategy — surgical extraction:
-#   Running the FULL pre-commit hook end-to-end requires a realistic repo
-#   layout (docs/, Runtime/, CHANGELOG.md, all referenced by doc-link-lint
-#   and sync scripts). Mirroring that in a sandbox is enormous and fragile.
-#
-#   Instead, we extract the exact cspell block from .githooks/pre-commit —
-#   the block whose `set -e` pipefail-regression this test guards against —
-#   into a minimal driver script, and exercise it against a synthetic
-#   markdown file containing `ZZQWERTYNOISE`. The driver inherits the same
-#   `set -eo pipefail` policy as the real hook, so the test reproduces the
-#   real failure-path contract precisely without requiring doc-link-lint
-#   fixtures.
-#
-#   The critical invariant under test is: when cspell reports an unknown
-#   word, the driver exits NON-ZERO AND prints "Unknown word" AND prints
-#   the copy-pasteable patch block. Round 1's regression silently exited 0
-#   in this case — a straight reproduction.
+# Spelling belongs in agent-preflight, validate:prepush, and CI. The local
+# pre-commit hook is now a last-resort fast guard and must not reintroduce
+# cspell process startup or pipeline-exit fragility.
 # -----------------------------------------------------------------------------
 test_precommit_spellcheck_regression() {
-    local name="pre-commit spell-check regression (P0-1 guard)"
+    local name="pre-commit excludes cspell; agent-preflight owns spelling"
+    if grep -REq 'cspell[[:space:]]+(lint|--no-progress)|SPELL_FILES_ARRAY' "$REPO_ROOT/.githooks/pre-commit" "$REPO_ROOT/.githooks/pre-commit.ps1"; then
+        fail "$name" "pre-commit must not run spelling checks"
+    elif grep -q 'cspell lint' "$REPO_ROOT/scripts/agent-preflight.ps1"; then
+        pass "$name"
+    else
+        fail "$name" "agent-preflight no longer invokes cspell lint"
+    fi
+}
 
-    if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
-        skip "$name" "no node_modules in REPO_ROOT; run npm install first"
+test_precommit_entrypoint_delegates_to_ps1() {
+    local name="pre-commit entrypoint delegates to .ps1 implementation"
+    local sandbox="$TEMPDIR/precommit-entrypoint"
+    mkdir -p "$sandbox/.githooks"
+
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config user.email test@example.com
+    git -C "$sandbox" config user.name "Test User"
+    git -C "$sandbox" config commit.gpgsign false
+    git -C "$sandbox" config core.hooksPath .githooks
+
+    local marker_file="$TEMPDIR/pre-commit-entrypoint-marker-$$"
+    rm -f "$marker_file"
+
+    cp "$REPO_ROOT/.githooks/pre-commit" "$sandbox/.githooks/pre-commit"
+    cat > "$sandbox/.githooks/pre-commit.ps1" <<EOF
+#!/usr/bin/env pwsh
+New-Item -ItemType File -Path '$marker_file' -Force | Out-Null
+exit 0
+EOF
+    chmod +x "$sandbox/.githooks/pre-commit"
+
+    printf 'entrypoint\n' > "$sandbox/README.md"
+    git -C "$sandbox" add README.md
+
+    local output exit_code
+    output=$(cd "$sandbox" && git commit -q -m "entrypoint smoke" 2>&1) || exit_code=$?
+    exit_code="${exit_code:-0}"
+
+    if [[ "$exit_code" -ne 0 ]]; then
+        fail "$name" "git commit exited $exit_code
+--- output ---
+$output
+--- end ---"
         return
     fi
 
-    local sandbox="$TEMPDIR/precommit-spellcheck-regression"
-    rm -rf "$sandbox"
-    mkdir -p "$sandbox/docs"
-
-    # Share node_modules so cspell resolves. Symlink when possible; copy is
-    # a slow but portable fallback (Windows-hostile filesystems).
-    if ! ln -s "$REPO_ROOT/node_modules" "$sandbox/node_modules" 2>/dev/null; then
-        cp -a "$REPO_ROOT/node_modules" "$sandbox/node_modules" 2>/dev/null || true
+    if [[ -f "$marker_file" ]]; then
+        pass "$name"
+        rm -f "$marker_file"
+    else
+        fail "$name" "marker not created; extensionless hook did not invoke pre-commit.ps1"
     fi
-    # Copy the real cspell.json so the fixture is scanned under the real
-    # project configuration (same dictionaries, same files: restrictions).
-    cp "$REPO_ROOT/cspell.json" "$sandbox/cspell.json"
-    mkdir -p "$sandbox/scripts"
-    cp "$REPO_ROOT/scripts/run-node-bin.js" "$sandbox/scripts/run-node-bin.js"
+}
 
-    # Synthetic markdown fixture under docs/ — matches cspell.json's
-    # `files: ["docs/**/*.md", ...]` entry so cspell actually scans it. A
-    # fixture outside that glob would be silently skipped (cspell filters
-    # --file-list down to configured files), masking the regression.
-    # Token `ZZQWERTYNOISE` is a synthetic unknown that cannot be resolved
-    # via any cspell mechanism (compound splitting, dictionary lookup,
-    # minWordLength). Unlikely to ever become a legitimate codebase word.
-    local fixture_rel="docs/regression-fixture.md"
-    cat > "$sandbox/$fixture_rel" <<'EOF'
-# Regression fixture
+test_precommit_fast_path_removes_ignored_artifacts() {
+    local name="pre-commit no-staged fast path removes ignored hook artifacts"
+    local sandbox="$TEMPDIR/precommit-artifact-cleanup"
+    mkdir -p "$sandbox/.githooks"
 
-This file deliberately contains ZZQWERTYNOISE so the pre-commit cspell gate
-has something to reject.
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config user.email test@example.com
+    git -C "$sandbox" config user.name "Test User"
+    git -C "$sandbox" config commit.gpgsign false
+    git -C "$sandbox" config core.hooksPath .githooks
+
+    cp "$REPO_ROOT/.githooks/pre-commit" "$sandbox/.githooks/pre-commit"
+    chmod +x "$sandbox/.githooks/pre-commit"
+
+cat > "$sandbox/.gitignore" <<'EOF'
+*.log
+pre-commit.txt
+.githooks/pre-commit.txt
 EOF
+    git -C "$sandbox" add .gitignore
+    git -C "$sandbox" commit -q --no-verify -m "baseline"
 
-    # Extract the exact cspell block pattern from .githooks/pre-commit into
-    # a minimal driver that uses the same `set -eo pipefail`, the same
-    # temp-file capture pattern, the same exit-status capture, and the same
-    # failure-branch messaging. A regression that re-breaks the real hook's
-    # cspell block (e.g. reverting to `if ! ... | tee ...`) would also
-    # re-break this driver, causing this test to fail.
-    # Note on the invocation form below:
-    #   The real pre-commit hook uses `cspell lint --file-list <path>` to
-    #   avoid Windows command-length limits. We deliberately use direct
-    #   positional argv here (`cspell lint ... -- "$fixture_rel"`) — the
-    #   pre-push hook already uses this exact form, and it makes the test
-    #   robust to a known cspell quirk where --file-list paths aren't
-    #   matched against the `files:` glob in every version. The
-    #   pipefail-regression being guarded IS AGNOSTIC to which invocation
-    #   form is used: the regression is in how the exit code is CAPTURED,
-    #   not in how cspell is invoked.
-    local driver="$sandbox/run-cspell-block.sh"
-    cat > "$driver" <<EOF
-#!/usr/bin/env bash
-set -eo pipefail
-cd '$sandbox'
+    printf 'stale root artifact\n' > "$sandbox/pre-commit.txt"
+    printf 'stale hook artifact\n' > "$sandbox/.githooks/pre-commit.txt"
+    printf 'local diagnostic log\n' > "$sandbox/pre-commit.log"
 
-SPELL_CAPTURE="\$(mktemp)"
-trap 'rm -f "\$SPELL_CAPTURE"' EXIT
+    local output exit_code=0
+    output=$(cd "$sandbox" && .githooks/pre-commit 2>&1) || exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        fail "$name" "pre-commit exited $exit_code
+--- output ---
+$output
+--- end ---"
+        return
+    fi
 
-# This is the EXACT exit-code capture pattern from .githooks/pre-commit
-# after the P0-1 fix: cspell output is redirected to a capture file, the
-# exit code is captured separately, and the failure branch keys off the
-# captured exit code. A revert to the if-not-cspell-tee pipeline form (the
-# Round 1 regression) would set SPELL_EXIT=0 even when cspell fails,
-# because tee always exits 0.
-SPELL_EXIT=0
-node scripts/run-node-bin.js cspell lint --no-must-find-files --no-progress --show-suggestions -- '$fixture_rel' >"\$SPELL_CAPTURE" 2>&1 || SPELL_EXIT=\$?
-cat "\$SPELL_CAPTURE"
-if [ "\$SPELL_EXIT" -ne 0 ]; then
-  echo "=== Spelling errors detected ===" >&2
-  UNKNOWN_CODE_PREFIXES="\$(grep -oE 'Unknown word \([A-Z]{2,}\)' "\$SPELL_CAPTURE" 2>/dev/null | grep -oE '[A-Z]{2,}' | sort -u || true)"
-  if [ -n "\$UNKNOWN_CODE_PREFIXES" ]; then
-    echo "=== Detected unregistered lint-error-code prefix(es) ===" >&2
-  fi
-  echo "Re-run locally: npm run lint:spelling" >&2
-  exit 1
-fi
-EOF
-    chmod +x "$driver"
+    if [[ -e "$sandbox/pre-commit.txt" || -e "$sandbox/.githooks/pre-commit.txt" ]]; then
+        fail "$name" "ignored hook artifacts were not removed
+--- output ---
+$output
+--- end ---"
+        return
+    fi
 
-    # Run the driver and capture output. Expected: non-zero exit, "Unknown
-    # word" in output, AND "Spelling errors detected" as the patch-marker
-    # anchor (same string the real hook prints).
-    local driver_output driver_exit
-    driver_output=$(bash "$driver" 2>&1) || driver_exit=$?
-    driver_exit="${driver_exit:-0}"
+    if [[ ! -e "$sandbox/pre-commit.log" ]]; then
+        fail "$name" "root pre-commit.log should be preserved because root .log files are not hook-owned artifacts
+--- output ---
+$output
+--- end ---"
+        return
+    fi
 
-    local has_unknown has_patch_marker
-    has_unknown=0
-    has_patch_marker=0
-    if echo "$driver_output" | grep -q "Unknown word"; then has_unknown=1; fi
-    if echo "$driver_output" | grep -q "Spelling errors detected"; then has_patch_marker=1; fi
-
-    if [[ $driver_exit -ne 0 && $has_unknown -eq 1 && $has_patch_marker -eq 1 ]]; then
+    if grep -q 'No staged files to check' <<<"$output"; then
         pass "$name"
     else
-        fail "$name" "driver_exit=$driver_exit has_unknown=$has_unknown has_patch_marker=$has_patch_marker
---- captured output (first 60 lines) ---
-$(echo "$driver_output" | head -60)
+        fail "$name" "missing no-staged fast-path message
+--- output ---
+$output
 --- end ---"
     fi
 }
@@ -528,17 +511,17 @@ test_premergecommit_delegates_to_precommit() {
     local marker_file="$TEMPDIR/pre-commit-marker-$$"
     # Pre-nuke in case of a stale marker from a previous in-session run.
     rm -f "$marker_file"
-    cat > "$sandbox/.githooks/pre-commit" <<EOF
-#!/usr/bin/env bash
-# Stub: records that pre-commit was invoked, then exits 0.
-touch '$marker_file'
+    cat > "$sandbox/.githooks/pre-commit.ps1" <<EOF
+#!/usr/bin/env pwsh
+New-Item -ItemType File -Path '$marker_file' -Force | Out-Null
 exit 0
 EOF
-    chmod +x "$sandbox/.githooks/pre-commit"
+    chmod +x "$sandbox/.githooks/pre-commit.ps1"
 
-    # Install the REAL pre-merge-commit hook (which execs pre-commit).
+    # Install the REAL pre-merge-commit hook and its PowerShell implementation.
     cp "$REPO_ROOT/.githooks/pre-merge-commit" "$sandbox/.githooks/pre-merge-commit"
-    chmod +x "$sandbox/.githooks/pre-merge-commit"
+    cp "$REPO_ROOT/.githooks/pre-merge-commit.ps1" "$sandbox/.githooks/pre-merge-commit.ps1"
+    chmod +x "$sandbox/.githooks/pre-merge-commit" "$sandbox/.githooks/pre-merge-commit.ps1"
     git -C "$sandbox" config core.hooksPath .githooks
 
     # Create initial commit on main so we have something to branch from.
@@ -582,6 +565,85 @@ $merge_output
     fi
 }
 
+test_precommit_refuses_partial_final_newline_before_write() {
+    local name="pre-commit refuses partial final-newline fix before write"
+    local sandbox="$TEMPDIR/precommit-partial-final-newline"
+    mkdir -p "$sandbox/.githooks" "$sandbox/scripts"
+
+    cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
+    cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+    cp "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/normalize-eol.ps1"
+
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config user.email test@example.com
+    git -C "$sandbox" config user.name "Test User"
+
+    printf 'line' > "$sandbox/README.md"
+    git -C "$sandbox" add README.md
+    printf 'line modified' > "$sandbox/README.md"
+    cp "$sandbox/README.md" "$TEMPDIR/precommit-partial-before"
+
+    local output exit_code
+    output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+    exit_code="${exit_code:-0}"
+
+    if [[ "$exit_code" -eq 0 ]]; then
+        fail "$name" "pre-commit unexpectedly succeeded"
+        return
+    fi
+
+    if ! grep -q 'Refusing to auto-stage whole file(s) with pre-existing unstaged changes before final newline normalization' <<<"$output"; then
+        fail "$name" "missing refusal diagnostic
+--- output ---
+$output
+--- end ---"
+        return
+    fi
+
+    if git diff --no-index --quiet "$sandbox/README.md" "$TEMPDIR/precommit-partial-before"; then
+        pass "$name"
+    else
+        fail "$name" "README.md changed even though the hook refused before auto-fix"
+    fi
+}
+
+test_precommit_checks_staged_csharp_blob() {
+    local name="pre-commit checks staged C# blob for regions"
+    local sandbox="$TEMPDIR/precommit-staged-csharp-blob"
+    mkdir -p "$sandbox/.githooks" "$sandbox/scripts"
+
+    cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
+    cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+    cp "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/normalize-eol.ps1"
+
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config user.email test@example.com
+    git -C "$sandbox" config user.name "Test User"
+
+    printf 'public sealed class Loose\r\n{\r\n#region Bad\r\n#endregion\r\n}\r\n' > "$sandbox/Loose.cs"
+    git -C "$sandbox" add Loose.cs
+
+    printf 'public sealed class Loose\r\n{\r\n}\r\n' > "$sandbox/Loose.cs"
+
+    local output exit_code
+    output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+    exit_code="${exit_code:-0}"
+
+    if [[ "$exit_code" -eq 0 ]]; then
+        fail "$name" "pre-commit passed while the staged blob still contained #region"
+        return
+    fi
+
+    if grep -q 'Forbidden #region/#endregion directives detected' <<<"$output"; then
+        pass "$name"
+    else
+        fail "$name" "missing staged-blob region diagnostic
+--- output ---
+$output
+--- end ---"
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Guard: the anti-pattern lint itself passes on the repo.
 # If THIS fails, there is a lingering -- argv form somewhere in the codebase.
@@ -616,7 +678,11 @@ test_duplicate_usings_branch
 test_sync_scripts_branch
 test_antipattern_lint_clean
 test_precommit_spellcheck_regression
+test_precommit_entrypoint_delegates_to_ps1
+test_precommit_fast_path_removes_ignored_artifacts
 test_premergecommit_delegates_to_precommit
+test_precommit_refuses_partial_final_newline_before_write
+test_precommit_checks_staged_csharp_blob
 
 echo ""
 echo "=== Summary ==="

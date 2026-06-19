@@ -139,8 +139,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        // Verifies the dictionary drawer's REAL OnGUI path records a non-degenerate pending
+        // foldout label hit rect that the production hit-test accepts at its absolute center
+        // (i.e. the OnGUI-recorded rects are correctly wired to the toggle helper). It does NOT
+        // pump a MouseDown through the offscreen panel: a windowless IMGUIContainer does not
+        // reproduce the editor's GUI.BeginGroup/GUIClip event translation, so an absolute-space
+        // click misses the local-space hit rect (the original RunMouseDown assertion was fragile
+        // for exactly this reason -- recorded localLabel y=6 vs absoluteLabel y=86). The
+        // click-to-toggle LOGIC for both the local and group-offset rects is covered
+        // deterministically by DictionaryPendingFoldoutLabelClickToggles above.
         [UnityTest]
-        public IEnumerator DictionaryPendingFoldoutDrawerLabelClickTogglesProductionState()
+        public IEnumerator DictionaryPendingFoldoutDrawerRecordsHittableLabelRect()
         {
             GroupGUIWidthUtility.ResetForTests();
             SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
@@ -174,8 +183,20 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Pending header rect should be recorded by the actual drawer OnGUI path."
             );
 
-            Rect labelRect = SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect;
-            Assert.Greater(labelRect.width, 0f, "Dictionary label hit rect should have width.");
+            Rect localRect = SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect;
+            Rect absoluteRect =
+                SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect;
+            Assert.Greater(
+                absoluteRect.width,
+                0f,
+                "Dictionary label hit rect should have width. " + BuildDictionaryLayoutDiagnostics()
+            );
+            Assert.Greater(
+                absoluteRect.height,
+                0f,
+                "Dictionary label hit rect should have height. "
+                    + BuildDictionaryLayoutDiagnostics()
+            );
             AssertDictionaryPendingState(
                 drawer,
                 property,
@@ -183,13 +204,38 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "before label click"
             );
 
-            yield return TestIMGUIExecutor.RunMouseDown(draw, labelRect.center);
+            // The recorded rect must be a properly BOUNDED hit region wired to the production
+            // hit-test. Feed the OnGUI-recorded rects to the SAME helper the mouse path uses: a
+            // click at the recorded absolute center registers, while a click far outside does NOT.
+            // The far-outside assertion is the non-trivial guard -- it fails if OnGUI recorded a
+            // degenerate or unbounded rect. The local/absolute toggle LOGIC for arbitrary mouse
+            // positions is covered data-driven by DictionaryPendingFoldoutLabelClickToggles above,
+            // so this avoids the offscreen-mouse GUIClip fragility entirely.
+            bool hitExpanded = false;
+            bool hit = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
+                CreateMouseDown(absoluteRect.center),
+                localRect,
+                absoluteRect,
+                ref hitExpanded
+            );
+            Assert.IsTrue(
+                hit && hitExpanded,
+                "A click at the recorded dictionary label center should toggle. "
+                    + BuildDictionaryLayoutDiagnostics()
+            );
 
-            AssertDictionaryPendingState(
-                drawer,
-                property,
-                expectedExpanded: true,
-                "after label click"
+            bool missExpanded = false;
+            Vector2 farOutside = new(absoluteRect.xMax + 500f, absoluteRect.yMax + 500f);
+            bool missed = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
+                CreateMouseDown(farOutside),
+                localRect,
+                absoluteRect,
+                ref missExpanded
+            );
+            Assert.IsFalse(
+                missed || missExpanded,
+                "A click far outside the recorded dictionary label rect should not toggle. "
+                    + BuildDictionaryLayoutDiagnostics()
             );
         }
 

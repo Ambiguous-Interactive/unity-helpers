@@ -23,7 +23,9 @@ npm run format:check
 
 ## Pre-Commit Hook Setup
 
-The repository uses git hooks in `.githooks/` to auto-format staged files on commit.
+The repository uses git hooks in `.githooks/` as fast last-resort guards. Run
+`npm run agent:preflight:fix` before committing for routine formatting,
+spelling, Markdown, and documentation repairs.
 
 ### Installation
 
@@ -32,26 +34,32 @@ The repository uses git hooks in `.githooks/` to auto-format staged files on com
 npm run hooks:install
 
 # Or use the full installation script
-bash scripts/install-hooks.sh
+pwsh -NoProfile -File scripts/install-hooks.ps1
 ```
 
 ### What the Hook Does
 
-1. Syncs versions (banner SVG + [LLM context](../context.md) from `package.json`; issue template dropdowns from `package.json`, the [CHANGELOG](../../CHANGELOG.md), and git tags)
-2. Normalizes line endings (CRLF/LF per file type)
-3. Runs path-scoped documentation link lint on staged Markdown/docs/source files
-4. Formats staged files with Prettier (Markdown, JSON, YAML, JS)
-5. Formats staged C# files with CSharpier
-6. Audits and auto-fixes staged C# license year headers
-7. Adds missing Markdown fence languages where inferable, then runs markdownlint on staged Markdown files
-8. Runs CHANGELOG lint when [CHANGELOG](../../CHANGELOG.md) is staged, plus YAML lint, Dependabot config schema lint, spell check (with copy-pasteable cspell.json patch for unregistered lint-error-code prefixes), LLM instruction lint, and test lint
-9. Checks staged C# files for duplicate using directives (`UNH007`)
-10. Checks for forbidden `#region` directives
-11. Checks drawer/editor files for missing multi-object editing support (GenericMenu without `hasMultipleDifferentValues`)
-12. Checks Odin drawer Undo safety (WeakTargets null-filtering before `Undo.RecordObjects`)
-13. Checks for missing `.meta` files on staged files (auto-stages existing `.meta` companions)
+1. Delegates from the extensionless POSIX hook launcher to `.githooks/pre-commit.ps1`
+2. Removes gitignored stray hook-output artifacts such as `pre-commit.txt`
+3. Syncs version metadata when version-bearing files are staged
+4. Adds missing final newlines on staged text files, then re-stages exact fixes
+5. Runs LLM instruction and skill-size checks when `.llm/` files are staged
+6. Checks staged C# files for forbidden `#region` directives
+7. Checks for missing `.meta` files on staged files and auto-stages dirty existing `.meta` companions
+
+Pre-commit intentionally does not run Prettier, CSharpier, cspell,
+markdownlint, documentation link lint, EOL normalization, test lint,
+duplicate-using lint, or broad license audits. Those checks belong in
+`npm run agent:preflight:fix`,
+`npm run validate:prepush`, and CI so the hook stays fast and reliable on native
+Linux, macOS, and Windows hosts.
 
 The repository also installs a `pre-merge-commit` hook that delegates to `pre-commit`. Git does NOT run `pre-commit` on merge commits by default, so without this delegation any file introduced through a merge (including manual conflict resolution) would bypass every validation. The April 2026 `PWS001` regression is the concrete incident this guards against.
+
+Do not invoke extensionless hooks with `pwsh -File`; PowerShell `-File` targets
+must be `.ps1` scripts on every supported host. For debugging, run
+`.githooks/pre-commit.ps1` with PowerShell, or let Git execute
+`.githooks/pre-commit` directly.
 
 ### If the Hook Wasn't Active
 
