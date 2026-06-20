@@ -7149,6 +7149,24 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
                 SetElementData elementData = ReadElementData(element);
                 object value = ConvertSnapshotValue(elementType, elementData.value);
+                // On Unity 2021.3 (no SerializedProperty.boxedValue) a complex/Generic element
+                // degrades to its string propertyPath, which is not assignable to a strongly-typed
+                // snapshot array and throws InvalidCastException at SetValue. Skip any value that
+                // is not assignable to elementType (the slot stays at default(elementType)) rather
+                // than throwing, so SyncRuntimeSet can complete on every Unity version.
+                //
+                // KNOWN 2021.3 LIMITATION (not a regression — boxedValue genuinely does not exist
+                // there): for sets of complex/[Serializable] reference elements the snapshot cannot
+                // be reconstructed from serialized state, so a snapshot rebuilt during a drawer
+                // *edit* round-trips existing complex entries as default/null. The pre-2022 editor
+                // could never read these values back regardless; this guard only converts the hard
+                // InvalidCastException into the same degraded read the rest of the 2021.3 path
+                // already produces. On 2022.1+/6000 ConvertSnapshotValue returns real instances and
+                // this guard is inert, so no convertible value is ever dropped.
+                if (value != null && !elementType.IsInstanceOfType(value))
+                {
+                    continue;
+                }
                 snapshot.SetValue(value, index);
             }
 

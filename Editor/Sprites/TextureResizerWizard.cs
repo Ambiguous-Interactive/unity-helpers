@@ -429,30 +429,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static void EnsureDirectory(string assetPath)
         {
+            // Route through the single hardened folder helper. Creating the directory on disk
+            // first and then calling AssetDatabase.CreateFolder per-segment (the previous
+            // approach) fabricates numbered-duplicate folders ("Name 1") because each segment
+            // already exists on disk by the time CreateFolder runs — the same on-disk/AssetDatabase
+            // desync that broke the singleton folders. EnsureAssetParentFolder adopts existing
+            // on-disk folders via import instead.
+            if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
+            {
+                return;
+            }
+
+            // Fallback: the helper refuses paths outside the Assets tree (and returns false if a
+            // segment cannot be registered). Preserve the prior guarantee that the physical output
+            // directory exists so the subsequent asset write cannot fail with "directory not found".
             string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
             if (string.IsNullOrEmpty(dirAsset))
             {
                 return;
             }
-
-            // Create physical directory if missing
             string fullDir = ToFullPath(dirAsset);
             if (!Directory.Exists(fullDir))
             {
                 _ = Directory.CreateDirectory(fullDir);
-            }
-
-            // Ensure Unity knows about folders
-            string[] parts = dirAsset.Split('/');
-            string cur = parts[0];
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string next = cur + "/" + parts[i];
-                if (!AssetDatabase.IsValidFolder(next))
-                {
-                    AssetDatabase.CreateFolder(cur, parts[i]);
-                }
-                cur = next;
             }
         }
     }

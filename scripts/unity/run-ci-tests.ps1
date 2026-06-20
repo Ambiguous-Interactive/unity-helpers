@@ -421,6 +421,59 @@ function Write-UnityPackageManagerDiagnostics {
     Write-Host "::endgroup::"
 }
 
+# The log line the Unity test runner emits once the run is over and results.xml has
+# been flushed. Used as the completion sentinel so a Unity editor that deadlocks on
+# shutdown AFTER this point is tree-killed within the grace window instead of blocking
+# until the GitHub step's wall-clock timeout (the Unity 2021.3 -batchmode hang).
+$script:EditorTestCompletionSentinel = 'Test run completed\. Exiting with code \d+'
+
+function Get-EditorTestRunTimeoutSeconds {
+    # Wall-clock backstop for a -runTests editor pass. The completion-sentinel grace is
+    # the primary guard against the shutdown deadlock; this is the fallback for a run
+    # that hangs WITHOUT ever logging completion (e.g. a mid-run deadlock or a compile
+    # hang). MUST stay strictly BELOW the GitHub step's timeout-minutes for the
+    # editmode/playmode legs (90 min in unity-tests.yml) so the watchdog tree-kills the
+    # editor, persists the log, and returns the license seat BEFORE GitHub force-cancels
+    # the job (which would lose the on-disk log and cascade the matrix). 4800s = 80 min
+    # leaves 10 min of headroom. Honors UH_EDITOR_TEST_TIMEOUT_SECONDS; a non-integer or
+    # negative override is ignored with a ::warning::; 0 is the explicit OPT-OUT
+    # (unbounded). StrictMode-safe.
+    param([int]$Default = 4800)
+
+    if ($env:UH_EDITOR_TEST_TIMEOUT_SECONDS) {
+        $parsed = 0
+        if (
+            [int]::TryParse($env:UH_EDITOR_TEST_TIMEOUT_SECONDS, [ref]$parsed) -and
+            $parsed -ge 0
+        ) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_EDITOR_TEST_TIMEOUT_SECONDS='$env:UH_EDITOR_TEST_TIMEOUT_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
+function Get-EditorTestCompletionGraceSeconds {
+    # How long to wait for the editor to exit on its own AFTER it logs the completion
+    # sentinel before tree-killing it. Small (results are already written) but non-zero
+    # so a normally-terminating editor is never killed mid-flush. Honors
+    # UH_EDITOR_TEST_COMPLETION_GRACE_SECONDS; invalid/negative ignored with a
+    # ::warning::; 0 means kill immediately on completion. StrictMode-safe.
+    param([int]$Default = 120)
+
+    if ($env:UH_EDITOR_TEST_COMPLETION_GRACE_SECONDS) {
+        $parsed = 0
+        if (
+            [int]::TryParse($env:UH_EDITOR_TEST_COMPLETION_GRACE_SECONDS, [ref]$parsed) -and
+            $parsed -ge 0
+        ) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_EDITOR_TEST_COMPLETION_GRACE_SECONDS='$env:UH_EDITOR_TEST_COMPLETION_GRACE_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
 function Invoke-UnityEditorTestsWithPackageManagerRetry {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -431,11 +484,17 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         [Parameter(Mandatory = $true)][string]$Project
     )
 
+    $completionGrace = Get-EditorTestCompletionGraceSeconds
+    $runTimeout = Get-EditorTestRunTimeoutSeconds
+
     $runExit = Invoke-UnityEditor `
         -EditorPath $EditorPath `
         -Arguments $Arguments `
         -Label $Label `
-        -LogPath $LogPath
+        -LogPath $LogPath `
+        -CompletionPattern $script:EditorTestCompletionSentinel `
+        -CompletionGraceSeconds $completionGrace `
+        -TimeoutSeconds $runTimeout
 
     if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
         -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
@@ -461,7 +520,10 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         -EditorPath $EditorPath `
         -Arguments $Arguments `
         -Label "$Label (retry 1 after UPM cancellation)" `
-        -LogPath $LogPath
+        -LogPath $LogPath `
+        -CompletionPattern $script:EditorTestCompletionSentinel `
+        -CompletionGraceSeconds $completionGrace `
+        -TimeoutSeconds $runTimeout
 }
 
 # Collapse any run of whitespace (including CR/LF) to a single space and trim, so
@@ -1763,6 +1825,49 @@ function ConvertTo-ProcessArgumentLine {
     return ($quoted -join ' ')
 }
 
+function Set-CompletionGraceDeadline {
+    # Helper for Invoke-ProcessWithTreeKillTimeout's completion-sentinel handling. If
+    # $Line matches $Pattern (and a pattern was supplied), arms the grace countdown:
+    # sets $Armed to $true, parses the "Exiting with code N" exit code into $ExitCode
+    # when present, and returns the tightened deadline (the earlier of the current
+    # deadline and now + $GraceSeconds). Otherwise returns $CurrentDeadline unchanged.
+    # StrictMode-safe: no uninitialized reads, no collection indexing.
+    param(
+        [string]$Line,
+        [string]$Pattern,
+        [int]$GraceSeconds,
+        [DateTime]$CurrentDeadline,
+        [Parameter(Mandatory = $true)][ref]$Armed,
+        [Parameter(Mandatory = $true)][ref]$ExitCode,
+        [string]$Label = ''
+    )
+
+    if ([string]::IsNullOrEmpty($Pattern)) {
+        return $CurrentDeadline
+    }
+    if ($Line -notmatch $Pattern) {
+        return $CurrentDeadline
+    }
+
+    $Armed.Value = $true
+
+    $codeMatch = [regex]::Match($Line, 'Exiting with code (\d+)')
+    if ($codeMatch.Success) {
+        $parsed = 0
+        if ([int]::TryParse($codeMatch.Groups[1].Value, [ref]$parsed)) {
+            $ExitCode.Value = $parsed
+        }
+    }
+
+    Write-Host "::notice::'$Label' logged a completion sentinel; results are already written. Will tree-kill the editor in up to $GraceSeconds s if it does not exit on its own (Unity 2021.3 batchmode shutdown-deadlock guard)."
+
+    $graceDeadline = [DateTime]::UtcNow.AddSeconds([double]$GraceSeconds)
+    if ($graceDeadline -lt $CurrentDeadline) {
+        return $graceDeadline
+    }
+    return $CurrentDeadline
+}
+
 function Invoke-ProcessWithTreeKillTimeout {
     # GENERALIZED hard tree-kill watchdog, STRUCTURALLY IDENTICAL to
     # scripts/unity/ensure-editor.ps1 Invoke-UnityCliCaptureWithTimeout (the proven
@@ -1788,12 +1893,28 @@ function Invoke-ProcessWithTreeKillTimeout {
     # Returns a StrictMode-safe hashtable @{ ExitCode; TimedOut }. The caller throws
     # on $TimedOut or a non-zero $ExitCode; the FILE written by the player is the
     # source of truth for pass/fail.
+    #
+    # COMPLETION SENTINEL (optional): some Unity versions (notably 2021.3 in
+    # -batchmode) finish the test run -- writing the authoritative results.xml and
+    # logging "Test run completed. Exiting with code N" -- and then DEADLOCK on
+    # shutdown, never terminating and never closing their stdout/stderr pipes. A bare
+    # wall-clock deadline would let that hang burn the full timeout. When
+    # $CompletionPattern is supplied, the FIRST log line matching it arms a short
+    # $CompletionGraceSeconds countdown; if the process still has not exited on its
+    # own when the countdown elapses, it is tree-killed and the run is reported as a
+    # NORMAL completion (TimedOut=$false) carrying the exit code parsed from the
+    # sentinel ("Exiting with code N"). The durable results.xml -- already written
+    # before the sentinel -- remains the source of truth, so a passing run still
+    # passes. A run that never logs the sentinel (e.g. a compile failure) falls back
+    # to the plain wall-clock deadline.
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments,
         [int]$TimeoutSeconds = 1800,
         [Parameter(Mandatory = $true)][string]$LogPath,
-        [Parameter(Mandatory = $true)][string]$Label
+        [Parameter(Mandatory = $true)][string]$Label,
+        [string]$CompletionPattern = '',
+        [int]$CompletionGraceSeconds = 120
     )
 
     $logDir = Split-Path -Parent $LogPath
@@ -1827,6 +1948,9 @@ function Invoke-ProcessWithTreeKillTimeout {
     $exit = -1
     $timedOut = $false
     $reaped = $false
+    $completionArmed = $false
+    $completionExitCode = $null
+    $killedAfterCompletion = $false
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $FilePath
@@ -1864,6 +1988,9 @@ function Invoke-ProcessWithTreeKillTimeout {
                 } else {
                     Write-Host $line
                     $buffer.Add([string]$line)
+                    if (-not $completionArmed) {
+                        $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
+                    }
                     $oTask = $outReader.ReadLineAsync()
                 }
                 $progressed = $true
@@ -1876,15 +2003,25 @@ function Invoke-ProcessWithTreeKillTimeout {
                 } else {
                     Write-Host $line
                     $buffer.Add([string]$line)
+                    if (-not $completionArmed) {
+                        $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
+                    }
                     $eTask = $errReader.ReadLineAsync()
                 }
                 $progressed = $true
             }
 
             if ([DateTime]::UtcNow -ge $deadline) {
-                # HUNG (or a quick-exit child whose grandchild still holds the pipe
-                # open, so EOF never arrives): tree-kill the WHOLE process tree.
-                $timedOut = $true
+                # Either a true wall-clock breach, OR the completion-grace countdown
+                # elapsed after the run finished but the editor hung on shutdown. The
+                # latter is a NORMAL completion (results.xml already written), not a
+                # timeout. Tree-kill the WHOLE process tree either way (the editor can
+                # spawn children -- bee/IL2CPP -- so a bare Kill() would orphan them).
+                if ($completionArmed) {
+                    $killedAfterCompletion = $true
+                } else {
+                    $timedOut = $true
+                }
                 try {
                     $proc.Kill($true)
                 } catch {
@@ -1915,7 +2052,20 @@ function Invoke-ProcessWithTreeKillTimeout {
             }
         }
 
-        if ($timedOut) {
+        if ($killedAfterCompletion) {
+            # The test run finished and wrote results.xml; the editor then hung on
+            # shutdown and we tree-killed it after the grace window. This is NOT a
+            # timeout -- report the exit code the runner logged in the sentinel (the
+            # caller validates the durable results.xml regardless). Fall back to 0 if
+            # the code could not be parsed, so a healthy run is never failed by the
+            # shutdown deadlock alone.
+            if ($null -ne $completionExitCode) {
+                $exit = $completionExitCode
+            } else {
+                $exit = 0
+            }
+            $timedOut = $false
+        } elseif ($timedOut) {
             $exit = $timeoutExitCode
         } elseif ($reaped -and $proc.HasExited) {
             $exit = $proc.ExitCode
@@ -2006,7 +2156,16 @@ function Invoke-UnityEditor {
         [Parameter(Mandatory = $true)][string]$EditorPath,
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][string]$LogPath
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        # When set, the editor is launched under the tree-kill watchdog with
+        # completion-sentinel detection instead of the bare `&` pipeline. The
+        # -runTests passes use this because Unity 2021.3 -batchmode can deadlock on
+        # shutdown AFTER results.xml is written, which would otherwise block the `&`
+        # pipeline until the GitHub step's wall-clock timeout. Configure/license/build
+        # callers omit it and keep the proven `&` idiom unchanged.
+        [string]$CompletionPattern = '',
+        [int]$CompletionGraceSeconds = 120,
+        [int]$TimeoutSeconds = 0
     )
 
     # Unity.exe is a Windows GUI-subsystem binary. PowerShell's `&` launches such
@@ -2021,18 +2180,34 @@ function Invoke-UnityEditor {
         New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     }
 
-    Write-Host "::group::$Label"
-    Write-Host "`"$EditorPath`" $($Arguments -join ' ')"
-    # Stream Unity's output LIVE to the console AND persist it to $LogPath, but route
-    # it to the HOST (Out-Host) so it never enters this function's success stream:
-    # the function RETURNS the exit code, and a bare `| Tee-Object` would otherwise
-    # collect every streamed log line into the caller's `$x = Invoke-UnityEditor`
-    # capture (turning the return value into an Object[] of log lines + the code).
-    # Consuming the process's stdout via the pipeline still forces PowerShell to
-    # BLOCK until the GUI-subsystem Unity.exe exits and to set $LASTEXITCODE.
-    & $EditorPath @Arguments 2>&1 | Tee-Object -FilePath $LogPath | Out-Host
-    $exitCode = $LASTEXITCODE
-    Write-Host "::endgroup::"
+    if ($CompletionPattern -or ($TimeoutSeconds -gt 0)) {
+        # Hung-shutdown-resilient path: the watchdog drains both pipes on a main-thread
+        # poll loop (live echo + tee to $LogPath), enforces the wall-clock deadline,
+        # and grace-kills the editor once the completion sentinel is seen. It returns
+        # @{ ExitCode; TimedOut }; the durable results.xml remains the source of truth.
+        $watch = Invoke-ProcessWithTreeKillTimeout `
+            -FilePath $EditorPath `
+            -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds `
+            -LogPath $LogPath `
+            -Label $Label `
+            -CompletionPattern $CompletionPattern `
+            -CompletionGraceSeconds $CompletionGraceSeconds
+        $exitCode = $watch.ExitCode
+    } else {
+        Write-Host "::group::$Label"
+        Write-Host "`"$EditorPath`" $($Arguments -join ' ')"
+        # Stream Unity's output LIVE to the console AND persist it to $LogPath, but route
+        # it to the HOST (Out-Host) so it never enters this function's success stream:
+        # the function RETURNS the exit code, and a bare `| Tee-Object` would otherwise
+        # collect every streamed log line into the caller's `$x = Invoke-UnityEditor`
+        # capture (turning the return value into an Object[] of log lines + the code).
+        # Consuming the process's stdout via the pipeline still forces PowerShell to
+        # BLOCK until the GUI-subsystem Unity.exe exits and to set $LASTEXITCODE.
+        & $EditorPath @Arguments 2>&1 | Tee-Object -FilePath $LogPath | Out-Host
+        $exitCode = $LASTEXITCODE
+        Write-Host "::endgroup::"
+    }
     if ($exitCode -ne 0) {
         # Proactively surface catastrophic compile-time failure patterns
         # (PrecompiledAssemblyException, CompilationFailedException, CS####,

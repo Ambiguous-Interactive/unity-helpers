@@ -12,6 +12,8 @@ on:
       - "scripts/tests/test-lint-tests.ps1"
       - "scripts/unity/report-slow-tests.ps1"
       - "scripts/tests/test-report-slow-tests.ps1"
+      - "scripts/unity/run-ci-tests.ps1"
+      - "scripts/tests/test-process-watchdog.ps1"
       - ".github/workflows/test-lint.yml"
   pull_request:
     paths:
@@ -22,6 +24,8 @@ on:
       - "scripts/tests/test-lint-tests.ps1"
       - "scripts/unity/report-slow-tests.ps1"
       - "scripts/tests/test-report-slow-tests.ps1"
+      - "scripts/unity/run-ci-tests.ps1"
+      - "scripts/tests/test-process-watchdog.ps1"
       - ".github/workflows/test-lint.yml"
 
 permissions:
@@ -45,6 +49,10 @@ jobs:
       - name: Test slow-test reporter
         shell: pwsh
         run: ./scripts/tests/test-report-slow-tests.ps1 -VerboseOutput
+
+      - name: Test process watchdog
+        shell: pwsh
+        run: ./scripts/tests/test-process-watchdog.ps1 -VerboseOutput
 
       - name: Lint tests
         shell: pwsh

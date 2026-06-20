@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
 #if UNITY_EDITOR
     using System;
+    using System.IO;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -394,24 +395,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Pausing guarantees CreateFolder is applied synchronously even when a fixture-wide
-            // StartAssetEditing batch is open. PauseBatch is a no-op when nothing is batching.
+            // Pausing guarantees CreateFolder/ImportAsset are applied synchronously even when a
+            // fixture-wide StartAssetEditing batch is open. PauseBatch is a no-op when nothing is batching.
             using (PauseBatch())
             {
                 string current = segments[0];
                 for (int i = 1; i < segments.Length; i++)
                 {
                     string next = current + "/" + segments[i];
-                    if (!AssetDatabase.IsValidFolder(next))
+                    if (
+                        !AssetDatabase.IsValidFolder(next)
+                        && !EnsureSingleFolderSegment(current, segments[i], next)
+                    )
                     {
-                        string createdGuid = AssetDatabase.CreateFolder(current, segments[i]);
-                        if (string.IsNullOrEmpty(createdGuid) && !AssetDatabase.IsValidFolder(next))
-                        {
-                            Debug.LogWarning(
-                                $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(EnsureAssetFolder)} failed to create folder '{next}'."
-                            );
-                            return false;
-                        }
+                        Debug.LogWarning(
+                            $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(EnsureAssetFolder)} failed to create folder '{next}'."
+                        );
+                        return false;
                     }
 
                     current = next;
@@ -419,6 +419,90 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 return AssetDatabase.IsValidFolder(normalized);
             }
+        }
+
+        /// <summary>
+        ///     Ensures a single child folder segment exists in the AssetDatabase, robust to the
+        ///     common desync where the folder already exists on disk but has not yet been imported.
+        ///     Calling <see cref="AssetDatabase.CreateFolder(string, string)"/> blindly in that
+        ///     state either fails (empty GUID) or fabricates a numbered duplicate ("Name 1") that
+        ///     leaves the intended path invalid — the root cause of the "Failed to ensure folder"
+        ///     errors and the leftover "Name 1" duplicate folders. Must be called inside
+        ///     <see cref="PauseBatch"/> so the operations apply synchronously.
+        /// </summary>
+        /// <param name="parentFolder">The (already-valid) parent folder, e.g. <c>Assets/Resources</c>.</param>
+        /// <param name="childName">The single child segment to create, e.g. <c>Wallstop Studios</c>.</param>
+        /// <param name="childFolder">The full intended child path (<paramref name="parentFolder"/>/<paramref name="childName"/>).</param>
+        /// <returns><see langword="true"/> if <paramref name="childFolder"/> is a valid AssetDatabase folder afterwards.</returns>
+        private static bool EnsureSingleFolderSegment(
+            string parentFolder,
+            string childName,
+            string childFolder
+        )
+        {
+            // 1. The folder already exists on disk but the AssetDatabase has not imported it yet
+            //    (VCS checkout, external tooling, a sibling test's Directory.CreateDirectory, a
+            //    leaked batch scope, ...). Adopt it via import instead of creating a duplicate.
+            if (DirectoryExistsOnDisk(childFolder))
+            {
+                AssetDatabase.ImportAsset(childFolder, ImportAssetOptions.ForceSynchronousImport);
+                if (AssetDatabase.IsValidFolder(childFolder))
+                {
+                    return true;
+                }
+            }
+
+            // 2. Genuinely missing in both the AssetDatabase and on disk — create it.
+            string createdGuid = AssetDatabase.CreateFolder(parentFolder, childName);
+
+            // 3. CreateFolder collided with an on-disk folder (or a concurrent op) and produced a
+            //    numbered duplicate ("Name 1") rather than the intended "Name". Remove the empty
+            //    duplicate and adopt the real on-disk folder so the intended path becomes valid.
+            if (!string.IsNullOrEmpty(createdGuid))
+            {
+                string createdPath = AssetDatabase.GUIDToAssetPath(createdGuid)?.SanitizePath();
+                if (
+                    !string.IsNullOrEmpty(createdPath)
+                    && !string.Equals(createdPath, childFolder, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    AssetDatabase.DeleteAsset(createdPath);
+                    if (DirectoryExistsOnDisk(childFolder))
+                    {
+                        AssetDatabase.ImportAsset(
+                            childFolder,
+                            ImportAssetOptions.ForceSynchronousImport
+                        );
+                    }
+                }
+            }
+
+            return AssetDatabase.IsValidFolder(childFolder);
+        }
+
+        /// <summary>
+        ///     Returns <see langword="true"/> if the given Unity-relative asset folder path
+        ///     (rooted at <c>Assets</c>) exists as a directory on the project's filesystem,
+        ///     regardless of whether the AssetDatabase has imported it.
+        /// </summary>
+        private static bool DirectoryExistsOnDisk(string assetFolderPath)
+        {
+            if (string.IsNullOrEmpty(assetFolderPath))
+            {
+                return false;
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return false;
+            }
+
+            string absolute = Path.Combine(
+                projectRoot,
+                assetFolderPath.Replace('/', Path.DirectorySeparatorChar)
+            );
+            return Directory.Exists(absolute);
         }
 
         /// <summary>
