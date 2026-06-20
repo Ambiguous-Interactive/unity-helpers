@@ -2192,6 +2192,151 @@ namespace WallstopStudios.UnityHelpers.Tests
 $r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'SuppressedEditorRef.cs' -FixtureContent $unh011Suppress
 Write-TestResult "UNH011.HonorsSuppress" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH011')) "Exit: $($r.ExitCode), Output: $($r.Output)"
 
+# ── UNH012: [UnityTest] must not yield return WaitForEndOfFrame ───────────────
+Write-Host "`n  Section: UNH012 WaitForEndOfFrame yield guard" -ForegroundColor White
+
+# GREEN: `yield return new WaitForEndOfFrame();` hangs under -batchmode
+# -nographics and must be flagged.
+$unh012NewExpression = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class WaitEndOfFrameNewFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForEndOfFrame();
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitEndOfFrameNewFixture.cs' -FixtureContent $unh012NewExpression
+$ok = ($r.ExitCode -ne 0) -and ($r.Output -match 'UNH012')
+Write-TestResult "UNH012.FlagsYieldNewWaitForEndOfFrame" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# GREEN: yielding the production helper field also never resumes headless.
+$unh012FieldExpression = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+
+    public sealed class WaitEndOfFrameFieldFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return Buffers.WaitForEndOfFrame;
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitEndOfFrameFieldFixture.cs' -FixtureContent $unh012FieldExpression
+$ok = ($r.ExitCode -ne 0) -and ($r.Output -match 'UNH012')
+Write-TestResult "UNH012.FlagsYieldBuffersWaitForEndOfFrame" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# GREEN: a csharpier-wrapped `yield return` with `new WaitForEndOfFrame()` on its
+# own line must still flag (the `new WaitForEndOfFrame(` alternation catches it even
+# though `yield return` and the type are on different lines).
+$unh012MultiLineNew = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class WaitMultiLineNewFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return
+                new WaitForEndOfFrame();
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitMultiLineNewFixture.cs' -FixtureContent $unh012MultiLineNew
+$ok = ($r.ExitCode -ne 0) -and ($r.Output -match 'UNH012')
+Write-TestResult "UNH012.FlagsMultiLineNewWaitForEndOfFrame" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# RED: `yield return null` is the batchmode-safe replacement and must not flag.
+$unh012YieldNull = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+
+    public sealed class WaitYieldNullFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return null;
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitYieldNullFixture.cs' -FixtureContent $unh012YieldNull
+$ok = ($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH012')
+Write-TestResult "UNH012.AllowsYieldNull" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# RED: a BARE Buffers.WaitForEndOfFrame reference WITHOUT `yield return`
+# (legitimate singleton assertion, see Tests/Runtime/Utils/BuffersTests.cs)
+# must NOT be flagged.
+$unh012BareReference = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+
+    public sealed class WaitBareReferenceFixture : CommonTestBase
+    {
+        [Test]
+        public void BuffersWaitForEndOfFrameIsSingleton()
+        {
+            Assert.NotNull(Buffers.WaitForEndOfFrame);
+            Assert.AreSame(Buffers.WaitForEndOfFrame, Buffers.WaitForEndOfFrame);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitBareReferenceFixture.cs' -FixtureContent $unh012BareReference
+$ok = ($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH012')
+Write-TestResult "UNH012.DoesNotFlagBareReference" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# UNH-SUPPRESS on the yield line suppresses the violation.
+$unh012Suppress = @'
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class WaitEndOfFrameSuppressFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForEndOfFrame(); // UNH-SUPPRESS
+        }
+    }
+}
+'@
+$r = Invoke-LintOnFixture -FixtureRelativePath 'WaitEndOfFrameSuppressFixture.cs' -FixtureContent $unh012Suppress
+$ok = ($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH012')
+Write-TestResult "UNH012.HonorsSuppress" $ok "Exit: $($r.ExitCode), Output: $($r.Output)"
+
 } finally {
   # ── Cleanup ──────────────────────────────────────────────────────────────────
   Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue

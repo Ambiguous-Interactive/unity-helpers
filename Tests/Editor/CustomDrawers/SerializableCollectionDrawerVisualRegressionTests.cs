@@ -30,9 +30,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryKeyAndValueRowsShareAlignment()
         {
+            const int entryCount = 3;
             VisualRegressionDictionaryHost host =
                 CreateScriptableObject<VisualRegressionDictionaryHost>();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < entryCount; i++)
             {
                 host.dictionary.Add(
                     new DrawerVisualRegressionKey(i),
@@ -81,6 +82,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 .OrderBy(sample => sample.ArrayIndex)
                 .ToArray();
 
+            // Guard against a silent zero/over-capture from the IMGUI recorder before
+            // comparing key/value rows: each of the entries must paint exactly one row.
+            Assert.AreEqual(
+                entryCount,
+                keySamples.Length,
+                "Dictionary drawer should emit exactly one key rect per entry."
+            );
             Assert.AreEqual(
                 keySamples.Length,
                 valueSamples.Length,
@@ -110,11 +118,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator SetAndDictionaryRowsAreEachUniformlyStacked()
         {
+            const int entryCount = 3;
             VisualRegressionDictionaryHost dictionaryHost =
                 CreateScriptableObject<VisualRegressionDictionaryHost>();
             VisualRegressionSetHost setHost = CreateScriptableObject<VisualRegressionSetHost>();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < entryCount; i++)
             {
                 int payload = (i + 1) * 5;
                 dictionaryHost.dictionary.Add(
@@ -192,10 +201,18 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 .OrderBy(sample => sample.Rect.y)
                 .ToArray();
 
+            // Guard against a silent zero/over-capture from the IMGUI recorder: every
+            // entry must yield exactly one painted row. Without this an empty capture
+            // would make the length-equality and stacked-row checks vacuously pass.
             Assert.AreEqual(
+                entryCount,
                 dictionaryValueRects.Length,
+                $"Dictionary drawer should emit exactly one value row per entry. {BuildVisualDiagnostics(dictionaryValueRects, setRects, dictionarySamples, setSamples)}"
+            );
+            Assert.AreEqual(
+                entryCount,
                 setRects.Length,
-                $"Set drawer should create one element row per value. {BuildVisualDiagnostics(dictionaryValueRects, setRects, dictionarySamples, setSamples)}"
+                $"Set drawer should create exactly one element row per value. {BuildVisualDiagnostics(dictionaryValueRects, setRects, dictionarySamples, setSamples)}"
             );
 
             float dictionaryStart =

@@ -391,7 +391,8 @@ jobs:
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
-            -ReleasePlayerBuild
+            -ReleasePlayerBuild `
+            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Report-only for now; pass -FixtureBudgetSeconds N

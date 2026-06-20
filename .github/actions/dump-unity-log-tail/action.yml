@@ -139,6 +139,7 @@ runs:
           @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
           @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
           @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
+          @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
         )
 
         $maxPerPattern = 5

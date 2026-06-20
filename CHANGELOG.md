@@ -17,6 +17,7 @@ See [the roadmap](./docs/overview/roadmap.md) for details
 
 - **`AssetDatabase.CreateAsset` failing with "Parent directory must exist" / "Creating asset at path … failed"**: editor utilities that create assets — `ScriptableObjectSingletonCreator`, `ScriptableObjectSingletonMetadataUtility`, `AttributeMetadataCacheGenerator`, `PersistentDirectorySettings`, and the sprite/atlas/animation creator windows — now ensure the parent folder is registered with the `AssetDatabase` before creating the asset, including while an `AssetDatabase` batch is open (common under `-batchmode`). Previously, creating an asset in a not-yet-registered folder could fail or be skipped.
 - **Unity 6 deprecation warnings from `Object.FindObjectsOfType` / `FindObjectOfType`**: runtime DI-integration code (Reflex / VContainer / Zenject) now routes object lookups through a version-gated shim that uses `FindObjectsByType` / `FindFirstObjectByType` on Unity 2022.2+ (including Unity 6) and the legacy API below it, eliminating the deprecation warnings while preserving behavior.
+- **`MonoBehaviour.ExecuteFunctionAfterFrame` callback never firing in headless/batch mode**: the helper yielded `WaitForEndOfFrame`, which never resumes under `-batchmode -nographics` (no end-of-frame render signal), so the queued callback was silently dropped on headless players, dedicated servers, and CI. It now advances a single frame in batch mode (the headless-safe equivalent) and continues to use `WaitForEndOfFrame` in interactive/graphical sessions, so the callback runs in every environment.
 
 ## [3.3.0]
 

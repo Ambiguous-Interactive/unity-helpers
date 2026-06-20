@@ -886,6 +886,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
+                // The blocked Retry singleton queues a deferred EditorApplication.delayCall
+                // retry. Left pending, it re-runs ensure on the next frame pump (the yield
+                // below) and re-logs "Failed to create folder" AFTER this suppression window
+                // closes, failing the test on an unhandled log. Cancel it while still
+                // suppressed; the test re-runs ensure manually once the blocker is removed.
+                ScriptableObjectSingletonCreator.ResetRetryStateForTests();
                 LogAssert.ignoreFailingMessages = false;
             }
             yield return null;

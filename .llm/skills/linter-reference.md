@@ -328,6 +328,13 @@ pwsh -NoProfile -File scripts/lint-tests.ps1
    player-compiled test code (anything under `Tests/` except `Tests/Editor/`) must be inside
    `#if UNITY_EDITOR`. Otherwise the editor assembly is stripped from the standalone player build
    and the leg fails with `CS0234` before any test runs. Add `// UNH-SUPPRESS UNH011` to opt out.
+8. **UNH012**: A test must never `yield return` a `WaitForEndOfFrame` (e.g.
+   `yield return new WaitForEndOfFrame();` or `yield return Buffers.WaitForEndOfFrame;`). Under
+   `-batchmode -nographics` (the headless CI legs) there is no end-of-frame callback, so the yield
+   never resumes: the PlayMode run hangs until it is force-killed and emits a misleading `total=0`
+   `results.xml` that aborts the whole leg. Use `yield return null` (the production helper is
+   batchmode-safe). A bare reference without `yield return` is not flagged. Add `// UNH-SUPPRESS`
+   to opt out.
 
 All Unity object creation in tests must use `Track()`:
 

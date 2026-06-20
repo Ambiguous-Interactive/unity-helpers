@@ -454,7 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Coroutine first = host.ExecuteFunctionAfterFrame(() => executed++);
             Coroutine second = host.ExecuteFunctionAfterFrame(() => executed++);
 
-            yield return new WaitForEndOfFrame();
+            yield return null;
             yield return null;
 
             Assert.AreEqual(2, executed);
@@ -544,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Coroutine coroutine = host.ExecuteFunctionAfterFrame(host.Increment);
             Assert.AreEqual(0, host.InvocationCount);
-            yield return new WaitForEndOfFrame();
+            yield return null;
             yield return null;
             Assert.AreEqual(1, host.InvocationCount);
             host.StopCoroutine(coroutine);

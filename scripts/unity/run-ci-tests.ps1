@@ -55,6 +55,15 @@ param(
 
     [switch]$ReleasePlayerBuild,
 
+    # IL2CPP C++ compiler configuration for the standalone player build. 'Release'
+    # (the default, what shipped players run) drives the MSVC optimizer hard, which on
+    # a very large generated translation unit can hit an MSVC `C1001` optimizer ICE
+    # (pass 2 / p2). 'Debug' disables that optimization, so the standalone TEST leg --
+    # a correctness/IL2CPP-compat check, not a native-perf benchmark -- can pass it to
+    # build robustly. Inert for editmode/playmode and Mono (no IL2CPP player is built).
+    [ValidateSet('Release', 'Debug')]
+    [string]$Il2CppCompilerConfiguration = 'Release',
+
     [switch]$GenerateOnly
 )
 
@@ -141,6 +150,12 @@ function Write-CiNotice {
 #     scripts/lint-unity-test-modules.ps1 lint is the pre-Unity guard that should
 #     catch it first. NON-transient (a bad manifest, not a flaky UPM channel), so
 #     it is a catastrophic pattern, not a retry signal.
+#   - WaitForEndOfFrame "not evoked in batchmode" -- a [UnityTest] (or a coroutine it
+#     drives) yielded WaitForEndOfFrame, which never resumes under -batchmode
+#     -nographics. The PlayMode coroutine stalls and Unity Test Framework writes a
+#     misleading total=0 results.xml (a generic "unexpected log" scan otherwise
+#     mis-points at unrelated LogAssert-guarded errors). NON-transient; the
+#     scripts/lint-tests.ps1 UNH012 rule is the pre-Unity guard that catches it first.
 $script:CatastrophicPatterns = @(
     @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
     @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
@@ -148,6 +163,7 @@ $script:CatastrophicPatterns = @(
     @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
     @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
     @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \[[^\]]+\] cannot be found'; UseSimple = $false }
+    @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
 )
 
 # CLASS-OF-ISSUE DIAGNOSTIC: when Unity exits non-zero, the operator's next
@@ -1071,7 +1087,11 @@ function New-ManifestJson {
 }
 
 function New-ConfiguratorSource {
-    param([string]$Backend = 'IL2CPP')
+    param(
+        [string]$Backend = 'IL2CPP',
+        [ValidateSet('Release', 'Debug')]
+        [string]$CompilerConfiguration = 'Release'
+    )
 
     # NOTE: this is a DOUBLE-quoted here-string so $Backend interpolates into the
     # generated C#. Every LITERAL C# dollar sign (the Debug.Log interpolated
@@ -1127,12 +1147,13 @@ public static class UhCiTestConfigurator
         // standalone TestRunCallback survive a NON-development (Release) Mono player
         // build; otherwise the stripper can drop the test code from the player.
         PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Disabled);
-        // Pin the IL2CPP C++ compiler configuration to Release explicitly. An
-        // ephemeral CI project has no committed default for this setting, and the
-        // published benchmark numbers must come from Release-optimized native code
-        // (matching what a shipped Release player runs), so the pin removes the
-        // variable instead of trusting any implicit default. Harmless under Mono.
-        PlayerSettings.SetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone, Il2CppCompilerConfiguration.Release);
+        // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
+        // An ephemeral CI project has no committed default, so the pin removes the
+        // variable instead of trusting any implicit default. Release matches a shipped
+        // player (and any future IL2CPP native benchmark); the standalone TEST leg pins
+        // Debug to skip the MSVC optimizer (pass 2), which can hit a `C1001` ICE on the
+        // very large generated test translation unit. Harmless under Mono.
+        PlayerSettings.SetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone, Il2CppCompilerConfiguration.$CompilerConfiguration);
 
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
         // + .NET Standard 2.1 + Release for this run.
@@ -1527,6 +1548,8 @@ function Initialize-EphemeralProject {
         [switch]$IncludeComparisons,
         [switch]$IncludeIntegrations,
         [string]$Backend = 'IL2CPP',
+        [ValidateSet('Release', 'Debug')]
+        [string]$Il2CppCompilerConfiguration = 'Release',
         [bool]$DevelopmentBuild = $false,
         [string]$RepoRoot
     )
@@ -1568,7 +1591,7 @@ EditorSettings:
   m_DefaultBehaviorMode: 1
 '@ |
         Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\EditorSettings.asset') -Encoding UTF8
-    New-ConfiguratorSource -Backend $Backend |
+    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration |
         Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
 
     # Pre-create the Assets/Plugins analyzer copy (NO-OP for unity-helpers, which
@@ -2889,7 +2912,8 @@ function Write-StandaloneBuildOutputDiagnostics {
 function Test-StandalonePlayerBuildOutput {
     param(
         [Parameter(Mandatory = $true)][string]$ExpectedExe,
-        [Parameter(Mandatory = $true)][datetime]$BuildStartedUtc
+        [Parameter(Mandatory = $true)][datetime]$BuildStartedUtc,
+        [switch]$RequireGameAssembly
     )
 
     if (-not (Test-Path -LiteralPath $ExpectedExe -PathType Leaf)) {
@@ -2904,6 +2928,25 @@ function Test-StandalonePlayerBuildOutput {
     $dataDir = Join-Path (Split-Path -Parent $ExpectedExe) ("{0}_Data" -f [System.IO.Path]::GetFileNameWithoutExtension($ExpectedExe))
     if (-not (Test-Path -LiteralPath $dataDir -PathType Container)) {
         return "missing player data directory: $dataDir"
+    }
+
+    # IL2CPP only: GameAssembly.dll is the LINKED native output of the il2cpp C++
+    # compile -- the file that actually contains the compiled managed/test code. Bee
+    # stages the bootstrapper exe and the _Data folder EARLY, BEFORE il2cpp compiles
+    # the generated C++, so a C++ compile failure (e.g. an MSVC `C1001` internal
+    # compiler error) leaves a FRESH exe + _Data but NO fresh GameAssembly.dll.
+    # Validating only the exe/_Data therefore green-lights a failed build and runs a
+    # broken player. GameAssembly.dll cannot exist fresh unless the compile AND link
+    # succeeded, so it is the authoritative "the IL2CPP build actually finished" signal.
+    if ($RequireGameAssembly) {
+        $gameAssembly = Join-Path (Split-Path -Parent $ExpectedExe) 'GameAssembly.dll'
+        if (-not (Test-Path -LiteralPath $gameAssembly -PathType Leaf)) {
+            return "missing GameAssembly.dll (IL2CPP native compile/link did not complete): $gameAssembly"
+        }
+        $ga = Get-Item -LiteralPath $gameAssembly
+        if ($ga.LastWriteTimeUtc -lt $BuildStartedUtc.AddSeconds(-5)) {
+            return "stale GameAssembly.dll (IL2CPP native compile/link did not run this build); LastWriteTimeUtc=$($ga.LastWriteTimeUtc.ToString('o'))"
+        }
     }
 
     return ''
@@ -3093,7 +3136,7 @@ $AdditionalScriptingDefinesList = @(
 )
 $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 
-$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
 $LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
 
@@ -3358,7 +3401,22 @@ try {
         # fresh, complete exe) still fails loudly with full diagnostics.
         $standaloneBuildProblem = Test-StandalonePlayerBuildOutput `
             -ExpectedExe $standaloneExe `
-            -BuildStartedUtc $standaloneBuildStartedUtc
+            -BuildStartedUtc $standaloneBuildStartedUtc `
+            -RequireGameAssembly:($StandaloneScriptingBackend -eq 'IL2CPP')
+
+        # A small positive build exit (e.g. 1/2/3 = Unity RunError) means Unity
+        # DELIBERATELY reported a build/run failure; the early-staged player exe is not
+        # proof of success. Only a watchdog tree-kill or a NATIVE crash code (a
+        # background-thread shutdown race AFTER a complete build) is a benign non-zero
+        # exit. Fold a non-benign non-zero exit into the build problem so it fails fast
+        # with full diagnostics instead of running a broken/incomplete player.
+        if ([string]::IsNullOrWhiteSpace($standaloneBuildProblem) -and
+            -not $buildResult.TimedOut -and
+            $buildResult.ExitCode -ne 0 -and
+            -not (Test-NativeCrashExitCode -ExitCode $buildResult.ExitCode)) {
+            $standaloneBuildProblem = "build exited $($buildResult.ExitCode) / $(Get-NativeExitCodeDescription -ExitCode $buildResult.ExitCode) (Unity RunError / deliberate build failure, not a benign post-work shutdown crash)"
+        }
+
         if (-not [string]::IsNullOrWhiteSpace($standaloneBuildProblem)) {
             Write-UnityRunFailureDiagnostics `
                 -Project $ProjectPath `

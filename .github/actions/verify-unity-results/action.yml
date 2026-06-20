@@ -229,6 +229,12 @@ runs:
         #   - error CS\d+ -- compiler errors (CS0246, CS0103, CS0117, etc).
         #   - warning CS8032 -- "An instance of analyzer cannot be created"
         #     (analyzer failed to instantiate; same class of issue).
+        #   - WaitForEndOfFrame "not evoked in batchmode" -- a [UnityTest] (or a
+        #     coroutine it drives) yielded WaitForEndOfFrame, which never resumes under
+        #     -batchmode -nographics; the PlayMode run stalls and writes a misleading
+        #     total=0 results.xml. Surfaced so the operator sees the real cause instead
+        #     of the generic "unexpected log" trail. scripts/lint-tests.ps1 UNH012 is
+        #     the pre-Unity guard. Keep in sync with run-ci-tests.ps1 CatastrophicPatterns.
         function Write-UnityCatastrophicPatternHits {
           param([Parameter(Mandatory = $true)][string]$ResultsDir)
 
@@ -238,6 +244,7 @@ runs:
             @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
             @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
             @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
+            @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
           )
 
           $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $ResultsDir)

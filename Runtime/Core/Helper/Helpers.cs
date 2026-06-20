@@ -917,7 +917,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static IEnumerator FunctionAfterFrame(Action action)
         {
-            yield return Buffers.WaitForEndOfFrame;
+            if (IsRunningInBatchMode)
+            {
+                // WaitForEndOfFrame never resumes under headless -batchmode -nographics
+                // (there is no end-of-frame render signal), so the callback would silently
+                // never fire. Advancing one frame is the headless-safe equivalent.
+                yield return null;
+            }
+            else
+            {
+                yield return Buffers.WaitForEndOfFrame;
+            }
             action();
         }
 

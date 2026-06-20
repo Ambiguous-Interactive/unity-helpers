@@ -1742,6 +1742,38 @@ foreach ($file in $filesToScan) {
     }
   }
 
+  # UNH012: a `[UnityTest]` PlayMode coroutine must never `yield return` a
+  # WaitForEndOfFrame. Under `-batchmode -nographics` (the headless CI legs)
+  # there is no end-of-frame callback, so the yield NEVER resumes: the test
+  # hangs until the run is force-killed and Unity emits a misleading total=0
+  # results.xml that aborts the whole PlayMode leg. Two such tests already
+  # broke CI; this lint is the <1s pre-Unity guard so it can't recur.
+  #   Matched on the SCRUBBED line so a `WaitForEndOfFrame` inside a string or
+  # comment can't trip the rule. Two alternations cover the realistic forms:
+  #   (a) `yield\s+return ... WaitForEndOfFrame` -- a same-line yield of a field
+  #       or property, e.g. `yield return Buffers.WaitForEndOfFrame;`.
+  #   (b) `new WaitForEndOfFrame(` anywhere -- constructing one in a test has no
+  #       purpose but to yield it, and this catches the `new` even when csharpier
+  #       wraps the statement across lines (`yield return\n new WaitForEndOfFrame();`)
+  #       or it is hoisted to a local (`var w = new WaitForEndOfFrame(); yield return w;`).
+  # A BARE field reference without `yield return`/`new` (e.g.
+  # `Assert.NotNull(Buffers.WaitForEndOfFrame)` in Tests/Runtime/Utils/BuffersTests.cs,
+  # which legitimately exercises the singleton field) is intentionally NOT matched.
+  # `new WaitForEndOfFrameXyz(` is not matched (word/`(` boundary). The production
+  # helper is batchmode-safe, so `yield return null` is the drop-in replacement.
+  $yieldWaitForEndOfFramePattern = [regex]'(?:yield\s+return\b[^;]*\bWaitForEndOfFrame\b)|(?:\bnew\s+WaitForEndOfFrame\s*\()'
+  $lineIndex = 0
+  foreach ($line in $content) {
+    $lineIndex++
+    if ($line -match 'UNH-SUPPRESS') { continue }
+    $scrubbedLine = $scrubbedContent[$lineIndex - 1]
+    if ($yieldWaitForEndOfFramePattern.IsMatch($scrubbedLine)) {
+      $violations += (@{
+        Path=$rel; Line=$lineIndex; Message="UNH012: [UnityTest] must not 'yield return' WaitForEndOfFrame; it never resumes under -batchmode -nographics and aborts the PlayMode run (total=0 results.xml). Use 'yield return null' (the production helper is batchmode-safe)."
+      })
+    }
+  }
+
   # UNH007: an enormous literal loop bound in a non-perf test belongs in a
   # Performance/Stress fixture (excluded from the fast suite) or should be
   # reduced. Const/field bounds (e.g. `< SampleCount`) are intentionally NOT
