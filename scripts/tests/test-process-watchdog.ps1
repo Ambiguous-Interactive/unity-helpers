@@ -17,6 +17,13 @@
          real exit code with TimedOut=$false (the guard is inert on the happy path).
       3. A process that hangs WITHOUT logging the sentinel still hits the plain
          wall-clock deadline -> TimedOut=$true, exit 124 (the backstop is intact).
+      4. A process that prints and then goes SILENT mid-run (no sentinel) is tree-killed
+         by the no-output stall guard within StallSeconds -> Stalled=$true, exit 125,
+         far below the wall clock. This is the CircleLineRenderer SINGLE_THREADED hang
+         class (a background coroutine throws and wedges the runner with zero output).
+      5. Continuous output resets the stall clock, so a slow-but-alive run is NOT killed;
+         and the stall guard is SUSPENDED once the completion sentinel arms (post-run
+         shutdown silence is the completion-grace's job, not the stall guard's).
 
     The real function bodies are extracted from run-ci-tests.ps1 via the PowerShell
     AST (the script is not dot-sourceable: it has a top-level param() + main flow), so
@@ -92,7 +99,13 @@ function Assert-That {
 }
 
 function Invoke-Watchdog {
-    param([string]$ChildCommand, [int]$TimeoutSeconds, [int]$GraceSeconds, [string]$Label)
+    param(
+        [string]$ChildCommand,
+        [int]$TimeoutSeconds,
+        [int]$GraceSeconds,
+        [string]$Label,
+        [int]$StallSeconds = 0
+    )
     $log = Join-Path $tmp ("uh-watchdog-{0}.log" -f $Label)
     return Invoke-ProcessWithTreeKillTimeout `
         -FilePath $pwshPath `
@@ -101,7 +114,8 @@ function Invoke-Watchdog {
         -LogPath $log `
         -Label $Label `
         -CompletionPattern $sentinel `
-        -CompletionGraceSeconds $GraceSeconds
+        -CompletionGraceSeconds $GraceSeconds `
+        -StallSeconds $StallSeconds
 }
 
 # 1. sentinel (code 0) then hang -> grace-killed fast, exit 0, not timed out.
@@ -137,6 +151,35 @@ $sw.Stop()
 Assert-That "sentinel-less hang hits the wall-clock backstop fast (elapsed=$([int]$sw.Elapsed.TotalSeconds)s)" ($sw.Elapsed.TotalSeconds -lt 30)
 Assert-That "sentinel-less hang is reported as a timeout" ($r.TimedOut)
 Assert-That "sentinel-less hang reports the timeout exit code 124" ($r.ExitCode -eq 124)
+
+# 5. output then SILENCE with no sentinel -> the no-output stall guard fires FAST (exit
+#    125, Stalled, TimedOut), far below the 600s wall clock. This is the CircleLineRenderer
+#    SINGLE_THREADED hang class: a run that prints, then goes quiet mid-flight forever.
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$r = Invoke-Watchdog -ChildCommand 'Write-Host "starting tests"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'midrun-stall'
+$sw.Stop()
+Assert-That "no-output stall is killed within the stall window (elapsed=$([int]$sw.Elapsed.TotalSeconds)s, far below the 600s wall clock)" ($sw.Elapsed.TotalSeconds -lt 30)
+Assert-That "no-output stall reports the distinct stall exit code 125 (not 124)" ($r.ExitCode -eq 125)
+Assert-That "no-output stall sets Stalled" ($r.Stalled)
+Assert-That "no-output stall is surfaced as a timeout-class failure" ($r.TimedOut)
+
+# 6. CONTINUOUS output (a line every 0.5s) must NOT trip a 2s stall guard: the stall clock
+#    resets on every line, so a slow-but-ALIVE run is never falsely killed (the guard must
+#    not be fragile). The child prints 8 lines over ~4s (each gap < the 2s window), exits 0.
+$r = Invoke-Watchdog -ChildCommand '1..8 | ForEach-Object { Write-Host "tick $_"; Start-Sleep -Milliseconds 500 }; exit 0' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'chatty-no-stall'
+Assert-That "continuous output is NOT stall-killed (a slow-but-alive run survives)" (-not $r.Stalled)
+Assert-That "continuous output returns the real exit code 0" ($r.ExitCode -eq 0)
+Assert-That "continuous output is NOT treated as a timeout" (-not $r.TimedOut)
+
+# 7. The stall guard is SUSPENDED once the completion sentinel arms: after the sentinel the
+#    editor legitimately goes quiet flushing results, so a short stall window must NOT
+#    pre-empt the completion-grace handling. Child logs the sentinel then hangs; with
+#    StallSeconds(2) < GraceSeconds(3) the grace path must still own the kill (exit 0,
+#    completion -> NOT stalled, NOT timed out).
+$r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 3 -StallSeconds 2 -Label 'sentinel-suspends-stall'
+Assert-That "stall guard is suspended after the completion sentinel (grace owns the kill, not stall)" (-not $r.Stalled)
+Assert-That "sentinel+hang with stall enabled still reports the parsed exit code 0" ($r.ExitCode -eq 0)
+Assert-That "sentinel+hang with stall enabled is NOT treated as a timeout" (-not $r.TimedOut)
 
 Write-Host ""
 Write-Host "Process-watchdog tests: $passed passed, $failed failed."

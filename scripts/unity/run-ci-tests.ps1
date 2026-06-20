@@ -474,6 +474,42 @@ function Get-EditorTestCompletionGraceSeconds {
     return $Default
 }
 
+function Get-EditorTestStallSeconds {
+    # No-output stall window for a -runTests editor pass: tree-kill the editor if it emits
+    # NO new log line for this many seconds WHILE TESTS ARE STILL RUNNING (before the
+    # completion sentinel arms). This is the guard for a silent MID-RUN hang -- e.g. a
+    # PlayMode test whose background coroutine throws and wedges the runner with zero
+    # further output (the CircleLineRenderer SINGLE_THREADED hang that burned ~70 min of
+    # total silence). The wall-clock backstop (Get-EditorTestRunTimeoutSeconds) alone
+    # would let such a hang run to ~80 min; this fails it in minutes and returns the seat.
+    #
+    # MUST stay comfortably ABOVE the longest legitimately-silent phase of a HEALTHY run.
+    # Measured on real CI logs: a COLD leg (first project open -> asset import + full
+    # script compile + domain reload, all streamed via `-logFile -`) has a max quiet gap
+    # of ~54s, and the longest quiet gap anywhere on a healthy leg is ~125s (a mid-run
+    # Unity license entitlement re-resolution). 300s is ~2.4x the worst observed gap and
+    # ~5.5x the worst COLD gap, so it never false-fires on a healthy run (cold or warm)
+    # yet converts a fully-silent hang into a ~5 min fast-fail. The watchdog also emits a
+    # throttled "still alive" heartbeat during any quiet stretch, so a near-threshold gap
+    # is visible (and tunable) long before it could kill. Honors
+    # UH_EDITOR_TEST_STALL_SECONDS; a non-integer or negative override is ignored with a
+    # ::warning::; 0 is the explicit OPT-OUT (stall guard off, wall-clock only).
+    # StrictMode-safe.
+    param([int]$Default = 300)
+
+    if ($env:UH_EDITOR_TEST_STALL_SECONDS) {
+        $parsed = 0
+        if (
+            [int]::TryParse($env:UH_EDITOR_TEST_STALL_SECONDS, [ref]$parsed) -and
+            $parsed -ge 0
+        ) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_EDITOR_TEST_STALL_SECONDS='$env:UH_EDITOR_TEST_STALL_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
 function Invoke-UnityEditorTestsWithPackageManagerRetry {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -486,6 +522,7 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
 
     $completionGrace = Get-EditorTestCompletionGraceSeconds
     $runTimeout = Get-EditorTestRunTimeoutSeconds
+    $runStall = Get-EditorTestStallSeconds
 
     $runExit = Invoke-UnityEditor `
         -EditorPath $EditorPath `
@@ -494,7 +531,8 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         -LogPath $LogPath `
         -CompletionPattern $script:EditorTestCompletionSentinel `
         -CompletionGraceSeconds $completionGrace `
-        -TimeoutSeconds $runTimeout
+        -TimeoutSeconds $runTimeout `
+        -StallSeconds $runStall
 
     if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
         -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
@@ -523,7 +561,8 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         -LogPath $LogPath `
         -CompletionPattern $script:EditorTestCompletionSentinel `
         -CompletionGraceSeconds $completionGrace `
-        -TimeoutSeconds $runTimeout
+        -TimeoutSeconds $runTimeout `
+        -StallSeconds $runStall
 }
 
 # Collapse any run of whitespace (including CR/LF) to a single space and trim, so
@@ -1914,7 +1953,16 @@ function Invoke-ProcessWithTreeKillTimeout {
         [Parameter(Mandatory = $true)][string]$LogPath,
         [Parameter(Mandatory = $true)][string]$Label,
         [string]$CompletionPattern = '',
-        [int]$CompletionGraceSeconds = 120
+        [int]$CompletionGraceSeconds = 120,
+        # No-output stall guard. When > 0, the process is tree-killed if it emits NO new
+        # stdout/stderr line for this many seconds WHILE THE RUN IS STILL IN PROGRESS
+        # (i.e. before the completion sentinel arms). 0 disables it. This is the guard for
+        # a MID-RUN silent hang -- e.g. a PlayMode test whose background coroutine throws
+        # and wedges the runner with zero further output -- which the wall-clock deadline
+        # alone would let burn the full TimeoutSeconds. Deliberately SUSPENDED once the
+        # completion sentinel is seen, because the editor legitimately goes quiet while
+        # flushing results during the grace window (that case is the completion guard's).
+        [int]$StallSeconds = 0
     )
 
     $logDir = Split-Path -Parent $LogPath
@@ -1925,6 +1973,13 @@ function Invoke-ProcessWithTreeKillTimeout {
     # Sentinel exit code for a wall-clock timeout kill. 124 mirrors GNU coreutils
     # `timeout`; it is non-zero so the caller's "exit != 0 -> fail" path applies.
     $timeoutExitCode = 124
+    # Sentinel exit code for a no-output stall kill. 125 is one above the wall-clock 124
+    # so the two watchdog kills are distinguishable in the log: each emits its own
+    # ::error:: and a distinct, greppable exit code. (NOT added to the
+    # $NativeExitCodeDescriptions table on purpose: that table also drives
+    # Test-NativeCrashExitCode, which must not classify a watchdog kill as a native
+    # crash.) The durable results.xml stays the pass/fail source of truth either way.
+    $stallExitCode = 125
 
     Write-Host "::group::$Label"
     Write-Host "`"$FilePath`" $($Arguments -join ' ')"
@@ -1948,6 +2003,8 @@ function Invoke-ProcessWithTreeKillTimeout {
     $exit = -1
     $timedOut = $false
     $reaped = $false
+    $stalled = $false
+    $stallEnabled = $StallSeconds -gt 0
     $completionArmed = $false
     $completionExitCode = $null
     $killedAfterCompletion = $false
@@ -1969,6 +2026,13 @@ function Invoke-ProcessWithTreeKillTimeout {
         $errReader = $proc.StandardError
         $oTask = $outReader.ReadLineAsync()
         $eTask = $errReader.ReadLineAsync()
+
+        # Stall clock: reset on every line received (see the poll loop below); measures
+        # time since the last output. Initialized at launch so a process that prints
+        # NOTHING at all is still bounded by the stall guard, not just the wall clock.
+        $lastOutputAt = [DateTime]::UtcNow
+        # Heartbeat clock: throttles the "still alive" ::notice:: during a quiet stretch.
+        $lastHeartbeatAt = [DateTime]::UtcNow
 
         if ($hasDeadline) {
             $deadline = [DateTime]::UtcNow.AddMilliseconds([double]$timeoutMs)
@@ -1992,6 +2056,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
                     }
                     $oTask = $outReader.ReadLineAsync()
+                    $lastOutputAt = [DateTime]::UtcNow
                 }
                 $progressed = $true
             }
@@ -2007,6 +2072,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
                     }
                     $eTask = $errReader.ReadLineAsync()
+                    $lastOutputAt = [DateTime]::UtcNow
                 }
                 $progressed = $true
             }
@@ -2028,6 +2094,44 @@ function Invoke-ProcessWithTreeKillTimeout {
                     try { $proc.Kill() } catch { }
                 }
                 break
+            }
+
+            if (
+                $stallEnabled -and
+                -not $completionArmed -and
+                ([DateTime]::UtcNow - $lastOutputAt).TotalSeconds -ge $StallSeconds
+            ) {
+                # No new output for $StallSeconds while the run is STILL in progress (the
+                # completion sentinel has not armed): a silent MID-RUN hang -- e.g. a
+                # PlayMode test whose background coroutine threw and wedged the runner.
+                # The wall-clock deadline alone would let this burn the full window; the
+                # stall guard tree-kills it in seconds. Flagged distinctly from a
+                # wall-clock breach so the caller reports exit 125 (not 124).
+                Write-Host "::error::$Label produced no output for ${StallSeconds}s (no-output stall) and was tree-killed. The wall-clock and completion-sentinel guards remain in force; raise the stall window if a run is legitimately silent for longer."
+                $stalled = $true
+                try {
+                    $proc.Kill($true)
+                } catch {
+                    try { $proc.Kill() } catch { }
+                }
+                break
+            }
+
+            # Heartbeat: during a legitimately quiet stretch (run still in progress, no
+            # output for a while but not yet a stall) emit a throttled ::notice:: so the CI
+            # log is never fully silent and an operator can tell "slow but alive" from
+            # "hung" without waiting for a kill. Suppressed on chatty runs (only after
+            # >=20s of quiet) and after the completion sentinel; one line/minute max.
+            # Diagnostic only -- never touches the exit decision.
+            if (-not $completionArmed) {
+                $quietSeconds = ([DateTime]::UtcNow - $lastOutputAt).TotalSeconds
+                if (
+                    $quietSeconds -ge 20 -and
+                    ([DateTime]::UtcNow - $lastHeartbeatAt).TotalSeconds -ge 60
+                ) {
+                    $lastHeartbeatAt = [DateTime]::UtcNow
+                    Write-Host "::notice::$Label is still running but has produced no new output for $([int]$quietSeconds)s (alive, not hung)."
+                }
             }
 
             if (-not $progressed) {
@@ -2065,6 +2169,12 @@ function Invoke-ProcessWithTreeKillTimeout {
                 $exit = 0
             }
             $timedOut = $false
+        } elseif ($stalled) {
+            # A no-output stall kill. Distinct exit code (125) from the wall-clock 124;
+            # surfaced as a timeout-class failure ($timedOut) so a stalled run is never
+            # mistaken for a clean exit by a caller that gates on TimedOut.
+            $exit = $stallExitCode
+            $timedOut = $true
         } elseif ($timedOut) {
             $exit = $timeoutExitCode
         } elseif ($reaped -and $proc.HasExited) {
@@ -2099,6 +2209,7 @@ function Invoke-ProcessWithTreeKillTimeout {
     return @{
         ExitCode = $exit
         TimedOut = [bool]$timedOut
+        Stalled  = [bool]$stalled
     }
 }
 
@@ -2130,6 +2241,10 @@ function Invoke-StandaloneTestPlayer {
         '-uhTestResults', $ResultsPath
     )
 
+    # No -StallSeconds here (only the wall-clock backstop): the no-output stall guard is
+    # deliberately scoped to the in-editor -runTests pass, whose silent-hang class -- a
+    # wedged PlayMode-test coroutine -- it exists to catch. A standalone player can
+    # legitimately run a batch of IL2CPP tests with little interleaved stdout.
     $result = Invoke-ProcessWithTreeKillTimeout `
         -FilePath $EditorBuiltExePath `
         -Arguments $playerArgs `
@@ -2157,15 +2272,18 @@ function Invoke-UnityEditor {
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][string]$Label,
         [Parameter(Mandatory = $true)][string]$LogPath,
-        # When set, the editor is launched under the tree-kill watchdog with
-        # completion-sentinel detection instead of the bare `&` pipeline. The
-        # -runTests passes use this because Unity 2021.3 -batchmode can deadlock on
-        # shutdown AFTER results.xml is written, which would otherwise block the `&`
-        # pipeline until the GitHub step's wall-clock timeout. Configure/license/build
-        # callers omit it and keep the proven `&` idiom unchanged.
+        # When ANY of these is set, the editor is launched under the tree-kill watchdog
+        # (completion-sentinel + wall-clock + no-output stall detection) instead of the
+        # bare `&` pipeline. The -runTests passes use this because Unity -batchmode can
+        # (a) deadlock on shutdown AFTER results.xml is written and (b) hang MID-RUN with
+        # zero further output (a PlayMode test whose background coroutine throws), either
+        # of which would otherwise block the `&` pipeline until the GitHub step's
+        # wall-clock timeout. Configure/license/build callers omit all of these and keep
+        # the proven `&` idiom unchanged.
         [string]$CompletionPattern = '',
         [int]$CompletionGraceSeconds = 120,
-        [int]$TimeoutSeconds = 0
+        [int]$TimeoutSeconds = 0,
+        [int]$StallSeconds = 0
     )
 
     # Unity.exe is a Windows GUI-subsystem binary. PowerShell's `&` launches such
@@ -2180,11 +2298,12 @@ function Invoke-UnityEditor {
         New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     }
 
-    if ($CompletionPattern -or ($TimeoutSeconds -gt 0)) {
+    if ($CompletionPattern -or ($TimeoutSeconds -gt 0) -or ($StallSeconds -gt 0)) {
         # Hung-shutdown-resilient path: the watchdog drains both pipes on a main-thread
         # poll loop (live echo + tee to $LogPath), enforces the wall-clock deadline,
-        # and grace-kills the editor once the completion sentinel is seen. It returns
-        # @{ ExitCode; TimedOut }; the durable results.xml remains the source of truth.
+        # grace-kills the editor once the completion sentinel is seen, and tree-kills it
+        # if it goes silent mid-run for $StallSeconds. It returns @{ ExitCode; TimedOut;
+        # Stalled }; the durable results.xml remains the source of truth.
         $watch = Invoke-ProcessWithTreeKillTimeout `
             -FilePath $EditorPath `
             -Arguments $Arguments `
@@ -2192,7 +2311,8 @@ function Invoke-UnityEditor {
             -LogPath $LogPath `
             -Label $Label `
             -CompletionPattern $CompletionPattern `
-            -CompletionGraceSeconds $CompletionGraceSeconds
+            -CompletionGraceSeconds $CompletionGraceSeconds `
+            -StallSeconds $StallSeconds
         $exitCode = $watch.ExitCode
     } else {
         Write-Host "::group::$Label"
@@ -2912,11 +3032,23 @@ function Invoke-UnityConfigurePass {
         '-executeMethod', 'UhCiTestConfigurator.Apply',
         '-logFile', '-'
     ) + @($ExtraArguments)
+    # Run the configure pass under the SAME tree-kill watchdog (wall-clock + no-output
+    # stall) as the test run, not the bare `&` path. This is a SEPARATE cold editor
+    # invocation that opens the project, compiles the local package + the injected
+    # configurator, runs Apply() to persist the requested global defines, and quits (the
+    # define-driven recompile itself happens later, on the -runTests pass's first compile
+    # -- Unity does not recompile on a mid-run define change). A cold-compile or a
+    # -batchmode shutdown deadlock here would otherwise silently burn the whole GitHub
+    # step timeout. There is no completion sentinel (this is -quit/-executeMethod, not
+    # -runTests), so the wall-clock + stall guards alone bound it; the durable marker file
+    # remains the source of truth for whether Apply() actually ran.
     $configureExit = Invoke-UnityEditor `
         -EditorPath $EditorPath `
         -Arguments $configureArgs `
         -Label $Label `
-        -LogPath $LogPath
+        -LogPath $LogPath `
+        -TimeoutSeconds (Get-EditorTestRunTimeoutSeconds) `
+        -StallSeconds (Get-EditorTestStallSeconds)
     # The configurator has run; drop the marker-path env var so it cannot be
     # inherited by later child processes (only Apply reads it).
     Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
@@ -3203,6 +3335,10 @@ try {
             '-logFile', '-'
         ) + $categoryArgs + $acceleratorArgs
 
+        # No -StallSeconds here (only the wall-clock backstop): IL2CPP native C++
+        # compilation and linking are legitimately silent for minutes under `-logFile -`,
+        # so a no-output stall guard WOULD false-fire on a healthy build. The stall guard
+        # is scoped to the in-editor -runTests pass instead.
         $buildResult = Invoke-ProcessWithTreeKillTimeout `
             -FilePath $UnityEditorPath `
             -Arguments $buildArgs `
