@@ -282,7 +282,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             continue;
                         }
 
-                        if (!string.IsNullOrEmpty(existingGuid))
+                        // Only a real on-disk asset body means the path is genuinely occupied. A
+                        // lingering GUID/.meta with no body (the body was deleted; Unity 6000.3+ keeps
+                        // the path->GUID mapping) is a stale artifact, not an occupant -- fall through
+                        // and recreate rather than permanently skipping (the bug that left
+                        // RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6).
+                        if (
+                            !string.IsNullOrEmpty(existingGuid)
+                            && DoesAssetBodyExistOnDisk(targetAssetPath)
+                        )
                         {
                             Debug.LogWarning(
                                 $"ScriptableObjectSingletonCreator: Singleton target path already occupied at {targetAssetPath}. Skipping creation for {derivedType.FullName}."
@@ -292,13 +300,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             continue;
                         }
 
-                        if (fileExistsOnDisk)
+                        if (DoesAssetBodyExistOnDisk(targetAssetPath))
                         {
                             Debug.LogWarning(
                                 $"ScriptableObjectSingletonCreator: Detected on-disk asset at {targetAssetPath} while ensuring {derivedType.FullName}. Unity has not imported it yet; deferring creation until the asset database picks it up."
                             );
                             retryRequested = true;
                             continue;
+                        }
+
+                        if (!string.IsNullOrEmpty(existingGuid))
+                        {
+                            // Reaching here means a GUID/.meta lingers but no asset body exists on
+                            // disk (Unity 6000.3+ keeps the path->GUID mapping after the body is
+                            // deleted). Remove the orphan .meta first so CreateAsset below re-maps the
+                            // path deterministically on every Unity version instead of depending on
+                            // version-specific .meta-adoption behavior.
+                            TryRemoveStaleAssetArtifacts(targetAssetPath);
                         }
 
                         ScriptableObject instance = ScriptableObject.CreateInstance(derivedType);
@@ -1191,6 +1209,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             string metaPath = absolutePath + ".meta";
             return File.Exists(metaPath);
+        }
+
+        private static bool DoesAssetBodyExistOnDisk(string assetsRelativePath)
+        {
+            // The .asset BODY only -- deliberately ignores a lingering .asset.meta. Unity 6000.3+
+            // retains the path->GUID mapping (and the .meta) for an asset whose body was deleted, so
+            // "a GUID/.meta exists" is NOT proof a real asset is present. Creation decisions must key
+            // on the body file, or a body-less orphan permanently blocks recreation of the singleton.
+            string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
+            if (string.IsNullOrWhiteSpace(absolutePath))
+            {
+                return false;
+            }
+
+            return File.Exists(absolutePath);
         }
 
         /// <summary>

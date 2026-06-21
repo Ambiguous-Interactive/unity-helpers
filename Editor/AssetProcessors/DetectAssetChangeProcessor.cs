@@ -304,6 +304,17 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             string[] movedFromAssetPaths
         )
         {
+            // The asset-change watcher is an editor-authoring concern, not a play-mode one.
+            // EnsureInitialized() below runs BuildWatchers, an all-types/all-methods reflection
+            // scan; if a play-mode test mutates the AssetDatabase, Unity invokes this callback
+            // recursively inside the import phase and that scan destabilizes the asset pipeline
+            // (a native mono crash on some Unity versions, multi-minute importer stalls on others),
+            // aborting the play-mode test run with a zero-count results.xml. Skip while playing.
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             EnsureInitialized();
             if (WatchersByAssetType.Count == 0)
             {

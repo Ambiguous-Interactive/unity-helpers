@@ -1,0 +1,20 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.Core.Editor",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Core.TestUtils",
+  "references": [
+    "UnityEditor.TestRunner",
+    "UnityEngine.TestRunner",
+    "WallstopStudios.UnityHelpers",
+    "WallstopStudios.UnityHelpers.Editor",
+    "WallstopStudios.UnityHelpers.Tests.Core"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll", "Sirenix.Serialization.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

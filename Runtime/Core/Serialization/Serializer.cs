@@ -1,6 +1,13 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+// System.Text.Json's reflection metadata serializer only fails to JIT the parameterized-constructor
+// converter under IL2CPP / WebGL-player (AOT). The reflection-light writer must engage there and
+// nowhere else, so we mark the JIT-capable runtimes exactly as ReflectionHelpers does.
+#if !((UNITY_WEBGL && !UNITY_EDITOR) || ENABLE_IL2CPP)
+#define SERIALIZER_SUPPORTS_JIT
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
     using System;
@@ -10,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.ComponentModel;
     using System.IO;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Runtime.Serialization.Formatters.Binary;
     using System.Text;
     using System.Text.Json;
@@ -17,6 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.Threading.Tasks;
     using JsonConverters;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
@@ -974,6 +983,254 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return (T)result;
         }
 
+        /// <summary>
+        /// Checks if the type is one of our [ProtoContract] data structures whose per-type protobuf
+        /// model build trips IL2CPP's unsupported GetTypeModifiers icall. These are routed through
+        /// plain array/scalar wrapper POCOs in <see cref="SerializeSpecialCollection{T}"/> /
+        /// <see cref="DeserializeSpecialCollection{T}"/> so protobuf-net never builds the original
+        /// type's model. Covers Deque&lt;T&gt;, CyclicBuffer&lt;T&gt;, and the non-generic SparseSet.
+        /// </summary>
+        private static bool IsSpecialCollectionType(Type type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (type == typeof(SparseSet))
+            {
+                return true;
+            }
+
+            if (!type.IsGenericType)
+            {
+                return false;
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            return genericDef == typeof(Deque<>) || genericDef == typeof(CyclicBuffer<>);
+        }
+
+        // Cached closed-generic serialize/deserialize delegates for the special collection wrappers.
+        // The dispatch happens entirely in our managed code (not protobuf's model builder), so it is
+        // safe under IL2CPP; SerializationAotHints force-references the common closed generics so the
+        // AOT compiler emits them.
+        private static readonly ConcurrentDictionary<
+            Type,
+            Func<object, byte[]>
+        > SpecialCollectionSerializers = new();
+        private static readonly ConcurrentDictionary<
+            Type,
+            Func<byte[], object>
+        > SpecialCollectionDeserializers = new();
+
+        private static readonly MethodInfo SerializeDequeWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(SerializeDequeWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo DeserializeDequeWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(DeserializeDequeWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo SerializeCyclicBufferWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(SerializeCyclicBufferWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo DeserializeCyclicBufferWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(DeserializeCyclicBufferWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+
+        private static byte[] SerializeSpecialCollection<T>(T input)
+        {
+            Type type = typeof(T);
+            Func<object, byte[]> serializer = SpecialCollectionSerializers.GetOrAdd(
+                type,
+                BuildSpecialCollectionSerializer
+            );
+            return serializer(input);
+        }
+
+        private static T DeserializeSpecialCollection<T>(byte[] data)
+        {
+            Type type = typeof(T);
+            Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(
+                type,
+                BuildSpecialCollectionDeserializer
+            );
+            return (T)deserializer(data);
+        }
+
+        private static Func<object, byte[]> BuildSpecialCollectionSerializer(Type type)
+        {
+            if (type == typeof(SparseSet))
+            {
+                return input => SerializeSparseSetWrapper((SparseSet)input);
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type elementType = type.GetGenericArguments()[0];
+            MethodInfo open =
+                genericDef == typeof(Deque<>)
+                    ? SerializeDequeWrapperMethod
+                    : SerializeCyclicBufferWrapperMethod;
+            MethodInfo closed = open.MakeGenericMethod(elementType);
+            return input => (byte[])closed.Invoke(null, new[] { input });
+        }
+
+        private static Func<byte[], object> BuildSpecialCollectionDeserializer(Type type)
+        {
+            if (type == typeof(SparseSet))
+            {
+                return data => DeserializeSparseSetWrapper(data);
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type elementType = type.GetGenericArguments()[0];
+            MethodInfo open =
+                genericDef == typeof(Deque<>)
+                    ? DeserializeDequeWrapperMethod
+                    : DeserializeCyclicBufferWrapperMethod;
+            MethodInfo closed = open.MakeGenericMethod(elementType);
+            return data => closed.Invoke(null, new object[] { data });
+        }
+
+        private static byte[] SerializeWrapperObject(object wrapper)
+        {
+            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
+                out PooledBufferStream stream
+            );
+            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
+            byte[] buffer = null;
+            stream.ToArrayExact(ref buffer);
+            return buffer;
+        }
+
+        internal static byte[] SerializeDequeWrapper<T>(Deque<T> input)
+        {
+            DequeProtoWrapper<T> wrapper = new()
+            {
+                Items = input.ToArray(),
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static Deque<T> DeserializeDequeWrapper<T>(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            DequeProtoWrapper<T> wrapper =
+                (DequeProtoWrapper<T>)
+                    ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(DequeProtoWrapper<T>), ms);
+
+            int itemCount = wrapper.Items?.Length ?? 0;
+            // Mirror Deque's own [ProtoAfterDeserialization] capacity reconciliation so empty
+            // deques keep their serialized capacity and non-empty deques never under-allocate.
+            int capacity = wrapper.Capacity;
+            if (capacity <= 0)
+            {
+                capacity = itemCount > 0 ? itemCount : Deque<T>.DefaultCapacity;
+            }
+            if (itemCount > capacity)
+            {
+                capacity = itemCount;
+            }
+
+            Deque<T> result = new(capacity);
+            for (int i = 0; i < itemCount; i++)
+            {
+                result.PushBack(wrapper.Items[i]);
+            }
+            return result;
+        }
+
+        internal static byte[] SerializeCyclicBufferWrapper<T>(CyclicBuffer<T> input)
+        {
+            T[] items = null;
+            int count = input.Count;
+            if (count > 0)
+            {
+                items = new T[count];
+                for (int i = 0; i < count; i++)
+                {
+                    items[i] = input[i];
+                }
+            }
+
+            CyclicBufferProtoWrapper<T> wrapper = new()
+            {
+                Items = items,
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static CyclicBuffer<T> DeserializeCyclicBufferWrapper<T>(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            CyclicBufferProtoWrapper<T> wrapper =
+                (CyclicBufferProtoWrapper<T>)
+                    ProtoBuf.Serializer.NonGeneric.Deserialize(
+                        typeof(CyclicBufferProtoWrapper<T>),
+                        ms
+                    );
+
+            int itemCount = wrapper.Items?.Length ?? 0;
+            int capacity = wrapper.Capacity;
+            if (capacity < itemCount)
+            {
+                capacity = itemCount;
+            }
+
+            // CyclicBuffer's constructor fills oldest-to-newest in the same order we serialized.
+            return new CyclicBuffer<T>(capacity, wrapper.Items);
+        }
+
+        internal static byte[] SerializeSparseSetWrapper(SparseSet input)
+        {
+            SparseSetProtoWrapper wrapper = new()
+            {
+                Elements = input.ToArray(),
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static SparseSet DeserializeSparseSetWrapper(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            SparseSetProtoWrapper wrapper = (SparseSetProtoWrapper)
+                ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(SparseSetProtoWrapper), ms);
+
+            int capacity = wrapper.Capacity;
+            int itemCount = wrapper.Elements?.Length ?? 0;
+            if (capacity <= 0)
+            {
+                // SparseSet requires a positive universe size; fall back to the smallest size that
+                // can hold the largest stored element plus one.
+                capacity = 1;
+                for (int i = 0; i < itemCount; i++)
+                {
+                    int candidate = wrapper.Elements[i] + 1;
+                    if (candidate > capacity)
+                    {
+                        capacity = candidate;
+                    }
+                }
+            }
+
+            SparseSet result = new(capacity);
+            for (int i = 0; i < itemCount; i++)
+            {
+                result.TryAdd(wrapper.Elements[i]);
+            }
+            return result;
+        }
+
         private static readonly Utils.WallstopGenericPool<BinaryFormatter> BinaryFormatterPool =
             new(() => new BinaryFormatter());
 
@@ -1426,6 +1683,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
+            // Intercept Deque/CyclicBuffer/SparseSet to use wrapper-based deserialization so the
+            // original [ProtoContract] type's model is never built under IL2CPP/AOT (Class A).
+            if (IsSpecialCollectionType(declared))
+            {
+                try
+                {
+                    return DeserializeSpecialCollection<T>(data);
+                }
+                catch (SerializationFailureException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    SerializationFailureException.ThrowCorrupt<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Deserialize,
+                        data.Length,
+                        SerializationStage.PostProcess,
+                        e,
+                        "Failed to unpack protobuf collection wrapper."
+                    );
+                    return default;
+                }
+            }
+
             try
             {
                 // Prefer zero-copy ROM/ROS overloads when available
@@ -1810,6 +2093,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return SerializeCollectionWithWrapper(input);
             }
 
+            // Intercept Deque/CyclicBuffer/SparseSet so the original [ProtoContract] model is never
+            // built under IL2CPP/AOT (Class A).
+            if (IsSpecialCollectionType(declared))
+            {
+                return SerializeSpecialCollection(input);
+            }
+
             using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
                 out PooledBufferStream stream
             );
@@ -1849,6 +2139,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (IsSerializableCollectionType(declared))
             {
                 byte[] result = SerializeCollectionWithWrapper(input);
+                if (buffer == null || buffer.Length < result.Length)
+                {
+                    buffer = new byte[result.Length];
+                }
+                Array.Copy(result, buffer, result.Length);
+                return result.Length;
+            }
+
+            // Intercept Deque/CyclicBuffer/SparseSet so the original [ProtoContract] model is never
+            // built under IL2CPP/AOT (Class A).
+            if (IsSpecialCollectionType(declared))
+            {
+                byte[] result = SerializeSpecialCollection(input);
                 if (buffer == null || buffer.Length < result.Length)
                 {
                     buffer = new byte[result.Length];
@@ -2248,13 +2551,465 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
 
                     Type type = data.GetType();
-                    JsonSerializer.Serialize(writer, data, type, options);
+                    WriteValueAotSafe(writer, data, type, options);
                 }
                 else
                 {
-                    JsonSerializer.Serialize(writer, input, options);
+                    WriteValueAotSafe(writer, input, typeof(T), options);
                 }
                 writer.Flush();
+            }
+        }
+
+        // Reflection-light AOT-safe object writer. System.Text.Json's metadata serializer routes types
+        // without a public parameterless constructor (anonymous types, positional records) through the
+        // SmallObjectWithParameterizedConstructorConverter, which throws ExecutionEngineException under
+        // IL2CPP ("no AOT code"). On JIT-capable runtimes (mono editor/standalone) STJ handles those
+        // types correctly, so this path stays inert there to avoid diverging from STJ's output. Only
+        // under AOT do we emit public readable members directly so the public API never throws.
+        private static bool RequiresReflectionLightObjectWriter(
+            Type type,
+            JsonSerializerOptions options
+        )
+        {
+#if SERIALIZER_SUPPORTS_JIT
+            // STJ's reflection metadata serializer works on JIT runtimes; never override it there.
+            return false;
+#else
+            if (type == null)
+            {
+                return false;
+            }
+
+            // STJ handles primitives, strings, enums, and collections intrinsically.
+            if (
+                type.IsPrimitive
+                || type.IsEnum
+                || type == typeof(string)
+                || type == typeof(decimal)
+                || type == typeof(Guid)
+                || type == typeof(DateTime)
+                || type == typeof(DateTimeOffset)
+                || type == typeof(TimeSpan)
+            )
+            {
+                return false;
+            }
+
+            // Value types always have an implicit parameterless constructor at the runtime level, so
+            // STJ never needs the parameterized-ctor converter for them; the AOT failure is specific
+            // to reference types (anonymous types, positional record classes).
+            if (!type.IsClass)
+            {
+                return false;
+            }
+
+            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type))
+            {
+                return false;
+            }
+
+            // A type-level [JsonConverter] tells STJ/the converter how to serialize the type without
+            // the metadata path, so it is safe under AOT and we must not second-guess its output.
+            if (
+                type.IsDefined(
+                    typeof(JsonConverterAttribute),
+                    inherit: false
+                )
+            )
+            {
+                return false;
+            }
+
+            // A registered custom converter knows how to serialize the type without the metadata path.
+            if (options != null)
+            {
+                IList<JsonConverter> converters = options.Converters;
+                for (int i = 0; i < converters.Count; i++)
+                {
+                    JsonConverter converter = converters[i];
+                    if (converter != null && converter.CanConvert(type))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            // Reference types with a public parameterless constructor serialize fine via STJ.
+            return type.GetConstructor(Type.EmptyTypes) == null;
+#endif
+        }
+
+        private static void WriteValueAotSafe(
+            Utf8JsonWriter writer,
+            object value,
+            Type type,
+            JsonSerializerOptions options
+        )
+        {
+            WriteValueAotSafe(writer, value, type, options, visited: null);
+        }
+
+        private static void WriteValueAotSafe(
+            Utf8JsonWriter writer,
+            object value,
+            Type type,
+            JsonSerializerOptions options,
+            HashSet<object> visited
+        )
+        {
+            if (value == null)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+
+            Type runtimeType = value.GetType();
+            Type effectiveType =
+                type == null || type == typeof(object) || type.IsAbstract || type.IsInterface
+                    ? runtimeType
+                    : type;
+
+            if (!RequiresReflectionLightObjectWriter(effectiveType, options))
+            {
+                JsonSerializer.Serialize(writer, value, effectiveType, options);
+                return;
+            }
+
+            WriteObjectPropertiesReflectionLight(writer, value, effectiveType, options, visited);
+        }
+
+        private static void WriteObjectPropertiesReflectionLight(
+            Utf8JsonWriter writer,
+            object value,
+            Type type,
+            JsonSerializerOptions options,
+            HashSet<object> visited
+        )
+        {
+            // Reference-cycle guard: when STJ would ignore cycles, mirror that by emitting null on
+            // re-entry instead of recursing forever (which would throw StackOverflowException).
+            bool tracksCycles =
+                options != null && options.ReferenceHandler == ReferenceHandler.IgnoreCycles;
+            if (tracksCycles)
+            {
+                visited ??= new HashSet<object>(ReferenceComparer.Instance);
+                if (!visited.Add(value))
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+            }
+
+            try
+            {
+                writer.WriteStartObject();
+
+                PropertyInfo[] properties = type.GetProperties(
+                    BindingFlags.Public | BindingFlags.Instance
+                );
+                for (int i = 0; i < properties.Length; i++)
+                {
+                    PropertyInfo property = properties[i];
+                    if (!property.CanRead || property.GetIndexParameters().Length != 0)
+                    {
+                        continue;
+                    }
+
+                    if (options != null && options.IgnoreReadOnlyProperties && !property.CanWrite)
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetReflectionLightMemberName(property, out string propertyName))
+                    {
+                        continue;
+                    }
+
+                    object propertyValue;
+                    try
+                    {
+                        propertyValue = property.GetValue(value);
+                    }
+                    catch
+                    {
+                        // Defensive: never throw from the public API for an unreadable member.
+                        continue;
+                    }
+
+                    if (
+                        ShouldSkipReflectionLightMember(
+                            property,
+                            propertyValue,
+                            property.PropertyType,
+                            options
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    string name = ApplyNamingPolicy(propertyName, options);
+                    writer.WritePropertyName(name);
+                    WriteValueAotSafe(
+                        writer,
+                        propertyValue,
+                        property.PropertyType,
+                        options,
+                        visited
+                    );
+                }
+
+                // STJ only walks fields when IncludeFields is set; the default Normal/Pretty options do.
+                if (options is { IncludeFields: true })
+                {
+                    FieldInfo[] fields = type.GetFields(
+                        BindingFlags.Public | BindingFlags.Instance
+                    );
+                    for (int i = 0; i < fields.Length; i++)
+                    {
+                        FieldInfo field = fields[i];
+                        if (options.IgnoreReadOnlyFields && field.IsInitOnly)
+                        {
+                            continue;
+                        }
+
+                        if (!TryGetReflectionLightMemberName(field, out string fieldName))
+                        {
+                            continue;
+                        }
+
+                        object fieldValue;
+                        try
+                        {
+                            fieldValue = field.GetValue(value);
+                        }
+                        catch
+                        {
+                            // Defensive: never throw from the public API for an unreadable member.
+                            continue;
+                        }
+
+                        if (
+                            ShouldSkipReflectionLightMember(
+                                field,
+                                fieldValue,
+                                field.FieldType,
+                                options
+                            )
+                        )
+                        {
+                            continue;
+                        }
+
+                        string name = ApplyNamingPolicy(fieldName, options);
+                        writer.WritePropertyName(name);
+                        WriteValueAotSafe(writer, fieldValue, field.FieldType, options, visited);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+            finally
+            {
+                if (tracksCycles)
+                {
+                    visited.Remove(value);
+                }
+            }
+        }
+
+        // Resolves the JSON name for a member, honoring [JsonPropertyName] and skipping [JsonIgnore]
+        // with an unconditional (Always) condition. Returns false when the member must be skipped.
+        private static bool TryGetReflectionLightMemberName(
+            MemberInfo member,
+            out string resolvedName
+        )
+        {
+            resolvedName = member.Name;
+
+            JsonIgnoreAttribute ignore = null;
+            JsonPropertyNameAttribute propertyName = null;
+            try
+            {
+                ignore = member.GetCustomAttribute<JsonIgnoreAttribute>();
+                propertyName = member.GetCustomAttribute<JsonPropertyNameAttribute>();
+            }
+            catch
+            {
+                // Defensive: malformed attribute metadata must not throw from the public API.
+                return true;
+            }
+
+            if (ignore != null && ignore.Condition == JsonIgnoreCondition.Always)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(propertyName?.Name))
+            {
+                resolvedName = propertyName.Name;
+            }
+
+            return true;
+        }
+
+        // Applies the per-member [JsonIgnore] Condition (and the option-level WhenWritingNull default)
+        // to decide whether a value with the resolved name should be omitted from the output.
+        private static bool ShouldSkipReflectionLightMember(
+            MemberInfo member,
+            object memberValue,
+            Type memberType,
+            JsonSerializerOptions options
+        )
+        {
+            JsonIgnoreCondition condition =
+                options?.DefaultIgnoreCondition ?? JsonIgnoreCondition.Never;
+
+            JsonIgnoreAttribute ignore = null;
+            try
+            {
+                ignore = member.GetCustomAttribute<JsonIgnoreAttribute>();
+            }
+            catch
+            {
+                // Defensive: malformed attribute metadata must not throw from the public API.
+            }
+
+            if (ignore != null && ignore.Condition != JsonIgnoreCondition.Never)
+            {
+                // [JsonIgnore(Condition = Always)] is already filtered out before the value is read.
+                condition = ignore.Condition;
+            }
+
+            switch (condition)
+            {
+                case JsonIgnoreCondition.Always:
+                    return true;
+                case JsonIgnoreCondition.WhenWritingNull:
+                    return memberValue == null;
+                case JsonIgnoreCondition.WhenWritingDefault:
+                    return IsDefaultValue(memberValue, memberType);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsDefaultValue(object memberValue, Type memberType)
+        {
+            if (memberValue == null)
+            {
+                return true;
+            }
+
+            if (memberType != null && memberType.IsValueType && !IsNullableValueType(memberType))
+            {
+                object defaultInstance;
+                try
+                {
+                    defaultInstance = Activator.CreateInstance(memberType);
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return memberValue.Equals(defaultInstance);
+            }
+
+            return false;
+        }
+
+        private static bool IsNullableValueType(Type type)
+        {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+        }
+
+        private static string ApplyNamingPolicy(string name, JsonSerializerOptions options)
+        {
+            JsonNamingPolicy policy = options?.PropertyNamingPolicy;
+            if (policy == null)
+            {
+                return name;
+            }
+
+            try
+            {
+                return policy.ConvertName(name);
+            }
+            catch
+            {
+                // Defensive: a misbehaving naming policy must not throw from the public API.
+                return name;
+            }
+        }
+
+        private static string SerializeValueAotSafe(
+            object value,
+            Type type,
+            JsonSerializerOptions options
+        )
+        {
+            if (value == null)
+            {
+                return JsonSerializer.Serialize(value, type ?? typeof(object), options);
+            }
+
+            Type effectiveType =
+                type == null || type == typeof(object) || type.IsAbstract || type.IsInterface
+                    ? value.GetType()
+                    : type;
+
+            if (!RequiresReflectionLightObjectWriter(effectiveType, options))
+            {
+                return JsonSerializer.Serialize(value, effectiveType, options);
+            }
+
+            using Utils.PooledResource<PooledArrayBufferWriter> lease =
+                PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter bufferWriter);
+            using (
+                Utf8JsonWriter writer = new(
+                    bufferWriter,
+                    new JsonWriterOptions
+                    {
+                        SkipValidation = true,
+                        Indented = options is { WriteIndented: true },
+                        Encoder = options?.Encoder,
+                    }
+                )
+            )
+            {
+                WriteObjectPropertiesReflectionLight(
+                    writer,
+                    value,
+                    effectiveType,
+                    options,
+                    visited: null
+                );
+                writer.Flush();
+            }
+
+            byte[] buffer = null;
+            int written = bufferWriter.ToArrayExact(ref buffer);
+            return SerializerEncoding.Encoding.GetString(buffer, 0, written);
+        }
+
+        // Reference-equality comparer for the cycle guard so distinct-but-equal objects are not
+        // mistaken for a cycle (and value-equal-but-different graph nodes are still written).
+        private sealed class ReferenceComparer : IEqualityComparer<object>
+        {
+            internal static readonly ReferenceComparer Instance = new();
+
+            private ReferenceComparer() { }
+
+            bool IEqualityComparer<object>.Equals(object x, object y)
+            {
+                return ReferenceEquals(x, y);
+            }
+
+            int IEqualityComparer<object>.GetHashCode(object obj)
+            {
+                return RuntimeHelpers.GetHashCode(obj);
             }
         }
 
@@ -2308,10 +3063,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
 
                 Type type = data.GetType();
-                return JsonSerializer.Serialize(data, type, options);
+                return SerializeValueAotSafe(data, type, options);
             }
 
-            return JsonSerializer.Serialize(input, options);
+            return SerializeValueAotSafe(input, parameterType, options);
         }
 
         /// <summary>
@@ -2362,11 +3117,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
 
                     Type type = data.GetType();
-                    JsonSerializer.Serialize(writer, data, type, options);
+                    WriteValueAotSafe(writer, data, type, options);
                 }
                 else
                 {
-                    JsonSerializer.Serialize(writer, input, options);
+                    WriteValueAotSafe(writer, input, typeof(T), options);
                 }
                 writer.Flush();
             }

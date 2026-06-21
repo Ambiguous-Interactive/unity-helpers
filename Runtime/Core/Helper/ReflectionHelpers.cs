@@ -3086,8 +3086,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (!ExpressionsEnabled)
             {
-                return CreateDelegateEnabledPropertyGetter(property, type)
-                    ?? (instance => (bool)property.GetValue(instance));
+                // AOT-safe path. IL2CPP cannot service Delegate.DynamicInvoke or a value-type
+                // generic MakeGenericType, so the previous delegate path threw at call time --
+                // swallowed by IsComponentEnabled's catch, which then defaulted every component
+                // to "enabled" and broke include-inactive filtering in player builds. A typed
+                // Behaviour check plus plain-reflection GetValue both run correctly under AOT.
+                return instance => ReadEnabledProperty(instance, property);
             }
 
             try
@@ -3119,33 +3123,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static Func<object, bool> CreateDelegateEnabledPropertyGetter(
-            PropertyInfo property,
-            Type type
-        )
+        private static bool ReadEnabledProperty(object instance, PropertyInfo property)
         {
-            try
+            // Behaviour (every MonoBehaviour plus most built-in components) is read directly; any
+            // other component exposing a bool "enabled" property falls back to reflection GetValue.
+            // Both are AOT-safe -- neither uses Reflection.Emit, DynamicInvoke, or value-type
+            // generic instantiation, all of which IL2CPP cannot service.
+            if (instance is UnityEngine.Behaviour behaviour)
             {
-                MethodInfo getMethod = property.GetGetMethod();
-                if (getMethod == null)
-                {
-                    return null;
-                }
-
-                // Try to create a delegate directly
-                Type delegateType = typeof(Func<,>).MakeGenericType(type, typeof(bool));
-                Delegate del = Delegate.CreateDelegate(delegateType, null, getMethod, false);
-                if (del == null)
-                {
-                    return null;
-                }
-
-                return instance => (bool)del.DynamicInvoke(instance);
+                return behaviour.enabled;
             }
-            catch
-            {
-                return null;
-            }
+
+            return (bool)property.GetValue(instance);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

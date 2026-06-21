@@ -14,6 +14,9 @@ on:
       - "scripts/tests/test-report-slow-tests.ps1"
       - "scripts/unity/run-ci-tests.ps1"
       - "scripts/tests/test-process-watchdog.ps1"
+      - "scripts/tests/test-catastrophic-pattern-sync.ps1"
+      - ".github/actions/verify-unity-results/action.yml"
+      - ".github/actions/dump-unity-log-tail/action.yml"
       - ".github/workflows/test-lint.yml"
   pull_request:
     paths:
@@ -26,6 +29,9 @@ on:
       - "scripts/tests/test-report-slow-tests.ps1"
       - "scripts/unity/run-ci-tests.ps1"
       - "scripts/tests/test-process-watchdog.ps1"
+      - "scripts/tests/test-catastrophic-pattern-sync.ps1"
+      - ".github/actions/verify-unity-results/action.yml"
+      - ".github/actions/dump-unity-log-tail/action.yml"
       - ".github/workflows/test-lint.yml"
 
 permissions:
@@ -53,6 +59,10 @@ jobs:
       - name: Test process watchdog
         shell: pwsh
         run: ./scripts/tests/test-process-watchdog.ps1 -VerboseOutput
+
+      - name: Test catastrophic-pattern sync
+        shell: pwsh
+        run: ./scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput
 
       - name: Lint tests
         shell: pwsh

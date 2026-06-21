@@ -678,6 +678,35 @@ namespace WallstopStudios.UnityHelpers.Tests
         }
 
         /// <summary>
+        /// Anonymous types (and other types without a public parameterless constructor) must serialize
+        /// without invoking System.Text.Json's parameterized-constructor converter, which has no AOT
+        /// code under IL2CPP. The reflection-light writer must emit the exact same JSON mono produces.
+        /// </summary>
+        [Test]
+        public void JsonStringifyAnonymousTypeProducesExpectedJson()
+        {
+            object testObj = new { Id = 1, Name = "x" };
+
+            string result = Serializer.JsonStringify(testObj);
+
+            Assert.AreEqual("{\"Id\":1,\"Name\":\"x\"}", result);
+        }
+
+        /// <summary>
+        /// The byte[] path must produce the same property layout for anonymous types as the string path.
+        /// </summary>
+        [Test]
+        public void JsonSerializeAnonymousTypeProducesExpectedJson()
+        {
+            object testObj = new { Id = 1, Name = "x" };
+
+            byte[] result = Serializer.JsonSerialize(testObj);
+            string asText = System.Text.Encoding.UTF8.GetString(result);
+
+            Assert.AreEqual("{\"Id\":1,\"Name\":\"x\"}", asText);
+        }
+
+        /// <summary>
         /// Documents that Cache.TryGet is the method for value retrieval (not TryGetValue).
         /// </summary>
         [Test]

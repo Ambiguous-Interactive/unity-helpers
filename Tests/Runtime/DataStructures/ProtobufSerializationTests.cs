@@ -543,6 +543,36 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void SparseSetEmptySerializesAndDeserializes()
+        {
+            SparseSet original = new(64);
+
+            SparseSet deserialized = SerializeDeserialize(original);
+
+            Assert.AreEqual(0, deserialized.Count);
+            Assert.AreEqual(64, deserialized.Capacity);
+        }
+
+        [Test]
+        public void SparseSetFullSerializesAndDeserializes()
+        {
+            SparseSet original = new(8);
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.IsTrue(original.TryAdd(i));
+            }
+
+            SparseSet deserialized = SerializeDeserialize(original);
+
+            Assert.AreEqual(original.Count, deserialized.Count);
+            Assert.AreEqual(original.Capacity, deserialized.Capacity);
+            for (int i = 0; i < original.Capacity; i++)
+            {
+                Assert.AreEqual(original.Contains(i), deserialized.Contains(i), $"Element {i}");
+            }
+        }
+
+        [Test]
         public void FastVector2IntSerializesAndDeserializes()
         {
             FastVector2Int original = new(42, -17);
@@ -704,6 +734,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(10000f, deserialized.MaxHeight, 1f);
             Assert.AreEqual(50000f, deserialized.Length, 1f);
+            Assert.IsTrue(original.Equals(deserialized));
+        }
+
+        [Test]
+        public void ParabolaFromCoefficientsSerializesAndDeserializes()
+        {
+            // FromCoefficients exercises all four fields independently, validating the surrogate
+            // round-trips A and B verbatim rather than recomputing them from maxHeight/length.
+            Parabola original = Parabola.FromCoefficients(a: -2f, b: 8f, length: 4f);
+
+            Parabola deserialized = SerializeDeserialize(original);
+
+            Assert.AreEqual(original.A, deserialized.A, 0.0001f);
+            Assert.AreEqual(original.B, deserialized.B, 0.0001f);
+            Assert.AreEqual(original.Length, deserialized.Length, 0.0001f);
+            Assert.AreEqual(original.MaxHeight, deserialized.MaxHeight, 0.0001f);
             Assert.IsTrue(original.Equals(deserialized));
         }
 

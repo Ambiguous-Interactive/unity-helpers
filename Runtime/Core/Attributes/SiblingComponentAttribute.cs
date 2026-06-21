@@ -6,8 +6,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Linq.Expressions;
-    using System.Reflection;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
@@ -404,54 +402,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class SiblingComponentFastInvoker
     {
-        private static readonly Dictionary<Type, Func<Component, Array>> ArrayGetters = new();
-
-        private static readonly MethodInfo GetComponentsGenericDefinition =
-            FindGetComponentsMethod();
-
-        private static MethodInfo FindGetComponentsMethod()
-        {
-            MethodInfo[] methods = typeof(Component).GetMethods(
-                BindingFlags.Instance | BindingFlags.Public
-            );
-            for (int i = 0; i < methods.Length; i++)
-            {
-                MethodInfo method = methods[i];
-                if (
-                    method.Name == nameof(Component.GetComponents)
-                    && method.IsGenericMethodDefinition
-                    && method.GetParameters().Length == 0
-                )
-                {
-                    return method;
-                }
-            }
-            throw new InvalidOperationException(
-                "Could not find GetComponents<T>() method on Component type."
-            );
-        }
-
         internal static Array GetArray(Component component, Type elementType)
         {
-            if (!ArrayGetters.TryGetValue(elementType, out Func<Component, Array> getter))
-            {
-                getter = CreateArrayGetter(elementType);
-                ArrayGetters[elementType] = getter;
-            }
-
-            return getter(component);
-        }
-
-        private static Func<Component, Array> CreateArrayGetter(Type elementType)
-        {
-            MethodInfo closedMethod = GetComponentsGenericDefinition.MakeGenericMethod(elementType);
-            ParameterExpression componentParameter = Expression.Parameter(
-                typeof(Component),
-                "component"
-            );
-            MethodCallExpression invoke = Expression.Call(componentParameter, closedMethod);
-            UnaryExpression convert = Expression.Convert(invoke, typeof(Array));
-            return Expression.Lambda<Func<Component, Array>>(convert, componentParameter).Compile();
+            // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
+            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
+            // at runtime in player builds). GetComponents(Type) returns only elementType
+            // instances; copy them into a typed array the caller can assign to its field.
+            Component[] matches = component.GetComponents(elementType);
+            Array typed = Array.CreateInstance(elementType, matches.Length);
+            Array.Copy(matches, typed, matches.Length);
+            return typed;
         }
     }
 }

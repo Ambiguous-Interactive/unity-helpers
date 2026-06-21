@@ -834,7 +834,8 @@
         "TMPDIR",
         "cwd",
         "gantt",
-        "mcp"
+        "mcp",
+        "icall"
       ]
     }
   ],

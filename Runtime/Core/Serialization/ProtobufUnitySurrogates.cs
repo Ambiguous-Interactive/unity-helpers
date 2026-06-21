@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using ProtoBuf;
     using ProtoBuf.Meta;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Math;
 
     // Surrogates allow protobuf-net to serialize Unity structs we cannot annotate directly.
     [ProtoContract]
@@ -324,6 +327,114 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
     }
 
+    // Surrogates for our own immutable [ProtoContract] readonly structs. Under IL2CPP/AOT
+    // protobuf-net cannot bind a parameterized constructor nor assign readonly fields without
+    // Reflection.Emit, so it falls back to ParameterInfo.GetRequiredCustomModifiers which hits the
+    // unsupported RuntimeParameterInfo::GetTypeModifiers icall. Routing these types through a
+    // mutable surrogate uses protobuf-net's working surrogate path instead. Field numbers mirror
+    // the originals exactly so the wire format is byte-identical to the pre-surrogate mono output.
+
+    [ProtoContract]
+    internal struct FastVector2IntSurrogate
+    {
+        [ProtoMember(1)]
+        public int x;
+
+        [ProtoMember(2)]
+        public int y;
+
+        // Mirrors FastVector2Int's serialized cached hash (ProtoMember 3) for wire parity; the value
+        // is recomputed by the FastVector2Int constructor on conversion, so it is not trusted on read.
+        [ProtoMember(3)]
+        public int hash;
+
+        public static implicit operator FastVector2IntSurrogate(FastVector2Int v) =>
+            new()
+            {
+                x = v.x,
+                y = v.y,
+                hash = v.GetHashCode(),
+            };
+
+        public static implicit operator FastVector2Int(FastVector2IntSurrogate s) => new(s.x, s.y);
+    }
+
+    [ProtoContract]
+    internal struct FastVector3IntSurrogate
+    {
+        [ProtoMember(1)]
+        public int x;
+
+        [ProtoMember(2)]
+        public int y;
+
+        // FastVector3Int intentionally serializes its cached hash as ProtoMember 3 and z as
+        // ProtoMember 4 (out of order). The surrogate preserves that ordering for wire parity.
+        [ProtoMember(3)]
+        public int hash;
+
+        [ProtoMember(4)]
+        public int z;
+
+        public static implicit operator FastVector3IntSurrogate(FastVector3Int v) =>
+            new()
+            {
+                x = v.x,
+                y = v.y,
+                hash = v.GetHashCode(),
+                z = v.z,
+            };
+
+        public static implicit operator FastVector3Int(FastVector3IntSurrogate s) =>
+            new(s.x, s.y, s.z);
+    }
+
+    [ProtoContract]
+    internal struct ParabolaSurrogate
+    {
+        [ProtoMember(1)]
+        public float length;
+
+        [ProtoMember(2)]
+        public float a;
+
+        [ProtoMember(3)]
+        public float b;
+
+        [ProtoMember(4)]
+        public float maxHeight;
+
+        public static implicit operator ParabolaSurrogate(Parabola p) =>
+            new()
+            {
+                length = p.Length,
+                a = p.A,
+                b = p.B,
+                maxHeight = p.MaxHeight,
+            };
+
+        // Uses the internal coefficient constructor so all four fields are restored verbatim and the
+        // public constructor's positivity validation (which would throw for default/zero) is bypassed.
+        public static implicit operator Parabola(ParabolaSurrogate s) =>
+            new(s.maxHeight, s.length, s.a, s.b);
+    }
+
+    [ProtoContract]
+    internal struct ImmutableBitSetSurrogate
+    {
+        [ProtoMember(1)]
+        public ulong[] bits;
+
+        [ProtoMember(2)]
+        public int capacity;
+
+        public static implicit operator ImmutableBitSetSurrogate(ImmutableBitSet b) =>
+            new() { bits = b.GetBitsArrayCopy(), capacity = b.Capacity };
+
+        public static implicit operator ImmutableBitSet(ImmutableBitSetSurrogate s) =>
+            new(s.bits, s.capacity);
+    }
+
     // Protobuf wrapper types for serializable collections.
     // These types do NOT implement IEnumerable, which prevents protobuf-net's
     // collection detection from treating them as repeated fields.
@@ -375,6 +486,51 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public TValue[] Values;
     }
 
+    // Wrappers for Deque/CyclicBuffer/SparseSet. These [ProtoContract] classes carry parameterized
+    // data plus [ProtoAfterDeserialization] reconstruction hooks; building their per-type model under
+    // IL2CPP/AOT trips the unsupported RuntimeParameterInfo::GetTypeModifiers icall (Class A). Routing
+    // them through these plain array/scalar POCOs (reconstructed in Serializer) bypasses protobuf-net's
+    // per-type model build for the originals entirely and also avoids the post-deserialization hook.
+
+    /// <summary>
+    /// Protobuf wrapper for <see cref="Deque{T}"/>: ordered items (front to back) plus capacity.
+    /// </summary>
+    [ProtoContract]
+    internal sealed class DequeProtoWrapper<T>
+    {
+        [ProtoMember(1, OverwriteList = true)]
+        public T[] Items;
+
+        [ProtoMember(2)]
+        public int Capacity;
+    }
+
+    /// <summary>
+    /// Protobuf wrapper for <see cref="CyclicBuffer{T}"/>: ordered items (oldest to newest) plus capacity.
+    /// </summary>
+    [ProtoContract]
+    internal sealed class CyclicBufferProtoWrapper<T>
+    {
+        [ProtoMember(1, OverwriteList = true)]
+        public T[] Items;
+
+        [ProtoMember(2)]
+        public int Capacity;
+    }
+
+    /// <summary>
+    /// Protobuf wrapper for <see cref="SparseSet"/>: dense elements plus universe size (capacity).
+    /// </summary>
+    [ProtoContract]
+    internal sealed class SparseSetProtoWrapper
+    {
+        [ProtoMember(1, OverwriteList = true)]
+        public int[] Elements;
+
+        [ProtoMember(2)]
+        public int Capacity;
+    }
+
     internal static class ProtobufUnityModel
     {
         static ProtobufUnityModel()
@@ -420,6 +576,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 model
                     .Add(typeof(Resolution), applyDefaultBehaviour: false)
                     .SetSurrogate(typeof(ResolutionSurrogate));
+
+                // Immutable readonly [ProtoContract] structs we own. applyDefaultBehaviour: false
+                // discards their direct contract so the mutable surrogate path is used instead; this
+                // is what keeps them serializable under IL2CPP/AOT (Class B). Wire format is preserved.
+                model
+                    .Add(typeof(FastVector2Int), applyDefaultBehaviour: false)
+                    .SetSurrogate(typeof(FastVector2IntSurrogate));
+                model
+                    .Add(typeof(FastVector3Int), applyDefaultBehaviour: false)
+                    .SetSurrogate(typeof(FastVector3IntSurrogate));
+                model
+                    .Add(typeof(Parabola), applyDefaultBehaviour: false)
+                    .SetSurrogate(typeof(ParabolaSurrogate));
+                model
+                    .Add(typeof(ImmutableBitSet), applyDefaultBehaviour: false)
+                    .SetSurrogate(typeof(ImmutableBitSetSurrogate));
 
                 // NOTE: SerializableHashSet, SerializableSortedSet, SerializableDictionary, and
                 // SerializableSortedDictionary are handled via wrapper-based serialization in

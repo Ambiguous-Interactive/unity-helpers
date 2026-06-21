@@ -6,8 +6,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Linq.Expressions;
-    using System.Reflection;
     using Extension;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -782,69 +780,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ChildComponentFastInvoker
     {
-        private static readonly Dictionary<Type, Func<Component, bool, Array>> ArrayGetters = new();
-
-        private static readonly MethodInfo GetComponentsInChildrenGeneric =
-            FindGetComponentsInChildrenMethod();
-
-        private static MethodInfo FindGetComponentsInChildrenMethod()
-        {
-            MethodInfo[] methods = typeof(Component).GetMethods(
-                BindingFlags.Instance | BindingFlags.Public
-            );
-            for (int i = 0; i < methods.Length; i++)
-            {
-                MethodInfo method = methods[i];
-                if (
-                    method.Name == nameof(Component.GetComponentsInChildren)
-                    && method.IsGenericMethodDefinition
-                    && method.GetParameters().Length == 1
-                    && method.GetParameters()[0].ParameterType == typeof(bool)
-                )
-                {
-                    return method;
-                }
-            }
-            throw new InvalidOperationException(
-                "Could not find GetComponentsInChildren<T>(bool) method on Component type."
-            );
-        }
-
         internal static Array GetArray(Component component, Type elementType, bool includeInactive)
         {
-            if (!ArrayGetters.TryGetValue(elementType, out Func<Component, bool, Array> getter))
-            {
-                getter = CreateArrayGetter(elementType);
-                ArrayGetters[elementType] = getter;
-            }
-
-            return getter(component, includeInactive);
-        }
-
-        private static Func<Component, bool, Array> CreateArrayGetter(Type elementType)
-        {
-            MethodInfo closedMethod = GetComponentsInChildrenGeneric.MakeGenericMethod(elementType);
-            ParameterExpression componentParameter = Expression.Parameter(
-                typeof(Component),
-                "component"
-            );
-            ParameterExpression includeInactiveParameter = Expression.Parameter(
-                typeof(bool),
-                "includeInactive"
-            );
-            MethodCallExpression invoke = Expression.Call(
-                componentParameter,
-                closedMethod,
-                includeInactiveParameter
-            );
-            UnaryExpression convert = Expression.Convert(invoke, typeof(Array));
-            return Expression
-                .Lambda<Func<Component, bool, Array>>(
-                    convert,
-                    componentParameter,
-                    includeInactiveParameter
-                )
-                .Compile();
+            // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
+            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
+            // at runtime in player builds). GetComponentsInChildren(Type, bool) returns only
+            // elementType instances; copy them into a typed array the caller can assign.
+            Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
+            Array typed = Array.CreateInstance(elementType, matches.Length);
+            Array.Copy(matches, typed, matches.Length);
+            return typed;
         }
     }
 }

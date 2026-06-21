@@ -1,0 +1,18 @@
+<!--
+  IL2CPP / AOT link preservation for the serialization stack.
+
+  protobuf-net (Reflection.Emit) and System.Text.Json (reflection metadata) are both stripped
+  aggressively by the IL2CPP managed linker, and the AOT compiler must retain the closed generic
+  members our serializer reaches through reflection. Preserving these assemblies wholesale is the
+  robust, low-maintenance choice for a redistributed package: it guarantees the surrogate path,
+  the collection wrappers, and the immutable-collections backing used by protobuf-net keep working
+  on standalone (IL2CPP) players. WallstopStudios.UnityHelpers is preserved so the surrogate /
+  wrapper types and the AOT hint references survive linking.
+-->
+<linker>
+  <assembly fullname="protobuf-net" preserve="all" />
+  <assembly fullname="protobuf-net.Core" preserve="all" />
+  <assembly fullname="System.Text.Json" preserve="all" />
+  <assembly fullname="System.Collections.Immutable" preserve="all" />
+  <assembly fullname="WallstopStudios.UnityHelpers" preserve="all" />
+</linker>

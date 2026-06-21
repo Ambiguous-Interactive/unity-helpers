@@ -145,6 +145,7 @@
     "test:lint-workflow-run-expression-length": "pwsh -NoProfile -File scripts/tests/test-lint-workflow-run-expression-length.ps1 -VerboseOutput",
     "test:git-path-helpers": "pwsh -NoProfile -File scripts/tests/test-git-path-helpers.ps1 -VerboseOutput",
     "test:accelerator": "pwsh -NoProfile -File scripts/tests/test-accelerator.ps1 -VerboseOutput",
+    "test:catastrophic-pattern-sync": "pwsh -NoProfile -File scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput",
     "test:postinstall-hooks": "node scripts/tests/test-postinstall-hooks.js",
     "test:github-pages-sortable": "node scripts/tests/test-github-pages-sortable.js",
     "test:validate-git-push-config": "pwsh -NoProfile -File scripts/tests/test-validate-git-push-config.ps1 -VerboseOutput",

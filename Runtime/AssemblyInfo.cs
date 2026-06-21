@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Integration.VContainer")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Integration.Zenject")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Core")]
+[assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Core.Editor")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.AssetProcessors")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Attributes")]

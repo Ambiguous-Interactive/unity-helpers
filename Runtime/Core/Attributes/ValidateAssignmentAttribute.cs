@@ -158,7 +158,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         public static void ValidateAssignments(this Object o)
         {
-#if UNITY_EDITOR
+            // Intentionally NOT gated on UNITY_EDITOR: the sibling AreAnyAssignmentsInvalid already
+            // runs in player builds, so gating only the logging variant left this a silent no-op in
+            // builds (and on IL2CPP standalone, where the warning test expects the log). The body is
+            // reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
             if (o == null)
             {
                 return;
@@ -176,7 +179,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     o.LogNotAssigned(field.Name);
                 }
             }
-#endif
         }
 
         public static bool AreAnyAssignmentsInvalid(this Object o)
