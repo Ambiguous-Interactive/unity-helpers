@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using System;
     using System.IO;
-    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -826,14 +825,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             const string inputPath = @"SomeFolder\SubFolder";
             const string expectedNormalizedPath = "SomeFolder/SubFolder";
 
-            // The production code normalizes backslashes to forward slashes before logging
-            LogAssert.Expect(
-                LogType.Error,
-                new Regex(
-                    $"Attempted to create directory outside of Assets: '{Regex.Escape(expectedNormalizedPath)}'"
-                )
-            );
-
             ArgumentException exception = Assert.Throws<ArgumentException>(
                 () => DirectoryHelper.EnsureDirectoryExists(inputPath),
                 $"Expected ArgumentException for path '{inputPath}' (normalized: '{expectedNormalizedPath}')"
@@ -841,9 +832,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.That(
                 exception.Message,
-                Does.Contain("Assets"),
-                $"Exception message should mention Assets folder. Input: '{inputPath}'"
+                Does.Contain(expectedNormalizedPath),
+                $"Exception message should name the offending (normalized) path. Input: '{inputPath}'"
             );
+            Assert.That(
+                exception.Message,
+                Does.Contain("Assets"),
+                "Exception message should mention the Assets folder requirement."
+            );
+            Assert.That(exception.ParamName, Is.EqualTo("relativeDirectoryPath"));
+
+            // The failure must be signalled ONLY through the typed exception -- no error log.
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
@@ -896,14 +896,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string expectedNormalizedPath
         )
         {
-            // The production code normalizes backslashes to forward slashes before logging
-            LogAssert.Expect(
-                LogType.Error,
-                new Regex(
-                    $"Attempted to create directory outside of Assets: '{Regex.Escape(expectedNormalizedPath)}'"
-                )
-            );
-
             ArgumentException exception = Assert.Throws<ArgumentException>(
                 () => DirectoryHelper.EnsureDirectoryExists(inputPath),
                 $"Expected ArgumentException for path '{inputPath}' (normalized: '{expectedNormalizedPath}')"
@@ -911,9 +903,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.That(
                 exception.Message,
-                Does.Contain("Assets"),
-                $"Exception message should mention Assets folder. Input: '{inputPath}', Normalized: '{expectedNormalizedPath}'"
+                Does.Contain(expectedNormalizedPath),
+                $"Exception message should name the offending (normalized) path. Input: '{inputPath}', Normalized: '{expectedNormalizedPath}'"
             );
+            Assert.That(
+                exception.Message,
+                Does.Contain("Assets"),
+                $"Exception message should mention the Assets folder requirement. Input: '{inputPath}'"
+            );
+            Assert.That(exception.ParamName, Is.EqualTo("relativeDirectoryPath"));
+
+            // The failure must be signalled ONLY through the typed exception -- no error log.
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]

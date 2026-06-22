@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 #if UNITY_EDITOR
+    using System.Text.RegularExpressions;
     using UnityEditor.SceneManagement;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core.TestUtils;
@@ -376,6 +377,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
 #if UNITY_EDITOR
+        /// <summary>
+        /// Registers an expectation for Unity's benign "No script asset for ScriptableObject"
+        /// importer warning so a fixture that legitimately persists a raw base
+        /// <see cref="ScriptableObject"/> (via <c>ScriptableObject.CreateInstance&lt;ScriptableObject&gt;()</c>
+        /// plus <see cref="UnityEditor.AssetDatabase.CreateAsset"/>) does not fail under
+        /// <see cref="LogAssert.NoUnexpectedReceived"/>.
+        /// </summary>
+        /// <remarks>
+        /// A base <see cref="ScriptableObject"/> has no backing <c>MonoScript</c>, so Unity's importer
+        /// emits this warning when the asset is imported, re-serialized, or deleted (most reliably during
+        /// a clean CI import). The warning originates inside Unity's importer, not in production cleanup
+        /// code, so the only thing to do is tolerate it.
+        ///
+        /// CI evidence (Unity 2021/2022/6000, clean editmode import) shows the warning fires
+        /// consistently for these fixtures, so <see cref="LogAssert.Expect(LogType, Regex)"/> is the
+        /// correct, tightly scoped choice: it consumes exactly this one message and nothing else.
+        /// <see cref="LogAssert.ignoreFailingMessages"/> was rejected because it suppresses ALL failing
+        /// messages for its scope, which would mask genuine regressions. Call this immediately before
+        /// the asset is imported/deleted and before <see cref="LogAssert.NoUnexpectedReceived"/>.
+        /// </remarks>
+        protected static void ExpectNoScriptAssetForScriptableObjectWarning()
+        {
+            LogAssert.Expect(LogType.Warning, new Regex("No script asset for "));
+        }
+
         private static void CleanupPackageRootGeneratedArtifacts()
         {
             string packageRoot = GetPackageRoot();

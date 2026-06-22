@@ -1703,9 +1703,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         [Test]
+        [TestCase(100, TestName = "ExtremeRapidCycles.Count100")]
         [TestCase(1000, TestName = "ExtremeRapidCycles.Count1000")]
-        [TestCase(5000, TestName = "ExtremeRapidCycles.Count5000")]
         public void ExtremelyRapidOpenCloseCyclesDoNotBreakState(int cycleCount)
+        {
+            RunRapidOpenCloseCycles(cycleCount);
+        }
+
+        [Test]
+        [NUnit.Framework.Category("Stress")]
+        [Timeout(60000)]
+        [TestCase(5000, TestName = "ExtremeRapidCycles.Count5000")]
+        public void ExtremelyRapidOpenCloseCyclesDoNotBreakStateStress(int cycleCount)
+        {
+            RunRapidOpenCloseCycles(cycleCount);
+        }
+
+        private static void RunRapidOpenCloseCycles(int cycleCount)
         {
             for (int i = 0; i < cycleCount; i++)
             {

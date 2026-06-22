@@ -485,6 +485,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: the tracked object should be a persisted asset"
             );
 
+            ExpectNoScriptAssetForScriptableObjectWarning();
             DestroyTrackedObjects();
             LogAssert.NoUnexpectedReceived();
 
@@ -522,6 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 // asset path is cleared -- the persistent-but-pathless state that broke CI.
                 AssetDatabase.DeleteAsset(assetPath);
 
+                ExpectNoScriptAssetForScriptableObjectWarning();
                 DestroyTrackedObjects();
                 LogAssert.NoUnexpectedReceived();
             }

@@ -43,11 +43,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return;
                 }
 
-                Debug.LogError(
-                    $"Attempted to create directory outside of Assets: '{relativeDirectoryPath}'"
-                );
+                // Signal this misuse through the typed exception ONLY -- the exception already
+                // carries the offending path, so an additional Debug.LogError would be a redundant
+                // second signal that also pollutes the console and fails tests that do not expect it.
                 throw new ArgumentException(
-                    "Cannot create directories outside the Assets folder using AssetDatabase.",
+                    $"Cannot create directory '{relativeDirectoryPath}' outside the Assets folder: "
+                        + "AssetDatabase only manages paths under 'Assets/'.",
                     nameof(relativeDirectoryPath)
                 );
             }

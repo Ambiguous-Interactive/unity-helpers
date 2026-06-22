@@ -33,42 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             "WallstopStudios.UnityHelpers.Editor",
         };
 
-        private static readonly string[] TestAssemblyNames =
-        {
-            "WallstopStudios.UnityHelpers.Tests.Core",
-            "WallstopStudios.UnityHelpers.Tests.Editor",
-            "WallstopStudios.UnityHelpers.Tests.Editor.AssetProcessors",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Attributes",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Core",
-            "WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers",
-            "WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Extensions",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Helper",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Reflex",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Settings",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Animation",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Cropper",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.PivotAdjuster",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.SpriteSheetExtractor",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureSettings",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureTools",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Tags",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Tools",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Utils",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Validation",
-            "WallstopStudios.UnityHelpers.Tests.Editor.VContainer",
-            "WallstopStudios.UnityHelpers.Tests.Editor.WButton",
-            "WallstopStudios.UnityHelpers.Tests.Editor.WGroup",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Windows",
-            "WallstopStudios.UnityHelpers.Tests.Editor.Zenject",
-            "WallstopStudios.UnityHelpers.Tests.Runtime",
-            "WallstopStudios.UnityHelpers.Tests.Runtime.Performance",
-            "WallstopStudios.UnityHelpers.Tests.Runtime.Random",
-            "WallstopStudios.UnityHelpers.Tests.Runtime.Reflex",
-            "WallstopStudios.UnityHelpers.Tests.Runtime.VContainer",
-            "WallstopStudios.UnityHelpers.Tests.Runtime.Zenject",
-        };
-
         private static readonly string[] AssemblyInfoPaths =
         {
             "Runtime/AssemblyInfo.cs",
@@ -132,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<string> failedAssemblies = new();
             List<string> skippedAssemblies = new();
 
-            foreach (string assemblyName in TestAssemblyNames)
+            foreach (string assemblyName in DiscoverTestAssemblyNames())
             {
                 try
                 {
@@ -200,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             List<string> failedAssemblies = new();
 
-            foreach (string assemblyName in TestAssemblyNames)
+            foreach (string assemblyName in DiscoverTestAssemblyNames())
             {
                 Assembly assembly = GetLoadedAssembly(assemblyName);
                 if (assembly == null)
@@ -333,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             // Check that each test assembly has an InternalsVisibleTo entry in at least one AssemblyInfo
-            foreach (string testAssemblyName in TestAssemblyNames)
+            foreach (string testAssemblyName in DiscoverTestAssemblyNames())
             {
                 // Skip assemblies that are optional integrations
                 if (IsOptionalIntegrationAssembly(testAssemblyName))
@@ -395,8 +359,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
 
-                TestContext.WriteLine("\nDiagnostic: TestAssemblyNames being checked:");
-                foreach (string name in TestAssemblyNames)
+                TestContext.WriteLine(
+                    "\nDiagnostic: Discovered test assembly names being checked:"
+                );
+                foreach (string name in DiscoverTestAssemblyNames())
                 {
                     TestContext.WriteLine($"  {name}");
                 }
@@ -474,12 +440,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         /// <summary>
-        /// Cross-validates that TestAssemblyNames stays in sync with actual asmdef files.
-        /// Detects stale entries in TestAssemblyNames that no longer have a matching asmdef,
-        /// and asmdef files that are missing from TestAssemblyNames.
+        /// Cross-validates that the test assemblies discovered from on-disk asmdef files stay
+        /// mutually consistent with the InternalsVisibleTo entries in the AssemblyInfo.cs files.
+        /// This is the canonical drift check: there is no hardcoded list to keep in sync, so a
+        /// new test asmdef without a matching InternalsVisibleTo entry (or a stale entry whose
+        /// asmdef was removed) fails loudly with an actionable message.
         /// </summary>
         [Test]
-        public void TestAssemblyNamesMatchAsmdefFiles()
+        public void DiscoveredTestAsmdefsAndInternalsVisibleToEntriesAreConsistent()
         {
             string packagePath = GetPackagePath();
             if (string.IsNullOrEmpty(packagePath))
@@ -488,111 +456,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return;
             }
 
-            string testsPath = Path.Combine(packagePath, "Tests");
-            if (!Directory.Exists(testsPath))
-            {
-                Assert.Fail("Tests directory not found at: " + testsPath);
-                return;
-            }
+            HashSet<string> asmdefAssemblyNames = new(DiscoverTestAssemblyNames());
 
-            string[] asmdefFiles = Directory.GetFiles(
-                testsPath,
-                "*.asmdef",
-                SearchOption.AllDirectories
+            // Guard against a silent vacuous pass: if discovery finds nothing, the package layout
+            // moved and every discovery-driven check below would pass without asserting anything.
+            Assert.That(
+                asmdefAssemblyNames,
+                Is.Not.Empty,
+                "Discovered zero test asmdefs under the package Tests/ tree. The discovery root "
+                    + "(GetPackagePath/Tests) is wrong or the layout changed; the validation suite "
+                    + "would otherwise pass vacuously."
             );
 
-            HashSet<string> asmdefAssemblyNames = new();
-            List<string> parseErrors = new();
-            foreach (string asmdefPath in asmdefFiles)
-            {
-                try
-                {
-                    string asmdefContent = File.ReadAllText(asmdefPath);
-                    string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
-                    if (!string.IsNullOrEmpty(assemblyName))
-                    {
-                        asmdefAssemblyNames.Add(assemblyName);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    parseErrors.Add($"{asmdefPath}: {ex.Message}");
-                }
-            }
-
-            if (parseErrors.Count > 0)
-            {
-                Assert.Fail("Failed to parse asmdef files:\n" + string.Join("\n", parseErrors));
-                return;
-            }
-
-            HashSet<string> expectedNames = new(TestAssemblyNames);
-            List<string> issues = new();
-
-            foreach (string asmdefName in asmdefAssemblyNames)
-            {
-                if (!expectedNames.Contains(asmdefName))
-                {
-                    issues.Add(
-                        $"asmdef assembly '{asmdefName}' exists on disk but is missing from "
-                            + "TestAssemblyNames. Add it to the hardcoded list."
-                    );
-                }
-            }
-
-            foreach (string expectedName in expectedNames)
-            {
-                if (
-                    !asmdefAssemblyNames.Contains(expectedName)
-                    && !IsOptionalIntegrationAssembly(expectedName)
-                )
-                {
-                    issues.Add(
-                        $"TestAssemblyNames contains '{expectedName}' but no matching asmdef "
-                            + "file exists. Remove it from the hardcoded list or create the asmdef."
-                    );
-                }
-            }
-
-            if (issues.Count > 0)
-            {
-                TestContext.WriteLine("Diagnostic: asmdef assembly names on disk:");
-                foreach (string name in asmdefAssemblyNames)
-                {
-                    TestContext.WriteLine($"  {name}");
-                }
-
-                TestContext.WriteLine("\nDiagnostic: TestAssemblyNames entries:");
-                foreach (string name in TestAssemblyNames)
-                {
-                    TestContext.WriteLine($"  {name}");
-                }
-            }
-
-            Assert.IsEmpty(
-                issues,
-                "TestAssemblyNames is out of sync with asmdef files:\n" + string.Join("\n", issues)
-            );
-        }
-
-        /// <summary>
-        /// Cross-validates that InternalsVisibleTo entries in AssemblyInfo.cs files
-        /// stay in sync with TestAssemblyNames. Detects entries referenced in
-        /// TestAssemblyNames but missing from all AssemblyInfo files, and entries in
-        /// AssemblyInfo files that are not in TestAssemblyNames.
-        /// </summary>
-        [Test]
-        public void InternalsVisibleToEntriesMatchTestAssemblyNames()
-        {
-            string packagePath = GetPackagePath();
-            if (string.IsNullOrEmpty(packagePath))
-            {
-                Assert.Inconclusive("Could not determine package path");
-                return;
-            }
-
-            HashSet<string> allInternalsVisibleToEntries = new();
-
+            HashSet<string> testInternalsVisibleToEntries = new();
             foreach (string relativePath in AssemblyInfoPaths)
             {
                 string fullPath = Path.Combine(packagePath, relativePath);
@@ -605,59 +481,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 HashSet<string> entries = ParseInternalsVisibleToEntries(content);
                 foreach (string entry in entries)
                 {
-                    allInternalsVisibleToEntries.Add(entry);
+                    if (entry.StartsWith("WallstopStudios.UnityHelpers.Tests"))
+                    {
+                        testInternalsVisibleToEntries.Add(entry);
+                    }
                 }
             }
 
-            HashSet<string> expectedNames = new(TestAssemblyNames);
             List<string> issues = new();
 
-            foreach (string testName in expectedNames)
+            // Every on-disk test asmdef must have an InternalsVisibleTo entry so the test
+            // assembly can reach the production internals it exercises.
+            foreach (string asmdefName in asmdefAssemblyNames)
             {
-                if (
-                    !allInternalsVisibleToEntries.Contains(testName)
-                    && !IsOptionalIntegrationAssembly(testName)
-                )
+                if (!testInternalsVisibleToEntries.Contains(asmdefName))
                 {
                     issues.Add(
-                        $"TestAssemblyNames contains '{testName}' but no InternalsVisibleTo "
-                            + "entry exists in any AssemblyInfo.cs file."
+                        $"Test asmdef '{asmdefName}' exists on disk but has no InternalsVisibleTo "
+                            + "entry. Add [assembly: InternalsVisibleTo(\""
+                            + asmdefName
+                            + "\")] to Runtime/AssemblyInfo.cs and Editor/AssemblyInfo.cs."
                     );
                 }
             }
 
-            foreach (string ivtEntry in allInternalsVisibleToEntries)
+            // Every test InternalsVisibleTo entry must correspond to an on-disk asmdef, otherwise
+            // it is stale and should be removed.
+            foreach (string ivtEntry in testInternalsVisibleToEntries)
             {
-                if (
-                    ivtEntry.StartsWith("WallstopStudios.UnityHelpers.Tests")
-                    && !expectedNames.Contains(ivtEntry)
-                )
+                if (!asmdefAssemblyNames.Contains(ivtEntry))
                 {
                     issues.Add(
-                        $"InternalsVisibleTo entry '{ivtEntry}' exists in AssemblyInfo.cs "
-                            + "but is missing from TestAssemblyNames."
+                        $"InternalsVisibleTo entry '{ivtEntry}' has no matching test asmdef on disk. "
+                            + "Remove the stale entry from Runtime/AssemblyInfo.cs and Editor/AssemblyInfo.cs."
                     );
                 }
             }
 
             if (issues.Count > 0)
             {
-                TestContext.WriteLine("Diagnostic: InternalsVisibleTo entries:");
-                foreach (string entry in allInternalsVisibleToEntries)
-                {
-                    TestContext.WriteLine($"  {entry}");
-                }
-
-                TestContext.WriteLine("\nDiagnostic: TestAssemblyNames entries:");
-                foreach (string name in TestAssemblyNames)
+                TestContext.WriteLine("Diagnostic: discovered test asmdef assembly names on disk:");
+                foreach (string name in asmdefAssemblyNames)
                 {
                     TestContext.WriteLine($"  {name}");
+                }
+
+                TestContext.WriteLine("\nDiagnostic: test InternalsVisibleTo entries:");
+                foreach (string entry in testInternalsVisibleToEntries)
+                {
+                    TestContext.WriteLine($"  {entry}");
                 }
             }
 
             Assert.IsEmpty(
                 issues,
-                "InternalsVisibleTo entries are out of sync with TestAssemblyNames:\n"
+                "Test asmdef files and InternalsVisibleTo entries are out of sync:\n"
                     + string.Join("\n", issues)
             );
         }
@@ -729,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             List<string> issues = new();
 
-            foreach (string testAssemblyName in TestAssemblyNames)
+            foreach (string testAssemblyName in DiscoverTestAssemblyNames())
             {
                 Assembly testAssembly = GetLoadedAssembly(testAssemblyName);
                 if (testAssembly == null)
@@ -1010,6 +888,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             // Test passes - this is informational only
             Assert.Pass("Namespace analysis complete");
+        }
+
+        // Canonical source of test-assembly names: discovered from the on-disk asmdef files
+        // rather than a hardcoded list, so adding/removing a test assembly cannot drift.
+        private static List<string> DiscoverTestAssemblyNames()
+        {
+            List<string> names = new();
+
+            string packagePath = GetPackagePath();
+            if (string.IsNullOrEmpty(packagePath))
+            {
+                return names;
+            }
+
+            string testsPath = Path.Combine(packagePath, "Tests");
+            if (!Directory.Exists(testsPath))
+            {
+                return names;
+            }
+
+            string[] asmdefFiles = Directory.GetFiles(
+                testsPath,
+                "*.asmdef",
+                SearchOption.AllDirectories
+            );
+
+            foreach (string asmdefPath in asmdefFiles)
+            {
+                string asmdefContent = File.ReadAllText(asmdefPath);
+                string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    names.Add(assemblyName);
+                }
+            }
+
+            return names;
         }
 
         private static Assembly GetLoadedAssembly(string assemblyName)
