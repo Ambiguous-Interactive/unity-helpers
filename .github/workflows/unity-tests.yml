@@ -30,6 +30,14 @@ on:
           - editmode
           - playmode
           - standalone
+      abort-on-first-failure:
+        description: >-
+          Stop the matrix at the first failing leg (fast iteration). Default
+          false keeps the full matrix running for cross-version compatibility
+          visibility. Only honored on workflow_dispatch.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -43,6 +51,7 @@ jobs:
     outputs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
       test-modes: ${{ steps.resolve.outputs.test-modes }}
+      matrix-include: ${{ steps.resolve.outputs.matrix-include }}
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
@@ -87,9 +96,26 @@ jobs:
           else
             modes='["editmode","playmode","standalone"]'
           fi
+          # Build an explicitly-ordered matrix include: mode-major
+          # (editmode -> playmode -> standalone), version-minor. With
+          # max-parallel:1 the legs run in array order, so the cheap, high-signal
+          # editmode legs run FIRST and the expensive ~30-min standalone IL2CPP
+          # legs run LAST -- a compile/logic break surfaces in ~8 min instead of
+          # after 90 min of player builds. GitHub's bare cartesian expansion order
+          # is not contractually guaranteed, so we pin it with include.
+          include="$(jq -cn \
+            --argjson versions "${versions}" \
+            --argjson modes "${modes}" \
+            --argjson priority '["editmode","playmode","standalone"]' \
+            '[ $priority[]
+                 | . as $m
+                 | select(($modes | index($m)) != null)
+                 | $versions[]
+                 | { "unity-version": ., "test-mode": $m } ]')"
           {
             echo "unity-versions=${versions}"
             echo "test-modes=${modes}"
+            echo "matrix-include=${include}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check for required Unity license secrets
@@ -236,11 +262,18 @@ jobs:
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 660
     strategy:
-      fail-fast: false
+      # Default false keeps the full matrix running so cross-version
+      # compatibility stays visible on a red run. workflow_dispatch can flip
+      # abort-on-first-failure to stop at the first failing leg for fast
+      # iteration (with max-parallel:1 that means "stop launching further legs").
+      fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
       max-parallel: 1
       matrix:
-        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
-        test-mode: ${{ fromJSON(needs.matrix-config.outputs.test-modes) }}
+        # Explicitly-ordered include from matrix-config: editmode -> playmode ->
+        # standalone, so the expensive ~30-min standalone IL2CPP legs run LAST and
+        # a break surfaces in minutes. matrix.unity-version / matrix.test-mode come
+        # from each include object.
+        include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
       - name: Enable Git long paths
         shell: pwsh
@@ -284,7 +317,15 @@ jobs:
           path: |
             .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
             .artifacts/unity/cache/${{ matrix.unity-version }}
-          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-${{ env.PACKAGE_HASH }}
+          # The `-default-` scope token keeps this prefix DISJOINT from the
+          # single-threaded job's `-single-threaded-` key so the restore-keys
+          # fallback can never cross-restore a SINGLE_THREADED-compiled Library
+          # into a default leg. restore-keys lets a test-only PR (different
+          # PACKAGE_HASH) warm-restore the prior run's imported Library instead of
+          # importing cold.
+          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-${{ env.PACKAGE_HASH }}
+          restore-keys: |
+            Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -503,7 +544,9 @@ jobs:
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 660
     strategy:
-      fail-fast: false
+      # See the unity-tests job: default false for full visibility;
+      # workflow_dispatch can opt into abort-on-first-failure.
+      fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
       max-parallel: 1
       matrix:
         # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode
@@ -554,8 +597,12 @@ jobs:
             .artifacts/unity/cache/${{ matrix.unity-version }}
           # `single-threaded` in BOTH the project path above and this key keeps this
           # leg's Library (compiled WITH SINGLE_THREADED) separate from the default
-          # matrix's `6000.3.16f1-{mode}` Library (compiled WITHOUT it).
+          # matrix's `6000.3.16f1-{mode}` Library (compiled WITHOUT it). The
+          # restore-keys prefix carries the same `-single-threaded-` token so it can
+          # only ever fall back to other SINGLE_THREADED Libraries.
           key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-${{ env.PACKAGE_HASH }}
+          restore-keys: |
+            Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
