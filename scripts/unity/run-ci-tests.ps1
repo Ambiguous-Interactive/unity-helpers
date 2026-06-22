@@ -111,6 +111,11 @@ $RequiredUnityHelpersAnalyzerDllNames = @()
 # / Test-AcceleratorReachable.
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
 
+# Single source of truth for the catastrophic-pattern list (shared with the two
+# composite actions via Get-CatastrophicPatterns). Dot-sourced here; the array is
+# assigned to $script:CatastrophicPatterns below.
+. (Join-Path $PSScriptRoot 'lib/catastrophic-patterns.ps1')
+
 function Write-CiError {
     param([Parameter(Mandatory = $true)][string]$Message)
     Write-Host "::error::$Message"
@@ -156,17 +161,9 @@ function Write-CiNotice {
 #     misleading total=0 results.xml (a generic "unexpected log" scan otherwise
 #     mis-points at unrelated LogAssert-guarded errors). NON-transient; the
 #     scripts/lint-tests.ps1 UNH012 rule is the pre-Unity guard that catches it first.
-$script:CatastrophicPatterns = @(
-    @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
-    @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
-    @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
-    @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
-    @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
-    @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \[[^\]]+\] cannot be found'; UseSimple = $false }
-    @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
-    @{ Label = 'Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)'; Pattern = 'fatal error in the mono runtime'; UseSimple = $true }
-    @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }
-)
+# Loaded from the single source of truth (scripts/unity/lib/catastrophic-patterns.ps1,
+# dot-sourced above). Wrapped in @() so a single-entry future list stays an array.
+$script:CatastrophicPatterns = @(Get-CatastrophicPatterns)
 
 # CLASS-OF-ISSUE DIAGNOSTIC: when Unity exits non-zero, the operator's next
 # question is "WHY did Unity fail?". The most common silent-killer answers are

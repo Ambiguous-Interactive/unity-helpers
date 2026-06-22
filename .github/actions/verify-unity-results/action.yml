@@ -238,17 +238,12 @@ runs:
         function Write-UnityCatastrophicPatternHits {
           param([Parameter(Mandatory = $true)][string]$ResultsDir)
 
-          $patterns = @(
-            @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
-            @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
-            @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
-            @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
-            @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
-            @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \[[^\]]+\] cannot be found'; UseSimple = $false }
-            @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
-            @{ Label = 'Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)'; Pattern = 'fatal error in the mono runtime'; UseSimple = $true }
-            @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }
-          )
+          # Catastrophic patterns come from the single source of truth shared with
+          # run-ci-tests.ps1 and dump-unity-log-tail (kept honest by
+          # scripts/tests/test-catastrophic-pattern-sync.ps1). Do NOT inline a copy here.
+          $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
+          . (Join-Path $repoRoot 'scripts/unity/lib/catastrophic-patterns.ps1')
+          $patterns = @(Get-CatastrophicPatterns)
 
           $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $ResultsDir)
 

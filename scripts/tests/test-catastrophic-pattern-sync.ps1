@@ -1,12 +1,17 @@
 #!/usr/bin/env pwsh
-# Contract test: the Unity catastrophic-pattern list is duplicated across three call
-# sites -- scripts/unity/run-ci-tests.ps1, .github/actions/verify-unity-results/action.yml,
-# and .github/actions/dump-unity-log-tail/action.yml. They MUST stay identical: a divergent
-# scanner gives false confidence (e.g. a real failure surfaced in one summary but hidden in
-# another). The "keep in sync by convention" comments already failed once -- the
-# `Package [id] cannot be found` entry drifted out of both action files. This test extracts
-# the @{ Label=...; Pattern=...; UseSimple=... } entries from all three files and fails with a
-# diff on any drift, so the convention is enforced mechanically instead of by hope.
+# Contract test: the Unity catastrophic-pattern list has ONE source of truth --
+# scripts/unity/lib/catastrophic-patterns.ps1 (Get-CatastrophicPatterns). Three call sites
+# consume it: scripts/unity/run-ci-tests.ps1, .github/actions/verify-unity-results/action.yml,
+# and .github/actions/dump-unity-log-tail/action.yml.
+#
+# Previously each site held a byte-identical inline copy "kept in sync by convention"; the
+# convention failed (the `Package [id] cannot be found` entry drifted out of both action files)
+# and the long Label strings tripped yamllint line-length (>200). The copies have been replaced
+# by a shared dot-sourced function. This test now enforces the stronger invariant:
+#   1. the shared source exists and Get-CatastrophicPatterns returns well-formed entries, and
+#   2. NO consumer re-introduces an inline @{ Label=...; Pattern=...; UseSimple=... } array, and
+#   3. every consumer actually loads the shared source (dot-source + Get-CatastrophicPatterns).
+# So drift is structurally impossible, not merely discouraged.
 [CmdletBinding()]
 param([switch]$VerboseOutput)
 
@@ -15,74 +20,83 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
-$sources = [ordered]@{
-    'run-ci-tests.ps1'      = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
-    'verify-unity-results'  = Join-Path $repoRoot '.github/actions/verify-unity-results/action.yml'
-    'dump-unity-log-tail'   = Join-Path $repoRoot '.github/actions/dump-unity-log-tail/action.yml'
-}
+$sharedSource = Join-Path $repoRoot 'scripts/unity/lib/catastrophic-patterns.ps1'
 
-function Get-PatternEntries {
-    param([string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Catastrophic-pattern source not found: $Path"
-    }
-
-    # Each entry is a single line of the form:
-    #   @{ Label = '...'; Pattern = '...'; UseSimple = $true }
-    # Trimming normalizes the differing indentation across the three files so only the
-    # entry content is compared.
-    [string[]]$entries = Get-Content -LiteralPath $Path |
-        Where-Object { $_ -match '@\{\s*Label\s*=.*Pattern\s*=.*UseSimple\s*=\s*\$(true|false)' } |
-        ForEach-Object { $_.Trim() }
-
-    return , $entries
+# Consumers that MUST delegate to the shared source (and never inline their own array).
+$consumers = [ordered]@{
+    'run-ci-tests.ps1'     = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
+    'verify-unity-results' = Join-Path $repoRoot '.github/actions/verify-unity-results/action.yml'
+    'dump-unity-log-tail'  = Join-Path $repoRoot '.github/actions/dump-unity-log-tail/action.yml'
 }
 
 [bool]$failed = $false
-$entriesByName = [ordered]@{}
 
-foreach ($name in $sources.Keys) {
-    [string[]]$entries = Get-PatternEntries -Path $sources[$name]
-    $entriesByName[$name] = $entries
-    if ($VerboseOutput) {
-        Write-Host "[$name] $($entries.Count) catastrophic pattern(s)"
-    }
-    if ($entries.Count -lt 1) {
-        Write-Host "::error::No catastrophic-pattern entries found in $name ($($sources[$name]))."
-        $failed = $true
-    }
+# --- 1. Shared source exists and produces well-formed entries -----------------------------
+if (-not (Test-Path -LiteralPath $sharedSource)) {
+    Write-Host "::error::Shared catastrophic-pattern source not found: $sharedSource"
+    exit 1
 }
 
-$referenceName = 'run-ci-tests.ps1'
-[string[]]$reference = $entriesByName[$referenceName]
+. $sharedSource
+if (-not (Get-Command -Name 'Get-CatastrophicPatterns' -ErrorAction SilentlyContinue)) {
+    Write-Host "::error::$sharedSource does not define Get-CatastrophicPatterns."
+    exit 1
+}
 
-foreach ($name in $sources.Keys) {
-    if ($name -eq $referenceName) {
+[object[]]$patterns = @(Get-CatastrophicPatterns)
+if ($patterns.Count -lt 1) {
+    Write-Host "::error::Get-CatastrophicPatterns returned no entries."
+    $failed = $true
+}
+foreach ($entry in $patterns) {
+    foreach ($key in @('Label', 'Pattern', 'UseSimple')) {
+        if (-not $entry.ContainsKey($key)) {
+            Write-Host "::error::Catastrophic-pattern entry missing '$key': $($entry | Out-String)"
+            $failed = $true
+        }
+    }
+}
+if ($VerboseOutput) {
+    Write-Host "[shared] Get-CatastrophicPatterns -> $($patterns.Count) pattern(s)"
+}
+
+# --- 2 + 3. Each consumer delegates to the shared source, with no inline copy --------------
+# An inline copy is an entry line of the form @{ Label=...; Pattern=...; UseSimple=$bool }.
+$inlineEntryRegex = '@\{\s*Label\s*=.*Pattern\s*=.*UseSimple\s*=\s*\$(true|false)'
+
+foreach ($name in $consumers.Keys) {
+    $path = $consumers[$name]
+    if (-not (Test-Path -LiteralPath $path)) {
+        Write-Host "::error::Catastrophic-pattern consumer not found: $path"
+        $failed = $true
         continue
     }
 
-    [string[]]$current = $entriesByName[$name]
-
-    [string[]]$missing = @($reference | Where-Object { $current -notcontains $_ })
-    [string[]]$extra = @($current | Where-Object { $reference -notcontains $_ })
-
-    if ($missing.Count -gt 0 -or $extra.Count -gt 0) {
+    [string[]]$lines = Get-Content -LiteralPath $path
+    [string[]]$inlineHits = @($lines | Where-Object { $_ -match $inlineEntryRegex })
+    if ($inlineHits.Count -gt 0) {
         $failed = $true
-        Write-Host "::error::Catastrophic-pattern drift between '$referenceName' and '$name'."
-        foreach ($entry in $missing) {
-            Write-Host "  MISSING from ${name}: $entry"
+        Write-Host "::error::'$name' contains $($inlineHits.Count) inline catastrophic-pattern entr(y/ies). Use Get-CatastrophicPatterns from scripts/unity/lib/catastrophic-patterns.ps1 instead of an inline array."
+        foreach ($hit in $inlineHits) {
+            Write-Host "  INLINE: $($hit.Trim())"
         }
-        foreach ($entry in $extra) {
-            Write-Host "  EXTRA in ${name} (not in $referenceName): $entry"
-        }
+    }
+
+    [bool]$callsShared = @($lines | Where-Object { $_ -match 'Get-CatastrophicPatterns' }).Count -gt 0
+    if (-not $callsShared) {
+        $failed = $true
+        Write-Host "::error::'$name' does not call Get-CatastrophicPatterns; it must load the shared catastrophic-pattern source."
+    }
+
+    if ($VerboseOutput) {
+        Write-Host "[$name] inline=$($inlineHits.Count) callsShared=$callsShared"
     }
 }
 
 if ($failed) {
-    Write-Host "::error::Catastrophic-pattern lists are out of sync. Update all three call sites identically."
+    Write-Host "::error::Catastrophic-pattern single-sourcing contract violated. See errors above."
     exit 1
 }
 
-Write-Host "Catastrophic-pattern lists are in sync across all $($sources.Count) call sites ($($reference.Count) patterns)."
+Write-Host "Catastrophic-pattern single source OK: $($patterns.Count) patterns, $($consumers.Count) consumers delegate to scripts/unity/lib/catastrophic-patterns.ps1."
 exit 0
