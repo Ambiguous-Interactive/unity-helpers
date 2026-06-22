@@ -36,5 +36,7 @@ function Get-CatastrophicPatterns {
         @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
         @{ Label = 'Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)'; Pattern = 'fatal error in the mono runtime'; UseSimple = $true }
         @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }
+        @{ Label = 'IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)'; Pattern = 'no ahead of time \(AOT\) code was generated'; UseSimple = $false }
+        @{ Label = 'ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)'; Pattern = 'System.ExecutionEngineException'; UseSimple = $true }
     )
 }
