@@ -448,6 +448,11 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          # Stream per-test results to unity.log as each test finishes (editor-side
+          # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
+          # serializes a misleading total=0 results.xml, the streamed lines still name
+          # the last test that ran -- the key to diagnosing the total=0 legs.
+          UH_STREAM_TEST_RESULTS: "1"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -721,6 +726,11 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          # Stream per-test results to unity.log as each test finishes (editor-side
+          # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
+          # serializes a misleading total=0 results.xml, the streamed lines still name
+          # the last test that ran -- the key to diagnosing the total=0 legs.
+          UH_STREAM_TEST_RESULTS: "1"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -972,6 +982,11 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          # Stream per-test results to unity.log as each test finishes (editor-side
+          # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
+          # serializes a misleading total=0 results.xml, the streamed lines still name
+          # the last test that ran -- the key to diagnosing the total=0 legs.
+          UH_STREAM_TEST_RESULTS: "1"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
