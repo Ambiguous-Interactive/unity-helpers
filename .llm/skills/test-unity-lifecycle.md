@@ -290,6 +290,39 @@ public sealed class MyTests
 
 ---
 
+## AssetDatabase deletion/import visibility is version-flaky — poll, don't assume
+
+A raw `System.IO.File.Delete(assetPath)`, or an `AssetDatabase.DeleteAsset` issued
+inside an open batch (`refreshOnDispose: false`), becomes visible to the
+`AssetDatabase` **asynchronously**, and the lag **differs by editor version**
+(2021.3 / 6000 retain the in-memory object longer than 2022.3). The classic
+"do one `Refresh()`, yield one frame, then `Assert` it's gone" pattern therefore
+passes on one editor and intermittently fails on another — this caused two
+real CI flakes (`RecreatesAssetWhenGuidRemainsButFileIsMissing` on 6000,
+`DestroyTrackedObjectsHandlesDeferredDeletedAssetWithoutError` on 2021.3).
+
+Use the `CommonTestBase` helpers that force a synchronous reconcile and **poll**
+until the condition actually holds (or a bounded timeout):
+
+```csharp
+// [UnityTest] (coroutine): yield the helper, then assert.
+File.Delete(GetAbsolutePath(assetPath));
+yield return WaitUntilAssetUnloaded(assetPath);          // refresh + poll until gone
+Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(assetPath) == null, "...");
+
+// [Test] (synchronous): force the reconcile before asserting.
+ForceAssetUnloaded(assetPath);                            // refresh-loop, no real-time sleep
+Assert.That(AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath), Is.Null, "...");
+```
+
+Never assert AssetDatabase state immediately after a file/asset deletion without
+going through one of these (or an equivalent bounded poll). Both helpers
+`PauseBatch()` first, so they also work inside a fixture-wide `BatchedEditorTestBase`
+batch. They use no `WaitForSeconds`/`Thread.Sleep` (editor refreshes are
+synchronous), so they do not trip UNH010.
+
+---
+
 ## Adding New Test Base Classes
 
 If you create a new abstract test base class that inherits from `CommonTestBase`, you need to update the lint script to recognize it:

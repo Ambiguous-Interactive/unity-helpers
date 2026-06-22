@@ -528,6 +528,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 LogAssert.NoUnexpectedReceived();
             }
 
+            // The primary assertion (no "Destroying assets is not permitted" error during
+            // DestroyTrackedObjects) already ran inside the batch. The DeleteAsset was
+            // deferred (refreshOnDispose:false); on 2021.3 the path can still resolve until
+            // a refresh reconciles it, so force that before the secondary "not resurrected"
+            // assertion instead of assuming the batch dispose alone settled it.
+            ForceAssetUnloaded(assetPath);
+
             Assert.That(
                 AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath),
                 Is.Null,

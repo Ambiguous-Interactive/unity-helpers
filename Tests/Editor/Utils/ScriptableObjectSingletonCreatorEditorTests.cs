@@ -533,14 +533,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 File.Delete(absoluteAsset);
             }
 
-            AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            yield return null;
+            // The asset BODY file was deleted directly on disk (the .meta stays). Unity
+            // reflects that deletion in the AssetDatabase asynchronously, and the lag is
+            // editor-version-dependent (6000 keeps the in-memory object past a single
+            // Refresh + frame, which is why this leg was CI-flaky). Poll until the body is
+            // actually unloaded before asserting.
+            yield return WaitUntilAssetUnloaded(TargetAssetPath);
 
             Assert.IsTrue(
                 AssetDatabase.AssetPathToGUID(TargetAssetPath).Length > 0,
                 "Meta should still exist after deleting only the asset file."
             );
-            Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) == null);
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) == null,
+                "Deleting the asset body file must unload it (its .meta/GUID is retained separately)."
+            );
 
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;

@@ -1204,6 +1204,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return result;
             }
         }
+
+        /// <summary>
+        /// Coroutine: force the AssetDatabase to reconcile, then yield frames until the
+        /// asset at <paramref name="assetPath"/> is no longer loadable (or the timeout
+        /// elapses). A raw <see cref="System.IO.File.Delete(string)"/> or a deferred
+        /// <see cref="UnityEditor.AssetDatabase.DeleteAsset(string)"/> becomes visible to
+        /// the AssetDatabase ASYNCHRONOUSLY, and the lag differs BY EDITOR VERSION
+        /// (2021.3 / 6000 retain the in-memory object longer than 2022.3), so the classic
+        /// "one Refresh + one frame, then assert null" pattern is version-flaky. Poll
+        /// instead. On timeout this returns quietly so the caller's own assertion produces
+        /// the test-specific failure message. Editor-only; for <c>[UnityTest]</c> fixtures.
+        /// </summary>
+        protected static IEnumerator WaitUntilAssetUnloaded(
+            string assetPath,
+            float timeoutSeconds = 5f
+        )
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (true)
+            {
+                using (AssetDatabaseBatchHelper.PauseBatch())
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+                if (UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath) == null)
+                {
+                    yield break;
+                }
+                if (Time.realtimeSinceStartup > endTime)
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Synchronous counterpart of <see cref="WaitUntilAssetUnloaded"/> for non-coroutine
+        /// (<c>[Test]</c>) fixtures: repeatedly forces a synchronous AssetDatabase refresh
+        /// until the asset at <paramref name="assetPath"/> is gone or
+        /// <paramref name="maxRefreshes"/> is reached. Uses no real-time sleep (editor
+        /// refreshes are synchronous), so it does not trip the UNH010 wait-time lint.
+        /// Editor-only.
+        /// </summary>
+        protected static void ForceAssetUnloaded(string assetPath, int maxRefreshes = 10)
+        {
+            for (int i = 0; i < maxRefreshes; i++)
+            {
+                using (AssetDatabaseBatchHelper.PauseBatch())
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+                if (UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath) == null)
+                {
+                    return;
+                }
+            }
+        }
 #endif
 
         /// <summary>
