@@ -520,6 +520,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator RecreatesAssetWhenGuidRemainsButFileIsMissing()
         {
+            // 2021.3 logs a version-specific "[Error] Unable to import newly created asset" while the
+            // importer reconciles the rapid delete-body / force-import / recreate sequence below. It is
+            // a transient importer message, not a production failure (the asset-existence asserts are the
+            // real contract), so tolerate it the same way the sibling invalid-asset test does.
+            IgnoreVersionSpecificInvalidAssetImportLogs();
+
             DeleteAssetIfExists(TargetAssetPath);
             yield return null;
 

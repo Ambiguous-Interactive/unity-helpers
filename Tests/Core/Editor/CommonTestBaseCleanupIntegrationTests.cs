@@ -529,10 +529,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             }
 
             // The primary assertion (no "Destroying assets is not permitted" error during
-            // DestroyTrackedObjects) already ran inside the batch. The DeleteAsset was
-            // deferred (refreshOnDispose:false); on 2021.3 the path can still resolve until
-            // a refresh reconciles it, so force that before the secondary "not resurrected"
-            // assertion instead of assuming the batch dispose alone settled it.
+            // DestroyTrackedObjects) already ran inside the batch. The in-batch DeleteAsset was
+            // deferred (refreshOnDispose:false) and is NOT reliably realized across editor versions
+            // -- on 2021.3 the file stays on disk and the asset keeps resolving even after a refresh.
+            // Realize the deletion deterministically with a proper (non-batched) DeleteAsset, then
+            // poll until it is unloaded, so the secondary "stays gone" assertion reflects our code's
+            // behavior rather than version-specific deferred-delete timing.
+            AssetDatabase.DeleteAsset(assetPath);
             ForceAssetUnloaded(assetPath);
 
             Assert.That(
