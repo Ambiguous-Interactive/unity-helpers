@@ -1648,16 +1648,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
-            if (data.Length == 0)
-            {
-                SerializationFailureException.ThrowEmptyInput<T>(
-                    SerializationFormat.Protobuf,
-                    SerializationOperation.Deserialize
-                );
-            }
-
-            // Intercept serializable collection types to use wrapper-based deserialization
-            // This bypasses protobuf-net's collection detection which ignores IgnoreListHandling
+            // Intercept serializable collection types to use wrapper-based deserialization.
+            // This bypasses protobuf-net's collection detection which ignores IgnoreListHandling.
+            // MUST run BEFORE the empty-payload guard below: an EMPTY SerializableHashSet/SortedSet/
+            // Dictionary/SortedDictionary serializes to ZERO bytes (its wrapper has only repeated
+            // fields, no scalar), so the generic "data is empty" guard would otherwise reject a valid
+            // empty collection. DeserializeCollectionFromWrapper handles zero-length input (protobuf
+            // yields a default wrapper -> null arrays -> OnAfterDeserialize materializes an empty set).
             Type declared = typeof(T);
             if (IsSerializableCollectionType(declared))
             {
@@ -1684,7 +1681,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             // Intercept Deque/CyclicBuffer/SparseSet to use wrapper-based deserialization so the
-            // original [ProtoContract] type's model is never built under IL2CPP/AOT (Class A).
+            // original [ProtoContract] type's model is never built under IL2CPP/AOT (Class A). Also
+            // before the empty guard so a zero-byte special collection round-trips.
             if (IsSpecialCollectionType(declared))
             {
                 try
@@ -1707,6 +1705,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     );
                     return default;
                 }
+            }
+
+            // Empty-payload guard for all OTHER (non-collection) types: an empty protobuf payload
+            // for an ordinary message is invalid input.
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize
+                );
             }
 
             try
