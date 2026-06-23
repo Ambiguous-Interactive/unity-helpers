@@ -50,7 +50,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             public void RunStarted(ITestAdaptor testsToRun)
             {
-                Debug.Log($"{Prefix} RUN-STARTED root='{(testsToRun != null ? testsToRun.FullName : "<null>")}'");
+                Debug.Log(
+                    $"{Prefix} RUN-STARTED root='{(testsToRun != null ? testsToRun.FullName : "<null>")}'"
+                );
             }
 
             public void TestStarted(ITestAdaptor test) { }
