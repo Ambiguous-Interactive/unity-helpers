@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Text.RegularExpressions;
     using NUnit.Framework;
@@ -15,9 +16,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class DropDownAttributeTests
     {
-        [TearDown]
-        public void VerifyNoUnexpectedLogs()
+        [UnityTearDown]
+        public IEnumerator VerifyNoUnexpectedLogs()
         {
+            // These synchronous [Test]s emit [Error] logs (WValueDropDown provider errors) that
+            // they LogAssert.Expect. Without spanning a frame, an error can flush at the NEXT frame
+            // boundary -- bleeding into a later PlayMode fixture's teardown (the cross-test pollution
+            // that failed ~20 RelationalComponentsZenjectTests). Pump a frame so the log flushes
+            // within THIS fixture, then reconcile here where the expectations were registered.
+            yield return null;
             LogAssert.NoUnexpectedReceived();
         }
 

@@ -347,6 +347,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             EditorUi.Suppress = _previousEditorUiSuppress;
 #endif
             DisposeDispatcherScope();
+
+            // Cross-test log-pollution guard (PlayMode only). A synchronous or late-flushed
+            // [Error] otherwise bleeds across the frame boundary into the NEXT test's scope, so
+            // an innocent later test fails for an error this (or an earlier) fixture produced.
+            // Pump one frame to flush any pending logs, then reconcile so an UNEXPECTED [Error]
+            // fails THIS fixture -- where it can be fixed with a LogAssert.Expect -- instead of a
+            // bystander. Compliant tests that LogAssert.Expect their errors are unaffected.
+            // EditMode tests reconcile synchronously at test end already (no frame bleed), so this
+            // is scoped to PlayMode to keep the green EditMode legs untouched.
+            if (Application.isPlaying)
+            {
+                yield return null;
+                LogAssert.NoUnexpectedReceived();
+            }
         }
 
         /// <summary>
