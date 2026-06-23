@@ -50,6 +50,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void GetAllSpriteLabelNamesCopiesCacheIntoBuffer()
         {
+            if (Helpers.IsRunningInContinuousIntegration || Helpers.IsRunningInBatchMode)
+            {
+                // Helpers.GetAllSpriteLabelNames(List) intentionally clears the buffer and
+                // returns under CI/batchmode (and is editor-only besides), so the copy/sort
+                // behavior cannot be exercised here. Covered in interactive editor runs.
+                Assert.Inconclusive(
+                    "GetAllSpriteLabelNames(List) no-ops under CI/batchmode by design."
+                );
+            }
             Helpers.SetSpriteLabelCache(new[] { "Gamma", "Beta", "Alpha" });
             List<string> buffer = new() { "placeholder" };
             Helpers.GetAllSpriteLabelNames(buffer);
