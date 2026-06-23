@@ -34,7 +34,7 @@ jobs:
       release-url: ${{ steps.release_drafter.outputs.html_url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1 # Only need current commit for package.json and CHANGELOG.md
 
