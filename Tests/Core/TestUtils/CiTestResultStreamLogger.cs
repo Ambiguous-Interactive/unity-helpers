@@ -27,6 +27,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     /// so an editor-registered callback observes them). Re-registration on each domain reload
     /// is harmless -- the logger is stateless.
     /// </remarks>
+    // UNH-SUPPRESS UNH003: This is a CI diagnostic utility ([InitializeOnLoad]), NOT a test class.
+    // It has no [Test] methods; it creates a TestRunnerApi (a ScriptableObject) only to register a
+    // global per-test stream logger, so it neither inherits CommonTestBase nor tracks that instance.
     [InitializeOnLoad]
     internal static class CiTestResultStreamLogger
     {
@@ -41,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 return;
             }
 
-            TestRunnerApi api = ScriptableObject.CreateInstance<TestRunnerApi>();
+            TestRunnerApi api = ScriptableObject.CreateInstance<TestRunnerApi>(); // UNH-SUPPRESS UNH002: long-lived global callback registrar, not a per-test object
             api.RegisterCallbacks(new StreamingCallbacks());
             Debug.Log($"{Prefix} registered (env {EnableEnvVar}={flag}).");
         }

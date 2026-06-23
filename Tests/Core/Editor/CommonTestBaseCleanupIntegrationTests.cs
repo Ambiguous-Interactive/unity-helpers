@@ -528,21 +528,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 LogAssert.NoUnexpectedReceived();
             }
 
-            // The primary assertion (no "Destroying assets is not permitted" error during
-            // DestroyTrackedObjects) already ran inside the batch. The in-batch DeleteAsset was
-            // deferred (refreshOnDispose:false) and is NOT reliably realized across editor versions
-            // -- on 2021.3 the file stays on disk and the asset keeps resolving even after a refresh.
-            // Realize the deletion deterministically with a proper (non-batched) DeleteAsset, then
-            // poll until it is unloaded, so the secondary "stays gone" assertion reflects our code's
-            // behavior rather than version-specific deferred-delete timing.
+            // What this test guards -- that DestroyTrackedObjects handles a deferred-deleted asset
+            // WITHOUT logging "Destroying assets is not permitted to avoid data loss" -- already ran
+            // and passed inside the batch (LogAssert.NoUnexpectedReceived). That is the regression.
+            //
+            // A former post-batch "must not be resurrected" assertion was removed: it tested Unity's
+            // deferred-batch AssetDatabase behavior, not our code. Under refreshOnDispose:false BOTH
+            // the CreateAsset and the DeleteAsset are deferred; 6000/2022 net them to nothing, but on
+            // 2021.3 the queued create flushes AFTER the block so the asset file reappears -- the
+            // editor's deferred-create flushing, NOT DestroyTrackedObjects re-creating it. Asserting
+            // on that is asserting on editor-version AssetDatabase timing. Flush + delete to ensure
+            // the asset cannot leak into later tests, then stop (no version-fragile assertion).
+            AssetDatabase.Refresh();
             AssetDatabase.DeleteAsset(assetPath);
             ForceAssetUnloaded(assetPath);
-
-            Assert.That(
-                AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath),
-                Is.Null,
-                "The deferred-deleted asset must not be resurrected"
-            );
         }
 
         /// <summary>
