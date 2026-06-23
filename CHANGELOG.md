@@ -15,6 +15,7 @@ See [the roadmap](./docs/overview/roadmap.md) for details
 
 ### Changed
 
+- **`[WValueDropDown]` provider-misconfiguration is now logged as a Warning, not an Error**: a null/empty/missing/throwing or wrong-return-type dropdown value provider is a handled condition — the dropdown falls back to an empty option list — so `WValueDropDownAttribute` / `DropDownValueProvider` now log these diagnostics at `Warning` severity instead of `Error`. The message text is unchanged. This better reflects that the feature degrades gracefully, and (as a side effect) stops these editor-tooling diagnostics from failing PlayMode tests that incidentally exercise the dropdown path.
 - **`DirectoryHelper.EnsureDirectoryExists` no longer logs an error before throwing**: passing a path outside `Assets/` in the editor previously emitted a `Debug.LogError` **and** threw an `ArgumentException` (a redundant double signal that polluted the console and could fail unrelated tests that did not expect the log). It now throws the `ArgumentException` only, and the exception message names the offending path (for example, `Cannot create directory 'SomeFolder/SubFolder' outside the Assets folder: AssetDatabase only manages paths under 'Assets/'.`). Callers that already catch the exception are unaffected; callers that relied on the console log should read the thrown exception instead.
 
 ### Fixed

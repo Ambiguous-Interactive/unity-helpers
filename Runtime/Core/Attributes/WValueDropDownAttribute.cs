@@ -185,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (providerType == null)
             {
-                Debug.LogError($"{AttributeName}: Provider type cannot be null.");
+                Debug.LogWarning($"{AttributeName}: Provider type cannot be null.");
                 ValueType = typeof(object);
                 _getOptions = EmptyFactory;
                 return;
@@ -193,7 +193,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (string.IsNullOrEmpty(methodName))
             {
-                Debug.LogError($"{AttributeName}: Method name cannot be null or empty.");
+                Debug.LogWarning($"{AttributeName}: Method name cannot be null or empty.");
                 ValueType = typeof(object);
                 _getOptions = EmptyFactory;
                 return;
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             MethodValidationResult validation = ValidateInstanceMethod(providerType, methodName);
             if (!validation.MethodFound)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Could not locate a parameterless method named '{methodName}' on {providerType.FullName} that returns enumerable values."
                 );
                 ValueType = typeof(object);
@@ -230,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (!validation.HasValidReturnType)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Method '{providerType.FullName}.{methodName}' must return an array or IEnumerable."
                 );
                 ValueType = typeof(object);
@@ -279,14 +279,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (providerType == null)
             {
-                Debug.LogError($"{AttributeName}: Provider type cannot be null.");
+                Debug.LogWarning($"{AttributeName}: Provider type cannot be null.");
                 _getOptions = EmptyFactory;
                 return;
             }
 
             if (string.IsNullOrEmpty(methodName))
             {
-                Debug.LogError($"{AttributeName}: Method name cannot be null or empty.");
+                Debug.LogWarning($"{AttributeName}: Method name cannot be null or empty.");
                 _getOptions = EmptyFactory;
                 return;
             }
@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             MethodValidationResult validation = ValidateInstanceMethod(providerType, methodName);
             if (!validation.MethodFound)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Could not locate a parameterless method named '{methodName}' on {providerType.FullName} that returns enumerable values."
                 );
                 _getOptions = EmptyFactory;
@@ -319,7 +319,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (!validation.HasValidReturnType)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Method '{providerType.FullName}.{methodName}' must return an array or IEnumerable."
                 );
                 _getOptions = EmptyFactory;
@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             if (string.IsNullOrWhiteSpace(methodName))
             {
-                Debug.LogError($"{AttributeName}: Method name cannot be null or empty.");
+                Debug.LogWarning($"{AttributeName}: Method name cannot be null or empty.");
                 ValueType = valueType ?? typeof(object);
                 _getOptions = EmptyFactory;
                 return;
@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 && !_explicitProviderType.IsAssignableFrom(contextType)
             )
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Context object of type '{contextType.FullName}' is not assignable to explicit provider type '{_explicitProviderType.FullName}'."
                 );
                 return Empty;
@@ -435,7 +435,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
             catch (Exception e)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Invocation of '{lookupType.FullName}.{provider.Method.Name}' threw {e.GetType().Name}."
                 );
                 return Empty;
@@ -473,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (method == null)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Could not locate '{_instanceMethodName}' on {providerType.FullName}."
                 );
                 CacheProvider(providerType, null);
@@ -483,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             Type returnType = method.ReturnType;
             if (returnType == typeof(void))
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
                 );
                 CacheProvider(providerType, null);
@@ -498,7 +498,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (!isEnumerable)
             {
-                Debug.LogError(
+                Debug.LogWarning(
                     $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
                 );
                 CacheProvider(providerType, null);
@@ -717,7 +717,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return values.ToArray();
             }
 
-            Debug.LogError(
+            Debug.LogWarning(
                 $"{AttributeName}: Method '{providerType.FullName}.{methodName}' returned incompatible type '{result.GetType().FullName}'. Expected an array or IEnumerable."
             );
             return Empty;
