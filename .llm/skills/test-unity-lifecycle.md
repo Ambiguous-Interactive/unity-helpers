@@ -323,6 +323,32 @@ synchronous), so they do not trip UNH010.
 
 ---
 
+## PlayMode: a test that triggers an `[Error]` log MUST `LogAssert.Expect` it
+
+**EditMode passing is NOT sufficient proof a test is correct.** Many production code
+paths log `[Error]` only under the player loop / `EditorApplication.isPlayingOrWillChangePlaymode`
+(e.g. `Serializable*` null-entry skips, `[SiblingComponent]`/`[ChildComponent]` resolution
+failures, relational DI validation). Those errors do not fire in EditMode, so an EditMode-green
+test can still emit an **unhandled `[Error]`** in PlayMode — which the Unity Test Framework
+fails, and in bulk corrupts the run into a `total=0` `results.xml` (this was the entire
+"PlayMode never passed" class — 65 tests, run 27989502140).
+
+Rules:
+
+- If a test (directly or incidentally, e.g. via `Awake`/`OnEnable` on a spawned object)
+  exercises a code path that logs `[Error]`/`[Exception]` in PlayMode, it MUST
+  `LogAssert.Expect(LogType.Error, <regex>)` for each occurrence (correct **count and order**),
+  or scope it with `LogAssert.ignoreFailingMessages` when the log is incidental to what the
+  test verifies.
+- PlayMode log messages carry the `UnityLogTagFormatter` prefix (`time / GameObject[Component] / msg`).
+  Use an **unanchored `Regex`** (match the message substring) so the expectation survives the prefix —
+  do not write a fully-anchored pattern tuned to the bare EditMode string.
+- **Verify in PlayMode**, not just EditMode (CI PlayMode leg, or a targeted `TestMode.PlayMode`
+  run). The `UH_STREAM_TEST_RESULTS` per-test stream
+  (`Tests/Core/TestUtils/CiTestResultStreamLogger.cs`) names any straggler in `unity.log`.
+
+---
+
 ## Adding New Test Base Classes
 
 If you create a new abstract test base class that inherits from `CommonTestBase`, you need to update the lint script to recognize it:
