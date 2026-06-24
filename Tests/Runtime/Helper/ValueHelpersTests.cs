@@ -56,7 +56,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(ValueHelpers.IsAssigned(go));
 
             Object.Destroy(go); // UNH-SUPPRESS: Test verifies IsAssigned returns false after destruction
-            yield return null;
+            // Destroy is async in PlayMode; poll until the managed wrapper is actually nulled
+            // instead of assuming a single frame settles it (version/CI-load flaky otherwise).
+            yield return WaitUntilDestroyed(go);
 
             Assert.IsFalse(ValueHelpers.IsAssigned(go));
         }

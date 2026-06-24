@@ -68,7 +68,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             testGo = Track(new GameObject());
             testGo.Destroy();
-            yield return null; // allow Unity to nullify destroyed object
+            // Destroy is async in PlayMode; poll until Unity nullifies the wrapper rather than
+            // assuming a single frame settles it (version/CI-load flaky otherwise).
+            yield return WaitUntilDestroyed(testGo);
             Assert.IsTrue(testGo == null);
             json = testGo.ToJson();
             Assert.AreEqual("null", json);

@@ -150,12 +150,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Should have exactly one StartTracker before attempting to add another"
             );
 
+            // The engine's "Can't add '<T>' ... already added" [Error] for a [DisallowMultipleComponent]
+            // violation is emitted on Unity 2022.1+ but NOT on 2021.3 (the addition is rejected
+            // silently there). Only register the expectation where the engine actually logs it; the
+            // behavioral assertions below verify the rejection on every version.
+#if UNITY_2022_1_OR_NEWER
             LogAssert.Expect(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(
                     "^Can't add 'StartTracker' to Tracker because a 'StartTracker' is already added to the game object!$"
                 )
             );
+#endif
             StartTracker second = go.AddComponent<StartTracker>();
 
             // Verify the actual behavior: second component was not added
