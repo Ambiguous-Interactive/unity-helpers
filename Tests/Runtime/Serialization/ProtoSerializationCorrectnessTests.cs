@@ -207,9 +207,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             IRandom rng = new PcgRandom(12345);
             for (int i = 0; i < 2_000; ++i)
             {
+                // Id is i+1 (never 0) so no iteration produces an ALL-default message. An all-default
+                // [ProtoContract] serializes to zero bytes, which the deserializer deliberately
+                // rejects as empty input (see ProtoDeserializeEmptyBytesThrowsSerializationInputException
+                // -- empty payload is a contract error, not an all-default round-trip). This test
+                // exercises pooled-stream state leakage across mixed payload sizes, not the
+                // empty-input contract, so it keeps at least one non-default field per message.
                 EdgeCaseMessage msg = new()
                 {
-                    Id = i,
+                    Id = i + 1,
                     Name = i % 3 == 0 ? null : ("N_" + i),
                     Values = i % 4 == 0 ? null : new List<int> { i, i + 1, i + 2 },
                     Data = i % 5 == 0 ? null : MakeBytes(rng.Next(0, 8192)),
