@@ -98,6 +98,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 catch (SerializationInputException) { }
             }
 
+            // Calibrate: can this platform's per-thread allocation counter observe a KNOWN string
+            // allocation at all? Mono/IL2CPP GC.GetAllocatedBytesForCurrentThread granularity varies
+            // by runtime/build; under some PlayMode configs it reports 0 even for real allocations,
+            // which would make the lazy-composition delta unobservable (a false red). When the
+            // counter is too coarse, the allocation-based assertions cannot prove laziness here, so
+            // we report Inconclusive instead of failing — the assertions still run wherever the
+            // counter is reliable (desktop/editor Mono).
+            long calibrationBefore = GC.GetAllocatedBytesForCurrentThread();
+            string forcedAllocation = new('x', 512);
+            long calibrationAfter = GC.GetAllocatedBytesForCurrentThread();
+            GC.KeepAlive(forcedAllocation);
+            if (calibrationAfter - calibrationBefore <= 0)
+            {
+                Assert.Inconclusive(
+                    "GC.GetAllocatedBytesForCurrentThread is too coarse on this runtime to measure "
+                        + "lazy-message composition (a forced 512-byte string allocation reported "
+                        + "zero). The lazy-message contract is exercised on runtimes with a reliable "
+                        + "allocation counter."
+                );
+            }
+
             // Take the MINIMUM over multiple runs to filter out background-GC / test-runner noise.
             long minThrowAlloc = long.MaxValue;
             long minMessageDelta = long.MaxValue;
