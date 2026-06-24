@@ -872,13 +872,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void GameObjectConverterReadThrowsNotImplementedException()
+        public void GameObjectConverterReadWrapsNotImplementedAsCorruptData()
         {
             string json = "{\"name\":\"Test\"}";
 
-            Assert.Throws<NotImplementedException>(() =>
-                Serializer.JsonDeserialize<GameObject>(json)
+            // The GameObjectConverter.Read throws NotImplementedException; the Serializer wraps that
+            // codec failure as SerializationCorruptDataException, preserving the original as inner.
+            SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
+                () =>
+                    Serializer.JsonDeserialize<GameObject>(json)
             );
+            Assert.IsTrue(ex.InnerException is NotImplementedException);
         }
 
         [Test]
@@ -1201,10 +1205,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void TouchConverterReadThrowsNotImplementedException()
+        public void TouchConverterReadWrapsNotImplementedAsCorruptData()
         {
             string json = "{}";
-            Assert.Throws<NotImplementedException>(() => Serializer.JsonDeserialize<Touch>(json));
+            // TouchConverter.Read throws NotImplementedException; the Serializer wraps it as
+            // SerializationCorruptDataException with the original preserved as inner.
+            SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
+                () =>
+                    Serializer.JsonDeserialize<Touch>(json)
+            );
+            Assert.IsTrue(ex.InnerException is NotImplementedException);
         }
 
         [Test]

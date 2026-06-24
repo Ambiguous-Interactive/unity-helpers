@@ -358,7 +358,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeEmptyStringThrowsException()
         {
-            Assert.Throws<SerializationCorruptDataException>(() =>
+            // Empty input is an input-contract violation, surfaced as SerializationInputException
+            // (the InputValidation stage), not a codec/decode failure.
+            Assert.Throws<SerializationInputException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(string.Empty)
             );
         }
@@ -366,7 +368,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeNullStringThrowsException()
         {
-            Assert.Throws<ArgumentNullException>(() =>
+            // Null input surfaces as SerializationInputException, not a raw ArgumentNullException —
+            // the failure carries Format/Operation/Stage at the type level.
+            Assert.Throws<SerializationInputException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>((string)null)
             );
         }

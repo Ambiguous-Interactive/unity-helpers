@@ -76,7 +76,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void WGuidInvalidStringThrows()
         {
-            Assert.Throws<JsonException>(() => Serializer.JsonDeserialize<WGuid>("\"not-a-guid\""));
+            // The WGuidConverter rejects the payload with a JsonException; the Serializer wraps that
+            // codec failure as a SerializationCorruptDataException, preserving the original as inner.
+            SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
+                () =>
+                    Serializer.JsonDeserialize<WGuid>("\"not-a-guid\"")
+            );
+            Assert.IsTrue(ex.InnerException is JsonException);
         }
 
         [Test]

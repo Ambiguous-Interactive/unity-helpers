@@ -101,10 +101,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             GameObject go = Track(new GameObject("NoReadSupport"));
             string json = Serializer.JsonStringify(go);
 
-            // Our converter intentionally does not implement Read. Ensure this throws.
-            Assert.Throws<NotImplementedException>(() =>
-                Serializer.JsonDeserialize<GameObject>(json)
+            // Our converter intentionally does not implement Read (throws NotImplementedException);
+            // the Serializer wraps that as SerializationCorruptDataException with the original inner.
+            SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
+                () =>
+                    Serializer.JsonDeserialize<GameObject>(json)
             );
+            Assert.IsTrue(ex.InnerException is NotImplementedException);
         }
 
         [UnityTest]

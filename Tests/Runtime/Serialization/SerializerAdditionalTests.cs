@@ -794,7 +794,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] emptyData = Array.Empty<byte>();
 
-            Assert.Throws<System.Runtime.Serialization.SerializationException>(() =>
+            // Empty input is an input-contract violation (InputValidation stage).
+            Assert.Throws<SerializationInputException>(() =>
                 Serializer.BinaryDeserialize<TestMessage>(emptyData)
             );
         }
@@ -804,7 +805,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] corruptedData = { 0xFF, 0xFF, 0xFF, 0xFF };
 
-            Assert.Throws<System.Runtime.Serialization.SerializationException>(() =>
+            // Corrupt (non-null, non-empty) payload surfaces as CorruptDataException with the
+            // underlying codec failure preserved as InnerException.
+            Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.BinaryDeserialize<TestMessage>(corruptedData)
             );
         }
@@ -830,7 +833,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeWithTypeNullDataThrowsException()
         {
-            Assert.Throws<ArgumentException>(() =>
+            // Null payload is an input-contract violation (InputValidation stage).
+            Assert.Throws<SerializationInputException>(() =>
                 Serializer.ProtoDeserialize<object>(null, typeof(TestMessage))
             );
         }
@@ -840,7 +844,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] data = { 1, 2, 3 };
 
-            Assert.Throws<ArgumentNullException>(() =>
+            // A null target Type is a configuration error (the dispatch cannot proceed), surfaced
+            // as SerializationConfigurationException — not swallowed by Try*.
+            Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.ProtoDeserialize<object>(data, null)
             );
         }
