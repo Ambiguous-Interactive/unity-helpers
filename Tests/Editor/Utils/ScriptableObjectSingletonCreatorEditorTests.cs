@@ -581,7 +581,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            yield return null;
+            // CreateFolder visibility to IsValidFolder is async; poll instead of assuming one
+            // refresh settles it (the SINGLE_THREADED leg exposed this race; the default leg did not).
+            yield return WaitUntilFolderValid(metadataFolder);
 
             Assert.IsTrue(
                 AssetDatabase.IsValidFolder("Assets/Resources/Wallstop Studios"),

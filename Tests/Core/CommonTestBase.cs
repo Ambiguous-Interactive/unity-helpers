@@ -1147,6 +1147,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 #endif
         }
 
+        /// <summary>
+        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
+        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
+        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
+        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
+        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
+        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
+        /// test-specific failure message. For <c>[UnityTest]</c> fixtures. Runtime-safe (no editor
+        /// API), so it is available to the standalone player build too.
+        /// </summary>
+        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
+        {
+            for (int i = 0; i < maxFrames; i++)
+            {
+                if (obj == null)
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
 #if UNITY_EDITOR
         /// <summary>
         /// Executes an action with immediate asset import enabled by pausing any active batch scope.
@@ -1289,27 +1311,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
-        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
-        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
-        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
-        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
-        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
-        /// test-specific failure message. For <c>[UnityTest]</c> fixtures.
-        /// </summary>
-        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
-        {
-            for (int i = 0; i < maxFrames; i++)
-            {
-                if (obj == null)
-                {
-                    yield break;
-                }
-                yield return null;
-            }
-        }
-
-        /// <summary>
         /// Synchronous counterpart of <see cref="WaitUntilAssetUnloaded"/> for non-coroutine
         /// (<c>[Test]</c>) fixtures: repeatedly forces a synchronous AssetDatabase refresh
         /// until the asset at <paramref name="assetPath"/> is gone or
@@ -1331,6 +1332,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     return;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Polls until the folder at <paramref name="folderPath"/> becomes a valid AssetDatabase
+        /// folder, forcing a synchronous refresh each iteration, or <paramref name="maxRefreshes"/>
+        /// is reached. <see cref="UnityEditor.AssetDatabase.CreateFolder"/> becomes visible to
+        /// <see cref="UnityEditor.AssetDatabase.IsValidFolder"/> ASYNCHRONOUSLY, and the lag varies
+        /// by scheduling (a SINGLE_THREADED leg exposed a "create then one refresh, then assert
+        /// valid" race that the default leg did not), so poll instead of assuming one refresh
+        /// settles it. Returns quietly on timeout so the caller's own assertion fails specifically.
+        /// Uses no real-time sleep (refreshes are synchronous), so it does not trip UNH010.
+        /// Editor-only; for <c>[UnityTest]</c> fixtures.
+        /// </summary>
+        protected static IEnumerator WaitUntilFolderValid(string folderPath, int maxRefreshes = 10)
+        {
+            for (int i = 0; i < maxRefreshes; i++)
+            {
+                if (UnityEditor.AssetDatabase.IsValidFolder(folderPath))
+                {
+                    yield break;
+                }
+                using (AssetDatabaseBatchHelper.PauseBatch())
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+                yield return null;
             }
         }
 #endif
