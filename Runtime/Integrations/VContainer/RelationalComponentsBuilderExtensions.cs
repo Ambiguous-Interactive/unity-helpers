@@ -67,10 +67,22 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 throw new ArgumentNullException(nameof(builder));
             }
 
+            // Always register the metadata-cache TYPE so dependent registrations (the assigner and
+            // the entry point, which both take AttributeMetadataCache by constructor) can be built
+            // by the container's graph validation -- even when no cache asset exists yet (e.g.
+            // batchmode/CI, where AttributeMetadataCache.Instance is null). When the instance is
+            // null we register a lazy resolver instead of skipping registration entirely; consumers
+            // tolerate a null cache and fall back to AttributeMetadataCache.Instance at init.
             AttributeMetadataCache cacheInstance = AttributeMetadataCache.Instance;
             if (cacheInstance != null)
             {
-                builder.RegisterInstance(cacheInstance).AsSelf();
+                builder.RegisterInstance(cacheInstance).As<AttributeMetadataCache>();
+            }
+            else
+            {
+                builder
+                    .Register(_ => AttributeMetadataCache.Instance, Lifetime.Singleton)
+                    .As<AttributeMetadataCache>();
             }
 
             RelationalSceneAssignmentOptions resolved =
