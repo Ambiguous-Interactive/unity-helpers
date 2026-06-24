@@ -347,6 +347,27 @@ Rules:
   run). The `UH_STREAM_TEST_RESULTS` per-test stream
   (`Tests/Core/TestUtils/CiTestResultStreamLogger.cs`) names any straggler in `unity.log`.
 
+### Production severity policy (fix the producer, not just the test)
+
+The robust fix for a leak-prone `[Error]` is usually in **production**, by choosing the right
+severity, not in the test. Apply this policy when adding or reviewing a log site:
+
+- **Handled / recoverable / optional → Warning (or Info), never Error.** If the code skips the bad
+  input and keeps going with no corruption (a `Serializable*` null entry skipped, a `ChildSpawner`
+  duplicate/null prefab skipped, an **optional** `[SiblingComponent]`/`[ChildComponent]` not found),
+  log a `Warning`. Warnings cannot fail `LogAssert.NoUnexpectedReceived`, so they cannot leak across
+  the PlayMode frame boundary and fail a bystander — the timing race disappears by construction.
+- **Required / unrecoverable → Error.** A missing **required** relational sibling, or a genuinely
+  escaped user exception (e.g. a coroutine body that throws), stays `Error`; the test that triggers
+  it owns a precise `LogAssert.Expect`.
+- **If a path already `throw`s a rich exception, do NOT also log.** The exception type carries all the
+  diagnostic context (see `SerializationFailureException`: Format / Operation / Stage / Input /
+  Reason). Double-signalling (log + throw) is redundant and the log becomes leak-prone noise.
+
+When a test fails on an unexpected `[Error]`, first ask "is this condition actually recoverable?" —
+if yes, demote the producer to `Warning` (deterministic) rather than papering over it with an
+`Expect` that the full-suite timing race can still defeat.
+
 ---
 
 ## Adding New Test Base Classes
