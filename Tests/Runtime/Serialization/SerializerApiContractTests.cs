@@ -178,6 +178,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 for (int i = 1; i < parameters.Length; i++)
                 {
                     ParameterInfo p = parameters[i];
+                    // A SerializationType argument selects the codec; the default enum value (0) is
+                    // an UNKNOWN type, which is a configuration/programmer error that legitimately
+                    // throws (documented contract) and is NOT the null-payload case under test here.
+                    // Supply a valid codec so this overload still exercises null-payload safety.
+                    if (p.ParameterType == typeof(SerializationType))
+                    {
+                        args[i] = SerializationType.Protobuf;
+                        continue;
+                    }
                     args[i] = p.HasDefaultValue
                         ? p.DefaultValue
                         : (
