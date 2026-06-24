@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             // Expect the error log about null key being skipped
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableSortedDictionary<System.String, System.Int32> skipped serialized entry at index 1 because the key reference was null."
             );
 
@@ -674,7 +674,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             // Expect the error log about null entry being skipped
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableSet<System.String> skipped serialized entry at index 1 because the value reference was null."
             );
 
@@ -2291,7 +2291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             // Expect the error log about null key being skipped
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableDictionary<System.String, System.Int32> skipped serialized entry at index 1 because the key reference was null."
             );
 

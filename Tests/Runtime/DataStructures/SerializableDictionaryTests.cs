@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = serializedValues;
 
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableDictionary<System.String, System.String> skipped serialized entry at index 0 because the key reference was null."
             );
 
@@ -482,7 +482,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string expectedMessage =
                 $"SerializableDictionary<{typeof(DummyAsset).FullName}, {typeof(string).FullName}> skipped serialized entry at index 0 because the key reference was null.";
-            LogAssert.Expect(LogType.Error, expectedMessage);
+            LogAssert.Expect(LogType.Warning, expectedMessage);
 
             dictionary.OnAfterDeserialize();
 

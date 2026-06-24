@@ -629,7 +629,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set._items = new[] { null, valid };
 
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableSet<WallstopStudios.UnityHelpers.Tests.DataStructures.SerializableSortedSetTests+ScriptableSample> skipped serialized entry at index 0 because the value reference was null."
             );
 

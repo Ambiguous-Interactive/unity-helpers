@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = serializedValues;
 
             LogAssert.Expect(
-                LogType.Error,
+                LogType.Warning,
                 "SerializableSortedDictionary<System.String, System.String> skipped serialized entry at index 0 because the key reference was null."
             );
 

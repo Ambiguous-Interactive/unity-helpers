@@ -351,7 +351,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 #endif
 
-            Debug.LogError(
+            // Recoverable, handled condition: the null entry is skipped and serialization continues
+            // with no data corruption, so this is a Warning, not an Error (Error is reserved for
+            // unrecoverable faults). Logging at Error also fails PlayMode tests via
+            // LogAssert.NoUnexpectedReceived even though nothing is wrong.
+            Debug.LogWarning(
                 $"SerializableDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
             );
         }
