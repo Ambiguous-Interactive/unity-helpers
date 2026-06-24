@@ -863,7 +863,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject gameObject = instance.gameObject;
 
             TestRuntimeSingleton.ClearInstance();
-            yield return null;
+            // ClearInstance destroys via Object.Destroy (deferred in PlayMode); poll until the
+            // wrapper is nulled rather than assuming one frame settles it (flaky under CI load).
+            yield return WaitUntilDestroyed(gameObject);
 
             Assert.IsFalse(TestRuntimeSingleton.HasInstance);
             Assert.IsTrue(gameObject == null);
@@ -889,11 +891,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator ClearInstanceAllowsFreshInstanceAfterClear()
         {
             TestRuntimeSingleton first = TestRuntimeSingleton.Instance;
+            GameObject firstObject = first.gameObject;
             Track(first.gameObject);
             first.testValue = 99;
 
             TestRuntimeSingleton.ClearInstance();
-            yield return null;
+            // Deferred destroy in PlayMode; poll until the old instance is actually gone.
+            yield return WaitUntilDestroyed(firstObject);
 
             TestRuntimeSingleton second = TestRuntimeSingleton.Instance;
             Track(second.gameObject);
@@ -910,7 +914,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject gameObject = instance.gameObject;
 
             RuntimeSingletonRegistry.ClearAllRegisteredInstances();
-            yield return null;
+            // Deferred destroy in PlayMode; poll until the wrapper is nulled (flaky under CI load).
+            yield return WaitUntilDestroyed(gameObject);
 
             Assert.IsFalse(TestRuntimeSingleton.HasInstance);
             Assert.IsTrue(gameObject == null);

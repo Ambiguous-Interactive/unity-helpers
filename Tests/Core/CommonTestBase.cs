@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 #if UNITY_EDITOR
     using System.Text.RegularExpressions;
@@ -347,6 +348,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             EditorUi.Suppress = _previousEditorUiSuppress;
 #endif
             DisposeDispatcherScope();
+
+            // Cross-test singleton-leak guard (PlayMode only). RuntimeSingleton<T> types
+            // (UnityMainThreadDispatcher, CoroutineHandler, ...) clear their static _instance only
+            // on domain reload / scene load -- NOT between PlayMode tests in the same domain -- so a
+            // singleton created (directly or incidentally) by one test otherwise survives into the
+            // next, which fails "no instance on first access" assertions and lets dispatcher
+            // instances accumulate across the suite. Clearing here nulls every registered singleton's
+            // cached reference so the next test starts clean (the dispatcher's GameObjects are also
+            // destroyed by DisposeDispatcherScope above). EditMode destroys synchronously already, so
+            // this is scoped to PlayMode to keep the green EditMode legs untouched.
+            if (Application.isPlaying)
+            {
+                RuntimeSingletonRegistry.ClearAllRegisteredInstances();
+
+                // Leak diagnostic: a UnityMainThreadDispatcher still resident after the scope tore
+                // down + the registry cleared means a leak the cleanup could not reach (an orphaned
+                // duplicate). Surface it as one [uh-leak] line naming the just-finished test so a
+                // regression self-identifies in unity.log (like the test streamer does for [Error]s)
+                // without failing the run. FindObjectsOfTypeAll over this one type is cheap.
+                int residentDispatchers = Resources
+                    .FindObjectsOfTypeAll<UnityMainThreadDispatcher>()
+                    .Length;
+                if (residentDispatchers > 0)
+                {
+                    Debug.LogWarning(
+                        $"[uh-leak] {residentDispatchers} UnityMainThreadDispatcher object(s) "
+                            + $"still resident after teardown of "
+                            + $"{TestContext.CurrentContext.Test.FullName}."
+                    );
+                }
+            }
 
             // Cross-test log-pollution guard (PlayMode only). A synchronous or late-flushed
             // [Error] otherwise bleeds across the frame boundary into the NEXT test's scope, so
