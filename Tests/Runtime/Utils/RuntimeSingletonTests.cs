@@ -277,9 +277,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsTrue(CustomDestroyableSingleton.HasInstance);
 
-            Object.DestroyImmediate(instance.gameObject);
+            GameObject gameObject = instance.gameObject;
+            Object.Destroy(gameObject); // UNH-SUPPRESS: Test verifies singleton destruction callback
 
-            yield return null;
+            yield return WaitUntilDestroyed(gameObject);
 
             Assert.IsTrue(CustomDestroyableSingleton.destroyWasCalled);
             Assert.IsFalse(CustomDestroyableSingleton.HasInstance);
@@ -289,11 +290,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator InstanceCanBeAccessedAfterDestruction()
         {
             TestRuntimeSingleton instance1 = TestRuntimeSingleton.Instance;
-            int instanceId1 = instance1.GetUnityObjectId();
+            long instanceId1 = instance1.GetUnityObjectId();
+            GameObject gameObject = instance1.gameObject;
 
-            Object.DestroyImmediate(instance1.gameObject); // UNH-SUPPRESS: Test verifies singleton recreation after destruction
+            Object.Destroy(gameObject); // UNH-SUPPRESS: Test verifies singleton recreation after destruction
 
-            yield return null;
+            yield return WaitUntilDestroyed(gameObject);
 
             TestRuntimeSingleton instance2 = TestRuntimeSingleton.Instance;
 
@@ -560,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator InstanceSurvivesMultipleFrames()
         {
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
-            int instanceId = instance.GetUnityObjectId();
+            long instanceId = instance.GetUnityObjectId();
 
             for (int i = 0; i < 10; i++)
             {
@@ -718,7 +720,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreNotSame(inactive, instance);
             Assert.IsTrue(instance.gameObject.activeSelf);
 
-            Object.DestroyImmediate(inactiveObject); // UNH-SUPPRESS: Test cleanup for inactive object
+            Object.Destroy(inactiveObject); // UNH-SUPPRESS: Test cleanup for inactive object
+            yield return WaitUntilDestroyed(inactiveObject);
         }
 
         [Test]
@@ -784,7 +787,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(instance.gameObject.TryGetComponent(out Rigidbody foundRb));
             Assert.AreSame(rb, foundRb);
 
-            Object.DestroyImmediate(rb); // UNH-SUPPRESS: Test cleanup for added component
+            Object.Destroy(rb); // UNH-SUPPRESS: Test cleanup for added component
+            yield return WaitUntilDestroyed(rb);
         }
 
         [Test]

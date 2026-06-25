@@ -10,11 +10,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using WallstopStudios.UnityHelpers.Core.Extension;
     using UnityEditor.IMGUI.Controls;
     using UnityEngine;
+#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+    using UnityMethodAnalyzerTreeView = UnityEditor.IMGUI.Controls.TreeView<int>;
+    using UnityMethodAnalyzerTreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+    using UnityMethodAnalyzerTreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+    using UnityMethodAnalyzerTreeView = UnityEditor.IMGUI.Controls.TreeView;
+    using UnityMethodAnalyzerTreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem;
+    using UnityMethodAnalyzerTreeViewState = UnityEditor.IMGUI.Controls.TreeViewState;
+#endif
 
     /// <summary>
     /// TreeView item for displaying analyzer issues.
     /// </summary>
-    internal sealed class IssueTreeViewItem : TreeViewItem
+    internal sealed class IssueTreeViewItem : UnityMethodAnalyzerTreeViewItem
     {
         public AnalyzerIssue Issue { get; }
         public string FilePath { get; }
@@ -51,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     /// <summary>
     /// TreeView for displaying analyzer issues in a hierarchical format.
     /// </summary>
-    internal sealed class IssueTreeView : TreeView
+    internal sealed class IssueTreeView : UnityMethodAnalyzerTreeView
     {
         private IReadOnlyList<AnalyzerIssue> _issues;
         private string _rootPath;
@@ -70,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         public event Action OnCopyAllAsJson;
         public event Action OnCopyAllAsMarkdown;
 
-        public IssueTreeView(TreeViewState state)
+        public IssueTreeView(UnityMethodAnalyzerTreeViewState state)
             : base(state)
         {
             _issues = Array.Empty<AnalyzerIssue>();
@@ -102,13 +111,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             Reload();
         }
 
-        protected override TreeViewItem BuildRoot()
+        protected override UnityMethodAnalyzerTreeViewItem BuildRoot()
         {
-            TreeViewItem root = new(-1, -1, "Root");
+            UnityMethodAnalyzerTreeViewItem root = new(-1, -1, "Root");
 
             if (_issues == null || _issues.Count == 0)
             {
-                root.AddChild(new TreeViewItem(0, 0, "No issues found"));
+                root.AddChild(new UnityMethodAnalyzerTreeViewItem(0, 0, "No issues found"));
                 return root;
             }
 
@@ -117,7 +126,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             if (issueList.Count == 0)
             {
-                root.AddChild(new TreeViewItem(0, 0, "No issues match the current filters"));
+                root.AddChild(
+                    new UnityMethodAnalyzerTreeViewItem(0, 0, "No issues match the current filters")
+                );
                 return root;
             }
 
@@ -210,7 +221,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             return filtered;
         }
 
-        private void BuildTreeBySeverity(TreeViewItem root, List<AnalyzerIssue> issues, ref int id)
+        private void BuildTreeBySeverity(
+            UnityMethodAnalyzerTreeViewItem root,
+            List<AnalyzerIssue> issues,
+            ref int id
+        )
         {
             // Build grouped structure in a single pass using dictionary
             Dictionary<IssueSeverity, Dictionary<string, List<AnalyzerIssue>>> severityGroups =
@@ -330,7 +345,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
         }
 
-        private void BuildTreeByCategory(TreeViewItem root, List<AnalyzerIssue> issues, ref int id)
+        private void BuildTreeByCategory(
+            UnityMethodAnalyzerTreeViewItem root,
+            List<AnalyzerIssue> issues,
+            ref int id
+        )
         {
             // Build grouped structure in a single pass using dictionary
             Dictionary<IssueCategory, Dictionary<string, List<AnalyzerIssue>>> categoryGroups =
@@ -462,7 +481,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
         }
 
-        private void BuildTreeByFile(TreeViewItem root, List<AnalyzerIssue> issues, ref int id)
+        private void BuildTreeByFile(
+            UnityMethodAnalyzerTreeViewItem root,
+            List<AnalyzerIssue> issues,
+            ref int id
+        )
         {
             // Build grouped structure with counts in a single pass
             Dictionary<string, (List<AnalyzerIssue> issues, int critical, int high)> fileGroups =
@@ -563,7 +586,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
         }
 
-        private void BuildFlatTree(TreeViewItem root, List<AnalyzerIssue> issues, ref int id)
+        private void BuildFlatTree(
+            UnityMethodAnalyzerTreeViewItem root,
+            List<AnalyzerIssue> issues,
+            ref int id
+        )
         {
             // Sort in-place to avoid creating new collection
             issues.Sort(
@@ -691,7 +718,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         protected override void SingleClickedItem(int id)
         {
-            TreeViewItem item = FindItem(id, rootItem);
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
             if (item is IssueTreeViewItem issueItem)
             {
                 if (issueItem.Issue != null)
@@ -703,7 +730,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         protected override void DoubleClickedItem(int id)
         {
-            TreeViewItem item = FindItem(id, rootItem);
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
             if (item is IssueTreeViewItem issueItem)
             {
                 string filePath = issueItem.FilePath;
@@ -724,7 +751,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         protected override void ContextClickedItem(int id)
         {
-            TreeViewItem item = FindItem(id, rootItem);
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
             if (item is IssueTreeViewItem issueItem)
             {
                 string filePath = issueItem.FilePath;

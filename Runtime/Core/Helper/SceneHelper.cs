@@ -1,6 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+#define UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
@@ -169,10 +173,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return;
                 }
 
+#if UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+                T[] allObjects = Object.FindObjectsByType<T>(FindObjectsInactive.Include);
+#else
                 T[] allObjects = Object.FindObjectsByType<T>(
                     FindObjectsInactive.Include,
                     FindObjectsSortMode.None
                 );
+#endif
                 if (allObjects.Length == 0)
                 {
                     taskCompletionSource.SetResult(Array.Empty<T>());

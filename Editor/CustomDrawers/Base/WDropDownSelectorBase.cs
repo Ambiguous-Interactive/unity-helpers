@@ -409,7 +409,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 ) && !string.IsNullOrEmpty(_suggestion)
             )
             {
-                evt.PreventDefault();
                 evt.StopPropagation();
                 evt.StopImmediatePropagation();
                 bool commitSelection = evt.keyCode == KeyCode.Tab && !evt.shiftKey;

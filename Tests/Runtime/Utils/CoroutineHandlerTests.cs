@@ -3,12 +3,14 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
+    using System;
     using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
+    using Object = UnityEngine.Object;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -49,8 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(inst.gameObject);
             inst.StartCoroutine(TestCoroutine());
 
-            yield return null;
-            yield return null;
+            yield return WaitUntil(() => coroutineRan, nameof(coroutineRan));
 
             Assert.IsTrue(coroutineRan);
             yield break;
@@ -71,8 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(inst2.gameObject);
             Coroutine coroutine = inst2.StartCoroutine(TestCoroutine());
 
-            yield return null;
-            yield return null;
+            yield return WaitUntil(() => counter >= 2, nameof(counter));
 
             int countBeforeStop = counter;
             CoroutineHandler.Instance.StopCoroutine(coroutine);
@@ -104,8 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             inst3.StartCoroutine(TestCoroutine1());
             inst3.StartCoroutine(TestCoroutine2());
 
-            yield return null;
-            yield return null;
+            yield return WaitUntil(() => counter1 > 0 && counter2 > 0, "both counters");
 
             int count1BeforeStop = counter1;
             int count2BeforeStop = counter2;
@@ -147,10 +146,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(inst4.gameObject);
             inst4.StartCoroutine(TestCoroutine());
 
-            for (int i = 0; i < 6; i++)
-            {
-                yield return null;
-            }
+            yield return WaitUntil(() => frameCount == 5, nameof(frameCount), maxFrames: 12);
 
             Assert.AreEqual(5, frameCount);
             yield break;
@@ -169,21 +165,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator CoroutineCanWaitForSeconds()
         {
             bool completed = false;
+            const float WaitSeconds = 0.01f;
             float startTime = Time.time;
 
-            CoroutineHandler.Instance.StartCoroutine(TestCoroutine());
+            CoroutineHandler inst = CoroutineHandler.Instance;
+            Track(inst.gameObject);
+            inst.StartCoroutine(TestCoroutine());
 
             Assert.IsFalse(completed);
 
-            yield return new WaitForSeconds(0.15f);
+            yield return WaitUntil(() => completed, nameof(completed), maxFrames: 60);
 
             Assert.IsTrue(completed);
-            Assert.Greater(Time.time - startTime, 0.1f);
+            Assert.GreaterOrEqual(Time.time - startTime, WaitSeconds);
             yield break;
 
             IEnumerator TestCoroutine()
             {
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(WaitSeconds);
                 completed = true;
             }
         }
@@ -195,12 +194,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool coroutine2Completed = false;
             bool coroutine3Completed = false;
 
-            CoroutineHandler.Instance.StartCoroutine(TestCoroutine1());
-            CoroutineHandler.Instance.StartCoroutine(TestCoroutine2());
-            CoroutineHandler.Instance.StartCoroutine(TestCoroutine3());
+            CoroutineHandler inst = CoroutineHandler.Instance;
+            Track(inst.gameObject);
+            inst.StartCoroutine(TestCoroutine1());
+            inst.StartCoroutine(TestCoroutine2());
+            inst.StartCoroutine(TestCoroutine3());
 
-            yield return null;
-            yield return null;
+            yield return WaitUntil(
+                () => coroutine1Completed && coroutine2Completed && coroutine3Completed,
+                "all coroutines completed"
+            );
 
             Assert.IsTrue(coroutine1Completed);
             Assert.IsTrue(coroutine2Completed);
@@ -232,10 +235,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool innerCompleted = false;
             bool outerCompleted = false;
 
-            CoroutineHandler.Instance.StartCoroutine(OuterCoroutine());
+            CoroutineHandler inst = CoroutineHandler.Instance;
+            Track(inst.gameObject);
+            inst.StartCoroutine(OuterCoroutine());
 
-            yield return null;
-            yield return null;
+            yield return WaitUntil(
+                () => innerCompleted && outerCompleted,
+                "nested coroutine completed"
+            );
 
             Assert.IsTrue(innerCompleted);
             Assert.IsTrue(outerCompleted);
@@ -258,6 +265,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator SingletonPersistsAcrossFrames()
         {
             CoroutineHandler instance1 = CoroutineHandler.Instance;
+            Track(instance1.gameObject);
 
             yield return null;
             yield return null;
@@ -271,6 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator InstanceIsDontDestroyOnLoad()
         {
             CoroutineHandler instance = CoroutineHandler.Instance;
+            Track(instance.gameObject);
 
             yield return null;
 
@@ -284,6 +293,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator StoppingNonexistentCoroutineDoesNotThrow()
         {
             Coroutine coroutine = CoroutineHandler.Instance.StartCoroutine(DummyCoroutine());
+            Track(CoroutineHandler.Instance.gameObject);
 
             yield return null;
             yield return null;
@@ -310,12 +320,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 LogType.Exception,
                 new System.Text.RegularExpressions.Regex(".*Test exception.*")
             );
-            CoroutineHandler.Instance.StartCoroutine(ThrowingCoroutine());
-            CoroutineHandler.Instance.StartCoroutine(SafeCoroutine());
+            CoroutineHandler inst = CoroutineHandler.Instance;
+            Track(inst.gameObject);
+            inst.StartCoroutine(ThrowingCoroutine());
+            inst.StartCoroutine(SafeCoroutine());
 
-            yield return null;
-            yield return null;
-            yield return null;
+            yield return WaitUntil(
+                () => continueAfterException,
+                nameof(continueAfterException),
+                maxFrames: 12
+            );
 
             Assert.IsTrue(continueAfterException);
             yield break;
@@ -340,6 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int counter = 0;
 
             CoroutineHandler instance = CoroutineHandler.Instance;
+            Track(instance.gameObject);
             instance.StartCoroutine(TestCoroutine());
 
             yield return null;
@@ -347,12 +362,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             int countBeforeDestroy = counter;
 
-            Object.Destroy(instance.gameObject); // UNH-SUPPRESS: Test verifies coroutine stops after destruction
+            GameObject handlerObject = instance.gameObject;
+            Object.Destroy(handlerObject); // UNH-SUPPRESS: Test verifies coroutine stops after destruction
 
+            yield return WaitUntilDestroyed(handlerObject);
+            int countAfterDestroy = counter;
             yield return null;
             yield return null;
 
-            Assert.AreEqual(countBeforeDestroy, counter);
+            Assert.GreaterOrEqual(countAfterDestroy, countBeforeDestroy);
+            Assert.AreEqual(countAfterDestroy, counter);
             yield break;
 
             IEnumerator TestCoroutine()
@@ -363,6 +382,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     yield return null;
                 }
             }
+        }
+
+        private static IEnumerator WaitUntil(
+            Func<bool> condition,
+            string description,
+            int maxFrames = 30
+        )
+        {
+            for (int i = 0; i < maxFrames; i++)
+            {
+                if (condition())
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            Assert.IsTrue(
+                condition(),
+                $"Timed out after {maxFrames} frame(s) waiting for {description}. Frame={Time.frameCount}, time={Time.time:0.###}."
+            );
         }
     }
 }

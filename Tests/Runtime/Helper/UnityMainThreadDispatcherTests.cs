@@ -64,11 +64,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Stopwatch timer = Stopwatch.StartNew();
             do
             {
-                // Spin-inspect initialize count to see if we're messing up by destroying ourselves.
-                long mainThreadDispatcherCount = UnityMainThreadDispatcher.InitializeCount;
-                Assert.IsTrue(
-                    mainThreadDispatcherCount <= 1,
-                    $"Expected 0 or 1 instances, got {mainThreadDispatcherCount} instances of UnityMainThreadDispatcher."
+                UnityMainThreadDispatcher[] dispatchers =
+                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+                Assert.LessOrEqual(
+                    dispatchers.Length,
+                    1,
+                    $"Expected 0 or 1 live UnityMainThreadDispatcher object, got {dispatchers.Length}. {DescribeDispatchers(dispatchers)}"
                 );
                 yield return null;
             } while (timer.Elapsed < TimeSpan.FromSeconds(1));
@@ -97,7 +98,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator AutoCreationScopeDestroysInstancesWhenConfigured()
         {
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
+            yield return WaitForNoLiveDispatchers();
             UnityMainThreadDispatcherTestHelper.EnableAutoCreation();
 
             UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
@@ -109,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     UnityMainThreadDispatcher.AutoCreationScope.Disabled(
                         destroyExistingInstanceOnEnter: true,
                         destroyInstancesOnDispose: true,
-                        destroyImmediate: true
+                        destroyImmediate: !Application.isPlaying
                     )
             )
             {
@@ -131,7 +135,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator InstanceDoesNotAutoCreateWhenDisabled()
         {
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
+            yield return WaitForNoLiveDispatchers();
             UnityMainThreadDispatcherTestHelper.EnableAutoCreation();
 
             UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
@@ -143,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     UnityMainThreadDispatcher.AutoCreationScope.Disabled(
                         destroyExistingInstanceOnEnter: true,
                         destroyInstancesOnDispose: true,
-                        destroyImmediate: true
+                        destroyImmediate: !Application.isPlaying
                     )
             )
             {
@@ -155,6 +162,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 );
             }
 
+            yield return WaitForNoLiveDispatchers();
+
             UnityMainThreadDispatcher recreated = UnityMainThreadDispatcher.Instance;
             Assert.IsTrue(recreated != null, "Dispatcher should be re-created after scope exits");
             Track(recreated.gameObject);
@@ -165,7 +174,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator AutoCreationScopeEnabledRestoresFlagAndCleansUp()
         {
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
+            yield return WaitForNoLiveDispatchers();
             UnityMainThreadDispatcher.SetAutoCreationEnabled(false);
             Assert.IsFalse(UnityMainThreadDispatcher.AutoCreationEnabled);
             Assert.IsTrue(
@@ -179,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     UnityMainThreadDispatcher.AutoCreationScope.Enabled(
                         destroyExistingInstanceOnEnter: false,
                         destroyInstancesOnDispose: true,
-                        destroyImmediate: true
+                        destroyImmediate: !Application.isPlaying
                     )
             )
             {
@@ -208,7 +220,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator DestroyExistingDispatcherUsesDestroy()
         {
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
+            yield return WaitForNoLiveDispatchers();
             UnityMainThreadDispatcherTestHelper.EnableAutoCreation();
 
             UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
@@ -218,21 +233,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             bool destroyed = UnityMainThreadDispatcher.DestroyExistingDispatcher(immediate: false);
             Assert.IsTrue(destroyed);
 
-            int guard = 10;
-            while (UnityMainThreadDispatcher.HasInstance && guard-- > 0)
-            {
-                yield return null;
-            }
-
-            guard = 10;
-            while (
-                UnityObjectExtensions.FindObjectsOfTypeShim<UnityMainThreadDispatcher>(false).Length
-                    > 0
-                && guard-- > 0
-            )
-            {
-                yield return null;
-            }
+            yield return WaitForNoLiveDispatchers();
 
             Assert.IsFalse(UnityMainThreadDispatcher.HasInstance);
             Assert.AreEqual(
@@ -286,12 +287,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator CreateTestScopeReEnablesAutoCreationAndCleansUp()
         {
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
+            yield return WaitForNoLiveDispatchers();
             UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
             Assert.IsTrue(UnityMainThreadDispatcher.AutoCreationEnabled);
 
             UnityMainThreadDispatcher.AutoCreationScope scope =
-                UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
+                UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: !Application.isPlaying);
             Assert.IsTrue(scope != null, "Test scope should not be null");
             Assert.IsTrue(UnityMainThreadDispatcher.AutoCreationEnabled);
 
@@ -305,11 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(UnityMainThreadDispatcher.AutoCreationEnabled);
             Assert.IsFalse(UnityMainThreadDispatcher.HasInstance);
 
-            int guard = 5;
-            while (UnityMainThreadDispatcher.HasInstance && guard-- > 0)
-            {
-                yield return null;
-            }
+            yield return WaitForNoLiveDispatchers();
         }
 
         [UnityTest]
@@ -649,16 +649,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
             UnityEngine.Object.Destroy(dispatcher.gameObject); // UNH-SUPPRESS: Test verifies dispatcher respawn prevention
-            while (UnityMainThreadDispatcher.HasInstance)
-            {
-                yield return null;
-            }
+            yield return WaitForNoLiveDispatchers();
 
             GameObject loggerOwner = Track(new GameObject("LoggerOwner"));
             Exception backgroundException = null;
 
             using (ManualResetEventSlim completed = new(false))
             {
+#if ENABLE_UBERLOGGING || DEBUG_LOGGING
+                LogAssert.Expect(LogType.Log, new Regex(".*Background log 1.*"));
+#endif
                 Task.Run(() =>
                 {
                     try
@@ -692,6 +692,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 0,
                 UnityObjectExtensions.FindObjectsOfTypeShim<UnityMainThreadDispatcher>(false).Length
             );
+        }
+
+        private static IEnumerator WaitForNoLiveDispatchers(int maxFrames = 10)
+        {
+            for (int i = 0; i < maxFrames; i++)
+            {
+                UnityMainThreadDispatcher[] dispatchers =
+                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+                if (dispatchers.Length == 0)
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            UnityMainThreadDispatcher[] remainingDispatchers =
+                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            Assert.AreEqual(
+                0,
+                remainingDispatchers.Length,
+                $"Expected no live UnityMainThreadDispatcher objects after cleanup. {DescribeDispatchers(remainingDispatchers)}"
+            );
+        }
+
+        private static string DescribeDispatchers(UnityMainThreadDispatcher[] dispatchers)
+        {
+            if (dispatchers == null || dispatchers.Length == 0)
+            {
+                return "No dispatchers found.";
+            }
+
+            string[] descriptions = new string[dispatchers.Length];
+            for (int i = 0; i < dispatchers.Length; i++)
+            {
+                UnityMainThreadDispatcher dispatcher = dispatchers[i];
+                if (dispatcher == null)
+                {
+                    descriptions[i] = "null";
+                    continue;
+                }
+
+                GameObject dispatcherObject = dispatcher.gameObject;
+                string sceneName = dispatcherObject == null ? "null" : dispatcherObject.scene.name;
+                descriptions[i] =
+                    $"{dispatcher.name}#{dispatcher.GetUnityObjectId()} scene='{sceneName}' active={dispatcherObject != null && dispatcherObject.activeInHierarchy}";
+            }
+
+            return string.Join(", ", descriptions);
         }
     }
 }

@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
     public sealed class RecordingEffectBehavior : EffectBehavior
     {
-        private static readonly HashSet<int> InstanceIds = new();
+        private static readonly HashSet<long> InstanceIds = new();
 
         public static List<EffectBehaviorContext> ApplyContexts { get; } = new();
 

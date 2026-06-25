@@ -1,11 +1,15 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if UNITY_2021 || UNITY_2022 || UNITY_2023
+#define UNH_NEEDS_DOES_NOT_RETURN_ATTRIBUTE_POLYFILL
+#endif
+
 // Polyfill DoesNotReturnAttribute on targets older than .NET 5 (e.g. Unity 2021.3 with
 // .NET Standard 2.1). The attribute is purely informational for static analyzers; declaring
 // it locally lets us decorate the Throw* helpers on every supported target without conditional
 // source changes elsewhere.
-#if !NET5_0_OR_GREATER && !UNITY_6000_0_OR_NEWER
+#if !NET5_0_OR_GREATER && UNH_NEEDS_DOES_NOT_RETURN_ATTRIBUTE_POLYFILL
 namespace System.Diagnostics.CodeAnalysis
 {
     using System;

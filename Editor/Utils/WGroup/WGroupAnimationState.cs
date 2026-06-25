@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         internal static AnimBool GetOrCreateAnim(
             WGroupDefinition definition,
             bool expanded,
-            int targetInstanceId = 0
+            long targetInstanceId = 0
         )
         {
             int key = ComputeKey(definition, targetInstanceId);
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         internal static float GetFadeProgress(
             WGroupDefinition definition,
             bool expanded,
-            int targetInstanceId = 0
+            long targetInstanceId = 0
         )
         {
             if (!UnityHelpersSettings.ShouldTweenWGroupFoldouts())
@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             FoldoutAnimations.Clear();
         }
 
-        private static int ComputeKey(WGroupDefinition definition, int targetInstanceId)
+        private static int ComputeKey(WGroupDefinition definition, long targetInstanceId)
         {
             return Objects.HashCode(
                 definition.Name,

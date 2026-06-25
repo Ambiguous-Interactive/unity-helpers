@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         > CachedAccessors = new();
         private static readonly object[] EmptyParameters = Array.Empty<object>();
         private static readonly Dictionary<
-            (int serializedObjectHash, int instanceId, string propertyPath, string conditionField),
+            (int serializedObjectHash, long instanceId, string propertyPath, string conditionField),
             SerializedProperty
         > ConditionPropertyCache = new();
         private static readonly Dictionary<
@@ -322,9 +322,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedObject serializedObject = property.serializedObject;
             UnityEngine.Object target = serializedObject?.targetObject;
             int serializedObjectHash = serializedObject?.GetHashCode() ?? 0;
-            int instanceId = target != null ? target.GetUnityObjectId() : 0;
+            long instanceId = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath ?? string.Empty;
-            (int, int, string, string) cacheKey = (
+            (int, long, string, string) cacheKey = (
                 serializedObjectHash,
                 instanceId,
                 propertyPath,

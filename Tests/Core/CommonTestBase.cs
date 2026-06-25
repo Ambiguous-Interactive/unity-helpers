@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -360,6 +361,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // this is scoped to PlayMode to keep the green EditMode legs untouched.
             if (Application.isPlaying)
             {
+                int dispatcherDestroyFrames = 10;
+                while (
+                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>().Length > 0
+                    && dispatcherDestroyFrames > 0
+                )
+                {
+                    dispatcherDestroyFrames--;
+                    yield return null;
+                }
+
                 RuntimeSingletonRegistry.ClearAllRegisteredInstances();
 
                 // Leak diagnostic: a UnityMainThreadDispatcher still resident after the scope tore
@@ -675,7 +686,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private void InitializeDispatcherScope()
         {
             DisposeDispatcherScope();
-            _dispatcherScope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
+            _dispatcherScope = UnityMainThreadDispatcher.CreateTestScope(
+                destroyImmediate: !Application.isPlaying
+            );
         }
 
         private void DisposeDispatcherScope()
@@ -1159,6 +1172,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
         {
+            if (obj == null)
+            {
+                yield break;
+            }
+
+            Type objectType = obj.GetType();
+            string objectName = obj.name;
+            long objectId = obj.GetUnityObjectId();
+
             for (int i = 0; i < maxFrames; i++)
             {
                 if (obj == null)
@@ -1167,6 +1189,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 yield return null;
             }
+
+            int liveObjectCount = -1;
+            try
+            {
+                liveObjectCount = Resources.FindObjectsOfTypeAll(objectType).Length;
+            }
+            catch (Exception ex)
+            {
+                TestContext.WriteLine(
+                    $"WaitUntilDestroyed failed to count live {objectType.FullName} objects: {ex.Message}"
+                );
+            }
+
+            TestContext.WriteLine(
+                $"WaitUntilDestroyed timed out after {maxFrames} frame(s). "
+                    + $"Object '{objectName}' ({objectType.FullName}, instance {objectId}) "
+                    + $"still reports alive. Application.isPlaying={Application.isPlaying}, "
+                    + $"live objects of same type={liveObjectCount}."
+            );
         }
 
 #if UNITY_EDITOR
@@ -1304,6 +1345,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 if (Time.realtimeSinceStartup > endTime)
                 {
+                    TestContext.WriteLine(
+                        $"WaitUntilAssetUnloaded timed out after {timeoutSeconds:0.###} second(s). "
+                            + DescribeAssetDatabaseState(assetPath)
+                    );
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Coroutine: force the AssetDatabase to reconcile, then yield frames until the
+        /// asset at <paramref name="assetPath"/> is loadable (or the timeout elapses).
+        /// Editor-only; for <c>[UnityTest]</c> fixtures.
+        /// </summary>
+        protected static IEnumerator WaitUntilAssetLoaded(
+            string assetPath,
+            float timeoutSeconds = 5f
+        )
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (true)
+            {
+                using (AssetDatabaseBatchHelper.PauseBatch())
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+                if (UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
+                {
+                    yield break;
+                }
+                if (Time.realtimeSinceStartup > endTime)
+                {
+                    TestContext.WriteLine(
+                        $"WaitUntilAssetLoaded timed out after {timeoutSeconds:0.###} second(s). "
+                            + DescribeAssetDatabaseState(assetPath)
+                    );
                     yield break;
                 }
                 yield return null;
@@ -1333,6 +1413,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     return;
                 }
             }
+
+            TestContext.WriteLine(
+                $"ForceAssetUnloaded timed out after {maxRefreshes} refresh(es). "
+                    + DescribeAssetDatabaseState(assetPath)
+            );
         }
 
         /// <summary>
@@ -1362,6 +1447,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 yield return null;
             }
+
+            TestContext.WriteLine(
+                $"WaitUntilFolderValid timed out after {maxRefreshes} refresh(es). "
+                    + $"folderPath='{folderPath}', "
+                    + $"isValidFolder={UnityEditor.AssetDatabase.IsValidFolder(folderPath)}."
+            );
+        }
+
+        private static string DescribeAssetDatabaseState(string assetPath)
+        {
+            string absolutePath = string.Empty;
+            string metaPath = string.Empty;
+            bool fileExists = false;
+            bool metaExists = false;
+            try
+            {
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                if (!string.IsNullOrEmpty(projectRoot) && !string.IsNullOrEmpty(assetPath))
+                {
+                    absolutePath = Path.Combine(
+                        projectRoot,
+                        assetPath.Replace('/', Path.DirectorySeparatorChar)
+                    );
+                    metaPath = absolutePath + ".meta";
+                    fileExists = File.Exists(absolutePath);
+                    metaExists = File.Exists(metaPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                TestContext.WriteLine(
+                    $"Failed to inspect filesystem state for asset '{assetPath}': {ex.Message}"
+                );
+            }
+
+            Object loadedAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+            UnityEditor.AssetImporter importer = UnityEditor.AssetImporter.GetAtPath(assetPath);
+            string guid = UnityEditor.AssetDatabase.AssetPathToGUID(assetPath);
+
+            return $"assetPath='{assetPath}', absolutePath='{absolutePath}', "
+                + $"fileExists={fileExists}, metaPath='{metaPath}', metaExists={metaExists}, "
+                + $"guid='{guid}', loadedAsset={DescribeUnityObject(loadedAsset)}, "
+                + $"importer={(importer == null ? "null" : importer.GetType().FullName)}.";
+        }
+
+        private static string DescribeUnityObject(Object obj)
+        {
+            if (obj == null)
+            {
+                return "null";
+            }
+
+            return $"{obj.GetType().FullName}('{obj.name}', instance {obj.GetUnityObjectId()})";
         }
 #endif
 

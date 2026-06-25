@@ -950,8 +950,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             // Cache key should include the instance ID
-            int instanceIdA = hostA.GetUnityObjectId();
-            int instanceIdB = hostB.GetUnityObjectId();
+            long instanceIdA = hostA.GetUnityObjectId();
+            long instanceIdB = hostB.GetUnityObjectId();
 
             Assert.IsTrue(
                 cacheKeyA.Contains(instanceIdA.ToString()),
@@ -1003,8 +1003,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             // Cache key should include the instance ID
-            int instanceIdA = hostA.GetUnityObjectId();
-            int instanceIdB = hostB.GetUnityObjectId();
+            long instanceIdA = hostA.GetUnityObjectId();
+            long instanceIdB = hostB.GetUnityObjectId();
 
             Assert.IsTrue(
                 cacheKeyA.Contains(instanceIdA.ToString()),

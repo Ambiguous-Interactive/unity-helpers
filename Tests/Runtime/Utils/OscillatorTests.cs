@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System.Collections;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -15,6 +16,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     public sealed class OscillatorTests : CommonTestBase
     {
         // Tracking handled by CommonTestBase
+
+        private static IEnumerable<TestCaseData> PositionCalculationCases()
+        {
+            yield return new TestCaseData(
+                Vector3.zero,
+                0f,
+                0f,
+                2f,
+                2f,
+                new Vector3(2f, 0f, 0f)
+            ).SetName("Zero speed uses the initial phase");
+            yield return new TestCaseData(
+                Vector3.zero,
+                Mathf.PI / 2f,
+                1f,
+                0f,
+                5f,
+                new Vector3(0f, 5f, 0f)
+            ).SetName("Height affects the y axis");
+            yield return new TestCaseData(
+                new Vector3(5f, 10f, 3f),
+                Mathf.PI,
+                1f,
+                2f,
+                0f,
+                new Vector3(3f, 10f, 3f)
+            ).SetName("Width is relative to initial position");
+            yield return new TestCaseData(
+                new Vector3(1f, 2f, 9f),
+                3f,
+                4f,
+                0f,
+                0f,
+                new Vector3(1f, 2f, 9f)
+            ).SetName("Zero dimensions preserve position");
+        }
+
+        [TestCaseSource(nameof(PositionCalculationCases))]
+        public void CalculatesLocalPositionFromInputs(
+            Vector3 initialLocalPosition,
+            float time,
+            float speed,
+            float width,
+            float height,
+            Vector3 expected
+        )
+        {
+            Vector3 actual = Oscillator.CalculateLocalPosition(
+                initialLocalPosition,
+                time,
+                speed,
+                width,
+                height
+            );
+
+            Assert.AreEqual(expected.x, actual.x, 0.001f);
+            Assert.AreEqual(expected.y, actual.y, 0.001f);
+            Assert.AreEqual(expected.z, actual.z, 0.001f);
+        }
 
         [UnityTest]
         public IEnumerator StoresInitialPositionOnAwake()
@@ -56,32 +116,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreNotEqual(Vector3.zero, go.transform.localPosition);
         }
 
-        [UnityTest]
-        public IEnumerator OscillatesWithPositiveSpeed()
+        [Test]
+        public void OscillatesWithPositiveSpeed()
         {
-            GameObject go = Track(
-                new GameObject("Oscillator", typeof(Oscillator))
-                {
-                    transform = { localPosition = Vector3.zero },
-                }
+            Vector3 position1 = Oscillator.CalculateLocalPosition(
+                Vector3.zero,
+                time: 0f,
+                speed: 2f,
+                width: 1f,
+                height: 1f
             );
-            Oscillator oscillator = go.GetComponent<Oscillator>();
-            oscillator.speed = 2f;
-            oscillator.width = 1f;
-            oscillator.height = 1f;
-
-            oscillator.SendMessage("Awake");
-
-            Vector3 position1 = Vector3.zero;
-            Vector3 position2 = Vector3.zero;
-
-            oscillator.SendMessage("Update");
-            position1 = go.transform.localPosition;
-            yield return new WaitForSeconds(0.1f);
-
-            oscillator.SendMessage("Update");
-            position2 = go.transform.localPosition;
-            yield return null;
+            Vector3 position2 = Oscillator.CalculateLocalPosition(
+                Vector3.zero,
+                time: 0.25f,
+                speed: 2f,
+                width: 1f,
+                height: 1f
+            );
 
             Assert.AreNotEqual(position1, position2);
         }
@@ -223,32 +274,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreNotEqual(0f, go.transform.localPosition.y);
         }
 
-        [UnityTest]
-        public IEnumerator NegativeSpeedWorks()
+        [Test]
+        public void NegativeSpeedWorks()
         {
-            GameObject go = Track(
-                new GameObject("Oscillator", typeof(Oscillator))
-                {
-                    transform = { localPosition = Vector3.zero },
-                }
+            Vector3 position1 = Oscillator.CalculateLocalPosition(
+                Vector3.zero,
+                time: 0f,
+                speed: -1f,
+                width: 2f,
+                height: 2f
             );
-            Oscillator oscillator = go.GetComponent<Oscillator>();
-            oscillator.speed = -1f;
-            oscillator.width = 2f;
-            oscillator.height = 2f;
-
-            oscillator.SendMessage("Awake");
-
-            Vector3 position1 = Vector3.zero;
-            Vector3 position2 = Vector3.zero;
-
-            oscillator.SendMessage("Update");
-            position1 = go.transform.localPosition;
-            yield return new WaitForSeconds(0.1f);
-
-            oscillator.SendMessage("Update");
-            position2 = go.transform.localPosition;
-            yield return null;
+            Vector3 position2 = Oscillator.CalculateLocalPosition(
+                Vector3.zero,
+                time: 0.25f,
+                speed: -1f,
+                width: 2f,
+                height: 2f
+            );
 
             Assert.AreNotEqual(position1, position2);
         }
@@ -446,10 +488,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             oscillator.speed = 10f;
-            yield return new WaitForSeconds(0.1f);
-            oscillator.SendMessage("Update");
-            Vector3 position2 = go.transform.localPosition;
-            yield return null;
+            Vector3 position2 = Oscillator.CalculateLocalPosition(
+                oscillator._initialLocalPosition,
+                0.25f,
+                oscillator.speed,
+                oscillator.width,
+                oscillator.height
+            );
 
             Assert.AreNotEqual(position1, position2);
         }
@@ -476,16 +521,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             oscillator.width = 10f;
             oscillator.height = 10f;
-            yield return new WaitForSeconds(0.5f);
-            oscillator.SendMessage("Update");
-            float distance2 = Vector3.Distance(go.transform.localPosition, Vector3.zero);
-            yield return null;
+            Vector3 largerPosition = Oscillator.CalculateLocalPosition(
+                oscillator._initialLocalPosition,
+                0.5f,
+                oscillator.speed,
+                oscillator.width,
+                oscillator.height
+            );
+            float distance2 = Vector3.Distance(largerPosition, Vector3.zero);
 
             Assert.Greater(distance2, distance1);
         }
 
-        [UnityTest]
-        public IEnumerator UsesTimeBasedCalculation()
+        [Test]
+        public void UsesTimeBasedCalculation()
         {
             GameObject go = Track(
                 new GameObject("Oscillator", typeof(Oscillator))
@@ -504,13 +553,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             oscillator.SendMessage("Update");
             Vector3 position1 = go.transform.localPosition;
 
-            yield return new WaitForSeconds(0.5f);
-
-            float time2 = Time.time;
-            oscillator.SendMessage("Update");
-            Vector3 position2 = go.transform.localPosition;
-
-            yield return null;
+            float time2 = time1 + 0.5f;
+            Vector3 position2 = Oscillator.CalculateLocalPosition(
+                oscillator._initialLocalPosition,
+                time2,
+                oscillator.speed,
+                oscillator.width,
+                oscillator.height
+            );
 
             Assert.AreNotEqual(time1, time2);
             Assert.AreNotEqual(position1, position2);
@@ -537,7 +587,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             oscillator.enabled = false;
             Vector3 disabledPosition = go.transform.localPosition;
 
-            yield return new WaitForSeconds(0.5f);
+            yield return null;
+            yield return null;
 
             Assert.AreEqual(disabledPosition, go.transform.localPosition);
         }

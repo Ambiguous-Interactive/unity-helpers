@@ -1,6 +1,11 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+#define UNH_HAS_ENTITY_ID
+#define UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System;
@@ -9,15 +14,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     internal static class UnityObjectExtensions
     {
-        internal static int GetUnityObjectId(this Object unityObject)
+        internal static long GetUnityObjectId(this Object unityObject)
         {
             if (unityObject == null)
             {
                 return 0;
             }
 
-#if UNITY_6000_0_OR_NEWER
-            return unityObject.GetEntityId();
+#if UNH_HAS_ENTITY_ID
+            return unchecked((long)EntityId.ToULong(unityObject.GetEntityId()));
 #else
             return unityObject.GetInstanceID();
 #endif
@@ -30,7 +35,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         internal static T[] FindObjectsOfTypeShim<T>(bool includeInactive)
             where T : Object
         {
-#if UNITY_2022_2_OR_NEWER
+#if UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+            return Object.FindObjectsByType<T>(
+                includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude
+            );
+#elif UNITY_2022_2_OR_NEWER
             return Object.FindObjectsByType<T>(
                 includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude,
                 FindObjectsSortMode.None
@@ -42,7 +51,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         internal static Object[] FindObjectsOfTypeShim(Type type, bool includeInactive)
         {
-#if UNITY_2022_2_OR_NEWER
+#if UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+            return Object.FindObjectsByType(
+                type,
+                includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude
+            );
+#elif UNITY_2022_2_OR_NEWER
             return Object.FindObjectsByType(
                 type,
                 includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude,

@@ -530,7 +530,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
-            yield return null;
+            yield return WaitUntilAssetLoaded(TargetAssetPath);
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) != null);
 
             string absoluteAsset = GetAbsolutePath(TargetAssetPath);
@@ -556,7 +556,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
-            yield return null;
+            yield return WaitUntilAssetLoaded(TargetAssetPath);
 
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) != null);
         }

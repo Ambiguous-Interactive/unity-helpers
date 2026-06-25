@@ -1667,14 +1667,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return 0;
             }
 
-            Span<int> instanceIds = stackalloc int[targets.Length];
+            Span<long> instanceIds = stackalloc long[targets.Length];
             for (int i = 0; i < targets.Length; i++)
             {
                 UnityEngine.Object target = targets[i];
                 instanceIds[i] = target != null ? target.GetUnityObjectId() : 0;
             }
 
-            return Objects.SpanHashCode<int>(instanceIds);
+            return Objects.SpanHashCode<long>(instanceIds);
         }
 
         public bool Equals(ContextCacheKey other)

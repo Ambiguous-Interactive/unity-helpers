@@ -1,6 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+#define UNH_HAS_ENTITY_ID
+#endif
+
 namespace WallstopStudios.UnityHelpers.Tests.Extensions
 {
     using NUnit.Framework;
@@ -18,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Object unityObject = null;
 
-            Assert.AreEqual(0, unityObject.GetUnityObjectId());
+            Assert.AreEqual(0L, unityObject.GetUnityObjectId());
         }
 
         [Test]
@@ -29,13 +33,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(GetExpectedObjectId(gameObject), gameObject.GetUnityObjectId());
         }
 
-#if UNITY_6000_0_OR_NEWER
-        private static int GetExpectedObjectId(Object unityObject)
+#if UNH_HAS_ENTITY_ID
+        private static long GetExpectedObjectId(Object unityObject)
         {
-            return unityObject.GetEntityId();
+            return unchecked((long)EntityId.ToULong(unityObject.GetEntityId()));
         }
 #else
-        private static int GetExpectedObjectId(Object unityObject)
+        private static long GetExpectedObjectId(Object unityObject)
         {
             return unityObject.GetInstanceID();
         }

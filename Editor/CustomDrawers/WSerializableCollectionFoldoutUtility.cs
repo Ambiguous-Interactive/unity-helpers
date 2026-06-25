@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 PropertyPath = propertyPath ?? string.Empty;
             }
 
-            private int TargetId { get; }
+            private long TargetId { get; }
 
             private string PropertyPath { get; }
 

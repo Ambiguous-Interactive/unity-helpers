@@ -203,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
                 UnityEngine.Object targetObject =
                     serializedObject != null ? serializedObject.targetObject : null;
-                int targetInstanceId = targetObject.GetUnityObjectId();
+                long targetInstanceId = targetObject.GetUnityObjectId();
 
                 if (headerHasFoldout)
                 {
@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         private static bool DrawFoldoutHeader(
             WGroupDefinition definition,
             Dictionary<int, bool> foldoutStates,
-            int targetInstanceId
+            long targetInstanceId
         )
         {
             int key = Objects.HashCode(

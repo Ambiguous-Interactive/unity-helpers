@@ -715,7 +715,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         )
         {
             HashSet<string> yieldedPaths = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<int> yieldedInstanceIds = new();
+            HashSet<long> yieldedInstanceIds = new();
 
             // Determine if this is a Component type - these require explicit prefab/scene search
             // and should NOT be found via the primary asset search (which would incorrectly
@@ -883,7 +883,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static IEnumerable<UnityEngine.Object> EnumeratePrefabComponents(
             Type declaringType,
             HashSet<string> yieldedPaths,
-            HashSet<int> yieldedInstanceIds
+            HashSet<long> yieldedInstanceIds
         )
         {
             // Find all prefabs in the project
@@ -917,7 +917,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         continue;
                     }
 
-                    int instanceId = component.GetUnityObjectId();
+                    long instanceId = component.GetUnityObjectId();
                     if (yieldedInstanceIds.Add(instanceId))
                     {
                         yield return component;
@@ -928,7 +928,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static IEnumerable<UnityEngine.Object> EnumerateSceneComponents(
             Type declaringType,
-            HashSet<int> yieldedInstanceIds
+            HashSet<long> yieldedInstanceIds
         )
         {
             // Search all loaded scenes
@@ -961,7 +961,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             continue;
                         }
 
-                        int instanceId = component.GetUnityObjectId();
+                        long instanceId = component.GetUnityObjectId();
                         if (yieldedInstanceIds.Add(instanceId))
                         {
                             yield return component;

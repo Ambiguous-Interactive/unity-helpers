@@ -17,7 +17,9 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         private static void DisableAutoCreation()
         {
             UnityMainThreadDispatcher.SetAutoCreationEnabled(false);
-            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(immediate: true);
+            UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
+                immediate: !Application.isPlaying
+            );
         }
     }
 }

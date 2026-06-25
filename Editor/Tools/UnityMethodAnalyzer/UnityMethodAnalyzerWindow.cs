@@ -19,6 +19,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
     using Object = UnityEngine.Object;
+#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+    using UnityMethodAnalyzerTreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+    using UnityMethodAnalyzerTreeViewState = UnityEditor.IMGUI.Controls.TreeViewState;
+#endif
 
     /// <summary>
     /// Unity Editor window for analyzing C# code for inheritance and Unity method issues.
@@ -65,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         internal List<string> _sourcePaths = new();
 
         [SerializeField]
-        private TreeViewState _treeViewState;
+        private UnityMethodAnalyzerTreeViewState _treeViewState;
 
         [SerializeField]
         private bool _sourcePathsFoldout = true;
@@ -146,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         internal void Initialize()
         {
             _analyzer = new MethodAnalyzer();
-            _treeViewState ??= new TreeViewState();
+            _treeViewState ??= new UnityMethodAnalyzerTreeViewState();
             _treeView = new IssueTreeView(_treeViewState);
             _treeView.OnIssueSelected += OnIssueSelected;
             _treeView.OnOpenFile += OpenFileAtLine;

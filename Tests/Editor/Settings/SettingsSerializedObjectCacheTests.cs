@@ -354,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
-            int instanceId = cached.targetObject.GetUnityObjectId();
+            long instanceId = cached.targetObject.GetUnityObjectId();
 
             Assert.AreNotEqual(
                 0,
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
 
             SerializedObject cachedAgain = GetCachedSerializedObject(settings);
-            int sameInstanceId = cachedAgain.targetObject.GetUnityObjectId();
+            long sameInstanceId = cachedAgain.targetObject.GetUnityObjectId();
 
             Assert.AreEqual(
                 instanceId,
@@ -836,7 +836,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             SerializedObject firstCached = GetCachedSerializedObject(settings);
             Assert.IsTrue(firstCached != null, "First cached SerializedObject should not be null.");
 
-            int originalTargetInstanceId = firstCached.targetObject.GetUnityObjectId();
+            long originalTargetInstanceId = firstCached.targetObject.GetUnityObjectId();
             Assert.AreNotEqual(
                 0,
                 originalTargetInstanceId,
@@ -864,7 +864,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
 
             // Verify the new SerializedObject targets the same underlying settings object
-            int newTargetInstanceId = secondCached.targetObject.GetUnityObjectId();
+            long newTargetInstanceId = secondCached.targetObject.GetUnityObjectId();
             Assert.AreEqual(
                 originalTargetInstanceId,
                 newTargetInstanceId,

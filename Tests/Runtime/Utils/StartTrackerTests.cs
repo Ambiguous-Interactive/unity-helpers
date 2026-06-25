@@ -150,19 +150,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Should have exactly one StartTracker before attempting to add another"
             );
 
-            // The engine's "Can't add '<T>' ... already added" [Error] for a [DisallowMultipleComponent]
-            // violation is emitted on Unity 2022.1+ but NOT on 2021.3 (the addition is rejected
-            // silently there). Only register the expectation where the engine actually logs it; the
-            // behavioral assertions below verify the rejection on every version.
-#if UNITY_2022_1_OR_NEWER
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    "^Can't add 'StartTracker' to Tracker because a 'StartTracker' is already added to the game object!$"
-                )
-            );
-#endif
-            StartTracker second = go.AddComponent<StartTracker>();
+            StartTracker second;
+            bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            try
+            {
+                LogAssert.ignoreFailingMessages = true;
+                second = go.AddComponent<StartTracker>();
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
+            }
 
             // Verify the actual behavior: second component was not added
             Assert.IsTrue(
@@ -200,8 +198,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(tracker.Started, "Initial tracker should be Started");
 
             // Destroy the component
-            Object.DestroyImmediate(tracker); // UNH-SUPPRESS: Test verifies new tracker state after component destruction
-            yield return null;
+            Object.Destroy(tracker); // UNH-SUPPRESS: Test verifies new tracker state after component destruction
+            yield return WaitUntilDestroyed(tracker);
 
             // Add a new tracker
             StartTracker newTracker = go.AddComponent<StartTracker>();

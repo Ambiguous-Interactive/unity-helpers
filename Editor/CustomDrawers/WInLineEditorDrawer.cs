@@ -44,19 +44,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         >(System.StringComparer.Ordinal);
 
         private static readonly Dictionary<
-            (int instanceId, string propertyPath),
+            (long instanceId, string propertyPath),
             string
-        > FoldoutKeyCache = new Dictionary<(int, string), string>();
+        > FoldoutKeyCache = new Dictionary<(long, string), string>();
         private static readonly Dictionary<
-            (int instanceId, string propertyPath),
+            (long instanceId, string propertyPath),
             string
-        > ScrollKeyCache = new Dictionary<(int, string), string>();
+        > ScrollKeyCache = new Dictionary<(long, string), string>();
 
         // Cache for InspectorHeightInfo to avoid redundant calculations within the same frame
         private static readonly Dictionary<
-            (int instanceId, float width),
+            (long instanceId, float width),
             InspectorHeightInfoCacheEntry
-        > InspectorHeightCache = new Dictionary<(int, float), InspectorHeightInfoCacheEntry>();
+        > InspectorHeightCache = new Dictionary<(long, float), InspectorHeightInfoCacheEntry>();
         private static int _lastInspectorHeightCacheFrame = -1;
 
         // Animation cache for smooth foldout transitions
@@ -794,10 +794,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _lastInspectorHeightCacheFrame = currentFrame;
             }
 
-            int instanceId = value.GetUnityObjectId();
+            long instanceId = value.GetUnityObjectId();
             // Round width to avoid cache misses from floating point variations
             float roundedWidth = Mathf.Round(availableWidth);
-            (int, float) cacheKey = (instanceId, roundedWidth);
+            (long, float) cacheKey = (instanceId, roundedWidth);
 
             if (
                 InspectorHeightCache.TryGetValue(cacheKey, out InspectorHeightInfoCacheEntry cached)
@@ -1373,9 +1373,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Object target =
                 property.serializedObject != null ? property.serializedObject.targetObject : null;
-            int id = target != null ? target.GetUnityObjectId() : 0;
+            long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
-            (int, string) cacheKey = (id, propertyPath);
+            (long, string) cacheKey = (id, propertyPath);
             if (!FoldoutKeyCache.TryGetValue(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildFoldoutKey(id, propertyPath);
@@ -1388,9 +1388,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Object target =
                 property.serializedObject != null ? property.serializedObject.targetObject : null;
-            int id = target != null ? target.GetUnityObjectId() : 0;
+            long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
-            (int, string) cacheKey = (id, propertyPath);
+            (long, string) cacheKey = (id, propertyPath);
             if (!ScrollKeyCache.TryGetValue(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildScrollKey(id, propertyPath);

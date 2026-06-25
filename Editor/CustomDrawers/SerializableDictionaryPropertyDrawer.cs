@@ -6160,11 +6160,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         private readonly struct PropertyCacheKey : IEquatable<PropertyCacheKey>
         {
-            public readonly int InstanceId;
+            public readonly long InstanceId;
             public readonly string PropertyPath;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public PropertyCacheKey(int instanceId, string propertyPath)
+            public PropertyCacheKey(long instanceId, string propertyPath)
             {
                 InstanceId = instanceId;
                 PropertyPath = propertyPath;
@@ -6220,7 +6220,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Common case: single target - use static cache to avoid string allocation
             if (targets.Length == 1 && targets[0] != null)
             {
-                int instanceId = targets[0].GetUnityObjectId();
+                long instanceId = targets[0].GetUnityObjectId();
                 PropertyCacheKey cacheKey = new(instanceId, propertyPath);
 
                 if (SingleTargetPropertyKeyCache.TryGetValue(cacheKey, out string cached))
@@ -6257,7 +6257,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             for (int index = 0; index < targets.Length; index++)
             {
-                int id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
+                long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
                 if (index < targets.Length - 1)
                 {
@@ -6759,11 +6759,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
         {
-            public readonly int InstanceId;
+            public readonly long InstanceId;
             public readonly string PropertyPath;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public MainFoldoutCacheKey(int instanceId, string propertyPath)
+            public MainFoldoutCacheKey(long instanceId, string propertyPath)
             {
                 InstanceId = instanceId;
                 PropertyPath = propertyPath;
@@ -6811,7 +6811,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string propertyPath
         )
         {
-            int instanceId =
+            long instanceId =
                 serializedObject?.targetObject != null
                     ? serializedObject.targetObject.GetUnityObjectId()
                     : 0;

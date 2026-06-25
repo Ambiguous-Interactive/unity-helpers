@@ -1047,7 +1047,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         )
             where T : Component
         {
-            HashSet<int> expectedIds = new();
+            HashSet<long> expectedIds = new();
             foreach (T instance in expectedInstances)
             {
                 if (instance != null)
@@ -1079,7 +1079,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         )
             where T : Component
         {
-            HashSet<int> expectedIds = new();
+            HashSet<long> expectedIds = new();
             foreach (T instance in expectedInstances)
             {
                 if (instance != null)

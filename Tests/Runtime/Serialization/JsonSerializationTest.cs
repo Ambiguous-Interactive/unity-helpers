@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void UnityEngineObjectSerializationWorks()
         {
             GameObject testGo = Track(new GameObject("Test GameObject", typeof(SpriteRenderer)));
-            int expectedId = testGo.GetUnityObjectId();
+            long expectedId = testGo.GetUnityObjectId();
             string json = testGo.ToJson();
             Assert.IsFalse(string.IsNullOrWhiteSpace(json), json);
             Assert.AreNotEqual("{}", json);
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.True(root.TryGetProperty("instanceId", out JsonElement id));
             Assert.AreEqual("Test GameObject", name.GetString());
             StringAssert.Contains("UnityEngine.GameObject", type.GetString());
-            Assert.AreEqual(expectedId, id.GetInt32());
+            Assert.AreEqual(expectedId, id.GetInt64());
         }
 
         [UnityEngine.TestTools.UnityTest]

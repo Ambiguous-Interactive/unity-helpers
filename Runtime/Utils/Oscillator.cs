@@ -22,8 +22,24 @@ namespace WallstopStudios.UnityHelpers.Utils
         private void Update()
         {
             float time = Time.time;
-            transform.localPosition =
-                _initialLocalPosition
+            transform.localPosition = CalculateLocalPosition(
+                _initialLocalPosition,
+                time,
+                speed,
+                width,
+                height
+            );
+        }
+
+        internal static Vector3 CalculateLocalPosition(
+            Vector3 initialLocalPosition,
+            float time,
+            float speed,
+            float width,
+            float height
+        )
+        {
+            return initialLocalPosition
                 + new Vector3(Mathf.Cos(time * speed) * width, Mathf.Sin(time * speed) * height);
         }
     }

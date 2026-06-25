@@ -656,7 +656,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     if (!string.IsNullOrEmpty(_suggestion) && _suggestionIndex >= 0)
                     {
                         evt.StopPropagation();
-                        evt.PreventDefault();
                         AcceptSuggestion();
                     }
                     break;
