@@ -553,6 +553,86 @@ runs:
           }
         }
 
+        # HANG-CULPRIT DIAGNOSTIC: the historical PlayMode killer is a single test
+        # (or its setup/teardown) that hangs -- Unity emits no output, the no-output
+        # watchdog tree-kills it, and results.xml is never written. The aggregate
+        # "tests did not run" message names nothing. CiTestResultStreamLogger streams
+        # one `[uh-test-stream] TEST-STARTED <name>` line as each leaf STARTS and one
+        # status line (`Passed|Failed|Skipped|Inconclusive <name> (<dur>s)`) as it
+        # FINISHES. A leaf that started but never finished -- the dangling
+        # TEST-STARTED with no matching status line -- IS the hang. Surface it by name
+        # so the operator (and the next session) sees the exact culprit instead of a
+        # generic stall. Best-effort: never throws, no-ops when no stream lines exist.
+        function Write-UnityHangCulpritDiagnostic {
+          param(
+            [Parameter(Mandatory = $true)][string]$ResultsDir,
+            [Parameter(Mandatory = $true)][string]$Label
+          )
+
+          $startedPattern = '\[uh-test-stream\] TEST-STARTED (.+?)\s*$'
+          $finishedPattern = '\[uh-test-stream\] (?:Passed|Failed|Skipped|Inconclusive) (.+?) \([0-9.]+s\)\s*$'
+          $runBoundaryPattern = '\[uh-test-stream\] RUN-(?:STARTED|FINISHED)'
+
+          # Tests run sequentially in a PlayMode batch run, so track the in-flight
+          # leaf by name: each TEST-STARTED sets it, each finished status clears the
+          # matching one. Whatever is still set after the last stream line is the
+          # leaf that never reported a result -- the hang. A RUN-STARTED / RUN-FINISHED
+          # boundary clears the in-flight name so a test whose finished line was lost to
+          # a mid-run domain reload (the streamer re-registers across reloads, producing
+          # multiple run segments) cannot be falsely blamed in a later segment.
+          $inFlight = $null
+          $started = 0
+          $finished = 0
+          foreach ($logFile in @(Get-UnityDiagnosticLogFiles -ResultsDir $ResultsDir)) {
+            try {
+              foreach ($rawLine in [System.IO.File]::ReadLines($logFile)) {
+                # Strip ANSI color codes so the anchored patterns match regardless of any
+                # terminal coloring a future log capture might introduce (keeps the
+                # started/finished patterns symmetric).
+                $line = $rawLine -replace '\x1b\[[0-9;]*m', ''
+                if ([regex]::IsMatch($line, $runBoundaryPattern)) {
+                  $inFlight = $null
+                  continue
+                }
+                $startMatch = [regex]::Match($line, $startedPattern)
+                if ($startMatch.Success) {
+                  $inFlight = $startMatch.Groups[1].Value
+                  $started++
+                  continue
+                }
+                $finishMatch = [regex]::Match($line, $finishedPattern)
+                if ($finishMatch.Success) {
+                  $finished++
+                  if ($inFlight -eq $finishMatch.Groups[1].Value) {
+                    $inFlight = $null
+                  }
+                }
+              }
+            } catch {
+              # Best-effort diagnostic only.
+            }
+          }
+
+          if ($started -lt 1) {
+            return
+          }
+
+          if ($inFlight) {
+            $hangMessage = @(
+              "::error::$label HANG CULPRIT: '$inFlight' started but never reported a result"
+              "($finished of $started streamed leaves finished). This test (or its"
+              "setup/teardown) hung; the no-output watchdog tree-killed Unity before"
+              "results.xml was written. Reproduce/fix this test -- everything before it passed."
+            ) -join " "
+            Write-Host $hangMessage
+          } else {
+            # Reaching this function means results.xml was missing/zero -- the run DID fail --
+            # so this is a warning, not a benign notice: the stall landed between leaves (e.g. a
+            # mid-run domain reload or framework overhead) rather than inside a single test body.
+            Write-Host "::warning::${label}: $finished of $started streamed leaves finished but no single test was left dangling -- the run aborted BETWEEN leaves (e.g. a mid-run domain reload or setup/teardown stall). Inspect the last finished test above and what runs next."
+          }
+        }
+
         # ALWAYS scan the Unity log for catastrophic patterns first, regardless
         # of which exit branch fires below. The patterns (PrecompiledAssemblyException,
         # CompilationFailedException, error CS####, warning CS8032) are the
@@ -577,6 +657,8 @@ runs:
           # Test-Path block); a second call here would emit duplicate
           # `::error::` annotations for the same hits.
           Write-UnityPackageManagerFailureHints -ResultsDir $dir
+          Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
+          Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
           Write-ProvisioningDiagnosticsHint -ResultsDir $dir
           Write-Host "::error::No NUnit results.xml (with a <test-run> element) under $dir -- tests did not run for $label"
           exit 1
@@ -591,6 +673,7 @@ runs:
         Write-Host "Results: total=$total passed=$passed failed=$failed skipped=$skipped ($($xml.Name))"
         if ($total -lt 1) {
           Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
+          Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
           $zeroCountMessage = @(
             "::error::$label produced zero-count NUnit XML."
             "This can be a failed or aborted Unity run with misleading results.xml,"

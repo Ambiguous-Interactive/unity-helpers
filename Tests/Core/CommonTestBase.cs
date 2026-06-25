@@ -31,6 +31,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </summary>
     public abstract class CommonTestBase
     {
+        /// <summary>
+        /// Upper bound (seconds) for any teardown-time async cleanup wait (tracked async
+        /// disposals, tracked scene unloads). Generous enough never to trip on a healthy
+        /// op (these complete in well under a frame) yet far below the CI no-output
+        /// watchdog window, so a stuck cleanup fails its own test -- and the leg still
+        /// writes results.xml -- instead of stalling the whole run.
+        /// </summary>
+        private const float TrackedDisposalTimeoutSeconds = 30f;
+
         private UnityMainThreadDispatcher.AutoCreationScope _dispatcherScope;
 
         protected readonly List<Object> _trackedObjects = new();
@@ -291,8 +300,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [UnityTearDown]
         public virtual IEnumerator UnityTearDown()
         {
+            // Deferred so the rest of teardown (object destroy, dispatcher-scope dispose,
+            // singleton clear) ALWAYS runs even if a disposal times out -- otherwise a stuck
+            // disposal would leak state into the next test. Surfaced after cleanup, below.
+            string disposalFailure = null;
             if (_trackedAsyncDisposals.Count > 0)
             {
+                // Bounded wait: an async disposal that never completes (e.g. a batchmode
+                // scene op that never signals) MUST NOT hang the leg. A hang produces no
+                // output, the CI watchdog tree-kills Unity, and results.xml is never
+                // written -- so ~thousands of passing tests report as "tests did not run."
+                // A SINGLE total deadline across all disposals bounds the whole teardown wait
+                // (a per-disposal cap could sum past the watchdog window with many disposals).
+                float disposalEndTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
                 foreach (Func<ValueTask> producer in _trackedAsyncDisposals.ToArray())
                 {
                     if (producer == null)
@@ -303,7 +323,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     ValueTask task = producer();
                     while (!task.IsCompleted)
                     {
+                        if (Time.realtimeSinceStartup > disposalEndTime)
+                        {
+                            // Record + abandon the wait; do NOT throw here. The failure is
+                            // surfaced after all cleanup runs so the next test starts clean.
+                            disposalFailure =
+                                "Tracked async disposal did not complete within "
+                                + $"{TrackedDisposalTimeoutSeconds:0.###}s during teardown of "
+                                + $"{TestContext.CurrentContext.Test.FullName}. A disposal that "
+                                + "never completes hangs the whole PlayMode leg (no results.xml); "
+                                + "ensure TrackAsyncDisposal targets complete in batchmode.";
+                            break;
+                        }
                         yield return null;
+                    }
+
+                    if (disposalFailure != null)
+                    {
+                        break;
                     }
                 }
                 _trackedAsyncDisposals.Clear();
@@ -389,6 +426,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                             + $"{TestContext.CurrentContext.Test.FullName}."
                     );
                 }
+            }
+
+            // A tracked async disposal timed out above. All state cleanup has now run
+            // (objects destroyed, dispatcher scope disposed, singletons cleared), so the next
+            // test starts clean; surface the failure for THIS test now -- ahead of the log
+            // reconcile below so the hang root cause is the reported failure.
+            if (disposalFailure != null)
+            {
+                Assert.Fail(disposalFailure);
             }
 
             // Cross-test log-pollution guard (PlayMode only). A synchronous or late-flushed
@@ -715,8 +761,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
+            // Bounded wait: a scene unload that never reports done (a batchmode edge case)
+            // must not hang teardown forever -- that stalls the leg and loses results.xml.
+            // Give up after a generous cap and surface it; the domain/editor tears down
+            // regardless, so a not-yet-unloaded scene at this point is harmless.
+            float endTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
             while (!unload.isDone)
             {
+                if (Time.realtimeSinceStartup > endTime)
+                {
+                    Debug.LogWarning(
+                        $"[uh-leak] Scene '{scene.name}' did not finish unloading within "
+                            + $"{TrackedDisposalTimeoutSeconds:0.###}s; abandoning the wait to "
+                            + "avoid hanging the run."
+                    );
+                    return;
+                }
                 await Task.Yield();
             }
         }

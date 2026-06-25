@@ -44,6 +44,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 return;
             }
 
+            // Drop stack traces for plain Log-level messages while streaming. Each
+            // streamed line is a Debug.Log, and Unity prepends a ~38-frame stack trace
+            // to every Log in batchmode -- with one TEST-STARTED + one status line per
+            // leaf across ~thousands of tests that is the dominant cost of the captured
+            // unity.log (size + the time spent extracting traces). The streamed text
+            // already carries the test name, so the trace is pure noise here. Errors and
+            // warnings KEEP their traces (only LogType.Log is changed), and this is gated
+            // on the CI env var below, so interactive editor sessions are untouched.
+            Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
+
             TestRunnerApi api = ScriptableObject.CreateInstance<TestRunnerApi>(); // UNH-SUPPRESS UNH002: long-lived global callback registrar, not a per-test object
             api.RegisterCallbacks(new StreamingCallbacks());
             Debug.Log($"{Prefix} registered (env {EnableEnvVar}={flag}).");
@@ -58,7 +68,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 );
             }
 
-            public void TestStarted(ITestAdaptor test) { }
+            public void TestStarted(ITestAdaptor test)
+            {
+                // Stream the leaf as it STARTS (not just when it finishes). A test that
+                // begins but never finishes -- a hang/deadlock or a mid-run domain reload --
+                // leaves a TEST-STARTED line with NO matching status line below it. That
+                // dangling TEST-STARTED is the authoritative name of the culprit when the leg
+                // is tree-killed before results.xml is written (the historical PlayMode
+                // total=0 failure mode). Suites are skipped so the signal stays per-leaf.
+                if (test == null || test.IsSuite)
+                {
+                    return;
+                }
+
+                Debug.Log($"{Prefix} TEST-STARTED {test.FullName}");
+            }
 
             public void TestFinished(ITestResultAdaptor result)
             {
