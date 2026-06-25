@@ -1,7 +1,7 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
+#if UNITY_6000_0_OR_NEWER
 #define UNH_HAS_RIGIDBODY2D_LINEAR_VELOCITY
 #endif
 

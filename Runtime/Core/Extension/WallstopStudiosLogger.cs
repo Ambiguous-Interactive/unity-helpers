@@ -34,8 +34,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         );
 
         private static bool ShouldLogOnMainThread =>
-            Equals(Thread.CurrentThread, UnityMainThread)
-            || (UnityMainThread == null && !Application.isPlaying);
+            UnityMainThreadGuard.IsInitialized
+                ? UnityMainThreadGuard.IsMainThread
+                : Equals(Thread.CurrentThread, UnityMainThread)
+                    || (UnityMainThread == null && !Application.isPlaying);
 
         private static Thread UnityMainThread;
         private const int LogsPerCacheClean = 5;
@@ -53,6 +55,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static void InitializeMainThread()
         {
             UnityMainThread = Thread.CurrentThread;
+            UnityMainThreadGuard.Capture(UnityMainThread);
             Disabled.Clear();
         }
 

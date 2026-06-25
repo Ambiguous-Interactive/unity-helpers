@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
-    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -49,16 +48,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(ValueHelpers.IsAssigned(populated));
         }
 
-        [UnityTest]
-        public System.Collections.IEnumerator IsAssignedReturnsFalseForDestroyedUnityObjects()
+        [Test]
+        public void IsAssignedReturnsFalseForDestroyedUnityObjects()
         {
             GameObject go = Track(new GameObject("ValueHelpers_Destroyed"));
             Assert.IsTrue(ValueHelpers.IsAssigned(go));
 
-            Object.Destroy(go); // UNH-SUPPRESS: Test verifies IsAssigned returns false after destruction
-            // Destroy is async in PlayMode; poll until the managed wrapper is actually nulled
-            // instead of assuming a single frame settles it (version/CI-load flaky otherwise).
-            yield return WaitUntilDestroyed(go);
+            Object.DestroyImmediate(go); // UNH-SUPPRESS: Test verifies IsAssigned returns false after destruction
 
             Assert.IsFalse(ValueHelpers.IsAssigned(go));
         }

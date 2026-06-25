@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
@@ -76,6 +76,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 () => Serializer.ProtoDeserialize<AbstractBase>(data),
                 "Deserializing abstract base with multiple derived types should require registration"
             );
+        }
+
+        [ProtoContract]
+        private abstract class RegisteredAbstractBase
+        {
+            [ProtoMember(1)]
+            public int Common { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class RegisteredDerived : RegisteredAbstractBase
+        {
+            [ProtoMember(2)]
+            public string Extra { get; set; }
+        }
+
+        [Test]
+        public void AbstractBaseWithRegisteredRootDeserializes()
+        {
+            RegisteredAbstractBase original = new RegisteredDerived { Common = 12, Extra = "root" };
+            byte[] data = Serializer.ProtoSerialize(original, forceRuntimeType: true);
+
+            Serializer.RegisterProtobufRoot<RegisteredAbstractBase, RegisteredDerived>();
+
+            RegisteredAbstractBase round = Serializer.ProtoDeserialize<RegisteredAbstractBase>(
+                data
+            );
+
+            Assert.IsInstanceOf<RegisteredDerived>(round);
+            RegisteredDerived derived = (RegisteredDerived)round;
+            Assert.AreEqual(12, derived.Common);
+            Assert.AreEqual("root", derived.Extra);
         }
     }
 }

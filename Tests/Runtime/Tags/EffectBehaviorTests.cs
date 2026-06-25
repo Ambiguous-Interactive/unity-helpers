@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Tags
@@ -63,7 +63,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 "OnTick should run after Update."
             );
 
-            yield return new WaitForSeconds(0.08f);
+            yield return WaitForPeriodicInvocations(
+                expectedCount: 1,
+                timeout: 0.5f,
+                checkpoint: "lifecycle periodic tick"
+            );
 
             Assert.AreEqual(
                 1,
@@ -137,7 +141,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             EffectHandle handle = handler.ApplyEffect(effect).Value;
 
-            yield return new WaitForSeconds(0.18f);
+            yield return WaitForPeriodicInvocations(
+                expectedCount: 3,
+                timeout: 0.75f,
+                checkpoint: "three periodic behavior callbacks"
+            );
 
             Assert.AreEqual(
                 3,
@@ -164,6 +172,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             }
 
             handler.RemoveEffect(handle);
+        }
+
+        private static IEnumerator WaitForPeriodicInvocations(
+            int expectedCount,
+            float timeout,
+            string checkpoint
+        )
+        {
+            float elapsed = 0f;
+            while (
+                RecordingEffectBehavior.PeriodicInvocations.Count < expectedCount
+                && elapsed < timeout
+            )
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+
+            Assert.That(
+                RecordingEffectBehavior.PeriodicInvocations.Count,
+                Is.GreaterThanOrEqualTo(expectedCount),
+                $"{checkpoint} not reached within {timeout:F2}s (saw {RecordingEffectBehavior.PeriodicInvocations.Count})."
+            );
         }
 
         private (

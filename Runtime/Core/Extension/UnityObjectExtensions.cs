@@ -1,9 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
-#define UNH_HAS_ENTITY_ID
-#define UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+#if UNITY_6000_4_OR_NEWER
+#define UNH_HAS_ENTITY_ID_TO_ULONG
+#define UNH_HAS_FIND_OBJECTS_BY_TYPE_INACTIVE_ONLY
 #endif
 
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -21,21 +21,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return 0;
             }
 
-#if UNH_HAS_ENTITY_ID
+#if UNH_HAS_ENTITY_ID_TO_ULONG
             return unchecked((long)EntityId.ToULong(unityObject.GetEntityId()));
 #else
             return unityObject.GetInstanceID();
 #endif
         }
 
-        // FindObjectsByType was added in 2022.2 (2021.3.18). Unity exposes only major.minor compile
-        // symbols, so the new API is gated behind UNITY_2022_2_OR_NEWER and the pre-2022.2 fallback
-        // keeps the legacy API (which only emits a deprecation warning on 6000.0+, a version that
-        // always takes the gated branch). Only the includeInactive overloads have callers today.
         internal static T[] FindObjectsOfTypeShim<T>(bool includeInactive)
             where T : Object
         {
-#if UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+#if UNH_HAS_FIND_OBJECTS_BY_TYPE_INACTIVE_ONLY
             return Object.FindObjectsByType<T>(
                 includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude
             );
@@ -51,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         internal static Object[] FindObjectsOfTypeShim(Type type, bool includeInactive)
         {
-#if UNH_HAS_FIND_OBJECTS_BY_TYPE_NO_SORT_MODE
+#if UNH_HAS_FIND_OBJECTS_BY_TYPE_INACTIVE_ONLY
             return Object.FindObjectsByType(
                 type,
                 includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude

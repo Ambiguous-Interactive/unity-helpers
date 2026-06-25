@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Utils
@@ -79,6 +79,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             SpawnedPrefabs.Clear();
         }
+
+#if UNITY_INCLUDE_TESTS
+        internal static void ClearSpawnedPrefabsForTesting()
+        {
+            SpawnedPrefabs.Clear();
+        }
+#endif
 
         private void Awake()
         {

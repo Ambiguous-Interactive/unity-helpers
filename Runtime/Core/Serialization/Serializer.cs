@@ -1894,18 +1894,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return declared;
             }
 
-            // If declared itself is an abstract [ProtoContract] base with [ProtoInclude]s, prefer it
-            if (
-                declared.IsAbstract
-                && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(declared)
-            )
-            {
-                return declared;
-            }
-
             if (ProtobufRootCache.TryGetValue(declared, out Type cached))
             {
                 return cached == NoRootMarker ? null : cached;
+            }
+
+            // If declared itself is an abstract [ProtoContract] base with [ProtoInclude]s, prefer it.
+            // An abstract contract without includes cannot construct a valid root on its own; require
+            // explicit registration instead of letting protobuf-net report version-specific decode errors.
+            if (
+                declared.IsAbstract
+                && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(declared)
+                && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(declared)
+            )
+            {
+                return declared;
             }
 
             // Try to resolve a unique abstract [ProtoContract] base that implements the declared interface.

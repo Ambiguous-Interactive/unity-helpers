@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
@@ -656,7 +656,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             using (ManualResetEventSlim completed = new(false))
             {
-#if ENABLE_UBERLOGGING || DEBUG_LOGGING
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEBUG || ENABLE_UBERLOGGING || DEBUG_LOGGING
                 LogAssert.Expect(LogType.Log, new Regex(".*Background log 1.*"));
 #endif
                 Task.Run(() =>
@@ -682,6 +682,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     yield return null;
                 }
             }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEBUG || ENABLE_UBERLOGGING || DEBUG_LOGGING
+            yield return null;
+#endif
 
             Assert.IsTrue(
                 backgroundException == null,
