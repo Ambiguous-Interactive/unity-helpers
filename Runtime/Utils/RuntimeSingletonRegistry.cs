@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
     using System.Collections.Generic;
+    using System.Text;
     using UnityEngine;
 
     /// <summary>
@@ -14,21 +15,58 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     internal static class RuntimeSingletonRegistry
     {
-        private static readonly HashSet<Action> _clearActions = new();
+        private sealed class RuntimeSingletonRegistration
+        {
+            internal readonly Type type;
+            internal readonly Action clearAction;
+            internal readonly Func<UnityEngine.Object> getCachedInstance;
+            internal readonly Func<UnityEngine.Object[]> findLiveInstances;
+
+            internal RuntimeSingletonRegistration(
+                Type type,
+                Action clearAction,
+                Func<UnityEngine.Object> getCachedInstance,
+                Func<UnityEngine.Object[]> findLiveInstances
+            )
+            {
+                this.type = type;
+                this.clearAction = clearAction;
+                this.getCachedInstance = getCachedInstance;
+                this.findLiveInstances = findLiveInstances;
+            }
+        }
+
+        private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
+            new();
 
         /// <summary>
         /// Registers a clear action for a singleton type.
         /// </summary>
-        internal static void Register(Action clearAction)
+        internal static void Register(
+            Type type,
+            Action clearAction,
+            Func<UnityEngine.Object> getCachedInstance,
+            Func<UnityEngine.Object[]> findLiveInstances
+        )
         {
-            if (clearAction == null)
+            if (
+                type == null
+                || clearAction == null
+                || getCachedInstance == null
+                || findLiveInstances == null
+            )
             {
                 return;
             }
 
-            lock (_clearActions)
+            lock (_registrations)
             {
-                _clearActions.Add(clearAction);
+                _registrations[type] = new RuntimeSingletonRegistration(
+                    type,
+                    clearAction,
+                    getCachedInstance,
+                    findLiveInstances
+                );
             }
         }
 
@@ -44,20 +82,93 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static void ClearAllRegisteredInstances()
         {
-            lock (_clearActions)
+            RuntimeSingletonRegistration[] registrations;
+            lock (_registrations)
             {
-                foreach (Action clearAction in _clearActions)
+                registrations = new RuntimeSingletonRegistration[_registrations.Count];
+                _registrations.Values.CopyTo(registrations, 0);
+            }
+
+            foreach (RuntimeSingletonRegistration registration in registrations)
+            {
+                try
                 {
-                    try
-                    {
-                        clearAction.Invoke();
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogException(ex);
-                    }
+                    registration.clearAction.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
                 }
             }
+        }
+
+        internal static string DescribeLiveInstancesForTesting()
+        {
+            RuntimeSingletonRegistration[] registrations;
+            lock (_registrations)
+            {
+                registrations = new RuntimeSingletonRegistration[_registrations.Count];
+                _registrations.Values.CopyTo(registrations, 0);
+            }
+
+            StringBuilder builder = null;
+            foreach (RuntimeSingletonRegistration registration in registrations)
+            {
+                UnityEngine.Object cachedInstance = null;
+                try
+                {
+                    cachedInstance = registration.getCachedInstance();
+                }
+                catch (Exception ex)
+                {
+                    builder ??= new StringBuilder();
+                    builder.Append(registration.type.FullName);
+                    builder.Append(" cache inspection failed: ");
+                    builder.Append(ex.Message);
+                    builder.AppendLine();
+                }
+
+                UnityEngine.Object[] liveInstances = Array.Empty<UnityEngine.Object>();
+                try
+                {
+                    liveInstances =
+                        registration.findLiveInstances() ?? Array.Empty<UnityEngine.Object>();
+                }
+                catch (Exception ex)
+                {
+                    builder ??= new StringBuilder();
+                    builder.Append(registration.type.FullName);
+                    builder.Append(" live-instance inspection failed: ");
+                    builder.Append(ex.Message);
+                    builder.AppendLine();
+                }
+
+                foreach (UnityEngine.Object liveInstance in liveInstances)
+                {
+                    if (liveInstance == null)
+                    {
+                        continue;
+                    }
+
+                    builder ??= new StringBuilder();
+                    builder.Append(registration.type.FullName);
+                    builder.Append(" '");
+                    builder.Append(liveInstance.name);
+                    builder.Append("'#");
+                    builder.Append(liveInstance.GetInstanceID());
+                    if (liveInstance is Component component && component.gameObject != null)
+                    {
+                        builder.Append(" scene='");
+                        builder.Append(component.gameObject.scene.name);
+                        builder.Append("'");
+                    }
+                    builder.Append(" cached=");
+                    builder.Append(cachedInstance == liveInstance);
+                    builder.AppendLine();
+                }
+            }
+
+            return builder?.ToString().Trim();
         }
     }
 }

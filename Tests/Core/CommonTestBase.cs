@@ -39,6 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// writes results.xml -- instead of stalling the whole run.
         /// </summary>
         private const float TrackedDisposalTimeoutSeconds = 30f;
+        private const int TrackedObjectDestroyMaxFrames = 30;
 
         private UnityMainThreadDispatcher.AutoCreationScope _dispatcherScope;
 
@@ -304,6 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // singleton clear) ALWAYS runs even if a disposal times out -- otherwise a stuck
             // disposal would leak state into the next test. Surfaced after cleanup, below.
             string disposalFailure = null;
+            string trackedObjectFailure = null;
             if (_trackedAsyncDisposals.Count > 0)
             {
                 // Bounded wait: an async disposal that never completes (e.g. a batchmode
@@ -357,8 +359,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     }
 
                     Object.Destroy(obj); // UNH-SUPPRESS: Required for PlayMode test cleanup
+                }
+
+                for (int i = 0; i < TrackedObjectDestroyMaxFrames; i++)
+                {
+                    bool hasLiveObject = false;
+                    foreach (Object obj in snapshot)
+                    {
+                        if (obj != null)
+                        {
+                            hasLiveObject = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasLiveObject)
+                    {
+                        break;
+                    }
+
                     yield return null;
                 }
+
+                List<string> liveTrackedObjects = null;
+                foreach (Object obj in snapshot)
+                {
+                    if (obj == null)
+                    {
+                        continue;
+                    }
+
+                    liveTrackedObjects ??= new List<string>();
+                    liveTrackedObjects.Add(
+                        $"{obj.name} ({obj.GetType().FullName}, instance {obj.GetUnityObjectId()})"
+                    );
+                }
+
+                if (liveTrackedObjects is { Count: > 0 })
+                {
+                    trackedObjectFailure =
+                        $"Tracked object cleanup left {liveTrackedObjects.Count} object(s) alive "
+                        + $"after {TrackedObjectDestroyMaxFrames} frame(s) during teardown of "
+                        + $"{TestContext.CurrentContext.Test.FullName}: "
+                        + string.Join(", ", liveTrackedObjects);
+                }
+
                 _trackedObjects.Clear();
             }
 
@@ -385,6 +430,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             EditorUi.Suppress = _previousEditorUiSuppress;
 #endif
+            string dispatcherFailure = null;
+            if (Application.isPlaying)
+            {
+                dispatcherFailure = DrainUnityMainThreadDispatchersForTeardown();
+                yield return null;
+                string followUpDispatcherFailure = DrainUnityMainThreadDispatchersForTeardown();
+                if (dispatcherFailure == null)
+                {
+                    dispatcherFailure = followUpDispatcherFailure;
+                }
+            }
+
             DisposeDispatcherScope();
 
             // Cross-test singleton-leak guard (PlayMode only). RuntimeSingleton<T> types
@@ -400,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 int dispatcherDestroyFrames = 10;
                 while (
-                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>().Length > 0
+                    UnityMainThreadDispatcher.GetLiveDispatcherCount() > 0
                     && dispatcherDestroyFrames > 0
                 )
                 {
@@ -408,23 +465,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     yield return null;
                 }
 
+                string singletonLeaksBeforeClear =
+                    RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
                 RuntimeSingletonRegistry.ClearAllRegisteredInstances();
+                int singletonDestroyFrames = TrackedObjectDestroyMaxFrames;
+                string singletonLeaksAfterClear =
+                    RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+                while (
+                    !string.IsNullOrWhiteSpace(singletonLeaksAfterClear)
+                    && singletonDestroyFrames > 0
+                )
+                {
+                    singletonDestroyFrames--;
+                    yield return null;
+                    singletonLeaksAfterClear =
+                        RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+                }
+
+                if (!string.IsNullOrWhiteSpace(singletonLeaksAfterClear))
+                {
+                    dispatcherFailure ??=
+                        "[uh-leak] RuntimeSingleton object(s) still resident after registry "
+                        + "cleanup during teardown of "
+                        + $"{TestContext.CurrentContext.Test.FullName}. Before cleanup: "
+                        + $"{singletonLeaksBeforeClear}. After cleanup: {singletonLeaksAfterClear}";
+                }
+
+                dispatcherDestroyFrames = 10;
+                while (
+                    UnityMainThreadDispatcher.GetLiveDispatcherCount() > 0
+                    && dispatcherDestroyFrames > 0
+                )
+                {
+                    dispatcherDestroyFrames--;
+                    yield return null;
+                }
 
                 // Leak diagnostic: a UnityMainThreadDispatcher still resident after the scope tore
                 // down + the registry cleared means a leak the cleanup could not reach (an orphaned
                 // duplicate). Surface it as one [uh-leak] line naming the just-finished test so a
-                // regression self-identifies in unity.log (like the test streamer does for [Error]s)
-                // without failing the run. FindObjectsOfTypeAll over this one type is cheap.
-                int residentDispatchers = Resources
-                    .FindObjectsOfTypeAll<UnityMainThreadDispatcher>()
-                    .Length;
+                // regression self-identifies in unity.log and fails the producer test instead of a
+                // later bystander.
+                int residentDispatchers = UnityMainThreadDispatcher.GetLiveDispatcherCount();
                 if (residentDispatchers > 0)
                 {
-                    Debug.LogWarning(
+                    dispatcherFailure ??=
                         $"[uh-leak] {residentDispatchers} UnityMainThreadDispatcher object(s) "
-                            + $"still resident after teardown of "
-                            + $"{TestContext.CurrentContext.Test.FullName}."
-                    );
+                        + "still resident after teardown of "
+                        + $"{TestContext.CurrentContext.Test.FullName}. "
+                        + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
                 }
             }
 
@@ -437,6 +526,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Assert.Fail(disposalFailure);
             }
 
+            if (trackedObjectFailure != null)
+            {
+                Assert.Fail(trackedObjectFailure);
+            }
+
+            if (dispatcherFailure != null)
+            {
+                Assert.Fail(dispatcherFailure);
+            }
+
             // Cross-test log-pollution guard (PlayMode only). A synchronous or late-flushed
             // [Error] otherwise bleeds across the frame boundary into the NEXT test's scope, so
             // an innocent later test fails for an error this (or an earlier) fixture produced.
@@ -447,7 +546,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // is scoped to PlayMode to keep the green EditMode legs untouched.
             if (Application.isPlaying)
             {
+                DrainUnityMainThreadDispatchersForTeardown();
                 yield return null;
+                DrainUnityMainThreadDispatchersForTeardown();
                 LogAssert.NoUnexpectedReceived();
             }
         }
@@ -726,7 +827,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             DisposeDispatcherScope();
-            UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
         }
 
         private void InitializeDispatcherScope()
@@ -746,6 +846,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             _dispatcherScope.Dispose();
             _dispatcherScope = null;
+        }
+
+        private static string DrainUnityMainThreadDispatchersForTeardown()
+        {
+            const int MaxDrainPasses = 8;
+            for (int i = 0; i < MaxDrainPasses; i++)
+            {
+                int pendingActionCount =
+                    UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+                if (pendingActionCount <= 0)
+                {
+                    return null;
+                }
+
+                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+            }
+
+            int remainingPendingActionCount =
+                UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+            if (remainingPendingActionCount <= 0)
+            {
+                return null;
+            }
+
+            return $"[uh-leak] {remainingPendingActionCount} UnityMainThreadDispatcher action(s) "
+                + "remained queued after teardown drain of "
+                + $"{TestContext.CurrentContext.Test.FullName}. "
+                + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
         }
 
         private static async ValueTask UnloadSceneAsync(Scene scene)

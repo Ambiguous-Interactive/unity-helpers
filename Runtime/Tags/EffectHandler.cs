@@ -49,6 +49,8 @@ namespace WallstopStudios.UnityHelpers.Tags
     [RequireComponent(typeof(TagHandler))]
     public sealed class EffectHandler : MonoBehaviour
     {
+        private const int MaxPeriodicCatchUpTicksPerUpdate = 32;
+
         /// <summary>
         /// Invoked when an effect is successfully applied.
         /// </summary>
@@ -1143,13 +1145,22 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void ProcessPeriodicEffects()
         {
+            _ = ProcessPeriodicEffects(Time.time, Time.deltaTime);
+        }
+
+        internal int ProcessPeriodicEffectsForTesting(float currentTime, float deltaTime)
+        {
+            return ProcessPeriodicEffects(currentTime, deltaTime);
+        }
+
+        private int ProcessPeriodicEffects(float currentTime, float deltaTime)
+        {
             if (_periodicEffectStates.Count <= 0)
             {
-                return;
+                return 0;
             }
 
-            float currentTime = Time.time;
-            float deltaTime = Time.deltaTime;
+            int consumedTicks = 0;
             using PooledResource<List<long>> periodicRemovalResource = Buffers<long>.List.Get(
                 out List<long> periodicRemovalBuffer
             );
@@ -1186,8 +1197,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                         continue;
                     }
 
-                    while (runtimeState.TryConsumeTick(currentTime))
+                    int consumedTicksThisUpdate = 0;
+                    while (
+                        consumedTicksThisUpdate < MaxPeriodicCatchUpTicksPerUpdate
+                        && runtimeState.TryConsumeTick(currentTime)
+                    )
                     {
+                        consumedTicksThisUpdate++;
+                        consumedTicks++;
                         ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
                     }
 
@@ -1215,6 +1232,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     RecyclePeriodicStateList(lease);
                 }
             }
+
+            return consumedTicks;
         }
     }
 }

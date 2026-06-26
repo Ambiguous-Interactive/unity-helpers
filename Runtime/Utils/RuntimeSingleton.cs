@@ -57,7 +57,12 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         static RuntimeSingleton()
         {
-            RuntimeSingletonRegistry.Register(ClearInstance);
+            RuntimeSingletonRegistry.Register(
+                typeof(T),
+                ClearInstance,
+                () => _instance,
+                () => Resources.FindObjectsOfTypeAll<T>()
+            );
         }
 
         /// <summary>

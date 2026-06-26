@@ -151,6 +151,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void RegistryDescribesLiveSingletonInstancesBeforeClear()
+        {
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            Track(instance.gameObject);
+
+            string description = RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+
+            StringAssert.Contains(nameof(TestRuntimeSingleton), description);
+            StringAssert.Contains(instance.name, description);
+        }
+
+        [Test]
         public void InstanceReturnsSameObjectOnMultipleAccesses()
         {
             TestRuntimeSingleton instance1 = TestRuntimeSingleton.Instance;

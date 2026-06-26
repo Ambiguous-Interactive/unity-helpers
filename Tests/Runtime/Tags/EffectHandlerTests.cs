@@ -640,6 +640,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
+        public IEnumerator PeriodicEffectCatchUpIsBoundedPerUpdate()
+        {
+            (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
+
+            AttributeEffect effect = CreateEffect(
+                "PeriodicCatchUpCap",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    PeriodicEffectDefinition definition = new() { interval = 0.01f, maxTicks = 0 };
+                    definition.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = -1f,
+                        }
+                    );
+                    e.periodicEffects.Add(definition);
+                }
+            );
+
+            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            float overdueTime = Time.time + 10f;
+
+            int firstCatchUpTicks = handler.ProcessPeriodicEffectsForTesting(
+                overdueTime,
+                deltaTime: 10f
+            );
+            Assert.AreEqual(32, firstCatchUpTicks);
+            Assert.AreEqual(32, attributes.notifications.Count);
+            Assert.AreEqual(68f, attributes.health.CurrentValue, 0.01f);
+
+            int secondCatchUpTicks = handler.ProcessPeriodicEffectsForTesting(
+                overdueTime,
+                deltaTime: 0f
+            );
+            Assert.AreEqual(32, secondCatchUpTicks);
+            Assert.AreEqual(64, attributes.notifications.Count);
+            Assert.AreEqual(36f, attributes.health.CurrentValue, 0.01f);
+
+            handler.RemoveEffect(handle);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator MultiplePeriodicDefinitionsAffectAttributesIndependently()
         {
             (
@@ -693,15 +739,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             EffectHandle handle = handler.ApplyEffect(effect).Value;
 
-            yield return new WaitForSeconds(0.06f);
-            Assert.AreEqual(95f, attributes.health.CurrentValue, 0.01f);
-            Assert.AreEqual(51f, attributes.armor.CurrentValue, 0.01f);
+            yield return WaitForAttributeNotifications(
+                attributes,
+                expectedCount: 5,
+                timeout: 0.75f,
+                checkpoint: "all independent periodic ticks"
+            );
 
-            yield return new WaitForSeconds(0.1f);
-            Assert.AreEqual(90f, attributes.health.CurrentValue, 0.01f);
-            Assert.AreEqual(52f, attributes.armor.CurrentValue, 0.01f);
+            int healthTicks = 0;
+            int armorTicks = 0;
+            foreach ((string attribute, _, _) in attributes.notifications)
+            {
+                if (attribute == nameof(TestAttributesComponent.health))
+                {
+                    healthTicks++;
+                }
+                else if (attribute == nameof(TestAttributesComponent.armor))
+                {
+                    armorTicks++;
+                }
+            }
 
-            yield return new WaitForSeconds(0.2f);
+            Assert.AreEqual(2, healthTicks);
+            Assert.AreEqual(3, armorTicks);
             Assert.AreEqual(90f, attributes.health.CurrentValue, 0.01f);
             Assert.AreEqual(53f, attributes.armor.CurrentValue, 0.01f);
 

@@ -370,6 +370,22 @@ if yes, demote the producer to `Warning` (deterministic) rather than papering ov
 
 ---
 
+## PlayMode: own dispatcher, singleton, and timing state
+
+Full-suite PlayMode runs share one editor domain, so static runtime state and queued main-thread work
+can fail an unrelated later test. Apply these rules when writing or changing PlayMode tests:
+
+- Track every `RuntimeSingleton<T>.Instance` GameObject created by the test, or clear it through a
+  helper that waits for deferred PlayMode destruction to complete. Do not leave singleton cleanup to a
+  later fixture.
+- If a test queues work through `UnityMainThreadDispatcher`, yield or drain until the queue is empty,
+  then call `LogAssert.NoUnexpectedReceived()` before returning when the queued work can log.
+- Do not assert periodic/time-based behavior at exact `WaitForSeconds` cutoffs. Wait for observable
+  state transitions or notification counts, then assert final state. Real-time sleeps can resume late
+  under CI load and observe a later tick than the test expected.
+
+---
+
 ## Adding New Test Base Classes
 
 If you create a new abstract test base class that inherits from `CommonTestBase`, you need to update the lint script to recognize it:

@@ -49,3 +49,7 @@ jobs:
       - name: Lint workflow run-expression length
         shell: pwsh
         run: ./scripts/lint-workflow-run-expression-length.ps1 -VerboseOutput
+
+      - name: Test Unity workflow matrix contract
+        shell: pwsh
+        run: ./scripts/tests/test-unity-workflow-matrix-contract.ps1 -VerboseOutput

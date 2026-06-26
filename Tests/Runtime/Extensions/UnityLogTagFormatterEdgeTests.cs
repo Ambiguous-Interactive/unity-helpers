@@ -140,33 +140,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ExceptionLoggingFormatsOutput()
         {
             UnityLogTagFormatter formatter = new();
-            Exception testException = new("Boom");
+            string message = nameof(ExceptionLoggingFormatsOutput);
+            Exception testException = new($"{nameof(ExceptionLoggingFormatsOutput)}Boom");
 
-            LogAssert.Expect(LogType.Log, new Regex("(?s).*Hello.*Boom.*"));
-            string logged = formatter.Log($"Hello", context: null, e: testException, pretty: true);
+            LogAssert.Expect(LogType.Log, new Regex($"(?s).*{message}.*{testException.Message}.*"));
+            string logged = formatter.Log(
+                $"{message}Log",
+                context: null,
+                e: testException,
+                pretty: true
+            );
             Assert.IsTrue(logged.Contains("NO_NAME[NO_TYPE]"), logged);
-            Assert.IsTrue(logged.Contains("Hello"), logged);
-            Assert.IsTrue(logged.Contains("Boom"), logged);
+            Assert.IsTrue(logged.Contains($"{message}Log"), logged);
+            Assert.IsTrue(logged.Contains(testException.Message), logged);
 
-            LogAssert.Expect(LogType.Warning, new Regex("(?s).*Hello.*Boom.*"));
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex($"(?s).*{message}.*{testException.Message}.*")
+            );
             string warned = formatter.LogWarn(
-                $"Hello",
+                $"{message}Warning",
                 context: null,
                 e: testException,
                 pretty: false
             );
-            Assert.IsTrue(warned.Contains("Hello"), warned);
-            Assert.IsTrue(warned.Contains("Boom"), warned);
+            Assert.IsTrue(warned.Contains($"{message}Warning"), warned);
+            Assert.IsTrue(warned.Contains(testException.Message), warned);
 
-            LogAssert.Expect(LogType.Error, new Regex("(?s).*Hello.*Boom.*"));
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex($"(?s).*{message}.*{testException.Message}.*")
+            );
             string errored = formatter.LogError(
-                $"Hello",
+                $"{message}Error",
                 context: null,
                 e: testException,
                 pretty: false
             );
-            Assert.IsTrue(errored.Contains("Hello"), errored);
-            Assert.IsTrue(errored.Contains("Boom"), errored);
+            Assert.IsTrue(errored.Contains($"{message}Error"), errored);
+            Assert.IsTrue(errored.Contains(testException.Message), errored);
+
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]

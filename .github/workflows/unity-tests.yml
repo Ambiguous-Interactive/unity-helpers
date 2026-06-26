@@ -554,7 +554,7 @@ jobs:
   # job (instead of erroring on an empty matrix) for single-mode dispatch pins,
   # which run entirely in the fast tier.
   unity-tests-standalone:
-    name: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+    name: Unity standalone (gated)
     needs:
       - matrix-config
       - runner-preflight

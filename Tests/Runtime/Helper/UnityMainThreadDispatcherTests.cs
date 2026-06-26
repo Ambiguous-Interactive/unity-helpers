@@ -51,6 +51,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
+        public IEnumerator DrainPendingActionsForTestingExecutesQueuedActions()
+        {
+            UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
+            int executionCount = 0;
+
+            dispatcher.RunOnMainThread(() => executionCount++);
+
+            Assert.AreEqual(1, UnityMainThreadDispatcher.GetPendingActionCountForTesting());
+
+            int remainingPendingActions = UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+
+            Assert.AreEqual(0, remainingPendingActions);
+            Assert.AreEqual(1, executionCount);
+
+            yield return null;
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest]
         public IEnumerator StartSceneOnlyOneInstance()
         {
             int sceneCount = SceneManager.sceneCountInBuildSettings;

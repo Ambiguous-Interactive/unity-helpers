@@ -488,6 +488,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         private static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
+        private static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
         private static readonly Type NoRootMarker = typeof(void);
 
         // Centralized decision logic for protobuf runtime vs declared handling
@@ -1288,9 +1289,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            if (ProtobufRootCache.TryGetValue(declared, out Type existing))
+            if (ExplicitProtobufRootCache.TryGetValue(declared, out Type existing))
             {
-                if (existing != root && existing != NoRootMarker)
+                if (existing != root)
                 {
                     throw new InvalidOperationException(
                         $"A different root {existing.FullName} is already registered for {declared.FullName}"
@@ -1298,7 +1299,29 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
+            ExplicitProtobufRootCache[declared] = root;
             ProtobufRootCache[declared] = root;
+        }
+
+        internal static void ClearProtobufRootCacheForTesting(params Type[] declaredTypes)
+        {
+            if (declaredTypes == null || declaredTypes.Length == 0)
+            {
+                ProtobufRootCache.Clear();
+                ExplicitProtobufRootCache.Clear();
+                return;
+            }
+
+            foreach (Type declaredType in declaredTypes)
+            {
+                if (declaredType == null)
+                {
+                    continue;
+                }
+
+                ProtobufRootCache.TryRemove(declaredType, out _);
+                ExplicitProtobufRootCache.TryRemove(declaredType, out _);
+            }
         }
 
         /// <summary>
@@ -1894,6 +1917,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return declared;
             }
 
+            if (ExplicitProtobufRootCache.TryGetValue(declared, out Type explicitRoot))
+            {
+                return explicitRoot;
+            }
+
             if (ProtobufRootCache.TryGetValue(declared, out Type cached))
             {
                 return cached == NoRootMarker ? null : cached;
@@ -1930,6 +1958,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                             && t.IsAbstract
                             && declared.IsAssignableFrom(t)
                             && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(t)
+                            && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t)
                         )
                         {
                             candidates.Add(t);

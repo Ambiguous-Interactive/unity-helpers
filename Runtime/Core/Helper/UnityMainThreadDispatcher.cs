@@ -82,6 +82,83 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return true;
         }
 
+        internal static int GetLiveDispatcherCount()
+        {
+            return Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>().Length;
+        }
+
+        internal static int GetPendingActionCountForTesting()
+        {
+            int pendingActionCount = 0;
+            UnityMainThreadDispatcher[] dispatchers =
+                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            foreach (UnityMainThreadDispatcher dispatcher in dispatchers)
+            {
+                if (dispatcher == null)
+                {
+                    continue;
+                }
+
+                pendingActionCount += dispatcher.PendingActionCount;
+            }
+
+            return pendingActionCount;
+        }
+
+        internal static int DrainPendingActionsForTesting(int maxActions = 1024)
+        {
+            int remainingActionBudget = Math.Max(1, maxActions);
+            UnityMainThreadDispatcher[] dispatchers =
+                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            foreach (UnityMainThreadDispatcher dispatcher in dispatchers)
+            {
+                if (dispatcher == null || dispatcher.PendingActionCount <= 0)
+                {
+                    continue;
+                }
+
+                while (
+                    remainingActionBudget > 0 && dispatcher._actions.TryDequeue(out Action action)
+                )
+                {
+                    remainingActionBudget--;
+                    dispatcher.ExecuteQueuedAction(action);
+                }
+            }
+
+            return GetPendingActionCountForTesting();
+        }
+
+        internal static string DescribeLiveDispatchersForTesting()
+        {
+            UnityMainThreadDispatcher[] dispatchers =
+                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            if (dispatchers.Length == 0)
+            {
+                return "No dispatchers found.";
+            }
+
+            string[] descriptions = new string[dispatchers.Length];
+            for (int i = 0; i < dispatchers.Length; i++)
+            {
+                UnityMainThreadDispatcher dispatcher = dispatchers[i];
+                if (dispatcher == null)
+                {
+                    descriptions[i] = "null";
+                    continue;
+                }
+
+                GameObject dispatcherObject = dispatcher.gameObject;
+                string sceneName = dispatcherObject == null ? "null" : dispatcherObject.scene.name;
+                descriptions[i] =
+                    $"{dispatcher.name}#{dispatcher.GetUnityObjectId()} scene='{sceneName}' "
+                    + $"active={dispatcherObject != null && dispatcherObject.activeInHierarchy} "
+                    + $"pending={dispatcher.PendingActionCount}";
+            }
+
+            return string.Join(", ", descriptions);
+        }
+
 #if UNITY_EDITOR
         private readonly EditorApplication.CallbackFunction _update;
         private bool _attachedEditorUpdate;
@@ -539,18 +616,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             while (_actions.TryDequeue(out Action action))
             {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _pendingActionCount);
-                }
+                ExecuteQueuedAction(action);
+            }
+        }
+
+        private void ExecuteQueuedAction(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingActionCount);
             }
         }
 

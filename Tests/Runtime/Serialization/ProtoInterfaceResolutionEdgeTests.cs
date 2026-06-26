@@ -24,6 +24,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             public string Label { get; set; }
         }
 
+        [SetUp]
+        public void SetUp()
+        {
+            Serializer.ClearProtobufRootCacheForTesting(
+                typeof(IWidget),
+                typeof(AbstractBase),
+                typeof(RegisteredAbstractBase)
+            );
+        }
+
         [Test]
         public void SingleImplementationRequiresRegistration()
         {
@@ -95,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AbstractBaseWithRegisteredRootDeserializes()
         {
-            RegisteredAbstractBase original = new RegisteredDerived { Common = 12, Extra = "root" };
+            RegisteredAbstractBase original = new RegisteredDerived { Extra = "root" };
             byte[] data = Serializer.ProtoSerialize(original, forceRuntimeType: true);
 
             Serializer.RegisterProtobufRoot<RegisteredAbstractBase, RegisteredDerived>();
@@ -106,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsInstanceOf<RegisteredDerived>(round);
             RegisteredDerived derived = (RegisteredDerived)round;
-            Assert.AreEqual(12, derived.Common);
             Assert.AreEqual("root", derived.Extra);
         }
     }

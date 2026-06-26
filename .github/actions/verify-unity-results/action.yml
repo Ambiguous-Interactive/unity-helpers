@@ -629,7 +629,13 @@ runs:
             # Reaching this function means results.xml was missing/zero -- the run DID fail --
             # so this is a warning, not a benign notice: the stall landed between leaves (e.g. a
             # mid-run domain reload or framework overhead) rather than inside a single test body.
-            Write-Host "::warning::${label}: $finished of $started streamed leaves finished but no single test was left dangling -- the run aborted BETWEEN leaves (e.g. a mid-run domain reload or setup/teardown stall). Inspect the last finished test above and what runs next."
+            $betweenLeavesMessage = @(
+              "::warning::${label}: $finished of $started streamed leaves finished but"
+              "no single test was left dangling -- the run aborted BETWEEN leaves"
+              "(e.g. a mid-run domain reload or setup/teardown stall). Inspect the"
+              "last finished test above and what runs next."
+            ) -join " "
+            Write-Host $betweenLeavesMessage
           }
         }
 

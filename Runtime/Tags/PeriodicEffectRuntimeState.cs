@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             ++ExecutedTicks;
-            NextTickTime = currentTime + interval;
+            NextTickTime += interval;
             return true;
         }
     }
