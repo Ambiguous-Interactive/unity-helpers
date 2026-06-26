@@ -133,6 +133,13 @@ else
 fi
 
 run_test
+if grep -q -- '--find-copies-harder' "$AUDIT_SCRIPT" && grep -q 'diff.renameLimit=999999' "$AUDIT_SCRIPT"; then
+    pass "Full audit primes cache with copy-aware history"
+else
+    fail "Full audit primes cache with copy-aware history" "--find-copies-harder and diff.renameLimit=999999" "not found"
+fi
+
+run_test
 if grep -q "git ls-files -z -- '\\*.cs'" "$REPO_ROOT/scripts/update-license-headers.sh"; then
     pass "License header updater enumerates tracked C# files through git ls-files"
 else
@@ -189,6 +196,76 @@ if [ -n "$CS_FILE" ]; then
 else
     fail "Cache creation" "found .cs file" "no .cs files in repo"
 fi
+
+run_test
+if [ -n "$CS_FILE" ]; then
+    TMP_PARENT=$(mktemp -d)
+    TMP_WORKTREE="$TMP_PARENT/worktree"
+    if git worktree add -q "$TMP_WORKTREE" HEAD >/dev/null 2>&1; then
+        cp "$AUDIT_SCRIPT" "$TMP_WORKTREE/scripts/audit-license-years.sh"
+        expected_year=$(git -C "$TMP_WORKTREE" log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$CS_FILE" | tail -1)
+        if [ -z "$expected_year" ]; then
+            expected_year=$(date +%Y)
+        elif [ "$expected_year" -lt 2023 ]; then
+            expected_year=2023
+        fi
+
+        wrong_year=2026
+        if [ "$expected_year" = "$wrong_year" ]; then
+            wrong_year=2025
+        fi
+
+        sed -i -E "1s/Copyright \\(c\\) [0-9]{4}/Copyright (c) $wrong_year/" "$TMP_WORKTREE/$CS_FILE"
+        set +e
+        summary_output=$(bash "$TMP_WORKTREE/scripts/audit-license-years.sh" --summary --paths "$CS_FILE" 2>&1)
+        summary_status=$?
+        set -e
+        if [ "$summary_status" -ne 0 ] &&
+            echo "$summary_output" | grep -Fq "Mismatched files:" &&
+            echo "$summary_output" | grep -Fq "$CS_FILE: has $wrong_year, expected $expected_year"; then
+            pass "Summary mode reports mismatched files"
+        else
+            fail "Summary mode reports mismatched files" "$CS_FILE mismatch details" "$summary_output"
+        fi
+        git worktree remove -f "$TMP_WORKTREE" >/dev/null 2>&1 || true
+    else
+        fail "Summary mode reports mismatched files" "temporary linked worktree" "git worktree add failed"
+    fi
+    rm -rf "$TMP_PARENT"
+else
+    fail "Summary mode diagnostics" "found .cs file" "no .cs files in repo"
+fi
+
+run_test
+TMP_COPY_REPO=$(mktemp -d)
+mkdir -p "$TMP_COPY_REPO/scripts" "$TMP_COPY_REPO/Runtime"
+cp "$AUDIT_SCRIPT" "$TMP_COPY_REPO/scripts/audit-license-years.sh"
+git -C "$TMP_COPY_REPO" init -q
+git -C "$TMP_COPY_REPO" config user.email "test@example.com"
+git -C "$TMP_COPY_REPO" config user.name "License Cache Test"
+cat > "$TMP_COPY_REPO/Runtime/Source.cs" <<'EOF_SOURCE'
+// MIT License - Copyright (c) 2023 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+public sealed class Source {}
+EOF_SOURCE
+git -C "$TMP_COPY_REPO" add Runtime/Source.cs scripts/audit-license-years.sh
+GIT_AUTHOR_DATE='2023-01-01T00:00:00Z' GIT_COMMITTER_DATE='2023-01-01T00:00:00Z' \
+    git -C "$TMP_COPY_REPO" commit -q -m 'Add source'
+cp "$TMP_COPY_REPO/Runtime/Source.cs" "$TMP_COPY_REPO/Runtime/Copied.cs"
+git -C "$TMP_COPY_REPO" add Runtime/Copied.cs
+GIT_AUTHOR_DATE='2025-01-01T00:00:00Z' GIT_COMMITTER_DATE='2025-01-01T00:00:00Z' \
+    git -C "$TMP_COPY_REPO" commit -q -m 'Copy source'
+set +e
+copy_output=$(bash "$TMP_COPY_REPO/scripts/audit-license-years.sh" --summary 2>&1)
+copy_status=$?
+set -e
+if [ "$copy_status" -eq 0 ] && echo "$copy_output" | grep -Fq "Matched years:          2"; then
+    pass "Full audit preserves copied file creation years"
+else
+    fail "Full audit preserves copied file creation years" "copy-aware full audit passes" "$copy_output"
+fi
+rm -rf "$TMP_COPY_REPO"
 
 run_test
 if [ -n "$CS_FILE" ]; then

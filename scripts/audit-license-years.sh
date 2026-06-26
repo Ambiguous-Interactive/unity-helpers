@@ -79,6 +79,7 @@ elif [[ "$CACHE_FILE" != /* ]]; then
 fi
 declare -A year_cache=()
 cache_dirty=false
+declare -a tracked_csharp_files=()
 
 # Load cache into associative array
 load_cache() {
@@ -117,6 +118,7 @@ no_git_history_files=0
 
 # Arrays for mismatches
 declare -a mismatch_list=()
+declare -a missing_header_list=()
 
 # Extract year from copyright header
 get_header_year() {
@@ -169,7 +171,7 @@ get_git_creation_year() {
     local rel="$1"
 
     # Check cache first
-    if [[ "$USE_CACHE" == true && -n "${year_cache[$rel]+_}" ]]; then
+    if [[ -n "${year_cache[$rel]+_}" ]]; then
         _git_year="${year_cache[$rel]}"
         return
     fi
@@ -182,6 +184,86 @@ get_git_creation_year() {
         year_cache["$rel"]="$_git_year"
         cache_dirty=true
     fi
+}
+
+load_tracked_csharp_files() {
+    tracked_csharp_files=()
+    while IFS= read -r -d '' file; do
+        tracked_csharp_files+=("$file")
+    done < <(git ls-files -z -- '*.cs' | sort -z)
+}
+
+prime_git_creation_year_cache() {
+    local missing_count=0
+    local rel
+    for rel in "${tracked_csharp_files[@]}"; do
+        if [[ -z "${year_cache[$rel]+_}" ]]; then
+            missing_count=$((missing_count + 1))
+        fi
+    done
+
+    if [[ "$missing_count" -eq 0 ]]; then
+        return
+    fi
+
+    declare -A history_years=()
+    local history_year=""
+    local line
+    local status
+    local first_path
+    local second_path
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^YEAR:([0-9]{4})$ ]]; then
+            history_year="${BASH_REMATCH[1]}"
+            continue
+        fi
+
+        if [[ -z "$line" ]]; then
+            continue
+        fi
+
+        IFS=$'\t' read -r status first_path second_path <<< "$line"
+        case "$status" in
+            A*)
+                history_years["$first_path"]="$history_year"
+                ;;
+            C*)
+                if [[ -n "${history_years[$first_path]+_}" ]]; then
+                    history_years["$second_path"]="${history_years[$first_path]}"
+                else
+                    history_years["$second_path"]="$history_year"
+                fi
+                ;;
+            R*)
+                if [[ -n "${history_years[$first_path]+_}" ]]; then
+                    history_years["$second_path"]="${history_years[$first_path]}"
+                    unset "history_years[$first_path]"
+                else
+                    history_years["$second_path"]="$history_year"
+                fi
+                ;;
+            D*)
+                unset "history_years[$first_path]"
+                ;;
+        esac
+    done < <(
+        git -c diff.renameLimit=999999 log \
+            --reverse \
+            --name-status \
+            --diff-filter=ACRD \
+            --format='YEAR:%ad' \
+            --date=format:%Y \
+            --find-renames \
+            --find-copies-harder
+    )
+
+    for rel in "${tracked_csharp_files[@]}"; do
+        if [[ -n "${history_years[$rel]+_}" ]]; then
+            year_cache["$rel"]="${history_years[$rel]}"
+            cache_dirty=true
+        fi
+    done
 }
 
 # Print CSV header if in CSV mode
@@ -200,6 +282,7 @@ audit_file() {
 
     if [[ -z "$header_year" ]]; then
         ((missing_header_files++)) || true
+        missing_header_list+=("$rel_path")
         if [[ "$OUTPUT_MODE" == "csv" ]]; then
             echo "$rel_path,MISSING,N/A,missing_header"
         elif [[ "$OUTPUT_MODE" == "default" ]]; then
@@ -272,9 +355,11 @@ if [[ "$PATHS_MODE" == true ]]; then
 else
     # Full scan: only tracked .cs files. Ignored local worktrees must never
     # affect repository validation.
-    while IFS= read -r -d '' file; do
+    load_tracked_csharp_files
+    prime_git_creation_year_cache
+    for file in "${tracked_csharp_files[@]}"; do
         audit_file "$file"
-    done < <(git ls-files -z -- '*.cs' | sort -z)
+    done
 fi
 
 # Print summary
@@ -291,6 +376,20 @@ if [[ "$OUTPUT_MODE" != "csv" ]]; then
     if [[ $mismatched_files -gt 0 || $missing_header_files -gt 0 ]]; then
         needs_update=$((mismatched_files + missing_header_files))
         echo "Files needing update: $needs_update"
+        if [[ ${#mismatch_list[@]} -gt 0 ]]; then
+            echo ""
+            echo "Mismatched files:"
+            for mismatch in "${mismatch_list[@]}"; do
+                echo "  $mismatch"
+            done
+        fi
+        if [[ ${#missing_header_list[@]} -gt 0 ]]; then
+            echo ""
+            echo "Missing header files:"
+            for missing_header in "${missing_header_list[@]}"; do
+                echo "  $missing_header"
+            done
+        fi
         exit 1
     else
         echo "All files have correct copyright years!"

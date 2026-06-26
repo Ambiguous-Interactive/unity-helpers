@@ -28,5 +28,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Audit license years
+      - name: Audit license years for pull request changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mapfile -d '' -t audit_inputs < <(
+            git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- \
+              "LICENSE" \
+              "scripts/audit-license-years.sh" \
+              ".github/workflows/license-year-audit.yml"
+          )
+          if ((${#audit_inputs[@]} > 0)); then
+            echo "License audit inputs changed; running full repository audit."
+            bash scripts/audit-license-years.sh --summary
+            exit
+          fi
+
+          mapfile -d '' -t changed_csharp_files < <(
+            git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- "*.cs"
+          )
+          if ((${#changed_csharp_files[@]} == 0)); then
+            echo "No changed C# files to audit."
+            exit 0
+          fi
+
+          echo "Auditing ${#changed_csharp_files[@]} changed C# file(s)."
+          bash scripts/audit-license-years.sh --summary --paths "${changed_csharp_files[@]}"
+
+      - name: Audit license years for repository
+        if: github.event_name != 'pull_request'
         run: bash scripts/audit-license-years.sh --summary
