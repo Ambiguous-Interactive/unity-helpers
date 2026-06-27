@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Core
@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             string diagnostic = RunLeakGuardSweepForTests();
 
-            Assert.IsNotNull(diagnostic, "sweep should detect the untracked leak");
+            Assert.IsTrue(diagnostic != null, "sweep should detect the untracked leak");
             StringAssert.Contains("UH_DeliberateLeakCanary", diagnostic);
             StringAssert.Contains("[uh-leak]", diagnostic);
 
@@ -65,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             string diagnostic = RunLeakGuardSweepForTests();
 
-            Assert.IsNull(diagnostic, "objects present at the baseline must not be swept");
+            Assert.IsTrue(diagnostic == null, "objects present at the baseline must not be swept");
             Assert.IsFalse(kept == null, "baseline object must survive the sweep");
             yield return null;
         }
