@@ -3,7 +3,6 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
-    using System.Collections;
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
@@ -16,8 +15,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class ValidateAssignmentAttributeTests : CommonTestBase
     {
-        [UnityTest]
-        public IEnumerator AreAnyAssignmentsInvalidDetectsMissingValues()
+        [Test]
+        public void AreAnyAssignmentsInvalidDetectsMissingValues()
         {
             GameObject go = Track(
                 new GameObject("ValidateAssignments", typeof(AssignmentComponent))
@@ -33,11 +32,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             component.requiredEnumerable = new[] { 3 };
 
             Assert.IsFalse(component.AreAnyAssignmentsInvalid());
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ValidateAssignmentsLogsWarningsForMissingFields()
+        [Test]
+        public void ValidateAssignmentsLogsWarningsForMissingFields()
         {
             GameObject go = Track(
                 new GameObject("ValidateAssignmentsLogs", typeof(AssignmentComponent))
@@ -76,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
 
             component.ValidateAssignments();
-            yield break;
+            return;
         }
 
         [Test]
@@ -163,8 +162,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.That((int)ValidateAssignmentMessageType.Error, Is.EqualTo(1));
         }
 
-        [UnityTest]
-        public IEnumerator AreAnyAssignmentsInvalidDetectsEmptyString()
+        [Test]
+        public void AreAnyAssignmentsInvalidDetectsEmptyString()
         {
             GameObject go = Track(
                 new GameObject("ValidateStringAssignment", typeof(AssignmentComponent))
@@ -181,11 +180,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             component.requiredString = "valid";
             Assert.IsFalse(component.AreAnyAssignmentsInvalid());
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator AreAnyAssignmentsInvalidDetectsWhitespaceString()
+        [Test]
+        public void AreAnyAssignmentsInvalidDetectsWhitespaceString()
         {
             GameObject go = Track(
                 new GameObject("ValidateWhitespaceAssignment", typeof(AssignmentComponent))
@@ -199,11 +198,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             component.requiredEnumerable = new[] { 3 };
 
             Assert.IsTrue(component.AreAnyAssignmentsInvalid());
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator AreAnyAssignmentsInvalidDetectsEmptyList()
+        [Test]
+        public void AreAnyAssignmentsInvalidDetectsEmptyList()
         {
             GameObject go = Track(
                 new GameObject("ValidateListAssignment", typeof(AssignmentComponent))
@@ -219,11 +218,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             component.requiredList.Add(1);
             Assert.IsFalse(component.AreAnyAssignmentsInvalid());
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator AreAnyAssignmentsInvalidDetectsEmptyEnumerable()
+        [Test]
+        public void AreAnyAssignmentsInvalidDetectsEmptyEnumerable()
         {
             GameObject go = Track(
                 new GameObject("ValidateEnumerableAssignment", typeof(AssignmentComponent))
@@ -240,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             component.requiredEnumerable = new[] { 3 };
             Assert.IsFalse(component.AreAnyAssignmentsInvalid());
-            yield break;
+            return;
         }
     }
 }

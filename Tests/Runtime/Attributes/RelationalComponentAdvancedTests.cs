@@ -3,7 +3,6 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
-    using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -23,8 +22,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentAdvancedTests : CommonTestBase
     {
-        [UnityTest]
-        public IEnumerator ParentMaxCountLimitsResults()
+        [Test]
+        public void ParentMaxCountLimitsResults()
         {
             GameObject root = Track(new GameObject("MaxCountRoot", typeof(SpriteRenderer)));
             GameObject parent1 = Track(new GameObject("Parent1", typeof(SpriteRenderer)));
@@ -42,11 +41,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all parents when no limit
             Assert.AreEqual(3, tester.allParents.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildMaxCountLimitsResults()
+        [Test]
+        public void ChildMaxCountLimitsResults()
         {
             GameObject root = Track(new GameObject("MaxCountRoot", typeof(ChildMaxCountTester)));
             ChildMaxCountTester tester = root.GetComponent<ChildMaxCountTester>();
@@ -64,11 +63,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all children when no limit
             Assert.AreEqual(5, tester.allChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator SiblingMaxCountLimitsResults()
+        [Test]
+        public void SiblingMaxCountLimitsResults()
         {
             GameObject root = Track(new GameObject("MaxCountRoot"));
 
@@ -85,11 +84,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all siblings when no limit
             Assert.AreEqual(5, tester.allSiblings.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ParentMaxDepthLimitsSearch()
+        [Test]
+        public void ParentMaxDepthLimitsSearch()
         {
             GameObject root = Track(new GameObject("DepthRoot", typeof(SpriteRenderer)));
             GameObject level1 = Track(new GameObject("Level1", typeof(SpriteRenderer)));
@@ -114,11 +113,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // allDepthList should find all 4 parents
             Assert.AreEqual(4, tester.allDepthList.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildMaxDepthLimitsSearch()
+        [Test]
+        public void ChildMaxDepthLimitsSearch()
         {
             GameObject root = Track(new GameObject("DepthRoot", typeof(ChildMaxDepthTester)));
             ChildMaxDepthTester tester = root.GetComponent<ChildMaxDepthTester>();
@@ -144,11 +143,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // allDepthList should find all 3 children
             Assert.AreEqual(3, tester.allDepthList.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ParentTagFilterOnlyFindsMatchingTags()
+        [Test]
+        public void ParentTagFilterOnlyFindsMatchingTags()
         {
             GameObject root = Track(new GameObject("TagRoot"));
             root.tag = "Player";
@@ -172,11 +171,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all parents when no filter
             Assert.AreEqual(2, tester.allParents.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildTagFilterOnlyFindsMatchingTags()
+        [Test]
+        public void ChildTagFilterOnlyFindsMatchingTags()
         {
             GameObject root = Track(new GameObject("TagRoot", typeof(ChildTagFilterTester)));
             ChildTagFilterTester tester = root.GetComponent<ChildTagFilterTester>();
@@ -201,11 +200,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all children when no filter
             Assert.AreEqual(2, tester.allChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator SiblingTagFilterOnlyFindsMatchingTags()
+        [Test]
+        public void SiblingTagFilterOnlyFindsMatchingTags()
         {
             GameObject root = new("TagRoot");
             Track(root);
@@ -221,11 +220,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.playerTaggedCollider != null);
             Assert.AreEqual(1, tester.playerTaggedRenderers.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ParentNameFilterOnlyFindsMatchingNames()
+        [Test]
+        public void ParentNameFilterOnlyFindsMatchingNames()
         {
             GameObject root = new("PlayerRoot", typeof(SpriteRenderer));
             Track(root);
@@ -246,11 +245,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all parents when no filter
             Assert.AreEqual(2, tester.allParents.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildNameFilterOnlyFindsMatchingNames()
+        [Test]
+        public void ChildNameFilterOnlyFindsMatchingNames()
         {
             GameObject root = new("Root", typeof(ChildNameFilterTester));
             Track(root);
@@ -273,11 +272,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all children when no filter
             Assert.AreEqual(2, tester.allChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ParentCanFindInterfaceComponents()
+        [Test]
+        public void ParentCanFindInterfaceComponents()
         {
             GameObject root = new("InterfaceRoot", typeof(TestInterfaceComponent));
             Track(root);
@@ -296,11 +295,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreEqual(1, tester.interfaceParentArray.Length);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceParentArray[0]);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildCanFindInterfaceComponents()
+        [Test]
+        public void ChildCanFindInterfaceComponents()
         {
             GameObject root = new("Root", typeof(ChildInterfaceTester));
             Track(root);
@@ -320,11 +319,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreEqual(1, tester.interfaceChildList.Count);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceChildList[0]);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator SiblingCanFindInterfaceComponents()
+        [Test]
+        public void SiblingCanFindInterfaceComponents()
         {
             GameObject root = new("Root");
             Track(root);
@@ -337,11 +336,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue((Object)tester.interfaceSibling != null);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceSibling);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator InterfaceSearchFindsMultipleImplementations()
+        [Test]
+        public void InterfaceSearchFindsMultipleImplementations()
         {
             GameObject root = new("Root", typeof(ChildMultiInterfaceTester));
             Track(root);
@@ -363,11 +362,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find all 3 components implementing ITestInterface
             Assert.AreEqual(3, tester.allInterfaces.Length);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator CombinedMaxCountAndTagFilter()
+        [Test]
+        public void CombinedMaxCountAndTagFilter()
         {
             GameObject root = new("Root", typeof(ChildCombinedTester));
             Track(root);
@@ -395,11 +394,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find max 2 player-tagged children
             Assert.AreEqual(2, tester.limitedPlayerChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator CombinedMaxDepthAndNameFilter()
+        [Test]
+        public void CombinedMaxDepthAndNameFilter()
         {
             GameObject root = new("Root", typeof(ChildDepthAndNameTester));
             Track(root);
@@ -426,11 +425,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 tester.depth1PlayerChildren[0]
             );
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ErrorMessageIncludesFieldName()
+        [Test]
+        public void ErrorMessageIncludesFieldName()
         {
             GameObject root = new("ErrorRoot", typeof(ErrorMessageTester));
             Track(root);
@@ -446,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignParentComponents();
 
-            yield break;
+            return;
         }
     }
 }

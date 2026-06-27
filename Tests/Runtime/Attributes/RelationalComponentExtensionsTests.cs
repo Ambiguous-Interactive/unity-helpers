@@ -3,7 +3,6 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
-    using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -17,8 +16,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     {
         // Tracking handled by CommonTestBase
 
-        [UnityTest]
-        public IEnumerator AssignRelationalComponentsResolvesParentSiblingAndChild()
+        [Test]
+        public void AssignRelationalComponentsResolvesParentSiblingAndChild()
         {
             GameObject parent = Track(new GameObject("RelationalParent", typeof(Rigidbody)));
             Rigidbody parentBody = parent.GetComponent<Rigidbody>();
@@ -43,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreSame(siblingCollider, tester.siblingCollider);
             Assert.AreSame(childCollider, tester.childCollider);
 
-            yield break;
+            return;
         }
     }
 }

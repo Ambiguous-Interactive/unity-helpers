@@ -3,7 +3,6 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
-    using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -18,8 +17,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentHashSetTests : CommonTestBase
     {
-        [UnityTest]
-        public IEnumerator ParentHashSetFindsComponents()
+        [Test]
+        public void ParentHashSetFindsComponents()
         {
             GameObject root = Track(new GameObject("Root", typeof(SpriteRenderer)));
             GameObject parent1 = Track(new GameObject("Parent1", typeof(SpriteRenderer)));
@@ -34,11 +33,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.parentRenderers != null);
             Assert.AreEqual(2, tester.parentRenderers.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator ChildHashSetFindsComponents()
+        [Test]
+        public void ChildHashSetFindsComponents()
         {
             GameObject root = Track(new GameObject("Root", typeof(ChildHashSetTester)));
             ChildHashSetTester tester = root.GetComponent<ChildHashSetTester>();
@@ -55,11 +54,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.childRenderers != null);
             Assert.AreEqual(3, tester.childRenderers.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator SiblingHashSetFindsComponents()
+        [Test]
+        public void SiblingHashSetFindsComponents()
         {
             GameObject root = Track(new GameObject("Root"));
 
@@ -75,11 +74,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.siblingColliders != null);
             Assert.AreEqual(3, tester.siblingColliders.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator HashSetAutomaticallyDeduplicates()
+        [Test]
+        public void HashSetAutomaticallyDeduplicates()
         {
             // This test verifies HashSet's natural deduplication
             // Even if the same component appears multiple times in search results,
@@ -99,11 +98,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.uniqueChildren != null);
             Assert.AreEqual(1, tester.uniqueChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator HashSetSupportsMaxCount()
+        [Test]
+        public void HashSetSupportsMaxCount()
         {
             GameObject root = Track(new GameObject("Root", typeof(ChildHashSetMaxCountTester)));
             ChildHashSetMaxCountTester tester = root.GetComponent<ChildHashSetMaxCountTester>();
@@ -119,11 +118,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find only 2 children despite 5 being available
             Assert.AreEqual(2, tester.limitedChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator HashSetSupportsInterfaces()
+        [Test]
+        public void HashSetSupportsInterfaces()
         {
             GameObject root = Track(new GameObject("Root", typeof(ChildHashSetInterfaceTester)));
             ChildHashSetInterfaceTester tester = root.GetComponent<ChildHashSetInterfaceTester>();
@@ -140,11 +139,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.interfaceChildren != null);
             Assert.AreEqual(2, tester.interfaceChildren.Count);
 
-            yield break;
+            return;
         }
 
-        [UnityTest]
-        public IEnumerator HashSetWorksWithFilters()
+        [Test]
+        public void HashSetWorksWithFilters()
         {
             GameObject root = new("Root", typeof(ChildHashSetFilterTester));
             Track(root);
@@ -165,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             // Should find only the Player-tagged child
             Assert.AreEqual(1, tester.playerChildren.Count);
 
-            yield break;
+            return;
         }
     }
 }
