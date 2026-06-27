@@ -129,17 +129,32 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public static void ClearInstance()
         {
-            if (_instance == null)
+            // Sweep EVERY live instance of T, not just the cached _instance. The singleton spawns
+            // on the fly the moment anything touches Instance (e.g. a logger/dispatcher access from
+            // a leaked coroutine), and Start()'s duplicate-destroy is deferred, so a PlayMode test
+            // can leave behind extra or inactive instances that _instance no longer points at. Those
+            // survivors keep HasInstance/activeInHierarchy lying and pollute later tests. Use the
+            // version-safe shim (FindObjectsByType is 2022.2+) and include inactive so a deactivated
+            // survivor is caught. StopAllCoroutines before the (deferred) destroy so a coroutine
+            // hosted on the singleton cannot tick once more and log/throw past the test boundary.
+            T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
+            for (int i = 0; i < liveInstances.Length; i++)
             {
-                return;
+                T inst = liveInstances[i];
+                if (inst == null)
+                {
+                    continue;
+                }
+
+                inst.StopAllCoroutines();
+                // Destroy the whole GameObject, not just the component: the Instance getter creates a
+                // dedicated "<Type>-Singleton" GameObject and Start()'s duplicate-detection path also
+                // destroys the GameObject. Destroying only the component leaked an empty GameObject
+                // (into DontDestroyOnLoad for Preserve singletons), which both failed
+                // ClearInstanceDestroysGameObjectAndClearsReference and polluted later PlayMode tests.
+                inst.gameObject.Destroy();
             }
 
-            // Destroy the whole GameObject, not just the component: the Instance getter creates a
-            // dedicated "<Type>-Singleton" GameObject and Start()'s duplicate-detection path also
-            // destroys the GameObject. Destroying only the component here leaked an empty GameObject
-            // (into DontDestroyOnLoad for Preserve singletons), which both fails
-            // ClearInstanceDestroysGameObjectAndClearsReference and pollutes later PlayMode tests.
-            _instance.gameObject.Destroy();
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
         }
