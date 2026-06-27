@@ -134,7 +134,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            _instance.Destroy();
+            // Destroy the whole GameObject, not just the component: the Instance getter creates a
+            // dedicated "<Type>-Singleton" GameObject and Start()'s duplicate-detection path also
+            // destroys the GameObject. Destroying only the component here leaked an empty GameObject
+            // (into DontDestroyOnLoad for Preserve singletons), which both fails
+            // ClearInstanceDestroysGameObjectAndClearsReference and pollutes later PlayMode tests.
+            _instance.gameObject.Destroy();
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
         }
