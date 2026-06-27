@@ -47,6 +47,16 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
 
         internal void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            // Additive-only, matching this class's summary and the Reflex sibling. A single-mode
+            // LoadScene replaces the scene (the scoped container is normally torn down with it), so
+            // re-assigning here is wrong -- and a listener that outlived its container would re-emit
+            // another fixture's required-field [Error] into whatever later test triggered the load
+            // (e.g. UnityMainThreadDispatcherTests.StartSceneOnlyOneInstance's LoadScene(0)).
+            if (mode != LoadSceneMode.Additive)
+            {
+                return;
+            }
+
             if (!scene.IsValid())
             {
                 return;
