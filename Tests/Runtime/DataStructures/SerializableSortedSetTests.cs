@@ -628,9 +628,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ScriptableSample valid = Track(ScriptableObject.CreateInstance<ScriptableSample>());
             set._items = new[] { null, valid };
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Warning,
-                "SerializableSet<WallstopStudios.UnityHelpers.Tests.DataStructures.SerializableSortedSetTests+ScriptableSample> skipped serialized entry at index 0 because the value reference was null."
+                System.Text.RegularExpressions.Regex.Escape(
+                    "SerializableSet<WallstopStudios.UnityHelpers.Tests.DataStructures.SerializableSortedSetTests+ScriptableSample> skipped serialized entry at index 0 because the value reference was null."
+                )
             );
 
             set.OnAfterDeserialize();

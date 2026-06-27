@@ -154,10 +154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(logged.Contains($"{message}Log"), logged);
             Assert.IsTrue(logged.Contains(testException.Message), logged);
 
-            LogAssert.Expect(
-                LogType.Warning,
-                new Regex($"(?s).*{message}.*{testException.Message}.*")
-            );
+            ExpectError(LogType.Warning, new Regex($"(?s).*{message}.*{testException.Message}.*"));
             string warned = formatter.LogWarn(
                 $"{message}Warning",
                 context: null,
@@ -167,10 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(warned.Contains($"{message}Warning"), warned);
             Assert.IsTrue(warned.Contains(testException.Message), warned);
 
-            LogAssert.Expect(
-                LogType.Error,
-                new Regex($"(?s).*{message}.*{testException.Message}.*")
-            );
+            ExpectError(LogType.Error, new Regex($"(?s).*{message}.*{testException.Message}.*"));
             string errored = formatter.LogError(
                 $"{message}Error",
                 context: null,

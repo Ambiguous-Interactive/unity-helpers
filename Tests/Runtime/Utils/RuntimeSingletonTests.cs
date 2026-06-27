@@ -269,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject secondObject = Track(new GameObject("SecondCustomStartSingleton"));
             CustomStartSingleton second = secondObject.AddComponent<CustomStartSingleton>();
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(".*Double singleton detected.*")
             );
@@ -522,7 +522,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject secondObject = Track(new GameObject("SecondTestRuntimeSingleton"));
             TestRuntimeSingleton second = secondObject.AddComponent<TestRuntimeSingleton>();
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(".*Double singleton detected.*")
             );
@@ -547,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton second = secondObject.AddComponent<TestRuntimeSingleton>();
             second.testValue = 200;
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(".*Double singleton detected.*")
             );
@@ -610,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject fakeObject = Track(new GameObject("Fake"));
             TestRuntimeSingleton fake = fakeObject.AddComponent<TestRuntimeSingleton>();
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(".*Double singleton detected.*")
             );

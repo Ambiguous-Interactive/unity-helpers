@@ -76,9 +76,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] source = { null, "valid" };
             set._items = source;
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Warning,
-                "SerializableSet<System.String> skipped serialized entry at index 0 because the value reference was null."
+                System.Text.RegularExpressions.Regex.Escape(
+                    "SerializableSet<System.String> skipped serialized entry at index 0 because the value reference was null."
+                )
             );
 
             set.OnAfterDeserialize();
@@ -106,9 +108,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] source = { null, "valid" };
             set._items = source;
 
-            LogAssert.Expect(
+            ExpectError(
                 LogType.Warning,
-                "SerializableSet<System.String> skipped serialized entry at index 0 because the value reference was null."
+                System.Text.RegularExpressions.Regex.Escape(
+                    "SerializableSet<System.String> skipped serialized entry at index 0 because the value reference was null."
+                )
             );
 
             set.OnAfterDeserialize();
@@ -676,7 +680,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string expectedMessage =
                 $"SerializableSet<{typeof(DummyAsset).FullName}> skipped serialized entry at index 0 because the value reference was null.";
-            LogAssert.Expect(LogType.Warning, expectedMessage);
+            ExpectError(
+                LogType.Warning,
+                System.Text.RegularExpressions.Regex.Escape(expectedMessage)
+            );
 
             set.OnAfterDeserialize();
 

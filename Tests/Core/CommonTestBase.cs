@@ -53,6 +53,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         // only code creating the leaked names Track()s them, yet the guard sweeps a live instance.
         private static readonly Dictionary<long, string> EverTrackedDiagnostics = new();
         private static bool _bleedProbeInstalled;
+
+        // Expected-error capture: the Unity Test Framework re-invokes completed test bodies on scene
+        // ops in batchmode, re-emitting their EXPECTED logs into bystanders. Capturing+suppressing the
+        // expected patterns via a custom log handler keeps them out of the global log entirely, so a
+        // re-run cannot bleed them. Static so a re-run of one fixture's body during another still hits
+        // the registry. PlayMode only (the re-run + frame bleed are PlayMode); EditMode falls back to
+        // LogAssert.Expect.
+        private static readonly System.Collections.Generic.List<(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )> _expectedErrors = new();
+        private static readonly System.Collections.Generic.HashSet<System.Text.RegularExpressions.Regex> _matchedExpectedErrors =
+            new();
+        private static readonly object _expectedErrorLock = new();
+        private static UnityEngine.ILogHandler _expectErrorInnerHandler;
+        private static ExpectedErrorSuppressingHandler _expectErrorHandler;
         protected readonly List<Func<ValueTask>> _trackedAsyncDisposals = new();
 
         /// <summary>
@@ -154,6 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // (synchronous destroy, no frame-boundary log bleed), so it never captures and never sweeps.
             if (Application.isPlaying)
             {
+                InstallExpectedErrorSuppression();
                 InstallBleedProbe();
                 CaptureLeakGuardBaseline();
             }
@@ -179,11 +196,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             if (
                 condition == null
-                || (
-                    type != LogType.Error
-                    && type != LogType.Exception
-                    && type != LogType.Warning
-                )
+                || (type != LogType.Error && type != LogType.Exception && type != LogType.Warning)
             )
             {
                 return;
@@ -292,7 +305,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string entry = $"{obj.name}/{test}@f{Time.frameCount}";
             // Capture the creation/track stack for coroutine hosts only (rare -> cheap): reveals what
             // calls CreateHost when a 'Helpers_CoroutineHost' is tracked during an unrelated test.
-            if (obj.name != null && obj.name.IndexOf("CoroutineHost", StringComparison.Ordinal) >= 0)
+            if (
+                obj.name != null
+                && obj.name.IndexOf("CoroutineHost", StringComparison.Ordinal) >= 0
+            )
             {
                 string raw = Environment.StackTrace ?? "";
                 entry +=
@@ -730,6 +746,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // it) instead of a bystander. Compliant tests that LogAssert.Expect their errors are
             // unaffected. EditMode reconciles synchronously at test end already (no frame bleed), so
             // this is scoped to PlayMode to keep the green EditMode legs untouched.
+            string expectedErrorFailure = null;
+            if (Application.isPlaying)
+            {
+                expectedErrorFailure = RestoreExpectedErrorSuppressionAndVerify();
+            }
             if (Application.isPlaying)
             {
                 DrainUnityMainThreadDispatchersForTeardown();
@@ -761,6 +782,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             if (sweepFailure != null)
             {
                 Assert.Fail(sweepFailure);
+            }
+
+            if (expectedErrorFailure != null)
+            {
+                Assert.Fail(expectedErrorFailure);
             }
         }
 
@@ -926,6 +952,147 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected int LeakGuardBaselineCountForTests => _testStartRootIds.Count;
 
         /// <summary>
+        /// Registers an EXPECTED error/warning log pattern that is captured + SUPPRESSED (kept out of
+        /// the global Unity log) for the rest of the current PlayMode test, instead of asserted via
+        /// LogAssert.Expect. This makes the assertion immune to the Unity Test Framework re-invoking a
+        /// completed test body on a later scene op (which would otherwise re-emit the log into a
+        /// bystander). The pattern must still be matched at least once by teardown, or the test fails
+        /// (same guarantee as LogAssert.Expect's "expected log did not appear"). EditMode (where the
+        /// suppressing handler is not installed) falls back to LogAssert.Expect.
+        /// </summary>
+        protected static void ExpectError(UnityEngine.LogType type, string pattern) =>
+            ExpectError(type, new System.Text.RegularExpressions.Regex(pattern));
+
+        protected static void ExpectError(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )
+        {
+            lock (_expectedErrorLock)
+            {
+                if (_expectErrorHandler != null)
+                {
+                    _expectedErrors.Add((type, pattern));
+                    return;
+                }
+            }
+            UnityEngine.TestTools.LogAssert.Expect(type, pattern);
+        }
+
+        // Custom log handler: for Error/Warning/Assert/Exception logs matching a registered expected
+        // pattern (same LogType), record the match and SUPPRESS (do not forward to the inner handler,
+        // which is what keeps it out of LogAssert/the console). Everything else forwards unchanged.
+        private sealed class ExpectedErrorSuppressingHandler : UnityEngine.ILogHandler
+        {
+            private readonly UnityEngine.ILogHandler _inner;
+
+            public ExpectedErrorSuppressingHandler(UnityEngine.ILogHandler inner)
+            {
+                _inner = inner;
+            }
+
+            public void LogFormat(
+                UnityEngine.LogType logType,
+                UnityEngine.Object context,
+                string format,
+                params object[] args
+            )
+            {
+                if (
+                    logType == UnityEngine.LogType.Error
+                    || logType == UnityEngine.LogType.Warning
+                    || logType == UnityEngine.LogType.Assert
+                    || logType == UnityEngine.LogType.Exception
+                )
+                {
+                    string message;
+                    try
+                    {
+                        message =
+                            args != null && args.Length > 0 ? string.Format(format, args) : format;
+                    }
+                    catch
+                    {
+                        message = format;
+                    }
+
+                    lock (_expectedErrorLock)
+                    {
+                        for (int i = 0; i < _expectedErrors.Count; i++)
+                        {
+                            if (
+                                _expectedErrors[i].type == logType
+                                && _expectedErrors[i].pattern.IsMatch(message)
+                            )
+                            {
+                                _matchedExpectedErrors.Add(_expectedErrors[i].pattern);
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                _inner.LogFormat(logType, context, format, args);
+            }
+
+            public void LogException(System.Exception exception, UnityEngine.Object context)
+            {
+                _inner.LogException(exception, context);
+            }
+        }
+
+        private static void InstallExpectedErrorSuppression()
+        {
+            if (_expectErrorHandler != null)
+            {
+                return;
+            }
+            _expectErrorInnerHandler = UnityEngine.Debug.unityLogger.logHandler;
+            _expectErrorHandler = new ExpectedErrorSuppressingHandler(_expectErrorInnerHandler);
+            UnityEngine.Debug.unityLogger.logHandler = _expectErrorHandler;
+        }
+
+        // Restores the real handler and returns a failure string for any expected pattern never matched
+        // (or null). Always clears the registry so the next test starts clean.
+        private static string RestoreExpectedErrorSuppressionAndVerify()
+        {
+            lock (_expectedErrorLock)
+            {
+                if (
+                    _expectErrorHandler != null
+                    && ReferenceEquals(
+                        UnityEngine.Debug.unityLogger.logHandler,
+                        _expectErrorHandler
+                    )
+                )
+                {
+                    UnityEngine.Debug.unityLogger.logHandler = _expectErrorInnerHandler;
+                }
+                _expectErrorHandler = null;
+                _expectErrorInnerHandler = null;
+
+                string failure = null;
+                foreach (
+                    (
+                        UnityEngine.LogType type,
+                        System.Text.RegularExpressions.Regex pattern
+                    ) in _expectedErrors
+                )
+                {
+                    if (!_matchedExpectedErrors.Contains(pattern))
+                    {
+                        failure =
+                            (failure ?? "Expected error log(s) never matched: ")
+                            + $"[{type}] {pattern} ; ";
+                    }
+                }
+                _expectedErrors.Clear();
+                _matchedExpectedErrors.Clear();
+                return failure;
+            }
+        }
+
+        /// <summary>
         /// Registers a <see cref="LogAssert"/> expectation for the exact <c>[Error]</c> a relational
         /// component assignment logs when a REQUIRED field cannot be resolved. Centralizes the log
         /// FORMAT -- the <c>&lt;time&gt;|&lt;name&gt;[&lt;type&gt;]|message</c> shape produced by the
@@ -955,7 +1122,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 + $"{relationship} component of type {Escape(fieldType)} for field "
                 + $"'{Escape(fieldName)}'$";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex(pattern));
+            ExpectError(LogType.Error, pattern);
         }
 
         /// <summary>
