@@ -79,7 +79,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 yield break;
             }
 
-            SceneManager.LoadScene(0);
+            // A single-mode LoadScene REPLACES the active test scene, which destroys the PlayMode test
+            // runner's non-DontDestroyOnLoad state and makes the Unity Test Framework re-invoke
+            // already-completed test methods. Those re-runs re-emit each test's expected logs (e.g.
+            // relational "Unable to find ... component", "Double singleton detected") into whatever
+            // bystander is running, failing it via LogAssert.NoUnexpectedReceived -- this single Single
+            // load was the dominant cross-test-pollution trigger for the whole PlayMode suite. Load the
+            // scene ADDITIVELY instead: dispatcher dedup is still exercised on a real scene load without
+            // wiping the runner. Unload the probe scene afterward so it does not pollute later tests.
+            yield return SceneManager.LoadSceneAsync(0, LoadSceneMode.Additive);
+            Scene probeScene = SceneManager.GetSceneByBuildIndex(0);
             Stopwatch timer = Stopwatch.StartNew();
             do
             {
@@ -92,6 +101,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 );
                 yield return null;
             } while (timer.Elapsed < TimeSpan.FromSeconds(1));
+
+            if (probeScene.IsValid() && probeScene.isLoaded)
+            {
+                yield return SceneManager.UnloadSceneAsync(probeScene);
+            }
         }
 
         [Test]
