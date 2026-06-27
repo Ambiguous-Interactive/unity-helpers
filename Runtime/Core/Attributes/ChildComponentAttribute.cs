@@ -124,6 +124,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignChildComponents(this Component component)
         {
+            // Match AssignRelationalComponents: skip a null/destroyed component. Besides being correct
+            // defensively, this stops a leaked test coroutine (Unity re-ticks a finished [UnityTest]
+            // in batchmode) from re-running assignment on an already-destroyed tester and re-logging
+            // its "Unable to find ..." error into an unrelated live test.
+            if (component == null)
+            {
+                return;
+            }
+
             FieldMetadata<ChildComponentAttribute>[] fields = FieldsByType.GetOrAdd(
                 component.GetType(),
                 type => GetFieldMetadata<ChildComponentAttribute>(type)

@@ -128,6 +128,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignParentComponents(this Component component)
         {
+            // Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
+            // test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
+            if (component == null)
+            {
+                return;
+            }
+
             FieldMetadata<ParentComponentAttribute>[] fields = FieldsByType.GetOrAdd(
                 component.GetType(),
                 type => GetFieldMetadata<ParentComponentAttribute>(type)
