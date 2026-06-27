@@ -46,11 +46,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
             SiblingMissingComponent tester = root.GetComponent<SiblingMissingComponent>();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingMissing\[SiblingMissingComponent\]\|Unable to find sibling component of type UnityEngine\.Rigidbody for field 'required'$"
-                )
+            ExpectMissingRelationalComponentError(
+                "SiblingMissing",
+                "SiblingMissingComponent",
+                "sibling",
+                "UnityEngine.Rigidbody",
+                "required"
             );
 
             tester.AssignSiblingComponents();
@@ -308,25 +309,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             SiblingNoMatchTester tester = root.GetComponent<SiblingNoMatchTester>();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingNoMatch\[SiblingNoMatchTester\]\|Unable to find sibling component of type UnityEngine\.BoxCollider for field 'siblingCollider'$"
-                )
+            const string owner = "SiblingNoMatch";
+            const string ownerType = "SiblingNoMatchTester";
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "UnityEngine.BoxCollider",
+                "siblingCollider"
             );
-
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingNoMatch\[SiblingNoMatchTester\]\|Unable to find sibling component of type UnityEngine\.BoxCollider\[\] for field 'colliderArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "UnityEngine.BoxCollider[]",
+                "colliderArray"
             );
-
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingNoMatch\[SiblingNoMatchTester\]\|Unable to find sibling component of type System\.Collections\.Generic\.List`1\[UnityEngine\.BoxCollider\] for field 'colliderList'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "System.Collections.Generic.List`1[UnityEngine.BoxCollider]",
+                "colliderList"
             );
 
             tester.AssignSiblingComponents();
@@ -415,23 +419,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             root.SetActive(false);
             SiblingExcludeInactiveTester tester = root.AddComponent<SiblingExcludeInactiveTester>();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingInactiveGameObject\[SiblingExcludeInactiveTester\]\|Unable to find sibling component of type UnityEngine\.BoxCollider for field 'activeOnlySingle'$"
-                )
+            const string owner = "SiblingInactiveGameObject";
+            const string ownerType = "SiblingExcludeInactiveTester";
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "UnityEngine.BoxCollider",
+                "activeOnlySingle"
             );
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingInactiveGameObject\[SiblingExcludeInactiveTester\]\|Unable to find sibling component of type UnityEngine\.BoxCollider\[\] for field 'activeOnlyArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "UnityEngine.BoxCollider[]",
+                "activeOnlyArray"
             );
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|SiblingInactiveGameObject\[SiblingExcludeInactiveTester\]\|Unable to find sibling component of type System\.Collections\.Generic\.List`1\[UnityEngine\.BoxCollider\] for field 'activeOnlyList'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "sibling",
+                "System.Collections.Generic.List`1[UnityEngine.BoxCollider]",
+                "activeOnlyList"
             );
 
             tester.AssignSiblingComponents();

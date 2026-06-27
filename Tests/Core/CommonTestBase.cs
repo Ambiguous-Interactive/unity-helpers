@@ -48,6 +48,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected readonly List<Scene> _trackedScenes = new();
         protected readonly List<Func<ValueTask>> _trackedAsyncDisposals = new();
 
+        /// <summary>
+        /// PlayMode cross-test leak guard. Captured at the start of every test (in
+        /// <see cref="CommonUnitySetUp"/>): the loaded scenes and the object IDs of every ROOT
+        /// GameObject that already existed in them. Any root alive at teardown, in one of those same
+        /// scenes, whose ID is NOT in the baseline was created by this test; if it survived the
+        /// targeted cleanup it is a leak that would pollute later tests, so the teardown sweep
+        /// (<see cref="CollectLeakedRoots"/> + <see cref="DestroyLeakedRootsAndDescribe"/>) destroys
+        /// it and fails THIS test (the producer). PlayMode only -- EditMode destroys synchronously
+        /// with no frame-boundary bleed, so it never captures and never sweeps.
+        ///
+        /// SCOPE (deliberately narrow to avoid false positives):
+        /// - Only the SCENES that existed at test start are swept. A scene the test LOADS itself
+        ///   (e.g. via <see cref="SceneManager.LoadScene(int)"/>) owns its content; those roots are
+        ///   not the test's leaks.
+        /// - The DontDestroyOnLoad scene is NOT swept (<see cref="SceneManager.GetSceneAt"/> excludes
+        ///   it): leaked RuntimeSingletons there are handled by the registry clear above, and
+        ///   framework infrastructure (e.g. Zenject's pooled prefab parent) must be left alone.
+        /// - Only ROOT GameObjects (not children re-parented under a baseline root) and only
+        ///   GameObjects (not non-object leaks like a dangling sceneLoaded delegate, handled at their
+        ///   source). Keys are
+        ///   <see cref="WallstopStudios.UnityHelpers.Core.Extension.UnityObjectExtensions.GetUnityObjectId"/>
+        ///   (stable per object; forward-compatible with Unity 6000.4 EntityId).
+        /// </summary>
+        private readonly HashSet<long> _testStartRootIds = new();
+        private readonly HashSet<Scene> _testStartScenes = new();
+        private bool _testStartRootsCaptured;
+
 #if UNITY_EDITOR
         /// <summary>
         /// Tracks folders created by this test instance for cleanup.
@@ -110,6 +137,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 #endif
             InitializeDispatcherScope();
+        }
+
+        [UnitySetUp]
+        public IEnumerator CommonUnitySetUp()
+        {
+            // PlayMode cross-test leak guard: snapshot the roots that exist before this test runs so
+            // the teardown sweep can destroy + attribute anything this test leaks. EditMode is immune
+            // (synchronous destroy, no frame-boundary log bleed), so it never captures and never sweeps.
+            if (Application.isPlaying)
+            {
+                CaptureLeakGuardBaseline();
+            }
+
+            yield break;
         }
 
         protected GameObject NewGameObject(string name = "GameObject")
@@ -517,10 +558,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            // A tracked async disposal timed out above. All state cleanup has now run
-            // (objects destroyed, dispatcher scope disposed, singletons cleared), so the next
-            // test starts clean; surface the failure for THIS test now -- ahead of the log
-            // reconcile below so the hang root cause is the reported failure.
+            // FINAL safety net (PlayMode only): destroy any root GameObject this test created that
+            // survived the targeted cleanup above (tracked-object destroy, dispatcher-scope dispose,
+            // singleton-registry clear), regardless of whether it was Track()'d. This closes the gap
+            // where an untracked / production-spawned / DI-spawned object outlives its test and
+            // pollutes a later one -- the root cause of this suite's cross-test flakiness.
+            //
+            // Candidates are settle-rechecked first: a non-baseline root may simply be mid-deferred-
+            // destroy from the targeted cleanup above. Object.Destroy and DontDestroyOnLoad singleton
+            // teardown flush at frame end, and the registry's Resources.FindObjectsOfTypeAll poll can
+            // report a singleton "gone" a frame before GetRootGameObjects stops returning it -- so an
+            // immediate enumeration would false-flag a singleton the registry IS correctly destroying.
+            // Only roots that survive the settle window are GENUINE leaks; those are destroyed and
+            // reported. The failure is surfaced AFTER the log reconcile below so any OnDestroy logs
+            // flush into THIS test.
+            string sweepFailure = null;
+            if (Application.isPlaying)
+            {
+                List<GameObject> leakedRoots = CollectLeakedRoots();
+                int settleFrames = TrackedObjectDestroyMaxFrames;
+                while (leakedRoots != null && settleFrames > 0)
+                {
+                    settleFrames--;
+                    yield return null;
+                    leakedRoots = CollectLeakedRoots();
+                }
+
+                if (leakedRoots != null)
+                {
+                    sweepFailure = DestroyLeakedRootsAndDescribe(leakedRoots);
+                    for (int i = 0; i < TrackedObjectDestroyMaxFrames; i++)
+                    {
+                        yield return null;
+                    }
+                }
+
+                _testStartRootsCaptured = false;
+            }
+
+            // Cross-test log-pollution guard (PlayMode only), run BEFORE any failure is surfaced. A
+            // synchronous or late-flushed [Error] -- including OnDestroy logs from the tracked-object
+            // destroy, the dispatcher/singleton clear, and the scorched-earth sweep above -- otherwise
+            // bleeds across the frame boundary into the NEXT test's scope, so an innocent later test
+            // fails for an error this fixture produced. Pump frames to flush any pending logs, then
+            // reconcile so an UNEXPECTED [Error] fails THIS fixture (where a LogAssert.Expect can fix
+            // it) instead of a bystander. Compliant tests that LogAssert.Expect their errors are
+            // unaffected. EditMode reconciles synchronously at test end already (no frame bleed), so
+            // this is scoped to PlayMode to keep the green EditMode legs untouched.
+            if (Application.isPlaying)
+            {
+                DrainUnityMainThreadDispatchersForTeardown();
+                yield return null;
+                DrainUnityMainThreadDispatchersForTeardown();
+                LogAssert.NoUnexpectedReceived();
+            }
+
+            // All state cleanup has now run (objects destroyed, dispatcher scope disposed, singletons
+            // cleared, leaks swept) and logs are reconciled, so the next test starts clean regardless
+            // of which failure fires. Surface them AFTER the reconcile so deferred OnDestroy logs from
+            // the cleanups cannot bleed; order is root-cause priority (a hang/leak is more actionable
+            // than the noise it may have produced).
             if (disposalFailure != null)
             {
                 Assert.Fail(disposalFailure);
@@ -536,21 +633,197 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Assert.Fail(dispatcherFailure);
             }
 
-            // Cross-test log-pollution guard (PlayMode only). A synchronous or late-flushed
-            // [Error] otherwise bleeds across the frame boundary into the NEXT test's scope, so
-            // an innocent later test fails for an error this (or an earlier) fixture produced.
-            // Pump one frame to flush any pending logs, then reconcile so an UNEXPECTED [Error]
-            // fails THIS fixture -- where it can be fixed with a LogAssert.Expect -- instead of a
-            // bystander. Compliant tests that LogAssert.Expect their errors are unaffected.
-            // EditMode tests reconcile synchronously at test end already (no frame bleed), so this
-            // is scoped to PlayMode to keep the green EditMode legs untouched.
-            if (Application.isPlaying)
+            if (sweepFailure != null)
             {
-                DrainUnityMainThreadDispatchersForTeardown();
-                yield return null;
-                DrainUnityMainThreadDispatchersForTeardown();
-                LogAssert.NoUnexpectedReceived();
+                Assert.Fail(sweepFailure);
             }
+        }
+
+        /// <summary>
+        /// Snapshots the leak-guard baseline: the loaded scenes and the IDs of their existing root
+        /// GameObjects. <see cref="SceneManager.GetSceneAt"/> excludes DontDestroyOnLoad, so framework
+        /// infrastructure and leaked singletons there are out of scope (the registry clear handles the
+        /// latter). PlayMode only.
+        /// </summary>
+        private void CaptureLeakGuardBaseline()
+        {
+            _testStartRootIds.Clear();
+            _testStartScenes.Clear();
+
+            int sceneCount = SceneManager.sceneCount;
+            for (int i = 0; i < sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() || !scene.isLoaded)
+                {
+                    continue;
+                }
+
+                _testStartScenes.Add(scene);
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    if (root != null)
+                    {
+                        _testStartRootIds.Add(root.GetUnityObjectId());
+                    }
+                }
+            }
+
+            _testStartRootsCaptured = true;
+        }
+
+        /// <summary>
+        /// Returns the root GameObjects alive now -- in a scene that existed at baseline -- whose ID
+        /// was NOT in the baseline (i.e. created by this test), or <c>null</c> when there are none (the
+        /// common fast path). Does NOT destroy anything -- the caller settle-rechecks to distinguish a
+        /// genuine leak from a root that is merely mid-deferred-destroy. Scenes the test LOADED itself
+        /// (absent from the baseline scene set) are skipped -- their content is not this test's leak.
+        /// No-op unless a PlayMode baseline was captured.
+        /// </summary>
+        private List<GameObject> CollectLeakedRoots()
+        {
+            if (!_testStartRootsCaptured)
+            {
+                return null;
+            }
+
+            List<GameObject> leaked = null;
+            int sceneCount = SceneManager.sceneCount;
+            for (int i = 0; i < sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() || !scene.isLoaded || !_testStartScenes.Contains(scene))
+                {
+                    continue;
+                }
+
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    if (root == null || _testStartRootIds.Contains(root.GetUnityObjectId()))
+                    {
+                        continue;
+                    }
+
+                    leaked ??= new List<GameObject>();
+                    leaked.Add(root);
+                }
+            }
+
+            return leaked;
+        }
+
+        /// <summary>
+        /// Destroys the given leaked roots (deferred <see cref="Object.Destroy(Object)"/>) and returns
+        /// a one-line <c>[uh-leak]</c> diagnostic naming them and the producing test, or <c>null</c>
+        /// if the list held nothing live.
+        /// </summary>
+        private string DestroyLeakedRootsAndDescribe(List<GameObject> leaked)
+        {
+            if (leaked == null)
+            {
+                return null;
+            }
+
+            List<string> descriptions = new(leaked.Count);
+            foreach (GameObject root in leaked)
+            {
+                if (root == null)
+                {
+                    continue;
+                }
+
+                descriptions.Add(DescribeRoot(root));
+                Object.Destroy(root); // UNH-SUPPRESS: scorched-earth cross-test leak cleanup
+            }
+
+            if (descriptions.Count == 0)
+            {
+                return null;
+            }
+
+            return "[uh-leak] scorched-earth swept "
+                + $"{descriptions.Count} untracked root GameObject(s) leaked by "
+                + $"{TestContext.CurrentContext.Test.FullName}: {string.Join(", ", descriptions)}. "
+                + "Every GameObject a PlayMode test creates must be destroyed before teardown "
+                + "(Track(...) it, or destroy it explicitly); a survivor pollutes later tests.";
+        }
+
+        private static string DescribeRoot(GameObject root)
+        {
+            string componentType = "GameObject";
+            Component[] components = root.GetComponents<Component>();
+            for (int i = 0; i < components.Length; i++)
+            {
+                Component component = components[i];
+                if (component != null && component is not Transform)
+                {
+                    componentType = component.GetType().Name;
+                    break;
+                }
+            }
+
+            return $"'{root.name}' ({componentType}, scene '{root.scene.name}', "
+                + $"instance {root.GetUnityObjectId()})";
+        }
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: re-captures the current roots as this test's
+        /// baseline (mirrors <see cref="CommonUnitySetUp"/>), so a test can establish a known
+        /// baseline after creating objects it expects the sweep to spare. PlayMode only.
+        /// </summary>
+        protected void CaptureLeakGuardBaselineForTests()
+        {
+            CaptureLeakGuardBaseline();
+        }
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: runs the teardown leak sweep immediately and
+        /// returns its diagnostic (null when nothing leaked), destroying any non-baseline root.
+        /// </summary>
+        protected string RunLeakGuardSweepForTests()
+        {
+            return DestroyLeakedRootsAndDescribe(CollectLeakedRoots());
+        }
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: the number of root GameObjects captured in the
+        /// current baseline. Non-zero in PlayMode proves <see cref="CommonUnitySetUp"/> actually
+        /// snapshotted the runner infrastructure (so a silent capture regression can't pass the
+        /// self-test).
+        /// </summary>
+        protected int LeakGuardBaselineCountForTests => _testStartRootIds.Count;
+
+        /// <summary>
+        /// Registers a <see cref="LogAssert"/> expectation for the exact <c>[Error]</c> a relational
+        /// component assignment logs when a REQUIRED field cannot be resolved. Centralizes the log
+        /// FORMAT -- the <c>&lt;time&gt;|&lt;name&gt;[&lt;type&gt;]|message</c> shape produced by the
+        /// package logger -- so the dozen-plus child/parent/sibling tests share ONE source of truth
+        /// (mirroring the producer in <c>BaseRelationalComponentAttribute</c>) instead of hand-copied
+        /// regexes that silently rot if the format changes. Caller-supplied values are regex-escaped,
+        /// so pass plain display names (e.g. <c>"UnityEngine.SpriteRenderer[]"</c>).
+        /// </summary>
+        /// <param name="ownerName">GameObject name hosting the component (e.g. "Child-Missing").</param>
+        /// <param name="ownerType">Owning component type name (e.g. "ChildMissingTester").</param>
+        /// <param name="relationship">"child", "parent", or "sibling".</param>
+        /// <param name="fieldType">Field type display name (e.g. "UnityEngine.SpriteRenderer").</param>
+        /// <param name="fieldName">Field name (e.g. "requiredRenderer").</param>
+        protected static void ExpectMissingRelationalComponentError(
+            string ownerName,
+            string ownerType,
+            string relationship,
+            string fieldType,
+            string fieldName
+        )
+        {
+            static string Escape(string value) =>
+                System.Text.RegularExpressions.Regex.Escape(value);
+
+            string pattern =
+                $@"^\d+(\.\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
+                + $"{relationship} component of type {Escape(fieldType)} for field "
+                + $"'{Escape(fieldName)}'$";
+
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex(pattern));
         }
 
         /// <summary>

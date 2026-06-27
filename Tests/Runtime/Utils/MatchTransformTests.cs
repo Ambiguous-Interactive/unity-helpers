@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 new GameObject("Target") { transform = { position = new Vector3(5f, 10f, 0f) } }
             );
 
-            GameObject follower = new("Follower", typeof(MatchTransform));
+            GameObject follower = Track(new GameObject("Follower", typeof(MatchTransform)));
             MatchTransform matcher = follower.GetComponent<MatchTransform>();
             matcher.toMatch = target.transform;
             matcher.localOffset = new Vector3(2f, 3f, 1f);

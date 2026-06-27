@@ -120,11 +120,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject orphan = Track(new GameObject("ParentOrphan", typeof(ParentMissingTester)));
             ParentMissingTester tester = orphan.GetComponent<ParentMissingTester>();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|ParentOrphan\[ParentMissingTester\]\|Unable to find parent component of type UnityEngine\.SpriteRenderer for field 'requiredRenderer'$"
-                )
+            ExpectMissingRelationalComponentError(
+                "ParentOrphan",
+                "ParentMissingTester",
+                "parent",
+                "UnityEngine.SpriteRenderer",
+                "requiredRenderer"
             );
 
             tester.AssignParentComponents();
@@ -273,33 +274,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(orphan);
             ParentOnlyAncestorsTester tester = orphan.GetComponent<ParentOnlyAncestorsTester>();
 
-            // Expect errors for ancestorOnly field (onlyAncestors=true, no parent)
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|OnlyAncestorsOrphan\[ParentOnlyAncestorsTester\]\|Unable to find parent component of type UnityEngine\.SpriteRenderer for field 'ancestorOnly'$"
-                )
+            const string owner = "OnlyAncestorsOrphan";
+            const string ownerType = "ParentOnlyAncestorsTester";
+            // onlyAncestors=true fields have no parent; includeSelf fields find no SpriteRenderer on self.
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "parent",
+                "UnityEngine.SpriteRenderer",
+                "ancestorOnly"
             );
-            // Expect errors for ancestorOnlyArray field (onlyAncestors=true, no parent)
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|OnlyAncestorsOrphan\[ParentOnlyAncestorsTester\]\|Unable to find parent component of type UnityEngine\.SpriteRenderer\[\] for field 'ancestorOnlyArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "parent",
+                "UnityEngine.SpriteRenderer[]",
+                "ancestorOnlyArray"
             );
-            // Expect errors for includeSelf field (onlyAncestors=false, no SpriteRenderer on self)
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|OnlyAncestorsOrphan\[ParentOnlyAncestorsTester\]\|Unable to find parent component of type UnityEngine\.SpriteRenderer for field 'includeSelf'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "parent",
+                "UnityEngine.SpriteRenderer",
+                "includeSelf"
             );
-            // Expect errors for includeSelfArray field (onlyAncestors=false, no SpriteRenderer on self)
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|OnlyAncestorsOrphan\[ParentOnlyAncestorsTester\]\|Unable to find parent component of type UnityEngine\.SpriteRenderer\[\] for field 'includeSelfArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "parent",
+                "UnityEngine.SpriteRenderer[]",
+                "includeSelfArray"
             );
 
             tester.AssignParentComponents();

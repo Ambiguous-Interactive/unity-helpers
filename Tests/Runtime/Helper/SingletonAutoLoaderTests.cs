@@ -22,6 +22,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void BaseSetUp()
         {
             base.BaseSetUp();
+            // Reset the auto-loader's static caches so each test re-emits its first-resolution
+            // warning (the loader/instance-property caches otherwise suppress it on the 2nd test in
+            // the domain, leaking an unconsumed LogAssert.Expect into a bystander fixture).
+            SingletonAutoLoader.ClearCachesForTests();
             AutoRuntimeSingleton.ClearForTests();
             AutoScriptableSingleton.ClearForTests();
             RuntimeMismatchSingleton.ClearForTests();

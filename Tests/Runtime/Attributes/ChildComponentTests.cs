@@ -149,11 +149,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ChildMissingTester tester = root.GetComponent<ChildMissingTester>();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|Child-Missing\[ChildMissingTester\]\|Unable to find child component of type UnityEngine\.SpriteRenderer for field 'requiredRenderer'$"
-                )
+            ExpectMissingRelationalComponentError(
+                "Child-Missing",
+                "ChildMissingTester",
+                "child",
+                "UnityEngine.SpriteRenderer",
+                "requiredRenderer"
             );
 
             tester.AssignChildComponents();
@@ -291,36 +292,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ChildOnlyDescendentsTester tester = root.GetComponent<ChildOnlyDescendentsTester>();
 
-            // Expect error for descendentOnly (SpriteRenderer)
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|ChildNoDescendents\[ChildOnlyDescendentsTester\]\|Unable to find child component of type UnityEngine\.SpriteRenderer for field 'descendentOnly'$"
-                )
+            const string owner = "ChildNoDescendents";
+            const string ownerType = "ChildOnlyDescendentsTester";
+            // No SpriteRenderer on root or descendants, so every required field reports missing.
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "child",
+                "UnityEngine.SpriteRenderer",
+                "descendentOnly"
             );
-
-            // Expect error for descendentOnlyArray (SpriteRenderer[])
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|ChildNoDescendents\[ChildOnlyDescendentsTester\]\|Unable to find child component of type UnityEngine\.SpriteRenderer\[\] for field 'descendentOnlyArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "child",
+                "UnityEngine.SpriteRenderer[]",
+                "descendentOnlyArray"
             );
-
-            // Expect error for includeSelf (SpriteRenderer) - no SpriteRenderer on root
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|ChildNoDescendents\[ChildOnlyDescendentsTester\]\|Unable to find child component of type UnityEngine\.SpriteRenderer for field 'includeSelf'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "child",
+                "UnityEngine.SpriteRenderer",
+                "includeSelf"
             );
-
-            // Expect error for includeSelfArray (SpriteRenderer[]) - no SpriteRenderer on root
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    @"^\d+(\.\d+)?\|ChildNoDescendents\[ChildOnlyDescendentsTester\]\|Unable to find child component of type UnityEngine\.SpriteRenderer\[\] for field 'includeSelfArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                owner,
+                ownerType,
+                "child",
+                "UnityEngine.SpriteRenderer[]",
+                "includeSelfArray"
             );
 
             tester.AssignChildComponents();
@@ -441,17 +442,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             yield return null;
 
             // Expect error logs for fields with includeInactive=false when disabled Behaviour is present
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    "Unable to find child component of type UnityEngine.BoxCollider for field 'activeOnly'$"
-                )
+            ExpectMissingRelationalComponentError(
+                "ChildDisabledRoot",
+                "ChildDisabledBehaviourTester",
+                "child",
+                "UnityEngine.BoxCollider",
+                "activeOnly"
             );
-            LogAssert.Expect(
-                LogType.Error,
-                new System.Text.RegularExpressions.Regex(
-                    "Unable to find child component of type UnityEngine.BoxCollider\\[\\] for field 'activeOnlyArray'$"
-                )
+            ExpectMissingRelationalComponentError(
+                "ChildDisabledRoot",
+                "ChildDisabledBehaviourTester",
+                "child",
+                "UnityEngine.BoxCollider[]",
+                "activeOnlyArray"
             );
 
             tester.AssignChildComponents();

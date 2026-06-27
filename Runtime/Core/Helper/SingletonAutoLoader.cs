@@ -283,6 +283,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 _testPlayModeOverride = previousOverride;
             }
         }
+
+        /// <summary>
+        /// Resets every static cache so a test that asserts a first-resolution log (e.g. the
+        /// "does not derive from RuntimeSingleton" / "Unable to resolve type" warnings) actually
+        /// re-emits it. Without this, the per-<c>typeName</c> loader cache and per-<see cref="Type"/>
+        /// instance-property caches suppress the warning on the second PlayMode test in the same
+        /// domain, leaving a <see cref="UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType,
+        /// string)"/> unconsumed -- which then bleeds across the frame boundary and fails an innocent
+        /// bystander fixture. Production keeps the dedupe (correct anti-spam); only tests reset it.
+        /// </summary>
+        internal static void ClearCachesForTests()
+        {
+            lock (_loaderBuildLock)
+            {
+                _cachedLoaders.Clear();
+                _runtimeInstanceProperties.Clear();
+                _scriptableInstanceProperties.Clear();
+            }
+
+            lock (_executionLock)
+            {
+                _executedLoadTypes.Clear();
+            }
+        }
 #endif
     }
 }
