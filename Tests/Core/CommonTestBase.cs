@@ -211,8 +211,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             int length = Math.Min(80, condition.Length);
+            string stack = "";
+            if (
+                condition.IndexOf("Unable to find", StringComparison.Ordinal) >= 0
+                || condition.IndexOf("Double singleton", StringComparison.Ordinal) >= 0
+            )
+            {
+                // The ORIGINAL log call's stack reveals the re-emit walker:
+                // ...LogMissingComponentError <- AssignChildComponents <- AssignRelationalComponents
+                // <- [whatever re-Assigns the leaked tester]. Flatten to one line.
+                string raw = stackTrace ?? "";
+                stack =
+                    " stack="
+                    + raw.Substring(0, Math.Min(500, raw.Length))
+                        .Replace("\r", "")
+                        .Replace("\n", " | ");
+            }
             Debug.Log(
-                $"[uh-probe] delivered type={type} frame={Time.frameCount} test={test} msg={condition.Substring(0, length)}"
+                $"[uh-probe] delivered type={type} frame={Time.frameCount} test={test} msg={condition.Substring(0, length)}{stack}"
             );
         }
 
@@ -259,7 +275,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 // No active test context (e.g. one-time setup); ignore.
             }
-            EverTrackedDiagnostics[obj.GetUnityObjectId()] = $"{obj.name}/{test}@f{Time.frameCount}";
+            string entry = $"{obj.name}/{test}@f{Time.frameCount}";
+            // Capture the creation/track stack for coroutine hosts only (rare -> cheap): reveals what
+            // calls CreateHost when a 'Helpers_CoroutineHost' is tracked during an unrelated test.
+            if (obj.name != null && obj.name.IndexOf("CoroutineHost", StringComparison.Ordinal) >= 0)
+            {
+                string raw = Environment.StackTrace ?? "";
+                entry +=
+                    " stack="
+                    + raw.Substring(0, Math.Min(500, raw.Length))
+                        .Replace("\r", "")
+                        .Replace("\n", " | ");
+            }
+            EverTrackedDiagnostics[obj.GetUnityObjectId()] = entry;
         }
 
         protected GameObject Track(GameObject obj)
