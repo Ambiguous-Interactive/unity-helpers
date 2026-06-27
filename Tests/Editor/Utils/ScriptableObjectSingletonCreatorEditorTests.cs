@@ -378,7 +378,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Directory.CreateDirectory(absoluteTarget);
             yield return null;
 
-            Assert.IsFalse(AssetDatabase.IsValidFolder(scenario.FolderPath));
+            // Intentionally NOT asserting the folder is still un-imported here. AssetDatabase
+            // auto-refresh can import the just-created on-disk folder before this point
+            // (CreateFolder/Refresh visibility is async and, under SINGLE_THREADED scheduling,
+            // races ahead), which is incidental to what this test verifies below: that
+            // EnsureSingletonAssets produces the asset and does not create a duplicate folder.
 
             Func<Type, bool> originalFilter = ScriptableObjectSingletonCreator.TypeFilter;
             ScriptableObjectSingletonCreator.TypeFilter = type => type == scenario.SingletonType;
@@ -393,6 +397,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ScriptableObjectSingletonCreator.TypeFilter = originalFilter;
             }
 
+            yield return WaitUntilFolderValid(scenario.FolderPath);
             Assert.IsTrue(AssetDatabase.IsValidFolder(scenario.FolderPath));
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(scenario.AssetPath) != null);
             Assert.IsFalse(AssetDatabase.IsValidFolder(scenario.FolderPath + " 1"));
