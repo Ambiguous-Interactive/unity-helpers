@@ -995,6 +995,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
     internal sealed class CoroutineHost : MonoBehaviour
     {
+        // TEMP DIAGNOSTIC (remove after CI batchmode root-cause): captures where EVERY CoroutineHost is
+        // created -- including an untracked one spawned by a leaked callback (which the Track() probe
+        // can't see). If 'test' is not a HelpersTests method, the stack pinpoints the leaked spawner.
+        private void Awake()
+        {
+            string test = "?";
+            try
+            {
+                test = NUnit.Framework.TestContext.CurrentContext?.Test?.Name ?? "?";
+            }
+            catch
+            {
+                // No active test context.
+            }
+            string raw = System.Environment.StackTrace ?? "";
+            string frames = "";
+            foreach (string frame in raw.Split('\n'))
+            {
+                if (
+                    frame.IndexOf("CreateHost", System.StringComparison.Ordinal) >= 0
+                    || frame.IndexOf("Tests.", System.StringComparison.Ordinal) >= 0
+                    || frame.IndexOf("MoveNext", System.StringComparison.Ordinal) >= 0
+                    || frame.IndexOf("Helpers", System.StringComparison.Ordinal) >= 0
+                    || frame.IndexOf("ExecuteFunction", System.StringComparison.Ordinal) >= 0
+                    || frame.IndexOf("Coroutine", System.StringComparison.Ordinal) >= 0
+                )
+                {
+                    frames += frame.Replace("\r", "").Trim() + " | ";
+                }
+            }
+            UnityEngine.Debug.Log(
+                $"[uh-hostnew] test={test} frame={UnityEngine.Time.frameCount} id={gameObject.GetInstanceID()} stack={frames}"
+            );
+        }
+
         public int InvocationCount { get; private set; }
         public bool Flag { get; private set; }
 

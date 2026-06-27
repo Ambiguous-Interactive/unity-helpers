@@ -217,15 +217,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 || condition.IndexOf("Double singleton", StringComparison.Ordinal) >= 0
             )
             {
-                // The ORIGINAL log call's stack reveals the re-emit walker:
-                // ...LogMissingComponentError <- AssignChildComponents <- AssignRelationalComponents
-                // <- [whatever re-Assigns the leaked tester]. Flatten to one line.
+                // The ORIGINAL log call's stack reveals the re-emit walker. A blind char-cap only
+                // reached the logger frames, so keep only the frames that identify WHO re-Assigns the
+                // leaked tester (assign chain, DI integration, coroutine driver, test method, Awake).
                 string raw = stackTrace ?? "";
-                stack =
-                    " stack="
-                    + raw.Substring(0, Math.Min(500, raw.Length))
-                        .Replace("\r", "")
-                        .Replace("\n", " | ");
+                stack = " stack=";
+                foreach (string frame in raw.Split('\n'))
+                {
+                    if (
+                        frame.IndexOf("Assign", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("Integrations", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("EntryPoint", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("Bootstrapper", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("SceneLoad", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("Initialize", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("Awake", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("RuntimeSingleton", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("Tests.", StringComparison.Ordinal) >= 0
+                        || frame.IndexOf("MoveNext", StringComparison.Ordinal) >= 0
+                    )
+                    {
+                        stack += frame.Replace("\r", "").Trim() + " | ";
+                    }
+                }
             }
             Debug.Log(
                 $"[uh-probe] delivered type={type} frame={Time.frameCount} test={test} msg={condition.Substring(0, length)}{stack}"
