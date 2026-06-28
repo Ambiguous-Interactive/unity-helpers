@@ -24,6 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializerAdditionalTests
     {
         private string _tempDirectory;

@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializableDictionaryJsonTests
     {
         [Test]

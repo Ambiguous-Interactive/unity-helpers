@@ -53,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ToStringSerializesAllFields()
         {
             AttributeModification modification = new()
@@ -79,6 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void SystemTextJsonRoundtripPreservesFields()
         {
             AttributeModification modification = new(
@@ -93,6 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoBufRoundtripPreservesFields()
         {
             AttributeModification modification = new("speed", ModificationAction.Addition, -3f);

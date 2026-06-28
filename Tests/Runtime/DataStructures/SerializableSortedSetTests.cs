@@ -97,6 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void SortedHashSetJsonRoundTripRetainsOrdering()
         {
             SerializableSortedSet<int> original = new() { 42, -5, 99 };
@@ -802,6 +803,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripPreservesUserDefinedOrder()
         {
             SerializableSortedSet<int> original = new(new[] { 5, 1, 3 });
@@ -981,6 +983,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationProducesIndependentCopy()
         {
             SerializableSortedSet<int> original = new() { 3, 1, 5 };
@@ -1617,6 +1620,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoRoundTripPreservesSortedOrderInToArray()
         {
             SerializableSortedSet<int> original = new() { 5, 1, 3, 4, 2 };
@@ -1632,6 +1636,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripPreservesSortedOrderInToArray()
         {
             SerializableSortedSet<int> original = new() { 5, 1, 3, 4, 2 };

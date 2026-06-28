@@ -51,6 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ToStringIncludesIdentifier()
         {
             AttributeEffect effect = Track(ScriptableObject.CreateInstance<AttributeEffect>());

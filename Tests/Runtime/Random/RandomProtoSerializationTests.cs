@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class RandomProtoSerializationTests
     {
         private const int NumGenerations = 1000;

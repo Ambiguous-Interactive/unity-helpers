@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtobufSerializationTests
     {
         private static T SerializeDeserialize<T>(T original)

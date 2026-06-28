@@ -963,23 +963,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield break;
         }
 
-        [UnityTest]
-        public IEnumerator GetAngleWithSpeedRotatesTowardsTarget()
+        [Test]
+        public void GetAngleWithSpeedRotatesTowardsTarget()
         {
-            // GetAngleWithSpeed scales the turn by Time.deltaTime, so it does nothing on a frame
-            // where deltaTime is 0. In a standalone player the first ticked frame can still report
-            // deltaTime == 0 (whereas the editor already has a non-zero delta), which would leave the
-            // vector unchanged and fail the asserts. Pump frames until a real delta is available so
-            // the rotation is exercised deterministically on every platform.
-            int guardFrames = 0;
-            do
-            {
-                yield return null;
-            } while (Time.deltaTime <= 0f && ++guardFrames < 120);
-
+            // GetAngleWithSpeed scales the turn by the time step, so it does nothing when the step is
+            // 0. A headless standalone player can report Time.deltaTime == 0 indefinitely, which would
+            // leave the vector unchanged and fail the asserts. Use the explicit-deltaTime overload so
+            // the rotation is exercised deterministically on every platform (no frame-timing dependency).
+            const float deltaTime = 1f / 60f;
             Vector2 current = Vector2.right;
             Vector2 target = Vector2.up;
-            Vector2 rotated = Helpers.GetAngleWithSpeed(target, current, 180f);
+            Vector2 rotated = Helpers.GetAngleWithSpeed(target, current, 180f, deltaTime);
             Assert.Greater(rotated.y, current.y);
             Assert.Less(rotated.x, current.x);
         }

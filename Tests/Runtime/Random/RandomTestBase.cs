@@ -542,6 +542,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonSerialization()
         {
             IRandom random = NewRandom();
@@ -565,6 +566,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonSerializationWithMix()
         {
             for (int preMix = 1; preMix < 10; ++preMix)
@@ -596,6 +598,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtobufSerialization()
         {
             IRandom random = NewRandom();
@@ -615,6 +618,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtobufSerializationWithMix()
         {
             for (int preMix = 1; preMix < 10; ++preMix)

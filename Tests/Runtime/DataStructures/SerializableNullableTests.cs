@@ -89,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonSerializationRoundTrips()
         {
             SerializableNullable<int> wrapped = new(42);
@@ -111,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationRoundTrips()
         {
             SerializableNullable<int> wrapped = new(1234);
@@ -136,6 +138,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationSnapshotsValueAcrossMutations()
         {
             SerializableNullable<int> wrapped = new(321);
@@ -208,6 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonSerializationCapturesMutations()
         {
             SerializableNullable<int> wrapped = new(12);

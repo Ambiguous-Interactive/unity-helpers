@@ -1475,12 +1475,38 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             float rotationSpeed
         )
         {
+            return GetAngleWithSpeed(
+                targetDirection,
+                currentDirection,
+                rotationSpeed,
+                Time.deltaTime
+            );
+        }
+
+        /// <summary>
+        /// Rotates a direction vector toward a target direction at a fixed angular speed, using an
+        /// explicit time step instead of <see cref="Time.deltaTime"/>. Prefer this overload from a
+        /// fixed-timestep loop, or wherever the caller must control the step deterministically (e.g.
+        /// tests, replays, headless simulation, where <see cref="Time.deltaTime"/> may be 0).
+        /// </summary>
+        /// <param name="targetDirection">Desired direction (normalized or not).</param>
+        /// <param name="currentDirection">Current direction (normalized or not).</param>
+        /// <param name="rotationSpeed">Degrees per second.</param>
+        /// <param name="deltaTime">Seconds elapsed this step.</param>
+        /// <returns>New normalized direction after applying rotation for the given step.</returns>
+        public static Vector2 GetAngleWithSpeed(
+            Vector2 targetDirection,
+            Vector2 currentDirection,
+            float rotationSpeed,
+            float deltaTime
+        )
+        {
             if (targetDirection == Vector2.zero)
             {
                 return currentDirection;
             }
 
-            float turnRatePerFrame = rotationSpeed * Time.deltaTime;
+            float turnRatePerFrame = rotationSpeed * deltaTime;
             float angleDiscrepancy = Vector2.SignedAngle(currentDirection, targetDirection);
             float turnRateThisFrame;
             if (Math.Sign(angleDiscrepancy) < 0)

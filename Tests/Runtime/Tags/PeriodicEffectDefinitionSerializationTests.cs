@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class PeriodicEffectDefinitionSerializationTests
     {
         [Test]

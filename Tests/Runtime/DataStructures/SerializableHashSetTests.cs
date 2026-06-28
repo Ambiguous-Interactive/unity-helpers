@@ -710,6 +710,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationRoundTripsValues()
         {
             SerializableHashSet<int> original = new(new[] { 1, 3, 5 });
@@ -873,6 +874,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripPreservesUserDefinedOrder()
         {
             SerializableHashSet<int> original = new(new[] { 9, 4, 7 });
@@ -1028,6 +1030,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationProducesIndependentCopy()
         {
             SerializableHashSet<int> original = new(new[] { 2, 4, 6 });

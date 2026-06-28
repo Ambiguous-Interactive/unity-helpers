@@ -1013,9 +1013,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         // Cached closed-generic serialize/deserialize delegates for the special collection wrappers.
-        // The dispatch happens entirely in our managed code (not protobuf's model builder), so it is
-        // safe under IL2CPP; SerializationAotHints force-references the common closed generics so the
-        // AOT compiler emits them.
+        // The dispatch happens in our managed code rather than protobuf's model builder. NOTE: protobuf-net
+        // serialization is NOT AOT-compatible under IL2CPP -- its serializer model is built at runtime via
+        // reflection/MakeGenericType, which IL2CPP cannot emit -- so it is supported only on the Mono
+        // scripting backend. The in-tree WallstopProto serializer (see PLAN.md) is the planned IL2CPP-safe,
+        // wire-compatible replacement.
         private static readonly ConcurrentDictionary<
             Type,
             Func<object, byte[]>

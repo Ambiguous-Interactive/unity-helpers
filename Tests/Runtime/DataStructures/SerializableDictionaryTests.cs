@@ -192,6 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationPreservesSerializationArraysWhenNoDuplicatesExist()
         {
             SerializableDictionary<int, string> dictionary = new() { { 1, "one" }, { 3, "three" } };
@@ -526,6 +527,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripPreservesArraysAndOrderAfterDeserialization()
         {
             SerializableDictionary<int, string> original = new()

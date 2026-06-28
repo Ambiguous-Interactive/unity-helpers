@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class RandomStateSerializationTests
     {
         private static void AssertStateEqual(

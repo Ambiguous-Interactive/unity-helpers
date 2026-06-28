@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     /// </summary>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializationOrderPreservationTests : CommonTestBase
     {
         [Test]

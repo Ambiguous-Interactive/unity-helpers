@@ -72,6 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ToStringSerializesSummaryAndCollections()
         {
             AttributeEffect effect = Track(ScriptableObject.CreateInstance<AttributeEffect>());

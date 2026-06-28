@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     // the originals exactly so the wire format is byte-identical to the pre-surrogate mono output.
 
     [ProtoContract]
-    internal sealed class FastVector2IntSurrogate
+    internal struct FastVector2IntSurrogate
     {
         [ProtoMember(1)]
         public int x;
@@ -360,7 +360,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal sealed class FastVector3IntSurrogate
+    internal struct FastVector3IntSurrogate
     {
         [ProtoMember(1)]
         public int x;
@@ -390,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal sealed class ParabolaSurrogate
+    internal struct ParabolaSurrogate
     {
         [ProtoMember(1)]
         public float length;
@@ -420,7 +420,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal sealed class ImmutableBitSetSurrogate
+    internal struct ImmutableBitSetSurrogate
     {
         [ProtoMember(1)]
         public ulong[] bits;

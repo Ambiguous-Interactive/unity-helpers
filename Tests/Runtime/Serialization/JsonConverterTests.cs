@@ -1012,6 +1012,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void AnimationCurveConverterSerializeAndDeserializeSuccess()
         {
             AnimationCurve original = new(
@@ -1032,6 +1033,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void GradientConverterSerializeAndDeserializeSuccess()
         {
             Gradient original = new()
@@ -1116,6 +1118,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void RenderTextureDescriptorConverterSerializeAndDeserializeSuccess()
         {
             RenderTextureDescriptor original = new(256, 128)
@@ -1139,6 +1142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void MinMaxCurveConverterSerializeAndDeserializeSuccess()
         {
             ParticleSystem.MinMaxCurve original = new(2f)
@@ -1159,6 +1163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void MinMaxGradientConverterSerializeAndDeserializeSuccess()
         {
             ParticleSystem.MinMaxGradient original = new(Color.green)

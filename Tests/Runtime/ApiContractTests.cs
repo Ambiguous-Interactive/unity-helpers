@@ -251,6 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests
     /// </summary>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializerApiContractTests
     {
         [Serializable]

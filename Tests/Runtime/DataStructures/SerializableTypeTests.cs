@@ -197,6 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationRoundTripsType()
         {
             SerializableType serializable = new(typeof(List<float>));
@@ -441,6 +442,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationPreservesMissingType()
         {
             SerializableType unresolved = SerializableType.FromSerializedName(MissingTypeName);

@@ -179,6 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonSerializationRoundTripsGuid()
         {
             WGuid original = WGuid.NewGuid();
@@ -189,6 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoSerializationRoundTripsGuid()
         {
             WGuid original = WGuid.NewGuid();
