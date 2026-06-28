@@ -387,22 +387,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static IEnumerator WaitUntil(
             Func<bool> condition,
             string description,
-            int maxFrames = 30
+            int maxFrames = 30,
+            float maxSeconds = 5f
         )
         {
-            for (int i = 0; i < maxFrames; i++)
+            // Bound by BOTH a frame budget and a wall-clock budget. In headless batchmode the frame
+            // rate can exceed several thousand FPS, so a fixed frame count can elapse in well under a
+            // millisecond -- far too little real time for a time-gated condition (e.g. a coroutine that
+            // yields WaitForSeconds). Keep waiting while EITHER budget remains so frame-gated and
+            // time-gated conditions are both satisfied.
+            float deadline = Time.time + maxSeconds;
+            int frames = 0;
+            while (!condition() && (frames < maxFrames || Time.time < deadline))
             {
-                if (condition())
-                {
-                    yield break;
-                }
-
                 yield return null;
+                frames++;
             }
 
             Assert.IsTrue(
                 condition(),
-                $"Timed out after {maxFrames} frame(s) waiting for {description}. Frame={Time.frameCount}, time={Time.time:0.###}."
+                $"Timed out after {frames} frame(s) / {maxSeconds:0.###}s waiting for {description}. Frame={Time.frameCount}, time={Time.time:0.###}."
             );
         }
     }
