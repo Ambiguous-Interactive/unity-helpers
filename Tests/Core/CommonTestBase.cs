@@ -821,6 +821,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected int LeakGuardBaselineCountForTests => _testStartRootIds.Count;
 
         /// <summary>
+        /// True when the package logger (<see cref="WallstopStudiosLogger"/>) actually emits at
+        /// runtime in THIS build. Its <c>Log/LogDebug/LogWarn/LogError</c> bodies are compiled out
+        /// unless <c>ENABLE_UBERLOGGING</c> (auto-defined for editor/dev/debug builds) or one of the
+        /// granular <c>*_LOGGING</c> symbols is set -- so a NON-development IL2CPP player produces NO
+        /// such logs. A test that asserts a log routed through the package logger must skip that
+        /// assertion when this is false, otherwise it fails with "expected log did not appear" for a
+        /// log the build intentionally omits. Mirrors the exact gate in
+        /// <see cref="WallstopStudiosLogger"/>; kept as a <c>static readonly</c> (not <c>const</c>)
+        /// so <c>if (WallstopLoggingCompiledIn)</c> guards do not trip the unreachable-code warning
+        /// that the assembly's warnings-as-errors setting would otherwise promote to a build break.
+        /// </summary>
+        protected static readonly bool WallstopLoggingCompiledIn =
+#if ENABLE_UBERLOGGING || DEBUG_LOGGING || WARN_LOGGING || ERROR_LOGGING || DEVELOPMENT_BUILD || DEBUG || UNITY_EDITOR
+            true;
+#else
+            false;
+#endif
+
+        /// <summary>
+        /// Registers a <see cref="LogAssert.Expect(LogType, Regex)"/> expectation only when the
+        /// package logger is compiled in for this build (see <see cref="WallstopLoggingCompiledIn"/>).
+        /// Use for logs produced via <see cref="WallstopStudiosLogger"/> (<c>component.Log/LogWarn/
+        /// LogError</c>) so the expectation is silently skipped in a NON-development player where those
+        /// bodies are no-ops. For logs emitted via raw <c>UnityEngine.Debug.Log*</c> (which are NOT
+        /// stripped) keep using <see cref="LogAssert.Expect(LogType, Regex)"/> directly.
+        /// </summary>
+        protected static void ExpectWallstopLog(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )
+        {
+            if (!WallstopLoggingCompiledIn)
+            {
+                return;
+            }
+
+            LogAssert.Expect(type, pattern);
+        }
+
+        /// <summary>
         /// Registers an EXPECTED error/warning log pattern that is captured + SUPPRESSED (kept out of
         /// the global Unity log) for the rest of the current PlayMode test, instead of asserted via
         /// LogAssert.Expect. This makes the assertion immune to the Unity Test Framework re-invoking a
@@ -983,6 +1023,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string fieldName
         )
         {
+            // The "Unable to find ..." error is emitted via the package logger
+            // (component.LogError in RelationalComponentProcessor.LogMissingComponentError), whose
+            // body is compiled out in a NON-development player. Skip the expectation there so the
+            // test does not fail for a log the build intentionally omits; the behavioral asserts
+            // (field left null, etc.) still run and validate the resolution result.
+            if (!WallstopLoggingCompiledIn)
+            {
+                return;
+            }
+
             static string Escape(string value) =>
                 System.Text.RegularExpressions.Regex.Escape(value);
 

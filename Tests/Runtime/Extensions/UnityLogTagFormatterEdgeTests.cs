@@ -23,6 +23,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void UnknownTagFallsBack(bool pretty)
         {
+            // go.Log(...) routes through WallstopStudiosLogger, whose body is compiled out in a
+            // non-development player; with no log emitted the logCount assertions below are
+            // meaningless, so skip the case there.
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(
                 new GameObject(nameof(UnknownTagFallsBack), typeof(SpriteRenderer))
             );
@@ -80,6 +88,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void RepeatedSeparatorsAreIgnored(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(
                 new GameObject(nameof(RepeatedSeparatorsAreIgnored), typeof(SpriteRenderer))
             );

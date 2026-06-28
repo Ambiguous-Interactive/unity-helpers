@@ -1088,7 +1088,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            LogAssert.Expect(
+            // Emitted via the package logger, which is compiled out in a non-development player.
+            ExpectWallstopLog(
                 LogType.Warning,
                 new Regex("defines periodic or behaviour data but is Instant")
             );

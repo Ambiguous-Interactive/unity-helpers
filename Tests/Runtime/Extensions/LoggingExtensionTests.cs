@@ -83,6 +83,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void SimpleLogging(bool pretty)
         {
+            // go.Log(...) routes through WallstopStudiosLogger, whose body is compiled out in a
+            // non-development player; with no log emitted the logCount assertions below are
+            // meaningless, so skip the case there.
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(SimpleLogging), typeof(SpriteRenderer)));
 
             int logCount = 0;
@@ -160,6 +168,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void ColorLogging(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(ColorLogging), typeof(SpriteRenderer)));
 
             int logCount = 0;
@@ -259,6 +272,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void BoldLogging(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(BoldLogging), typeof(SpriteRenderer)));
 
             int logCount = 0;
@@ -323,6 +341,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void JsonLogging(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(JsonLogging), typeof(SpriteRenderer)));
 
             int logCount = 0;
@@ -435,6 +458,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void SizeLogging(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(SizeLogging), typeof(SpriteRenderer)));
 
             int logCount = 0;
@@ -494,6 +522,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void DateTimeNormalFormatTests(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(
                 new GameObject(nameof(DateTimeNormalFormatTests), typeof(SpriteRenderer))
             );
@@ -569,6 +602,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void StackedTags(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(StackedTags), typeof(SpriteRenderer)));
             int logCount = 0;
             Exception exception = null;
@@ -645,6 +683,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void TagsDeduplicate(bool pretty)
         {
+            if (!WallstopLoggingCompiledIn)
+            {
+                Assert.Ignore("Package logging is compiled out in this build.");
+            }
+
             GameObject go = Track(new GameObject(nameof(TagsDeduplicate), typeof(SpriteRenderer)));
             int logCount = 0;
             Exception exception = null;

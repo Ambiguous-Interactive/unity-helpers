@@ -57,8 +57,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.InvokeStartForTests();
 
-            Texture maskInMaterial = image.material.GetTexture("_ShapeMask");
-            Assert.That(maskInMaterial, Is.SameAs(mask));
+            // The shape-mask path only engages when the support shader is present and the (possibly
+            // swapped) material actually exposes the _ShapeMask property. In a player build the
+            // Hidden/Wallstop/EnhancedImageSupport shader can be stripped (it is referenced only via
+            // Shader.Find and is not in Always-Included Shaders), so Shader.Find returns null and the
+            // property never exists. Guard the assert exactly like ShapeMaskCanBeChangedAfterStart so
+            // the test validates the mask write where the shader is available and no-ops where it is
+            // stripped, instead of failing for an environment-stripped shader.
+            Material cached = image.material;
+            Shader supportShader = Shader.Find("Hidden/Wallstop/EnhancedImageSupport");
+            if (supportShader != null && cached.HasProperty("_ShapeMask"))
+            {
+                Texture maskInMaterial = cached.GetTexture("_ShapeMask");
+                Assert.That(maskInMaterial, Is.SameAs(mask));
+            }
         }
 
         [Test]

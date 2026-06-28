@@ -435,8 +435,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ErrorMessageTester tester = root.GetComponent<ErrorMessageTester>();
 
-            // Expect error with field name
-            LogAssert.Expect(
+            // Expect error with field name. Emitted via the package logger, which is compiled out in
+            // a non-development player -- ExpectWallstopLog skips the expectation there.
+            ExpectWallstopLog(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(
                     "Unable to find parent component of type .* for field 'missingParentRenderer'"

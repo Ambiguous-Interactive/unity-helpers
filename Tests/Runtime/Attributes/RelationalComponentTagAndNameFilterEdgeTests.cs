@@ -124,7 +124,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject child = Track(new GameObject("Child", typeof(TestInterfaceComponent)));
             child.transform.SetParent(root.transform);
 
-            LogAssert.Expect(
+            // Emitted via the package logger, which is compiled out in a non-development player.
+            ExpectWallstopLog(
                 LogType.Error,
                 new Regex(@"Unable to find child component of type .* for field 'iface'")
             );
@@ -157,7 +158,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             root.AddComponent<BoxCollider>();
             SiblingNoMatchTagTester tester = root.AddComponent<SiblingNoMatchTagTester>();
 
-            LogAssert.Expect(
+            // Emitted via the package logger, which is compiled out in a non-development player.
+            ExpectWallstopLog(
                 LogType.Error,
                 new Regex(
                     @"Unable to find sibling component of type .* for field 'siblingCollider'"

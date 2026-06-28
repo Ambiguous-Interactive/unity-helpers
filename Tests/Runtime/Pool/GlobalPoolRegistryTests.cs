@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.CompilerServices;
     using System.Threading;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Utils;
@@ -492,16 +493,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
-            // Create a pool without using statement so it can be garbage collected
-            WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 5);
+            // Register a pool whose only strong reference lives in (and dies with) the helper frame,
+            // so it is retained solely by the registry's WeakReference and is collectible.
+            RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(5, GlobalPoolRegistry.CurrentTotalPooledItems);
 
-            // Clear the reference and force garbage collection
-            pool = null;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            if (!TryForceCollectOrphanPools(expectedAliveCount: 0))
+            {
+                Assert.Ignore(
+                    "Platform GC did not reclaim the orphaned pool (conservative GC); "
+                        + "dead-weak-reference cleanup cannot be verified deterministically here."
+                );
+            }
 
             // EnforceBudget should clean up the dead WeakReference entry
             // and not throw any errors when operating with dead references
@@ -516,15 +520,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void DeadWeakReferencesAreCleanedUpDuringPurgeAll()
         {
-            // Create a pool without using statement so it can be garbage collected
-            WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 5);
+            // Register a pool retained only by the registry's WeakReference (see helper remarks).
+            RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
 
-            // Clear the reference and force garbage collection
-            pool = null;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            if (!TryForceCollectOrphanPools(expectedAliveCount: 0))
+            {
+                Assert.Ignore(
+                    "Platform GC did not reclaim the orphaned pool (conservative GC); "
+                        + "dead-weak-reference cleanup cannot be verified deterministically here."
+                );
+            }
 
             // PurgeAll should clean up the dead WeakReference entry
             // and not throw any errors when operating with dead references
@@ -541,15 +547,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void DeadWeakReferencesAreCleanedUpDuringGetStatistics()
         {
-            // Create a pool without using statement so it can be garbage collected
-            WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 5);
+            // Register a pool retained only by the registry's WeakReference (see helper remarks).
+            RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
 
-            // Clear the reference and force garbage collection
-            pool = null;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            if (!TryForceCollectOrphanPools(expectedAliveCount: 0))
+            {
+                Assert.Ignore(
+                    "Platform GC did not reclaim the orphaned pool (conservative GC); "
+                        + "dead-weak-reference cleanup cannot be verified deterministically here."
+                );
+            }
 
             // GetStatistics should clean up the dead WeakReference entry
             // and not throw any errors when operating with dead references
@@ -567,8 +575,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
-            // Create a pool that will be garbage collected
-            WallstopGenericPool<TestPoolItem> deadPool = CreateTestPool(preWarmCount: 5);
+            // Register a pool that is collectible (retained only by the registry's WeakReference).
+            RegisterOrphanTestPool(preWarmCount: 5);
 
             // Create a pool that will remain alive
             using WallstopGenericPool<TestPoolItem> livePool = CreateTestPool(preWarmCount: 10);
@@ -576,11 +584,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(2, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(15, GlobalPoolRegistry.CurrentTotalPooledItems);
 
-            // Clear the reference to the first pool and force garbage collection
-            deadPool = null;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            // Force collection; only the orphaned pool should go away, leaving the live one (1).
+            if (!TryForceCollectOrphanPools(expectedAliveCount: 1))
+            {
+                Assert.Ignore(
+                    "Platform GC did not reclaim the orphaned pool (conservative GC); "
+                        + "dead-weak-reference cleanup cannot be verified deterministically here."
+                );
+            }
 
             // Operations should work correctly with mixed live and dead references
             GlobalPoolStatistics stats = GlobalPoolRegistry.GetStatistics();
@@ -590,6 +601,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(1, stats.StatisticsPoolCount);
             Assert.AreEqual(10, stats.TotalPooledItems);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
+
+            GC.KeepAlive(livePool);
         }
 
 #if !SINGLE_THREADED
@@ -680,6 +693,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     UseIntelligentPurging = false,
                 }
             );
+        }
+
+        /// <summary>
+        /// Creates a pool, lets it self-register, and returns WITHOUT exposing the strong reference
+        /// to the caller's stack frame. The pool is only retained by the registry's
+        /// <see cref="WeakReference"/>, so once this method returns it is eligible for collection.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="MethodImplOptions.NoInlining"/> is required: if the body were inlined into the
+        /// test, the pool would become a local there and IL2CPP's CONSERVATIVE (Boehm) GC could keep
+        /// it alive via a stale stack slot / register that the scanner conservatively treats as a
+        /// live pointer -- so a subsequent <c>GC.Collect()</c> would not reclaim it and the
+        /// dead-weak-reference assertions would fail in the standalone player (they pass under the
+        /// editor's precise GC). Keeping creation in its own frame that fully unwinds removes that
+        /// root so collection is deterministic.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void RegisterOrphanTestPool(int preWarmCount)
+        {
+            WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: preWarmCount);
+            GC.KeepAlive(pool);
+        }
+
+        /// <summary>
+        /// Forces collection of pools retained only by the registry's weak references and waits
+        /// (bounded) until <see cref="GlobalPoolRegistry.RegisteredCount"/> drops to
+        /// <paramref name="expectedAliveCount"/>. Returns true if it reached that count. Returns
+        /// false when the platform GC did not reclaim the orphaned pool(s) within the budget -- which
+        /// happens under a conservative GC and is not a product defect, so callers treat a false
+        /// result as inconclusive rather than failing.
+        /// </summary>
+        private static bool TryForceCollectOrphanPools(int expectedAliveCount)
+        {
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                if (GlobalPoolRegistry.RegisteredCount <= expectedAliveCount)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

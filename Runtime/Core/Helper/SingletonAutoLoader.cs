@@ -249,6 +249,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 Type closed = openGenericBase.MakeGenericType(singletonType);
+
+                // Constraint check, explicit on purpose: the singleton bases are declared
+                // `where T : Base<T>`, so a type that does NOT derive from Base<itself> violates the
+                // constraint. The CLR (Mono) throws ArgumentException from MakeGenericType for that
+                // violation, but IL2CPP does NOT validate generic constraints at runtime -- it
+                // returns a usable closed type whose inherited static `Instance` then resolves,
+                // suppressing the "does not derive from ..." diagnostic the callers rely on. Verify
+                // the relationship ourselves (assignability is AOT-safe and runtime-consistent) so a
+                // mismatched entry is reported identically on every backend.
+                if (!closed.IsAssignableFrom(singletonType))
+                {
+                    return null;
+                }
+
                 return closed.GetProperty(
                     nameof(RuntimeSingleton<CoroutineHandler>.Instance),
                     BindingFlags.Public | BindingFlags.Static

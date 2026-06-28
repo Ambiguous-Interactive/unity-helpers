@@ -369,8 +369,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             child.SetActive(false);
             child.transform.SetParent(middle.transform);
 
-            // Expect an error about missing child component due to IncludeInactive=false on attribute
-            LogAssert.Expect(
+            // Expect an error about missing child component due to IncludeInactive=false on attribute.
+            // Emitted via the package logger, which is compiled out in a non-development player.
+            ExpectWallstopLog(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(
                     ".*Unable to find child component of type UnityEngine\\.CapsuleCollider for field 'childCollider'.*"

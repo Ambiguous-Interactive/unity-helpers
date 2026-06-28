@@ -532,7 +532,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        // Allocation-bounds test over a 64x64 (4096-point) cloud run multiple times (warmup +
+        // measured). The KNN concave-hull work runs markedly slower under IL2CPP than under the Mono
+        // editor, exceeding the default 60s case timeout in the standalone player. Raise the budget
+        // (still far below the CI no-output watchdog); the allocation assertion is unchanged.
         [Test]
+        [Timeout(300000)]
         public void ConcaveHullVector2LargePointCloudAllocationsStayBounded()
         {
             const int width = 64;

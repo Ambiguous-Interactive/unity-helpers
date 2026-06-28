@@ -148,7 +148,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             childSpawner._dontDestroyOnLoad = false;
 
             Assert.AreEqual(0, spawner.transform.childCount);
-            LogAssert.Expect(
+            // Emitted via the package logger (this.LogWarn), which is compiled out in a
+            // non-development player -- ExpectWallstopLog skips the expectation there.
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     "Duplicate child prefab detected: TestPrefab"
@@ -225,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             childSpawner._prefabs = new[] { prefab, null };
             childSpawner._dontDestroyOnLoad = false;
 
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex("Unexpectedly null prefab")
             );
@@ -314,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             childSpawner._spawnMethod = ChildSpawnMethod.Start;
             childSpawner._prefabs = new[] { prefab, prefab };
             childSpawner._dontDestroyOnLoad = false;
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(".*Duplicate.*")
             );

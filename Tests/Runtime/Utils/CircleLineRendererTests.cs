@@ -65,7 +65,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             clr.enabled = false;
 
             clr.numSegments = 2;
-            LogAssert.Expect(
+            // These warnings are emitted via the package logger (this.LogWarn), whose body is
+            // compiled out in a non-development player -- ExpectWallstopLog skips the expectations
+            // there so the test does not fail for logs the build intentionally omits.
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(".*Invalid number of segments.*")
             );
@@ -75,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // every OnValidate() call emits exactly the single warning it is asserting.
             clr.numSegments = 4;
             clr.updateRateSeconds = 0;
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(".*Invalid update rate.*")
             );
@@ -84,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             clr.updateRateSeconds = 0.1f;
             clr.minLineWidth = 1f;
             clr.maxLineWidth = 0.5f;
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(".*MaxLineWidth.*MinLineWidth.*")
             );

@@ -2443,6 +2443,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if !EMIT_DYNAMIC_IL
+        // AOT note (this whole !EMIT_DYNAMIC_IL block): Delegate.CreateDelegate cannot bind an open
+        // Func<TInstance,...>/Action<TInstance,...> to an instance method declared on a VALUE TYPE
+        // (the open delegate needs a by-ref receiver), so it throws for value-type TInstance. The
+        // catch then fell back to Expression.Compile(), which under IL2CPP only runs via the tree
+        // interpreter and throws ExecutionEngineException at CALL time for these generic signatures.
+        // When expressions are unavailable (see ExpressionsEnabled -> false on IL2CPP) we instead
+        // wrap MethodInfo.Invoke, which IS AOT-safe (it handles the boxed receiver internally). The
+        // Expression path is preserved verbatim for platforms where it works (Mono editor/runtime).
         private static Delegate BuildInstanceInvoker0<TInstance, TReturn>(MethodInfo method)
         {
             try
@@ -2451,6 +2459,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Func<TInstance, TReturn>)(
+                        instance => (TReturn)method.Invoke(instance, Array.Empty<object>())
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 MethodCallExpression call = Expression.Call(inst, method);
                 return Expression.Lambda<Func<TInstance, TReturn>>(call, inst).Compile();
@@ -2465,6 +2480,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Func<TInstance, T1, TReturn>)(
+                        (instance, a) => (TReturn)method.Invoke(instance, new object[] { a })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 MethodCallExpression call = Expression.Call(inst, method, a);
@@ -2480,6 +2502,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Func<TInstance, T1, T2, TReturn>)(
+                        (instance, a, b) => (TReturn)method.Invoke(instance, new object[] { a, b })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -2500,6 +2529,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Func<TInstance, T1, T2, T3, TReturn>)(
+                        (instance, a, b, c) =>
+                            (TReturn)method.Invoke(instance, new object[] { a, b, c })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -2521,6 +2558,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Func<TInstance, T1, T2, T3, T4, TReturn>)(
+                        (instance, a, b, c, d) =>
+                            (TReturn)method.Invoke(instance, new object[] { a, b, c, d })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -2541,6 +2586,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Action<TInstance>)(
+                        instance => method.Invoke(instance, Array.Empty<object>())
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 MethodCallExpression call = Expression.Call(inst, method);
                 return Expression.Lambda<Action<TInstance>>(call, inst).Compile();
@@ -2555,6 +2607,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Action<TInstance, T1>)(
+                        (instance, a) => method.Invoke(instance, new object[] { a })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 MethodCallExpression call = Expression.Call(inst, method, a);
@@ -2570,6 +2629,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Action<TInstance, T1, T2>)(
+                        (instance, a, b) => method.Invoke(instance, new object[] { a, b })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -2588,6 +2654,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Action<TInstance, T1, T2, T3>)(
+                        (instance, a, b, c) => method.Invoke(instance, new object[] { a, b, c })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -2609,6 +2682,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch
             {
+                if (!ExpressionsEnabled)
+                {
+                    return (Action<TInstance, T1, T2, T3, T4>)(
+                        (instance, a, b, c, d) =>
+                            method.Invoke(instance, new object[] { a, b, c, d })
+                    );
+                }
+
                 ParameterExpression inst = Expression.Parameter(typeof(TInstance), "instance");
                 ParameterExpression a = Expression.Parameter(typeof(T1), "a");
                 ParameterExpression b = Expression.Parameter(typeof(T2), "b");
@@ -3125,16 +3206,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool ReadEnabledProperty(object instance, PropertyInfo property)
         {
-            // Behaviour (every MonoBehaviour plus most built-in components) is read directly; any
-            // other component exposing a bool "enabled" property falls back to reflection GetValue.
-            // Both are AOT-safe -- neither uses Reflection.Emit, DynamicInvoke, or value-type
-            // generic instantiation, all of which IL2CPP cannot service.
-            if (instance is UnityEngine.Behaviour behaviour)
+            // Read the well-known built-in `enabled` properties through DIRECT typed casts, not
+            // reflection. The three base types below cover every Unity component that exposes a bool
+            // `enabled`: Behaviour (all MonoBehaviours + e.g. Collider2D, most built-ins), Collider
+            // (3D colliders are Components, NOT Behaviours), and Renderer. The typed path is the only
+            // reliably AOT-safe option: under IL2CPP, PropertyInfo.GetValue on a built-in engine
+            // property (notably Collider.enabled) does not work -- the read fails/returns wrong and
+            // IsComponentEnabled's catch then defaults the component to "enabled", which silently
+            // broke include-inactive filtering for disabled Colliders/Renderers in player builds.
+            // Plain `(bool)property.GetValue` remains the fallback for any other custom component
+            // type that happens to expose a bool `enabled`.
+            switch (instance)
             {
-                return behaviour.enabled;
+                case UnityEngine.Behaviour behaviour:
+                    return behaviour.enabled;
+                case UnityEngine.Collider collider:
+                    return collider.enabled;
+                case UnityEngine.Renderer renderer:
+                    return renderer.enabled;
+                default:
+                    return (bool)property.GetValue(instance);
             }
-
-            return (bool)property.GetValue(instance);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3144,6 +3236,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (component == null)
             {
                 return false;
+            }
+
+            // Direct typed fast-paths for the built-in `enabled`-bearing base types. This runs BEFORE
+            // (and independently of) the reflection-based getter so it cannot be defeated by IL2CPP
+            // reflection gaps: GetProperty("enabled") returning null or PropertyInfo.GetValue
+            // failing on a built-in engine property (observed for Collider under IL2CPP) would
+            // otherwise leave enabledGetter null / throw, and the fallbacks below return true --
+            // defaulting a DISABLED Collider/Renderer to "enabled" and breaking include-inactive
+            // filtering in player builds. Behaviour covers all MonoBehaviours and most built-ins;
+            // Collider (3D) and Renderer are Components, not Behaviours, and need their own cast.
+            switch (component)
+            {
+                case UnityEngine.Behaviour behaviour:
+                    return behaviour.enabled;
+                case UnityEngine.Collider collider:
+                    return collider.enabled;
+                case UnityEngine.Renderer renderer:
+                    return renderer.enabled;
             }
 
             Type componentType = component.GetType();
@@ -3828,6 +3938,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static bool CheckExpressionCompilationSupport()
         {
 #if !SUPPORT_EXPRESSION_COMPILE
+            // SUPPORT_EXPRESSION_COMPILE is left undefined for IL2CPP and non-editor WebGL (see the
+            // file header), so expression compilation is already reported unavailable there and the
+            // factory uses the AOT-safe reflection paths.
             return false;
 #else
             try

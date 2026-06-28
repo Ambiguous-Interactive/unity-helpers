@@ -649,7 +649,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
+        // Correctness/metrics test over a large (~21k-point) cloud. The concave-hull + repair work
+        // is heavy and runs markedly slower under IL2CPP than under the Mono editor, exceeding the
+        // default 60s case timeout in the standalone player. Raise the budget (still far below the
+        // CI no-output watchdog) rather than shrink the cloud, so coverage is unchanged.
         [Test]
+        [Timeout(300000)]
         public void ConcaveHullRepairMetricsRemainBoundedAcrossMultipleCavities()
         {
             Grid grid = CreateGrid(out GameObject owner);

@@ -43,31 +43,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
             AssignmentComponent component = go.GetComponent<AssignmentComponent>();
 
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     @"^\d+(\.\d+)?\|ValidateAssignmentsLogs\[AssignmentComponent\]\|requiredObject not found\.$"
                 )
             );
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     @"^\d+(\.\d+)?\|ValidateAssignmentsLogs\[AssignmentComponent\]\|requiredString not found\.$"
                 )
             );
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     @"^\d+(\.\d+)?\|ValidateAssignmentsLogs\[AssignmentComponent\]\|requiredList not found\.$"
                 )
             );
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     @"^\d+(\.\d+)?\|ValidateAssignmentsLogs\[AssignmentComponent\]\|requiredCollection not found\.$"
                 )
             );
-            LogAssert.Expect(
+            ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(
                     @"^\d+(\.\d+)?\|ValidateAssignmentsLogs\[AssignmentComponent\]\|requiredEnumerable not found\.$"
