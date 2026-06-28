@@ -1350,6 +1350,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
         }
 
+        /// <summary>
+        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
+        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
+        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
+        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
+        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
+        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
+        /// test-specific failure message. For <c>[UnityTest]</c> fixtures. Runtime-safe (no editor
+        /// API), so it is available to the standalone player build too.
+        /// </summary>
+        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
+        {
+            if (obj == null)
+            {
+                yield break;
+            }
+
+            Type objectType = obj.GetType();
+            string objectName = obj.name;
+            long objectId = obj.GetUnityObjectId();
+
+            for (int i = 0; i < maxFrames; i++)
+            {
+                if (obj == null)
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+
+            int liveObjectCount = -1;
+            try
+            {
+                liveObjectCount = Resources.FindObjectsOfTypeAll(objectType).Length;
+            }
+            catch (Exception ex)
+            {
+                TestContext.WriteLine(
+                    $"WaitUntilDestroyed failed to count live {objectType.FullName} objects: {ex.Message}"
+                );
+            }
+
+            TestContext.WriteLine(
+                $"WaitUntilDestroyed timed out after {maxFrames} frame(s). "
+                    + $"Object '{objectName}' ({objectType.FullName}, instance {objectId}) "
+                    + $"still reports alive. Application.isPlaying={Application.isPlaying}, "
+                    + $"live objects of same type={liveObjectCount}."
+            );
+        }
+
 #if UNITY_EDITOR
         private void CloseTrackedScenesInEditor()
         {
@@ -1787,56 +1837,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 #endif
-        }
-
-        /// <summary>
-        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
-        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
-        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
-        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
-        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
-        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
-        /// test-specific failure message. For <c>[UnityTest]</c> fixtures. Runtime-safe (no editor
-        /// API), so it is available to the standalone player build too.
-        /// </summary>
-        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
-        {
-            if (obj == null)
-            {
-                yield break;
-            }
-
-            Type objectType = obj.GetType();
-            string objectName = obj.name;
-            long objectId = obj.GetUnityObjectId();
-
-            for (int i = 0; i < maxFrames; i++)
-            {
-                if (obj == null)
-                {
-                    yield break;
-                }
-                yield return null;
-            }
-
-            int liveObjectCount = -1;
-            try
-            {
-                liveObjectCount = Resources.FindObjectsOfTypeAll(objectType).Length;
-            }
-            catch (Exception ex)
-            {
-                TestContext.WriteLine(
-                    $"WaitUntilDestroyed failed to count live {objectType.FullName} objects: {ex.Message}"
-                );
-            }
-
-            TestContext.WriteLine(
-                $"WaitUntilDestroyed timed out after {maxFrames} frame(s). "
-                    + $"Object '{objectName}' ({objectType.FullName}, instance {objectId}) "
-                    + $"still reports alive. Application.isPlaying={Application.isPlaying}, "
-                    + $"live objects of same type={liveObjectCount}."
-            );
         }
 
 #if UNITY_EDITOR
