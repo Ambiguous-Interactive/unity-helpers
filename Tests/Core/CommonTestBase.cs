@@ -47,13 +47,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected readonly List<IDisposable> _trackedDisposables = new();
         protected readonly List<Scene> _trackedScenes = new();
 
-        // TEMP DIAGNOSTIC (remove after CI batchmode root-cause): records, across ALL tests, the most
-        // recent Track() of each Unity instance id (name / test / frame). Lets the leak guard report
-        // whether a swept "leak" was EVER tracked -- resolving the data-vs-code contradiction where the
-        // only code creating the leaked names Track()s them, yet the guard sweeps a live instance.
-        private static readonly Dictionary<long, string> EverTrackedDiagnostics = new();
-        private static bool _bleedProbeInstalled;
-
         // Expected-error capture: the Unity Test Framework re-invokes completed test bodies on scene
         // ops in batchmode, re-emitting their EXPECTED logs into bystanders. Capturing+suppressing the
         // expected patterns via a custom log handler keeps them out of the global log entirely, so a
@@ -171,92 +164,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             if (Application.isPlaying)
             {
                 InstallExpectedErrorSuppression();
-                InstallBleedProbe();
                 CaptureLeakGuardBaseline();
             }
 
             yield break;
-        }
-
-        // TEMP DIAGNOSTIC (remove after CI batchmode root-cause): logs, via Debug.Log (LogType.Log is
-        // visible in CI and never trips LogAssert), the frame + current test at which each bleed-prone
-        // EXPECTED log is actually DELIVERED to the log system. Correlating that against which test's
-        // teardown reports it Unhandled measures the batchmode log-delivery lag behind the producer.
-        private static void InstallBleedProbe()
-        {
-            if (_bleedProbeInstalled)
-            {
-                return;
-            }
-            _bleedProbeInstalled = true;
-            Application.logMessageReceived += OnBleedProbeLog;
-        }
-
-        private static void OnBleedProbeLog(string condition, string stackTrace, LogType type)
-        {
-            if (
-                condition == null
-                || (type != LogType.Error && type != LogType.Exception && type != LogType.Warning)
-            )
-            {
-                return;
-            }
-
-            if (
-                condition.IndexOf("Unable to find", StringComparison.Ordinal) < 0
-                && condition.IndexOf("Double singleton detected", StringComparison.Ordinal) < 0
-                && condition.IndexOf("skipped serialized entry", StringComparison.Ordinal) < 0
-                && condition.IndexOf("ExceptionLoggingFormatsOutput", StringComparison.Ordinal) < 0
-                && condition.IndexOf("Test exception", StringComparison.Ordinal) < 0
-            )
-            {
-                return;
-            }
-
-            string test = "?";
-            try
-            {
-                test = TestContext.CurrentContext?.Test?.Name ?? "?";
-            }
-            catch
-            {
-                // No active test context; ignore.
-            }
-
-            int length = Math.Min(80, condition.Length);
-            string stack = "";
-            if (
-                condition.IndexOf("Unable to find", StringComparison.Ordinal) >= 0
-                || condition.IndexOf("Double singleton", StringComparison.Ordinal) >= 0
-            )
-            {
-                // The ORIGINAL log call's stack reveals the re-emit walker. A blind char-cap only
-                // reached the logger frames, so keep only the frames that identify WHO re-Assigns the
-                // leaked tester (assign chain, DI integration, coroutine driver, test method, Awake).
-                string raw = stackTrace ?? "";
-                stack = " stack=";
-                foreach (string frame in raw.Split('\n'))
-                {
-                    if (
-                        frame.IndexOf("Assign", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("Integrations", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("EntryPoint", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("Bootstrapper", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("SceneLoad", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("Initialize", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("Awake", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("RuntimeSingleton", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("Tests.", StringComparison.Ordinal) >= 0
-                        || frame.IndexOf("MoveNext", StringComparison.Ordinal) >= 0
-                    )
-                    {
-                        stack += frame.Replace("\r", "").Trim() + " | ";
-                    }
-                }
-            }
-            Debug.Log(
-                $"[uh-probe] delivered type={type} frame={Time.frameCount} test={test} msg={condition.Substring(0, length)}{stack}"
-            );
         }
 
         protected GameObject NewGameObject(string name = "GameObject")
@@ -281,43 +192,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             if (obj != null)
             {
                 _trackedObjects.Add(obj);
-                RecordTrackDiagnostic(obj);
             }
             return obj;
-        }
-
-        // TEMP DIAGNOSTIC (remove after CI batchmode root-cause).
-        private static void RecordTrackDiagnostic(Object obj)
-        {
-            if (EverTrackedDiagnostics.Count > 8000)
-            {
-                EverTrackedDiagnostics.Clear();
-            }
-            string test = "?";
-            try
-            {
-                test = TestContext.CurrentContext?.Test?.Name ?? "?";
-            }
-            catch
-            {
-                // No active test context (e.g. one-time setup); ignore.
-            }
-            string entry = $"{obj.name}/{test}@f{Time.frameCount}";
-            // Capture the creation/track stack for coroutine hosts only (rare -> cheap): reveals what
-            // calls CreateHost when a 'Helpers_CoroutineHost' is tracked during an unrelated test.
-            if (
-                obj.name != null
-                && obj.name.IndexOf("CoroutineHost", StringComparison.Ordinal) >= 0
-            )
-            {
-                string raw = Environment.StackTrace ?? "";
-                entry +=
-                    " stack="
-                    + raw.Substring(0, Math.Min(500, raw.Length))
-                        .Replace("\r", "")
-                        .Replace("\n", " | ");
-            }
-            EverTrackedDiagnostics[obj.GetUnityObjectId()] = entry;
         }
 
         protected GameObject Track(GameObject obj)
@@ -913,15 +789,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            // TEMP DIAGNOSTIC (remove after CI batchmode root-cause): append whether this swept root was
-            // EVER tracked (and by which test/frame), plus its active state, to resolve whether the leak
-            // is a tracked object that survived its destroy or a genuinely untracked instance.
-            long id = root.GetUnityObjectId();
-            string everTracked = EverTrackedDiagnostics.TryGetValue(id, out string diag)
-                ? diag
-                : "NEVER-TRACKED";
             return $"'{root.name}' ({componentType}, scene '{root.scene.name}', "
-                + $"instance {id}, active={root.activeInHierarchy}, everTracked={everTracked})";
+                + $"instance {root.GetUnityObjectId()}, active={root.activeInHierarchy})";
         }
 
         /// <summary>
