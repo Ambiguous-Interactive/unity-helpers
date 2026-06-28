@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
+    using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
     /// Roots, for the IL2CPP AOT compiler, the closed generic protobuf serializer instantiations the
@@ -59,6 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 RootWrapperConstructors();
                 RootDirectlySerializedCollections();
                 ReferenceStructValueTypePaths();
+                RootNullableElementPaths();
+                RootRandomPolymorphicGraph();
             }
         }
 
@@ -157,6 +160,69 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             where T : struct
         {
             _ = EqualityComparer<T>.Default;
+            using System.IO.MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize<T>(stream, default);
+            stream.Position = 0;
+            _ = ProtoBuf.Serializer.Deserialize<T>(stream);
+        }
+
+        // Nullable members (AbstractRandom._cachedGaussian is double?, UnityRandom._seed is int?) make
+        // protobuf-net resolve ConcreteStub<Nullable<T>> and ConcreteStub<T> reflectively; without a
+        // static site IL2CPP never emits them and the runtime throws "No serializer defined for
+        // System.Nullable`1[...]". Rooting both the underlying and the nullable round-trip emits both.
+        private static void RootNullableElementPaths()
+        {
+            ReferenceValueType<double>();
+            ReferenceValueType<int>();
+            ReferenceNullableValueType<double>();
+            ReferenceNullableValueType<int>();
+        }
+
+        private static void ReferenceNullableValueType<T>()
+            where T : struct
+        {
+            _ = EqualityComparer<T?>.Default;
+            using System.IO.MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize<T?>(stream, default);
+            stream.Position = 0;
+            _ = ProtoBuf.Serializer.Deserialize<T?>(stream);
+        }
+
+        // The AbstractRandom [ProtoInclude] graph (17 concrete subtypes) is polymorphic; protobuf-net
+        // resolves each subtype's serializer and members reflectively, so IL2CPP emits none of them
+        // without a static site. Rooting the base round-trip plus each concrete subtype emits the full
+        // polymorphic graph (and, with the nullable hints above, their double?/int? members).
+        private static void RootRandomPolymorphicGraph()
+        {
+            using (System.IO.MemoryStream stream = new())
+            {
+                ProtoBuf.Serializer.Serialize<AbstractRandom>(stream, default);
+                stream.Position = 0;
+                _ = ProtoBuf.Serializer.Deserialize<AbstractRandom>(stream);
+            }
+
+            ReferenceRandom<DotNetRandom>();
+            ReferenceRandom<PcgRandom>();
+            ReferenceRandom<XorShiftRandom>();
+            ReferenceRandom<WyRandom>();
+            ReferenceRandom<XoroShiroRandom>();
+            ReferenceRandom<UnityRandom>();
+            ReferenceRandom<SystemRandom>();
+            ReferenceRandom<LinearCongruentialGenerator>();
+            ReferenceRandom<SquirrelRandom>();
+            ReferenceRandom<RomuDuo>();
+            ReferenceRandom<SplitMix64>();
+            ReferenceRandom<IllusionFlow>();
+            ReferenceRandom<FlurryBurstRandom>();
+            ReferenceRandom<PhotonSpinRandom>();
+            ReferenceRandom<StormDropRandom>();
+            ReferenceRandom<BlastCircuitRandom>();
+            ReferenceRandom<WaveSplatRandom>();
+        }
+
+        private static void ReferenceRandom<T>()
+            where T : AbstractRandom
+        {
             using System.IO.MemoryStream stream = new();
             ProtoBuf.Serializer.Serialize<T>(stream, default);
             stream.Position = 0;
