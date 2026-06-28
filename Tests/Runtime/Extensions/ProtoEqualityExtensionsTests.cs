@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+    [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoEqualityExtensionsTests : CommonTestBase
     {
         [ProtoContract]
@@ -180,7 +181,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsComplexObjectsDifferentNestedReturnsFalse()
         {
             ComplexMessage obj1 = new()
@@ -204,7 +204,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsComplexObjectsDifferentListReturnsFalse()
         {
             ComplexMessage obj1 = new()
@@ -228,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsEmptyCollectionsReturnsTrue()
         {
             CollectionMessage obj1 = new()
@@ -294,7 +292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsValueTypesIdenticalReturnsTrue()
         {
             ValueTypeMessage val1 = new() { X = 10, Y = 20 };
@@ -309,7 +306,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsValueTypesDifferentReturnsFalse()
         {
             ValueTypeMessage val1 = new() { X = 10, Y = 20 };
@@ -548,7 +544,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoEqualsComplexObjectsOneNullNestedReturnsFalse()
         {
             ComplexMessage obj1 = new()
