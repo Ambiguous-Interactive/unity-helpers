@@ -12,7 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
-    using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -70,42 +69,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
-        public IEnumerator StartSceneOnlyOneInstance()
+        public IEnumerator OnlyOneInstanceAfterDuplicateCreation()
         {
-            int sceneCount = SceneManager.sceneCountInBuildSettings;
-            if (sceneCount == 0)
-            {
-                Assert.Fail("No scenes in build settings");
-                yield break;
-            }
+            // RuntimeSingleton invariant: a second UnityMainThreadDispatcher must be deduplicated down
+            // to a single live instance. This deliberately verifies that WITHOUT loading a scene by
+            // build index. Loading build index 0 inside a PlayMode test resolves to the runner's backup
+            // scene (Temp/__Backupscenes/0.backup) and makes the Unity batchmode test framework
+            // RE-INVOKE already-completed test method bodies; those re-runs re-emit each test's expected
+            // logs (e.g. relational "Unable to find ... component") and re-leak their tracked objects
+            // into whatever bystander is running, failing it -- the dominant cross-test-pollution
+            // trigger for the whole PlayMode suite. A Single->Additive load did NOT avoid it (the
+            // trigger is the build-index-0 load specifically; path-based additive loads do not cascade).
+            // UnityMainThreadDispatcher has no sceneLoaded hook, so a real scene load exercises no
+            // dispatcher code path that creating a duplicate directly does not: dedup runs in
+            // RuntimeSingleton.Start() and, because LogErrorOnDestruction is false here, logs at Log
+            // level (not Error), so no LogAssert.Expect is required.
+            UnityMainThreadDispatcher canonical = UnityMainThreadDispatcher.Instance;
+            Assert.IsTrue(
+                canonical != null,
+                "Expected an auto-created UnityMainThreadDispatcher instance."
+            );
+            yield return null;
 
-            // A single-mode LoadScene REPLACES the active test scene, which destroys the PlayMode test
-            // runner's non-DontDestroyOnLoad state and makes the Unity Test Framework re-invoke
-            // already-completed test methods. Those re-runs re-emit each test's expected logs (e.g.
-            // relational "Unable to find ... component", "Double singleton detected") into whatever
-            // bystander is running, failing it via LogAssert.NoUnexpectedReceived -- this single Single
-            // load was the dominant cross-test-pollution trigger for the whole PlayMode suite. Load the
-            // scene ADDITIVELY instead: dispatcher dedup is still exercised on a real scene load without
-            // wiping the runner. Unload the probe scene afterward so it does not pollute later tests.
-            yield return SceneManager.LoadSceneAsync(0, LoadSceneMode.Additive);
-            Scene probeScene = SceneManager.GetSceneByBuildIndex(0);
+            GameObject duplicate = Track(
+                new GameObject($"{nameof(UnityMainThreadDispatcher)}-Duplicate")
+            );
+            duplicate.AddComponent<UnityMainThreadDispatcher>();
+
+            // Dedup happens in Start() (next frame) and the destroy is deferred to end of frame, so
+            // poll until the live count settles to <= 1 before asserting.
             Stopwatch timer = Stopwatch.StartNew();
+            UnityMainThreadDispatcher[] dispatchers;
             do
             {
-                UnityMainThreadDispatcher[] dispatchers =
-                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-                Assert.LessOrEqual(
-                    dispatchers.Length,
-                    1,
-                    $"Expected 0 or 1 live UnityMainThreadDispatcher object, got {dispatchers.Length}. {DescribeDispatchers(dispatchers)}"
-                );
                 yield return null;
-            } while (timer.Elapsed < TimeSpan.FromSeconds(1));
+                dispatchers = Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            } while (dispatchers.Length > 1 && timer.Elapsed < TimeSpan.FromSeconds(2));
 
-            if (probeScene.IsValid() && probeScene.isLoaded)
-            {
-                yield return SceneManager.UnloadSceneAsync(probeScene);
-            }
+            Assert.LessOrEqual(
+                dispatchers.Length,
+                1,
+                $"Expected 0 or 1 live UnityMainThreadDispatcher after duplicate creation, got {dispatchers.Length}. {DescribeDispatchers(dispatchers)}"
+            );
         }
 
         [Test]

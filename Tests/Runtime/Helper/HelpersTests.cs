@@ -303,21 +303,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public IEnumerator StartFunctionAsCoroutineWaitsBeforeFirstInvocationWhenRequested()
         {
             CoroutineHost host = CreateHost();
+            host.ResetState();
 
+            // Use an interval comfortably larger than a single (possibly slow, ~50-70ms) batchmode
+            // frame and assert frame-independently: the coroutine cannot invoke synchronously
+            // (StartCoroutine only advances it to the first WaitForDelay yield), and with waitBefore the
+            // first invocation must land no earlier than ~interval after start. Asserting "0 after
+            // exactly one yield" used to flake because a single slow frame can span a sub-frame delay.
+            const float interval = 0.25f;
+            float start = Time.time;
             Coroutine coroutine = host.StartFunctionAsCoroutine(
                 host.Increment,
-                0.01f,
+                interval,
                 useJitter: false,
                 waitBefore: true
             );
 
-            yield return null;
-            Assert.AreEqual(0, host.InvocationCount);
+            Assert.AreEqual(0, host.InvocationCount, "waitBefore must not invoke synchronously.");
 
-            while (host.InvocationCount == 0)
+            float timeout = Time.time + interval + 5f;
+            while (host.InvocationCount == 0 && Time.time < timeout)
             {
                 yield return null;
             }
+
+            Assert.Greater(
+                host.InvocationCount,
+                0,
+                "Invocation never occurred after the waitBefore delay elapsed."
+            );
+            Assert.GreaterOrEqual(
+                Time.time - start,
+                interval * 0.5f,
+                "waitBefore should delay the first invocation by approximately the interval."
+            );
 
             host.StopCoroutine(coroutine);
         }
@@ -327,24 +346,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             CoroutineHost host = CreateHost();
             host.ResetState();
-            Helpers.JitterSampler = _ => 0.02f;
+
+            // Jitter is clamped to the interval (Helpers.SampleInitialJitter -> Min(jitter, interval)),
+            // so use an interval/jitter comfortably larger than one (~50-70ms) batchmode frame and
+            // assert frame-independently. Otherwise a single slow frame can span the whole sub-frame
+            // delay and invoke on frame 1, which previously flaked this test ("Expected 0 But was 1").
+            const float interval = 0.25f;
+            Helpers.JitterSampler = _ => interval;
+            float start = Time.time;
 
             Coroutine coroutine = host.StartFunctionAsCoroutine(
                 host.Increment,
-                0.05f,
+                interval,
                 useJitter: true
             );
 
             try
             {
-                yield return null;
-                Assert.AreEqual(
-                    0,
-                    host.InvocationCount,
-                    "Jitter should delay the first invocation."
-                );
+                Assert.AreEqual(0, host.InvocationCount, "Jitter must not invoke synchronously.");
 
-                float timeout = Time.time + 0.5f;
+                float timeout = Time.time + interval + 5f;
                 while (host.InvocationCount == 0 && Time.time < timeout)
                 {
                     yield return null;
@@ -354,6 +375,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     host.InvocationCount,
                     0,
                     "Invocation never occurred after jitter delay elapsed."
+                );
+                Assert.GreaterOrEqual(
+                    Time.time - start,
+                    interval * 0.5f,
+                    "Jitter should delay the first invocation."
                 );
             }
             finally

@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
             // LoadScene replaces the scene (the scoped container is normally torn down with it), so
             // re-assigning here is wrong -- and a listener that outlived its container would re-emit
             // another fixture's required-field [Error] into whatever later test triggered the load
-            // (e.g. UnityMainThreadDispatcherTests.StartSceneOnlyOneInstance's LoadScene(0)).
+            // (e.g. any later PlayMode test that performs a scene load).
             if (mode != LoadSceneMode.Additive)
             {
                 return;
