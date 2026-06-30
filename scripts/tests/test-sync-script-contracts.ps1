@@ -1103,6 +1103,8 @@ function Run-ReleaseTagWorkflowContractTests {
 
   $subjectCheckIndex = $workflowContent.IndexOf('subject="$(git log -1 --format=%s)"', [StringComparison]::Ordinal)
   $nonReleaseExitIndex = $workflowContent.IndexOf('Head commit is not a release commit; nothing to do.', [StringComparison]::Ordinal)
+  $existingTagNoOpIndex = $workflowContent.IndexOf('git show-ref --verify --quiet "refs/tags/${version}"', [StringComparison]::Ordinal)
+  $untaggedWarningIndex = $workflowContent.IndexOf('Version ${version} is untagged and CHANGELOG.md documents it', [StringComparison]::Ordinal)
   $nonReleaseProceedFalseIndex = if ($subjectCheckIndex -ge 0) {
     $workflowContent.IndexOf('echo "proceed=false" >> "${GITHUB_OUTPUT}"', $subjectCheckIndex, [StringComparison]::Ordinal)
   } else {
@@ -1129,6 +1131,12 @@ function Run-ReleaseTagWorkflowContractTests {
     $tagLookupIndex -gt $releaseHeadingValidationIndex -and
     $tagMismatchIndex -gt $tagLookupIndex
   )
+  $checksLocalTagBeforeUntaggedWarning = (
+    $subjectCheckIndex -ge 0 -and
+    $existingTagNoOpIndex -gt $subjectCheckIndex -and
+    $untaggedWarningIndex -gt $existingTagNoOpIndex -and
+    $existingTagNoOpIndex -lt $nonReleaseProceedFalseIndex
+  )
   $usesRobustTagLookup = (
     $tagLookupIndex -ge 0 -and
     $workflowContent.Contains('tag_lookup_exit=$?') -and
@@ -1154,6 +1162,11 @@ function Run-ReleaseTagWorkflowContractTests {
     -TestName 'release tag workflow checks existing tags without hiding API failures' `
     -Passed $usesRobustTagLookup `
     -Message 'Expected release-tag.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow suppresses untagged warning for locally-known tags' `
+    -Passed $checksLocalTagBeforeUntaggedWarning `
+    -Message 'Expected release-tag.yml to check refs/tags/${version} before warning that the documented version is untagged.'
 
   Write-TestResult `
     -TestName 'release tag workflow checks app credentials before token action' `
