@@ -136,7 +136,7 @@ jobs:
             echo "::error::Tag ${version} already exists."
             exit 1
           fi
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+          if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
             echo "::error::Branch ${branch} already exists."
             exit 1
           fi

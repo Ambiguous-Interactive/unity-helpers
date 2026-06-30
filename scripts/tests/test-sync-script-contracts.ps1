@@ -988,6 +988,26 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -Message 'Expected Verify GitHub Release assets to set GH_REPO from github.repository.'
 }
 
+function Run-ReleasePrepareWorkflowContractTests {
+  Write-Host ""
+  Write-Host "Release prepare workflow contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/release-prepare.yml'
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+
+  $usesGitBranchLookup = (
+    $workflowContent.Contains('git ls-remote --exit-code --heads origin "${branch}"') -and
+    -not $workflowContent.Contains('git/ref/heads/${branch}')
+  )
+
+  Write-TestResult `
+    -TestName 'release prepare checks existing release branches with git heads lookup' `
+    -Passed $usesGitBranchLookup `
+    -Message 'Expected release-prepare.yml to avoid slash-sensitive git/ref/heads/${branch} API paths.'
+}
+
 function Run-ReleaseTagWorkflowContractTests {
   Write-Host ""
   Write-Host "Release tag workflow contracts:" -ForegroundColor Magenta
@@ -1013,6 +1033,11 @@ function Run-ReleaseTagWorkflowContractTests {
     $workflowContent.Contains('required to push release tags')
   )
 
+  $hasDefaultBranchGate = (
+    $workflowContent.Contains('github.ref_name == github.event.repository.default_branch') -and
+    $workflowContent -notmatch "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*branches:"
+  )
+
   Write-TestResult `
     -TestName 'release tag workflow fails when existing tag points elsewhere' `
     -Passed $hasTagTargetCheck `
@@ -1022,6 +1047,11 @@ function Run-ReleaseTagWorkflowContractTests {
     -TestName 'release tag workflow checks app credentials before token action' `
     -Passed $hasCredentialCheck `
     -Message 'Expected release-tag.yml to validate AUTO_COMMIT_APP_* before create-github-app-token.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow runs on repository default branch' `
+    -Passed $hasDefaultBranchGate `
+    -Message 'Expected release-tag.yml to avoid hard-coded main/master branch filters and gate on github.event.repository.default_branch.'
 }
 
 function Run-ReleasePackageContentContractTests {
@@ -1139,6 +1169,7 @@ Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
+Run-ReleasePrepareWorkflowContractTests
 Run-ReleaseTagWorkflowContractTests
 Run-ReleasePackageContentContractTests
 Print-SummaryAndExit
