@@ -988,6 +988,48 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -Message 'Expected Verify GitHub Release assets to set GH_REPO from github.repository.'
 }
 
+function Run-ReleasePublishWorkflowBudgetContractTests {
+  Write-Host ""
+  Write-Host "Release publish workflow budget contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+  $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
+  $exporterContent = Get-Content -Path $exporterPath -Raw
+
+  $jobTimeoutMatch = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*unitypackage:\s*.*?^\s*timeout-minutes:\s*(?<minutes>\d+)\s*$'
+  )
+  $lockTimeoutMatch = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*- name: Acquire organization Unity lock\s*\r?\n(?:(?!^\s*- name:).)*?^\s+with:\s*\r?\n(?:(?!^\s*- name:).)*?^\s+timeout-minutes:\s*["'']?(?<minutes>\d+)["'']?\s*$'
+  )
+  $unityTimeoutMatch = [regex]::Match(
+    $exporterContent,
+    'UNITY_TIMEOUT="\$\{UNITY_TIMEOUT:-(?<seconds>\d+)\}"'
+  )
+
+  $jobTimeoutMinutes = if ($jobTimeoutMatch.Success) { [int]$jobTimeoutMatch.Groups['minutes'].Value } else { 0 }
+  $lockTimeoutMinutes = if ($lockTimeoutMatch.Success) { [int]$lockTimeoutMatch.Groups['minutes'].Value } else { 0 }
+  $unityTimeoutMinutes = if ($unityTimeoutMatch.Success) { [int][Math]::Ceiling(([int]$unityTimeoutMatch.Groups['seconds'].Value) / 60.0) } else { 0 }
+  $minimumOverheadMinutes = 30
+  $requiredJobTimeoutMinutes = $lockTimeoutMinutes + $unityTimeoutMinutes + $minimumOverheadMinutes
+  $timeoutBudgetIsCoherent = (
+    $jobTimeoutMatch.Success -and
+    $lockTimeoutMatch.Success -and
+    $unityTimeoutMatch.Success -and
+    $jobTimeoutMinutes -ge $requiredJobTimeoutMinutes
+  )
+
+  Write-TestResult `
+    -TestName 'release unitypackage job timeout covers lock wait and export budget' `
+    -Passed $timeoutBudgetIsCoherent `
+    -Message "Expected unitypackage job timeout to be at least lock timeout + Unity export timeout + ${minimumOverheadMinutes}m overhead. Job=${jobTimeoutMinutes}m, lock=${lockTimeoutMinutes}m, Unity=${unityTimeoutMinutes}m, required=${requiredJobTimeoutMinutes}m."
+}
+
 function Run-ReleasePrepareWorkflowContractTests {
   Write-Host ""
   Write-Host "Release prepare workflow contracts:" -ForegroundColor Magenta
@@ -1201,6 +1243,7 @@ Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
+Run-ReleasePublishWorkflowBudgetContractTests
 Run-ReleasePrepareWorkflowContractTests
 Run-ReleaseTagWorkflowContractTests
 Run-ReleasePackageContentContractTests
