@@ -246,6 +246,24 @@ else
         "Guard line ${guard_line}, create-test-project line ${create_line}, mkdir line ${mkdir_line}"
 fi
 
+echo ""
+echo "--- B3: Unity package export project stays below artifacts root ---"
+
+run_test
+unity_export_package="$REPO_ROOT/scripts/unity/export-unitypackage.sh"
+root_guard_line=$(grep -nF '"${PROJECT_DIR}" == "${ARTIFACTS_ROOT}"' "$unity_export_package" | head -n 1 | cut -d: -f1)
+outside_guard_line=$(grep -nF '"${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"*' "$unity_export_package" | head -n 1 | cut -d: -f1)
+delete_line=$(grep -nF 'rm -rf "${PROJECT_DIR}"' "$unity_export_package" | head -n 1 | cut -d: -f1)
+if [[ -z "$root_guard_line" || -z "$outside_guard_line" || -z "$delete_line" ]]; then
+    fail "Unity package export project guard is missing expected structure" \
+        "root_guard_line='${root_guard_line}', outside_guard_line='${outside_guard_line}', delete_line='${delete_line}'"
+elif (( root_guard_line < delete_line && outside_guard_line < delete_line )); then
+    pass "Unity package export refuses artifacts root before deleting the project directory"
+else
+    fail "Unity package export validates project path too late" \
+        "Root guard line ${root_guard_line}, outside guard line ${outside_guard_line}, delete line ${delete_line}"
+fi
+
 # =============================================================================
 # Section C: Inappropriate stderr suppression in git hooks
 # =============================================================================

@@ -37,8 +37,8 @@ fi
 
 ARTIFACTS_ROOT="$(realpath -m "${REPO_ROOT}/.artifacts")"
 PROJECT_DIR="$(realpath -m "${PROJECT_DIR}")"
-if [[ "${PROJECT_DIR}" != "${ARTIFACTS_ROOT}" && "${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"* ]]; then
-    echo "ERROR: Refusing to create the export project outside ${ARTIFACTS_ROOT}: ${PROJECT_DIR}" >&2
+if [[ "${PROJECT_DIR}" == "${ARTIFACTS_ROOT}" || "${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"* ]]; then
+    echo "ERROR: Refusing to create the export project unless it is a subdirectory under ${ARTIFACTS_ROOT}: ${PROJECT_DIR}" >&2
     exit 1
 fi
 

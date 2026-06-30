@@ -51,7 +51,14 @@ jobs:
           escaped_version="${version//./\\.}"
           if [ "${subject}" != "release: ${version}" ] \
             && ! printf '%s\n' "${subject}" | grep -Eq "^release: ${escaped_version} \(#[0-9]+\)$"; then
-            if grep -Eq "^## \[${escaped_version}\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$" CHANGELOG.md; then
+            # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
+            if CHANGELOG_VERSION="${version}" pwsh -NoProfile -Command '
+              . ./scripts/release-tools/release-helpers.ps1
+              $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
+              if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
+                exit 1
+              }
+            '; then
               message="Version ${version} is untagged and CHANGELOG.md documents it, "
               message+="but head subject '${subject}' is not 'release: ${version}'. "
               message+="Squash-merge release PRs with the default title, or tag this commit manually."
@@ -63,7 +70,14 @@ jobs:
             exit 0
           fi
 
-          if ! grep -Eq "^## \[${escaped_version}\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$" CHANGELOG.md; then
+          # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
+          if ! CHANGELOG_VERSION="${version}" pwsh -NoProfile -Command '
+            . ./scripts/release-tools/release-helpers.ps1
+            $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
+            if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
+              exit 1
+            }
+          '; then
             echo "::error::Release commit for ${version} has no matching CHANGELOG.md heading."
             exit 1
           fi

@@ -48,8 +48,14 @@ jobs:
             echo "::error::Tag ${tag} does not match package.json version ${package_version}."
             exit 1
           fi
-          escaped_version="${package_version//./\\.}"
-          if ! grep -Eq "^## \[${escaped_version}\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$" CHANGELOG.md; then
+          # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
+          if ! CHANGELOG_VERSION="${package_version}" pwsh -NoProfile -Command '
+            . ./scripts/release-tools/release-helpers.ps1
+            $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
+            if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
+              exit 1
+            }
+          '; then
             echo "::error::CHANGELOG.md has no exact heading for ${package_version}."
             exit 1
           fi

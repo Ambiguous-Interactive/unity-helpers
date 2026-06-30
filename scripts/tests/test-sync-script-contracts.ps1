@@ -906,6 +906,46 @@ function Run-ReleaseDrafterChangelogVersionContractTests {
     -Message 'Expected current release body to be preserved when changelog section already exists.'
 }
 
+function Run-ReleaseWorkflowChangelogContractTests {
+  Write-Host ""
+  Write-Host "Release workflow changelog heading contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPaths = @(
+    Join-Path $repoRoot '.github/workflows/release-tag.yml'
+    Join-Path $repoRoot '.github/workflows/release.yml'
+  )
+
+  $missingHelper = @()
+  $rawHeadingGrep = @()
+  foreach ($workflowPath in $workflowPaths) {
+    if (-not (Test-Path $workflowPath)) {
+      $missingHelper += "missing: $workflowPath"
+      continue
+    }
+
+    $content = Get-Content -Path $workflowPath -Raw
+    $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $workflowPath).Replace('\', '/')
+    if ($content -notmatch 'Test-ChangelogVersionHeading') {
+      $missingHelper += $relativePath
+    }
+    if ($content -match 'grep\s+-Eq\s+"\^##\s+\\\[') {
+      $rawHeadingGrep += $relativePath
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'release tag/publish workflows use fence-aware changelog heading checks' `
+    -Passed ($missingHelper.Count -eq 0) `
+    -Message "Missing Test-ChangelogVersionHeading usage: $($missingHelper -join '; ')"
+
+  Write-TestResult `
+    -TestName 'release tag/publish workflows avoid raw changelog heading grep' `
+    -Passed ($rawHeadingGrep.Count -eq 0) `
+    -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
+}
+
 function Print-SummaryAndExit {
   Write-Host ""
   Write-Host "Results:" -ForegroundColor Magenta
@@ -932,4 +972,5 @@ Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
 Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
+Run-ReleaseWorkflowChangelogContractTests
 Print-SummaryAndExit
