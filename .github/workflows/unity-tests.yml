@@ -828,10 +828,10 @@ jobs:
   # keep time small (no IL2CPP standalone build). Core-only (no integrations): the
   # single-threaded toggle is a core-runtime concern, so installing the DI packages
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
-  # self-hosted Unity seat; the org lock `wallstop-organization-builds` (acquired
-  # below, released if:always()) is what actually serializes it against the main
-  # matrix on that single seat -- max-parallel:1 only serializes within this job's
-  # own (version x mode) legs. Reuses the same secrets gate, runner-preflight,
+  # self-hosted Unity seat. This job depends on both Unity tiers so same-workflow
+  # jobs do not contend with each other for the org lock; the external
+  # `wallstop-organization-builds` lock still serializes this work against other
+  # workflows and runs. Reuses the same secrets gate, runner-preflight,
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
   # scaffolding as unity-tests, with DISTINCT project/Library/artifact paths
   # (suffix `-single-threaded`) so its differently-compiled Library never collides
@@ -841,11 +841,19 @@ jobs:
     needs:
       - matrix-config
       - runner-preflight
+      - unity-tests
+      - unity-tests-standalone
     if: >-
       ${{
+        always() &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
+        needs.matrix-config.result == 'success' &&
+        needs.runner-preflight.result == 'success' &&
+        needs.unity-tests.result == 'success' &&
+        (needs.unity-tests-standalone.result == 'success' ||
+          needs.unity-tests-standalone.result == 'skipped') &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
