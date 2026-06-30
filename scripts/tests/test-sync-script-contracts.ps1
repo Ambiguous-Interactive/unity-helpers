@@ -1191,6 +1191,7 @@ function Run-ReleasePackageContentContractTests {
     $requiredUnityPackageEntries
     'scripts.meta'
     'scripts/postinstall-hooks.js'
+    'scripts/postinstall-hooks.js.meta'
   )
   $requiredUnityPackageFolders = @(
     'Editor',

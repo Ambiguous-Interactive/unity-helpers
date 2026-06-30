@@ -176,7 +176,10 @@ try {
 
   $scriptsDir = Join-Path $packageDir 'scripts'
   if (Test-Path -LiteralPath $scriptsDir) {
-    $allowedScriptsEntries = @('postinstall-hooks.js')
+    $allowedScriptsEntries = @(
+      'postinstall-hooks.js',
+      'postinstall-hooks.js.meta'
+    )
     $scriptEntries = Get-ChildItem -LiteralPath $scriptsDir -Recurse -File | ForEach-Object {
       $_.FullName.Replace("$scriptsDir\", "").Replace("$scriptsDir/", "") -replace '\\', '/'
     }
@@ -201,6 +204,7 @@ try {
     'Samples~',
     'scripts.meta',
     'scripts/postinstall-hooks.js',
+    'scripts/postinstall-hooks.js.meta',
     'Shaders',
     'Shaders.meta',
     'Styles',
@@ -244,7 +248,8 @@ try {
     'package.json',
     'package.json.meta',
     'scripts.meta',
-    'scripts/postinstall-hooks.js'
+    'scripts/postinstall-hooks.js',
+    'scripts/postinstall-hooks.js.meta'
   )
 
   $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/', 'Styles/')

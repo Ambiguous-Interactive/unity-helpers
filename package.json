@@ -120,7 +120,8 @@
     "link.xml.meta",
     "package.json.meta",
     "scripts.meta",
-    "scripts/postinstall-hooks.js"
+    "scripts/postinstall-hooks.js",
+    "scripts/postinstall-hooks.js.meta"
   ],
   "scripts": {
     "docs:serve": "bundle exec jekyll serve --baseurl \"\" --livereload",
