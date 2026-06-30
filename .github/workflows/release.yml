@@ -276,6 +276,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.verify-tag.outputs.tag }}
           PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
           UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}
@@ -299,6 +300,7 @@ jobs:
       - name: Verify GitHub Release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.verify-tag.outputs.tag }}
           PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
           UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}

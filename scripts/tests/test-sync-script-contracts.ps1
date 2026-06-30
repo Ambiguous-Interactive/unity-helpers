@@ -946,6 +946,30 @@ function Run-ReleaseWorkflowChangelogContractTests {
     -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
 }
 
+function Run-ReleaseWorkflowGitHubCliContractTests {
+  Write-Host ""
+  Write-Host "Release workflow GitHub CLI contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+  $repoEnvPattern = 'GH_REPO:\s*\$\{\{\s*github\.repository\s*\}\}'
+
+  $publishHasRepo = $workflowContent -match "(?ms)- name: Publish GitHub Release.*?env:.*?${repoEnvPattern}.*?run:"
+  $verifyHasRepo = $workflowContent -match "(?ms)- name: Verify GitHub Release assets.*?env:.*?${repoEnvPattern}.*?run:"
+
+  Write-TestResult `
+    -TestName 'release publish gh commands set repository context' `
+    -Passed $publishHasRepo `
+    -Message 'Expected Publish GitHub Release to set GH_REPO from github.repository.'
+
+  Write-TestResult `
+    -TestName 'release asset verification gh commands set repository context' `
+    -Passed $verifyHasRepo `
+    -Message 'Expected Verify GitHub Release assets to set GH_REPO from github.repository.'
+}
+
 function Print-SummaryAndExit {
   Write-Host ""
   Write-Host "Results:" -ForegroundColor Magenta
@@ -973,4 +997,5 @@ Run-RepoLocalPrettierContractTests
 Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
+Run-ReleaseWorkflowGitHubCliContractTests
 Print-SummaryAndExit
