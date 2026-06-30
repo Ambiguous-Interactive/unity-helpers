@@ -154,7 +154,7 @@ jobs:
           set -euo pipefail
           echo "Dry run: would push ${BRANCH} and open a PR titled 'release: ${VERSION}'."
           echo "::group::Prepared diff"
-          git --no-pager diff
+          git --no-pager diff HEAD --
           echo "::endgroup::"
 
       - name: Push release branch and open PR

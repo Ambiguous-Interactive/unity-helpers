@@ -214,13 +214,6 @@ function Update-ReleaseChangelogContent {
     )
 
     $normalized = Normalize-ReleaseText -Content $Content
-    if (Test-ChangelogVersionHeading -Content $normalized -Version $Version) {
-        return [pscustomobject]@{
-            Content = $normalized.TrimEnd() + "`n"
-            Rotated = $false
-        }
-    }
-
     $lines = $normalized.Split("`n")
     $fenced = Get-ChangelogFenceMask -Lines $lines
     $unreleasedIndexes = @()
@@ -260,6 +253,17 @@ function Update-ReleaseChangelogContent {
         if (-not [string]::IsNullOrWhiteSpace($line) -and -not $line.StartsWith('### ')) {
             $hasContent = $true
             break
+        }
+    }
+
+    if (Test-ChangelogVersionHeading -Content $normalized -Version $Version) {
+        if ($hasContent) {
+            throw "CHANGELOG.md already contains '## [$Version]' but '## [Unreleased]' still has release-note content."
+        }
+
+        return [pscustomobject]@{
+            Content = $normalized.TrimEnd() + "`n"
+            Rotated = $false
         }
     }
 

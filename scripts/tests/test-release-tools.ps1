@@ -193,6 +193,37 @@ try {
         Remove-ReleaseFixture -Path $fixture
     }
 
+    $duplicateTargetChangelog = @(
+        '# Changelog',
+        '',
+        '## [Unreleased]',
+        '',
+        '### Added',
+        '',
+        '- A pending change.',
+        '',
+        '## [1.2.4] - 2026-06-30',
+        '',
+        '- Already rotated change.',
+        '',
+        '## [1.2.3]',
+        '',
+        '- Old.',
+        ''
+    ) -join "`n"
+    $fixture = New-ReleaseFixture -Changelog $duplicateTargetChangelog
+    try {
+        $duplicateTargetRejected = $false
+        try {
+            [void](Invoke-ReleasePreparation -RepoRoot $fixture -Version '1.2.4' -Date '2026-06-30')
+        } catch {
+            $duplicateTargetRejected = $_.Exception.Message -match 'already contains.*Unreleased'
+        }
+        Write-TestResult -TestName 'Existing target headings reject pending Unreleased content' -Passed $duplicateTargetRejected
+    } finally {
+        Remove-ReleaseFixture -Path $fixture
+    }
+
     $fencedChangelog = @(
         '# Changelog',
         '',
