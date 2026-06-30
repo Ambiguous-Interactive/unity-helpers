@@ -1189,6 +1189,7 @@ function Run-ReleasePackageContentContractTests {
   )
   $requiredPackageFilesEntries = @(
     $requiredUnityPackageEntries
+    'scripts.meta'
     'scripts/postinstall-hooks.js'
   )
   $requiredUnityPackageFolders = @(
@@ -1214,7 +1215,10 @@ function Run-ReleasePackageContentContractTests {
   $validatorContent = Get-Content -Path $validatorPath -Raw
   $validatorRequiredEntries = Get-PowerShellSingleQuotedArrayEntries `
     -Content $validatorContent `
-    -VariableName 'requiredTopLevelEntries'
+    -VariableName 'requiredPackageEntries'
+  $validatorAllowedTopLevelEntries = Get-PowerShellSingleQuotedArrayEntries `
+    -Content $validatorContent `
+    -VariableName 'allowedTopLevelEntries'
   $validatorUnityFolders = Get-PowerShellSingleQuotedArrayEntries `
     -Content $validatorContent `
     -VariableName 'unityFolders'
@@ -1222,6 +1226,9 @@ function Run-ReleasePackageContentContractTests {
     -Content $validatorContent `
     -VariableName 'packageContentRoots'
   $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })
+  $requiredValidatorAllowedTopLevelEntries = @('scripts', 'scripts.meta')
+  $missingValidatorAllowedTopLevelEntries = @($requiredValidatorAllowedTopLevelEntries | Where-Object { $_ -notin $validatorAllowedTopLevelEntries })
+  $nestedValidatorAllowedTopLevelEntries = @($validatorAllowedTopLevelEntries | Where-Object { $_.Contains('/') -or $_.Contains('\') })
   $missingValidatorUnityFolders = @($requiredUnityPackageFolders | Where-Object { $_ -notin $validatorUnityFolders })
   $missingValidatorPackageContentRoots = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorPackageContentRoots })
   $validatorUsesCaseSensitiveMembership = (
@@ -1244,6 +1251,16 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator requires all release package entries' `
     -Passed ($missingValidatorRequiredEntries.Count -eq 0) `
     -Message "Missing validator required entries: $($missingValidatorRequiredEntries -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator allows shipped scripts folder metadata' `
+    -Passed ($missingValidatorAllowedTopLevelEntries.Count -eq 0) `
+    -Message "Missing validator allowed top-level entries: $($missingValidatorAllowedTopLevelEntries -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator top-level allowlist contains only top-level entries' `
+    -Passed ($nestedValidatorAllowedTopLevelEntries.Count -eq 0) `
+    -Message "Nested entries in top-level allowlist: $($nestedValidatorAllowedTopLevelEntries -join ', ')"
 
   Write-TestResult `
     -TestName 'npm package validator compares all shipped Unity roots against git' `

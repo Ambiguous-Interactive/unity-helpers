@@ -144,7 +144,6 @@ try {
     'Runtime',
     'Runtime.meta',
     'Samples~',
-    'scripts/postinstall-hooks.js',
     'Shaders',
     'Shaders.meta',
     'Styles',
@@ -157,7 +156,8 @@ try {
     'link.xml.meta',
     'package.json',
     'package.json.meta',
-    'scripts'
+    'scripts',
+    'scripts.meta'
   )
 
   foreach ($entry in $forbiddenPackageEntries) {
@@ -187,7 +187,7 @@ try {
     }
   }
 
-  $requiredTopLevelEntries = @(
+  $requiredPackageEntries = @(
     'CHANGELOG.md',
     'CHANGELOG.md.meta',
     'Editor',
@@ -199,6 +199,7 @@ try {
     'Runtime',
     'Runtime.meta',
     'Samples~',
+    'scripts.meta',
     'scripts/postinstall-hooks.js',
     'Shaders',
     'Shaders.meta',
@@ -211,10 +212,10 @@ try {
     'package.json',
     'package.json.meta'
   )
-  foreach ($entry in $requiredTopLevelEntries) {
+  foreach ($entry in $requiredPackageEntries) {
     $entryPath = Join-Path $packageDir $entry
     if (-not (Test-Path -LiteralPath $entryPath)) {
-      $errors += "Missing required top-level package entry: $entry"
+      $errors += "Missing required package entry: $entry"
     }
   }
 
@@ -242,6 +243,7 @@ try {
     'link.xml.meta',
     'package.json',
     'package.json.meta',
+    'scripts.meta',
     'scripts/postinstall-hooks.js'
   )
 

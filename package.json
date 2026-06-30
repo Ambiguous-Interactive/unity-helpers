@@ -119,6 +119,7 @@
     "link.xml",
     "link.xml.meta",
     "package.json.meta",
+    "scripts.meta",
     "scripts/postinstall-hooks.js"
   ],
   "scripts": {
