@@ -1048,11 +1048,27 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not $workflowContent.Contains('git/ref/heads/${branch}') -and
     -not $workflowContent.Contains('if git ls-remote --exit-code --heads origin "${branch}"')
   )
+  $usesRobustGitTagLookup = (
+    $workflowContent.Contains('tag_lookup_output="$(gh api -i "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>&1)"') -and
+    $workflowContent.Contains('tag_lookup_exit=$?') -and
+    $workflowContent.Contains('if [ "${tag_lookup_exit}" -eq 0 ]; then') -and
+    $workflowContent.Contains('Failed to check whether tag ${version} already exists.') -and
+    $workflowContent.Contains('"status":"404"') -and
+    $workflowContent.Contains('grep -E ''(^HTTP/[0-9.]+ 404( |$)|"status":"404")'' >/dev/null') -and
+    -not $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" >/dev/null 2>&1') -and
+    -not ($workflowContent -match 'gh api[^\r\n]+\|\|\s*true') -and
+    -not ($workflowContent -match 'grep -Eq .*\bstatus')
+  )
 
   Write-TestResult `
     -TestName 'release prepare checks existing release branches with robust git heads lookup' `
     -Passed $usesRobustGitBranchLookup `
     -Message 'Expected release-prepare.yml to treat git ls-remote exit 2 as absent while failing other lookup errors.'
+
+  Write-TestResult `
+    -TestName 'release prepare checks existing tags without hiding API failures' `
+    -Passed $usesRobustGitTagLookup `
+    -Message 'Expected release-prepare.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
 }
 
 function Run-ReleaseTagWorkflowContractTests {
@@ -1102,7 +1118,7 @@ function Run-ReleaseTagWorkflowContractTests {
   } else {
     -1
   }
-  $tagLookupIndex = $workflowContent.IndexOf('tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}"', [StringComparison]::Ordinal)
+  $tagLookupIndex = $workflowContent.IndexOf('tag_lookup_output="$(gh api -i "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}"', [StringComparison]::Ordinal)
   $tagMismatchIndex = $workflowContent.IndexOf('already exists at ${tag_target}, not release commit ${GITHUB_SHA}', [StringComparison]::Ordinal)
   $checksTagsAfterReleaseDetection = (
     $subjectCheckIndex -ge 0 -and
@@ -1112,6 +1128,16 @@ function Run-ReleaseTagWorkflowContractTests {
     $releaseHeadingValidationIndex -gt $nonReleaseExitZeroIndex -and
     $tagLookupIndex -gt $releaseHeadingValidationIndex -and
     $tagMismatchIndex -gt $tagLookupIndex
+  )
+  $usesRobustTagLookup = (
+    $tagLookupIndex -ge 0 -and
+    $workflowContent.Contains('tag_lookup_exit=$?') -and
+    $workflowContent.Contains('if [ "${tag_lookup_exit}" -eq 0 ]; then') -and
+    $workflowContent.Contains('Failed to check whether tag ${version} already exists.') -and
+    $workflowContent.Contains('"status":"404"') -and
+    $workflowContent.Contains('grep -E ''(^HTTP/[0-9.]+ 404( |$)|"status":"404")'' >/dev/null') -and
+    -not ($workflowContent -match 'gh api[^\r\n]+\|\|\s*true') -and
+    -not ($workflowContent -match 'grep -Eq .*\bstatus')
   )
 
   Write-TestResult `
@@ -1123,6 +1149,11 @@ function Run-ReleaseTagWorkflowContractTests {
     -TestName 'release tag workflow checks existing tags only after release detection' `
     -Passed $checksTagsAfterReleaseDetection `
     -Message 'Expected release-tag.yml to exit cleanly for non-release package/changelog pushes before checking existing tag targets.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow checks existing tags without hiding API failures' `
+    -Passed $usesRobustTagLookup `
+    -Message 'Expected release-tag.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
 
   Write-TestResult `
     -TestName 'release tag workflow checks app credentials before token action' `
@@ -1199,6 +1230,7 @@ function Run-ReleasePackageContentContractTests {
     $validatorContent.Contains('$gitFile -cnotin $npmPackageFiles') -and
     $validatorContent.Contains('$npmFile -cnotin $gitPackageFiles')
   )
+  $validatorPreservesCaseOnlyPathVariants = -not $validatorContent.Contains('Sort-Object -Unique')
   $validatorComparesWholePackagePayload = (
     $validatorContent.Contains('Get-TrackedPackageFiles -RepoRoot $repoRoot -PackageRoots $packageContentRoots') -and
     $validatorContent.Contains('Get-PackedPackageFiles -PackageDir $packageDir') -and
@@ -1227,6 +1259,11 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator uses case-sensitive package membership checks' `
     -Passed $validatorUsesCaseSensitiveMembership `
     -Message 'Expected validate-npm-package.ps1 to reject differently-cased package paths with -cnotin.'
+
+  Write-TestResult `
+    -TestName 'npm package validator preserves case-only path variants before membership checks' `
+    -Passed $validatorPreservesCaseOnlyPathVariants `
+    -Message 'Expected validate-npm-package.ps1 not to collapse case-only path variants with Sort-Object -Unique.'
 
   $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
   $exporterContent = Get-Content -Path $exporterPath -Raw

@@ -36,7 +36,7 @@ function Get-TrackedPackageFiles {
   return @(
     $trackedFiles |
       ForEach-Object { $_ -replace '\\', '/' } |
-      Sort-Object -Unique
+      Sort-Object
   )
 }
 
@@ -50,7 +50,7 @@ function Get-PackedPackageFiles {
       ForEach-Object {
         $_.FullName.Replace("$PackageDir\", "").Replace("$PackageDir/", "") -replace '\\', '/'
       } |
-      Sort-Object -Unique
+      Sort-Object
   )
 }
 

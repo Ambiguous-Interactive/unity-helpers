@@ -75,8 +75,11 @@ jobs:
             exit 1
           fi
 
-          tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>/dev/null || true)"
-          if [ -n "${tag_ref_json}" ]; then
+          set +e
+          tag_lookup_output="$(gh api -i "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>&1)"
+          tag_lookup_exit=$?
+          set -e
+          if [ "${tag_lookup_exit}" -eq 0 ]; then
             git fetch --force --tags origin "refs/tags/${version}:refs/tags/${version}" >/dev/null
             tag_target="$(git rev-list -n 1 "${version}")"
             if [ "${tag_target}" = "${GITHUB_SHA}" ]; then
@@ -86,6 +89,11 @@ jobs:
             fi
             echo "::error::Tag ${version} already exists at ${tag_target}, not release commit ${GITHUB_SHA}."
             exit 1
+          fi
+          if ! printf '%s\n' "${tag_lookup_output}" | grep -E '(^HTTP/[0-9.]+ 404( |$)|"status":"404")' >/dev/null; then
+            echo "::error::Failed to check whether tag ${version} already exists."
+            printf '%s\n' "${tag_lookup_output}"
+            exit "${tag_lookup_exit}"
           fi
 
           {
