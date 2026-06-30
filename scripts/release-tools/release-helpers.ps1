@@ -328,7 +328,7 @@ function Update-PackageJsonVersionContent {
         throw "Expected exactly one package.json version property for '$CurrentVersion'; found $($matches.Count)."
     }
 
-    $updated = [regex]::Replace($Content, $pattern, "`${1}$NextVersion`${2}", 1)
+    $updated = [regex]::Replace($Content, $pattern, "`${1}$NextVersion`${2}")
     $updatedParsed = $updated | ConvertFrom-Json
     if ([string]$updatedParsed.version -ne $NextVersion) {
         throw "package.json rewrite verification failed; parsed version is '$($updatedParsed.version)', expected '$NextVersion'."

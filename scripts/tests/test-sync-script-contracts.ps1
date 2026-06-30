@@ -970,6 +970,42 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -Message 'Expected Verify GitHub Release assets to set GH_REPO from github.repository.'
 }
 
+function Run-ReleaseTagWorkflowContractTests {
+  Write-Host ""
+  Write-Host "Release tag workflow contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/release-tag.yml'
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+
+  $hasTagTargetCheck = (
+    $workflowContent.Contains('tag_target="$(git rev-list -n 1 "${version}")"') -and
+    $workflowContent.Contains('[ "${tag_target}" = "${GITHUB_SHA}" ]') -and
+    $workflowContent.Contains('already exists at ${tag_target}, not release commit ${GITHUB_SHA}')
+  )
+
+  $credentialStepIndex = $workflowContent.IndexOf('- name: Check auto-commit GitHub App credentials', [StringComparison]::Ordinal)
+  $tokenStepIndex = $workflowContent.IndexOf('- name: Generate auto-commit GitHub App token', [StringComparison]::Ordinal)
+  $hasCredentialCheck = (
+    $credentialStepIndex -ge 0 -and
+    $tokenStepIndex -gt $credentialStepIndex -and
+    $workflowContent.Contains('AUTO_COMMIT_APP_ID: ${{ secrets.AUTO_COMMIT_APP_ID }}') -and
+    $workflowContent.Contains('AUTO_COMMIT_APP_PRIVATE_KEY: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}') -and
+    $workflowContent.Contains('required to push release tags')
+  )
+
+  Write-TestResult `
+    -TestName 'release tag workflow fails when existing tag points elsewhere' `
+    -Passed $hasTagTargetCheck `
+    -Message 'Expected release-tag.yml to compare existing tag target with GITHUB_SHA and error on mismatches.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow checks app credentials before token action' `
+    -Passed $hasCredentialCheck `
+    -Message 'Expected release-tag.yml to validate AUTO_COMMIT_APP_* before create-github-app-token.'
+}
+
 function Print-SummaryAndExit {
   Write-Host ""
   Write-Host "Results:" -ForegroundColor Magenta
@@ -998,4 +1034,5 @@ Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
+Run-ReleaseTagWorkflowContractTests
 Print-SummaryAndExit

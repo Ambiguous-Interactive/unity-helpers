@@ -159,7 +159,13 @@ public static class UnityHelpersPackageExporter
             throw new InvalidOperationException("Missing -exportOutput argument.");
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+        string outputDirectory = Path.GetDirectoryName(outputPath);
+        if (string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            outputDirectory = Directory.GetCurrentDirectory();
+        }
+
+        Directory.CreateDirectory(outputDirectory);
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         AssetDatabase.ExportPackage(
             "Assets/WallstopStudios/UnityHelpers",

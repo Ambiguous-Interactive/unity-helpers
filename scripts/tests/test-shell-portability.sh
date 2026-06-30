@@ -264,6 +264,23 @@ else
         "Root guard line ${root_guard_line}, outside guard line ${outside_guard_line}, delete line ${delete_line}"
 fi
 
+echo ""
+echo "--- B4: Unity package export supports bare output filenames ---"
+
+run_test
+dirname_line=$(grep -nF 'string outputDirectory = Path.GetDirectoryName(outputPath);' "$unity_export_package" | head -n 1 | cut -d: -f1)
+fallback_line=$(grep -nF 'outputDirectory = Directory.GetCurrentDirectory();' "$unity_export_package" | head -n 1 | cut -d: -f1)
+create_line=$(grep -nF 'Directory.CreateDirectory(outputDirectory);' "$unity_export_package" | head -n 1 | cut -d: -f1)
+if [[ -z "$dirname_line" || -z "$fallback_line" || -z "$create_line" ]]; then
+    fail "Unity package export output-directory fallback is missing expected structure" \
+        "dirname_line='${dirname_line}', fallback_line='${fallback_line}', create_line='${create_line}'"
+elif (( dirname_line < fallback_line && fallback_line < create_line )); then
+    pass "Unity package export falls back to the current directory for bare output filenames"
+else
+    fail "Unity package export applies output-directory fallback too late" \
+        "dirname line ${dirname_line}, fallback line ${fallback_line}, create line ${create_line}"
+fi
+
 # =============================================================================
 # Section C: Inappropriate stderr suppression in git hooks
 # =============================================================================

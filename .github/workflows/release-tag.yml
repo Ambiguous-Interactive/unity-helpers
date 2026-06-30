@@ -41,10 +41,17 @@ jobs:
             exit 1
           fi
 
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" >/dev/null 2>&1; then
-            echo "Tag ${version} already exists; nothing to do."
-            echo "proceed=false" >> "${GITHUB_OUTPUT}"
-            exit 0
+          tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>/dev/null || true)"
+          if [ -n "${tag_ref_json}" ]; then
+            git fetch --force --tags origin "refs/tags/${version}:refs/tags/${version}" >/dev/null
+            tag_target="$(git rev-list -n 1 "${version}")"
+            if [ "${tag_target}" = "${GITHUB_SHA}" ]; then
+              echo "Tag ${version} already points at this release commit; nothing to do."
+              echo "proceed=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            echo "::error::Tag ${version} already exists at ${tag_target}, not release commit ${GITHUB_SHA}."
+            exit 1
           fi
 
           subject="$(git log -1 --format=%s)"
@@ -86,6 +93,19 @@ jobs:
             echo "proceed=true"
             echo "version=${version}"
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Check auto-commit GitHub App credentials
+        if: ${{ steps.detect.outputs.proceed == 'true' }}
+        env:
+          AUTO_COMMIT_APP_ID: ${{ secrets.AUTO_COMMIT_APP_ID }}
+          AUTO_COMMIT_APP_PRIVATE_KEY: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${AUTO_COMMIT_APP_ID:-}" ] && [ -n "${AUTO_COMMIT_APP_PRIVATE_KEY:-}" ]; then
+            exit 0
+          fi
+          echo "::error::AUTO_COMMIT_APP_ID and AUTO_COMMIT_APP_PRIVATE_KEY are required to push release tags with a token that triggers Release Publish."
+          exit 1
 
       - name: Generate auto-commit GitHub App token
         id: app-token

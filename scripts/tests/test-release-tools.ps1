@@ -130,6 +130,12 @@ try {
     }
     Write-TestResult -TestName 'Explicit versions must increase' -Passed $nonIncreasingRejected
 
+    $helperContent = Get-Content -Path (Join-Path $repoRoot 'scripts/release-tools/release-helpers.ps1') -Raw
+    Write-TestResult `
+        -TestName 'Package version rewrite uses unambiguous regex replace overload' `
+        -Passed (-not ($helperContent -match '\[regex\]::Replace\([^\r\n]+,\s*1\)')) `
+        -Message 'Passing 1 to [regex]::Replace selects RegexOptions.IgnoreCase, not a replacement count.'
+
     $fixture = New-ReleaseFixture
     try {
         $result = Invoke-ReleasePreparation -RepoRoot $fixture -Bump minor -Date '2026-06-30'
