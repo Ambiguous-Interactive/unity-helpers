@@ -281,6 +281,50 @@ else
         "dirname line ${dirname_line}, fallback line ${fallback_line}, create line ${create_line}"
 fi
 
+echo ""
+echo "--- B5: Unity package export stages package content roots ---"
+
+run_test
+stage_project="$REPO_ROOT/.artifacts/unity/shell-portability-unitypackage-stage"
+stage_log="$(mktemp)"
+rm -rf "$stage_project"
+if bash "$unity_export_package" --stage-only --project-dir "$stage_project" >"$stage_log" 2>&1; then
+    staged_root="$stage_project/Assets/WallstopStudios/UnityHelpers"
+    required_stage_entries=(
+        "Runtime"
+        "Runtime.meta"
+        "Editor"
+        "Editor.meta"
+        "Samples"
+        "Shaders"
+        "Shaders.meta"
+        "Styles"
+        "Styles.meta"
+        "URP"
+        "URP.meta"
+        "link.xml"
+        "link.xml.meta"
+    )
+    missing_stage_entries=()
+    for entry in "${required_stage_entries[@]}"; do
+        if [[ ! -e "$staged_root/$entry" ]]; then
+            missing_stage_entries+=("$entry")
+        fi
+    done
+
+    if (( ${#missing_stage_entries[@]} == 0 )); then
+        pass "Unity package export stage contains all shipped package roots"
+    else
+        fail "Unity package export stage is missing package roots" \
+            "Missing entries: ${missing_stage_entries[*]}"
+    fi
+else
+    stage_tail="$(tail -n 40 "$stage_log" 2>/dev/null || true)"
+    fail "Unity package export stage-only command failed" "$stage_tail"
+fi
+rm -rf "$stage_project"
+rm -f "$stage_log"
+
 # =============================================================================
 # Section C: Inappropriate stderr suppression in git hooks
 # =============================================================================

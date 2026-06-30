@@ -59,6 +59,24 @@ function Get-RepoRoot {
   return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
+function Get-PowerShellSingleQuotedArrayEntries {
+  param(
+    [string]$Content,
+    [string]$VariableName
+  )
+
+  $escapedName = [regex]::Escape($VariableName)
+  $match = [regex]::Match($Content, "(?ms)\`$$escapedName\s*=\s*@\((?<body>.*?)\)")
+  if (-not $match.Success) {
+    return @()
+  }
+
+  return @(
+    [regex]::Matches($match.Groups['body'].Value, "'(?<entry>[^']+)'") |
+      ForEach-Object { $_.Groups['entry'].Value }
+  )
+}
+
 function Assert-NoNewlineWriteHasFinalLfNormalization {
   param(
     [string]$ScriptPath,
@@ -1006,6 +1024,93 @@ function Run-ReleaseTagWorkflowContractTests {
     -Message 'Expected release-tag.yml to validate AUTO_COMMIT_APP_* before create-github-app-token.'
 }
 
+function Run-ReleasePackageContentContractTests {
+  Write-Host ""
+  Write-Host "Release package content contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $requiredUnityPackageEntries = @(
+    'Editor',
+    'Editor.meta',
+    'Runtime',
+    'Runtime.meta',
+    'Samples~',
+    'Shaders',
+    'Shaders.meta',
+    'Styles',
+    'Styles.meta',
+    'URP',
+    'URP.meta',
+    'link.xml',
+    'link.xml.meta'
+  )
+  $requiredPackageFilesEntries = @(
+    $requiredUnityPackageEntries
+    'scripts/postinstall-hooks.js'
+  )
+  $requiredUnityPackageFolders = @(
+    'Editor',
+    'Runtime',
+    'Samples~',
+    'Shaders',
+    'Styles',
+    'URP'
+  )
+
+  $packagePath = Join-Path $repoRoot 'package.json'
+  $package = Get-Content -Path $packagePath -Raw | ConvertFrom-Json
+  $packageFiles = @($package.files)
+  $missingPackageFiles = @($requiredPackageFilesEntries | Where-Object { $_ -notin $packageFiles })
+
+  Write-TestResult `
+    -TestName 'package.json files allowlist includes all required release package entries' `
+    -Passed ($missingPackageFiles.Count -eq 0) `
+    -Message "Missing package.json files entries: $($missingPackageFiles -join ', ')"
+
+  $validatorPath = Join-Path $repoRoot 'scripts/validate-npm-package.ps1'
+  $validatorContent = Get-Content -Path $validatorPath -Raw
+  $validatorRequiredEntries = Get-PowerShellSingleQuotedArrayEntries `
+    -Content $validatorContent `
+    -VariableName 'requiredTopLevelEntries'
+  $validatorUnityFolders = Get-PowerShellSingleQuotedArrayEntries `
+    -Content $validatorContent `
+    -VariableName 'unityFolders'
+  $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })
+  $missingValidatorUnityFolders = @($requiredUnityPackageFolders | Where-Object { $_ -notin $validatorUnityFolders })
+
+  Write-TestResult `
+    -TestName 'npm package validator requires all release package entries' `
+    -Passed ($missingValidatorRequiredEntries.Count -eq 0) `
+    -Message "Missing validator required entries: $($missingValidatorRequiredEntries -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator compares all shipped Unity roots against git' `
+    -Passed ($missingValidatorUnityFolders.Count -eq 0) `
+    -Message "Missing validator Unity folders: $($missingValidatorUnityFolders -join ', ')"
+
+  $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
+  $exporterContent = Get-Content -Path $exporterPath -Raw
+  $requiredLoop = [regex]::Match(
+    $exporterContent,
+    '(?ms)for entry in \\\s*(?<entries>.*?)\s*do\s*\r?\n\s*copy_package_entry "\$\{entry\}" required'
+  )
+  $requiredExportEntries = @()
+  if ($requiredLoop.Success) {
+    $requiredExportEntries = @(
+      $requiredLoop.Groups['entries'].Value -split "`r?`n" |
+        ForEach-Object { $_.Trim().TrimEnd('\').Trim() } |
+        Where-Object { $_ }
+    )
+  }
+  $missingExportEntries = @($requiredUnityPackageEntries | Where-Object { $_ -notin $requiredExportEntries })
+
+  Write-TestResult `
+    -TestName 'Unity package exporter stages all shipped Unity roots from npm pack' `
+    -Passed ($requiredLoop.Success -and $missingExportEntries.Count -eq 0) `
+    -Message "Missing exporter required entries: $($missingExportEntries -join ', ')"
+}
+
 function Print-SummaryAndExit {
   Write-Host ""
   Write-Host "Results:" -ForegroundColor Magenta
@@ -1035,4 +1140,5 @@ Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
 Run-ReleaseTagWorkflowContractTests
+Run-ReleasePackageContentContractTests
 Print-SummaryAndExit

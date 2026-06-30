@@ -17,6 +17,27 @@ function Write-Error-Custom($msg) {
   Write-Host "[validate-npm-package] $msg" -ForegroundColor Red
 }
 
+function Get-TrackedFilesForPackageRoot {
+  param(
+    [string]$RepoRoot,
+    [string]$PackageRoot
+  )
+
+  $trackedFiles = (& git -C $RepoRoot ls-files -z -- $PackageRoot) -split "`0" | Where-Object { $_ -ne '' }
+  if ($LASTEXITCODE -ne 0) {
+    throw "git ls-files failed while collecting tracked files for package root: $PackageRoot"
+  }
+
+  $prefix = "$PackageRoot/"
+  return @(
+    $trackedFiles |
+      Where-Object { $_.StartsWith($prefix, [System.StringComparison]::Ordinal) } |
+      ForEach-Object { $_.Substring($prefix.Length) -replace '\\', '/' }
+  )
+}
+
+$repoRoot = (Get-Location).Path
+
 # Step 1: Create a temporary directory for npm pack
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "npm-package-validation-$(Get-Random)"
 Write-Info "Creating temporary directory: $tempDir"
@@ -81,8 +102,17 @@ try {
     'Runtime',
     'Runtime.meta',
     'Samples~',
+    'scripts/postinstall-hooks.js',
+    'Shaders',
+    'Shaders.meta',
+    'Styles',
+    'Styles.meta',
+    'URP',
+    'URP.meta',
     'docs',
     'docs.meta',
+    'link.xml',
+    'link.xml.meta',
     'package.json',
     'package.json.meta',
     'scripts'
@@ -115,7 +145,38 @@ try {
     }
   }
 
-  $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/')
+  $requiredTopLevelEntries = @(
+    'CHANGELOG.md',
+    'CHANGELOG.md.meta',
+    'Editor',
+    'Editor.meta',
+    'LICENSE',
+    'LICENSE.meta',
+    'README.md',
+    'README.md.meta',
+    'Runtime',
+    'Runtime.meta',
+    'Samples~',
+    'scripts/postinstall-hooks.js',
+    'Shaders',
+    'Shaders.meta',
+    'Styles',
+    'Styles.meta',
+    'URP',
+    'URP.meta',
+    'link.xml',
+    'link.xml.meta',
+    'package.json',
+    'package.json.meta'
+  )
+  foreach ($entry in $requiredTopLevelEntries) {
+    $entryPath = Join-Path $packageDir $entry
+    if (-not (Test-Path -LiteralPath $entryPath)) {
+      $errors += "Missing required top-level package entry: $entry"
+    }
+  }
+
+  $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/', 'Styles/')
   $packedCsFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.cs' | ForEach-Object {
     $_.FullName.Replace("$packageDir\", "").Replace("$packageDir/", "") -replace '\\', '/'
   }
@@ -133,7 +194,7 @@ try {
   }
   
   # Folders that should be in the npm package
-  $unityFolders = @('Runtime', 'Editor')
+  $unityFolders = @('Runtime', 'Editor', 'Samples~', 'Shaders', 'Styles', 'URP')
   
   foreach ($folder in $unityFolders) {
     $folderPath = Join-Path $packageDir $folder
@@ -145,10 +206,13 @@ try {
     
     Write-Info "Validating folder: $folder"
     
-    # Check if folder has .meta file
-    $folderMetaPath = "$folderPath.meta"
-    if (-not (Test-Path $folderMetaPath)) {
-      $errors += "Missing .meta file for folder: $folder"
+    # Check if folder has .meta file. Samples~ is the Unity package-manager
+    # convention for samples and intentionally has no root folder .meta.
+    if ($folder -ne 'Samples~') {
+      $folderMetaPath = "$folderPath.meta"
+      if (-not (Test-Path $folderMetaPath)) {
+        $errors += "Missing .meta file for folder: $folder"
+      }
     }
     
     # Get all files and subdirectories in this folder (recursively)
@@ -182,10 +246,9 @@ try {
   Write-Info "Validating that npm package content matches git repository..."
   
   foreach ($folder in $unityFolders) {
-    $gitFolderPath = Join-Path (Get-Location) $folder
     $npmFolderPath = Join-Path $packageDir $folder
     
-    if (-not (Test-Path $gitFolderPath)) {
+    if (-not (Test-Path (Join-Path $repoRoot $folder))) {
       Write-Info "Git folder does not exist: $folder (skipping comparison)"
       continue
     }
@@ -195,10 +258,10 @@ try {
       continue
     }
     
-    # Get all files in git repo for this folder
-    $gitFiles = Get-ChildItem -Path $gitFolderPath -Recurse -File | ForEach-Object {
-      $_.FullName.Replace("$gitFolderPath\", "").Replace("$gitFolderPath/", "") -replace '\\', '/'
-    }
+    # Get all tracked files in git repo for this folder. npm pack can include
+    # untracked files under allowlisted directories; those must fail validation
+    # instead of being accepted as part of the release payload.
+    $gitFiles = Get-TrackedFilesForPackageRoot -RepoRoot $repoRoot -PackageRoot $folder
     
     # Get all files in npm package for this folder
     $npmFiles = Get-ChildItem -Path $npmFolderPath -Recurse -File | ForEach-Object {
@@ -236,8 +299,7 @@ try {
     # Check for files in npm that shouldn't be there (extra files not in git)
     foreach ($npmFile in $npmFiles) {
       if ($npmFile -notin $gitFiles) {
-        # This might be OK (e.g., generated files), but worth noting
-        Write-Info "File in npm package but not in git repo: $folder/$npmFile"
+        $errors += "File in npm package but not tracked in git repo: $folder/$npmFile"
       }
     }
   }

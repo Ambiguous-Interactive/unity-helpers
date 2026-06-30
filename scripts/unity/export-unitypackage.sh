@@ -130,12 +130,21 @@ for entry in \
     Runtime \
     Runtime.meta \
     Editor \
-    Editor.meta
+    Editor.meta \
+    Samples~ \
+    Shaders \
+    Shaders.meta \
+    Styles \
+    Styles.meta \
+    URP \
+    URP.meta \
+    link.xml \
+    link.xml.meta
 do
     copy_package_entry "${entry}" required
 done
 
-for entry in docs docs.meta Samples~; do
+for entry in docs docs.meta; do
     copy_package_entry "${entry}" optional
 done
 
