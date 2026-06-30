@@ -1,0 +1,231 @@
+name: Release Prepare
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump kind"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      version:
+        description: "Explicit version X.Y.Z. When set, this wins over bump."
+        type: string
+        required: false
+      dry_run:
+        description: "Validate and print the prepared diff without pushing a PR"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release PR
+    if: github.repository == 'wallstop/unity-helpers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Require default branch dispatch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF}" != "refs/heads/${DEFAULT_BRANCH}" ]; then
+            echo "::error::Release Prepare must run from ${DEFAULT_BRANCH}; got ${GITHUB_REF}."
+            exit 1
+          fi
+
+      - name: Check auto-commit GitHub App credentials
+        env:
+          AUTO_COMMIT_APP_ID: ${{ secrets.AUTO_COMMIT_APP_ID }}
+          AUTO_COMMIT_APP_PRIVATE_KEY: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ -n "${AUTO_COMMIT_APP_ID:-}" ] && [ -n "${AUTO_COMMIT_APP_PRIVATE_KEY:-}" ]; then
+            exit 0
+          fi
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "::warning::AUTO_COMMIT_APP_* secrets are missing; dry-run can continue, but a real release PR cannot be pushed."
+            exit 0
+          fi
+          echo "::error::AUTO_COMMIT_APP_ID and AUTO_COMMIT_APP_PRIVATE_KEY are required to push the release PR with a token that triggers CI."
+          exit 1
+
+      - name: Generate auto-commit GitHub App token
+        id: app-token
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.AUTO_COMMIT_APP_ID }}
+          private-key: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Install Node dependencies
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i --no-audit --no-fund --package-lock=false
+          fi
+
+      - name: Prepare release files
+        shell: pwsh
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+        run: |
+          $arguments = @('-Bump', $env:BUMP)
+          if (-not [string]::IsNullOrWhiteSpace($env:EXPLICIT_VERSION)) {
+            $arguments += @('-Version', $env:EXPLICIT_VERSION)
+          }
+          ./scripts/release-tools/prepare-release.ps1 @arguments
+
+      - name: Sync generated version references
+        shell: pwsh
+        run: |
+          ./scripts/sync-banner-version.ps1
+          ./scripts/sync-issue-template-versions.ps1
+
+      - name: Validate prepared release tree
+        run: |
+          set -euo pipefail
+          npm run test:release-tools
+          npm run lint:changelog
+          npm run test:npm-package-changelog
+          npm run test:npm-package-signature
+          npm run validate:npm-package
+          npm run format:check
+
+      - name: Resolve prepared version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r '.version // empty' package.json)"
+          if ! printf '%s\n' "${version}" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::package.json version '${version}' is not strict X.Y.Z semver."
+            exit 1
+          fi
+          branch="release/${version}"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" >/dev/null 2>&1; then
+            echo "::error::Tag ${version} already exists."
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            echo "::error::Branch ${branch} already exists."
+            exit 1
+          fi
+          {
+            echo "version=${version}"
+            echo "branch=${branch}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Print dry-run diff
+        if: ${{ inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          set -euo pipefail
+          echo "Dry run: would push ${BRANCH} and open a PR titled 'release: ${VERSION}'."
+          echo "::group::Prepared diff"
+          git --no-pager diff
+          echo "::endgroup::"
+
+      - name: Push release branch and open PR
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+
+          git add package.json CHANGELOG.md docs/images/unity-helpers-banner.svg .llm/context.md \
+            .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            git add package-lock.json
+          fi
+
+          if git diff --cached --quiet; then
+            echo "::error::Release preparation staged no changes."
+            exit 1
+          fi
+
+          git commit -m "release: ${VERSION}"
+
+          mkdir -p artifacts/release-prepare
+          git format-patch -1 --stdout > "artifacts/release-prepare/release-${VERSION}.patch"
+          git show --stat --oneline --decorate --no-renames HEAD > "artifacts/release-prepare/release-${VERSION}.stat.txt"
+
+          auth_header="$(printf 'x-access-token:%s' "${GH_PUSH_TOKEN}" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${BRANCH}"
+
+          notes_file="${RUNNER_TEMP}/release-notes.md"
+          pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
+            -Version "${VERSION}" \
+            -OutputPath "${notes_file}"
+
+          pr_body_file="${RUNNER_TEMP}/release-pr-body.md"
+          {
+            echo "Automated release preparation for ${VERSION}."
+            echo
+            echo "## Checklist"
+            echo
+            echo "- [ ] \`package.json\` version is \`${VERSION}\`."
+            echo "- [ ] \`CHANGELOG.md\` has a reviewed \`## [${VERSION}]\` section."
+            echo "- [ ] Squash-merge with the default \`release: ${VERSION}\` title."
+            echo
+            echo "## Release Notes"
+            echo
+            cat "${notes_file}"
+            echo
+            echo "## After Merge"
+            echo
+            echo "The Release Tag workflow pushes tag \`${VERSION}\`, then Release Publish validates, packs npm, exports the \`.unitypackage\`, publishes npm, and publishes the GitHub Release assets."
+          } > "${pr_body_file}"
+
+          GH_TOKEN="${GH_PUSH_TOKEN}" gh pr create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base "${DEFAULT_BRANCH}" \
+            --head "${BRANCH}" \
+            --title "release: ${VERSION}" \
+            --body-file "${pr_body_file}"
+
+      - name: Upload release preparation recovery patch
+        if: ${{ failure() && !inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-prepare-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release-prepare/
+          if-no-files-found: ignore

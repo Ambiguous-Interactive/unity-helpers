@@ -1,0 +1,311 @@
+name: Release Publish
+
+on:
+  push:
+    tags:
+      - "[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify-tag:
+    name: Verify release tag
+    if: github.repository == 'wallstop/unity-helpers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      package-name: ${{ steps.verify.outputs.package-name }}
+      package-version: ${{ steps.verify.outputs.package-version }}
+      tag: ${{ steps.verify.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag matches package metadata
+        id: verify
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if ! printf '%s\n' "${tag}" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::Release tags must use unprefixed X.Y.Z semver."
+            exit 1
+          fi
+          package_name="$(jq -r '.name // empty' package.json)"
+          package_version="$(jq -r '.version // empty' package.json)"
+          if [ -z "${package_name}" ] || [ -z "${package_version}" ]; then
+            echo "::error::package.json name/version is missing."
+            exit 1
+          fi
+          if [ "${tag}" != "${package_version}" ]; then
+            echo "::error::Tag ${tag} does not match package.json version ${package_version}."
+            exit 1
+          fi
+          escaped_version="${package_version//./\\.}"
+          if ! grep -Eq "^## \[${escaped_version}\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no exact heading for ${package_version}."
+            exit 1
+          fi
+          {
+            echo "package-name=${package_name}"
+            echo "package-version=${package_version}"
+            echo "tag=${tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+  validate-package:
+    name: Validate and pack npm package
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Install Node dependencies
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i --no-audit --no-fund --package-lock=false
+          fi
+
+      - name: Run release package validation
+        run: |
+          set -euo pipefail
+          npm run test:release-tools
+          npm run lint:changelog
+          npm run test:npm-package-changelog
+          npm run test:npm-package-signature
+          npm run validate:npm-package
+
+      - name: Pack npm package
+        id: pack
+        run: |
+          set -euo pipefail
+          pack_dir="${RUNNER_TEMP}/npm-pack"
+          mkdir -p "${pack_dir}"
+          pack_json="$(npm pack --json --pack-destination "${pack_dir}")"
+          package_file="$(printf '%s' "${pack_json}" | jq -r '.[0].filename')"
+          if [ -z "${package_file}" ] || [ ! -f "${pack_dir}/${package_file}" ]; then
+            echo "::error::npm pack did not produce a tarball."
+            exit 1
+          fi
+          mkdir -p .artifacts/release
+          mv "${pack_dir}/${package_file}" ".artifacts/release/${package_file}"
+          (cd .artifacts/release && sha256sum "${package_file}" > "${package_file}.sha256")
+          pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
+            -Version "${{ needs.verify-tag.outputs.package-version }}" \
+            -Footer \
+            -OutputPath .artifacts/release/release-notes.md
+          echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-package
+          path: .artifacts/release/
+          if-no-files-found: error
+          overwrite: true
+
+  unitypackage:
+    name: Export .unitypackage
+    needs:
+      - verify-tag
+      - validate-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Validate Unity license secrets
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Acquire organization Unity lock
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: release-${{ needs.verify-tag.outputs.package-version }}
+          timeout-minutes: "300"
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Export Unity package
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_VERSION: ${{ vars.RELEASE_UNITY_VERSION }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UNITY_VERSION:-}" ]; then
+            UNITY_VERSION="$(jq -r '.release' .github/unity-versions.json)"
+            export UNITY_VERSION
+          fi
+          output=".artifacts/unitypackage/${{ needs.verify-tag.outputs.package-name }}-${{ needs.verify-tag.outputs.package-version }}.unitypackage"
+          bash scripts/unity/export-unitypackage.sh --output "${output}"
+
+      - name: Return Unity license
+        if: always()
+        uses: ./.github/actions/return-unity-license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Release organization Unity lock
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: release-${{ needs.verify-tag.outputs.package-version }}
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Upload .unitypackage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-unitypackage
+          path: .artifacts/unitypackage/
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    name: Publish npm and GitHub Release
+    needs:
+      - verify-tag
+      - validate-package
+      - unitypackage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download release package
+        uses: actions/download-artifact@v8
+        with:
+          name: release-package
+          path: .artifacts/release
+
+      - name: Download .unitypackage
+        uses: actions/download-artifact@v8
+        with:
+          name: release-unitypackage
+          path: .artifacts/unitypackage
+
+      - name: Verify downloaded artifacts
+        id: artifacts
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find .artifacts/release -maxdepth 1 -type f -name '*.tgz' | sort)
+          mapfile -t unitypackages < <(find .artifacts/unitypackage -maxdepth 1 -type f -name '*.unitypackage' | sort)
+          if [ "${#packages[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one npm tarball; found ${#packages[@]}."
+            exit 1
+          fi
+          if [ "${#unitypackages[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one .unitypackage; found ${#unitypackages[@]}."
+            exit 1
+          fi
+          package_file="${packages[0]}"
+          unitypackage_file="${unitypackages[0]}"
+          (cd "$(dirname "${package_file}")" && sha256sum -c "$(basename "${package_file}").sha256")
+          (cd "$(dirname "${unitypackage_file}")" && sha256sum -c "$(basename "${unitypackage_file}").sha256")
+          echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
+          echo "unitypackage-file=${unitypackage_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish npm package
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
+          PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
+        run: |
+          set -euo pipefail
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org" >/dev/null 2>&1; then
+            echo "::notice::${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping publish."
+            exit 0
+          fi
+
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            NODE_AUTH_TOKEN="${NPM_TOKEN}" npx --yes --package=npm@^11.5.1 npm publish "${PACKAGE_FILE}" --access public
+          else
+            npx --yes --package=npm@^11.5.1 npm publish "${PACKAGE_FILE}" --access public --provenance
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
+          PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
+          UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}
+        run: |
+          set -euo pipefail
+          notes_file=".artifacts/release/release-notes.md"
+          assets=(
+            "${PACKAGE_FILE}"
+            "${PACKAGE_FILE}.sha256"
+            "${UNITYPACKAGE_FILE}"
+            "${UNITYPACKAGE_FILE}.sha256"
+          )
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${assets[@]}" --clobber
+            gh release edit "${TAG}" --title "${TAG}" --notes-file "${notes_file}" --draft=false --prerelease=false
+          else
+            gh release create "${TAG}" "${assets[@]}" --title "${TAG}" --notes-file "${notes_file}" --verify-tag
+          fi
+
+      - name: Verify GitHub Release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
+          PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
+          UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}
+        run: |
+          set -euo pipefail
+          asset_json="$(gh release view "${TAG}" --json assets)"
+          for asset in \
+            "$(basename "${PACKAGE_FILE}")" \
+            "$(basename "${PACKAGE_FILE}").sha256" \
+            "$(basename "${UNITYPACKAGE_FILE}")" \
+            "$(basename "${UNITYPACKAGE_FILE}").sha256"; do
+            if ! printf '%s' "${asset_json}" | jq -e --arg name "${asset}" '.assets[] | select(.name == $name)' >/dev/null; then
+              echo "::error::Release ${TAG} is missing asset ${asset}."
+              exit 1
+            fi
+          done

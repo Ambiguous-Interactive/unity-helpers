@@ -100,4 +100,4 @@ When installing via Git URL, reference versions without the `v` prefix:
 https://github.com/wallstop/unity-helpers.git#3.1.5
 ```
 
-Releases are drafted automatically via [release-drafter](https://github.com/release-drafter/release-drafter). Maintainers review and publish the draft when ready.
+Maintainers prepare releases from the default branch with the **Release Prepare** workflow. Choose a `major`, `minor`, or `patch` bump, review the generated release PR, and squash-merge it with the default `release: X.Y.Z` title. After merge, the release automation tags that commit, validates and packs the npm package, exports the `.unitypackage`, publishes npm, and publishes the GitHub Release assets.

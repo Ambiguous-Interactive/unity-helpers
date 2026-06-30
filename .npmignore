@@ -17,6 +17,10 @@ scripts/wiki/__pycache__.meta
 .github/
 .devcontainer/
 .config/
+.artifacts/
+.artifacts.meta
+.cursor/
+.githooks/
 .husky/
 .llm/
 .vscode/
@@ -24,6 +28,12 @@ scripts/wiki/__pycache__.meta
 .idea/
 .claude/
 .codex/
+.mcp.json
+.lychee.toml
+.markdownlint.json
+.markdownlint.jsonc
+.markdownlintignore
+.pre-commit-config.yaml
 _llm_*
 _llm_*.meta
 
@@ -36,8 +46,15 @@ _llm_*.meta
 .gitignore
 .yamllint.yaml
 .prettierrc
+.prettierrc.json
 .prettierignore
 .npmignore.meta
+_config.yml
+_config.yml.meta
+_includes/
+_includes.meta
+site/
+site.meta
 
 # Agent/AI instruction files (keep for npm but exclude from published package)
 # Use leading slash to match only root-level files

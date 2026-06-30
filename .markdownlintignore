@@ -7,6 +7,8 @@ Samples~/
 /.github/
 artifacts/
 progress/
+PLAN.md
+PLAN.md.meta
 
 # MkDocs Material files with tabbed content syntax (===) that markdownlint doesn't support
 docs/index.md

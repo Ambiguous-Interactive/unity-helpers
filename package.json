@@ -96,6 +96,23 @@
       "path": "Samples~/UGUI - EnhancedImage"
     }
   ],
+  "files": [
+    "CHANGELOG.md",
+    "CHANGELOG.md.meta",
+    "Editor",
+    "Editor.meta",
+    "LICENSE",
+    "LICENSE.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime",
+    "Runtime.meta",
+    "Samples~",
+    "docs",
+    "docs.meta",
+    "package.json.meta",
+    "scripts/postinstall-hooks.js"
+  ],
   "scripts": {
     "docs:serve": "bundle exec jekyll serve --baseurl \"\" --livereload",
     "docs:build": "bundle exec jekyll build --baseurl \"\"",
@@ -156,7 +173,7 @@
     "test:license-cache": "bash scripts/tests/test-license-cache.sh",
     "lint:markdown": "node ./scripts/run-node-bin.js markdownlint --config .markdownlint.json --ignore-path .markdownlintignore -- \"**/*.md\" \"**/*.markdown\"",
     "validate:content": "npm run lint:docs && npm run test:deprecated-external-links && npm run lint:markdown && npm run lint:changelog && npm run lint:yaml && npm run format:check && npm run lint:llm && npm run lint:doc-counts && npm run lint:dependabot && npm run lint:pwsh-invocations && npm run lint:workflow-run-expression-length && npm run validate:lint-error-codes && npm run validate:mcp-config",
-    "validate:tests": "npm run lint:tests && npm run test:gitignore-docs && npm run test:validate-mcp-config && npm run test:sync-script-contracts && npm run test:agent-preflight && npm run test:git-path-helpers && npm run test:accelerator && npm run test:postinstall-hooks && npm run test:github-pages-sortable && npm run test:add-cspell-word && npm run test:configure-git-defaults && npm run test:validate-git-push-config && npm run test:git-staging-helpers && npm run test:lint-dependabot && npm run test:lint-duplicate-usings && npm run test:lint-pwsh-invocations && npm run test:lint-workflow-run-expression-length && npm run test:unity-workflow-matrix-contract && npm run test:validate-lint-error-codes && npm run test:precommit-integration && npm run test:pre-push-changed-files && npm run test:license-cache && npm run test:wiki-generation && npm run test:npm-package-signature && npm run test:npm-package-changelog",
+    "validate:tests": "npm run lint:tests && npm run test:gitignore-docs && npm run test:validate-mcp-config && npm run test:sync-script-contracts && npm run test:agent-preflight && npm run test:git-path-helpers && npm run test:accelerator && npm run test:postinstall-hooks && npm run test:github-pages-sortable && npm run test:add-cspell-word && npm run test:configure-git-defaults && npm run test:validate-git-push-config && npm run test:git-staging-helpers && npm run test:lint-dependabot && npm run test:lint-duplicate-usings && npm run test:lint-pwsh-invocations && npm run test:lint-workflow-run-expression-length && npm run test:unity-workflow-matrix-contract && npm run test:validate-lint-error-codes && npm run test:precommit-integration && npm run test:pre-push-changed-files && npm run test:license-cache && npm run test:wiki-generation && npm run test:npm-package-signature && npm run test:npm-package-changelog && npm run test:release-tools",
     "validate:prepush": "npm run validate:git-push-config && npm run validate:content && npm run lint:spelling && npm run eol:check && npm run validate:tests && npm run lint:csharp-naming && npm run lint:duplicate-usings && npm run lint:spelling:config && npm run validate:devcontainer && npm run validate:hook-sync && npm run validate:hook-perms && npm run validate:hook-spell-parity && npm run validate:cspell-files-parity && npm run test:shell-portability",
     "validate:devcontainer": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput && npm run test:validate-devcontainer-urls && npm run test:post-create",
     "validate:hook-sync": "pwsh -NoProfile -File scripts/validate-hook-sync-calls.ps1 -VerboseOutput",
@@ -183,6 +200,7 @@
     "test:shell-portability": "bash scripts/tests/test-shell-portability.sh",
     "test:npm-package-signature": "pwsh -NoProfile -File scripts/tests/test-npm-package-signature.ps1 -VerboseOutput",
     "test:npm-package-changelog": "pwsh -NoProfile -File scripts/tests/test-npm-package-changelog.ps1 -VerboseOutput",
+    "test:release-tools": "pwsh -NoProfile -File scripts/tests/test-release-tools.ps1 -VerboseOutput",
     "verify:tools": "bash scripts/verify-devcontainer-tools.sh",
     "codex:login": "bash scripts/codex-login.sh",
     "codex:login:browser": "bash scripts/codex-login.sh --browser",

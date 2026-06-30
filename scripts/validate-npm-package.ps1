@@ -55,6 +55,82 @@ try {
 
   # Step 5: Validate Unity folders and meta files
   $errors = @()
+
+  $forbiddenPackageEntries = @(
+    '.artifacts',
+    '.cursor',
+    '.git',
+    '.github',
+    '.githooks',
+    '.llm',
+    '.mcp.json',
+    'node_modules',
+    'package-lock.json',
+    'Tests'
+  )
+
+  $allowedTopLevelEntries = @(
+    'CHANGELOG.md',
+    'CHANGELOG.md.meta',
+    'Editor',
+    'Editor.meta',
+    'LICENSE',
+    'LICENSE.meta',
+    'README.md',
+    'README.md.meta',
+    'Runtime',
+    'Runtime.meta',
+    'Samples~',
+    'docs',
+    'docs.meta',
+    'package.json',
+    'package.json.meta',
+    'scripts'
+  )
+
+  foreach ($entry in $forbiddenPackageEntries) {
+    $entryPath = Join-Path $packageDir $entry
+    if (Test-Path $entryPath) {
+      $errors += "Forbidden development entry included in npm package: $entry"
+    }
+  }
+
+  $topLevelEntries = Get-ChildItem -LiteralPath $packageDir -Force | ForEach-Object { $_.Name }
+  foreach ($entry in $topLevelEntries) {
+    if ($entry -notin $allowedTopLevelEntries) {
+      $errors += "Unexpected top-level entry included in npm package: $entry"
+    }
+  }
+
+  $scriptsDir = Join-Path $packageDir 'scripts'
+  if (Test-Path -LiteralPath $scriptsDir) {
+    $allowedScriptsEntries = @('postinstall-hooks.js')
+    $scriptEntries = Get-ChildItem -LiteralPath $scriptsDir -Recurse -File | ForEach-Object {
+      $_.FullName.Replace("$scriptsDir\", "").Replace("$scriptsDir/", "") -replace '\\', '/'
+    }
+    foreach ($entry in $scriptEntries) {
+      if ($entry -notin $allowedScriptsEntries) {
+        $errors += "Unexpected script included in npm package: scripts/$entry"
+      }
+    }
+  }
+
+  $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/')
+  $packedCsFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.cs' | ForEach-Object {
+    $_.FullName.Replace("$packageDir\", "").Replace("$packageDir/", "") -replace '\\', '/'
+  }
+  foreach ($entry in $packedCsFiles) {
+    $isAllowed = $false
+    foreach ($root in $allowedCsRoots) {
+      if ($entry.StartsWith($root, [System.StringComparison]::Ordinal)) {
+        $isAllowed = $true
+        break
+      }
+    }
+    if (-not $isAllowed) {
+      $errors += "C# source outside Unity package roots included in npm package: $entry"
+    }
+  }
   
   # Folders that should be in the npm package
   $unityFolders = @('Runtime', 'Editor')
