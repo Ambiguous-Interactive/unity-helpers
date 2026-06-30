@@ -205,6 +205,75 @@ if ($changelogExists -and (-not [string]::IsNullOrWhiteSpace($versionValue))) {
   Write-TestResult -TestName 'CHANGELOG.md starts with markdown heading' -Passed $startsWithHeading -Message "First line should be a markdown heading (e.g., '# Changelog')"
 }
 
+# ── Section: package validator regressions ──────────────────────────────────
+
+Write-Host ""
+Write-Host "  Section: package validator regressions" -ForegroundColor White
+
+$validatorPath = Join-Path $repoRoot 'scripts/validate-npm-package.ps1'
+$caseOnlyCanaryPath = Join-Path $repoRoot 'docs/Index.md'
+$caseOnlyCanaryRelativePath = 'docs/Index.md'
+
+function Invoke-ValidatorExpectingUntrackedPayloadFailure {
+  param(
+    [string]$RelativePath,
+    [string]$TestName
+  )
+
+  $canaryPath = Join-Path $repoRoot $RelativePath
+  if (Test-Path -LiteralPath $canaryPath) {
+    Write-TestResult -TestName $TestName -Passed $false -Message "Canary path already exists: $RelativePath"
+    return
+  }
+
+  $validatorExitCode = 0
+  $validatorOutput = $null
+  try {
+    $canaryDirectory = Split-Path -Parent $canaryPath
+    if (-not [string]::IsNullOrWhiteSpace($canaryDirectory)) {
+      New-Item -ItemType Directory -Path $canaryDirectory -Force | Out-Null
+    }
+
+    Set-Content -LiteralPath $canaryPath -Value "# Package Validator Canary`n" -NoNewline
+    Push-Location $repoRoot
+    try {
+      $validatorOutput = & pwsh -NoProfile -File $validatorPath *>&1
+      $validatorExitCode = $LASTEXITCODE
+    }
+    finally {
+      Pop-Location
+    }
+  }
+  finally {
+    Remove-Item -LiteralPath $canaryPath -Force -ErrorAction SilentlyContinue
+  }
+
+  $validatorOutputText = ($validatorOutput | Out-String).Trim()
+  $expectedMessage = "File in npm package but not tracked in git repo: $RelativePath"
+  Write-TestResult `
+    -TestName $TestName `
+    -Passed ($validatorExitCode -ne 0 -and $validatorOutputText.Contains($expectedMessage)) `
+    -Message "Expected validator to fail with '$expectedMessage'. Exit: $validatorExitCode. Output: $validatorOutputText"
+}
+
+if (-not (Test-Path -LiteralPath $validatorPath)) {
+  Write-TestResult -TestName 'validate-npm-package script exists' -Passed $false -Message "Missing validator: $validatorPath"
+}
+else {
+  Invoke-ValidatorExpectingUntrackedPayloadFailure `
+    -RelativePath 'docs/package-validator-untracked-payload-canary.md' `
+    -TestName 'validate-npm-package rejects untracked payload files'
+
+  if (Test-Path -LiteralPath $caseOnlyCanaryPath) {
+    Write-Info "Skipping case-only payload canary because $caseOnlyCanaryRelativePath resolves on this filesystem."
+  }
+  else {
+    Invoke-ValidatorExpectingUntrackedPayloadFailure `
+      -RelativePath $caseOnlyCanaryRelativePath `
+      -TestName 'validate-npm-package rejects case-only untracked payload files'
+  }
+}
+
 Write-Host ""
 Write-Host "Results:" -ForegroundColor Magenta
 Write-Host "  Passed: $script:TestsPassed"

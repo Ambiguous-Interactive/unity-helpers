@@ -136,9 +136,18 @@ jobs:
             echo "::error::Tag ${version} already exists."
             exit 1
           fi
-          if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+          set +e
+          branch_lookup_output="$(git ls-remote --exit-code --heads origin "${branch}" 2>&1)"
+          branch_lookup_exit=$?
+          set -e
+          if [ "${branch_lookup_exit}" -eq 0 ]; then
             echo "::error::Branch ${branch} already exists."
             exit 1
+          fi
+          if [ "${branch_lookup_exit}" -ne 2 ]; then
+            echo "::error::Failed to check whether branch ${branch} already exists."
+            printf '%s\n' "${branch_lookup_output}"
+            exit "${branch_lookup_exit}"
           fi
           {
             echo "version=${version}"

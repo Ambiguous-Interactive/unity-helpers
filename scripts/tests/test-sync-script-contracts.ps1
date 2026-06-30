@@ -997,15 +997,19 @@ function Run-ReleasePrepareWorkflowContractTests {
   $workflowPath = Join-Path $repoRoot '.github/workflows/release-prepare.yml'
   $workflowContent = Get-Content -Path $workflowPath -Raw
 
-  $usesGitBranchLookup = (
+  $usesRobustGitBranchLookup = (
     $workflowContent.Contains('git ls-remote --exit-code --heads origin "${branch}"') -and
-    -not $workflowContent.Contains('git/ref/heads/${branch}')
+    $workflowContent.Contains('branch_lookup_exit=$?') -and
+    $workflowContent.Contains('if [ "${branch_lookup_exit}" -ne 2 ]; then') -and
+    $workflowContent.Contains('Failed to check whether branch ${branch} already exists.') -and
+    -not $workflowContent.Contains('git/ref/heads/${branch}') -and
+    -not $workflowContent.Contains('if git ls-remote --exit-code --heads origin "${branch}"')
   )
 
   Write-TestResult `
-    -TestName 'release prepare checks existing release branches with git heads lookup' `
-    -Passed $usesGitBranchLookup `
-    -Message 'Expected release-prepare.yml to avoid slash-sensitive git/ref/heads/${branch} API paths.'
+    -TestName 'release prepare checks existing release branches with robust git heads lookup' `
+    -Passed $usesRobustGitBranchLookup `
+    -Message 'Expected release-prepare.yml to treat git ls-remote exit 2 as absent while failing other lookup errors.'
 }
 
 function Run-ReleaseTagWorkflowContractTests {
@@ -1106,8 +1110,26 @@ function Run-ReleasePackageContentContractTests {
   $validatorUnityFolders = Get-PowerShellSingleQuotedArrayEntries `
     -Content $validatorContent `
     -VariableName 'unityFolders'
+  $validatorPackageContentRoots = Get-PowerShellSingleQuotedArrayEntries `
+    -Content $validatorContent `
+    -VariableName 'packageContentRoots'
   $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })
   $missingValidatorUnityFolders = @($requiredUnityPackageFolders | Where-Object { $_ -notin $validatorUnityFolders })
+  $missingValidatorPackageContentRoots = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorPackageContentRoots })
+  $validatorUsesCaseSensitiveMembership = (
+    $validatorContent.Contains('$entry -cnotin $allowedTopLevelEntries') -and
+    $validatorContent.Contains('$entry -cnotin $allowedScriptsEntries') -and
+    $validatorContent.Contains('$gitFile -cnotin $npmPackageFiles') -and
+    $validatorContent.Contains('$npmFile -cnotin $gitPackageFiles')
+  )
+  $validatorComparesWholePackagePayload = (
+    $validatorContent.Contains('Get-TrackedPackageFiles -RepoRoot $repoRoot -PackageRoots $packageContentRoots') -and
+    $validatorContent.Contains('Get-PackedPackageFiles -PackageDir $packageDir') -and
+    $validatorContent.Contains('Get-ChildItem -LiteralPath $PackageDir -Recurse -File -Force') -and
+    $validatorContent.Contains('git -C $RepoRoot ls-files -z -- @trackedRoots') -and
+    -not $validatorContent.Contains('Test-Path -LiteralPath (Join-Path $RepoRoot $_)') -and
+    $missingValidatorPackageContentRoots.Count -eq 0
+  )
 
   Write-TestResult `
     -TestName 'npm package validator requires all release package entries' `
@@ -1118,6 +1140,16 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator compares all shipped Unity roots against git' `
     -Passed ($missingValidatorUnityFolders.Count -eq 0) `
     -Message "Missing validator Unity folders: $($missingValidatorUnityFolders -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator compares whole release payload against git' `
+    -Passed $validatorComparesWholePackagePayload `
+    -Message "Missing validator package content roots: $($missingValidatorPackageContentRoots -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator uses case-sensitive package membership checks' `
+    -Passed $validatorUsesCaseSensitiveMembership `
+    -Message 'Expected validate-npm-package.ps1 to reject differently-cased package paths with -cnotin.'
 
   $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
   $exporterContent = Get-Content -Path $exporterPath -Raw
