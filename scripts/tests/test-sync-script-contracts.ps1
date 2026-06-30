@@ -935,6 +935,8 @@ function Run-ReleaseWorkflowChangelogContractTests {
     Join-Path $repoRoot '.github/workflows/release-tag.yml'
     Join-Path $repoRoot '.github/workflows/release.yml'
   )
+  $publishWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
+  $publishWorkflowContent = Get-Content -Path $publishWorkflowPath -Raw
 
   $missingHelper = @()
   $rawHeadingGrep = @()
@@ -963,6 +965,18 @@ function Run-ReleaseWorkflowChangelogContractTests {
     -TestName 'release tag/publish workflows avoid raw changelog heading grep' `
     -Passed ($rawHeadingGrep.Count -eq 0) `
     -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
+
+  $publishTriggerExcludesPrereleaseTags = (
+    $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
+    $publishWorkflowContent.Contains('- "![0-9]*.[0-9]*.[0-9]*-*"') -and
+    $publishWorkflowContent.Contains("- '![0-9]*.[0-9]*.[0-9]*\+*'") -and
+    $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.')
+  )
+
+  Write-TestResult `
+    -TestName 'release publish workflow excludes prerelease-style tags before strict verification' `
+    -Passed $publishTriggerExcludesPrereleaseTags `
+    -Message 'Expected release.yml tag filters to skip prerelease/build metadata tags while verify-tag enforces exact X.Y.Z semver.'
 }
 
 function Run-ReleaseWorkflowGitHubCliContractTests {
@@ -1101,6 +1115,12 @@ function Run-ReleaseTagWorkflowContractTests {
     $workflowContent -notmatch "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*branches:"
   )
 
+  $checkoutStepIndex = $workflowContent.IndexOf('- name: Checkout', [StringComparison]::Ordinal)
+  $checkoutFetchTagsIndex = if ($checkoutStepIndex -ge 0) {
+    $workflowContent.IndexOf('fetch-tags: true', $checkoutStepIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
   $subjectCheckIndex = $workflowContent.IndexOf('subject="$(git log -1 --format=%s)"', [StringComparison]::Ordinal)
   $nonReleaseExitIndex = $workflowContent.IndexOf('Head commit is not a release commit; nothing to do.', [StringComparison]::Ordinal)
   $existingTagNoOpIndex = $workflowContent.IndexOf('git show-ref --verify --quiet "refs/tags/${version}"', [StringComparison]::Ordinal)
@@ -1137,6 +1157,11 @@ function Run-ReleaseTagWorkflowContractTests {
     $untaggedWarningIndex -gt $existingTagNoOpIndex -and
     $existingTagNoOpIndex -lt $nonReleaseProceedFalseIndex
   )
+  $fetchesTagsBeforeLocalTaggedNoOp = (
+    $checkoutStepIndex -ge 0 -and
+    $checkoutFetchTagsIndex -gt $checkoutStepIndex -and
+    $checkoutFetchTagsIndex -lt $existingTagNoOpIndex
+  )
   $usesRobustTagLookup = (
     $tagLookupIndex -ge 0 -and
     $workflowContent.Contains('tag_lookup_exit=$?') -and
@@ -1167,6 +1192,11 @@ function Run-ReleaseTagWorkflowContractTests {
     -TestName 'release tag workflow suppresses untagged warning for locally-known tags' `
     -Passed $checksLocalTagBeforeUntaggedWarning `
     -Message 'Expected release-tag.yml to check refs/tags/${version} before warning that the documented version is untagged.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow fetches tags before local tagged no-op check' `
+    -Passed $fetchesTagsBeforeLocalTaggedNoOp `
+    -Message 'Expected release-tag.yml checkout to fetch tags before using local refs/tags/${version} for the non-release no-op path.'
 
   Write-TestResult `
     -TestName 'release tag workflow checks app credentials before token action' `

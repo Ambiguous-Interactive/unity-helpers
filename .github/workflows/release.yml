@@ -3,7 +3,11 @@ name: Release Publish
 on:
   push:
     tags:
+      # GitHub tag filters are globs, not regex. The verify job below still
+      # enforces exact X.Y.Z; these exclusions avoid noisy prerelease/build runs.
       - "[0-9]*.[0-9]*.[0-9]*"
+      - "![0-9]*.[0-9]*.[0-9]*-*"
+      - '![0-9]*.[0-9]*.[0-9]*\+*'
 
 permissions:
   contents: read
