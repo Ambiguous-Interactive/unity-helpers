@@ -266,6 +266,44 @@ try {
     } finally {
         Remove-ReleaseFixture -Path $fixture
     }
+
+    $longFenceChangelog = @(
+        '# Changelog',
+        '',
+        '## [Unreleased]',
+        '',
+        '### Added',
+        '',
+        '- Example:',
+        '',
+        '````markdown',
+        '```',
+        '## [1.2.4]',
+        '````',
+        '',
+        '- Still part of Unreleased.',
+        '',
+        '## [1.2.3]',
+        '',
+        '- Old.',
+        ''
+    ) -join "`n"
+    $fixture = New-ReleaseFixture -Changelog $longFenceChangelog
+    try {
+        $result = Invoke-ReleasePreparation -RepoRoot $fixture -Bump patch -Date '2026-06-30'
+        $changelog = Get-Content -Path (Join-Path $fixture 'CHANGELOG.md') -Raw
+        Write-TestResult `
+            -TestName 'Long fenced changelog headings require matching close length' `
+            -Passed (
+                $result.NextVersion -eq '1.2.4' -and
+                $changelog.Contains('````markdown') -and
+                $changelog.Contains('## [1.2.4] - 2026-06-30') -and
+                $changelog.Contains('## [1.2.4]' + "`n" + '````')
+            ) `
+            -Message $changelog
+    } finally {
+        Remove-ReleaseFixture -Path $fixture
+    }
 } catch {
     Write-TestResult -TestName 'Unexpected release-tool exception' -Passed $false -Message $_.Exception.ToString()
 }

@@ -87,6 +87,7 @@ function Get-ChangelogFenceMask {
     $mask = New-Object bool[] $Lines.Count
     $inFence = $false
     $fenceMarker = ''
+    $fenceLength = 0
 
     for ($index = 0; $index -lt $Lines.Count; $index++) {
         $line = $Lines[$index]
@@ -99,12 +100,14 @@ function Get-ChangelogFenceMask {
             if (-not $inFence) {
                 $inFence = $true
                 $fenceMarker = $markerPrefix
+                $fenceLength = $marker.Length
                 $isFenceLine = $true
-            } elseif ($fenceMarker -eq $markerPrefix) {
+            } elseif ($fenceMarker -eq $markerPrefix -and $marker.Length -ge $fenceLength) {
                 $isFenceLine = $true
                 $mask[$index] = $true
                 $inFence = $false
                 $fenceMarker = ''
+                $fenceLength = 0
                 continue
             }
         }
