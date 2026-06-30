@@ -40,19 +40,6 @@ jobs:
             exit 1
           fi
 
-          tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>/dev/null || true)"
-          if [ -n "${tag_ref_json}" ]; then
-            git fetch --force --tags origin "refs/tags/${version}:refs/tags/${version}" >/dev/null
-            tag_target="$(git rev-list -n 1 "${version}")"
-            if [ "${tag_target}" = "${GITHUB_SHA}" ]; then
-              echo "Tag ${version} already points at this release commit; nothing to do."
-              echo "proceed=false" >> "${GITHUB_OUTPUT}"
-              exit 0
-            fi
-            echo "::error::Tag ${version} already exists at ${tag_target}, not release commit ${GITHUB_SHA}."
-            exit 1
-          fi
-
           subject="$(git log -1 --format=%s)"
           escaped_version="${version//./\\.}"
           if [ "${subject}" != "release: ${version}" ] \
@@ -85,6 +72,19 @@ jobs:
             }
           '; then
             echo "::error::Release commit for ${version} has no matching CHANGELOG.md heading."
+            exit 1
+          fi
+
+          tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}" 2>/dev/null || true)"
+          if [ -n "${tag_ref_json}" ]; then
+            git fetch --force --tags origin "refs/tags/${version}:refs/tags/${version}" >/dev/null
+            tag_target="$(git rev-list -n 1 "${version}")"
+            if [ "${tag_target}" = "${GITHUB_SHA}" ]; then
+              echo "Tag ${version} already points at this release commit; nothing to do."
+              echo "proceed=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            echo "::error::Tag ${version} already exists at ${tag_target}, not release commit ${GITHUB_SHA}."
             exit 1
           fi
 

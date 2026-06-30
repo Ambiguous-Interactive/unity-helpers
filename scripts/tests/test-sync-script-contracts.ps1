@@ -1085,10 +1085,44 @@ function Run-ReleaseTagWorkflowContractTests {
     $workflowContent -notmatch "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*branches:"
   )
 
+  $subjectCheckIndex = $workflowContent.IndexOf('subject="$(git log -1 --format=%s)"', [StringComparison]::Ordinal)
+  $nonReleaseExitIndex = $workflowContent.IndexOf('Head commit is not a release commit; nothing to do.', [StringComparison]::Ordinal)
+  $nonReleaseProceedFalseIndex = if ($subjectCheckIndex -ge 0) {
+    $workflowContent.IndexOf('echo "proceed=false" >> "${GITHUB_OUTPUT}"', $subjectCheckIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
+  $nonReleaseExitZeroIndex = if ($nonReleaseProceedFalseIndex -ge 0) {
+    $workflowContent.IndexOf('exit 0', $nonReleaseProceedFalseIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
+  $releaseHeadingValidationIndex = if ($nonReleaseExitZeroIndex -ge 0) {
+    $workflowContent.IndexOf('Release commit for ${version} has no matching CHANGELOG.md heading.', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
+  $tagLookupIndex = $workflowContent.IndexOf('tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}"', [StringComparison]::Ordinal)
+  $tagMismatchIndex = $workflowContent.IndexOf('already exists at ${tag_target}, not release commit ${GITHUB_SHA}', [StringComparison]::Ordinal)
+  $checksTagsAfterReleaseDetection = (
+    $subjectCheckIndex -ge 0 -and
+    $nonReleaseExitIndex -gt $subjectCheckIndex -and
+    $nonReleaseProceedFalseIndex -gt $nonReleaseExitIndex -and
+    $nonReleaseExitZeroIndex -gt $nonReleaseProceedFalseIndex -and
+    $releaseHeadingValidationIndex -gt $nonReleaseExitZeroIndex -and
+    $tagLookupIndex -gt $releaseHeadingValidationIndex -and
+    $tagMismatchIndex -gt $tagLookupIndex
+  )
+
   Write-TestResult `
     -TestName 'release tag workflow fails when existing tag points elsewhere' `
     -Passed $hasTagTargetCheck `
     -Message 'Expected release-tag.yml to compare existing tag target with GITHUB_SHA and error on mismatches.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow checks existing tags only after release detection' `
+    -Passed $checksTagsAfterReleaseDetection `
+    -Message 'Expected release-tag.yml to exit cleanly for non-release package/changelog pushes before checking existing tag targets.'
 
   Write-TestResult `
     -TestName 'release tag workflow checks app credentials before token action' `
