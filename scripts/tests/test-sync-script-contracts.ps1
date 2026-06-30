@@ -66,7 +66,8 @@ function Get-PowerShellSingleQuotedArrayEntries {
   )
 
   $escapedName = [regex]::Escape($VariableName)
-  $match = [regex]::Match($Content, "(?ms)\`$$escapedName\s*=\s*@\((?<body>.*?)\)")
+  $arrayPattern = '(?ms)\${0}\s*=\s*@\((?<body>.*?)\)' -f $escapedName
+  $match = [regex]::Match($Content, $arrayPattern)
   if (-not $match.Success) {
     return @()
   }
