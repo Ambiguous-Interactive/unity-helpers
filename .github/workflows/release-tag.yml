@@ -47,11 +47,10 @@ jobs:
             && ! printf '%s\n' "${subject}" | grep -Eq "^release: ${escaped_version} \(#[0-9]+\)$"; then
             # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
             if CHANGELOG_VERSION="${version}" pwsh -NoProfile -Command '
+              $ErrorActionPreference = "Stop"
               . ./scripts/release-tools/release-helpers.ps1
               $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
-              if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
-                exit 1
-              }
+              [void](Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION)
             '; then
               if git show-ref --verify --quiet "refs/tags/${version}"; then
                 echo "Head commit is not a release commit; version ${version} is already tagged; nothing to do."
@@ -70,13 +69,12 @@ jobs:
 
           # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
           if ! CHANGELOG_VERSION="${version}" pwsh -NoProfile -Command '
+            $ErrorActionPreference = "Stop"
             . ./scripts/release-tools/release-helpers.ps1
             $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
-            if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
-              exit 1
-            }
+            [void](Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION)
           '; then
-            echo "::error::Release commit for ${version} has no matching CHANGELOG.md heading."
+            echo "::error::Release commit for ${version} has no CHANGELOG.md section with release-note content."
             exit 1
           fi
 

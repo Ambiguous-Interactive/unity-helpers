@@ -52,13 +52,12 @@ jobs:
           fi
           # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
           if ! CHANGELOG_VERSION="${package_version}" pwsh -NoProfile -Command '
+            $ErrorActionPreference = "Stop"
             . ./scripts/release-tools/release-helpers.ps1
             $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
-            if (-not (Test-ChangelogVersionHeading -Content $content -Version $env:CHANGELOG_VERSION)) {
-              exit 1
-            }
+            [void](Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION)
           '; then
-            echo "::error::CHANGELOG.md has no exact heading for ${package_version}."
+            echo "::error::CHANGELOG.md has no exact section with release-note content for ${package_version}."
             exit 1
           fi
           {

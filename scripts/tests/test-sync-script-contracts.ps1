@@ -938,18 +938,18 @@ function Run-ReleaseWorkflowChangelogContractTests {
   $publishWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
   $publishWorkflowContent = Get-Content -Path $publishWorkflowPath -Raw
 
-  $missingHelper = @()
+  $missingSectionHelper = @()
   $rawHeadingGrep = @()
   foreach ($workflowPath in $workflowPaths) {
     if (-not (Test-Path $workflowPath)) {
-      $missingHelper += "missing: $workflowPath"
+      $missingSectionHelper += "missing: $workflowPath"
       continue
     }
 
     $content = Get-Content -Path $workflowPath -Raw
     $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $workflowPath).Replace('\', '/')
-    if ($content -notmatch 'Test-ChangelogVersionHeading') {
-      $missingHelper += $relativePath
+    if ($content -notmatch 'Get-ChangelogSection') {
+      $missingSectionHelper += $relativePath
     }
     if ($content -match 'grep\s+-Eq\s+"\^##\s+\\\[') {
       $rawHeadingGrep += $relativePath
@@ -957,9 +957,9 @@ function Run-ReleaseWorkflowChangelogContractTests {
   }
 
   Write-TestResult `
-    -TestName 'release tag/publish workflows use fence-aware changelog heading checks' `
-    -Passed ($missingHelper.Count -eq 0) `
-    -Message "Missing Test-ChangelogVersionHeading usage: $($missingHelper -join '; ')"
+    -TestName 'release tag/publish workflows validate changelog release-note content' `
+    -Passed ($missingSectionHelper.Count -eq 0) `
+    -Message "Missing Get-ChangelogSection usage: $($missingSectionHelper -join '; ')"
 
   Write-TestResult `
     -TestName 'release tag/publish workflows avoid raw changelog heading grep' `
@@ -1170,17 +1170,23 @@ function Run-ReleaseTagWorkflowContractTests {
     -1
   }
   $releaseHeadingValidationIndex = if ($nonReleaseExitZeroIndex -ge 0) {
-    $workflowContent.IndexOf('Release commit for ${version} has no matching CHANGELOG.md heading.', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
+    $workflowContent.IndexOf('Release commit for ${version} has no CHANGELOG.md section with release-note content.', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
   } else {
     -1
   }
   $tagLookupIndex = $workflowContent.IndexOf('tag_lookup_output="$(gh api -i "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}"', [StringComparison]::Ordinal)
   $tagMismatchIndex = $workflowContent.IndexOf('already exists at ${tag_target}, not release commit ${GITHUB_SHA}', [StringComparison]::Ordinal)
+  $releaseSectionValidationIndex = if ($nonReleaseExitZeroIndex -ge 0) {
+    $workflowContent.IndexOf('Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
   $checksTagsAfterReleaseDetection = (
     $subjectCheckIndex -ge 0 -and
     $nonReleaseExitIndex -gt $subjectCheckIndex -and
     $nonReleaseProceedFalseIndex -gt $nonReleaseExitIndex -and
     $nonReleaseExitZeroIndex -gt $nonReleaseProceedFalseIndex -and
+    $releaseSectionValidationIndex -gt $nonReleaseExitZeroIndex -and
     $releaseHeadingValidationIndex -gt $nonReleaseExitZeroIndex -and
     $tagLookupIndex -gt $releaseHeadingValidationIndex -and
     $tagMismatchIndex -gt $tagLookupIndex
@@ -1216,6 +1222,11 @@ function Run-ReleaseTagWorkflowContractTests {
     -TestName 'release tag workflow checks existing tags only after release detection' `
     -Passed $checksTagsAfterReleaseDetection `
     -Message 'Expected release-tag.yml to exit cleanly for non-release package/changelog pushes before checking existing tag targets.'
+
+  Write-TestResult `
+    -TestName 'release tag workflow validates changelog release-note content before tag lookup' `
+    -Passed ($releaseSectionValidationIndex -gt $nonReleaseExitZeroIndex -and $releaseSectionValidationIndex -lt $tagLookupIndex) `
+    -Message 'Expected release-tag.yml to call Get-ChangelogSection before checking or creating a release tag.'
 
   Write-TestResult `
     -TestName 'release tag workflow checks existing tags without hiding API failures' `
