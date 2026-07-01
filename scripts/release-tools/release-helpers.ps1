@@ -264,6 +264,7 @@ function Update-ReleaseChangelogContent {
             throw "CHANGELOG.md already contains '## [$Version]' but '## [Unreleased]' still has release-note content."
         }
 
+        [void](Get-ChangelogSection -Content $normalized -Version $Version)
         return [pscustomobject]@{
             Content = $normalized.TrimEnd() + "`n"
             Rotated = $false

@@ -205,14 +205,14 @@ jobs:
           git format-patch -1 --stdout > "artifacts/release-prepare/release-${VERSION}.patch"
           git show --stat --oneline --decorate --no-renames HEAD > "artifacts/release-prepare/release-${VERSION}.stat.txt"
 
-          auth_header="$(printf 'x-access-token:%s' "${GH_PUSH_TOKEN}" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-            push origin "HEAD:refs/heads/${BRANCH}"
-
           notes_file="${RUNNER_TEMP}/release-notes.md"
           pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
             -Version "${VERSION}" \
             -OutputPath "${notes_file}"
+
+          auth_header="$(printf 'x-access-token:%s' "${GH_PUSH_TOKEN}" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${BRANCH}"
 
           pr_body_file="${RUNNER_TEMP}/release-pr-body.md"
           {

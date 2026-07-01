@@ -230,6 +230,35 @@ try {
         Remove-ReleaseFixture -Path $fixture
     }
 
+    $emptyDuplicateTargetChangelog = @(
+        '# Changelog',
+        '',
+        '## [Unreleased]',
+        '',
+        '### Added',
+        '',
+        '## [1.2.4] - 2026-06-30',
+        '',
+        '### Fixed',
+        '',
+        '## [1.2.3]',
+        '',
+        '- Old.',
+        ''
+    ) -join "`n"
+    $fixture = New-ReleaseFixture -Changelog $emptyDuplicateTargetChangelog
+    try {
+        $emptyDuplicateTargetRejected = $false
+        try {
+            [void](Invoke-ReleasePreparation -RepoRoot $fixture -Version '1.2.4' -Date '2026-06-30')
+        } catch {
+            $emptyDuplicateTargetRejected = $_.Exception.Message -match "section '## \[1\.2\.4\]' has no release-note content"
+        }
+        Write-TestResult -TestName 'Existing target headings require release-note content' -Passed $emptyDuplicateTargetRejected
+    } finally {
+        Remove-ReleaseFixture -Path $fixture
+    }
+
     $fencedChangelog = @(
         '# Changelog',
         '',

@@ -292,7 +292,7 @@ try {
     }
     
     # Get all files and subdirectories in this folder (recursively)
-    $items = Get-ChildItem -Path $folderPath -Recurse
+    $items = Get-ChildItem -LiteralPath $folderPath -Recurse -Force
     
     foreach ($item in $items) {
       # Get relative path for better error messages

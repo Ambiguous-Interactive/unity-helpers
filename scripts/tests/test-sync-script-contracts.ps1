@@ -966,17 +966,16 @@ function Run-ReleaseWorkflowChangelogContractTests {
     -Passed ($rawHeadingGrep.Count -eq 0) `
     -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
 
-  $publishTriggerExcludesPrereleaseTags = (
-    $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
-    $publishWorkflowContent.Contains('- "![0-9]*.[0-9]*.[0-9]*-*"') -and
-    $publishWorkflowContent.Contains("- '![0-9]*.[0-9]*.[0-9]*\+*'") -and
+  $publishTriggerNarrowlyMatchesReleaseTags = (
+    $publishWorkflowContent.Contains('- "[0-9]+.[0-9]+.[0-9]+"') -and
+    -not $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
     $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.')
   )
 
   Write-TestResult `
-    -TestName 'release publish workflow excludes prerelease-style tags before strict verification' `
-    -Passed $publishTriggerExcludesPrereleaseTags `
-    -Message 'Expected release.yml tag filters to skip prerelease/build metadata tags while verify-tag enforces exact X.Y.Z semver.'
+    -TestName 'release publish workflow narrows tag trigger before strict verification' `
+    -Passed $publishTriggerNarrowlyMatchesReleaseTags `
+    -Message 'Expected release.yml tag filter to match digit-only X.Y.Z tags while verify-tag enforces exact no-leading-zero semver.'
 }
 
 function Run-ReleaseWorkflowGitHubCliContractTests {
@@ -1073,6 +1072,13 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not ($workflowContent -match 'gh api[^\r\n]+\|\|\s*true') -and
     -not ($workflowContent -match 'grep -Eq .*\bstatus')
   )
+  $notesIndex = $workflowContent.IndexOf('scripts/release-tools/write-release-notes.ps1')
+  $branchPushIndex = $workflowContent.IndexOf('push origin "HEAD:refs/heads/${BRANCH}"')
+  $generatesNotesBeforePushingBranch = (
+    $notesIndex -ge 0 -and
+    $branchPushIndex -ge 0 -and
+    $notesIndex -lt $branchPushIndex
+  )
 
   Write-TestResult `
     -TestName 'release prepare checks existing release branches with robust git heads lookup' `
@@ -1083,6 +1089,11 @@ function Run-ReleasePrepareWorkflowContractTests {
     -TestName 'release prepare checks existing tags without hiding API failures' `
     -Passed $usesRobustGitTagLookup `
     -Message 'Expected release-prepare.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
+
+  Write-TestResult `
+    -TestName 'release prepare validates release notes before pushing branch' `
+    -Passed $generatesNotesBeforePushingBranch `
+    -Message 'Expected write-release-notes.ps1 to run before pushing release/X.Y.Z so failed note generation leaves no remote branch.'
 }
 
 function Run-ReleaseTagWorkflowContractTests {
@@ -1290,6 +1301,7 @@ function Run-ReleasePackageContentContractTests {
     -not $validatorContent.Contains('Test-Path -LiteralPath (Join-Path $RepoRoot $_)') -and
     $missingValidatorPackageContentRoots.Count -eq 0
   )
+  $validatorChecksHiddenUnityFolderEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $folderPath -Recurse -Force')
 
   Write-TestResult `
     -TestName 'npm package validator requires all release package entries' `
@@ -1315,6 +1327,11 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator compares whole release payload against git' `
     -Passed $validatorComparesWholePackagePayload `
     -Message "Missing validator package content roots: $($missingValidatorPackageContentRoots -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator checks hidden Unity folder entries for metadata' `
+    -Passed $validatorChecksHiddenUnityFolderEntries `
+    -Message 'Expected Unity folder metadata validation to enumerate with -LiteralPath and -Force, matching packed payload parity.'
 
   Write-TestResult `
     -TestName 'npm package validator uses case-sensitive package membership checks' `
