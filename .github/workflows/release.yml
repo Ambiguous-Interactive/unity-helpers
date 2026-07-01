@@ -3,8 +3,9 @@ name: Release Publish
 on:
   push:
     tags:
-      # GitHub tag filters are globs, not regex. The verify job below still
-      # enforces no-leading-zero X.Y.Z semver.
+      # GitHub tag filters are globs, not regex; their filter-pattern cheat
+      # sheet defines + as one-or-more of the preceding character. The verify
+      # job below still enforces no-leading-zero X.Y.Z semver.
       - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
