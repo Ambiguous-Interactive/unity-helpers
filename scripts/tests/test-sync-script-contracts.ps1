@@ -966,16 +966,39 @@ function Run-ReleaseWorkflowChangelogContractTests {
     -Passed ($rawHeadingGrep.Count -eq 0) `
     -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
 
-  $publishTriggerNarrowlyMatchesReleaseTags = (
-    $publishWorkflowContent.Contains('- "[0-9]+.[0-9]+.[0-9]+"') -and
-    -not $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
-    $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.')
+  $strictReleaseTagRegex = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+  $acceptedReleaseTags = @('0.0.0', '1.2.3', '10.20.30')
+  $rejectedReleaseTags = @(
+    '01.2.3',
+    '1.02.3',
+    '1.2.03',
+    'v1.2.3',
+    '1.2',
+    '1.2.3.4',
+    '1.2.x',
+    '1.2.3-alpha'
+  )
+  $verifierHasStrictReleaseTagRegex = $publishWorkflowContent.Contains("grep -Eq '$strictReleaseTagRegex'")
+  $strictRegexAcceptsExpectedTags = @(
+    $acceptedReleaseTags | Where-Object { $_ -notmatch $strictReleaseTagRegex }
+  ).Count -eq 0
+  $strictRegexRejectsExpectedTags = @(
+    $rejectedReleaseTags | Where-Object { $_ -match $strictReleaseTagRegex }
+  ).Count -eq 0
+
+  $publishTriggerDelegatesStrictnessToVerifier = (
+    $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
+    -not $publishWorkflowContent.Contains('- "[0-9]+.[0-9]+.[0-9]+"') -and
+    $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.') -and
+    $verifierHasStrictReleaseTagRegex -and
+    $strictRegexAcceptsExpectedTags -and
+    $strictRegexRejectsExpectedTags
   )
 
   Write-TestResult `
-    -TestName 'release publish workflow narrows tag trigger before strict verification' `
-    -Passed $publishTriggerNarrowlyMatchesReleaseTags `
-    -Message 'Expected release.yml tag filter to match digit-only X.Y.Z tags while verify-tag enforces exact no-leading-zero semver.'
+    -TestName 'release publish workflow uses unambiguous tag glob before strict verification' `
+    -Passed $publishTriggerDelegatesStrictnessToVerifier `
+    -Message 'Expected release.yml tag filter to use an unambiguous digit-start glob while verify-tag enforces exact no-leading-zero semver.'
 }
 
 function Run-ReleaseWorkflowGitHubCliContractTests {
