@@ -53,14 +53,14 @@ jobs:
 
       - name: Checkout PR branch (same-repo)
         if: ${{ steps.meta.outputs.same_repo == 'true' }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.meta.outputs.head_ref }}
           fetch-depth: 0
 
       - name: Checkout PR fork head
         if: ${{ steps.meta.outputs.same_repo != 'true' }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.meta.outputs.head_repo }}
           ref: ${{ steps.meta.outputs.head_ref }}
@@ -73,7 +73,7 @@ jobs:
           node-version: "22"
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5.2.0
+        uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: "8.0.x"
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Commit changes to PR branch (same-repo)
         if: ${{ steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
-        uses: stefanzweifel/git-auto-commit-action@v7.1.0
+        uses: stefanzweifel/git-auto-commit-action@v7.2.0
         with:
           commit_message: "chore(format): apply requested formatting"
           branch: ${{ steps.meta.outputs.head_ref }}
@@ -202,14 +202,14 @@ jobs:
 
       - name: Checkout PR branch (same-repo)
         if: ${{ steps.meta.outputs.same_repo == 'true' }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.meta.outputs.head_ref }}
           fetch-depth: 0
 
       - name: Checkout PR fork head
         if: ${{ steps.meta.outputs.same_repo != 'true' }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.meta.outputs.head_repo }}
           ref: ${{ steps.meta.outputs.head_ref }}
@@ -222,7 +222,7 @@ jobs:
           node-version: "22"
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5.2.0
+        uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: "8.0.x"
 
@@ -255,7 +255,7 @@ jobs:
 
       - name: Commit changes to PR branch (same-repo)
         if: ${{ steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
-        uses: stefanzweifel/git-auto-commit-action@v7.1.0
+        uses: stefanzweifel/git-auto-commit-action@v7.2.0
         with:
           commit_message: "chore(format): apply requested formatting"
           branch: ${{ steps.meta.outputs.head_ref }}

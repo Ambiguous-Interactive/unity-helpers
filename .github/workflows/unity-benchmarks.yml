@@ -35,7 +35,7 @@ jobs:
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Resolve dispatch overrides
@@ -188,7 +188,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -203,7 +203,7 @@ jobs:
           matrix-note: "default (organization lock wraps the Unity section)"
 
       - name: Cache Unity Library and package caches
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         env:
           PACKAGE_HASH: >-
             ${{ hashFiles(
@@ -427,7 +427,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Persist credentials so git-auto-commit-action can push.
           persist-credentials: true
@@ -521,7 +521,7 @@ jobs:
       # the default below is the simplest path that works on an UNprotected
       # default branch.
       - name: Commit perf results
-        uses: stefanzweifel/git-auto-commit-action@v7.1.0
+        uses: stefanzweifel/git-auto-commit-action@v7.2.0
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
           # Broadened from perf-results/*.xml to the whole tree so the rolling

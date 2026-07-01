@@ -238,7 +238,7 @@ jobs:
       - name: Checkout
         # Shallow checkout: bootstrap only needs scripts/unity/* and a
         # composite action; no history depth required.
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -336,7 +336,7 @@ jobs:
           Write-Host "Resolved detect-only: $detectOnly (raw='$rawDetect')"
 
           # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
-          # reliably the repo root post-checkout (actions/checkout@v6 above).
+          # reliably the repo root post-checkout (actions/checkout@v7 above).
           #
           # TODO(unity-helpers): scripts/unity/maintain-windows-runner.ps1 (and
           # the scripts/unity/bootstrap-windows-runner.ps1 it wraps, plus the
