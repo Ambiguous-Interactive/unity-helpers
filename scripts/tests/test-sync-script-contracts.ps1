@@ -804,6 +804,28 @@ function Run-ReleaseDrafterChangelogVersionContractTests {
   }
 
   $workflowContent = Get-Content -Path $workflowPath -Raw
+  $workflowLines = @($workflowContent -split "`r?`n")
+  $onBlockLines = @()
+  $insideOnBlock = $false
+  foreach ($line in $workflowLines) {
+    if ($line -ceq 'on:') {
+      $insideOnBlock = $true
+      continue
+    }
+    if ($insideOnBlock -and $line -match '^\S') {
+      break
+    }
+    if ($insideOnBlock) {
+      $onBlockLines += $line
+    }
+  }
+  $hasPushTrigger = @($onBlockLines | Where-Object { $_ -match '^\s+push\s*:' }).Count -gt 0
+  $hasWorkflowDispatchTrigger = @($onBlockLines | Where-Object { $_ -match '^\s+workflow_dispatch\s*:' }).Count -gt 0
+
+  Write-TestResult `
+    -TestName 'release-drafter is manual-only so release publishes cannot race draft updates' `
+    -Passed ((-not $hasPushTrigger) -and $hasWorkflowDispatchTrigger) `
+    -Message 'Expected release-drafter.yml to expose workflow_dispatch without an automatic push trigger.'
 
   Write-TestResult `
     -TestName 'release-drafter extracts latest changelog header before version selection' `
@@ -897,7 +919,6 @@ function Run-ReleaseDrafterChangelogVersionContractTests {
     -Passed ($workflowContent -match '-F tag_name="\$VERSION"' -and $workflowContent -match '-F name="\$VERSION"') `
     -Message 'Expected release PATCH request to include tag_name/name fields from VERSION.'
 
-  $workflowLines = @($workflowContent -split "`r?`n")
   $earlyExitAfterChangelogNotice = $false
   for ($i = 0; $i -lt $workflowLines.Count; $i++) {
     if ($workflowLines[$i] -match 'Changelog section already exists') {

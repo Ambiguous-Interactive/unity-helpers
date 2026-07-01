@@ -1,16 +1,8 @@
 name: Release Drafter
 
 on:
-  push:
-    branches:
-      - main
-  # Uncomment after release-drafter.yml config is merged to main:
-  # pull_request_target:
-  #   types:
-  #     - opened
-  #     - reopened
-  #     - synchronize
-  #     - labeled
+  # Manual-only: release-tag.yml and release.yml own release merges.
+  # Running this draft updater on push can race tag-triggered publishing.
   workflow_dispatch:
 
 permissions:
