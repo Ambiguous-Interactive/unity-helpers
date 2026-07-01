@@ -1324,6 +1324,8 @@ function Run-ReleasePackageContentContractTests {
     -not $validatorContent.Contains('Test-Path -LiteralPath (Join-Path $RepoRoot $_)') -and
     $missingValidatorPackageContentRoots.Count -eq 0
   )
+  $validatorChecksHiddenScriptEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Force')
+  $validatorChecksHiddenPackedCsFiles = $validatorContent.Contains("Get-ChildItem -LiteralPath `$packageDir -Recurse -File -Filter '*.cs' -Force")
   $validatorChecksHiddenUnityFolderEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $folderPath -Recurse -Force')
 
   Write-TestResult `
@@ -1355,6 +1357,16 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator checks hidden Unity folder entries for metadata' `
     -Passed $validatorChecksHiddenUnityFolderEntries `
     -Message 'Expected Unity folder metadata validation to enumerate with -LiteralPath and -Force, matching packed payload parity.'
+
+  Write-TestResult `
+    -TestName 'npm package validator checks hidden scripts entries against allowlist' `
+    -Passed $validatorChecksHiddenScriptEntries `
+    -Message 'Expected scripts folder allowlist validation to enumerate with -LiteralPath and -Force.'
+
+  Write-TestResult `
+    -TestName 'npm package validator checks hidden C# files for root restrictions' `
+    -Passed $validatorChecksHiddenPackedCsFiles `
+    -Message 'Expected packed C# root validation to enumerate with -LiteralPath and -Force.'
 
   Write-TestResult `
     -TestName 'npm package validator uses case-sensitive package membership checks' `

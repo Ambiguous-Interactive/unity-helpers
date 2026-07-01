@@ -180,7 +180,7 @@ try {
       'postinstall-hooks.js',
       'postinstall-hooks.js.meta'
     )
-    $scriptEntries = Get-ChildItem -LiteralPath $scriptsDir -Recurse -File | ForEach-Object {
+    $scriptEntries = Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Force | ForEach-Object {
       $_.FullName.Replace("$scriptsDir\", "").Replace("$scriptsDir/", "") -replace '\\', '/'
     }
     foreach ($entry in $scriptEntries) {
@@ -253,7 +253,7 @@ try {
   )
 
   $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/', 'Styles/')
-  $packedCsFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.cs' | ForEach-Object {
+  $packedCsFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.cs' -Force | ForEach-Object {
     $_.FullName.Replace("$packageDir\", "").Replace("$packageDir/", "") -replace '\\', '/'
   }
   foreach ($entry in $packedCsFiles) {
