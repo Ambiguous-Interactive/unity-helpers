@@ -1371,7 +1371,9 @@ function Run-ReleasePackageContentContractTests {
     -VariableName 'packageContentRoots'
   $validatorKeepsPackOutputConcise = (
     $validatorContent.Contains('npm pack --json --pack-destination $tempDir') -and
+    $validatorContent.Contains('1> $packStdoutPath 2> $packStderrPath') -and
     $validatorContent.Contains('npm pack produced $($packSummary.filename)') -and
+    -not $validatorContent.Contains('2>&1 | Out-String') -and
     -not $validatorContent.Contains('npm pack output: $packOutput')
   )
   $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })

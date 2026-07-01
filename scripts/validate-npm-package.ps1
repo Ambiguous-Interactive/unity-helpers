@@ -115,11 +115,29 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
   # Step 2: Run npm pack
   Write-Info "Running npm pack..."
-  $packOutput = npm pack --json --pack-destination $tempDir 2>&1 | Out-String
+  $packStdoutPath = Join-Path $tempDir 'npm-pack.stdout.json'
+  $packStderrPath = Join-Path $tempDir 'npm-pack.stderr.log'
+  npm pack --json --pack-destination $tempDir 1> $packStdoutPath 2> $packStderrPath
   $packExitCode = $LASTEXITCODE
+  $packOutput = if (Test-Path -LiteralPath $packStdoutPath -PathType Leaf) {
+    Get-Content -LiteralPath $packStdoutPath -Raw
+  } else {
+    ''
+  }
+  $packErrorOutput = if (Test-Path -LiteralPath $packStderrPath -PathType Leaf) {
+    Get-Content -LiteralPath $packStderrPath -Raw
+  } else {
+    ''
+  }
+
   if ($packExitCode -ne 0) {
     Write-Error-Custom "npm pack failed with exit code $packExitCode."
-    Write-Host $packOutput
+    if (-not [string]::IsNullOrWhiteSpace($packOutput)) {
+      Write-Host $packOutput
+    }
+    if (-not [string]::IsNullOrWhiteSpace($packErrorOutput)) {
+      Write-Host $packErrorOutput
+    }
     exit $packExitCode
   }
 
