@@ -29,8 +29,14 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-PACKAGE_NAME="$(jq -r '.name' "${REPO_ROOT}/package.json")"
-PACKAGE_VERSION="$(jq -r '.version' "${REPO_ROOT}/package.json")"
+PACKAGE_JSON="${REPO_ROOT}/package.json"
+PACKAGE_NAME="$(jq -r '(.name // empty) | strings | select(test("\\S"))' "${PACKAGE_JSON}")"
+PACKAGE_VERSION="$(jq -r '(.version // empty) | strings | select(test("\\S"))' "${PACKAGE_JSON}")"
+if [[ -z "${PACKAGE_NAME}" || -z "${PACKAGE_VERSION}" ]]; then
+    echo "ERROR: ${PACKAGE_JSON} must define non-empty string name and version fields." >&2
+    exit 1
+fi
+
 if [[ -z "${OUTPUT_PATH}" ]]; then
     OUTPUT_PATH="${REPO_ROOT}/.artifacts/release/${PACKAGE_NAME}-${PACKAGE_VERSION}.unitypackage"
 fi

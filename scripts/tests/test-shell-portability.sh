@@ -325,6 +325,33 @@ fi
 rm -rf "$stage_project"
 rm -f "$stage_log"
 
+echo ""
+echo "--- B6: Unity package export rejects incomplete package metadata ---"
+
+run_test
+metadata_fixture="$(mktemp -d)"
+metadata_log="$(mktemp)"
+mkdir -p "$metadata_fixture/scripts/unity" "$metadata_fixture/.github"
+cp "$unity_export_package" "$metadata_fixture/scripts/unity/export-unitypackage.sh"
+printf '{ "release": "2022.3.45f1" }\n' > "$metadata_fixture/.github/unity-versions.json"
+printf '{ "name": "fixture-package" }\n' > "$metadata_fixture/package.json"
+if bash "$metadata_fixture/scripts/unity/export-unitypackage.sh" \
+    --stage-only \
+    --project-dir "$metadata_fixture/.artifacts/unity/unitypackage-stage" \
+    >"$metadata_log" 2>&1; then
+    fail "Unity package export fails fast when package metadata is incomplete" \
+        "Expected export-unitypackage.sh to reject package.json without version."
+else
+    if grep -Fq 'must define non-empty string name and version fields' "$metadata_log"; then
+        pass "Unity package export fails fast when package metadata is incomplete"
+    else
+        metadata_tail="$(tail -n 40 "$metadata_log" 2>/dev/null || true)"
+        fail "Unity package export reports incomplete package metadata clearly" "$metadata_tail"
+    fi
+fi
+rm -rf "$metadata_fixture"
+rm -f "$metadata_log"
+
 # =============================================================================
 # Section C: Inappropriate stderr suppression in git hooks
 # =============================================================================
