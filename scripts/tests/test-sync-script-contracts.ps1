@@ -1034,6 +1034,13 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
 
   $publishHasRepo = $workflowContent -match "(?ms)- name: Publish GitHub Release.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyHasRepo = $workflowContent -match "(?ms)- name: Verify GitHub Release assets.*?env:.*?${repoEnvPattern}.*?run:"
+  $verifyDownloadedArtifactsChecksIdentity = (
+    $workflowContent.Contains('EXPECTED_PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}') -and
+    $workflowContent.Contains('EXPECTED_PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}') -and
+    $workflowContent.Contains('notes_file=".artifacts/release/release-notes.md"') -and
+    $workflowContent.Contains('tar -xOf "${package_file}" package/package.json') -and
+    $workflowContent.Contains('Npm tarball identity mismatch.')
+  )
 
   Write-TestResult `
     -TestName 'release publish gh commands set repository context' `
@@ -1044,6 +1051,11 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -TestName 'release asset verification gh commands set repository context' `
     -Passed $verifyHasRepo `
     -Message 'Expected Verify GitHub Release assets to set GH_REPO from github.repository.'
+
+  Write-TestResult `
+    -TestName 'release publish verifies downloaded artifact identity before publish' `
+    -Passed $verifyDownloadedArtifactsChecksIdentity `
+    -Message 'Expected Verify downloaded artifacts to require non-empty release notes and matching npm tarball package name/version.'
 }
 
 function Run-ReleasePublishWorkflowBudgetContractTests {
@@ -1123,6 +1135,11 @@ function Run-ReleasePrepareWorkflowContractTests {
     $branchPushIndex -ge 0 -and
     $notesIndex -lt $branchPushIndex
   )
+  $usesExplicitPrepareReleaseInvocation = (
+    $workflowContent.Contains('./scripts/release-tools/prepare-release.ps1 -Bump $env:BUMP -Version $env:EXPLICIT_VERSION') -and
+    -not $workflowContent.Contains('$arguments = @(') -and
+    -not $workflowContent.Contains('@arguments')
+  )
 
   Write-TestResult `
     -TestName 'release prepare checks existing release branches with robust git heads lookup' `
@@ -1138,6 +1155,11 @@ function Run-ReleasePrepareWorkflowContractTests {
     -TestName 'release prepare validates release notes before pushing branch' `
     -Passed $generatesNotesBeforePushingBranch `
     -Message 'Expected write-release-notes.ps1 to run before pushing release/X.Y.Z so failed note generation leaves no remote branch.'
+
+  Write-TestResult `
+    -TestName 'release prepare invokes prepare-release with explicit PowerShell parameters' `
+    -Passed $usesExplicitPrepareReleaseInvocation `
+    -Message 'Expected release-prepare.yml to avoid positional array splatting that can bind "-Bump" as the Bump value.'
 }
 
 function Run-ReleaseTagWorkflowContractTests {
@@ -1179,7 +1201,12 @@ function Run-ReleaseTagWorkflowContractTests {
   $subjectCheckIndex = $workflowContent.IndexOf('subject="$(git log -1 --format=%s)"', [StringComparison]::Ordinal)
   $nonReleaseExitIndex = $workflowContent.IndexOf('Head commit is not a release commit; nothing to do.', [StringComparison]::Ordinal)
   $existingTagNoOpIndex = $workflowContent.IndexOf('git show-ref --verify --quiet "refs/tags/${version}"', [StringComparison]::Ordinal)
-  $untaggedWarningIndex = $workflowContent.IndexOf('Version ${version} is untagged and CHANGELOG.md documents it', [StringComparison]::Ordinal)
+  $untaggedErrorIndex = $workflowContent.IndexOf('Version ${version} is untagged and CHANGELOG.md documents it', [StringComparison]::Ordinal)
+  $untaggedErrorExitIndex = if ($untaggedErrorIndex -ge 0) {
+    $workflowContent.IndexOf('exit 1', $untaggedErrorIndex, [StringComparison]::Ordinal)
+  } else {
+    -1
+  }
   $nonReleaseProceedFalseIndex = if ($subjectCheckIndex -ge 0) {
     $workflowContent.IndexOf('echo "proceed=false" >> "${GITHUB_OUTPUT}"', $subjectCheckIndex, [StringComparison]::Ordinal)
   } else {
@@ -1212,11 +1239,18 @@ function Run-ReleaseTagWorkflowContractTests {
     $tagLookupIndex -gt $releaseHeadingValidationIndex -and
     $tagMismatchIndex -gt $tagLookupIndex
   )
-  $checksLocalTagBeforeUntaggedWarning = (
+  $checksLocalTagBeforeUntaggedError = (
     $subjectCheckIndex -ge 0 -and
     $existingTagNoOpIndex -gt $subjectCheckIndex -and
-    $untaggedWarningIndex -gt $existingTagNoOpIndex -and
+    $untaggedErrorIndex -gt $existingTagNoOpIndex -and
+    $untaggedErrorExitIndex -gt $untaggedErrorIndex -and
+    $untaggedErrorExitIndex -lt $nonReleaseProceedFalseIndex -and
     $existingTagNoOpIndex -lt $nonReleaseProceedFalseIndex
+  )
+  $untaggedDocumentedVersionIsHardFailure = (
+    $checksLocalTagBeforeUntaggedError -and
+    $workflowContent.Contains('echo "::error::${message}"') -and
+    -not $workflowContent.Contains('echo "::warning::${message}"')
   )
   $fetchesTagsBeforeLocalTaggedNoOp = (
     $checkoutStepIndex -ge 0 -and
@@ -1255,9 +1289,9 @@ function Run-ReleaseTagWorkflowContractTests {
     -Message 'Expected release-tag.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
 
   Write-TestResult `
-    -TestName 'release tag workflow suppresses untagged warning for locally-known tags' `
-    -Passed $checksLocalTagBeforeUntaggedWarning `
-    -Message 'Expected release-tag.yml to check refs/tags/${version} before warning that the documented version is untagged.'
+    -TestName 'release tag workflow fails for untagged documented versions with non-release subjects' `
+    -Passed $untaggedDocumentedVersionIsHardFailure `
+    -Message 'Expected release-tag.yml to fail when CHANGELOG.md documents the package version, no local tag exists, and the commit subject is not a release subject.'
 
   Write-TestResult `
     -TestName 'release tag workflow fetches tags before local tagged no-op check' `
@@ -1335,6 +1369,11 @@ function Run-ReleasePackageContentContractTests {
   $validatorPackageContentRoots = Get-PowerShellSingleQuotedArrayEntries `
     -Content $validatorContent `
     -VariableName 'packageContentRoots'
+  $validatorKeepsPackOutputConcise = (
+    $validatorContent.Contains('npm pack --json --pack-destination $tempDir') -and
+    $validatorContent.Contains('npm pack produced $($packSummary.filename)') -and
+    -not $validatorContent.Contains('npm pack output: $packOutput')
+  )
   $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })
   $requiredValidatorAllowedTopLevelEntries = @('scripts', 'scripts.meta')
   $missingValidatorAllowedTopLevelEntries = @($requiredValidatorAllowedTopLevelEntries | Where-Object { $_ -notin $validatorAllowedTopLevelEntries })
@@ -1375,6 +1414,11 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator requires all release package entries' `
     -Passed ($missingValidatorRequiredEntries.Count -eq 0) `
     -Message "Missing validator required entries: $($missingValidatorRequiredEntries -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator keeps npm pack diagnostics concise' `
+    -Passed $validatorKeepsPackOutputConcise `
+    -Message 'Expected validate-npm-package.ps1 to avoid dumping the full npm pack file list during normal verbose validation.'
 
   Write-TestResult `
     -TestName 'npm package validator allows shipped scripts folder metadata' `

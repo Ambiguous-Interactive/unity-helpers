@@ -58,7 +58,8 @@ jobs:
                 message="Version ${version} is untagged and CHANGELOG.md documents it, "
                 message+="but head subject '${subject}' is not 'release: ${version}'. "
                 message+="Squash-merge release PRs with the default title, or tag this commit manually."
-                echo "::warning::${message}"
+                echo "::error::${message}"
+                exit 1
               fi
             else
               echo "Head commit is not a release commit; nothing to do."

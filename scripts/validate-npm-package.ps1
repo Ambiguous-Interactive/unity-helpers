@@ -93,6 +93,19 @@ function Test-ExpectedPackageExclusion {
 }
 
 $repoRoot = (Get-Location).Path
+$packageJsonPath = Join-Path $repoRoot 'package.json'
+
+if (-not (Test-Path -LiteralPath $packageJsonPath -PathType Leaf)) {
+  Write-Error-Custom "package.json not found at $packageJsonPath"
+  exit 1
+}
+
+$packageJson = Get-Content -LiteralPath $packageJsonPath -Raw | ConvertFrom-Json
+$packageVersion = [string]$packageJson.version
+if ([string]::IsNullOrWhiteSpace($packageVersion)) {
+  Write-Error-Custom "package.json must define a non-empty version."
+  exit 1
+}
 
 # Step 1: Create a temporary directory for npm pack
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "npm-package-validation-$(Get-Random)"
@@ -102,8 +115,20 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
   # Step 2: Run npm pack
   Write-Info "Running npm pack..."
-  $packOutput = npm pack --pack-destination $tempDir 2>&1 | Out-String
-  Write-Info "npm pack output: $packOutput"
+  $packOutput = npm pack --json --pack-destination $tempDir 2>&1 | Out-String
+  $packExitCode = $LASTEXITCODE
+  if ($packExitCode -ne 0) {
+    Write-Error-Custom "npm pack failed with exit code $packExitCode."
+    Write-Host $packOutput
+    exit $packExitCode
+  }
+
+  try {
+    $packSummary = @($packOutput | ConvertFrom-Json)[0]
+    Write-Info "npm pack produced $($packSummary.filename) with $($packSummary.files.Count) file(s)."
+  } catch {
+    Write-Info "npm pack completed."
+  }
 
   # Step 3: Find the tarball
   $tarball = Get-ChildItem -Path $tempDir -Filter "*.tgz" | Select-Object -First 1

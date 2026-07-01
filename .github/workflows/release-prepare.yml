@@ -98,11 +98,7 @@ jobs:
           BUMP: ${{ inputs.bump }}
           EXPLICIT_VERSION: ${{ inputs.version }}
         run: |
-          $arguments = @('-Bump', $env:BUMP)
-          if (-not [string]::IsNullOrWhiteSpace($env:EXPLICIT_VERSION)) {
-            $arguments += @('-Version', $env:EXPLICIT_VERSION)
-          }
-          ./scripts/release-tools/prepare-release.ps1 @arguments
+          ./scripts/release-tools/prepare-release.ps1 -Bump $env:BUMP -Version $env:EXPLICIT_VERSION
 
       - name: Sync generated version references
         shell: pwsh

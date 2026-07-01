@@ -130,6 +130,29 @@ try {
     }
     Write-TestResult -TestName 'Explicit versions must increase' -Passed $nonIncreasingRejected
 
+    $fixture = New-ReleaseFixture
+    try {
+        $prepareScriptPath = Join-Path $repoRoot 'scripts/release-tools/prepare-release.ps1'
+        $prepareOutput = & pwsh -NoProfile -File $prepareScriptPath `
+            -RepoRoot $fixture `
+            -Bump minor `
+            -Version '' `
+            -Date '2026-06-30' *>&1
+        $prepareExitCode = $LASTEXITCODE
+        $packageJson = Get-Content -Path (Join-Path $fixture 'package.json') -Raw | ConvertFrom-Json
+        $changelog = Get-Content -Path (Join-Path $fixture 'CHANGELOG.md') -Raw
+        Write-TestResult `
+            -TestName 'Prepare release script accepts empty explicit version from workflow' `
+            -Passed (
+                $prepareExitCode -eq 0 -and
+                $packageJson.version -eq '1.3.0' -and
+                $changelog.Contains('## [1.3.0] - 2026-06-30')
+            ) `
+            -Message ($prepareOutput | Out-String)
+    } finally {
+        Remove-ReleaseFixture -Path $fixture
+    }
+
     $helperContent = Get-Content -Path (Join-Path $repoRoot 'scripts/release-tools/release-helpers.ps1') -Raw
     Write-TestResult `
         -TestName 'Package version rewrite uses unambiguous regex replace overload' `

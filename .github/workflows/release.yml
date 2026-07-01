@@ -236,6 +236,9 @@ jobs:
 
       - name: Verify downloaded artifacts
         id: artifacts
+        env:
+          EXPECTED_PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          EXPECTED_PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
         run: |
           set -euo pipefail
           mapfile -t packages < <(find .artifacts/release -maxdepth 1 -type f -name '*.tgz' | sort)
@@ -252,6 +255,21 @@ jobs:
           unitypackage_file="${unitypackages[0]}"
           (cd "$(dirname "${package_file}")" && sha256sum -c "$(basename "${package_file}").sha256")
           (cd "$(dirname "${unitypackage_file}")" && sha256sum -c "$(basename "${unitypackage_file}").sha256")
+
+          notes_file=".artifacts/release/release-notes.md"
+          if [ ! -s "${notes_file}" ]; then
+            echo "::error::Release notes artifact is missing or empty: ${notes_file}."
+            exit 1
+          fi
+
+          package_manifest="$(tar -xOf "${package_file}" package/package.json)"
+          packed_name="$(printf '%s' "${package_manifest}" | jq -r '.name // empty')"
+          packed_version="$(printf '%s' "${package_manifest}" | jq -r '.version // empty')"
+          if [ "${packed_name}" != "${EXPECTED_PACKAGE_NAME}" ] || [ "${packed_version}" != "${EXPECTED_PACKAGE_VERSION}" ]; then
+            echo "::error::Npm tarball identity mismatch. Expected ${EXPECTED_PACKAGE_NAME}@${EXPECTED_PACKAGE_VERSION}; found ${packed_name}@${packed_version}."
+            exit 1
+          fi
+
           echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
           echo "unitypackage-file=${unitypackage_file}" >> "${GITHUB_OUTPUT}"
 
