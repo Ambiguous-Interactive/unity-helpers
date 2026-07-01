@@ -17,6 +17,20 @@ function Write-Error-Custom($msg) {
   Write-Host "[validate-npm-package] $msg" -ForegroundColor Red
 }
 
+function ConvertTo-PackageRelativePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$BasePath,
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $rootPath = [System.IO.Path]::GetFullPath($BasePath)
+  $childPath = [System.IO.Path]::GetFullPath($Path)
+
+  return [System.IO.Path]::GetRelativePath($rootPath, $childPath).Replace('\', '/')
+}
+
 function Get-TrackedPackageFiles {
   param(
     [string]$RepoRoot,
@@ -48,7 +62,7 @@ function Get-PackedPackageFiles {
   return @(
     Get-ChildItem -LiteralPath $PackageDir -Recurse -File -Force |
       ForEach-Object {
-        $_.FullName.Replace("$PackageDir\", "").Replace("$PackageDir/", "") -replace '\\', '/'
+        ConvertTo-PackageRelativePath -BasePath $PackageDir -Path $_.FullName
       } |
       Sort-Object
   )
@@ -181,7 +195,7 @@ try {
       'postinstall-hooks.js.meta'
     )
     $scriptEntries = Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Force | ForEach-Object {
-      $_.FullName.Replace("$scriptsDir\", "").Replace("$scriptsDir/", "") -replace '\\', '/'
+      ConvertTo-PackageRelativePath -BasePath $scriptsDir -Path $_.FullName
     }
     foreach ($entry in $scriptEntries) {
       if ($entry -cnotin $allowedScriptsEntries) {
@@ -254,7 +268,7 @@ try {
 
   $allowedCsRoots = @('Runtime/', 'Editor/', 'Samples~/', 'Styles/')
   $packedCsFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.cs' -Force | ForEach-Object {
-    $_.FullName.Replace("$packageDir\", "").Replace("$packageDir/", "") -replace '\\', '/'
+    ConvertTo-PackageRelativePath -BasePath $packageDir -Path $_.FullName
   }
   foreach ($entry in $packedCsFiles) {
     $isAllowed = $false
@@ -296,8 +310,7 @@ try {
     
     foreach ($item in $items) {
       # Get relative path for better error messages
-      $relativePath = $item.FullName.Replace("$packageDir\", "").Replace("$packageDir/", "")
-      $relativePath = $relativePath -replace '\\', '/'
+      $relativePath = ConvertTo-PackageRelativePath -BasePath $packageDir -Path $item.FullName
       
       # Skip .meta files themselves
       if ($item.Name -like "*.meta") {

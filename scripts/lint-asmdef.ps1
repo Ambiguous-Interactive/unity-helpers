@@ -30,6 +30,18 @@ function Get-JsonProp($obj, [string]$name, $default = $null) {
   return $default
 }
 
+function ConvertTo-RepoRelativePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $rootPath = [System.IO.Path]::GetFullPath($repoRoot)
+  $childPath = [System.IO.Path]::GetFullPath($Path)
+
+  return [System.IO.Path]::GetRelativePath($rootPath, $childPath).Replace('\', '/')
+}
+
 # Faithfully replicates UnityEditor.Scripting.ScriptCompilation.VersionRanges<T>.ParseExpression
 # + ExpressionTypeFactory<T>.Create() (UnityCsReference). A versionDefines "expression" that this
 # grammar rejects is SILENTLY ignored by Unity: the define is never applied, with no compile error.
@@ -330,7 +342,7 @@ $checkedCount = 0
 
 foreach ($file in $asmdefFilesToValidate) {
   $checkedCount++
-  $relativePath = $file.FullName.Replace($repoRoot, '').TrimStart('\', '/')
+  $relativePath = ConvertTo-RepoRelativePath -Path $file.FullName
   $expectedName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
   Write-Info "Validating: $relativePath"
@@ -449,7 +461,7 @@ foreach ($file in $asmdefFilesToValidate) {
 
 # 6. Check that assemblies referencing WallstopStudios.UnityHelpers with overrideReferences include Sirenix.Serialization.dll
 foreach ($file in $asmdefFilesToValidate) {
-  $relativePath = $file.FullName.Replace($repoRoot, '').TrimStart('\', '/')
+  $relativePath = ConvertTo-RepoRelativePath -Path $file.FullName
 
   try {
     $content = Get-Content -Path $file.FullName -Raw
@@ -541,7 +553,7 @@ if ($asmrefFiles.Count -gt 0) {
 
   foreach ($file in $asmrefFiles) {
     $checkedCount++
-    $relativePath = $file.FullName.Replace($repoRoot, '').TrimStart('\', '/')
+    $relativePath = ConvertTo-RepoRelativePath -Path $file.FullName
 
     Write-Info "Validating: $relativePath"
 

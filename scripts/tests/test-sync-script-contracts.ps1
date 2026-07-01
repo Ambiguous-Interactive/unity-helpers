@@ -1327,6 +1327,17 @@ function Run-ReleasePackageContentContractTests {
   $validatorChecksHiddenScriptEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Force')
   $validatorChecksHiddenPackedCsFiles = $validatorContent.Contains("Get-ChildItem -LiteralPath `$packageDir -Recurse -File -Filter '*.cs' -Force")
   $validatorChecksHiddenUnityFolderEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $folderPath -Recurse -Force')
+  $validatorUsesStructuredRelativePaths = (
+    $validatorContent.Contains('function ConvertTo-PackageRelativePath') -and
+    $validatorContent.Contains('[System.IO.Path]::GetRelativePath($rootPath, $childPath)') -and
+    -not $validatorContent.Contains('.FullName.Replace(')
+  )
+  $productionPowerShellScriptsWithStringPathExtraction = @(
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Recurse -File -Filter '*.ps1' |
+      Where-Object { $_.FullName -notmatch '[\\/](scripts[\\/])?tests[\\/]' } |
+      Where-Object { (Get-Content -LiteralPath $_.FullName -Raw).Contains('.FullName.Replace(') } |
+      ForEach-Object { [System.IO.Path]::GetRelativePath($repoRoot, $_.FullName).Replace('\', '/') }
+  )
 
   Write-TestResult `
     -TestName 'npm package validator requires all release package entries' `
@@ -1367,6 +1378,16 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'npm package validator checks hidden C# files for root restrictions' `
     -Passed $validatorChecksHiddenPackedCsFiles `
     -Message 'Expected packed C# root validation to enumerate with -LiteralPath and -Force.'
+
+  Write-TestResult `
+    -TestName 'npm package validator uses structured relative path extraction' `
+    -Passed $validatorUsesStructuredRelativePaths `
+    -Message 'Expected validate-npm-package.ps1 to use GetRelativePath instead of string replacement on FullName.'
+
+  Write-TestResult `
+    -TestName 'production PowerShell scripts avoid string-based FullName relative paths' `
+    -Passed ($productionPowerShellScriptsWithStringPathExtraction.Count -eq 0) `
+    -Message "Scripts still using string-based FullName relative path extraction: $($productionPowerShellScriptsWithStringPathExtraction -join ', ')"
 
   Write-TestResult `
     -TestName 'npm package validator uses case-sensitive package membership checks' `

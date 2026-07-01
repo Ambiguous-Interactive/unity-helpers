@@ -17,6 +17,20 @@ function Write-SuccessMsg($msg) {
   Write-Host "[lint-license-headers] $msg" -ForegroundColor Green
 }
 
+$repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+
+function ConvertTo-RepoRelativePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $rootPath = [System.IO.Path]::GetFullPath($repoRoot)
+  $childPath = [System.IO.Path]::GetFullPath($Path)
+
+  return [System.IO.Path]::GetRelativePath($rootPath, $childPath).Replace('\', '/')
+}
+
 # Directories to scan
 $sourceRoots = @('Runtime', 'Editor', 'Tests')
 
@@ -56,7 +70,7 @@ foreach ($root in $sourceRoots) {
 
   foreach ($file in $csFiles) {
     $checkedCount++
-    $relativePath = $file.FullName.Replace((Get-Item $PSScriptRoot).Parent.FullName, '').TrimStart('\', '/')
+    $relativePath = ConvertTo-RepoRelativePath -Path $file.FullName
 
     Write-Info "Checking: $relativePath"
 
