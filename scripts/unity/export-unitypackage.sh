@@ -222,6 +222,7 @@ UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"
 mkdir -p "${INTERNAL_OUTPUT_DIR}" "$(dirname "${OUTPUT_PATH}")"
 
 UNITY_EXIT_CODE=0
+TEE_EXIT_CODE=0
 set +e
 UNITY_TEST_PROJECT_DIR="${PROJECT_DIR}" \
 UNITY_VERSION="${UNITY_VERSION}" \
@@ -233,11 +234,17 @@ UNITY_TIMEOUT="${UNITY_TIMEOUT:-7200}" \
     -exportOutput "/project/unitypackage-output/$(basename "${OUTPUT_PATH}")" \
     -logFile - 2>&1 | tee "${UNITY_LOG}"
 UNITY_EXIT_CODE="${PIPESTATUS[0]}"
+TEE_EXIT_CODE="${PIPESTATUS[1]}"
 set -e
 
 if [[ "${UNITY_EXIT_CODE}" -ne 0 ]]; then
     echo "ERROR: Unity package export failed with exit code ${UNITY_EXIT_CODE}. Log: ${UNITY_LOG}" >&2
     exit "${UNITY_EXIT_CODE}"
+fi
+
+if [[ "${TEE_EXIT_CODE}" -ne 0 ]]; then
+    echo "ERROR: Failed to persist Unity package export log with tee exit code ${TEE_EXIT_CODE}: ${UNITY_LOG}" >&2
+    exit "${TEE_EXIT_CODE}"
 fi
 
 if [[ ! -s "${INTERNAL_OUTPUT}" ]]; then

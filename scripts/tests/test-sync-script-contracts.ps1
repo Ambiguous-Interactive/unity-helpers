@@ -1097,7 +1097,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $exporterContent.Contains('UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"') -and
     $exporterContent.Contains('-logFile - 2>&1 | tee "${UNITY_LOG}"') -and
     $exporterContent.Contains('UNITY_EXIT_CODE="${PIPESTATUS[0]}"') -and
-    $exporterContent.Contains('Unity package export failed with exit code')
+    $exporterContent.Contains('TEE_EXIT_CODE="${PIPESTATUS[1]}"') -and
+    $exporterContent.Contains('Unity package export failed with exit code') -and
+    $exporterContent.Contains('Failed to persist Unity package export log with tee exit code')
   )
   $releaseUploadsExportDiagnostics = (
     $workflowContent.Contains('Dump Unity export log tail on failure or cancellation') -and
@@ -1115,7 +1117,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   Write-TestResult `
     -TestName 'unitypackage exporter persists Unity log and preserves exit code' `
     -Passed $exporterPersistsUnityLog `
-    -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log and exit with the original Unity command exit code.'
+    -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log, preserve the original Unity command exit code, and fail when tee cannot persist the log.'
 
   Write-TestResult `
     -TestName 'release unitypackage job uploads export diagnostics on failure' `
