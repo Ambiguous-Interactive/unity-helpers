@@ -319,7 +319,7 @@ $assertIsNotNullPattern = [regex]'Assert\.IsNotNull\s*\('
 $testCaseDataReturnsNullPattern = [regex]'(?ms)\.Returns\s*\(\s*null\s*\)'
 $unityTestAttributePattern = [regex]'\[\s*(?:global\s*::\s*)?(?:[A-Za-z_][\w\.]*\.)?UnityTest(?:Attribute)?(?:\s*\(|\s*\])'
 $coroutineMethodPattern = [regex]'\bIEnumerator\s+(?<name>\w+)\s*\('
-$tagsWaitInstructionPattern = [regex]'\bnew\s+(?:(?:global\s*::\s*)?UnityEngine\s*(?:\.|::)\s*)?WaitForSeconds(?:Realtime)?\s*\('
+$tagsWaitInstructionPattern = [regex]'WaitForSeconds(?:Realtime)?'
 $tagsWaitAliasPattern = [regex]'(?m)^\s*(?:global\s+)?using\s+(?<alias>[A-Za-z_]\w*)\s*=\s*(?:global\s*::\s*)?UnityEngine\s*(?:\.|::)\s*WaitForSeconds(?:Realtime)?\s*;'
 $tagsUnityEngineAliasPattern = [regex]'(?m)^\s*(?:global\s+)?using\s+(?<alias>[A-Za-z_]\w*)\s*=\s*(?:global\s*::\s*)?UnityEngine\s*;'
 
@@ -1769,7 +1769,7 @@ foreach ($file in $filesToScan) {
   # behavior-tick logic that must not depend on Unity's imprecise real-time wait
   # instructions. Use EffectHandler's deterministic test seams for handler time
   # math; suppress only when the test is explicitly about Unity lifecycle timing.
-  if ($isRuntimeTagsTest -and $isTestFile -and -not $perfCategory) {
+  if ($isRuntimeTagsTest -and -not $perfCategory) {
     $tagsWaitAliases = @()
     foreach ($aliasMatch in $tagsWaitAliasPattern.Matches($scrubbedText)) {
       $tagsWaitAliases += [regex]::Escape($aliasMatch.Groups['alias'].Value)

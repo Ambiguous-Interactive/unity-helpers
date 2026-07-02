@@ -2047,6 +2047,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 $r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsWaitFixture.cs' -FixtureContent $unh013WaitForSeconds
 Write-TestResult "UNH013.FlagsWaitForSecondsInRuntimeTags" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
 
+$unh013HelperWaitForSeconds = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using UnityEngine;
+
+    internal static class TagsWaitHelper
+    {
+        public static WaitForSeconds CreateWait()
+        {
+            return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsWaitHelper.cs' -FixtureContent $unh013HelperWaitForSeconds
+Write-TestResult "UNH013.FlagsWaitForSecondsInRuntimeTagsHelper" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013CachedApiWaitForSeconds = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsCachedWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return TagsWaitBuffers.GetWaitForSeconds(0.5f);
+        }
+    }
+
+    internal static class TagsWaitBuffers
+    {
+        public static object GetWaitForSeconds(float duration)
+        {
+            return null;
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsCachedWaitFixture.cs' -FixtureContent $unh013CachedApiWaitForSeconds
+Write-TestResult "UNH013.FlagsCachedWaitForSecondsApiReference" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
 $unh013UnityTestAttribute = @'
 namespace WallstopStudios.UnityHelpers.Tests.Tags
 {

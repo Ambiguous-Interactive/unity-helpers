@@ -549,7 +549,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     if (refreshDuration)
                     {
-                        _ = RefreshEffect(handle, ignoreReapplicationPolicy: false, currentTime);
+                        _ = RefreshEffect(
+                            handle,
+                            ignoreReapplicationPolicy: false,
+                            currentTime: currentTime
+                        );
                     }
 
                     return handle;

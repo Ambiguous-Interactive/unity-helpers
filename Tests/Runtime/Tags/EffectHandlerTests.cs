@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 10.05f,
-                    out float beforeReapply
+                    remainingDuration: out float beforeReapply
                 )
             );
             Assert.AreEqual(0.25f, beforeReapply, RemainingDurationEpsilon);
@@ -375,7 +375,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(handle, reapplied.Value);
 
             Assert.IsTrue(
-                handler.TryGetRemainingDuration(handle, currentTime: 10.2f, out float afterReapply)
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 10.2f,
+                    remainingDuration: out float afterReapply
+                )
             );
             Assert.AreEqual(0.1f, afterReapply, RemainingDurationEpsilon);
             Assert.Less(afterReapply, beforeReapply);
@@ -778,7 +782,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 70f).Value;
             Assert.IsTrue(
-                handler.TryGetRemainingDuration(handle, currentTime: 70f, out float remaining)
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 70f,
+                    remainingDuration: out float remaining
+                )
             );
             Assert.Greater(remaining, 0f);
             Assert.LessOrEqual(
@@ -817,14 +825,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 100f,
-                    out float initialRemaining
+                    remainingDuration: out float initialRemaining
                 )
             );
             Assert.IsTrue(
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 100.05f,
-                    out float beforeRefresh
+                    remainingDuration: out float beforeRefresh
                 )
             );
             Assert.Less(beforeRefresh, initialRemaining);
@@ -837,7 +845,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(ensured.HasValue);
             Assert.AreEqual(handle, ensured.Value);
             Assert.IsTrue(
-                handler.TryGetRemainingDuration(handle, currentTime: 100.1f, out float afterRefresh)
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100.1f,
+                    remainingDuration: out float afterRefresh
+                )
             );
             Assert.Greater(afterRefresh, beforeRefresh);
 
@@ -845,7 +857,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 100.15f,
-                    out float beforeNoRefresh
+                    remainingDuration: out float beforeNoRefresh
                 )
             );
             EffectHandle? ensuredNoRefresh = handler.EnsureHandle(
@@ -859,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 100.18f,
-                    out float afterNoRefresh
+                    remainingDuration: out float afterNoRefresh
                 )
             );
             Assert.Less(afterNoRefresh, beforeNoRefresh);
@@ -892,7 +904,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 200.1f,
-                    out float beforeRefresh
+                    remainingDuration: out float beforeRefresh
                 )
             );
 
@@ -904,7 +916,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.TryGetRemainingDuration(
                     handle,
                     currentTime: 200.15f,
-                    out float afterRefresh
+                    remainingDuration: out float afterRefresh
                 )
             );
             Assert.Greater(afterRefresh, beforeRefresh);
