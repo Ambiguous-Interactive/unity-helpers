@@ -2000,16 +2000,16 @@ namespace WallstopStudios.UnityHelpers.Tests
 $r = Invoke-LintOnFixture -FixtureRelativePath 'WaitPerfFixture.cs' -FixtureContent $unh010Perf
 Write-TestResult "UNH010.SkipsPerfCategory" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH010')) "Exit: $($r.ExitCode), Output: $($r.Output)"
 
-# ── UNH011: editor-only refs in player-compiled test code ────────────────────
-Write-Host "`n  Section: UNH011 editor-reference guard" -ForegroundColor White
-
-# UNH011 only governs PLAYER-compiled trees (everything under Tests/ EXCEPT
-# Tests/Editor), so these fixtures live under a Tests/Runtime path.
+# Runtime-path fixtures are shared by UNH011 and UNH013 coverage.
 $tempRuntimeDir = Join-Path $tempDir 'Tests' 'Runtime'
 New-Item -ItemType Directory -Path $tempRuntimeDir -Force | Out-Null
 function Invoke-LintOnRuntimeFixture {
   param([string]$FixtureRelativePath, [string]$FixtureContent)
   $path = Join-Path $tempRuntimeDir $FixtureRelativePath
+  $fixtureDirectory = Split-Path -Parent $path
+  if (-not [string]::IsNullOrWhiteSpace($fixtureDirectory)) {
+    New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+  }
   Set-Content -Path $path -Value $FixtureContent -NoNewline
   try {
     Push-Location $tempDir
@@ -2023,6 +2023,377 @@ function Invoke-LintOnRuntimeFixture {
   }
 }
 
+# ── UNH013: Runtime Tags tests must not use literal wait instructions ────────
+Write-Host "`n  Section: UNH013 Tags wait guard" -ForegroundColor White
+
+$unh013WaitForSeconds = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsWaitFixture.cs' -FixtureContent $unh013WaitForSeconds
+Write-TestResult "UNH013.FlagsWaitForSecondsInRuntimeTags" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013UnityTestAttribute = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsUnityTestAttributeWaitFixture : CommonTestBase
+    {
+        [UnityTestAttribute]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsUnityTestAttributeWaitFixture.cs' -FixtureContent $unh013UnityTestAttribute
+Write-TestResult "UNH013.FlagsUnityTestAttributeWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013QualifiedUnityTest = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using UnityEngine;
+
+    public sealed class TagsQualifiedUnityTestWaitFixture : CommonTestBase
+    {
+        [UnityEngine.TestTools.UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsQualifiedUnityTestWaitFixture.cs' -FixtureContent $unh013QualifiedUnityTest
+Write-TestResult "UNH013.FlagsQualifiedUnityTestWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Compact = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags { using System.Collections; using NUnit.Framework; using UnityEngine; using UnityEngine.TestTools; [TestFixture] public sealed class TagsCompactWaitFixture : CommonTestBase { [UnityTest] public IEnumerator Waits() {
+yield return new WaitForSeconds(0.5f); } } }
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsCompactWaitFixture.cs' -FixtureContent $unh013Compact
+Write-TestResult "UNH013.FlagsCompactWaitWithoutStrictModeCrash" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013, not a strict-mode crash. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Realtime = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsRealtimeWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSecondsRealtime(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsRealtimeWaitFixture.cs' -FixtureContent $unh013Realtime
+Write-TestResult "UNH013.FlagsWaitForSecondsRealtimeInRuntimeTags" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013VariableDuration = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsVariableWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            float duration = 0.5f;
+            yield return new WaitForSeconds(duration);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsVariableWaitFixture.cs' -FixtureContent $unh013VariableDuration
+Write-TestResult "UNH013.FlagsVariableDurationConstructor" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Qualified = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsQualifiedWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new UnityEngine.WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsQualifiedWaitFixture.cs' -FixtureContent $unh013Qualified
+Write-TestResult "UNH013.FlagsQualifiedWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013GlobalQualified = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsGlobalQualifiedWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new global::UnityEngine.WaitForSecondsRealtime(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsGlobalQualifiedWaitFixture.cs' -FixtureContent $unh013GlobalQualified
+Write-TestResult "UNH013.FlagsGlobalQualifiedWaitForSecondsRealtime" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Alias = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+    using Wait = UnityEngine.WaitForSeconds;
+
+    public sealed class TagsAliasWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new Wait(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsAliasWaitFixture.cs' -FixtureContent $unh013Alias
+Write-TestResult "UNH013.FlagsAliasedWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013GlobalAlias = @'
+global using Wait = UnityEngine.WaitForSeconds;
+
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsGlobalAliasWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new Wait(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsGlobalAliasWaitFixture.cs' -FixtureContent $unh013GlobalAlias
+Write-TestResult "UNH013.FlagsGlobalAliasedWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013NamespaceAlias = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+    using UE = UnityEngine;
+
+    public sealed class TagsNamespaceAliasWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new UE.WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsNamespaceAliasWaitFixture.cs' -FixtureContent $unh013NamespaceAlias
+Write-TestResult "UNH013.FlagsUnityEngineNamespaceAliasWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013NamespaceAliasQualifier = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine.TestTools;
+    using UE = UnityEngine;
+
+    public sealed class TagsNamespaceAliasQualifierWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new UE::WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsNamespaceAliasQualifierWaitFixture.cs' -FixtureContent $unh013NamespaceAliasQualifier
+Write-TestResult "UNH013.FlagsUnityEngineNamespaceAliasQualifierWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Multiline = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsMultilineWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new
+                WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsMultilineWaitFixture.cs' -FixtureContent $unh013Multiline
+Write-TestResult "UNH013.FlagsMultilineWaitForSeconds" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Suppress = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsSuppressedWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f); // UNH-SUPPRESS UNH013: verifies Unity lifecycle timing.
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsSuppressedWaitFixture.cs' -FixtureContent $unh013Suppress
+Write-TestResult "UNH013.HonorsCodeSpecificSuppress" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH013')) "Expected exit 0 and no UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013StringSuppress = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class TagsStringSuppressedWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f); string token = "// UNH-SUPPRESS UNH013";
+            Assert.IsTrue(token.Length > 0);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsStringSuppressedWaitFixture.cs' -FixtureContent $unh013StringSuppress
+Write-TestResult "UNH013.IgnoresStringLiteralSuppress" (($r.ExitCode -ne 0) -and ($r.Output -match 'UNH013')) "Expected non-zero exit with UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Performance = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    [Category("Performance")]
+    public sealed class TagsPerformanceWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsPerformanceWaitFixture.cs' -FixtureContent $unh013Performance
+Write-TestResult "UNH013.AllowsPerformanceCategory" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH013')) "Expected exit 0 and no UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013NonTags = @'
+namespace WallstopStudios.UnityHelpers.Tests.OtherRuntime
+{
+    using System.Collections;
+    using NUnit.Framework;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+
+    public sealed class RuntimeWaitFixture : CommonTestBase
+    {
+        [UnityTest]
+        public IEnumerator Waits()
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'OtherRuntime/RuntimeWaitFixture.cs' -FixtureContent $unh013NonTags
+Write-TestResult "UNH013.AllowsNonTagsRuntimePath" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH013')) "Expected exit 0 and no UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+$unh013Masked = @'
+namespace WallstopStudios.UnityHelpers.Tests.Tags
+{
+    using NUnit.Framework;
+
+    public sealed class TagsMaskedWaitFixture : CommonTestBase
+    {
+        [Test]
+        public void MentionsOnly()
+        {
+            string sample = "yield return new WaitForSeconds(0.5f);";
+            // yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(sample.Length > 0);
+        }
+    }
+}
+'@
+$r = Invoke-LintOnRuntimeFixture -FixtureRelativePath 'Tags/TagsMaskedWaitFixture.cs' -FixtureContent $unh013Masked
+Write-TestResult "UNH013.IgnoresCommentsAndStrings" (($r.ExitCode -eq 0) -and ($r.Output -notmatch 'UNH013')) "Expected exit 0 and no UNH013. Exit: $($r.ExitCode), Output: $($r.Output)"
+
+# ── UNH011: editor-only refs in player-compiled test code ────────────────────
+Write-Host "`n  Section: UNH011 editor-reference guard" -ForegroundColor White
+
+# UNH011 only governs PLAYER-compiled trees (everything under Tests/ EXCEPT
+# Tests/Editor), so these fixtures live under a Tests/Runtime path.
 # Unguarded UnityEditor reference in a player-compiled file -> CS0234 -> must fail.
 $unh011Bad = @'
 namespace WallstopStudios.UnityHelpers.Tests
