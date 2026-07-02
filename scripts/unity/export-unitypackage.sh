@@ -239,14 +239,14 @@ UNITY_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[0]}"
 TEE_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[1]}"
 set -e
 
-if [[ "${UNITY_EXIT_CODE}" -ne 0 ]]; then
-    echo "ERROR: Unity package export failed with exit code ${UNITY_EXIT_CODE}. Log: ${UNITY_LOG}" >&2
-    exit "${UNITY_EXIT_CODE}"
-fi
-
 if [[ "${TEE_EXIT_CODE}" -ne 0 ]]; then
     echo "ERROR: Failed to persist Unity package export log with tee exit code ${TEE_EXIT_CODE}: ${UNITY_LOG}" >&2
     exit "${TEE_EXIT_CODE}"
+fi
+
+if [[ "${UNITY_EXIT_CODE}" -ne 0 ]]; then
+    echo "ERROR: Unity package export failed with exit code ${UNITY_EXIT_CODE}. Log: ${UNITY_LOG}" >&2
+    exit "${UNITY_EXIT_CODE}"
 fi
 
 if [[ ! -s "${INTERNAL_OUTPUT}" ]]; then

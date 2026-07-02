@@ -1095,6 +1095,8 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $unityTimeoutMatch.Success -and
     $jobTimeoutMinutes -ge $requiredJobTimeoutMinutes
   )
+  $teeFailureMessageIndex = $exporterContent.IndexOf('Failed to persist Unity package export log with tee exit code')
+  $unityFailureMessageIndex = $exporterContent.IndexOf('Unity package export failed with exit code')
   $exporterPersistsUnityLog = (
     $exporterContent.Contains('UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"') -and
     $exporterContent.Contains('-logFile - 2>&1 | tee "${UNITY_LOG}"') -and
@@ -1102,7 +1104,10 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $exporterContent.Contains('UNITY_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[0]}"') -and
     $exporterContent.Contains('TEE_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[1]}"') -and
     $exporterContent.Contains('Unity package export failed with exit code') -and
-    $exporterContent.Contains('Failed to persist Unity package export log with tee exit code')
+    $exporterContent.Contains('Failed to persist Unity package export log with tee exit code') -and
+    $teeFailureMessageIndex -ge 0 -and
+    $unityFailureMessageIndex -ge 0 -and
+    $teeFailureMessageIndex -lt $unityFailureMessageIndex
   )
   $releaseUploadsExportDiagnostics = (
     $workflowContent.Contains('Dump Unity export log tail on failure or cancellation') -and
