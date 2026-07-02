@@ -196,6 +196,27 @@ jobs:
         env:
           BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
 
+      - name: Dump Unity export log tail on failure or cancellation
+        if: ${{ failure() || cancelled() }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/unitypackage-project/unitypackage-output
+          label: Unity package export
+
+      - name: Upload .unitypackage export diagnostics
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .artifacts/unity/unitypackage-project/Assets/Editor/UnityHelpersPackageExporter.cs
+            .artifacts/unity/unitypackage-project/Packages/manifest.json
+            .artifacts/unity/unitypackage-project/ProjectSettings/
+            .artifacts/unity/unitypackage-project/unitypackage-output/*.log
+          if-no-files-found: warn
+          retention-days: 14
+          overwrite: true
+
       - name: Upload .unitypackage artifact
         uses: actions/upload-artifact@v7
         with:

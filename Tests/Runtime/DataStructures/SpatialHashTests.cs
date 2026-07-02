@@ -61,6 +61,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void SpatialHash2DCanBeUsedThroughItsInterface()
+        {
+            ISpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
+            hash.Insert(new Vector2(0.5f, 0.5f), "value");
+
+            List<string> results = new();
+            hash.Query(new Vector2(0.5f, 0.5f), 0.25f, results);
+
+            CollectionAssert.AreEqual(new[] { "value" }, results);
+        }
+
+        [Test]
         public void ConstructorWithCustomComparerUsesComparer()
         {
             StringComparer comparer = StringComparer.OrdinalIgnoreCase;

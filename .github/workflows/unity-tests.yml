@@ -1063,3 +1063,109 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
           if-no-files-found: warn
           retention-days: 14
+
+  unitypackage-smoke:
+    name: Unity package export smoke
+    needs:
+      - matrix-config
+      - runner-preflight
+      - unity-tests
+      - unity-tests-standalone
+      - unity-tests-single-threaded
+    if: >-
+      ${{
+        always() &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected) &&
+        needs.matrix-config.result == 'success' &&
+        needs.runner-preflight.result == 'success' &&
+        needs.unity-tests.result == 'success' &&
+        (needs.unity-tests-standalone.result == 'success' ||
+          needs.unity-tests-standalone.result == 'skipped') &&
+        needs.unity-tests-single-threaded.result == 'success' &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Validate Unity license secrets
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Acquire organization Unity lock
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
+          timeout-minutes: "210"
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Export Unity package smoke artifact
+        timeout-minutes: 120
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          UNITY_VERSION="$(jq -r '.release' .github/unity-versions.json)"
+          export UNITY_VERSION
+          package_name="$(jq -r '.name // empty' package.json)"
+          package_version="$(jq -r '.version // empty' package.json)"
+          output=".artifacts/unitypackage-smoke/${package_name}-${package_version}.unitypackage"
+          bash scripts/unity/export-unitypackage.sh \
+            --project-dir ".artifacts/unity/unitypackage-smoke-project" \
+            --output "${output}"
+
+      - name: Return Unity license
+        if: always()
+        uses: ./.github/actions/return-unity-license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Release organization Unity lock
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        with:
+          lock-name: wallstop-organization-builds
+          holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
+        env:
+          BUILD_LOCK_TOKEN: ${{ secrets.ORG_BUILD_LOCK_TOKEN }}
+
+      - name: Dump Unity export log tail on failure or cancellation
+        if: ${{ failure() || cancelled() }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/unitypackage-smoke-project/unitypackage-output
+          label: Unity package export smoke
+
+      - name: Upload Unity package export smoke diagnostics
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unitypackage-smoke-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .artifacts/unity/unitypackage-smoke-project/Assets/Editor/UnityHelpersPackageExporter.cs
+            .artifacts/unity/unitypackage-smoke-project/Packages/manifest.json
+            .artifacts/unity/unitypackage-smoke-project/ProjectSettings/
+            .artifacts/unity/unitypackage-smoke-project/unitypackage-output/*.log
+          if-no-files-found: warn
+          retention-days: 14
+          overwrite: true

@@ -113,6 +113,59 @@ if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
     }
 }
 
+if (-not $jobTexts.ContainsKey('unitypackage-smoke')) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Missing unitypackage-smoke job."
+    $failed = $true
+} else {
+    $unitypackageSmokeJob = $jobTexts['unitypackage-smoke']
+    $requiredUnitypackageSmokeContracts = @(
+        @{
+            Name = 'needs main Unity matrix'
+            Pattern = '(?m)^      - unity-tests\s*$'
+            Message = 'unitypackage-smoke must wait for unity-tests so package export smoke runs only after the standard matrix is green.'
+        },
+        @{
+            Name = 'needs standalone Unity tier'
+            Pattern = '(?m)^      - unity-tests-standalone\s*$'
+            Message = 'unitypackage-smoke must wait for unity-tests-standalone so the export smoke does not race the standalone tier for the org Unity lock.'
+        },
+        @{
+            Name = 'needs single-threaded Unity tier'
+            Pattern = '(?m)^      - unity-tests-single-threaded\s*$'
+            Message = 'unitypackage-smoke must wait for unity-tests-single-threaded so release payload smoke is the final Unity gate.'
+        },
+        @{
+            Name = 'requires successful single-threaded Unity tier'
+            Pattern = "needs\.unity-tests-single-threaded\.result\s*==\s*'success'"
+            Message = 'unitypackage-smoke must run only after the single-threaded Unity tier succeeds.'
+        },
+        @{
+            Name = 'runs the release exporter'
+            Pattern = 'bash scripts/unity/export-unitypackage\.sh'
+            Message = 'unitypackage-smoke must run scripts/unity/export-unitypackage.sh so Samples~ are staged as the release .unitypackage payload.'
+        },
+        @{
+            Name = 'uses release Unity version'
+            Pattern = [regex]::Escape('UNITY_VERSION="$(jq -r ''.release'' .github/unity-versions.json)"')
+            Message = 'unitypackage-smoke must use the release Unity version source of truth.'
+        },
+        @{
+            Name = 'uploads export diagnostics'
+            Pattern = [regex]::Escape('unitypackage-smoke-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}')
+            Message = 'unitypackage-smoke must upload export diagnostics when the smoke export fails.'
+        }
+    )
+
+    foreach ($contract in $requiredUnitypackageSmokeContracts) {
+        if ($unitypackageSmokeJob -notmatch $contract.Pattern) {
+            Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked unitypackage-smoke contract '$($contract.Name)'."
+        }
+    }
+}
+
 if ($failed) {
     exit 1
 }

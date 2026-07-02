@@ -1093,11 +1093,34 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $unityTimeoutMatch.Success -and
     $jobTimeoutMinutes -ge $requiredJobTimeoutMinutes
   )
+  $exporterPersistsUnityLog = (
+    $exporterContent.Contains('UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"') -and
+    $exporterContent.Contains('-logFile - 2>&1 | tee "${UNITY_LOG}"') -and
+    $exporterContent.Contains('UNITY_EXIT_CODE="${PIPESTATUS[0]}"') -and
+    $exporterContent.Contains('Unity package export failed with exit code')
+  )
+  $releaseUploadsExportDiagnostics = (
+    $workflowContent.Contains('Dump Unity export log tail on failure or cancellation') -and
+    $workflowContent.Contains('results-dir: .artifacts/unity/unitypackage-project/unitypackage-output') -and
+    $workflowContent.Contains('Upload .unitypackage export diagnostics') -and
+    $workflowContent.Contains('unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}') -and
+    $workflowContent.Contains('.artifacts/unity/unitypackage-project/unitypackage-output/*.log')
+  )
 
   Write-TestResult `
     -TestName 'release unitypackage job timeout covers lock wait and export budget' `
     -Passed $timeoutBudgetIsCoherent `
     -Message "Expected unitypackage job timeout to be at least lock timeout + Unity export timeout + ${minimumOverheadMinutes}m overhead. Job=${jobTimeoutMinutes}m, lock=${lockTimeoutMinutes}m, Unity=${unityTimeoutMinutes}m, required=${requiredJobTimeoutMinutes}m."
+
+  Write-TestResult `
+    -TestName 'unitypackage exporter persists Unity log and preserves exit code' `
+    -Passed $exporterPersistsUnityLog `
+    -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log and exit with the original Unity command exit code.'
+
+  Write-TestResult `
+    -TestName 'release unitypackage job uploads export diagnostics on failure' `
+    -Passed $releaseUploadsExportDiagnostics `
+    -Message 'Expected release.yml to dump and upload the persisted Unity package export log on failure or cancellation.'
 }
 
 function Run-ReleasePrepareWorkflowContractTests {

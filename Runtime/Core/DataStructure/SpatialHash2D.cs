@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
-    public sealed class SpatialHash2D<T> : IDisposable
+    public sealed class SpatialHash2D<T> : ISpatialHash2D<T>
     {
         private readonly struct Entry
         {
