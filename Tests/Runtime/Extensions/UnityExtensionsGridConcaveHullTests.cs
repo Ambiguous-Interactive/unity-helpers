@@ -532,18 +532,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        public void ConcaveHullRepairMetricsRemainBoundedOnLargeSamples()
+        public void ConcaveHullRepairMetricsRemainBoundedOnRepresentativeSamples()
         {
             Grid grid = CreateGrid(out GameObject owner);
             Track(owner);
 
             List<FastVector3Int> samples = new();
-            for (int y = 0; y < 120; ++y)
+            for (int y = 0; y < 72; ++y)
             {
-                for (int x = 0; x < 120; ++x)
+                for (int x = 0; x < 72; ++x)
                 {
-                    // Carve out a concave cavity to force the repair path.
-                    if (x > 30 && x < 90 && y > 30 && y < 90)
+                    if (x > 18 && x < 54 && y > 18 && y < 54)
                     {
                         continue;
                     }
@@ -551,11 +550,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
             }
 
-            Assert.GreaterOrEqual(samples.Count, 10000);
+            Assert.GreaterOrEqual(samples.Count, 3500);
 
             UnityExtensions.ConcaveHullOptions options =
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit(
-                    bucketSize: 48,
+                    bucketSize: 32,
                     angleThreshold: 220f
                 );
 
@@ -571,16 +570,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"Repair stats: start={stats.StartHullCount}, final={stats.FinalHullCount}, axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions}, duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}, frontier={stats.MaxFrontierSize}"
             );
 
-            // Verify hull correctness: all four corners of the carved cavity should be in the hull.
-            // The cavity spans from (31, 31) to (89, 89), so corners are at edges of that region.
             FastVector3Int[] expectedCavityCorners =
             {
-                new(30, 30, 0),
-                new(30, 90, 0),
-                new(90, 30, 0),
-                new(90, 90, 0),
+                new(18, 18, 0),
+                new(18, 54, 0),
+                new(54, 18, 0),
+                new(54, 54, 0),
             };
-            AssertRequiredVertices("LargeSample cavity corners", expectedCavityCorners, hull);
+            AssertRequiredVertices(
+                "RepresentativeSample cavity corners",
+                expectedCavityCorners,
+                hull
+            );
 
             // EdgeSplit may produce axis-aligned hulls without needing repair.
             // Log the insertion counts for diagnostics but focus on hull correctness.
@@ -595,8 +596,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 "Repair must not exceed the source point budget."
             );
             Assert.AreEqual(0, stats.DuplicateRemovals, "Repair should deduplicate as it goes.");
+            AssertRepairStatsRemainBounded("RepresentativeSample", stats, samples.Count);
 
-            // Hull should have reasonable size (boundary points of the shape)
             Assert.Greater(hull.Count, 0, "Hull should have vertices.");
             Assert.LessOrEqual(hull.Count, samples.Count, "Hull should not exceed input size.");
         }
@@ -649,24 +650,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        // Correctness/metrics test over a large (~21k-point) cloud. The concave-hull + repair work
-        // is heavy and runs markedly slower under IL2CPP than under the Mono editor, exceeding the
-        // default 60s case timeout in the standalone player. Raise the budget (still far below the
-        // CI no-output watchdog) rather than shrink the cloud, so coverage is unchanged.
         [Test]
-        [Timeout(300000)]
         public void ConcaveHullRepairMetricsRemainBoundedAcrossMultipleCavities()
         {
             Grid grid = CreateGrid(out GameObject owner);
             Track(owner);
 
             List<FastVector3Int> samples = new();
-            for (int y = 0; y < 150; ++y)
+            for (int y = 0; y < 84; ++y)
             {
-                for (int x = 0; x < 150; ++x)
+                for (int x = 0; x < 84; ++x)
                 {
-                    bool inFirstCavity = x > 25 && x < 55 && y > 25 && y < 55;
-                    bool inSecondCavity = x > 95 && x < 125 && y > 70 && y < 120;
+                    bool inFirstCavity = x > 14 && x < 34 && y > 14 && y < 34;
+                    bool inSecondCavity = x > 52 && x < 70 && y > 40 && y < 66;
                     if (inFirstCavity || inSecondCavity)
                     {
                         continue;
@@ -677,7 +673,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             UnityExtensions.ConcaveHullOptions options =
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit(
-                    bucketSize: 64,
+                    bucketSize: 40,
                     angleThreshold: 240f
                 );
 
@@ -696,18 +692,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}"
             );
 
-            // Verify hull correctness: cavity corners should be present.
-            // First cavity: (26, 26) to (54, 54), Second cavity: (96, 71) to (124, 119)
             FastVector3Int[] expectedCorners =
             {
-                new(25, 25, 0),
-                new(25, 55, 0),
-                new(55, 25, 0),
-                new(55, 55, 0),
-                new(95, 70, 0),
-                new(95, 120, 0),
-                new(125, 70, 0),
-                new(125, 120, 0),
+                new(14, 14, 0),
+                new(14, 34, 0),
+                new(34, 14, 0),
+                new(34, 34, 0),
+                new(52, 40, 0),
+                new(52, 66, 0),
+                new(70, 40, 0),
+                new(70, 66, 0),
             };
             AssertRequiredVertices("Multi-cavity corners", expectedCorners, hull);
 
@@ -723,13 +717,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 stats.DuplicateRemovals,
                 "Repair should deduplicate as it goes (multi-cavity)."
             );
-            Assert.LessOrEqual(
-                stats.FinalHullCount,
-                stats.OriginalPointsCount,
-                "Repair must stay within the original point budget for multi-cavity datasets."
-            );
+            AssertRepairStatsRemainBounded("Multi-cavity", stats, samples.Count);
 #else
             Assert.IsTrue(hull != null);
+#endif
+        }
+
+        [TestCaseSource(nameof(ConcaveHullRepairStressCases))]
+        [NUnit.Framework.Category("Stress")]
+        [Timeout(300000)]
+        public void ConcaveHullRepairStressSamplesRetainCavityCorners(
+            string label,
+            int gridWidth,
+            int gridHeight,
+            CavityRect[] cavities,
+            FastVector3Int[] expectedCorners,
+            int bucketSize,
+            float angleThreshold,
+            int minimumSamples
+        )
+        {
+            Grid grid = CreateGrid(out GameObject owner);
+            Track(owner);
+
+            List<FastVector3Int> samples = CreateCavitySamples(gridWidth, gridHeight, cavities);
+            Assert.GreaterOrEqual(samples.Count, minimumSamples, $"{label}: sample count changed.");
+
+            UnityExtensions.ConcaveHullOptions options =
+                UnityExtensions.ConcaveHullOptions.ForEdgeSplit(bucketSize, angleThreshold);
+
+            List<FastVector3Int> hull = samples.BuildConcaveHull(grid, options);
+            AssertHullSubset(samples, hull);
+            AssertRequiredVertices($"{label} cavity corners", expectedCorners, hull);
+
+#if ENABLE_CONCAVE_HULL_STATS
+            UnityExtensions.ConcaveHullRepairStats stats = UnityExtensions.ProfileConcaveHullRepair(
+                hull,
+                samples,
+                UnityExtensions.ConcaveHullStrategy.EdgeSplit,
+                angleThreshold
+            );
+
+            TestContext.WriteLine(
+                $"{label} stress stats: start={stats.StartHullCount}, final={stats.FinalHullCount}, "
+                    + $"axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions}, "
+                    + $"duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}, "
+                    + $"frontier={stats.MaxFrontierSize}, visits={stats.AxisNeighborVisits}"
+            );
+
+            Assert.AreEqual(0, stats.DuplicateRemovals, $"{label} should not emit duplicates.");
+            AssertRepairStatsRemainBounded(label, stats, samples.Count);
 #endif
         }
 
@@ -1003,6 +1040,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             ).SetName("ConcaveHullCavityShape.CrossShaped");
         }
 
+        private static IEnumerable<TestCaseData> ConcaveHullRepairStressCases()
+        {
+            yield return new TestCaseData(
+                "LargeSingleCavity",
+                120,
+                120,
+                new[] { new CavityRect(31, 89, 31, 89) },
+                new[] { FV(30, 30), FV(30, 90), FV(90, 30), FV(90, 90) },
+                48,
+                220f,
+                10000
+            ).SetName("ConcaveHullRepairStressSamples.SingleLargeCavity");
+
+            yield return new TestCaseData(
+                "LargeMultipleCavities",
+                150,
+                150,
+                new[] { new CavityRect(26, 54, 26, 54), new CavityRect(96, 124, 71, 119) },
+                new[]
+                {
+                    FV(25, 25),
+                    FV(25, 55),
+                    FV(55, 25),
+                    FV(55, 55),
+                    FV(95, 70),
+                    FV(95, 120),
+                    FV(125, 70),
+                    FV(125, 120),
+                },
+                64,
+                240f,
+                20000
+            ).SetName("ConcaveHullRepairStressSamples.MultipleLargeCavities");
+        }
+
         [TestCaseSource(nameof(CavityShapeCases))]
         public void ConcaveHullHandlesVariousCavityShapes(
             string label,
@@ -1017,28 +1089,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Grid grid = CreateGrid(out GameObject owner);
             Track(owner);
 
-            // Generate sample points by iterating the grid and excluding cavity regions
-            List<FastVector3Int> samples = new();
-            for (int y = 0; y < gridHeight; ++y)
-            {
-                for (int x = 0; x < gridWidth; ++x)
-                {
-                    bool inCavity = false;
-                    foreach (CavityRect cavity in cavities)
-                    {
-                        if (cavity.Contains(x, y))
-                        {
-                            inCavity = true;
-                            break;
-                        }
-                    }
-
-                    if (!inCavity)
-                    {
-                        samples.Add(new FastVector3Int(x, y, 0));
-                    }
-                }
-            }
+            List<FastVector3Int> samples = CreateCavitySamples(gridWidth, gridHeight, cavities);
 
             TestContext.WriteLine(
                 $"{label}: Grid {gridWidth}x{gridHeight}, {cavities.Length} cavities, {samples.Count} sample points"
@@ -1111,6 +1162,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+#if ENABLE_CONCAVE_HULL_STATS
+        private static void AssertRepairStatsRemainBounded(
+            string label,
+            UnityExtensions.ConcaveHullRepairStats stats,
+            int sourceCount
+        )
+        {
+            Assert.LessOrEqual(
+                stats.FinalHullCount,
+                sourceCount,
+                $"{label}: Repair must not exceed the source point budget."
+            );
+            Assert.LessOrEqual(
+                stats.AxisCornerInsertions + stats.AxisPathInsertions,
+                sourceCount,
+                $"{label}: Repair insertions must remain bounded by the source point count."
+            );
+            Assert.LessOrEqual(
+                stats.CandidateConnections,
+                sourceCount,
+                $"{label}: Candidate connections must remain bounded by the source point count."
+            );
+            Assert.LessOrEqual(
+                stats.MaxFrontierSize,
+                sourceCount,
+                $"{label}: Axis repair frontier must remain bounded by the source point count."
+            );
+            Assert.LessOrEqual(
+                stats.AxisNeighborVisits,
+                sourceCount * 16,
+                $"{label}: Axis repair should avoid repeated whole-grid neighbor searches."
+            );
+        }
+#endif
+
         private static List<FastVector3Int> CreateSharedThroatSamples()
         {
             List<FastVector3Int> samples = new();
@@ -1127,6 +1213,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     }
 
                     samples.Add(new FastVector3Int(x, y, 0));
+                }
+            }
+
+            return samples;
+        }
+
+        private static List<FastVector3Int> CreateCavitySamples(
+            int gridWidth,
+            int gridHeight,
+            IReadOnlyList<CavityRect> cavities
+        )
+        {
+            List<FastVector3Int> samples = new();
+            for (int y = 0; y < gridHeight; ++y)
+            {
+                for (int x = 0; x < gridWidth; ++x)
+                {
+                    bool inCavity = false;
+                    foreach (CavityRect cavity in cavities)
+                    {
+                        if (cavity.Contains(x, y))
+                        {
+                            inCavity = true;
+                            break;
+                        }
+                    }
+
+                    if (!inCavity)
+                    {
+                        samples.Add(new FastVector3Int(x, y, 0));
+                    }
                 }
             }
 
