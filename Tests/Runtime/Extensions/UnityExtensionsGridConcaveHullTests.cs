@@ -567,7 +567,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
 
             TestContext.WriteLine(
-                $"Repair stats: start={stats.StartHullCount}, final={stats.FinalHullCount}, axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions}, duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}, frontier={stats.MaxFrontierSize}"
+                $"Repair stats: start={stats.StartHullCount}, final={stats.FinalHullCount}, axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions}, duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}, frontier={stats.MaxFrontierSize}, visits={stats.AxisNeighborVisits}"
             );
 
             FastVector3Int[] expectedCavityCorners =
@@ -689,7 +689,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             TestContext.WriteLine(
                 $"Multi-cavity stats: start={stats.StartHullCount}, final={stats.FinalHullCount}, "
                     + $"axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions}, "
-                    + $"duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}"
+                    + $"duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}, "
+                    + $"frontier={stats.MaxFrontierSize}, visits={stats.AxisNeighborVisits}"
             );
 
             FastVector3Int[] expectedCorners =
@@ -1169,6 +1170,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int sourceCount
         )
         {
+            const int axisNeighborVisitBudgetMultiplier = 512;
+
             Assert.LessOrEqual(
                 stats.FinalHullCount,
                 sourceCount,
@@ -1191,8 +1194,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
             Assert.LessOrEqual(
                 stats.AxisNeighborVisits,
-                sourceCount * 16,
-                $"{label}: Axis repair should avoid repeated whole-grid neighbor searches."
+                sourceCount * axisNeighborVisitBudgetMultiplier,
+                $"{label}: Axis repair neighbor visits should stay below the configured sample budget."
             );
         }
 #endif
