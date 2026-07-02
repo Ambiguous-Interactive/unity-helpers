@@ -301,14 +301,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            _lock.EnterReadLock();
+            _lock.EnterWriteLock();
             try
             {
                 return TryGetUnlocked(key, out value);
             }
             finally
             {
-                _lock.ExitReadLock();
+                _lock.ExitWriteLock();
             }
         }
 
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return default;
             }
 
-            _lock.EnterUpgradeableReadLock();
+            _lock.EnterWriteLock();
             try
             {
                 if (TryGetUnlocked(key, out TValue value))
@@ -367,42 +367,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     return value;
                 }
 
-                _lock.EnterWriteLock();
+                Func<TKey, TValue> actualFactory = factory ?? _options.Loader;
+                if (actualFactory == null)
+                {
+                    return default;
+                }
+
+                TValue newValue;
                 try
                 {
-                    if (TryGetUnlocked(key, out value))
-                    {
-                        return value;
-                    }
-
-                    Func<TKey, TValue> actualFactory = factory ?? _options.Loader;
-                    if (actualFactory == null)
-                    {
-                        return default;
-                    }
-
-                    TValue newValue;
-                    try
-                    {
-                        newValue = actualFactory(key);
-                        RecordLoad();
-                    }
-                    catch
-                    {
-                        return default;
-                    }
-
-                    SetUnlocked(key, newValue);
-                    return newValue;
+                    newValue = actualFactory(key);
+                    RecordLoad();
                 }
-                finally
+                catch
                 {
-                    _lock.ExitWriteLock();
+                    return default;
                 }
+
+                SetUnlocked(key, newValue);
+                return newValue;
             }
             finally
             {
-                _lock.ExitUpgradeableReadLock();
+                _lock.ExitWriteLock();
             }
         }
 
