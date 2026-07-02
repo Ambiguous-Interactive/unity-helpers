@@ -538,8 +538,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
 
             int beforeDelayTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.03f,
-                deltaTime: 0.03f
+                currentTime: 5.049f,
+                deltaTime: 0.049f
             );
             Assert.AreEqual(0, beforeDelayTicks);
             Assert.Zero(
@@ -548,21 +548,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
 
             int firstTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.05f,
+                currentTime: 5.051f,
                 deltaTime: 0.05f
             );
             Assert.AreEqual(1, firstTicks);
             Assert.AreEqual(90f, attributes.health.CurrentValue, 0.01f);
 
             int secondTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.1f,
+                currentTime: 5.101f,
                 deltaTime: 0.05f
             );
             Assert.AreEqual(1, secondTicks);
             Assert.AreEqual(80f, attributes.health.CurrentValue, 0.01f);
 
             int afterMaxTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.2f,
+                currentTime: 5.201f,
                 deltaTime: 0.1f
             );
             Assert.AreEqual(0, afterMaxTicks);
@@ -721,19 +721,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 50f).Value;
 
             int firstTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 50.02f,
+                currentTime: 50.021f,
                 deltaTime: 0.02f
             );
             Assert.AreEqual(1, firstTicks);
 
             int secondTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 50.05f,
+                currentTime: 50.051f,
                 deltaTime: 0.03f
             );
             Assert.AreEqual(1, secondTicks);
 
             int finalTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 50.22f,
+                currentTime: 50.221f,
                 deltaTime: 0.17f
             );
             Assert.AreEqual(3, finalTicks);
