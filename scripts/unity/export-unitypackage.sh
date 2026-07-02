@@ -223,6 +223,7 @@ mkdir -p "${INTERNAL_OUTPUT_DIR}" "$(dirname "${OUTPUT_PATH}")"
 
 UNITY_EXIT_CODE=0
 TEE_EXIT_CODE=0
+UNITY_EXPORT_PIPE_STATUS=()
 set +e
 UNITY_TEST_PROJECT_DIR="${PROJECT_DIR}" \
 UNITY_VERSION="${UNITY_VERSION}" \
@@ -233,8 +234,9 @@ UNITY_TIMEOUT="${UNITY_TIMEOUT:-7200}" \
     -executeMethod UnityHelpersPackageExporter.Export \
     -exportOutput "/project/unitypackage-output/$(basename "${OUTPUT_PATH}")" \
     -logFile - 2>&1 | tee "${UNITY_LOG}"
-UNITY_EXIT_CODE="${PIPESTATUS[0]}"
-TEE_EXIT_CODE="${PIPESTATUS[1]}"
+UNITY_EXPORT_PIPE_STATUS=("${PIPESTATUS[@]}")
+UNITY_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[0]}"
+TEE_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[1]}"
 set -e
 
 if [[ "${UNITY_EXIT_CODE}" -ne 0 ]]; then

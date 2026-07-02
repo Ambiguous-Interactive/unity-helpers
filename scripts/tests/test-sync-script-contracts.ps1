@@ -1096,8 +1096,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $exporterPersistsUnityLog = (
     $exporterContent.Contains('UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"') -and
     $exporterContent.Contains('-logFile - 2>&1 | tee "${UNITY_LOG}"') -and
-    $exporterContent.Contains('UNITY_EXIT_CODE="${PIPESTATUS[0]}"') -and
-    $exporterContent.Contains('TEE_EXIT_CODE="${PIPESTATUS[1]}"') -and
+    $exporterContent.Contains('UNITY_EXPORT_PIPE_STATUS=("${PIPESTATUS[@]}")') -and
+    $exporterContent.Contains('UNITY_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[0]}"') -and
+    $exporterContent.Contains('TEE_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[1]}"') -and
     $exporterContent.Contains('Unity package export failed with exit code') -and
     $exporterContent.Contains('Failed to persist Unity package export log with tee exit code')
   )
