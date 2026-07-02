@@ -536,22 +536,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float remaining));
             Assert.Greater(remaining, 0f);
 
-            yield return null;
-            Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float beforeEnsure));
+            EffectHandler handler = entity.GetComponent<EffectHandler>();
+            handler.RemoveEffect(activeHandle);
+            activeHandle = handler.ApplyEffectForTesting(effect, currentTime: -10f).Value;
+            Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float beforeNoRefresh));
+            Assert.AreEqual(0f, beforeNoRefresh);
+
+            EffectHandle? ensuredNoRefresh = entity.EnsureHandle(effect, refreshDuration: false);
+            Assert.IsTrue(ensuredNoRefresh.HasValue);
+            Assert.AreEqual(activeHandle, ensuredNoRefresh.Value);
+            Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float afterNoRefresh));
+            Assert.AreEqual(0f, afterNoRefresh);
 
             EffectHandle? ensured = entity.EnsureHandle(effect);
             Assert.IsTrue(ensured.HasValue);
             Assert.AreEqual(activeHandle, ensured.Value);
             Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float afterEnsure));
-            Assert.Greater(afterEnsure, beforeEnsure);
-
-            yield return null;
-            Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float beforeNoRefresh));
-            EffectHandle? ensuredNoRefresh = entity.EnsureHandle(effect, refreshDuration: false);
-            Assert.IsTrue(ensuredNoRefresh.HasValue);
-            Assert.AreEqual(activeHandle, ensuredNoRefresh.Value);
-            Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float afterNoRefresh));
-            Assert.LessOrEqual(afterNoRefresh, beforeNoRefresh);
+            Assert.Greater(afterEnsure, afterNoRefresh);
 
             Assert.IsTrue(entity.RefreshEffect(activeHandle));
 
@@ -613,10 +614,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = entity.ApplyEffect(effect).Value;
-            yield return null;
+            EffectHandler handler = entity.GetComponent<EffectHandler>();
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: -10f).Value;
+            Assert.IsTrue(entity.TryGetRemainingDuration(handle, out float beforeRefresh));
+            Assert.AreEqual(0f, beforeRefresh);
+
             Assert.IsFalse(entity.RefreshEffect(handle));
             Assert.IsTrue(entity.RefreshEffect(handle, ignoreReapplicationPolicy: true));
+            Assert.IsTrue(entity.TryGetRemainingDuration(handle, out float afterRefresh));
+            Assert.Greater(afterRefresh, beforeRefresh);
         }
 
         [UnityTest]

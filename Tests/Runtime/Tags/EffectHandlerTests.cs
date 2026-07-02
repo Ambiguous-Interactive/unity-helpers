@@ -360,16 +360,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return new WaitForSeconds(0.05f);
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float beforeReapply));
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 10f).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 10.05f,
+                    remainingDuration: out float beforeReapply
+                )
+            );
+            Assert.AreEqual(0.25f, beforeReapply, RemainingDurationEpsilon);
 
-            EffectHandle? reapplied = handler.ApplyEffect(effect);
+            EffectHandle? reapplied = handler.ApplyEffectForTesting(effect, currentTime: 10.2f);
             Assert.IsTrue(reapplied.HasValue);
             Assert.AreEqual(handle, reapplied.Value);
 
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float afterReapply));
-            Assert.LessOrEqual(afterReapply, beforeReapply + 0.01f);
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 10.2f,
+                    remainingDuration: out float afterReapply
+                )
+            );
+            Assert.AreEqual(0.1f, afterReapply, RemainingDurationEpsilon);
+            Assert.Less(afterReapply, beforeReapply);
 
             handler.RemoveEffect(handle);
         }
@@ -521,82 +534,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return null;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 5f).Value;
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
 
-            yield return new WaitForSeconds(0.03f);
+            int beforeDelayTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 5.049f,
+                deltaTime: 0.049f
+            );
+            Assert.AreEqual(0, beforeDelayTicks);
             Assert.Zero(
                 attributes.notifications.Count,
                 "No periodic ticks should occur before the initial delay elapses."
             );
 
-            yield return WaitForAttributeNotifications(
-                attributes,
-                expectedCount: 1,
-                timeout: 0.5f,
-                checkpoint: "first periodic tick"
+            int firstTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 5.051f,
+                deltaTime: 0.05f
             );
+            Assert.AreEqual(1, firstTicks);
             Assert.AreEqual(90f, attributes.health.CurrentValue, 0.01f);
 
-            yield return WaitForAttributeNotifications(
-                attributes,
-                expectedCount: 2,
-                timeout: 0.5f,
-                checkpoint: "second periodic tick"
+            int secondTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 5.101f,
+                deltaTime: 0.05f
             );
+            Assert.AreEqual(1, secondTicks);
             Assert.AreEqual(80f, attributes.health.CurrentValue, 0.01f);
 
-            yield return AssertNoAdditionalAttributeNotifications(
-                attributes,
-                expectedCount: 2,
-                holdDuration: 0.2f,
-                checkpoint: "max tick enforcement"
+            int afterMaxTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 5.201f,
+                deltaTime: 0.1f
             );
+            Assert.AreEqual(0, afterMaxTicks);
+            Assert.AreEqual(2, attributes.notifications.Count);
             Assert.AreEqual(80f, attributes.health.CurrentValue, 0.01f);
 
             handler.RemoveEffect(handle);
-        }
-
-        private static IEnumerator WaitForAttributeNotifications(
-            TestAttributesComponent attributes,
-            int expectedCount,
-            float timeout,
-            string checkpoint
-        )
-        {
-            float elapsed = 0f;
-            while (attributes.notifications.Count < expectedCount && elapsed < timeout)
-            {
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
-
-            Assert.That(
-                attributes.notifications.Count,
-                Is.GreaterThanOrEqualTo(expectedCount),
-                $"{checkpoint} not reached within {timeout:F2}s (saw {attributes.notifications.Count})."
-            );
-        }
-
-        private static IEnumerator AssertNoAdditionalAttributeNotifications(
-            TestAttributesComponent attributes,
-            int expectedCount,
-            float holdDuration,
-            string checkpoint
-        )
-        {
-            float elapsed = 0f;
-            while (elapsed < holdDuration)
-            {
-                Assert.AreEqual(
-                    expectedCount,
-                    attributes.notifications.Count,
-                    $"{checkpoint}: detected unexpected periodic ticks after reaching the expected count."
-                );
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
         }
 
         [UnityTest]
@@ -628,14 +601,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return new WaitForSeconds(0.16f);
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 20f).Value;
+            int ticks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 20.16f,
+                deltaTime: 0.16f
+            );
+            Assert.Greater(ticks, 0);
             float afterTicks = attributes.health.CurrentValue;
             Assert.Less(afterTicks, 100f);
 
             handler.RemoveEffect(handle);
             float afterRemoval = attributes.health.CurrentValue;
-            yield return new WaitForSeconds(0.1f);
+            int ticksAfterRemoval = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 20.26f,
+                deltaTime: 0.1f
+            );
+            Assert.AreEqual(0, ticksAfterRemoval);
             Assert.AreEqual(afterRemoval, attributes.health.CurrentValue, 0.01f);
         }
 
@@ -662,8 +643,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            float overdueTime = Time.time + 10f;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 30f).Value;
+            float overdueTime = 40f;
 
             int firstCatchUpTicks = handler.ProcessPeriodicEffectsForTesting(
                 overdueTime,
@@ -737,14 +718,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 50f).Value;
 
-            yield return WaitForAttributeNotifications(
-                attributes,
-                expectedCount: 5,
-                timeout: 0.75f,
-                checkpoint: "all independent periodic ticks"
+            int firstTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 50.021f,
+                deltaTime: 0.02f
             );
+            Assert.AreEqual(1, firstTicks);
+
+            int secondTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 50.051f,
+                deltaTime: 0.03f
+            );
+            Assert.AreEqual(1, secondTicks);
+
+            int finalTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 50.221f,
+                deltaTime: 0.17f
+            );
+            Assert.AreEqual(3, finalTicks);
+            Assert.AreEqual(5, attributes.notifications.Count);
 
             int healthTicks = 0;
             int armorTicks = 0;
@@ -787,8 +780,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float remaining));
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 70f).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 70f,
+                    remainingDuration: out float remaining
+                )
+            );
             Assert.Greater(remaining, 0f);
             Assert.LessOrEqual(
                 remaining,
@@ -821,25 +820,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float initialRemaining));
-            yield return null;
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float beforeRefresh));
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 100f).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100f,
+                    remainingDuration: out float initialRemaining
+                )
+            );
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100.05f,
+                    remainingDuration: out float beforeRefresh
+                )
+            );
             Assert.Less(beforeRefresh, initialRemaining);
 
-            EffectHandle? ensured = handler.EnsureHandle(effect);
+            EffectHandle? ensured = handler.EnsureHandle(
+                effect,
+                refreshDuration: true,
+                currentTime: 100.1f
+            );
             Assert.IsTrue(ensured.HasValue);
             Assert.AreEqual(handle, ensured.Value);
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float afterRefresh));
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100.1f,
+                    remainingDuration: out float afterRefresh
+                )
+            );
             Assert.Greater(afterRefresh, beforeRefresh);
 
-            yield return null;
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float beforeNoRefresh));
-            EffectHandle? ensuredNoRefresh = handler.EnsureHandle(effect, refreshDuration: false);
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100.15f,
+                    remainingDuration: out float beforeNoRefresh
+                )
+            );
+            EffectHandle? ensuredNoRefresh = handler.EnsureHandle(
+                effect,
+                refreshDuration: false,
+                currentTime: 100.18f
+            );
             Assert.IsTrue(ensuredNoRefresh.HasValue);
             Assert.AreEqual(handle, ensuredNoRefresh.Value);
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float afterNoRefresh));
-            Assert.LessOrEqual(afterNoRefresh, beforeNoRefresh);
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 100.18f,
+                    remainingDuration: out float afterNoRefresh
+                )
+            );
+            Assert.Less(afterNoRefresh, beforeNoRefresh);
 
             handler.RemoveEffect(handle);
         }
@@ -864,13 +899,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return null;
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float beforeRefresh));
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 200f).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 200.1f,
+                    remainingDuration: out float beforeRefresh
+                )
+            );
 
             Assert.IsFalse(handler.RefreshEffect(handle));
-            Assert.IsTrue(handler.RefreshEffect(handle, ignoreReapplicationPolicy: true));
-            Assert.IsTrue(handler.TryGetRemainingDuration(handle, out float afterRefresh));
+            Assert.IsTrue(
+                handler.RefreshEffect(handle, ignoreReapplicationPolicy: true, currentTime: 200.15f)
+            );
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(
+                    handle,
+                    currentTime: 200.15f,
+                    remainingDuration: out float afterRefresh
+                )
+            );
             Assert.Greater(afterRefresh, beforeRefresh);
 
             handler.RemoveEffect(handle);
@@ -905,11 +953,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return new WaitForSeconds(0.35f);
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 300f).Value;
+            int ticks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 300.35f,
+                deltaTime: 0.35f
+            );
+            Assert.AreEqual(3, ticks);
             Assert.AreEqual(70f, attributes.health.CurrentValue, 0.01f);
 
-            yield return new WaitForSeconds(0.2f);
+            int afterMaxTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 300.55f,
+                deltaTime: 0.2f
+            );
+            Assert.AreEqual(0, afterMaxTicks);
             handler.RemoveEffect(handle);
             Assert.AreEqual(70f, attributes.health.CurrentValue, 0.01f);
         }
@@ -941,14 +997,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 400f).Value;
             Assert.AreEqual(1, RecordingEffectBehavior.ApplyCount);
 
-            yield return null;
+            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.033f);
+            Assert.AreEqual(1, tickCount);
             Assert.Greater(RecordingEffectBehavior.TickCount, 0);
+            Assert.AreEqual(0.033f, RecordingEffectBehavior.TickContexts[0].deltaTime);
 
-            yield return new WaitForSeconds(0.12f);
+            int periodicTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 400.12f,
+                deltaTime: 0.12f
+            );
+            Assert.AreEqual(2, periodicTicks);
             Assert.GreaterOrEqual(RecordingEffectBehavior.PeriodicTickCount, 1);
+            Assert.AreEqual(
+                0.12f,
+                RecordingEffectBehavior.PeriodicInvocations[0].Context.deltaTime
+            );
 
             handler.RemoveEffect(handle);
             Assert.AreEqual(1, RecordingEffectBehavior.RemoveCount);
@@ -1017,8 +1083,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
-            yield return new WaitForSeconds(0.1f);
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 500f).Value;
+            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f);
+            Assert.AreEqual(1, tickCount);
 
             Assert.AreEqual(0, RecordingEffectBehavior.PeriodicTickCount);
 
@@ -1097,7 +1164,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle? handle = handler.ApplyEffect(effect);
             Assert.IsFalse(handle.HasValue);
 
-            yield return new WaitForSeconds(0.1f);
+            int ticks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 600f,
+                deltaTime: 0.1f
+            );
+            Assert.AreEqual(0, ticks);
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
         }
 

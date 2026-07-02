@@ -32,6 +32,7 @@ For Odin-specific testing, see [test-odin-drawers](./test-odin-drawers.md).
 | `UNH002` | Unity object allocation must be tracked: wrap with `Track()`                                        |
 | `UNH003` | Test class creates Unity objects but doesn't inherit from `CommonTestBase`                          |
 | `UNH005` | Unity null checks must use `Assert.IsTrue(x != null/ == null)` instead of `Assert.IsNotNull/IsNull` |
+| `UNH013` | Runtime Tags tests must not use `WaitForSeconds`/`WaitForSecondsRealtime` for handler time math     |
 
 ---
 
@@ -320,6 +321,29 @@ going through one of these (or an equivalent bounded poll). Both helpers
 `PauseBatch()` first, so they also work inside a fixture-wide `BatchedEditorTestBase`
 batch. They use no `WaitForSeconds`/`Thread.Sleep` (editor refreshes are
 synchronous), so they do not trip UNH010.
+
+---
+
+## Runtime Tags timing tests use handler clock seams
+
+`Tests/Runtime/Tags` tests must not assert `EffectHandler` duration, periodic, or behavior-tick
+semantics through literal `WaitForSeconds`/`WaitForSecondsRealtime` waits. Unity does not promise
+exact resume timing for those waits, and standalone IL2CPP legs can resume late enough to observe a
+different tick or remaining-duration value.
+
+Use the handler's internal deterministic seams for effect-system time math:
+
+- `ApplyEffectForTesting(effect, currentTime)` seeds duration expiration and periodic runtime start time.
+- `TryGetRemainingDuration(handle, currentTime, out remaining)` verifies remaining-duration math.
+- `EnsureHandle(effect, refreshDuration, currentTime)` and
+  `RefreshEffect(handle, ignoreReapplicationPolicy, currentTime)` verify refresh policy.
+- `ProcessBehaviorTicksForTesting(deltaTime)` and
+  `ProcessPeriodicEffectsForTesting(currentTime, deltaTime)` verify callback and periodic tick behavior.
+
+`yield return null` is still valid when the test is observing real Unity lifecycle behavior such as
+component initialization or deferred object destruction. If a Tags test genuinely must use a real wait
+for Unity lifecycle timing, keep the wait local to that assertion and add `// UNH-SUPPRESS UNH013`
+with the reason.
 
 ---
 

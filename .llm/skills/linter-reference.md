@@ -266,22 +266,6 @@ npm run lint:csharp-naming
 | Parameters        | camelCase                | `itemCount`     |
 | Type parameters   | `T` or `T` + PascalCase  | `T`, `TValue`   |
 
-### Common Violations
-
-```csharp
-// ❌ WRONG: lowercase method name
-public void processData() { }
-
-// ✅ CORRECT: PascalCase method name
-public void ProcessData() { }
-
-// ❌ WRONG: missing underscore prefix
-private int count;
-
-// ✅ CORRECT: underscore prefix
-private int _count;
-```
-
 ---
 
 ## YAML Linter
@@ -335,6 +319,9 @@ pwsh -NoProfile -File scripts/lint-tests.ps1
    `results.xml` that aborts the whole leg. Use `yield return null` (the production helper is
    batchmode-safe). A bare reference without `yield return` is not flagged. Add `// UNH-SUPPRESS`
    to opt out.
+9. **UNH013**: Non-performance `Tests/Runtime/Tags` tests must not construct
+   `WaitForSeconds` or `WaitForSecondsRealtime`; use deterministic `EffectHandler` clock/tick seams.
+   Add `// UNH-SUPPRESS UNH013` only for tests that intentionally verify real Unity lifecycle timing.
 
 All Unity object creation in tests must use `Track()`:
 
@@ -393,7 +380,8 @@ Every file and directory under scanned source roots (`Runtime`, `Editor`, `Tests
 
 ### Exclusion Configuration
 
-The script excludes certain paths from requiring `.meta` files. Exclusions are defined in three arrays at the top of [lint-meta-files.ps1](../../scripts/lint-meta-files.ps1):
+The script excludes certain paths from requiring `.meta` files. Exclusions are defined in three arrays at
+the top of [lint-meta-files.ps1](../../scripts/lint-meta-files.ps1):
 
 | Array                  | Purpose                                          | Examples                                                      |
 | ---------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
@@ -405,19 +393,23 @@ The script excludes certain paths from requiring `.meta` files. Exclusions are d
 
 When introducing new tooling that creates cache or artifact directories inside source roots:
 
-1. Add the directory name to `$excludeDirs` (for directories) or file pattern to `$excludeFilePatterns` (for files)
+1. Add the directory name to `$excludeDirs` (for directories) or file pattern to `$excludeFilePatterns`
+   (for files)
 2. Add test cases to [test-lint-meta-exclusions.sh](../../scripts/tests/test-lint-meta-exclusions.sh)
 3. Run the tests: `bash scripts/tests/test-lint-meta-exclusions.sh`
 
 ### Test-ShouldExclude Function
 
-The `Test-ShouldExclude` function checks whether a path should be excluded. For `$excludeDirs` entries, it matches:
+The `Test-ShouldExclude` function checks whether a path should be excluded. For `$excludeDirs` entries,
+it matches:
 
 - The directory itself: `$relativePath -eq $dir` or `$relativePath -like "*/$dir"`
 - Contents at root level: `$relativePath -like "$dir/*"`
 - Nested contents: `$relativePath -like "*/$dir/*"`
 
-Patterns must match **both** the excluded directory itself **and** its contents. If only contents are matched (e.g., `$dir/*` without `$dir`), orphaned `.meta` files for the directory itself won't be detected correctly.
+Patterns must match **both** the excluded directory itself **and** its contents. If only contents are
+matched (e.g., `$dir/*` without `$dir`), orphaned `.meta` files for the directory itself won't be
+detected correctly.
 
 ### Tests
 

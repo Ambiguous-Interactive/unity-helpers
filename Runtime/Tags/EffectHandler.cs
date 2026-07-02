@@ -140,6 +140,16 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </remarks>
         public EffectHandle? ApplyEffect(AttributeEffect effect)
         {
+            return ApplyEffect(effect, Time.time);
+        }
+
+        internal EffectHandle? ApplyEffectForTesting(AttributeEffect effect, float currentTime)
+        {
+            return ApplyEffect(effect, currentTime);
+        }
+
+        private EffectHandle? ApplyEffect(AttributeEffect effect, float currentTime)
+        {
             if (effect == null)
             {
                 return null;
@@ -177,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     if (existingHandles is { Count: > 0 })
                     {
                         EffectHandle handle = existingHandles[0];
-                        InternalApplyEffect(handle);
+                        InternalApplyEffect(handle, currentTime);
                         return handle;
                     }
 
@@ -215,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             EffectHandle newHandle = EffectHandle.CreateInstance(effect);
             RegisterStackHandle(stackKey, newHandle);
-            InternalApplyEffect(newHandle);
+            InternalApplyEffect(newHandle, currentTime);
             return newHandle;
         }
 
@@ -473,6 +483,15 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
         public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
         {
+            return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
+        }
+
+        internal bool TryGetRemainingDuration(
+            EffectHandle handle,
+            float currentTime,
+            out float remainingDuration
+        )
+        {
             long handleId = handle.id;
             if (!_effectExpirations.TryGetValue(handleId, out float expiration))
             {
@@ -480,7 +499,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            float timeRemaining = expiration - Time.time;
+            float timeRemaining = expiration - currentTime;
             if (timeRemaining < 0f)
             {
                 timeRemaining = 0f;
@@ -510,6 +529,15 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns>An active handle for the effect, or <c>null</c> for instant effects.</returns>
         public EffectHandle? EnsureHandle(AttributeEffect effect, bool refreshDuration)
         {
+            return EnsureHandle(effect, refreshDuration, Time.time);
+        }
+
+        internal EffectHandle? EnsureHandle(
+            AttributeEffect effect,
+            bool refreshDuration,
+            float currentTime
+        )
+        {
             if (effect == null)
             {
                 return null;
@@ -521,14 +549,18 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     if (refreshDuration)
                     {
-                        _ = RefreshEffect(handle);
+                        _ = RefreshEffect(
+                            handle,
+                            ignoreReapplicationPolicy: false,
+                            currentTime: currentTime
+                        );
                     }
 
                     return handle;
                 }
             }
 
-            return ApplyEffect(effect);
+            return ApplyEffect(effect, currentTime);
         }
 
         /// <summary>
@@ -550,6 +582,15 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </param>
         /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
         public bool RefreshEffect(EffectHandle handle, bool ignoreReapplicationPolicy)
+        {
+            return RefreshEffect(handle, ignoreReapplicationPolicy, Time.time);
+        }
+
+        internal bool RefreshEffect(
+            EffectHandle handle,
+            bool ignoreReapplicationPolicy,
+            float currentTime
+        )
         {
             AttributeEffect effect = handle.effect;
             if (effect == null)
@@ -573,7 +614,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            float newExpiration = Time.time + effect.duration;
+            float newExpiration = currentTime + effect.duration;
             _effectExpirations[handleId] = newExpiration;
             _effectHandlesById[handleId] = handle;
             return true;
@@ -607,7 +648,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             OnEffectRemoved?.Invoke(handle);
         }
 
-        private void InternalApplyEffect(EffectHandle handle)
+        private void InternalApplyEffect(EffectHandle handle, float currentTime)
         {
             bool exists = _appliedEffects.Contains(handle);
             if (!exists)
@@ -623,13 +664,13 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (!exists || effect.resetDurationOnReapplication)
                 {
-                    _effectExpirations[handleId] = Time.time + effect.duration;
+                    _effectExpirations[handleId] = currentTime + effect.duration;
                 }
             }
 
             if (!exists)
             {
-                RegisterPeriodicRuntime(handle);
+                RegisterPeriodicRuntime(handle, currentTime);
                 RegisterBehaviors(handle);
             }
 
@@ -692,7 +733,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        private void RegisterPeriodicRuntime(EffectHandle handle)
+        private void RegisterPeriodicRuntime(EffectHandle handle, float startTime)
         {
             AttributeEffect effect = handle.effect;
             if (effect.periodicEffects is not { Count: > 0 })
@@ -702,7 +743,6 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             List<PeriodicEffectRuntimeState> runtimeStates = null;
             PooledResource<List<PeriodicEffectRuntimeState>> runtimeStatesLease = default;
-            float startTime = Time.time;
 
             foreach (PeriodicEffectDefinition definition in effect.periodicEffects)
             {
@@ -1101,16 +1141,26 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void ProcessBehaviorTicks()
         {
+            _ = ProcessBehaviorTicks(Time.deltaTime);
+        }
+
+        internal int ProcessBehaviorTicksForTesting(float deltaTime)
+        {
+            return ProcessBehaviorTicks(deltaTime);
+        }
+
+        private int ProcessBehaviorTicks(float deltaTime)
+        {
             if (_behaviorsByHandleId.Count <= 0)
             {
-                return;
+                return 0;
             }
 
             using PooledResource<List<long>> behaviorHandleIdsResource = Buffers<long>.List.Get(
                 out List<long> behaviorHandleIdsBuffer
             );
             behaviorHandleIdsBuffer.AddRange(_behaviorsByHandleId.Keys);
-            float deltaTime = Time.deltaTime;
+            int processedTicks = 0;
 
             foreach (long handleId in behaviorHandleIdsBuffer)
             {
@@ -1139,8 +1189,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
 
                     behavior.OnTick(context);
+                    ++processedTicks;
                 }
             }
+
+            return processedTicks;
         }
 
         private void ProcessPeriodicEffects()

@@ -21,8 +21,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             RecordingEffectBehavior.ResetForTests();
         }
 
-        [UnityTest]
-        public IEnumerator LifecycleCallbacksProvideContextData()
+        [Test]
+        public void LifecycleCallbacksProvideContextData()
         {
             (GameObject entity, EffectHandler handler, _, _) = CreateEntity();
 
@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 10f).Value;
             Assert.AreEqual(1, RecordingEffectBehavior.ApplyCount);
             Assert.AreEqual(
                 1,
@@ -55,19 +55,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 "OnApply should fire immediately."
             );
 
-            yield return null;
-            yield return null;
-
+            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.02f);
+            Assert.AreEqual(1, tickCount);
             Assert.IsNotEmpty(
                 RecordingEffectBehavior.TickContexts,
-                "OnTick should run after Update."
+                "OnTick should run when behavior ticks are processed."
             );
 
-            yield return WaitForPeriodicInvocations(
-                expectedCount: 1,
-                timeout: 0.5f,
-                checkpoint: "lifecycle periodic tick"
+            int periodicTicks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 10f,
+                deltaTime: 0.02f
             );
+            Assert.AreEqual(1, periodicTicks);
 
             Assert.AreEqual(
                 1,
@@ -94,17 +93,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreSame(handler, tickContext.handler);
             Assert.AreSame(entity, tickContext.Target);
             Assert.AreEqual(effect, tickContext.Effect);
-            Assert.Greater(tickContext.deltaTime, 0f);
+            Assert.AreEqual(0.02f, tickContext.deltaTime);
 
             RecordingEffectBehavior.PeriodicInvocation periodicInvocation =
                 RecordingEffectBehavior.PeriodicInvocations[0];
             Assert.AreSame(handler, periodicInvocation.Context.handler);
             Assert.AreSame(entity, periodicInvocation.Context.Target);
             Assert.AreEqual(effect, periodicInvocation.Context.Effect);
-            Assert.Greater(periodicInvocation.Context.deltaTime, 0f);
+            Assert.AreEqual(0.02f, periodicInvocation.Context.deltaTime);
             Assert.AreSame(periodicDefinition, periodicInvocation.TickContext.definition);
             Assert.AreEqual(1, periodicInvocation.TickContext.executedTicks);
-            Assert.GreaterOrEqual(periodicInvocation.TickContext.currentTime, 0f);
+            Assert.AreEqual(10f, periodicInvocation.TickContext.currentTime);
 
             EffectBehaviorContext removeContext = RecordingEffectBehavior.RemoveContexts[0];
             Assert.AreSame(handler, removeContext.handler);
@@ -113,8 +112,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(0f, removeContext.deltaTime);
         }
 
-        [UnityTest]
-        public IEnumerator PeriodicTickContextTracksExecutedTicksAndTime()
+        [Test]
+        public void PeriodicTickContextTracksExecutedTicksAndTime()
         {
             (GameObject entity, EffectHandler handler, _, _) = CreateEntity();
 
@@ -139,13 +138,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 20f).Value;
 
-            yield return WaitForPeriodicInvocations(
-                expectedCount: 3,
-                timeout: 0.75f,
-                checkpoint: "three periodic behavior callbacks"
+            int ticks = handler.ProcessPeriodicEffectsForTesting(
+                currentTime: 20.11f,
+                deltaTime: 0.11f
             );
+            Assert.AreEqual(3, ticks);
 
             Assert.AreEqual(
                 3,
@@ -159,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     RecordingEffectBehavior.PeriodicInvocations[i];
                 Assert.AreSame(periodicDefinition, invocation.TickContext.definition);
                 Assert.AreEqual(i + 1, invocation.TickContext.executedTicks);
-                Assert.Greater(invocation.Context.deltaTime, 0f);
+                Assert.AreEqual(0.11f, invocation.Context.deltaTime);
 
                 if (i > 0)
                 {
@@ -174,27 +173,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             handler.RemoveEffect(handle);
         }
 
-        private static IEnumerator WaitForPeriodicInvocations(
-            int expectedCount,
-            float timeout,
-            string checkpoint
-        )
+        [UnityTest]
+        public IEnumerator UpdateProcessesBehaviorAndPeriodicTicks()
         {
-            float elapsed = 0f;
-            while (
-                RecordingEffectBehavior.PeriodicInvocations.Count < expectedCount
-                && elapsed < timeout
-            )
-            {
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
+            (_, EffectHandler handler, _, _) = CreateEntity();
 
-            Assert.That(
-                RecordingEffectBehavior.PeriodicInvocations.Count,
-                Is.GreaterThanOrEqualTo(expectedCount),
-                $"{checkpoint} not reached within {timeout:F2}s (saw {RecordingEffectBehavior.PeriodicInvocations.Count})."
+            PeriodicEffectDefinition periodicDefinition = new()
+            {
+                name = "Update Pulse",
+                initialDelay = 0f,
+                interval = 0.05f,
+                maxTicks = 1,
+            };
+
+            AttributeEffect effect = CreateEffect(
+                "Update Lifecycle",
+                e =>
+                {
+                    e.periodicEffects.Add(periodicDefinition);
+                }
             );
+
+            RecordingEffectBehavior behavior = Track(
+                ScriptableObject.CreateInstance<RecordingEffectBehavior>()
+            );
+            effect.behaviors.Add(behavior);
+
+            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            Assert.AreEqual(0, RecordingEffectBehavior.TickCount);
+            Assert.AreEqual(0, RecordingEffectBehavior.PeriodicTickCount);
+
+            yield return null;
+
+            Assert.Greater(
+                RecordingEffectBehavior.TickCount,
+                0,
+                "Update should process behavior ticks without a direct test seam call."
+            );
+            Assert.AreEqual(
+                1,
+                RecordingEffectBehavior.PeriodicTickCount,
+                "Update should process the zero-delay periodic tick without a real-time wait."
+            );
+
+            handler.RemoveEffect(handle);
         }
 
         private (

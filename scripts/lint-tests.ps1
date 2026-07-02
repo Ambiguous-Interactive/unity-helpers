@@ -211,6 +211,63 @@ function Remove-CsStringLiteralsAndLineComments([string]$text) {
   return $sb.ToString()
 }
 
+function Get-CsCommentMaskedText([string]$text) {
+  if ([string]::IsNullOrEmpty($text)) { return $text }
+
+  $lines = $text -split "`n", -1
+  $maskedLines = Get-CommentMaskedLines -Lines $lines -Language 'csharp'
+  $commentMasked = [string]::Join("`n", $maskedLines)
+  if ($commentMasked.Length -ne $text.Length) {
+    return $text
+  }
+
+  return $commentMasked
+}
+
+function Test-CodeSpecificLineSuppression {
+  Param(
+    [string]$Line,
+    [string]$CommentMaskedLine,
+    [string]$Code
+  )
+
+  $suppressionPattern = [regex]('//\s*UNH-SUPPRESS\s+' + [regex]::Escape($Code) + '\b')
+  foreach ($match in $suppressionPattern.Matches($Line)) {
+    if ($match.Index -ge $CommentMaskedLine.Length) { continue }
+    $length = [Math]::Min($match.Length, $CommentMaskedLine.Length - $match.Index)
+    $maskedSuppression = $CommentMaskedLine.Substring($match.Index, $length)
+    if ($maskedSuppression -match '^\s+$') { return $true }
+  }
+
+  return $false
+}
+
+function Test-CodeSpecificSuppressionInLineRange {
+  Param(
+    [string[]]$Lines,
+    [string[]]$CommentMaskedLines,
+    [int]$StartLine,
+    [int]$EndLine,
+    [string]$Code
+  )
+
+  for ($lineNumber = $StartLine; $lineNumber -le $EndLine; $lineNumber++) {
+    $lineIndex = $lineNumber - 1
+    if ($lineIndex -lt 0 -or $lineIndex -ge $Lines.Count) { continue }
+    if ($lineIndex -ge $CommentMaskedLines.Count) { continue }
+    if (
+      Test-CodeSpecificLineSuppression `
+        -Line $Lines[$lineIndex] `
+        -CommentMaskedLine $CommentMaskedLines[$lineIndex] `
+        -Code $Code
+    ) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
 $destroyPattern = [regex]'\b(?:UnityEngine\.)?Object\.(?:DestroyImmediate|Destroy)\s*\((?<arg>[^)]*)\)'
 $createAssignObjectPattern = [regex]'(?<var>\b\w+)\s*=\s*new\s+(?<type>GameObject|Texture2D|Material|Mesh|Camera)\s*\('
 $createInlineTrackPattern = [regex]'\bTrack\s*\(\s*new\s+(?:GameObject|Texture2D|Material|Mesh|Camera)\s*\('
@@ -254,6 +311,7 @@ $inlineTestAttributePattern = [regex]'^\s*\[\s*(?:global\s*::\s*)?(?:[A-Za-z_][\
 # misses. Operates on a SCRUBBED line so "[Test]" inside a string literal
 # cannot match.
 $inlineTestAttributeAnywherePattern = [regex]'\[\s*(?:global\s*::\s*)?(?:[A-Za-z_][\w\.]*\.)?(?:Test|TestCase|TestCaseSource|UnityTest)(?:Attribute)?(?:\s*\(|\s*\]|\s*,)'
+$testFileAttributePattern = [regex]'\[\s*(?:global\s*::\s*)?(?:(?:[A-Za-z_]\w*)\s*(?:\.|::)\s*)*(?:Test|TestCase|TestCaseSource|TestFixture|UnityTest)(?:Attribute)?(?:\s*\(|\s*\]|\s*,)'
 
 # UNH005: Assert.IsNull/IsNotNull patterns (should use Assert.IsTrue for Unity null checks)
 $assertIsNullPattern = [regex]'Assert\.IsNull\s*\('
@@ -261,6 +319,9 @@ $assertIsNotNullPattern = [regex]'Assert\.IsNotNull\s*\('
 $testCaseDataReturnsNullPattern = [regex]'(?ms)\.Returns\s*\(\s*null\s*\)'
 $unityTestAttributePattern = [regex]'\[\s*(?:global\s*::\s*)?(?:[A-Za-z_][\w\.]*\.)?UnityTest(?:Attribute)?(?:\s*\(|\s*\])'
 $coroutineMethodPattern = [regex]'\bIEnumerator\s+(?<name>\w+)\s*\('
+$tagsWaitInstructionPattern = [regex]'WaitForSeconds(?:Realtime)?'
+$tagsWaitAliasPattern = [regex]'(?m)^\s*(?:global\s+)?using\s+(?<alias>[A-Za-z_]\w*)\s*=\s*(?:global\s*::\s*)?UnityEngine\s*(?:\.|::)\s*WaitForSeconds(?:Realtime)?\s*;'
+$tagsUnityEngineAliasPattern = [regex]'(?m)^\s*(?:global\s+)?using\s+(?<alias>[A-Za-z_]\w*)\s*=\s*(?:global\s*::\s*)?UnityEngine\s*;'
 
 # Returns true if the relative path matches an allowlisted helper file path.
 function Is-AllowlistedFile([string]$relPath) {
@@ -1032,8 +1093,15 @@ function Get-LineNumberAtIndex {
     return 1
   }
 
-  $prefix = $Text.Substring(0, [Math]::Min($Index, $Text.Length))
-  return (($prefix.ToCharArray() | Where-Object { $_ -eq "`n" }).Count + 1)
+  $lineNumber = 1
+  $limit = [Math]::Min($Index, $Text.Length)
+  for ($i = 0; $i -lt $limit; $i++) {
+    if ($Text[$i] -eq "`n") {
+      $lineNumber++
+    }
+  }
+
+  return $lineNumber
 }
 
 function Get-TestCaseSourceBody {
@@ -1277,6 +1345,11 @@ foreach ($file in $filesToScan) {
   # pipeline conditions, which then fails the `.Count` access under
   # StrictMode. Build the array imperatively and re-wrap to guarantee
   # array semantics for downstream `.Count` / indexing access.
+  $commentMaskedText = Get-CsCommentMaskedText $text
+  $commentMaskedContent = @($commentMaskedText -split "`n")
+  $commentMaskedContent = @($commentMaskedContent)
+  if ($commentMaskedContent.Count -ne $content.Count) { $commentMaskedContent = $content }
+
   $scrubbedText = Remove-CsStringLiteralsAndLineComments $text
   if ($null -eq $scrubbedText) {
     $scrubbedContent = $content
@@ -1631,7 +1704,8 @@ foreach ($file in $filesToScan) {
   # folder or is named *PerformanceTests / *BenchmarkTests) MUST carry the
   # Performance or Stress category, otherwise the fast matrix would run it.
   $looksPerf = ($rel -match '(^|/)Performance/') -or [regex]::IsMatch($scrubbedText, '\bclass\s+\w*(Performance|Benchmark)\w*Tests\b')
-  $isTestFile = [regex]::IsMatch($scrubbedText, '\[\s*Test\b|\[\s*TestFixture\b|\[\s*UnityTest\b')
+  $isTestFile = $testFileAttributePattern.IsMatch($scrubbedText)
+  $isRuntimeTagsTest = ($rel -match '^Tests/Runtime/Tags/')
   if ($looksPerf -and $isTestFile -and -not $perfCategory -and ($text -notmatch 'UNH-SUPPRESS.*UNH008')) {
     $violations += (@{
       Path=$rel; Line=1; Message='UNH008: Performance/benchmark fixture must declare [Category("Performance")] or [Category("Stress")] so the main CI matrix (which runs !Performance;!Stress) excludes it'
@@ -1683,8 +1757,55 @@ foreach ($file in $filesToScan) {
       $scrubbedLine = $scrubbedContent[$lineIndex - 1]
       $waitMatch = [regex]::Match($scrubbedLine, $waitRegex)
       if ($waitMatch.Success) {
+        if ($isRuntimeTagsTest -and $waitMatch.Value -match 'WaitForSeconds') { continue }
         $advisories += (@{
           Path=$rel; Line=$lineIndex; Message="UNH010: real-time wait '$($waitMatch.Value.Trim())' blocks the serial test clock; prefer frame-stepping/deterministic completion/injectable clock (advisory)"
+        })
+      }
+    }
+  }
+
+  # UNH013: Tags runtime tests exercise effect duration, periodic, and
+  # behavior-tick logic that must not depend on Unity's imprecise real-time wait
+  # instructions. Use EffectHandler's deterministic test seams for handler time
+  # math; suppress only when the test is explicitly about Unity lifecycle timing.
+  if ($isRuntimeTagsTest -and -not $perfCategory) {
+    $tagsWaitAliases = @()
+    foreach ($aliasMatch in $tagsWaitAliasPattern.Matches($scrubbedText)) {
+      $tagsWaitAliases += [regex]::Escape($aliasMatch.Groups['alias'].Value)
+    }
+    foreach ($aliasMatch in $tagsUnityEngineAliasPattern.Matches($scrubbedText)) {
+      $tagsWaitAliases += (
+        [regex]::Escape($aliasMatch.Groups['alias'].Value) +
+        '\s*(?:\.|::)\s*WaitForSeconds(?:Realtime)?'
+      )
+    }
+    $tagsWaitPatterns = New-Object System.Collections.Generic.List[regex]
+    $tagsWaitPatterns.Add($tagsWaitInstructionPattern)
+    if ($tagsWaitAliases.Count -gt 0) {
+      $tagsWaitPatterns.Add([regex]('\bnew\s+(?:' + ($tagsWaitAliases -join '|') + ')\s*\('))
+    }
+
+    $reportedTagsWaitMatches = @{}
+    foreach ($tagsWaitPattern in $tagsWaitPatterns) {
+      foreach ($waitMatch in $tagsWaitPattern.Matches($scrubbedText)) {
+        $lineIndex = Get-LineNumberAtIndex -Text $scrubbedText -Index $waitMatch.Index
+        $endLineIndex = Get-LineNumberAtIndex -Text $scrubbedText -Index ($waitMatch.Index + [Math]::Max($waitMatch.Length - 1, 0))
+        $matchKey = "$($waitMatch.Index):$($waitMatch.Length)"
+        if ($reportedTagsWaitMatches.ContainsKey($matchKey)) { continue }
+        $reportedTagsWaitMatches[$matchKey] = $true
+        if (
+          Test-CodeSpecificSuppressionInLineRange `
+            -Lines $content `
+            -CommentMaskedLines $commentMaskedContent `
+            -StartLine $lineIndex `
+            -EndLine $endLineIndex `
+            -Code 'UNH013'
+        ) {
+          continue
+        }
+        $violations += (@{
+          Path=$rel; Line=$lineIndex; Message='UNH013: Tests/Runtime/Tags tests must not use WaitForSeconds/WaitForSecondsRealtime; prefer deterministic handler clock seams or add // UNH-SUPPRESS UNH013 with justification'
         })
       }
     }
