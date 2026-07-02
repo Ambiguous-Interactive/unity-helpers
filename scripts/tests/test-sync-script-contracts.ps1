@@ -1068,6 +1068,8 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $workflowContent = Get-Content -Path $workflowPath -Raw
   $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
   $exporterContent = Get-Content -Path $exporterPath -Raw
+  $dockerRunnerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
+  $dockerRunnerContent = Get-Content -Path $dockerRunnerPath -Raw
 
   $jobTimeoutMatch = [regex]::Match(
     $workflowContent,
@@ -1109,6 +1111,19 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $workflowContent.Contains('unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}') -and
     $workflowContent.Contains('.artifacts/unity/unitypackage-project/unitypackage-output/*.log')
   )
+  $dockerRunnerRedactsAndReturnsSerialLicense = (
+    $dockerRunnerContent.Contains('redact_unity_license_output()') -and
+    $dockerRunnerContent.Contains('[REDACTED-UNITY-SERIAL]') -and
+    $dockerRunnerContent.Contains('[REDACTED-UNITY-EMAIL]') -and
+    $dockerRunnerContent.Contains('printf "%s\n" "${SERIAL_OUTPUT}" | redact_unity_license_output') -and
+    $dockerRunnerContent.Contains('UNITY_COMMAND_PIPE_STATUS=(\"\${PIPESTATUS[@]}\")') -and
+    $dockerRunnerContent.Contains('printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output') -and
+    $dockerRunnerContent.Contains('-username "${UNITY_EMAIL}"') -and
+    $dockerRunnerContent.Contains('-password "${UNITY_PASSWORD}"') -and
+    $dockerRunnerContent.Contains('Successfully returned the entitlement license') -and
+    $dockerRunnerContent.Contains('Serial number unavailable for ULF return') -and
+    $dockerRunnerContent.Contains('exit "${RETURN_EXIT_CODE}"')
+  )
 
   Write-TestResult `
     -TestName 'release unitypackage job timeout covers lock wait and export budget' `
@@ -1124,6 +1139,11 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     -TestName 'release unitypackage job uploads export diagnostics on failure' `
     -Passed $releaseUploadsExportDiagnostics `
     -Message 'Expected release.yml to dump and upload the persisted Unity package export log on failure or cancellation.'
+
+  Write-TestResult `
+    -TestName 'Docker Unity runner redacts and returns serial licenses' `
+    -Passed $dockerRunnerRedactsAndReturnsSerialLicense `
+    -Message 'Expected run-unity-docker.sh to redact Unity serial/email output and return serial licenses with credentials before allowing a successful Docker export.'
 }
 
 function Run-ReleasePrepareWorkflowContractTests {

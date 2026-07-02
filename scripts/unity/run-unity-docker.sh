@@ -143,6 +143,12 @@ require_license_artifact() {
     fi
 }
 
+redact_unity_license_output() {
+    sed -E \
+        -e '"'"'s/[A-Z]{2}-[A-Z0-9X]{4}(-[A-Z0-9X]{4}){4}/[REDACTED-UNITY-SERIAL]/g'"'"' \
+        -e '"'"'s/[[:alnum:]_.%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/[REDACTED-UNITY-EMAIL]/g'"'"'
+}
+
 # ── xvfb setup (if requested) ───────────────────────────────────────────────
 '
 
@@ -176,7 +182,8 @@ ONLINE_OUTPUT=$(unity-editor -batchmode -nographics -quit \
     -username "${UNITY_EMAIL}" \
     -password "${UNITY_PASSWORD}" \
     -logFile /dev/stdout 2>&1) || true
-echo "${ONLINE_OUTPUT}" | tee "${ONLINE_LOG_FILE}"
+printf "%s\n" "${ONLINE_OUTPUT}" > "${ONLINE_LOG_FILE}"
+printf "%s\n" "${ONLINE_OUTPUT}" | redact_unity_license_output
 echo "==> Activation log saved: ${ONLINE_LOG_FILE}"
 
 if echo "${ONLINE_OUTPUT}" | grep -Eqi "No license activation found for this computer|No ULF license found"; then
@@ -201,7 +208,7 @@ if [[ "${ONLINE_CONFIRMED}" -ne 1 ]]; then
             echo "==> Trying .ulf file (in case it was generated for this machine)..."
             printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
             ULF_OUTPUT=$(unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            echo "${ULF_OUTPUT}"
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
             rm -f /tmp/unity.ulf
             if check_license_artifact; then
                 echo "==> .ulf activation succeeded."
@@ -237,14 +244,14 @@ if [[ "${ONLINE_CONFIRMED}" -ne 1 ]]; then
             echo "==> Online activation had a transient failure. Falling back to .ulf file..."
             printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
             ULF_OUTPUT=$(unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            echo "${ULF_OUTPUT}"
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
             rm -f /tmp/unity.ulf
             require_license_artifact
         elif [[ -n "${UNITY_LICENSE:-}" ]]; then
             echo "==> Online activation was not confirmed. Falling back to .ulf file..."
             printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
             ULF_OUTPUT=$(unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            echo "${ULF_OUTPUT}"
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
             rm -f /tmp/unity.ulf
             require_license_artifact
         else
@@ -270,7 +277,7 @@ elif [[ -n "${UNITY_LICENSE:-}" ]]; then
 echo "==> Activating Unity with manual .ulf license..."
 printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
 ULF_OUTPUT=$(unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-echo "${ULF_OUTPUT}"
+printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
 rm -f /tmp/unity.ulf
 require_license_artifact
 echo "==> License activation complete."
@@ -289,7 +296,7 @@ SERIAL_OUTPUT=$(unity-editor -batchmode -nographics -quit \
     -username "${UNITY_EMAIL}" \
     -password "${UNITY_PASSWORD}" \
     -logFile /dev/stdout 2>&1) || true
-echo "${SERIAL_OUTPUT}"
+printf "%s\n" "${SERIAL_OUTPUT}" | redact_unity_license_output
 require_license_artifact
 echo "==> License activation complete."
 '
@@ -305,26 +312,50 @@ fi
 INNER_SCRIPT+="
 echo '==> Running Unity command...'
 EXIT_CODE=0
+UNITY_COMMAND_PIPE_STATUS=()
+set +e
 if [[ \"\${USE_XVFB:-0}\" == \"1\" ]]; then
     xvfb-run --auto-servernum --server-args='-screen 0 640x480x24' \\
-        unity-editor ${ESCAPED_ARGS} || EXIT_CODE=\$?
+        unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
 else
-    unity-editor ${ESCAPED_ARGS} || EXIT_CODE=\$?
+    unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
 fi
+UNITY_COMMAND_PIPE_STATUS=(\"\${PIPESTATUS[@]}\")
+EXIT_CODE=\"\${UNITY_COMMAND_PIPE_STATUS[0]}\"
+set -e
 "
 
 # ── License return (serial only) ────────────────────────────────────────────
 if [[ -n "${UNITY_SERIAL:-}" ]]; then
     INNER_SCRIPT+='
 echo "==> Returning Pro serial license..."
-unity-editor -batchmode -nographics -quit -returnlicense -logFile - || true
-echo "==> License returned."
+RETURN_EXIT_CODE=0
+RETURN_OUTPUT=$(unity-editor -batchmode -nographics -quit \
+    -returnlicense \
+    -username "${UNITY_EMAIL}" \
+    -password "${UNITY_PASSWORD}" \
+    -logFile /dev/stdout 2>&1) || RETURN_EXIT_CODE=$?
+printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
+if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
+    if printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Successfully returned the entitlement license" && \
+        printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Serial number unavailable for ULF return"; then
+        echo "==> Unity returned the entitlement license, then exited with code ${RETURN_EXIT_CODE} while skipping legacy ULF return; treating the seat return as successful."
+        RETURN_EXIT_CODE=0
+    else
+        echo "ERROR: Unity license return failed with exit code ${RETURN_EXIT_CODE}." >&2
+    fi
+else
+    echo "==> License returned."
+fi
 '
 fi
 
 # ── Exit with Unity exit code ───────────────────────────────────────────────
 INNER_SCRIPT+='
 echo "==> Unity command finished with exit code: ${EXIT_CODE}"
+if [[ "${EXIT_CODE}" -eq 0 && "${RETURN_EXIT_CODE:-0}" -ne 0 ]]; then
+    exit "${RETURN_EXIT_CODE}"
+fi
 exit ${EXIT_CODE}
 '
 
