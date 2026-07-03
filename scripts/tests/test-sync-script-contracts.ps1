@@ -1131,6 +1131,15 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     $publishJobBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
     $publishJobBlock.Value.Contains('(HTTP 404|Not Found|"status":"404")')
   )
+  $publishRechecksTagTargetBeforePublish = (
+    $publishJobBlock.Success -and
+    $publishJobBlock.Value.Contains('Verify release tag target before publish') -and
+    $publishJobBlock.Value.Contains('SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}') -and
+    $publishJobBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"') -and
+    $publishJobBlock.Value.Contains('git/tags/${tag_object_sha}') -and
+    $publishJobBlock.Value.Contains('Tag ${TAG} points at ${tag_target}, not selected source ${SOURCE_SHA}.') -and
+    $publishJobBlock.Value.IndexOf('Verify release tag target before publish') -lt $publishJobBlock.Value.IndexOf('Publish npm package')
+  )
 
   Write-TestResult `
     -TestName 'release publish gh commands set repository context' `
@@ -1151,6 +1160,11 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -TestName 'release publish artifact existence checks fail closed' `
     -Passed $publishChecksFailClosed `
     -Message 'Expected publish-time npm and GitHub Release existence checks to continue only after success or recognizable not-found responses.'
+
+  Write-TestResult `
+    -TestName 'release publish rechecks release tag target before publishing' `
+    -Passed $publishRechecksTagTargetBeforePublish `
+    -Message 'Expected publish to fail if the release tag no longer points at the verified source SHA.'
 }
 
 function Run-ReleasePublishTagPreparationContractTests {
@@ -1184,6 +1198,15 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('source_ref="${INPUT_SOURCE_REF}"') -and
     $workflowContent.Contains('Release source ref must be a single line.') -and
     $workflowContent.Contains('printf ''source-ref=%s\n'' "${source_ref}"')
+  )
+
+  $versionOutputIsInjectionSafe = (
+    $workflowContent.Contains('INPUT_VERSION: ${{ inputs.version }}') -and
+    $workflowContent.Contains('tag="${INPUT_VERSION}"') -and
+    $workflowContent.Contains('Release version is required.') -and
+    $workflowContent.Contains('Release version must be a single line.') -and
+    $workflowContent.Contains('echo "tag=${tag}"') -and
+    $workflowContent.IndexOf('Release version must be a single line.') -lt $workflowContent.IndexOf('echo "tag=${tag}"')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
@@ -1312,6 +1335,11 @@ function Run-ReleasePublishTagPreparationContractTests {
     -TestName 'release publish rejects multiline source refs before writing outputs' `
     -Passed $sourceRefOutputIsInjectionSafe `
     -Message 'Expected release.yml to reject multiline source_ref values before writing source-ref to GITHUB_OUTPUT.'
+
+  Write-TestResult `
+    -TestName 'release publish rejects multiline versions before writing outputs' `
+    -Passed $versionOutputIsInjectionSafe `
+    -Message 'Expected release.yml to reject empty or multiline version values before writing tag to GITHUB_OUTPUT.'
 
   Write-TestResult `
     -TestName 'release publish checks existing tag targets before publish' `

@@ -43,9 +43,19 @@ jobs:
       - name: Validate source ref input
         env:
           INPUT_SOURCE_REF: ${{ inputs.source_ref }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          tag="${INPUT_VERSION}"
           source_ref="${INPUT_SOURCE_REF}"
+          if [ -z "${tag}" ]; then
+            echo "::error::Release version is required."
+            exit 1
+          fi
+          if [[ "${tag}" == *$'\n'* || "${tag}" == *$'\r'* ]]; then
+            echo "::error::Release version must be a single line."
+            exit 1
+          fi
           if [ -z "${source_ref}" ]; then
             echo "::error::Release source ref is required."
             exit 1
@@ -82,6 +92,14 @@ jobs:
           source_ref="${INPUT_SOURCE_REF}"
           allow_tag_recovery="${INPUT_ALLOW_TAG_RECOVERY}"
 
+          if [ -z "${tag}" ]; then
+            echo "::error::Release version is required."
+            exit 1
+          fi
+          if [[ "${tag}" == *$'\n'* || "${tag}" == *$'\r'* ]]; then
+            echo "::error::Release version must be a single line."
+            exit 1
+          fi
           if ! printf '%s\n' "${tag}" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
             echo "::error::Release tags must use unprefixed X.Y.Z semver."
             exit 1
@@ -571,6 +589,43 @@ jobs:
 
           echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
           echo "unitypackage-file=${unitypackage_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify release tag target before publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}
+          TAG: ${{ needs.release-ready.outputs.tag }}
+        run: |
+          set -euo pipefail
+          tag_ref_file="${RUNNER_TEMP}/publish-tag-ref.json"
+          tag_ref_error="${RUNNER_TEMP}/publish-tag-ref.err"
+          set +e
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" > "${tag_ref_file}" 2> "${tag_ref_error}"
+          tag_lookup_exit=$?
+          set -e
+          if [ "${tag_lookup_exit}" -ne 0 ]; then
+            tag_lookup_output="$(cat "${tag_ref_error}")"
+            echo "::error::Failed to verify release tag ${TAG} before publish."
+            printf '%s\n' "${tag_lookup_output}"
+            exit "${tag_lookup_exit}"
+          fi
+
+          tag_object_sha="$(jq -r '.object.sha // empty' "${tag_ref_file}")"
+          tag_object_type="$(jq -r '.object.type // empty' "${tag_ref_file}")"
+          if [ "${tag_object_type}" = "tag" ]; then
+            tag_target="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" --jq '.object.sha')"
+          elif [ "${tag_object_type}" = "commit" ]; then
+            tag_target="${tag_object_sha}"
+          else
+            echo "::error::Tag ${TAG} points at unsupported object type '${tag_object_type}'."
+            exit 1
+          fi
+
+          if [ "${tag_target}" != "${SOURCE_SHA}" ]; then
+            echo "::error::Tag ${TAG} points at ${tag_target}, not selected source ${SOURCE_SHA}."
+            exit 1
+          fi
 
       - name: Publish npm package
         env:
