@@ -201,12 +201,62 @@ jobs:
   recover-tag:
     name: Recover release tag
     needs: verify-tag
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_tag_recovery == true && needs.verify-tag.outputs.tag-action != 'none' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_tag_recovery == 'true' && needs.verify-tag.outputs.tag-action != 'none' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
+      - name: Recheck release artifacts before tag recovery
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          npm_published="false"
+          npm_view_file="${RUNNER_TEMP}/release-npm-view.txt"
+          npm_view_error="${RUNNER_TEMP}/release-npm-view.err"
+          set +e
+          npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org" > "${npm_view_file}" 2> "${npm_view_error}"
+          npm_view_exit=$?
+          set -e
+          if [ "${npm_view_exit}" -eq 0 ]; then
+            npm_published="true"
+          else
+            npm_view_output="$(cat "${npm_view_error}")"
+            if ! printf '%s\n' "${npm_view_output}" | grep -E '(E404|404 Not Found|is not in this registry)' >/dev/null; then
+              echo "::error::Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
+              printf '%s\n' "${npm_view_output}"
+              exit "${npm_view_exit}"
+            fi
+          fi
+
+          github_release_exists="false"
+          release_view_file="${RUNNER_TEMP}/release-view.json"
+          release_view_error="${RUNNER_TEMP}/release-view.err"
+          set +e
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > "${release_view_file}" 2> "${release_view_error}"
+          release_lookup_exit=$?
+          set -e
+          if [ "${release_lookup_exit}" -eq 0 ]; then
+            github_release_exists="true"
+          else
+            release_lookup_output="$(cat "${release_view_error}")"
+            if ! printf '%s\n' "${release_lookup_output}" | grep -E '(HTTP 404|Not Found|"status":"404")' >/dev/null; then
+              echo "::error::Failed to verify GitHub Release state for ${TAG}."
+              printf '%s\n' "${release_lookup_output}"
+              exit "${release_lookup_exit}"
+            fi
+          fi
+
+          if [ "${npm_published}" = "true" ] || [ "${github_release_exists}" = "true" ]; then
+            echo "::error::Published artifacts already exist; refusing to create or retarget tag ${TAG}. npm=${npm_published}, github_release=${github_release_exists}."
+            exit 1
+          fi
+
       - name: Create or retarget release tag for manual recovery
         env:
           GH_REPO: ${{ github.repository }}

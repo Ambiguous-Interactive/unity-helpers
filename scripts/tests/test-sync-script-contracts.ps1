@@ -1116,6 +1116,21 @@ function Run-ReleasePublishRecoveryContractTests {
     $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.')
   )
 
+  $recoverTagBlock = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*recover-tag:\s*.*?^\s*release-ready:'
+  )
+  $tagRecoveryRechecksPublishedArtifactsBeforeMutation = (
+    $recoverTagBlock.Success -and
+    $recoverTagBlock.Value.Contains('Recheck release artifacts before tag recovery') -and
+    $recoverTagBlock.Value.Contains('npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org"') -and
+    $recoverTagBlock.Value.Contains('Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}.') -and
+    $recoverTagBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
+    $recoverTagBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
+    $recoverTagBlock.Value.Contains('Published artifacts already exist; refusing to create or retarget tag ${TAG}.') -and
+    $recoverTagBlock.Value.IndexOf('Recheck release artifacts before tag recovery') -lt $recoverTagBlock.Value.IndexOf('Create or retarget release tag for manual recovery')
+  )
+
   $tagRecoveryCreatesAnnotatedTags = (
     $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"') -and
     $workflowContent.Contains('--field message="Release ${TAG}"') -and
@@ -1128,7 +1143,7 @@ function Run-ReleasePublishRecoveryContractTests {
     $workflowContent.Contains("permissions:`n  contents: read") -and
     ($workflowContent -match '(?ms)^\s*verify-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*read\s*\r?\n\s*outputs:') -and
     ($workflowContent -match '(?ms)^\s*recover-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*steps:') -and
-    $workflowContent.Contains('if: ${{ github.event_name == ''workflow_dispatch'' && inputs.allow_tag_recovery == true && needs.verify-tag.outputs.tag-action != ''none'' }}') -and
+    $workflowContent.Contains('if: ${{ github.event_name == ''workflow_dispatch'' && inputs.allow_tag_recovery == ''true'' && needs.verify-tag.outputs.tag-action != ''none'' }}') -and
     ($workflowContent -match '(?ms)^\s*publish:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*id-token:\s*write\s*\r?\n\s*steps:')
   )
 
@@ -1156,6 +1171,11 @@ function Run-ReleasePublishRecoveryContractTests {
     -TestName 'release publish recovery refuses tag movement after npm or GitHub Release publication' `
     -Passed $tagRecoveryRefusesPublishedArtifacts `
     -Message 'Expected tag recovery to query npm and GitHub Release state before creating or retargeting a tag.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery rechecks publication state before tag mutation' `
+    -Passed $tagRecoveryRechecksPublishedArtifactsBeforeMutation `
+    -Message 'Expected recover-tag to re-check npm and GitHub Release state immediately before creating or retargeting a tag.'
 
   Write-TestResult `
     -TestName 'release publish recovery creates annotated recovery tags' `
