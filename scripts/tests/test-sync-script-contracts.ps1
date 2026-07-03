@@ -1031,6 +1031,10 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
   $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
   $workflowContent = Get-Content -Path $workflowPath -Raw
   $repoEnvPattern = 'GH_REPO:\s*\$\{\{\s*github\.repository\s*\}\}'
+  $publishJobBlock = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*publish:\s*.*?\z'
+  )
 
   $publishHasRepo = $workflowContent -match "(?ms)- name: Publish GitHub Release.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyHasRepo = $workflowContent -match "(?ms)- name: Verify GitHub Release assets.*?env:.*?${repoEnvPattern}.*?run:"
@@ -1040,6 +1044,16 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     $workflowContent.Contains('notes_file=".artifacts/release/release-notes.md"') -and
     $workflowContent.Contains('tar -xOf "${package_file}" package/package.json') -and
     $workflowContent.Contains('Npm tarball identity mismatch.')
+  )
+  $publishChecksFailClosed = (
+    $publishJobBlock.Success -and
+    $publishJobBlock.Value.Contains('npm_view_exit=$?') -and
+    $publishJobBlock.Value.Contains('Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}.') -and
+    $publishJobBlock.Value.Contains('(E404|404 Not Found|is not in this registry)') -and
+    $publishJobBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
+    $publishJobBlock.Value.Contains('release_lookup_exit=$?') -and
+    $publishJobBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
+    $publishJobBlock.Value.Contains('(HTTP 404|Not Found|"status":"404")')
   )
 
   Write-TestResult `
@@ -1056,6 +1070,11 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -TestName 'release publish verifies downloaded artifact identity before publish' `
     -Passed $verifyDownloadedArtifactsChecksIdentity `
     -Message 'Expected Verify downloaded artifacts to require non-empty release notes and matching npm tarball package name/version.'
+
+  Write-TestResult `
+    -TestName 'release publish artifact existence checks fail closed' `
+    -Passed $publishChecksFailClosed `
+    -Message 'Expected publish-time npm and GitHub Release existence checks to continue only after success or recognizable not-found responses.'
 }
 
 function Run-ReleasePublishRecoveryContractTests {
@@ -1077,7 +1096,7 @@ function Run-ReleasePublishRecoveryContractTests {
   )
 
   $usesSourceRefForVerification = (
-    $workflowContent.Contains("ref: `${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}") -and
+    $workflowContent.Contains("ref: `${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}") -and
     $workflowContent.Contains('INPUT_SOURCE_REF: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('source_sha="$(git rev-parse HEAD)"') -and
     $workflowContent.Contains('echo "source-ref=${source_ref}"') -and
