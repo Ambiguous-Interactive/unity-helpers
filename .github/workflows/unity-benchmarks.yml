@@ -312,9 +312,11 @@ jobs:
       # PR suite at the REDUCED default sample count (Tests/Runtime/Random/
       # RandomTestBase.cs). This dedicated leg re-runs the Random assembly at the
       # FULL statistical sample count so the thorough bias-detection coverage the
-      # fast default trades away is recovered weekly in CI. editmode-only (the
-      # Random tests are pure C# EditMode); runs inside the org-lock section.
-      # This is the ONLY place UH_RANDOM_SAMPLE_COUNT is consumed.
+      # fast default trades away is recovered weekly in CI. The same lane restores
+      # the historical broad NextNoiseMap sweep; PR CI keeps representative fixed
+      # dimensions only. editmode-only (the Random tests are pure C# EditMode);
+      # runs inside the org-lock section. This is the ONLY place
+      # UH_RANDOM_SAMPLE_COUNT / UH_RANDOM_NOISE_MAP_ITERATIONS are consumed.
       - name: Run Random suite at full sample count
         id: run_random_thorough
         if: ${{ matrix.test-mode == 'editmode' && steps.compute.outputs.is-empty != 'true' }}
@@ -328,6 +330,7 @@ jobs:
           # No perf-category filter: run the Fast-tagged Random tests by assembly.
           UH_UNITY_TEST_CATEGORY: ""
           UH_RANDOM_SAMPLE_COUNT: "12750000"
+          UH_RANDOM_NOISE_MAP_ITERATIONS: "1000"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `

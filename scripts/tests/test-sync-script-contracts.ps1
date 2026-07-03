@@ -1058,6 +1058,107 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -Message 'Expected Verify downloaded artifacts to require non-empty release notes and matching npm tarball package name/version.'
 }
 
+function Run-ReleasePublishRecoveryContractTests {
+  Write-Host ""
+  Write-Host "Release publish recovery contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+
+  $hasManualRecoveryInputs = (
+    $workflowContent.Contains('workflow_dispatch:') -and
+    $workflowContent.Contains('version:') -and
+    $workflowContent.Contains('source_ref:') -and
+    $workflowContent.Contains('allow_tag_recovery:') -and
+    $workflowContent.Contains('Release version/tag to publish, as strict X.Y.Z semver.') -and
+    $workflowContent.Contains('Create or retarget the tag only if npm and GitHub Release are both still unpublished.')
+  )
+
+  $usesSourceRefForVerification = (
+    $workflowContent.Contains("ref: `${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}") -and
+    $workflowContent.Contains('INPUT_SOURCE_REF: ${{ inputs.source_ref }}') -and
+    $workflowContent.Contains('source_sha="$(git rev-parse HEAD)"') -and
+    $workflowContent.Contains('echo "source-ref=${source_sha}"')
+  )
+
+  $downstreamJobsCheckoutVerifiedSha = (
+    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.verify-tag.outputs.source-ref }}')).Count -ge 2) -and
+    $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}')
+  )
+
+  $tagRecoveryChecksExistingTagTarget = (
+    $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"') -and
+    $workflowContent.Contains('tag_object_type="$(jq -r ''.object.type // empty'' "${tag_ref_file}")"') -and
+    $workflowContent.Contains('tag_target="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" --jq ''.object.sha'')"') -and
+    $workflowContent.Contains('[ "${tag_target}" != "${source_sha}" ]') -and
+    $workflowContent.Contains('Tag ${tag} already points at ${tag_target}, not selected source ${source_sha}.')
+  )
+
+  $tagRecoveryRequiresExplicitOptIn = (
+    $workflowContent.Contains('[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${allow_tag_recovery}" != "true" ]') -and
+    $workflowContent.Contains('tag_action="retarget"') -and
+    $workflowContent.Contains('tag_action="create"')
+  )
+
+  $tagRecoveryRefusesPublishedArtifacts = (
+    $workflowContent.Contains('npm view "${package_name}@${package_version}" version --registry "https://registry.npmjs.org"') -and
+    $workflowContent.Contains('gh release view "${tag}"') -and
+    $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.')
+  )
+
+  $tagRecoveryCreatesAnnotatedTags = (
+    $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"') -and
+    $workflowContent.Contains('--field message="Release ${TAG}"') -and
+    $workflowContent.Contains('--field object="${SOURCE_SHA}"') -and
+    $workflowContent.Contains('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}"') -and
+    $workflowContent.Contains('--field force=true')
+  )
+
+  $hasWritePermissionOnlyWhereNeeded = (
+    $workflowContent.Contains("permissions:`n  contents: read") -and
+    $workflowContent.Contains("verify-tag:`n    name: Verify release tag") -and
+    $workflowContent.Contains("permissions:`n      contents: write") -and
+    $workflowContent.Contains("publish:`n    name: Publish npm and GitHub Release")
+  )
+
+  Write-TestResult `
+    -TestName 'release publish exposes manual version/source recovery inputs' `
+    -Passed $hasManualRecoveryInputs `
+    -Message 'Expected release.yml workflow_dispatch inputs for version, source_ref, and allow_tag_recovery.'
+
+  Write-TestResult `
+    -TestName 'release publish verifies selected source ref and freezes downstream checkouts to its SHA' `
+    -Passed ($usesSourceRefForVerification -and $downstreamJobsCheckoutVerifiedSha) `
+    -Message 'Expected verify-tag to checkout the selected source ref, output its resolved SHA, and downstream jobs to checkout that SHA.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery checks existing tag targets before publish' `
+    -Passed $tagRecoveryChecksExistingTagTarget `
+    -Message 'Expected release.yml to compare existing tag targets with the selected source SHA before continuing.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery requires explicit opt-in before creating or retargeting tags' `
+    -Passed $tagRecoveryRequiresExplicitOptIn `
+    -Message 'Expected tag creation/retargeting only for workflow_dispatch with allow_tag_recovery=true.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery refuses tag movement after npm or GitHub Release publication' `
+    -Passed $tagRecoveryRefusesPublishedArtifacts `
+    -Message 'Expected tag recovery to query npm and GitHub Release state before creating or retargeting a tag.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery creates annotated recovery tags' `
+    -Passed $tagRecoveryCreatesAnnotatedTags `
+    -Message 'Expected release.yml to create annotated release tags and force-update only through the guarded recovery path.'
+
+  Write-TestResult `
+    -TestName 'release publish keeps default permissions read-only while recovery verifier can write refs' `
+    -Passed $hasWritePermissionOnlyWhereNeeded `
+    -Message 'Expected workflow-level contents: read plus verify-tag contents: write and publish contents: write.'
+}
+
 function Run-ReleasePublishWorkflowBudgetContractTests {
   Write-Host ""
   Write-Host "Release publish workflow budget contracts:" -ForegroundColor Magenta
@@ -1578,6 +1679,7 @@ Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
+Run-ReleasePublishRecoveryContractTests
 Run-ReleasePublishWorkflowBudgetContractTests
 Run-ReleasePrepareWorkflowContractTests
 Run-ReleaseTagWorkflowContractTests
