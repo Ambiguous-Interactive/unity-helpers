@@ -53,6 +53,11 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
       - name: Verify tag matches package metadata
         id: verify
         env:
@@ -207,6 +212,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
       - name: Recheck release artifacts before tag recovery
         env:
           GH_REPO: ${{ github.repository }}

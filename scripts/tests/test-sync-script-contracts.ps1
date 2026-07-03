@@ -1116,10 +1116,26 @@ function Run-ReleasePublishRecoveryContractTests {
     $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.')
   )
 
+  $verifyTagBlock = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*verify-tag:\s*.*?^\s*recover-tag:'
+  )
   $recoverTagBlock = [regex]::Match(
     $workflowContent,
     '(?ms)^\s*recover-tag:\s*.*?^\s*release-ready:'
   )
+
+  $tagRecoverySetsUpNodeForNpmChecks = (
+    $verifyTagBlock.Success -and
+    $recoverTagBlock.Success -and
+    $verifyTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
+    $verifyTagBlock.Value.Contains('node-version: "22.18.0"') -and
+    $verifyTagBlock.Value.IndexOf('Setup Node.js') -lt $verifyTagBlock.Value.IndexOf('Verify tag matches package metadata') -and
+    $recoverTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
+    $recoverTagBlock.Value.Contains('node-version: "22.18.0"') -and
+    $recoverTagBlock.Value.IndexOf('Setup Node.js') -lt $recoverTagBlock.Value.IndexOf('Recheck release artifacts before tag recovery')
+  )
+
   $tagRecoveryRechecksPublishedArtifactsBeforeMutation = (
     $recoverTagBlock.Success -and
     $recoverTagBlock.Value.Contains('Recheck release artifacts before tag recovery') -and
@@ -1171,6 +1187,11 @@ function Run-ReleasePublishRecoveryContractTests {
     -TestName 'release publish recovery refuses tag movement after npm or GitHub Release publication' `
     -Passed $tagRecoveryRefusesPublishedArtifacts `
     -Message 'Expected tag recovery to query npm and GitHub Release state before creating or retargeting a tag.'
+
+  Write-TestResult `
+    -TestName 'release publish recovery sets up Node before npm publication checks' `
+    -Passed $tagRecoverySetsUpNodeForNpmChecks `
+    -Message 'Expected verify-tag and recover-tag to set up pinned Node before running npm view publication checks.'
 
   Write-TestResult `
     -TestName 'release publish recovery rechecks publication state before tag mutation' `
