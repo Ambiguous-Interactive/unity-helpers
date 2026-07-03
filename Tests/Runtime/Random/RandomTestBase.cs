@@ -41,9 +41,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         // times across ~21 PRNG subclasses (~half a billion iterations at the
         // historical count). The fast default keeps the MAIN suite quick while
         // staying statistically valid (see the sqrt deviation floor in
-        // TestAndVerify); the perf/stress CI job exports UH_RANDOM_SAMPLE_COUNT =
-        // ThoroughSampleCount to restore the original, tighter bias-detection
-        // sensitivity. Override the env var for a thorough local run.
+        // TestAndVerify); the weekly benchmark Random lane exports the sample
+        // count and noise-map iteration env vars to restore the original,
+        // broader coverage. Override the env vars for a thorough local run.
         private const int DefaultFastSampleCount = 250_000;
         private const int ThoroughSampleCount = 12_750_000;
         private static readonly int SampleCount = ResolvePositiveIntEnvironmentVariable(
