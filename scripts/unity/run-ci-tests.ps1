@@ -126,6 +126,11 @@ function Write-CiNotice {
     Write-Host "::notice::$Message"
 }
 
+function Write-CiWarning {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-Host "::warning::$Message"
+}
+
 # SINGLE SOURCE OF TRUTH for the catastrophic-pattern list that both
 # Write-UnityCatastrophicErrorAnnotations (new ::error:: annotation surface)
 # AND Write-UnityResultFailureDiagnostics (older line-numbered selected-line

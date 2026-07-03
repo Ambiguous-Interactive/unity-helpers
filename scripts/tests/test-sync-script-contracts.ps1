@@ -362,6 +362,63 @@ function Run-PowerShellPathBindingContractTests {
   }
 }
 
+function Run-UnityCiScriptContractTests {
+  Write-Host ""
+  Write-Host "Unity CI script contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $runnerPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
+
+  if (-not (Test-Path $runnerPath)) {
+    Write-TestResult `
+      -TestName 'run-ci-tests.ps1 exists for Unity CI script contracts' `
+      -Passed $false `
+      -Message "Missing file: $runnerPath"
+    return
+  }
+
+  $tokens = $null
+  $errors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseFile($runnerPath, [ref]$tokens, [ref]$errors)
+  if ($errors -and $errors.Count -gt 0) {
+    $parseErrors = @($errors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" })
+    Write-TestResult `
+      -TestName 'run-ci-tests.ps1 parses for Unity CI script contracts' `
+      -Passed $false `
+      -Message "Parse errors: $($parseErrors -join '; ')"
+    return
+  }
+
+  $definedFunctionNames = @(
+    $ast.FindAll(
+      {
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
+      },
+      $true
+    ) | ForEach-Object { $_.Name }
+  )
+  $ciCommandNames = @(
+    $ast.FindAll(
+      {
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst]
+      },
+      $true
+    ) |
+      ForEach-Object { $_.GetCommandName() } |
+      Where-Object { $_ -match '^Write-Ci[A-Za-z0-9_]*$' } |
+      Sort-Object -Unique
+  )
+  $missingDefinitions = @($ciCommandNames | Where-Object { $_ -notin $definedFunctionNames })
+
+  Write-TestResult `
+    -TestName 'run-ci-tests.ps1 defines every Write-Ci* helper it calls' `
+    -Passed ($missingDefinitions.Count -eq 0) `
+    -Message "Missing helper definitions: $($missingDefinitions -join ', ')"
+}
+
 function Run-HookInstallContractTests {
   Write-Host ""
   Write-Host "Hook install contracts:" -ForegroundColor Magenta
@@ -1724,6 +1781,7 @@ Run-SyncScriptContractTests
 Run-CspellContractTests
 Run-AgentValidationContractTests
 Run-PowerShellPathBindingContractTests
+Run-UnityCiScriptContractTests
 Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
 Run-PrePushLastResortGuidanceContractTests
