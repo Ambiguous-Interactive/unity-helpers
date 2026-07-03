@@ -1105,7 +1105,13 @@ function Run-ReleasePublishRecoveryContractTests {
 
   $tagRecoveryRefusesPublishedArtifacts = (
     $workflowContent.Contains('npm view "${package_name}@${package_version}" version --registry "https://registry.npmjs.org"') -and
-    $workflowContent.Contains('gh release view "${tag}"') -and
+    $workflowContent.Contains('npm_view_exit=$?') -and
+    $workflowContent.Contains('(E404|404 Not Found|is not in this registry)') -and
+    $workflowContent.Contains('Failed to verify npm publication state for ${package_name}@${package_version}.') -and
+    $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}"') -and
+    $workflowContent.Contains('release_lookup_exit=$?') -and
+    $workflowContent.Contains('(HTTP 404|Not Found|"status":"404")') -and
+    $workflowContent.Contains('Failed to verify GitHub Release state for ${tag}.') -and
     $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.')
   )
 
