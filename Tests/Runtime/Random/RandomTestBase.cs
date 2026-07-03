@@ -889,14 +889,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             IRandom random
         )
         {
-            for (int i = 0; i < NoiseMapIterationCount; ++i)
+            if (NoiseMapIterationCount == FastNoiseMapDimensions.Length)
             {
-                if (i < FastNoiseMapDimensions.Length)
+                foreach ((int width, int height) in FastNoiseMapDimensions)
                 {
-                    yield return FastNoiseMapDimensions[i];
-                    continue;
+                    yield return (width, height);
                 }
 
+                yield break;
+            }
+
+            for (int i = 0; i < NoiseMapIterationCount; ++i)
+            {
                 yield return (
                     random.Next(1, NoiseMapExclusiveMaxDimension),
                     random.Next(1, NoiseMapExclusiveMaxDimension)
