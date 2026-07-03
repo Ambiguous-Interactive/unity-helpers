@@ -165,7 +165,7 @@ jobs:
             fi
           else
             tag_lookup_output="$(cat "${tag_ref_error}")"
-            if ! printf '%s\n' "${tag_lookup_output}" | grep -E '(HTTP 404|Not Found)' >/dev/null; then
+            if ! printf '%s\n' "${tag_lookup_output}" | grep -E '(HTTP 404|Not Found|"status":"404")' >/dev/null; then
               echo "::error::Failed to check whether tag ${tag} exists."
               printf '%s\n' "${tag_lookup_output}"
               exit "${tag_lookup_exit}"

@@ -1266,6 +1266,12 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent,
     '(?ms)^\s*publish:\s*.*?\z'
   )
+  $missingTagLookupAcceptsJson404 = (
+    $verifyTagBlock.Success -and
+    $verifyTagBlock.Value.Contains('tag_lookup_output="$(cat "${tag_ref_error}")"') -and
+    $verifyTagBlock.Value.Contains('(HTTP 404|Not Found|"status":"404")') -and
+    $verifyTagBlock.Value.Contains('tag_action="create"')
+  )
 
   $tagPreparationRunsAfterArtifactJobs = (
     $prepareTagBlock.Success -and
@@ -1350,6 +1356,11 @@ function Run-ReleasePublishTagPreparationContractTests {
     -TestName 'release publish creates missing tags as the normal manual path' `
     -Passed $missingTagCreationIsNormalPath `
     -Message 'Expected missing release tags to be created by Release Publish without the retired Release Tag workflow.'
+
+  Write-TestResult `
+    -TestName 'release publish missing tag lookup accepts GitHub JSON 404s' `
+    -Passed $missingTagLookupAcceptsJson404 `
+    -Message 'Expected missing release tag detection to accept the JSON 404 shape returned by gh api.'
 
   Write-TestResult `
     -TestName 'release publish requires explicit opt-in before retargeting tags' `
