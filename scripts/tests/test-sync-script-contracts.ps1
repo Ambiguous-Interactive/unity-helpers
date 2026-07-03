@@ -953,7 +953,6 @@ function Run-ReleaseWorkflowChangelogContractTests {
 
   $repoRoot = Get-RepoRoot
   $workflowPaths = @(
-    Join-Path $repoRoot '.github/workflows/release-tag.yml'
     Join-Path $repoRoot '.github/workflows/release.yml'
   )
   $publishWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
@@ -978,12 +977,12 @@ function Run-ReleaseWorkflowChangelogContractTests {
   }
 
   Write-TestResult `
-    -TestName 'release tag/publish workflows validate changelog release-note content' `
+    -TestName 'release publish workflow validates changelog release-note content' `
     -Passed ($missingSectionHelper.Count -eq 0) `
     -Message "Missing Get-ChangelogSection usage: $($missingSectionHelper -join '; ')"
 
   Write-TestResult `
-    -TestName 'release tag/publish workflows avoid raw changelog heading grep' `
+    -TestName 'release publish workflow avoids raw changelog heading grep' `
     -Passed ($rawHeadingGrep.Count -eq 0) `
     -Message "Raw heading grep found in: $($rawHeadingGrep -join '; ')"
 
@@ -1007,19 +1006,39 @@ function Run-ReleaseWorkflowChangelogContractTests {
     $rejectedReleaseTags | Where-Object { $_ -match $strictReleaseTagRegex }
   ).Count -eq 0
 
-  $publishTriggerDelegatesStrictnessToVerifier = (
-    $publishWorkflowContent.Contains('- "[0-9]*.[0-9]*.[0-9]*"') -and
-    -not $publishWorkflowContent.Contains('- "[0-9]+.[0-9]+.[0-9]+"') -and
+  $publishVerifierKeepsStrictSemver = (
     $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.') -and
     $verifierHasStrictReleaseTagRegex -and
     $strictRegexAcceptsExpectedTags -and
     $strictRegexRejectsExpectedTags
   )
+  $workflowLines = @($publishWorkflowContent -split "`r?`n")
+  $onBlockLines = @()
+  $insideOnBlock = $false
+  foreach ($line in $workflowLines) {
+    if ($line -ceq 'on:') {
+      $insideOnBlock = $true
+      continue
+    }
+    if ($insideOnBlock -and $line -match '^\S') {
+      break
+    }
+    if ($insideOnBlock) {
+      $onBlockLines += $line
+    }
+  }
+  $hasPushTrigger = @($onBlockLines | Where-Object { $_ -match '^\s+push\s*:' }).Count -gt 0
+  $hasWorkflowDispatchTrigger = @($onBlockLines | Where-Object { $_ -match '^\s+workflow_dispatch\s*:' }).Count -gt 0
 
   Write-TestResult `
-    -TestName 'release publish workflow uses unambiguous tag glob before strict verification' `
-    -Passed $publishTriggerDelegatesStrictnessToVerifier `
-    -Message 'Expected release.yml tag filter to use an unambiguous digit-start glob while verify-tag enforces exact no-leading-zero semver.'
+    -TestName 'release publish workflow is manual-only' `
+    -Passed ((-not $hasPushTrigger) -and $hasWorkflowDispatchTrigger) `
+    -Message 'Expected release.yml to expose workflow_dispatch without an automatic push/tag trigger.'
+
+  Write-TestResult `
+    -TestName 'release publish workflow verifies strict release semver' `
+    -Passed $publishVerifierKeepsStrictSemver `
+    -Message 'Expected release.yml verify-tag to enforce exact no-leading-zero semver.'
 }
 
 function Run-ReleaseWorkflowGitHubCliContractTests {
@@ -1077,26 +1096,26 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     -Message 'Expected publish-time npm and GitHub Release existence checks to continue only after success or recognizable not-found responses.'
 }
 
-function Run-ReleasePublishRecoveryContractTests {
+function Run-ReleasePublishTagPreparationContractTests {
   Write-Host ""
-  Write-Host "Release publish recovery contracts:" -ForegroundColor Magenta
+  Write-Host "Release publish tag-preparation contracts:" -ForegroundColor Magenta
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
   $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
   $workflowContent = Get-Content -Path $workflowPath -Raw
 
-  $hasManualRecoveryInputs = (
+  $hasManualReleaseInputs = (
     $workflowContent.Contains('workflow_dispatch:') -and
     $workflowContent.Contains('version:') -and
     $workflowContent.Contains('source_ref:') -and
     $workflowContent.Contains('allow_tag_recovery:') -and
-    $workflowContent.Contains('Release version/tag to publish, as strict X.Y.Z semver.') -and
-    $workflowContent.Contains('Create or retarget the tag only if npm and GitHub Release are both still unpublished.')
+    $workflowContent.Contains('Release version to publish, as strict X.Y.Z semver.') -and
+    $workflowContent.Contains('Retarget an existing tag only if npm and GitHub Release are both still unpublished.')
   )
 
   $usesSourceRefForVerification = (
-    $workflowContent.Contains("ref: `${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}") -and
+    $workflowContent.Contains('ref: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('INPUT_SOURCE_REF: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('source_sha="$(git rev-parse HEAD)"') -and
     $workflowContent.Contains('echo "source-ref=${source_ref}"') -and
@@ -1106,85 +1125,118 @@ function Run-ReleasePublishRecoveryContractTests {
   $downstreamJobsCheckoutVerifiedSha = (
     ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.release-ready.outputs.source-sha }}')).Count -ge 2) -and
     $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}') -and
-    $workflowContent.Contains('source-sha: ${{ needs.verify-tag.outputs.source-sha }}')
+    $workflowContent.Contains('source-sha: ${{ needs.verify-tag.outputs.source-sha }}') -and
+    $workflowContent.Contains('tag-action: ${{ needs.verify-tag.outputs.tag-action }}')
   )
 
-  $tagRecoveryChecksExistingTagTarget = (
+  $tagPreparationChecksExistingTagTarget = (
     $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"') -and
     $workflowContent.Contains('tag_object_type="$(jq -r ''.object.type // empty'' "${tag_ref_file}")"') -and
     $workflowContent.Contains('tag_target="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" --jq ''.object.sha'')"') -and
     $workflowContent.Contains('[ "${tag_target}" != "${source_sha}" ]') -and
-    $workflowContent.Contains('Tag ${tag} already points at ${tag_target}, not selected source ${source_sha}.')
+    $workflowContent.Contains('Tag ${tag} already points at ${tag_target}, not selected source ${source_sha}.') -and
+    $workflowContent.Contains('Re-run with allow_tag_recovery=true only after confirming npm and GitHub Release are unpublished.')
   )
 
-  $tagRecoveryRequiresExplicitOptIn = (
-    $workflowContent.Contains('[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${allow_tag_recovery}" != "true" ]') -and
+  $missingTagCreationIsNormalPath = (
+    $workflowContent.Contains('Tag ${tag} does not exist and will be created after package validation and .unitypackage export succeed.') -and
+    $workflowContent.Contains('tag_action="create"') -and
+    -not $workflowContent.Contains('Tag ${tag} does not exist. Use Release Tag')
+  )
+
+  $tagRetargetRequiresExplicitOptIn = (
+    $workflowContent.Contains('[ "${allow_tag_recovery}" != "true" ]') -and
     $workflowContent.Contains('tag_action="retarget"') -and
-    $workflowContent.Contains('tag_action="create"')
+    $workflowContent.Contains('allow_tag_recovery=true only after confirming npm and GitHub Release are unpublished')
   )
 
-  $tagRecoveryRefusesPublishedArtifacts = (
+  $tagPreparationRefusesPublishedArtifacts = (
     $workflowContent.Contains('npm view "${package_name}@${package_version}" version --registry "https://registry.npmjs.org"') -and
+    $workflowContent.Contains('npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org"') -and
     $workflowContent.Contains('npm_view_exit=$?') -and
     $workflowContent.Contains('(E404|404 Not Found|is not in this registry)') -and
     $workflowContent.Contains('Failed to verify npm publication state for ${package_name}@${package_version}.') -and
+    $workflowContent.Contains('Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}.') -and
     $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}"') -and
+    $workflowContent.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
     $workflowContent.Contains('release_lookup_exit=$?') -and
     $workflowContent.Contains('(HTTP 404|Not Found|"status":"404")') -and
     $workflowContent.Contains('Failed to verify GitHub Release state for ${tag}.') -and
-    $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.')
+    $workflowContent.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
+    $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${tag}.') -and
+    $workflowContent.Contains('Published artifacts already exist; refusing to create or retarget tag ${TAG}.')
   )
 
   $verifyTagBlock = [regex]::Match(
     $workflowContent,
-    '(?ms)^\s*verify-tag:\s*.*?^\s*recover-tag:'
+    '(?ms)^\s*verify-tag:\s*.*?^\s*release-ready:'
   )
-  $recoverTagBlock = [regex]::Match(
+  $prepareTagBlock = [regex]::Match(
     $workflowContent,
-    '(?ms)^\s*recover-tag:\s*.*?^\s*release-ready:'
+    '(?ms)^\s*prepare-tag:\s*.*?^\s*publish:'
+  )
+  $publishBlock = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*publish:\s*.*?\z'
   )
 
-  $tagRecoverySetsUpNodeForNpmChecks = (
+  $tagPreparationRunsAfterArtifactJobs = (
+    $prepareTagBlock.Success -and
+    $prepareTagBlock.Value.Contains('name: Prepare release tag') -and
+    $prepareTagBlock.Value.Contains('needs:') -and
+    $prepareTagBlock.Value.Contains('      - release-ready') -and
+    $prepareTagBlock.Value.Contains('      - validate-package') -and
+    $prepareTagBlock.Value.Contains('      - unitypackage') -and
+    $prepareTagBlock.Value.Contains('if: ${{ needs.release-ready.outputs.tag-action != ''none'' }}')
+  )
+
+  $tagPreparationSetsUpNodeForNpmChecks = (
     $verifyTagBlock.Success -and
-    $recoverTagBlock.Success -and
+    $prepareTagBlock.Success -and
     $verifyTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
     $verifyTagBlock.Value.Contains('node-version: "22.18.0"') -and
     $verifyTagBlock.Value.IndexOf('Setup Node.js') -lt $verifyTagBlock.Value.IndexOf('Verify tag matches package metadata') -and
-    $recoverTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
-    $recoverTagBlock.Value.Contains('node-version: "22.18.0"') -and
-    $recoverTagBlock.Value.IndexOf('Setup Node.js') -lt $recoverTagBlock.Value.IndexOf('Recheck release artifacts before tag recovery')
+    $prepareTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
+    $prepareTagBlock.Value.Contains('node-version: "22.18.0"') -and
+    $prepareTagBlock.Value.IndexOf('Setup Node.js') -lt $prepareTagBlock.Value.IndexOf('Recheck release artifacts before tag mutation')
   )
 
-  $tagRecoveryRechecksPublishedArtifactsBeforeMutation = (
-    $recoverTagBlock.Success -and
-    $recoverTagBlock.Value.Contains('Recheck release artifacts before tag recovery') -and
-    $recoverTagBlock.Value.Contains('npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org"') -and
-    $recoverTagBlock.Value.Contains('Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}.') -and
-    $recoverTagBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
-    $recoverTagBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
-    $recoverTagBlock.Value.Contains('Published artifacts already exist; refusing to create or retarget tag ${TAG}.') -and
-    $recoverTagBlock.Value.IndexOf('Recheck release artifacts before tag recovery') -lt $recoverTagBlock.Value.IndexOf('Create or retarget release tag for manual recovery')
+  $tagPreparationRechecksPublishedArtifactsBeforeMutation = (
+    $prepareTagBlock.Success -and
+    $prepareTagBlock.Value.Contains('Recheck release artifacts before tag mutation') -and
+    $prepareTagBlock.Value.Contains('npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org"') -and
+    $prepareTagBlock.Value.Contains('Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}.') -and
+    $prepareTagBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
+    $prepareTagBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
+    $prepareTagBlock.Value.Contains('Published artifacts already exist; refusing to create or retarget tag ${TAG}.') -and
+    $prepareTagBlock.Value.IndexOf('Recheck release artifacts before tag mutation') -lt $prepareTagBlock.Value.IndexOf('Create or retarget release tag')
   )
 
-  $tagRecoveryCreatesAnnotatedTags = (
+  $tagPreparationCreatesAnnotatedTags = (
     $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"') -and
     $workflowContent.Contains('--field message="Release ${TAG}"') -and
     $workflowContent.Contains('--field object="${SOURCE_SHA}"') -and
+    $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs"') -and
     $workflowContent.Contains('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}"') -and
     $workflowContent.Contains('--field force=true')
+  )
+
+  $publishWaitsForPreparedTag = (
+    $publishBlock.Success -and
+    $publishBlock.Value.Contains('      - prepare-tag') -and
+    $publishBlock.Value.Contains("needs.release-ready.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success'")
   )
 
   $hasWritePermissionOnlyWhereNeeded = (
     ($workflowContent -match '(?m)^permissions:\r?\n  contents: read\r?$') -and
     ($workflowContent -match '(?ms)^\s*verify-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*read\s*\r?\n\s*outputs:') -and
-    ($workflowContent -match '(?ms)^\s*recover-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*steps:') -and
-    $workflowContent.Contains('if: ${{ github.event_name == ''workflow_dispatch'' && inputs.allow_tag_recovery && needs.verify-tag.outputs.tag-action != ''none'' }}') -and
+    ($workflowContent -match '(?ms)^\s*prepare-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*steps:') -and
     ($workflowContent -match '(?ms)^\s*publish:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*id-token:\s*write\s*\r?\n\s*steps:')
   )
 
   Write-TestResult `
-    -TestName 'release publish exposes manual version/source recovery inputs' `
-    -Passed $hasManualRecoveryInputs `
+    -TestName 'release publish exposes manual version/source/tag recovery inputs' `
+    -Passed $hasManualReleaseInputs `
     -Message 'Expected release.yml workflow_dispatch inputs for version, source_ref, and allow_tag_recovery.'
 
   Write-TestResult `
@@ -1193,39 +1245,54 @@ function Run-ReleasePublishRecoveryContractTests {
     -Message 'Expected verify-tag to checkout the selected source ref, output its resolved SHA, and downstream jobs to checkout that SHA.'
 
   Write-TestResult `
-    -TestName 'release publish recovery checks existing tag targets before publish' `
-    -Passed $tagRecoveryChecksExistingTagTarget `
+    -TestName 'release publish checks existing tag targets before publish' `
+    -Passed $tagPreparationChecksExistingTagTarget `
     -Message 'Expected release.yml to compare existing tag targets with the selected source SHA before continuing.'
 
   Write-TestResult `
-    -TestName 'release publish recovery requires explicit opt-in before creating or retargeting tags' `
-    -Passed $tagRecoveryRequiresExplicitOptIn `
-    -Message 'Expected tag creation/retargeting only for workflow_dispatch with allow_tag_recovery=true.'
+    -TestName 'release publish creates missing tags as the normal manual path' `
+    -Passed $missingTagCreationIsNormalPath `
+    -Message 'Expected missing release tags to be created by Release Publish without the retired Release Tag workflow.'
 
   Write-TestResult `
-    -TestName 'release publish recovery refuses tag movement after npm or GitHub Release publication' `
-    -Passed $tagRecoveryRefusesPublishedArtifacts `
-    -Message 'Expected tag recovery to query npm and GitHub Release state before creating or retargeting a tag.'
+    -TestName 'release publish requires explicit opt-in before retargeting tags' `
+    -Passed $tagRetargetRequiresExplicitOptIn `
+    -Message 'Expected existing mismatched release tags to require allow_tag_recovery=true before retargeting.'
 
   Write-TestResult `
-    -TestName 'release publish recovery sets up Node before npm publication checks' `
-    -Passed $tagRecoverySetsUpNodeForNpmChecks `
-    -Message 'Expected verify-tag and recover-tag to set up pinned Node before running npm view publication checks.'
+    -TestName 'release publish refuses tag mutation after npm or GitHub Release publication' `
+    -Passed $tagPreparationRefusesPublishedArtifacts `
+    -Message 'Expected tag preparation to query npm and GitHub Release state before creating or retargeting a tag.'
 
   Write-TestResult `
-    -TestName 'release publish recovery rechecks publication state before tag mutation' `
-    -Passed $tagRecoveryRechecksPublishedArtifactsBeforeMutation `
-    -Message 'Expected recover-tag to re-check npm and GitHub Release state immediately before creating or retargeting a tag.'
+    -TestName 'release publish prepares tags only after package and unitypackage artifacts' `
+    -Passed $tagPreparationRunsAfterArtifactJobs `
+    -Message 'Expected prepare-tag to need validate-package and unitypackage so failed artifact production cannot create a release tag.'
 
   Write-TestResult `
-    -TestName 'release publish recovery creates annotated recovery tags' `
-    -Passed $tagRecoveryCreatesAnnotatedTags `
-    -Message 'Expected release.yml to create annotated release tags and force-update only through the guarded recovery path.'
+    -TestName 'release publish tag preparation sets up Node before npm publication checks' `
+    -Passed $tagPreparationSetsUpNodeForNpmChecks `
+    -Message 'Expected verify-tag and prepare-tag to set up pinned Node before running npm view publication checks.'
 
   Write-TestResult `
-    -TestName 'release publish keeps default verification permissions read-only while recovery can write refs' `
+    -TestName 'release publish tag preparation rechecks publication state before mutation' `
+    -Passed $tagPreparationRechecksPublishedArtifactsBeforeMutation `
+    -Message 'Expected prepare-tag to re-check npm and GitHub Release state immediately before creating or retargeting a tag.'
+
+  Write-TestResult `
+    -TestName 'release publish tag preparation creates annotated tags' `
+    -Passed $tagPreparationCreatesAnnotatedTags `
+    -Message 'Expected release.yml to create annotated release tags and force-update only through the guarded retarget path.'
+
+  Write-TestResult `
+    -TestName 'release publish waits for prepared tag before publishing' `
+    -Passed $publishWaitsForPreparedTag `
+    -Message 'Expected publish to wait for prepare-tag when tag_action is create or retarget.'
+
+  Write-TestResult `
+    -TestName 'release publish keeps verification permissions read-only while tag preparation can write refs' `
     -Passed $hasWritePermissionOnlyWhereNeeded `
-    -Message 'Expected workflow-level contents: read, verify-tag contents: read, guarded recover-tag contents: write, and publish contents: write.'
+    -Message 'Expected workflow-level contents: read, verify-tag contents: read, prepare-tag contents: write, and publish contents: write.'
 }
 
 function Run-ReleasePublishWorkflowBudgetContractTests {
@@ -1361,6 +1428,11 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not $workflowContent.Contains('$arguments = @(') -and
     -not $workflowContent.Contains('@arguments')
   )
+  $prBodyUsesManualPublishWorkflow = (
+    $workflowContent.Contains('Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`.') -and
+    $workflowContent.Contains('creates the release tag if needed') -and
+    -not $workflowContent.Contains('The Release Tag workflow pushes tag')
+  )
 
   Write-TestResult `
     -TestName 'release prepare checks existing release branches with robust git heads lookup' `
@@ -1381,153 +1453,51 @@ function Run-ReleasePrepareWorkflowContractTests {
     -TestName 'release prepare invokes prepare-release with explicit PowerShell parameters' `
     -Passed $usesExplicitPrepareReleaseInvocation `
     -Message 'Expected release-prepare.yml to avoid positional array splatting that can bind "-Bump" as the Bump value.'
+
+  Write-TestResult `
+    -TestName 'release prepare points operators at the manual Release Publish button' `
+    -Passed $prBodyUsesManualPublishWorkflow `
+    -Message 'Expected release PR body to tell operators to run Release Publish after merge, without referencing the retired Release Tag workflow.'
 }
 
-function Run-ReleaseTagWorkflowContractTests {
+function Run-ReleaseTagWorkflowRetirementContractTests {
   Write-Host ""
-  Write-Host "Release tag workflow contracts:" -ForegroundColor Magenta
+  Write-Host "Release tag workflow retirement contracts:" -ForegroundColor Magenta
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
-  $workflowPath = Join-Path $repoRoot '.github/workflows/release-tag.yml'
-  $workflowContent = Get-Content -Path $workflowPath -Raw
+  $tagWorkflowPath = Join-Path $repoRoot '.github/workflows/release-tag.yml'
+  $publishWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
+  $publishWorkflowContent = Get-Content -Path $publishWorkflowPath -Raw
+  $prepareWorkflowPath = Join-Path $repoRoot '.github/workflows/release-prepare.yml'
+  $prepareWorkflowContent = Get-Content -Path $prepareWorkflowPath -Raw
 
-  $hasTagTargetCheck = (
-    $workflowContent.Contains('tag_target="$(git rev-list -n 1 "${version}")"') -and
-    $workflowContent.Contains('[ "${tag_target}" = "${GITHUB_SHA}" ]') -and
-    $workflowContent.Contains('already exists at ${tag_target}, not release commit ${GITHUB_SHA}')
+  $tagWorkflowRetired = -not (Test-Path $tagWorkflowPath)
+  $publishOwnsTagCreation = (
+    $publishWorkflowContent.Contains('name: Prepare release tag') -and
+    $publishWorkflowContent.Contains('tag_action="create"') -and
+    $publishWorkflowContent.Contains('Create or retarget release tag') -and
+    $publishWorkflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"')
   )
-
-  $credentialStepIndex = $workflowContent.IndexOf('- name: Check auto-commit GitHub App credentials', [StringComparison]::Ordinal)
-  $tokenStepIndex = $workflowContent.IndexOf('- name: Generate auto-commit GitHub App token', [StringComparison]::Ordinal)
-  $hasCredentialCheck = (
-    $credentialStepIndex -ge 0 -and
-    $tokenStepIndex -gt $credentialStepIndex -and
-    $workflowContent.Contains('AUTO_COMMIT_APP_ID: ${{ secrets.AUTO_COMMIT_APP_ID }}') -and
-    $workflowContent.Contains('AUTO_COMMIT_APP_PRIVATE_KEY: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}') -and
-    $workflowContent.Contains('required to push release tags')
-  )
-
-  $hasDefaultBranchGate = (
-    $workflowContent.Contains('github.ref_name == github.event.repository.default_branch') -and
-    $workflowContent -notmatch "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*branches:"
-  )
-
-  $checkoutStepIndex = $workflowContent.IndexOf('- name: Checkout', [StringComparison]::Ordinal)
-  $checkoutFetchTagsIndex = if ($checkoutStepIndex -ge 0) {
-    $workflowContent.IndexOf('fetch-tags: true', $checkoutStepIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $subjectCheckIndex = $workflowContent.IndexOf('subject="$(git log -1 --format=%s)"', [StringComparison]::Ordinal)
-  $nonReleaseExitIndex = $workflowContent.IndexOf('Head commit is not a release commit; nothing to do.', [StringComparison]::Ordinal)
-  $existingTagNoOpIndex = $workflowContent.IndexOf('git show-ref --verify --quiet "refs/tags/${version}"', [StringComparison]::Ordinal)
-  $untaggedErrorIndex = $workflowContent.IndexOf('Version ${version} is untagged and CHANGELOG.md documents it', [StringComparison]::Ordinal)
-  $untaggedErrorExitIndex = if ($untaggedErrorIndex -ge 0) {
-    $workflowContent.IndexOf('exit 1', $untaggedErrorIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $nonReleaseProceedFalseIndex = if ($subjectCheckIndex -ge 0) {
-    $workflowContent.IndexOf('echo "proceed=false" >> "${GITHUB_OUTPUT}"', $subjectCheckIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $nonReleaseExitZeroIndex = if ($nonReleaseProceedFalseIndex -ge 0) {
-    $workflowContent.IndexOf('exit 0', $nonReleaseProceedFalseIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $releaseHeadingValidationIndex = if ($nonReleaseExitZeroIndex -ge 0) {
-    $workflowContent.IndexOf('Release commit for ${version} has no CHANGELOG.md section with release-note content.', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $tagLookupIndex = $workflowContent.IndexOf('tag_lookup_output="$(gh api -i "repos/${GITHUB_REPOSITORY}/git/ref/tags/${version}"', [StringComparison]::Ordinal)
-  $tagMismatchIndex = $workflowContent.IndexOf('already exists at ${tag_target}, not release commit ${GITHUB_SHA}', [StringComparison]::Ordinal)
-  $releaseSectionValidationIndex = if ($nonReleaseExitZeroIndex -ge 0) {
-    $workflowContent.IndexOf('Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION', $nonReleaseExitZeroIndex, [StringComparison]::Ordinal)
-  } else {
-    -1
-  }
-  $checksTagsAfterReleaseDetection = (
-    $subjectCheckIndex -ge 0 -and
-    $nonReleaseExitIndex -gt $subjectCheckIndex -and
-    $nonReleaseProceedFalseIndex -gt $nonReleaseExitIndex -and
-    $nonReleaseExitZeroIndex -gt $nonReleaseProceedFalseIndex -and
-    $releaseSectionValidationIndex -gt $nonReleaseExitZeroIndex -and
-    $releaseHeadingValidationIndex -gt $nonReleaseExitZeroIndex -and
-    $tagLookupIndex -gt $releaseHeadingValidationIndex -and
-    $tagMismatchIndex -gt $tagLookupIndex
-  )
-  $checksLocalTagBeforeUntaggedError = (
-    $subjectCheckIndex -ge 0 -and
-    $existingTagNoOpIndex -gt $subjectCheckIndex -and
-    $untaggedErrorIndex -gt $existingTagNoOpIndex -and
-    $untaggedErrorExitIndex -gt $untaggedErrorIndex -and
-    $untaggedErrorExitIndex -lt $nonReleaseProceedFalseIndex -and
-    $existingTagNoOpIndex -lt $nonReleaseProceedFalseIndex
-  )
-  $untaggedDocumentedVersionIsHardFailure = (
-    $checksLocalTagBeforeUntaggedError -and
-    $workflowContent.Contains('echo "::error::${message}"') -and
-    -not $workflowContent.Contains('echo "::warning::${message}"')
-  )
-  $fetchesTagsBeforeLocalTaggedNoOp = (
-    $checkoutStepIndex -ge 0 -and
-    $checkoutFetchTagsIndex -gt $checkoutStepIndex -and
-    $checkoutFetchTagsIndex -lt $existingTagNoOpIndex
-  )
-  $usesRobustTagLookup = (
-    $tagLookupIndex -ge 0 -and
-    $workflowContent.Contains('tag_lookup_exit=$?') -and
-    $workflowContent.Contains('if [ "${tag_lookup_exit}" -eq 0 ]; then') -and
-    $workflowContent.Contains('Failed to check whether tag ${version} already exists.') -and
-    $workflowContent.Contains('"status":"404"') -and
-    $workflowContent.Contains('grep -E ''(^HTTP/[0-9.]+ 404( |$)|"status":"404")'' >/dev/null') -and
-    -not ($workflowContent -match 'gh api[^\r\n]+\|\|\s*true') -and
-    -not ($workflowContent -match 'grep -Eq .*\bstatus')
+  $releasePrepareNoLongerMentionsReleaseTag = (
+    $prepareWorkflowContent.Contains('Run the Release Publish workflow') -and
+    -not $prepareWorkflowContent.Contains('Release Tag workflow')
   )
 
   Write-TestResult `
-    -TestName 'release tag workflow fails when existing tag points elsewhere' `
-    -Passed $hasTagTargetCheck `
-    -Message 'Expected release-tag.yml to compare existing tag target with GITHUB_SHA and error on mismatches.'
+    -TestName 'release tag workflow is retired' `
+    -Passed $tagWorkflowRetired `
+    -Message 'Expected .github/workflows/release-tag.yml to be absent because Release Publish owns tag creation.'
 
   Write-TestResult `
-    -TestName 'release tag workflow checks existing tags only after release detection' `
-    -Passed $checksTagsAfterReleaseDetection `
-    -Message 'Expected release-tag.yml to exit cleanly for non-release package/changelog pushes before checking existing tag targets.'
+    -TestName 'release publish owns release tag creation' `
+    -Passed $publishOwnsTagCreation `
+    -Message 'Expected release.yml prepare-tag job to create annotated release tags when the manual release tag is missing.'
 
   Write-TestResult `
-    -TestName 'release tag workflow validates changelog release-note content before tag lookup' `
-    -Passed ($releaseSectionValidationIndex -gt $nonReleaseExitZeroIndex -and $releaseSectionValidationIndex -lt $tagLookupIndex) `
-    -Message 'Expected release-tag.yml to call Get-ChangelogSection before checking or creating a release tag.'
-
-  Write-TestResult `
-    -TestName 'release tag workflow checks existing tags without hiding API failures' `
-    -Passed $usesRobustTagLookup `
-    -Message 'Expected release-tag.yml to treat tag lookup 404 as absent while failing auth, rate-limit, and other API errors.'
-
-  Write-TestResult `
-    -TestName 'release tag workflow fails for untagged documented versions with non-release subjects' `
-    -Passed $untaggedDocumentedVersionIsHardFailure `
-    -Message 'Expected release-tag.yml to fail when CHANGELOG.md documents the package version, no local tag exists, and the commit subject is not a release subject.'
-
-  Write-TestResult `
-    -TestName 'release tag workflow fetches tags before local tagged no-op check' `
-    -Passed $fetchesTagsBeforeLocalTaggedNoOp `
-    -Message 'Expected release-tag.yml checkout to fetch tags before using local refs/tags/${version} for the non-release no-op path.'
-
-  Write-TestResult `
-    -TestName 'release tag workflow checks app credentials before token action' `
-    -Passed $hasCredentialCheck `
-    -Message 'Expected release-tag.yml to validate AUTO_COMMIT_APP_* before create-github-app-token.'
-
-  Write-TestResult `
-    -TestName 'release tag workflow runs on repository default branch' `
-    -Passed $hasDefaultBranchGate `
-    -Message 'Expected release-tag.yml to avoid hard-coded main/master branch filters and gate on github.event.repository.default_branch.'
+    -TestName 'release prepare instructions no longer mention Release Tag workflow' `
+    -Passed $releasePrepareNoLongerMentionsReleaseTag `
+    -Message 'Expected release-prepare.yml PR body to instruct operators to run Release Publish, not Release Tag.'
 }
 
 function Run-ReleasePackageContentContractTests {
@@ -1748,9 +1718,9 @@ Run-PrePushLastResortGuidanceContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
-Run-ReleasePublishRecoveryContractTests
+Run-ReleasePublishTagPreparationContractTests
 Run-ReleasePublishWorkflowBudgetContractTests
 Run-ReleasePrepareWorkflowContractTests
-Run-ReleaseTagWorkflowContractTests
+Run-ReleaseTagWorkflowRetirementContractTests
 Run-ReleasePackageContentContractTests
 Print-SummaryAndExit

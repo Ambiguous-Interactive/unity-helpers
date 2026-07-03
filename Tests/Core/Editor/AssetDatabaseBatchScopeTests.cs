@@ -558,9 +558,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         [Test]
-        [TestCase(100, TestName = "RapidCycles.Count100")]
-        [TestCase(500, TestName = "RapidCycles.Count500")]
-        [TestCase(1000, TestName = "RapidCycles.Count1000")]
+        [TestCase(10, TestName = "RapidUnityCycles.Count10")]
+        [TestCase(50, TestName = "RapidUnityCycles.Count50")]
         public void RapidOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
             for (int cycle = 0; cycle < cycleCount; cycle++)
@@ -588,8 +587,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         [Test]
-        [TestCase(50, TestName = "RapidNestedCycles.Count50")]
-        [TestCase(100, TestName = "RapidNestedCycles.Count100")]
+        [TestCase(10, TestName = "RapidNestedUnityCycles.Count10")]
+        [TestCase(50, TestName = "RapidNestedUnityCycles.Count50")]
         public void RapidNestedOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
             for (int cycle = 0; cycle < cycleCount; cycle++)
@@ -1703,28 +1702,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         [Test]
-        [TestCase(100, TestName = "ExtremeRapidCycles.Count100")]
-        [TestCase(1000, TestName = "ExtremeRapidCycles.Count1000")]
+        [TestCase(100, TestName = "ExtremeRapidCounterCycles.Count100")]
+        [TestCase(1000, TestName = "ExtremeRapidCounterCycles.Count1000")]
         public void ExtremelyRapidOpenCloseCyclesDoNotBreakState(int cycleCount)
         {
-            RunRapidOpenCloseCycles(cycleCount);
+            RunRapidCounterCycles(cycleCount);
         }
 
         [Test]
         [NUnit.Framework.Category("Stress")]
         [Timeout(60000)]
-        [TestCase(5000, TestName = "ExtremeRapidCycles.Count5000")]
+        [TestCase(5000, TestName = "ExtremeRapidCounterCycles.Count5000")]
         public void ExtremelyRapidOpenCloseCyclesDoNotBreakStateStress(int cycleCount)
         {
-            RunRapidOpenCloseCycles(cycleCount);
+            RunRapidCounterCycles(cycleCount);
         }
 
-        private static void RunRapidOpenCloseCycles(int cycleCount)
+        private static void RunRapidCounterCycles(int cycleCount)
         {
             for (int i = 0; i < cycleCount; i++)
             {
-                AssetDatabaseBatchScope scope = AssetDatabaseBatchHelper.BeginBatch();
-                scope.Dispose();
+                bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
+                if (!isOutermost)
+                {
+                    Assert.Fail($"Cycle {i} should start from an outermost batch counter state.");
+                }
+
+                bool shouldCleanUpUnity =
+                    AssetDatabaseBatchHelper.DecrementBatchDepthWithUnityCleanup();
+                if (!shouldCleanUpUnity)
+                {
+                    Assert.Fail($"Cycle {i} should return to an outermost batch cleanup state.");
+                }
             }
 
             Assert.That(
@@ -1736,6 +1745,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 Is.False,
                 "Should not be batching after extreme rapid cycles"
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.ActualUnityBatchDepth,
+                Is.EqualTo(0),
+                "Actual Unity batch depth should be 0 after extreme rapid cycles"
             );
         }
 

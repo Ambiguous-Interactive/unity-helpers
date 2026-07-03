@@ -21,9 +21,29 @@ if (-not (Test-Path -LiteralPath $workflowPath)) {
 }
 
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
+[string]$workflowContent = $lines -join "`n"
 [bool]$failed = $false
 [bool]$insideJobs = $false
 $jobTexts = @{}
+
+$hasPrCancelConcurrency = (
+    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
+    $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
+)
+if (-not $hasPrCancelConcurrency) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must cancel superseded pull_request runs so old iterations do not keep the organization Unity runner occupied."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity Tests pull_request concurrency cancellation contract."
+}
+
+$slowReportBudgetCount = ([regex]::Matches($workflowContent, [regex]::Escape('-FixtureBudgetSeconds 120'))).Count
+if ($slowReportBudgetCount -lt 3) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity slow-test reports must include a warn-only 120s fixture budget for main, standalone, and single-threaded legs."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity slow-test warn-only fixture budget contract."
+}
 
 for ($i = 0; $i -lt $lines.Count; $i++) {
     if ($lines[$i] -match '^jobs:\s*$') {

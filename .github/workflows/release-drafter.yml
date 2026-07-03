@@ -1,8 +1,8 @@
 name: Release Drafter
 
 on:
-  # Manual-only: release-tag.yml and release.yml own release merges.
-  # Running this draft updater on push can race tag-triggered publishing.
+  # Manual-only: release.yml owns release publishing and tag creation.
+  # Running this draft updater on push can race manual publishing.
   workflow_dispatch:
 
 permissions:

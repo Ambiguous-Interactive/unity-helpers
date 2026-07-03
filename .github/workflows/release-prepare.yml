@@ -226,7 +226,9 @@ jobs:
             echo
             echo "## After Merge"
             echo
-            echo "The Release Tag workflow pushes tag \`${VERSION}\`, then Release Publish validates, packs npm, exports the \`.unitypackage\`, publishes npm, and publishes the GitHub Release assets."
+            echo "Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`."
+            echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
+            echo "Release Publish validates, packs npm, exports the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."
           } > "${pr_body_file}"
 
           GH_TOKEN="${GH_PUSH_TOKEN}" gh pr create \

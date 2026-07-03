@@ -1,15 +1,10 @@
 name: Release Publish
 
 on:
-  push:
-    tags:
-      # Keep the trigger as an unambiguous digit-start glob. The verify job below
-      # rejects anything except exact no-leading-zero X.Y.Z semver before publish.
-      - "[0-9]*.[0-9]*.[0-9]*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version/tag to publish, as strict X.Y.Z semver."
+        description: "Release version to publish, as strict X.Y.Z semver."
         type: string
         required: true
       source_ref:
@@ -18,7 +13,7 @@ on:
         required: true
         default: main
       allow_tag_recovery:
-        description: "Create or retarget the tag only if npm and GitHub Release are both still unpublished."
+        description: "Retarget an existing tag only if npm and GitHub Release are both still unpublished."
         type: boolean
         default: false
 
@@ -26,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  group: release-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
@@ -50,7 +45,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+          ref: ${{ inputs.source_ref }}
           persist-credentials: false
 
       - name: Setup Node.js
@@ -68,15 +63,9 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            tag="${INPUT_VERSION}"
-            source_ref="${INPUT_SOURCE_REF}"
-            allow_tag_recovery="${INPUT_ALLOW_TAG_RECOVERY}"
-          else
-            tag="${GITHUB_REF_NAME}"
-            source_ref="${GITHUB_REF_NAME}"
-            allow_tag_recovery="false"
-          fi
+          tag="${INPUT_VERSION}"
+          source_ref="${INPUT_SOURCE_REF}"
+          allow_tag_recovery="${INPUT_ALLOW_TAG_RECOVERY}"
 
           if ! printf '%s\n' "${tag}" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
             echo "::error::Release tags must use unprefixed X.Y.Z semver."
@@ -129,8 +118,10 @@ jobs:
             fi
 
             if [ "${tag_target}" != "${source_sha}" ]; then
-              if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${allow_tag_recovery}" != "true" ]; then
-                echo "::error::Tag ${tag} already points at ${tag_target}, not selected source ${source_sha}."
+              if [ "${allow_tag_recovery}" != "true" ]; then
+                message="Tag ${tag} already points at ${tag_target}, not selected source ${source_sha}. "
+                message+="Re-run with allow_tag_recovery=true only after confirming npm and GitHub Release are unpublished."
+                echo "::error::${message}"
                 exit 1
               fi
               tag_action="retarget"
@@ -142,10 +133,7 @@ jobs:
               printf '%s\n' "${tag_lookup_output}"
               exit "${tag_lookup_exit}"
             fi
-            if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${allow_tag_recovery}" != "true" ]; then
-              echo "::error::Tag ${tag} does not exist. Use Release Tag or rerun this workflow with allow_tag_recovery after confirming the version is unpublished."
-              exit 1
-            fi
+            echo "::notice::Tag ${tag} does not exist and will be created after package validation and .unitypackage export succeed."
             tag_action="create"
           fi
 
@@ -203,108 +191,9 @@ jobs:
             echo "tag=${tag}"
           } >> "${GITHUB_OUTPUT}"
 
-  recover-tag:
-    name: Recover release tag
-    needs: verify-tag
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_tag_recovery && needs.verify-tag.outputs.tag-action != 'none' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22.18.0"
-
-      - name: Recheck release artifacts before tag recovery
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
-          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
-          TAG: ${{ needs.verify-tag.outputs.tag }}
-        run: |
-          set -euo pipefail
-          npm_published="false"
-          npm_view_file="${RUNNER_TEMP}/release-npm-view.txt"
-          npm_view_error="${RUNNER_TEMP}/release-npm-view.err"
-          set +e
-          npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org" > "${npm_view_file}" 2> "${npm_view_error}"
-          npm_view_exit=$?
-          set -e
-          if [ "${npm_view_exit}" -eq 0 ]; then
-            npm_published="true"
-          else
-            npm_view_output="$(cat "${npm_view_error}")"
-            if ! printf '%s\n' "${npm_view_output}" | grep -E '(E404|404 Not Found|is not in this registry)' >/dev/null; then
-              echo "::error::Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
-              printf '%s\n' "${npm_view_output}"
-              exit "${npm_view_exit}"
-            fi
-          fi
-
-          github_release_exists="false"
-          release_view_file="${RUNNER_TEMP}/release-view.json"
-          release_view_error="${RUNNER_TEMP}/release-view.err"
-          set +e
-          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > "${release_view_file}" 2> "${release_view_error}"
-          release_lookup_exit=$?
-          set -e
-          if [ "${release_lookup_exit}" -eq 0 ]; then
-            github_release_exists="true"
-          else
-            release_lookup_output="$(cat "${release_view_error}")"
-            if ! printf '%s\n' "${release_lookup_output}" | grep -E '(HTTP 404|Not Found|"status":"404")' >/dev/null; then
-              echo "::error::Failed to verify GitHub Release state for ${TAG}."
-              printf '%s\n' "${release_lookup_output}"
-              exit "${release_lookup_exit}"
-            fi
-          fi
-
-          if [ "${npm_published}" = "true" ] || [ "${github_release_exists}" = "true" ]; then
-            echo "::error::Published artifacts already exist; refusing to create or retarget tag ${TAG}. npm=${npm_published}, github_release=${github_release_exists}."
-            exit 1
-          fi
-
-      - name: Create or retarget release tag for manual recovery
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}
-          TAG: ${{ needs.verify-tag.outputs.tag }}
-          TAG_ACTION: ${{ needs.verify-tag.outputs.tag-action }}
-        run: |
-          set -euo pipefail
-          created_tag_sha="$(
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
-              --field tag="${TAG}" \
-              --field message="Release ${TAG}" \
-              --field object="${SOURCE_SHA}" \
-              --field type="commit" \
-              --jq '.sha'
-          )"
-          if [ "${TAG_ACTION}" = "create" ]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-              --field ref="refs/tags/${TAG}" \
-              --field sha="${created_tag_sha}" >/dev/null
-            echo "::notice::Created release tag ${TAG} at ${SOURCE_SHA}."
-          elif [ "${TAG_ACTION}" = "retarget" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
-              --field sha="${created_tag_sha}" \
-              --field force=true >/dev/null
-            echo "::notice::Retargeted release tag ${TAG} to ${SOURCE_SHA}."
-          else
-            echo "::error::Unsupported tag recovery action '${TAG_ACTION}'."
-            exit 1
-          fi
-
   release-ready:
     name: Confirm release publish inputs
-    needs:
-      - verify-tag
-      - recover-tag
-    if: ${{ always() && needs.verify-tag.result == 'success' && (needs.verify-tag.outputs.tag-action == 'none' || needs.recover-tag.result == 'success') }}
+    needs: verify-tag
     runs-on: ubuntu-latest
     timeout-minutes: 1
     outputs:
@@ -313,6 +202,7 @@ jobs:
       source-ref: ${{ needs.verify-tag.outputs.source-ref }}
       source-sha: ${{ needs.verify-tag.outputs.source-sha }}
       tag: ${{ needs.verify-tag.outputs.tag }}
+      tag-action: ${{ needs.verify-tag.outputs.tag-action }}
     steps:
       - name: Confirm release inputs
         env:
@@ -486,12 +376,120 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  prepare-tag:
+    name: Prepare release tag
+    needs:
+      - release-ready
+      - validate-package
+      - unitypackage
+    if: ${{ needs.release-ready.outputs.tag-action != 'none' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Recheck release artifacts before tag mutation
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}
+          PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}
+          TAG: ${{ needs.release-ready.outputs.tag }}
+        run: |
+          set -euo pipefail
+          npm_published="false"
+          npm_view_file="${RUNNER_TEMP}/release-npm-view.txt"
+          npm_view_error="${RUNNER_TEMP}/release-npm-view.err"
+          set +e
+          npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry "https://registry.npmjs.org" > "${npm_view_file}" 2> "${npm_view_error}"
+          npm_view_exit=$?
+          set -e
+          if [ "${npm_view_exit}" -eq 0 ]; then
+            npm_published="true"
+          else
+            npm_view_output="$(cat "${npm_view_error}")"
+            if ! printf '%s\n' "${npm_view_output}" | grep -E '(E404|404 Not Found|is not in this registry)' >/dev/null; then
+              echo "::error::Failed to verify npm publication state for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
+              printf '%s\n' "${npm_view_output}"
+              exit "${npm_view_exit}"
+            fi
+          fi
+
+          github_release_exists="false"
+          release_view_file="${RUNNER_TEMP}/release-view.json"
+          release_view_error="${RUNNER_TEMP}/release-view.err"
+          set +e
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > "${release_view_file}" 2> "${release_view_error}"
+          release_lookup_exit=$?
+          set -e
+          if [ "${release_lookup_exit}" -eq 0 ]; then
+            github_release_exists="true"
+          else
+            release_lookup_output="$(cat "${release_view_error}")"
+            if ! printf '%s\n' "${release_lookup_output}" | grep -E '(HTTP 404|Not Found|"status":"404")' >/dev/null; then
+              echo "::error::Failed to verify GitHub Release state for ${TAG}."
+              printf '%s\n' "${release_lookup_output}"
+              exit "${release_lookup_exit}"
+            fi
+          fi
+
+          if [ "${npm_published}" = "true" ] || [ "${github_release_exists}" = "true" ]; then
+            echo "::error::Published artifacts already exist; refusing to create or retarget tag ${TAG}. npm=${npm_published}, github_release=${github_release_exists}."
+            exit 1
+          fi
+
+      - name: Create or retarget release tag
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}
+          TAG: ${{ needs.release-ready.outputs.tag }}
+          TAG_ACTION: ${{ needs.release-ready.outputs.tag-action }}
+        run: |
+          set -euo pipefail
+          created_tag_sha="$(
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
+              --field tag="${TAG}" \
+              --field message="Release ${TAG}" \
+              --field object="${SOURCE_SHA}" \
+              --field type="commit" \
+              --jq '.sha'
+          )"
+          if [ "${TAG_ACTION}" = "create" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              --field ref="refs/tags/${TAG}" \
+              --field sha="${created_tag_sha}" >/dev/null
+            echo "::notice::Created release tag ${TAG} at ${SOURCE_SHA}."
+          elif [ "${TAG_ACTION}" = "retarget" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
+              --field sha="${created_tag_sha}" \
+              --field force=true >/dev/null
+            echo "::notice::Retargeted release tag ${TAG} to ${SOURCE_SHA}."
+          else
+            echo "::error::Unsupported tag action '${TAG_ACTION}'."
+            exit 1
+          fi
+
   publish:
     name: Publish npm and GitHub Release
     needs:
       - release-ready
       - validate-package
       - unitypackage
+      - prepare-tag
+    if: >-
+      ${{
+        always() &&
+        needs.release-ready.result == 'success' &&
+        needs.validate-package.result == 'success' &&
+        needs.unitypackage.result == 'success' &&
+        (needs.release-ready.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success')
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
