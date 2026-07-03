@@ -1704,7 +1704,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         [TestCase(100, TestName = "ExtremeRapidCounterCycles.Count100")]
         [TestCase(1000, TestName = "ExtremeRapidCounterCycles.Count1000")]
-        public void ExtremelyRapidOpenCloseCyclesDoNotBreakState(int cycleCount)
+        public void ExtremelyRapidCounterCyclesDoNotBreakState(int cycleCount)
         {
             RunRapidCounterCycles(cycleCount);
         }
@@ -1713,7 +1713,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [NUnit.Framework.Category("Stress")]
         [Timeout(60000)]
         [TestCase(5000, TestName = "ExtremeRapidCounterCycles.Count5000")]
-        public void ExtremelyRapidOpenCloseCyclesDoNotBreakStateStress(int cycleCount)
+        public void ExtremelyRapidCounterCyclesDoNotBreakStateStress(int cycleCount)
         {
             RunRapidCounterCycles(cycleCount);
         }

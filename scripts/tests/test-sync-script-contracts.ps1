@@ -1118,8 +1118,15 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('ref: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('INPUT_SOURCE_REF: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('source_sha="$(git rev-parse HEAD)"') -and
-    $workflowContent.Contains('echo "source-ref=${source_ref}"') -and
+    $workflowContent.Contains('printf ''source-ref=%s\n'' "${source_ref}"') -and
     $workflowContent.Contains('echo "source-sha=${source_sha}"')
+  )
+
+  $sourceRefOutputIsInjectionSafe = (
+    $workflowContent.Contains('Validate source ref input') -and
+    $workflowContent.Contains('source_ref="${INPUT_SOURCE_REF}"') -and
+    $workflowContent.Contains('Release source ref must be a single line.') -and
+    $workflowContent.Contains('printf ''source-ref=%s\n'' "${source_ref}"')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
@@ -1243,6 +1250,11 @@ function Run-ReleasePublishTagPreparationContractTests {
     -TestName 'release publish verifies selected source ref and freezes downstream checkouts to its SHA' `
     -Passed ($usesSourceRefForVerification -and $downstreamJobsCheckoutVerifiedSha) `
     -Message 'Expected verify-tag to checkout the selected source ref, output its resolved SHA, and downstream jobs to checkout that SHA.'
+
+  Write-TestResult `
+    -TestName 'release publish rejects multiline source refs before writing outputs' `
+    -Passed $sourceRefOutputIsInjectionSafe `
+    -Message 'Expected release.yml to reject multiline source_ref values before writing source-ref to GITHUB_OUTPUT.'
 
   Write-TestResult `
     -TestName 'release publish checks existing tag targets before publish' `

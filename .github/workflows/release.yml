@@ -40,6 +40,21 @@ jobs:
       tag: ${{ steps.verify.outputs.tag }}
       tag-action: ${{ steps.verify.outputs.tag-action }}
     steps:
+      - name: Validate source ref input
+        env:
+          INPUT_SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          set -euo pipefail
+          source_ref="${INPUT_SOURCE_REF}"
+          if [ -z "${source_ref}" ]; then
+            echo "::error::Release source ref is required."
+            exit 1
+          fi
+          if [[ "${source_ref}" == *$'\n'* || "${source_ref}" == *$'\r'* ]]; then
+            echo "::error::Release source ref must be a single line."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -73,6 +88,10 @@ jobs:
           fi
           if [ -z "${source_ref}" ]; then
             echo "::error::Release source ref is required."
+            exit 1
+          fi
+          if [[ "${source_ref}" == *$'\n'* || "${source_ref}" == *$'\r'* ]]; then
+            echo "::error::Release source ref must be a single line."
             exit 1
           fi
 
@@ -181,7 +200,7 @@ jobs:
           fi
 
           {
-            echo "source-ref=${source_ref}"
+            printf 'source-ref=%s\n' "${source_ref}"
             echo "source-sha=${source_sha}"
             echo "tag-action=${tag_action}"
           } >> "${GITHUB_OUTPUT}"
