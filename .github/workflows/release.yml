@@ -201,7 +201,7 @@ jobs:
   recover-tag:
     name: Recover release tag
     needs: verify-tag
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_tag_recovery == 'true' && needs.verify-tag.outputs.tag-action != 'none' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_tag_recovery && needs.verify-tag.outputs.tag-action != 'none' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
