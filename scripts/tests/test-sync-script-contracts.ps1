@@ -1035,8 +1035,8 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
   $publishHasRepo = $workflowContent -match "(?ms)- name: Publish GitHub Release.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyHasRepo = $workflowContent -match "(?ms)- name: Verify GitHub Release assets.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyDownloadedArtifactsChecksIdentity = (
-    $workflowContent.Contains('EXPECTED_PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}') -and
-    $workflowContent.Contains('EXPECTED_PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}') -and
+    $workflowContent.Contains('EXPECTED_PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}') -and
+    $workflowContent.Contains('EXPECTED_PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}') -and
     $workflowContent.Contains('notes_file=".artifacts/release/release-notes.md"') -and
     $workflowContent.Contains('tar -xOf "${package_file}" package/package.json') -and
     $workflowContent.Contains('Npm tarball identity mismatch.')
@@ -1085,8 +1085,9 @@ function Run-ReleasePublishRecoveryContractTests {
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
-    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.verify-tag.outputs.source-sha }}')).Count -ge 2) -and
-    $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}')
+    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.release-ready.outputs.source-sha }}')).Count -ge 2) -and
+    $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}') -and
+    $workflowContent.Contains('source-sha: ${{ needs.verify-tag.outputs.source-sha }}')
   )
 
   $tagRecoveryChecksExistingTagTarget = (
@@ -1125,9 +1126,10 @@ function Run-ReleasePublishRecoveryContractTests {
 
   $hasWritePermissionOnlyWhereNeeded = (
     $workflowContent.Contains("permissions:`n  contents: read") -and
-    $workflowContent.Contains("verify-tag:`n    name: Verify release tag") -and
-    $workflowContent.Contains("permissions:`n      contents: write") -and
-    $workflowContent.Contains("publish:`n    name: Publish npm and GitHub Release")
+    ($workflowContent -match '(?ms)^\s*verify-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*read\s*\r?\n\s*outputs:') -and
+    ($workflowContent -match '(?ms)^\s*recover-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*steps:') -and
+    $workflowContent.Contains('if: ${{ github.event_name == ''workflow_dispatch'' && inputs.allow_tag_recovery == true && needs.verify-tag.outputs.tag-action != ''none'' }}') -and
+    ($workflowContent -match '(?ms)^\s*publish:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*id-token:\s*write\s*\r?\n\s*steps:')
   )
 
   Write-TestResult `
@@ -1161,9 +1163,9 @@ function Run-ReleasePublishRecoveryContractTests {
     -Message 'Expected release.yml to create annotated release tags and force-update only through the guarded recovery path.'
 
   Write-TestResult `
-    -TestName 'release publish keeps default permissions read-only while recovery verifier can write refs' `
+    -TestName 'release publish keeps default verification permissions read-only while recovery can write refs' `
     -Passed $hasWritePermissionOnlyWhereNeeded `
-    -Message 'Expected workflow-level contents: read plus verify-tag contents: write and publish contents: write.'
+    -Message 'Expected workflow-level contents: read, verify-tag contents: read, guarded recover-tag contents: write, and publish contents: write.'
 }
 
 function Run-ReleasePublishWorkflowBudgetContractTests {
