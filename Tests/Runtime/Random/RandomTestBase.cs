@@ -45,7 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         // count and noise-map iteration env vars to restore the original,
         // broader coverage. Override the env vars for a thorough local run.
         private const int DefaultFastSampleCount = 250_000;
-        private const int ThoroughSampleCount = 12_750_000;
         private static readonly int SampleCount = ResolvePositiveIntEnvironmentVariable(
             RandomSampleCountEnvironmentVariable,
             DefaultFastSampleCount
