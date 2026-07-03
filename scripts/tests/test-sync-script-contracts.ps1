@@ -1080,11 +1080,12 @@ function Run-ReleasePublishRecoveryContractTests {
     $workflowContent.Contains("ref: `${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}") -and
     $workflowContent.Contains('INPUT_SOURCE_REF: ${{ inputs.source_ref }}') -and
     $workflowContent.Contains('source_sha="$(git rev-parse HEAD)"') -and
-    $workflowContent.Contains('echo "source-ref=${source_sha}"')
+    $workflowContent.Contains('echo "source-ref=${source_ref}"') -and
+    $workflowContent.Contains('echo "source-sha=${source_sha}"')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
-    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.verify-tag.outputs.source-ref }}')).Count -ge 2) -and
+    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.verify-tag.outputs.source-sha }}')).Count -ge 2) -and
     $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}')
   )
 

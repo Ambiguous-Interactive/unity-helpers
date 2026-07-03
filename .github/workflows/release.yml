@@ -159,7 +159,7 @@ jobs:
           fi
 
           {
-            echo "source-ref=${source_sha}"
+            echo "source-ref=${source_ref}"
             echo "source-sha=${source_sha}"
             echo "tag-action=${tag_action}"
           } >> "${GITHUB_OUTPUT}"
@@ -212,7 +212,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.verify-tag.outputs.source-ref }}
+          ref: ${{ needs.verify-tag.outputs.source-sha }}
           persist-credentials: false
 
       - name: Setup Node.js
@@ -279,7 +279,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.verify-tag.outputs.source-ref }}
+          ref: ${{ needs.verify-tag.outputs.source-sha }}
           persist-credentials: false
 
       - name: Setup Node.js

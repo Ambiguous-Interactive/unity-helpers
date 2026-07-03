@@ -823,14 +823,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 random.NextNoiseMap(noise);
                 foreach (float value in noise)
                 {
-                    Assert.LessOrEqual(
-                        0f,
+                    Assert.GreaterOrEqual(
                         value,
+                        0f,
                         $"Noise value underflow at iteration {iteration}, size {width}x{height}."
                     );
-                    Assert.GreaterOrEqual(
-                        1.1f,
+                    Assert.LessOrEqual(
                         value,
+                        1.1f,
                         $"Noise value overflow at iteration {iteration}, size {width}x{height}."
                     );
                 }
