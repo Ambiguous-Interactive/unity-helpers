@@ -829,7 +829,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     );
                     Assert.LessOrEqual(
                         value,
-                        1.1f,
+                        1f,
                         $"Noise value overflow at iteration {iteration}, size {width}x{height}."
                     );
                 }

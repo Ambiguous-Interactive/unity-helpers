@@ -1140,7 +1140,7 @@ function Run-ReleasePublishRecoveryContractTests {
   )
 
   $hasWritePermissionOnlyWhereNeeded = (
-    $workflowContent.Contains("permissions:`n  contents: read") -and
+    ($workflowContent -match '(?m)^permissions:\r?\n  contents: read\r?$') -and
     ($workflowContent -match '(?ms)^\s*verify-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*read\s*\r?\n\s*outputs:') -and
     ($workflowContent -match '(?ms)^\s*recover-tag:\s*.*?^\s*permissions:\s*\r?\n\s*contents:\s*write\s*\r?\n\s*steps:') -and
     $workflowContent.Contains('if: ${{ github.event_name == ''workflow_dispatch'' && inputs.allow_tag_recovery && needs.verify-tag.outputs.tag-action != ''none'' }}') -and
