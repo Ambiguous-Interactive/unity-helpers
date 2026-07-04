@@ -34,13 +34,14 @@ Exceptions should ONLY be thrown for:
 
 ### When Exceptions Are FORBIDDEN
 
-| Scenario                    | Bad                                    | Good                                                                                           |
-| --------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- | --- | ------------------ | ----------------------------------------- | ------------------------------- |
-| Null input to public method | `throw new ArgumentNullException()`    | Return `default`, empty, or `false`                                                            |
-| Index out of range          | `throw new IndexOutOfRangeException()` | Clamp, return `false`, or no-op                                                                |
-| Type mismatch               | `throw new InvalidCastException()`     | Use `TryXxx` pattern or return `default`                                                       |
-| Missing resource            | `throw new FileNotFoundException()`    | Return `null`, log warning                                                                     |
-| Deserialization failure     | `throw new JsonException()`            | `Serializer.TryXxx` or wrap `SerializationFailureException` (see `serialization-safety` skill) |     | Invalid enum value | `throw new ArgumentOutOfRangeException()` | Use `default` case, log warning |
+| Scenario                    | Bad                                       | Good                                                                                           |
+| --------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Null input to public method | `throw new ArgumentNullException()`       | Return `default`, empty, or `false`                                                            |
+| Index out of range          | `throw new IndexOutOfRangeException()`    | Clamp, return `false`, or no-op                                                                |
+| Type mismatch               | `throw new InvalidCastException()`        | Use `TryXxx` pattern or return `default`                                                       |
+| Missing resource            | `throw new FileNotFoundException()`       | Return `null`, log warning                                                                     |
+| Deserialization failure     | `throw new JsonException()`               | `Serializer.TryXxx` or wrap `SerializationFailureException` (see `serialization-safety` skill) |
+| Invalid enum value          | `throw new ArgumentOutOfRangeException()` | Use `default` case, log warning                                                                |
 
 ---
 

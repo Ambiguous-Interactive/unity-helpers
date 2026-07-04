@@ -14,7 +14,7 @@ The script executes the benchmark test in batch mode, captures the markdown tabl
 
 <!-- RELATIONAL_COMPONENTS_WINDOWS_START -->
 
-_Last updated 2026-05-08 04:09 UTC on Windows 11 (10.0.26200) 64bit_
+Last updated 2026-05-08 04:09 UTC on Windows 11 (10.0.26200) 64bit.
 
 Numbers capture repeated `Assign*Components` calls for one second per scenario.
 Higher operations per second are better.

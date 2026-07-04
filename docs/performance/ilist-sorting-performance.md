@@ -42,7 +42,7 @@ Run the `IListSortingPerformanceTests.Benchmark` test inside Unity’s Test Runn
 
 <!-- ILIST_SORT_WINDOWS_START -->
 
-_Last updated 2026-05-08 04:05 UTC on Windows 11 (10.0.26200) 64bit_
+Last updated 2026-05-08 04:05 UTC on Windows 11 (10.0.26200) 64bit.
 
 Times are single-pass measurements in milliseconds (lower is better). `n/a` indicates the algorithm was skipped for the dataset size.
 

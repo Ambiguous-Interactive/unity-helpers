@@ -145,7 +145,7 @@ Literal pipe characters inside table cells must be escaped as `\|`:
 <!-- Wrong -->
 
 | Method | Signature  |
-| ------ | ---------- | --- |
+| ------ | ---------- |
 | Foo    | void Foo(A | B)  |
 
 <!-- Right -->
