@@ -387,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(1, TestName = "SequentialScopes.Count1")]
         [TestCase(5, TestName = "SequentialScopes.Count5")]
         [TestCase(10, TestName = "SequentialScopes.Count10")]
-        [TestCase(50, TestName = "SequentialScopes.Count50")]
+        [TestCase(50, TestName = "SequentialScopes.Count50", Category = "Stress")]
         public void MultipleSequentialScopesWorkCorrectly(int scopeCount)
         {
             for (int i = 0; i < scopeCount; i++)
@@ -559,7 +559,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
         [Test]
         [TestCase(10, TestName = "RapidUnityCycles.Count10")]
-        [TestCase(50, TestName = "RapidUnityCycles.Count50")]
+        [TestCase(50, TestName = "RapidUnityCycles.Count50", Category = "Stress")]
         public void RapidOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
             for (int cycle = 0; cycle < cycleCount; cycle++)
@@ -588,7 +588,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
         [Test]
         [TestCase(10, TestName = "RapidNestedUnityCycles.Count10")]
-        [TestCase(50, TestName = "RapidNestedUnityCycles.Count50")]
+        [TestCase(50, TestName = "RapidNestedUnityCycles.Count50", Category = "Stress")]
         public void RapidNestedOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
             for (int cycle = 0; cycle < cycleCount; cycle++)
