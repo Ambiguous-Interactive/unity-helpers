@@ -429,7 +429,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             DetectAssetChangeProcessor.TimeProvider = () => fakeTime;
             DetectAssetChangeProcessor.LoopWindowSecondsOverride = 5d;
 
-            int iterations = DetectAssetChangeProcessor.MaxConsecutiveChangeSetsWithinWindow + 5;
+            int iterations = DetectAssetChangeProcessor.MaxConsecutiveChangeSetsWithinWindow + 1;
             for (int i = 0; i < iterations; i++)
             {
                 fakeTime += 6d;

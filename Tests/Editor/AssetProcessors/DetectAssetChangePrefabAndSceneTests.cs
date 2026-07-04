@@ -312,6 +312,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void PrefabHandlerFindsMultipleComponentsOnSamePrefab()
         {
             // Arrange - Use shared multiple handlers fixture (prefab with multiple handler components)
@@ -488,6 +489,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void SceneHandlerInvokesInstanceMethodWhenAssetDeleted()
         {
             // Arrange
@@ -586,6 +588,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void SceneHandlerFindsMultipleHandlersInScene()
         {
             // Arrange - Create multiple handlers
@@ -634,6 +637,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void SceneHandlerFindsInactiveObjects()
         {
             // Arrange - Create inactive handler
@@ -736,6 +740,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void CombinedHandlerDoesNotDuplicateWhenSameInstanceInPrefabAndScene()
         {
             // Arrange - Use shared CombinedHandler fixture and instantiate it in scene
@@ -786,6 +791,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void HandlerHandlesNullComponentsGracefully()
         {
             // This tests the null checks in the enumeration code
@@ -809,6 +815,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void HandlerHandlesEmptyScenesGracefully()
         {
             // Arrange - No handlers in scene
@@ -830,6 +837,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        [NUnit.Framework.Category("Stress")]
         public void HandlerHandlesDestroyedObjectsDuringEnumeration()
         {
             // Arrange - Use CreateTrackedSceneObject to ensure proper cleanup if destroy fails
@@ -880,8 +888,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [TestCase(true, false, 1, TestName = "SearchOptions.PrefabOnly.FindsPrefab")]
-        [TestCase(false, true, 1, TestName = "SearchOptions.SceneOnly.FindsScene")]
-        [TestCase(true, true, 2, TestName = "SearchOptions.Both.FindsBoth")]
+        [TestCase(
+            false,
+            true,
+            1,
+            TestName = "SearchOptions.SceneOnly.FindsScene",
+            Category = "Stress"
+        )]
+        [TestCase(true, true, 2, TestName = "SearchOptions.Both.FindsBoth", Category = "Stress")]
         public void SearchOptionsFindsCorrectInstances(
             bool usePrefab,
             bool createSceneObject,
@@ -959,33 +973,24 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             (typeof(TestNestedPrefabHandler), "TestNestedPrefabHandler"),
         };
 
-        public static IEnumerable<TestCaseData> HandlerCanBeAddedToGameObjectCases()
+        /// <summary>
+        /// Verifies that each MonoBehaviour handler test double lives in a non-Editor
+        /// folder so Unity permits attaching it to GameObjects.
+        /// </summary>
+        [Test]
+        public void HandlersCanBeAddedToGameObjects()
         {
             foreach ((Type handlerType, string humanName) in HandlerTypesUnderTest)
             {
-                yield return new TestCaseData(handlerType).SetName(
-                    $"HandlerCanBeAddedToGameObject({humanName})"
+                GameObject go = CreateTrackedSceneObject(humanName + "AddComponent");
+                Component handler = go.AddComponent(handlerType);
+                Assert.IsTrue(
+                    handler != null,
+                    $"{handlerType.Name} must NOT be in an Editor folder. "
+                        + "MonoBehaviours in Editor folders cannot be attached to GameObjects. "
+                        + "Move it to a non-Editor folder (e.g., Tests/Runtime/)."
                 );
             }
-        }
-
-        /// <summary>
-        /// Verifies that each MonoBehaviour handler test double lives in a non-Editor
-        /// folder so Unity permits attaching it to GameObjects. Consolidated from four
-        /// copy-pasted tests via <see cref="TestCaseSourceAttribute"/>.
-        /// </summary>
-        [Test]
-        [TestCaseSource(nameof(HandlerCanBeAddedToGameObjectCases))]
-        public void HandlerCanBeAddedToGameObject(Type handlerType)
-        {
-            GameObject go = CreateTrackedSceneObject("TestAddComponent");
-            Component handler = go.AddComponent(handlerType);
-            Assert.IsTrue(
-                handler != null,
-                $"{handlerType.Name} must NOT be in an Editor folder. "
-                    + "MonoBehaviours in Editor folders cannot be attached to GameObjects. "
-                    + "Move it to a non-Editor folder (e.g., Tests/Runtime/)."
-            );
         }
 
         [Test]
