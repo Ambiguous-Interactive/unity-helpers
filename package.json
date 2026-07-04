@@ -34,10 +34,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wallstop/unity-helpers.git"
+    "url": "git+https://github.com/Ambiguous-Interactive/unity-helpers.git"
   },
   "bugs": {
-    "url": "https://github.com/wallstop/unity-helpers/issues"
+    "url": "https://github.com/Ambiguous-Interactive/unity-helpers/issues"
   },
   "signature": "unsigned",
   "author": "wallstop studios <wallstop@wallstopstudios.com> (https://wallstopstudios.com)",
