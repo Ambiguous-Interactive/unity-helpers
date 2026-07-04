@@ -1306,12 +1306,20 @@ function Run-ReleasePublishTagPreparationContractTests {
   )
 
   $tagPreparationCreatesAnnotatedTags = (
-    $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"') -and
+    $workflowContent.Contains('gh_api_or_error "Creating annotated tag object ${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/tags"') -and
     $workflowContent.Contains('--field message="Release ${TAG}"') -and
     $workflowContent.Contains('--field object="${SOURCE_SHA}"') -and
-    $workflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs"') -and
-    $workflowContent.Contains('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}"') -and
+    $workflowContent.Contains('gh_api_or_error "Creating tag ref refs/tags/${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/refs"') -and
+    $workflowContent.Contains('gh_api_or_error "Retargeting tag ref refs/tags/${TAG}" --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}"') -and
     $workflowContent.Contains('--field force=true')
+  )
+
+  $tagPreparationReportsMutationFailures = (
+    $prepareTagBlock.Success -and
+    $prepareTagBlock.Value.Contains('gh_api_or_error()') -and
+    $prepareTagBlock.Value.Contains('The release tag may have changed after verification, or the GitHub token may lack contents:write.') -and
+    $prepareTagBlock.Value.Contains('tag-gh-api-stderr.txt') -and
+    $prepareTagBlock.Value.Contains('tag-gh-api-stdout.txt')
   )
 
   $publishWaitsForPreparedTag = (
@@ -1391,6 +1399,11 @@ function Run-ReleasePublishTagPreparationContractTests {
     -TestName 'release publish tag preparation creates annotated tags' `
     -Passed $tagPreparationCreatesAnnotatedTags `
     -Message 'Expected release.yml to create annotated release tags and force-update only through the guarded retarget path.'
+
+  Write-TestResult `
+    -TestName 'release publish tag preparation reports mutation failures clearly' `
+    -Passed $tagPreparationReportsMutationFailures `
+    -Message 'Expected prepare-tag to capture gh api output and emit actionable tag mutation errors.'
 
   Write-TestResult `
     -TestName 'release publish waits for prepared tag before publishing' `
@@ -1585,7 +1598,7 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
     $publishWorkflowContent.Contains('name: Prepare release tag') -and
     $publishWorkflowContent.Contains('tag_action="create"') -and
     $publishWorkflowContent.Contains('Create or retarget release tag') -and
-    $publishWorkflowContent.Contains('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags"')
+    $publishWorkflowContent.Contains('gh_api_or_error "Creating annotated tag object ${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/tags"')
   )
   $releasePrepareNoLongerMentionsReleaseTag = (
     $prepareWorkflowContent.Contains('Run the Release Publish workflow') -and

@@ -489,8 +489,33 @@ jobs:
           TAG_ACTION: ${{ needs.release-ready.outputs.tag-action }}
         run: |
           set -euo pipefail
+
+          gh_api_or_error() {
+            local description="$1"
+            shift
+            local stdout_file="${RUNNER_TEMP}/tag-gh-api-stdout.txt"
+            local stderr_file="${RUNNER_TEMP}/tag-gh-api-stderr.txt"
+            set +e
+            gh api "$@" > "${stdout_file}" 2> "${stderr_file}"
+            local exit_code=$?
+            set -e
+            if [ "${exit_code}" -ne 0 ]; then
+              {
+                echo "::error::${description} failed. The release tag may have changed after verification, or the GitHub token may lack contents:write."
+                if [ -s "${stderr_file}" ]; then
+                  cat "${stderr_file}"
+                fi
+                if [ -s "${stdout_file}" ]; then
+                  cat "${stdout_file}"
+                fi
+              } >&2
+              exit "${exit_code}"
+            fi
+            cat "${stdout_file}"
+          }
+
           created_tag_sha="$(
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
+            gh_api_or_error "Creating annotated tag object ${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
               --field tag="${TAG}" \
               --field message="Release ${TAG}" \
               --field object="${SOURCE_SHA}" \
@@ -498,12 +523,12 @@ jobs:
               --jq '.sha'
           )"
           if [ "${TAG_ACTION}" = "create" ]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            gh_api_or_error "Creating tag ref refs/tags/${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               --field ref="refs/tags/${TAG}" \
               --field sha="${created_tag_sha}" >/dev/null
             echo "::notice::Created release tag ${TAG} at ${SOURCE_SHA}."
           elif [ "${TAG_ACTION}" = "retarget" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
+            gh_api_or_error "Retargeting tag ref refs/tags/${TAG}" --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
               --field sha="${created_tag_sha}" \
               --field force=true >/dev/null
             echo "::notice::Retargeted release tag ${TAG} to ${SOURCE_SHA}."
