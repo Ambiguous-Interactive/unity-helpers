@@ -888,11 +888,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             IRandom random
         )
         {
-            if (NoiseMapIterationCount == FastNoiseMapDimensions.Length)
+            if (NoiseMapIterationCount <= FastNoiseMapDimensions.Length)
             {
-                foreach ((int width, int height) in FastNoiseMapDimensions)
+                for (int i = 0; i < NoiseMapIterationCount; ++i)
                 {
-                    yield return (width, height);
+                    yield return FastNoiseMapDimensions[i];
                 }
 
                 yield break;
