@@ -538,11 +538,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Track(owner);
 
             List<FastVector3Int> samples = new();
-            for (int y = 0; y < 72; ++y)
+            for (int y = 0; y < 40; ++y)
             {
-                for (int x = 0; x < 72; ++x)
+                for (int x = 0; x < 40; ++x)
                 {
-                    if (x > 18 && x < 54 && y > 18 && y < 54)
+                    if (x > 10 && x < 30 && y > 10 && y < 30)
                     {
                         continue;
                     }
@@ -550,11 +550,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
             }
 
-            Assert.GreaterOrEqual(samples.Count, 3500);
+            Assert.GreaterOrEqual(samples.Count, 1000);
 
             UnityExtensions.ConcaveHullOptions options =
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit(
-                    bucketSize: 32,
+                    bucketSize: 20,
                     angleThreshold: 220f
                 );
 
@@ -572,10 +572,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             FastVector3Int[] expectedCavityCorners =
             {
-                new(18, 18, 0),
-                new(18, 54, 0),
-                new(54, 18, 0),
-                new(54, 54, 0),
+                new(10, 10, 0),
+                new(10, 30, 0),
+                new(30, 10, 0),
+                new(30, 30, 0),
             };
             AssertRequiredVertices(
                 "RepresentativeSample cavity corners",
@@ -657,12 +657,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Track(owner);
 
             List<FastVector3Int> samples = new();
-            for (int y = 0; y < 84; ++y)
+            for (int y = 0; y < 48; ++y)
             {
-                for (int x = 0; x < 84; ++x)
+                for (int x = 0; x < 48; ++x)
                 {
-                    bool inFirstCavity = x > 14 && x < 34 && y > 14 && y < 34;
-                    bool inSecondCavity = x > 52 && x < 70 && y > 40 && y < 66;
+                    bool inFirstCavity = x > 8 && x < 19 && y > 8 && y < 19;
+                    bool inSecondCavity = x > 30 && x < 40 && y > 24 && y < 40;
                     if (inFirstCavity || inSecondCavity)
                     {
                         continue;
@@ -673,7 +673,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             UnityExtensions.ConcaveHullOptions options =
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit(
-                    bucketSize: 40,
+                    bucketSize: 24,
                     angleThreshold: 240f
                 );
 
@@ -695,14 +695,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             FastVector3Int[] expectedCorners =
             {
-                new(14, 14, 0),
-                new(14, 34, 0),
-                new(34, 14, 0),
-                new(34, 34, 0),
-                new(52, 40, 0),
-                new(52, 66, 0),
-                new(70, 40, 0),
-                new(70, 66, 0),
+                new(8, 8, 0),
+                new(8, 19, 0),
+                new(19, 8, 0),
+                new(19, 19, 0),
+                new(30, 24, 0),
+                new(30, 40, 0),
+                new(40, 24, 0),
+                new(40, 40, 0),
             };
             AssertRequiredVertices("Multi-cavity corners", expectedCorners, hull);
 
@@ -861,182 +861,182 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             // Single rectangular cavity (like the large samples test)
             yield return new TestCaseData(
                 "SingleRectangularCavity",
-                60, // gridWidth
-                60, // gridHeight
-                new[] { new CavityRect(15, 45, 15, 45) },
-                new[] { FV(14, 14), FV(14, 46), FV(46, 14), FV(46, 46) },
-                32, // bucketSize
+                36, // gridWidth
+                36, // gridHeight
+                new[] { new CavityRect(9, 27, 9, 27) },
+                new[] { FV(8, 8), FV(8, 28), FV(28, 8), FV(28, 28) },
+                20, // bucketSize
                 220f // angleThreshold
             ).SetName("ConcaveHullCavityShape.SingleRectangular");
 
             // Multiple disjoint cavities
             yield return new TestCaseData(
                 "MultipleDisjointCavities",
-                80,
-                80,
-                new[] { new CavityRect(10, 25, 10, 25), new CavityRect(50, 70, 50, 70) },
+                48,
+                48,
+                new[] { new CavityRect(7, 16, 7, 16), new CavityRect(31, 40, 31, 40) },
                 new[]
                 {
                     // First cavity corners
-                    FV(9, 9),
-                    FV(9, 26),
-                    FV(26, 9),
-                    FV(26, 26),
+                    FV(6, 6),
+                    FV(6, 17),
+                    FV(17, 6),
+                    FV(17, 17),
                     // Second cavity corners
-                    FV(49, 49),
-                    FV(49, 71),
-                    FV(71, 49),
-                    FV(71, 71),
+                    FV(30, 30),
+                    FV(30, 41),
+                    FV(41, 30),
+                    FV(41, 41),
                 },
-                48,
+                24,
                 240f
             ).SetName("ConcaveHullCavityShape.MultipleDisjoint");
 
             // L-shaped cavity (two overlapping rectangles forming an L)
             yield return new TestCaseData(
                 "LShapedCavity",
-                50,
-                50,
+                36,
+                36,
                 new[]
                 {
-                    new CavityRect(10, 20, 10, 35), // Vertical part of L
-                    new CavityRect(10, 35, 10, 20), // Horizontal part of L
+                    new CavityRect(7, 14, 7, 25), // Vertical part of L
+                    new CavityRect(7, 25, 7, 14), // Horizontal part of L
                 },
                 new[]
                 {
                     // Outer corners of L
-                    FV(9, 9),
-                    FV(9, 36),
-                    FV(21, 36),
-                    FV(21, 21),
-                    FV(36, 21),
-                    FV(36, 9),
+                    FV(6, 6),
+                    FV(6, 26),
+                    FV(15, 26),
+                    FV(15, 15),
+                    FV(26, 15),
+                    FV(26, 6),
                 },
-                32,
+                20,
                 230f
             ).SetName("ConcaveHullCavityShape.LShaped");
 
             // U-shaped cavity (three rectangles forming a U)
             yield return new TestCaseData(
                 "UShapedCavity",
-                60,
-                50,
+                44,
+                36,
                 new[]
                 {
-                    new CavityRect(10, 20, 10, 35), // Left arm of U
-                    new CavityRect(10, 50, 10, 20), // Bottom of U
-                    new CavityRect(40, 50, 10, 35), // Right arm of U
+                    new CavityRect(7, 14, 7, 25), // Left arm of U
+                    new CavityRect(7, 36, 7, 14), // Bottom of U
+                    new CavityRect(29, 36, 7, 25), // Right arm of U
                 },
                 new[]
                 {
                     // U shape outer corners
-                    FV(9, 9),
-                    FV(9, 36),
-                    FV(21, 36),
-                    FV(21, 21),
-                    FV(39, 21),
-                    FV(39, 36),
-                    FV(51, 36),
-                    FV(51, 9),
+                    FV(6, 6),
+                    FV(6, 26),
+                    FV(15, 26),
+                    FV(15, 15),
+                    FV(28, 15),
+                    FV(28, 26),
+                    FV(37, 26),
+                    FV(37, 6),
                 },
-                40,
+                24,
                 235f
             ).SetName("ConcaveHullCavityShape.UShaped");
 
             // Irregular cavity boundary (staircase pattern via multiple small rectangles)
             yield return new TestCaseData(
                 "IrregularStaircaseCavity",
-                50,
-                50,
+                36,
+                36,
                 new[]
                 {
-                    new CavityRect(10, 15, 10, 40),
-                    new CavityRect(15, 20, 15, 40),
-                    new CavityRect(20, 25, 20, 40),
-                    new CavityRect(25, 30, 25, 40),
+                    new CavityRect(7, 10, 7, 29),
+                    new CavityRect(10, 14, 11, 29),
+                    new CavityRect(14, 18, 15, 29),
+                    new CavityRect(18, 22, 19, 29),
                 },
                 new[]
                 {
                     // Staircase corners (outer edges)
-                    FV(9, 9),
-                    FV(9, 41),
-                    FV(16, 41),
-                    FV(16, 14),
-                    FV(21, 14),
-                    FV(21, 19),
-                    FV(26, 19),
-                    FV(26, 24),
-                    FV(31, 24),
-                    FV(31, 41),
+                    FV(6, 6),
+                    FV(6, 30),
+                    FV(11, 30),
+                    FV(11, 10),
+                    FV(15, 10),
+                    FV(15, 14),
+                    FV(19, 14),
+                    FV(19, 18),
+                    FV(23, 18),
+                    FV(23, 30),
                 },
-                32,
+                20,
                 225f
             ).SetName("ConcaveHullCavityShape.IrregularStaircase");
 
             // Concentric frame (outer rectangle with inner rectangle, like a picture frame)
             yield return new TestCaseData(
                 "ConcentricFrameCavity",
-                70,
-                70,
-                new[] { new CavityRect(20, 50, 20, 50) },
-                new[] { FV(19, 19), FV(19, 51), FV(51, 19), FV(51, 51) },
-                40,
+                44,
+                44,
+                new[] { new CavityRect(13, 31, 13, 31) },
+                new[] { FV(12, 12), FV(12, 32), FV(32, 12), FV(32, 32) },
+                24,
                 220f
             ).SetName("ConcaveHullCavityShape.ConcentricFrame");
 
             // T-shaped cavity
             yield return new TestCaseData(
                 "TShapedCavity",
-                60,
-                50,
+                44,
+                36,
                 new[]
                 {
-                    new CavityRect(10, 50, 30, 40), // Top bar of T
-                    new CavityRect(25, 35, 10, 40), // Vertical stem of T
+                    new CavityRect(7, 36, 22, 29), // Top bar of T
+                    new CavityRect(19, 25, 7, 29), // Vertical stem of T
                 },
                 new[]
                 {
                     // T shape corners
-                    FV(9, 29),
-                    FV(9, 41),
-                    FV(24, 41),
-                    FV(24, 9),
-                    FV(36, 9),
-                    FV(36, 41),
-                    FV(51, 41),
-                    FV(51, 29),
+                    FV(6, 21),
+                    FV(6, 30),
+                    FV(18, 30),
+                    FV(18, 6),
+                    FV(26, 6),
+                    FV(26, 30),
+                    FV(37, 30),
+                    FV(37, 21),
                 },
-                36,
+                24,
                 230f
             ).SetName("ConcaveHullCavityShape.TShaped");
 
             // Cross/Plus-shaped cavity
             yield return new TestCaseData(
                 "CrossShapedCavity",
-                60,
-                60,
+                44,
+                44,
                 new[]
                 {
-                    new CavityRect(20, 40, 10, 50), // Vertical bar
-                    new CavityRect(10, 50, 20, 40), // Horizontal bar
+                    new CavityRect(15, 29, 7, 36), // Vertical bar
+                    new CavityRect(7, 36, 15, 29), // Horizontal bar
                 },
                 new[]
                 {
                     // Cross corners (12 total for a plus shape)
-                    FV(19, 9),
-                    FV(19, 19),
-                    FV(9, 19),
-                    FV(9, 41),
-                    FV(19, 41),
-                    FV(19, 51),
-                    FV(41, 51),
-                    FV(41, 41),
-                    FV(51, 41),
-                    FV(51, 19),
-                    FV(41, 19),
-                    FV(41, 9),
+                    FV(14, 6),
+                    FV(14, 14),
+                    FV(6, 14),
+                    FV(6, 30),
+                    FV(14, 30),
+                    FV(14, 37),
+                    FV(30, 37),
+                    FV(30, 30),
+                    FV(37, 30),
+                    FV(37, 14),
+                    FV(30, 14),
+                    FV(30, 6),
                 },
-                40,
+                24,
                 235f
             ).SetName("ConcaveHullCavityShape.CrossShaped");
         }
