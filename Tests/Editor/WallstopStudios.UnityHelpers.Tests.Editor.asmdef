@@ -18,6 +18,7 @@
     "nunit.framework.dll",
     "System.Text.Json.dll",
     "Sirenix.Serialization.dll",
+    "Sirenix.OdinInspector.Attributes.dll",
     "Sirenix.OdinInspector.Editor.dll"
   ],
   "autoReferenced": false,

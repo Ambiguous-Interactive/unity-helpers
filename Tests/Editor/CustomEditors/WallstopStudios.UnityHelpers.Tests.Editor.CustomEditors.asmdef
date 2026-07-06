@@ -17,6 +17,7 @@
   "precompiledReferences": [
     "nunit.framework.dll",
     "Sirenix.Serialization.dll",
+    "Sirenix.OdinInspector.Attributes.dll",
     "Sirenix.OdinInspector.Editor.dll"
   ],
   "autoReferenced": false,

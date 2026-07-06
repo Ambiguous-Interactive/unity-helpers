@@ -675,6 +675,41 @@ function Run-OptionalOdinIntegrationContractTests {
     -Passed ($missingOdinVersionDefines.Count -eq 0) `
     -Message "Missing odininspector versionDefines: $($missingOdinVersionDefines -join ', ')"
 
+  $missingOdinOverrideReferences = New-Object System.Collections.Generic.List[string]
+  foreach ($asmdefRelativePath in $requiredOdinSymbolAsmdefs) {
+    $asmdefPath = Join-Path $repoRoot $asmdefRelativePath
+    if (-not (Test-Path $asmdefPath)) {
+      continue
+    }
+
+    $asmdef = Get-Content -Path $asmdefPath -Raw | ConvertFrom-Json
+    $overrideReferences = $asmdef.PSObject.Properties['overrideReferences'] -and
+      $asmdef.overrideReferences -eq $true
+    if (-not $overrideReferences) {
+      continue
+    }
+
+    $precompiledReferences = @($asmdef.precompiledReferences)
+    $requiredReferences = @(
+      'Sirenix.Serialization.dll',
+      'Sirenix.OdinInspector.Attributes.dll'
+    )
+    if ($asmdefRelativePath -like 'Tests/Editor/*') {
+      $requiredReferences += 'Sirenix.OdinInspector.Editor.dll'
+    }
+
+    foreach ($requiredReference in $requiredReferences) {
+      if ($requiredReference -notin $precompiledReferences) {
+        $missingOdinOverrideReferences.Add("${asmdefRelativePath}: ${requiredReference}") | Out-Null
+      }
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'Odin-enabled overrideReferences test asmdefs keep Odin assemblies visible' `
+    -Passed ($missingOdinOverrideReferences.Count -eq 0) `
+    -Message "Missing Odin precompiledReferences: $($missingOdinOverrideReferences -join ', ')"
+
   $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
   $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json
   $runtimePrecompiledReferences = @($runtimeAsmdef.precompiledReferences)

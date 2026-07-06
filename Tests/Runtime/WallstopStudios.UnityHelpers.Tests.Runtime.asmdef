@@ -18,7 +18,8 @@
     "protobuf-net.dll",
     "protobuf-net.Core.dll",
     "System.Collections.Immutable.dll",
-    "Sirenix.Serialization.dll"
+    "Sirenix.Serialization.dll",
+    "Sirenix.OdinInspector.Attributes.dll"
   ],
   "autoReferenced": false,
   "defineConstraints": ["UNITY_INCLUDE_TESTS"],
