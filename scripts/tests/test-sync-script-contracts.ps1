@@ -21,7 +21,7 @@ Param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# cspell:ignore Eqi asmdefs odininspector WALLSTOP
+# cspell:ignore cnotin Eqi asmdefs odininspector WALLSTOP
 
 $script:TestsPassed = 0
 $script:TestsFailed = 0
@@ -1247,6 +1247,27 @@ function Run-PrePushLastResortGuidanceContractTests {
     -Message "Stale guidance: $($staleGuidanceHits -join '; ')"
 }
 
+function Get-WorkflowEventPathFilterBlock {
+  param(
+    [Parameter(Mandatory = $true)][string]$WorkflowContent,
+    [Parameter(Mandatory = $true)][string]$EventName
+  )
+
+  $eventPattern = "(?ms)^  $([regex]::Escape($EventName)):\s*\r?\n(?<body>.*?)(?=^  [A-Za-z0-9_-]+:\s*$|^\S|\z)"
+  $eventMatch = [regex]::Match($WorkflowContent, $eventPattern)
+  if (-not $eventMatch.Success) {
+    return ''
+  }
+
+  $pathsPattern = '(?ms)^    paths:\s*\r?\n(?<body>.*?)(?=^    [A-Za-z0-9_-]+:\s*$|^  [A-Za-z0-9_-]+:\s*$|^\S|\z)'
+  $pathsMatch = [regex]::Match($eventMatch.Value, $pathsPattern)
+  if (-not $pathsMatch.Success) {
+    return ''
+  }
+
+  return $pathsMatch.Groups['body'].Value
+}
+
 function Run-DocumentationWorkflowContractTests {
   Write-Host ""
   Write-Host "Documentation workflow contracts:" -ForegroundColor Magenta
@@ -1288,6 +1309,27 @@ function Run-DocumentationWorkflowContractTests {
     $validateLinkFormatBlock.Value.Contains('timeout-minutes: 5')
   )
 
+  [string[]]$requiredValidateDocsPathFilters = @(
+    'scripts/comment-stripping.ps1',
+    'scripts/lint-doc-links.ps1',
+    'scripts/run-doc-link-lint.js',
+    'scripts/tests/test-lint-doc-links.ps1'
+  )
+  [string[]]$missingValidateDocsPathFilters = @()
+  $validateDocsPathFilterBlocks = @{
+    push = Get-WorkflowEventPathFilterBlock -WorkflowContent $workflowContent -EventName 'push'
+    pull_request = Get-WorkflowEventPathFilterBlock -WorkflowContent $workflowContent -EventName 'pull_request'
+  }
+  foreach ($eventName in @('push', 'pull_request')) {
+    $pathFilterBlock = $validateDocsPathFilterBlocks[$eventName]
+    foreach ($requiredPathFilter in $requiredValidateDocsPathFilters) {
+      $pathFilterPattern = '- "' + $requiredPathFilter + '"'
+      if (-not $pathFilterBlock.Contains($pathFilterPattern)) {
+        $missingValidateDocsPathFilters += "${eventName}:$requiredPathFilter"
+      }
+    }
+  }
+
   $slowInlineScannerPatterns = @(
     'find . -name "*.md"',
     'strip_inline_code()',
@@ -1315,6 +1357,11 @@ function Run-DocumentationWorkflowContractTests {
     -TestName 'validate-docs bounds link-check job runtime' `
     -Passed $hasBoundedLinkJobTimeouts `
     -Message 'Expected validate-docs.yml link jobs to have timeout-minutes: 5.'
+
+  Write-TestResult `
+    -TestName 'validate-docs path filters include doc link linter sources' `
+    -Passed ($missingValidateDocsPathFilters.Count -eq 0) `
+    -Message "Expected push and pull_request path filters to include doc link linter sources. Missing: $($missingValidateDocsPathFilters -join ', ')"
 
   Write-TestResult `
     -TestName 'validate-docs avoids duplicated slow inline markdown scanner' `

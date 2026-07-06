@@ -211,11 +211,18 @@ jobs:
             -ProvisioningProfile $provisioningProfile `
             -DiagnosticsRoot $maintenanceDiagnosticsRoot
           $pwshCandidates = @(
-            (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
             (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
-            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' }),
-            $(if ($env:LocalAppData) { Join-Path $env:LocalAppData 'Microsoft\WindowsApps\pwsh.exe' })
-          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' })
+          )
+          $pathPwsh = Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+          if ($pathPwsh -and $pathPwsh -notlike '*\Microsoft\WindowsApps\pwsh.exe') {
+            $pwshCandidates += $pathPwsh
+          }
+          $pwshCandidates = @(
+            $pwshCandidates |
+              Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+              Select-Object -Unique
+          )
           $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
           if (-not $pwshPath) {
             throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'

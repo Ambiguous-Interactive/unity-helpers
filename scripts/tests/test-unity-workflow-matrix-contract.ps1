@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# cspell:ignore Redist
+# cspell:ignore ims msiexec Redist WindowsApps
 # Contract test: a job skipped by a job-level `if:` before matrix expansion must
 # not use `matrix.*` in the job display name. GitHub renders those skipped names
 # literally, which hides the actual gated job behind unresolved expressions.
@@ -324,6 +324,10 @@ $runnerBootstrapBackendPresent = (
     $windowsRunnerBootstrapContent.Contains('$script:VcRedist2010X64Sha256') -and
     $windowsRunnerBootstrapContent.Contains('unity-runner-bootstrap-installers') -and
     $windowsRunnerBootstrapContent.Contains('function Test-RunnerPowerShell7Present') -and
+    $windowsRunnerBootstrapContent.Contains('function Test-RunnerWindowsAppsPowerShellAliasPath') -and
+    $windowsRunnerBootstrapContent.Contains('function Test-RunnerPowerShell7ExecutablePath') -and
+    $windowsRunnerBootstrapContent.Contains('\Microsoft\WindowsApps\pwsh.exe') -and
+    -not $windowsRunnerBootstrapContent.Contains("if (Test-RunnerCommandExists -Name 'pwsh')") -and
     $windowsRunnerBootstrapContent.Contains("[Alias('DetectOnly')]") -and
     $windowsRunnerBootstrapContent.Contains('$RunnerBootstrapDetectOnly') -and
     $windowsRunnerBootstrapContent.Contains('$wingetOutput = @(& winget @arguments 2>&1)') -and
@@ -610,10 +614,20 @@ function Test-UnityJobMaintainsSelectedRunner {
     $computeIndex = $JobText.IndexOf('- name: Compute')
     $licenseValidationIndex = $JobText.IndexOf('- name: Validate Unity license secrets')
     $maintenanceUsesWindowsPowerShell = $JobText -match '(?s)- name: Maintain Unity editor on selected runner.*?shell:\s*powershell'
+    $programFilesPwshIndex = $JobText.IndexOf('PowerShell\7\pwsh.exe')
+    $getCommandPwshIndex = $JobText.IndexOf('Get-Command pwsh')
     $maintenancePublishesPowerShell7Path = (
         $JobText -match '(?s)- name: Maintain Unity editor on selected runner.*?\$env:GITHUB_PATH' -and
         $JobText.Contains('PowerShell\7\pwsh.exe') -and
         $JobText.Contains('pwsh.exe was not found for later GitHub Actions steps')
+    )
+    $maintenancePrefersRealPowerShell7Install = (
+        $programFilesPwshIndex -ge 0 -and
+        $getCommandPwshIndex -ge 0 -and
+        $programFilesPwshIndex -lt $getCommandPwshIndex -and
+        $JobText.Contains('$pathPwsh -and $pathPwsh -notlike ''*\Microsoft\WindowsApps\pwsh.exe''') -and
+        $JobText.Contains('Select-Object -Unique') -and
+        -not $JobText.Contains('Join-Path $env:LocalAppData ''Microsoft\WindowsApps\pwsh.exe''')
     )
     $jobTimeoutCoversMaintenanceBudget = $JobText -match '(?m)^\s+timeout-minutes:\s*1200\s*$'
 
@@ -629,6 +643,7 @@ function Test-UnityJobMaintainsSelectedRunner {
         ($licenseValidationIndex -lt 0 -or $maintenanceIndex -lt $licenseValidationIndex) -and
         $maintenanceUsesWindowsPowerShell -and
         $maintenancePublishesPowerShell7Path -and
+        $maintenancePrefersRealPowerShell7Install -and
         $jobTimeoutCoversMaintenanceBudget -and
         $JobText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
         $JobText.Contains('-UnityVersions ''${{ matrix.unity-version }}''') -and
@@ -776,6 +791,72 @@ if ($healthyBootstrapDetectOnlyExitCode -ne 0 -or (($healthyBootstrapDetectOnlyO
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked healthy direct bootstrap detect-only avoids Defender mutation."
+}
+
+$windowsAppsPwshProbeScriptPath = ''
+$windowsAppsPwshProbeOutput = @()
+$windowsAppsPwshProbeExitCode = 1
+try {
+    $windowsAppsPwshProbeScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-windowsapps-pwsh-$PID-$(Get-Random).ps1"
+    @"
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+. '$($windowsRunnerBootstrapPath.Replace("'", "''"))'
+
+`$script:ProgramFilesRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'ProgramFiles'
+`$script:LocalAppDataRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'Users/runneradmin/AppData/Local'
+`$env:LOCALAPPDATA = `$script:LocalAppDataRoot
+`$env:ProgramFiles = `$script:ProgramFilesRoot
+`$script:CommandSource = Join-Path `$script:LocalAppDataRoot 'Microsoft/WindowsApps/pwsh.exe'
+`$script:ExistingPaths = @(`$script:CommandSource)
+
+function Get-Command {
+    param(
+        [string]`$Name,
+        [object]`$ErrorAction
+    )
+    if (`$Name -eq 'pwsh') {
+        return [pscustomobject]@{ Source = `$script:CommandSource }
+    }
+
+    return `$null
+}
+
+function Test-Path {
+    param(
+        [string]`$LiteralPath,
+        [object]`$PathType,
+        [object]`$ErrorAction
+    )
+    `$normalizedLiteralPath = `$LiteralPath.Replace('/', '\')
+    `$normalizedExistingPaths = @(`$script:ExistingPaths | ForEach-Object { `$_.Replace('/', '\') })
+    return `$normalizedExistingPaths -contains `$normalizedLiteralPath
+}
+
+if (Test-RunnerPowerShell7Present) {
+    Write-Host 'WindowsApps pwsh alias was incorrectly treated as PowerShell 7.'
+    exit 7
+}
+
+`$programFilesPwshPath = Join-Path `$env:ProgramFiles 'PowerShell\7\pwsh.exe'
+`$script:ExistingPaths = @(`$programFilesPwshPath)
+if (-not (Test-RunnerPowerShell7Present)) {
+    Write-Host 'Real Program Files PowerShell 7 install was not detected after ignoring WindowsApps alias.'
+    exit 8
+}
+"@ | Set-Content -LiteralPath $windowsAppsPwshProbeScriptPath -Encoding UTF8
+    $windowsAppsPwshProbeOutput = & pwsh -NoProfile -File $windowsAppsPwshProbeScriptPath 2>&1
+    $windowsAppsPwshProbeExitCode = $LASTEXITCODE
+} finally {
+    if ($windowsAppsPwshProbeScriptPath -and (Test-Path -LiteralPath $windowsAppsPwshProbeScriptPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $windowsAppsPwshProbeScriptPath -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($windowsAppsPwshProbeExitCode -ne 0) {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::Windows runner bootstrap must ignore the WindowsApps pwsh.exe app execution alias and keep searching for a real PowerShell 7 install. Exit $windowsAppsPwshProbeExitCode. Output: $($windowsAppsPwshProbeOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Windows runner bootstrap ignores WindowsApps pwsh alias."
 }
 
 $workflowShapeScriptPath = ''

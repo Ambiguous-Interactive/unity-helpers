@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# cspell:ignore HKLM msvcp redist redists vcredist vcruntime winget UCRT ucrtbase
+# cspell:ignore HKLM msvcp redist redists vcredist vcruntime winget UCRT ucrtbase WindowsApps
 [CmdletBinding()]
 param(
     [Alias('DetectOnly')]
@@ -72,6 +72,31 @@ function Test-RunnerIsWindows {
 function Test-RunnerCommandExists {
     param([Parameter(Mandatory = $true)][string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Test-RunnerWindowsAppsPowerShellAliasPath {
+    param([AllowNull()][string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    $normalizedPath = $Path.Trim().Replace('/', '\')
+    return $normalizedPath.EndsWith('\Microsoft\WindowsApps\pwsh.exe', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-RunnerPowerShell7ExecutablePath {
+    param([AllowNull()][string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    if (Test-RunnerWindowsAppsPowerShellAliasPath -Path $Path) {
+        return $false
+    }
+
+    return Test-Path -LiteralPath $Path -PathType Leaf
 }
 
 function Get-RunnerRegistryDword {
@@ -194,7 +219,13 @@ function Test-RunnerVcRuntime140DllsPresent {
 }
 
 function Test-RunnerPowerShell7Present {
-    if (Test-RunnerCommandExists -Name 'pwsh') {
+    $pathCommand = Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -First 1
+    $pathPwsh = Get-RunnerObjectPropertyValue -InputObject $pathCommand -Name 'Source'
+    if ([string]::IsNullOrWhiteSpace([string]$pathPwsh)) {
+        $pathPwsh = Get-RunnerObjectPropertyValue -InputObject $pathCommand -Name 'Path'
+    }
+
+    if (Test-RunnerPowerShell7ExecutablePath -Path ([string]$pathPwsh)) {
         return $true
     }
 
@@ -204,7 +235,7 @@ function Test-RunnerPowerShell7Present {
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     foreach ($root in $roots) {
         $candidate = Join-Path $root 'PowerShell\7\pwsh.exe'
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+        if (Test-RunnerPowerShell7ExecutablePath -Path $candidate) {
             return $true
         }
     }

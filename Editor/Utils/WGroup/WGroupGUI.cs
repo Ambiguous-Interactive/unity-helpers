@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         internal static bool Enabled { get; set; }
 
         /// <summary>
-        /// Counts grouped properties drawn while diagnostics are enabled.
+        /// Counts grouped property draw operations that diagnostics actually log.
         /// </summary>
         internal static int DrawPropertyLogCount { get; private set; }
 
