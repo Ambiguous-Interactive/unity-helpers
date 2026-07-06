@@ -359,7 +359,7 @@ jobs:
               }
               $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
               $unityVersions = @(
-                  $unityVersionsConfig.all |
+                  @($unityVersionsConfig.all) |
                       ForEach-Object { [string]$_ } |
                       Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
               )
@@ -380,8 +380,8 @@ jobs:
               if ($detectOnly) {
                   $maintenanceArgs.DetectOnly = $true
               }
-              & $script @maintenanceArgs
-              $code = $LASTEXITCODE
+              . $script
+              $code = Invoke-WindowsRunnerMaintenance @maintenanceArgs
           } finally {
               try { Stop-Transcript | Out-Null } catch { Write-Host "::notice::Stop-Transcript: $($_.Exception.Message) (non-fatal)" }
           }

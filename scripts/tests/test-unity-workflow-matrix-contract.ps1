@@ -69,10 +69,11 @@ if ($unityVersions.Count -lt 1) {
 $runnerUsesUnityVersionsConfig = (
     $runnerBootstrapContent.Contains('.github\unity-versions.json') -and
     $runnerBootstrapContent.Contains('ConvertFrom-Json') -and
+    $runnerBootstrapContent.Contains('@($unityVersionsConfig.all)') -and
     $runnerBootstrapContent.Contains('Unity versions from .github/unity-versions.json')
 )
 if (-not $runnerUsesUnityVersionsConfig) {
-    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must read .github/unity-versions.json so self-hosted runner provisioning cannot drift from the Unity test matrix."
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must read .github/unity-versions.json through an array wrapper so self-hosted runner provisioning cannot drift from the Unity test matrix or split one-element arrays incorrectly."
     $failed = $true
 } elseif ($runnerBootstrapContent -match "(?s)\`$unityVersions\s*=\s*@\(\s*'\d+\.\d+\.\d+f\d+'") {
     Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must not hardcode a Unity version array; update .github/unity-versions.json instead."
@@ -126,19 +127,20 @@ if (-not $runnerBootstrapBackendPresent) {
     Write-Info "Checked runner bootstrap Windows maintenance backend contract."
 }
 
-$runnerBootstrapAvoidsDotSourceClobber = (
-    -not $runnerBootstrapContent.Contains('. $script') -and
+$runnerBootstrapInvokesMaintenanceFunction = (
+    $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
     $runnerBootstrapContent.Contains('UnityVersions = $unityVersions') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
-    $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
-    $runnerBootstrapContent.Contains('$code = $LASTEXITCODE')
+    $runnerBootstrapContent.Contains('$code = Invoke-WindowsRunnerMaintenance @maintenanceArgs') -and
+    -not $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
+    -not $runnerBootstrapContent.Contains('$code = $LASTEXITCODE')
 )
-if (-not $runnerBootstrapAvoidsDotSourceClobber) {
-    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap workflow must invoke the maintenance script directly and read LASTEXITCODE; dot-sourcing a script with top-level params can clobber detect-only variables."
+if (-not $runnerBootstrapInvokesMaintenanceFunction) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap workflow must dot-source maintain-windows-runner.ps1 and call Invoke-WindowsRunnerMaintenance so the script's top-level exit cannot skip transcript cleanup or summary reporting."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked runner bootstrap avoids dot-sourced parameter clobber."
+    Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
 }
 
 $detectOnly = $true
@@ -174,8 +176,10 @@ try {
     DiagnosticsRoot = ''
     DetectOnly = `$true
 }
-& `$script @maintenanceArgs
-exit `$LASTEXITCODE
+. `$script
+`$code = Invoke-WindowsRunnerMaintenance @maintenanceArgs
+Write-Output "after-maintenance:`$code"
+exit `$code
 "@ | Set-Content -LiteralPath $workflowShapeScriptPath -Encoding UTF8
     $workflowShapeOutput = & pwsh -NoProfile -File $workflowShapeScriptPath 2>&1
     $workflowShapeExitCode = $LASTEXITCODE
@@ -184,11 +188,11 @@ exit `$LASTEXITCODE
         Remove-Item -LiteralPath $workflowShapeScriptPath -Force -ErrorAction SilentlyContinue
     }
 }
-if ($workflowShapeExitCode -ne 2) {
-    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Workflow-style hashtable splatting into maintain-windows-runner.ps1 must bind named parameters and return detect-only exit 2 on a non-Windows host. Exit $workflowShapeExitCode. Output: $($workflowShapeOutput -join ' ')"
+if ($workflowShapeExitCode -ne 2 -or (($workflowShapeOutput -join ' ') -notmatch 'after-maintenance:2')) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Workflow-style hashtable splatting into maintain-windows-runner.ps1 must bind named parameters, return detect-only exit 2 on a non-Windows host, and continue after Invoke-WindowsRunnerMaintenance for cleanup/summary code. Exit $workflowShapeExitCode. Output: $($workflowShapeOutput -join ' ')"
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked workflow-style maintenance hashtable splatting binds named parameters."
+    Write-Info "Checked workflow-style maintenance function invocation binds named parameters and returns control."
 }
 
 $ensureEditorShapeRoot = ''
