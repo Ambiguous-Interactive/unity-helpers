@@ -96,6 +96,17 @@ Because `administration` is not a valid `permissions:` key for the workflow-scop
 
 If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
+## Machine-name labels for runner bootstrap
+
+The manual `.github/workflows/runner-bootstrap.yml` workflow performs host maintenance on one specific Windows runner. Each runner must therefore have a custom label that exactly matches its runner name:
+
+- `DAD-MACHINE`
+- `ELI-MACHINE`
+
+The bootstrap job requests `self-hosted`, `Windows`, `RAM-64GB`, and the selected machine-name label. GitHub schedules a self-hosted job only on runners that have every requested label, so this prevents an ELI bootstrap from silently running on DAD, or the reverse. The workflow still keeps a hard runner-identity check as a final guard against label drift.
+
+If a bootstrap dispatch stays queued after selecting a runner, verify the runner is online and that the matching machine-name label is present in Settings -> Actions -> Runners. Do not work around the queue by removing the machine-name label from the workflow; that reintroduces wrong-runner maintenance.
+
 ## PowerShell 7 prerequisite on self-hosted runners
 
 Self-hosted Windows Unity runners require **PowerShell 7 (`pwsh`)** in addition to Git Bash. Every Unity workflow consumes the `print-self-hosted-runner-diagnostics` composite action (`.github/actions/print-self-hosted-runner-diagnostics/action.yml`) before its own steps, and that action plus the Unity run/provision steps run with `shell: pwsh`. PowerShell 7 is _not_ the Windows-built-in PowerShell 5.1 (`powershell`); it is a separate install that provides the `pwsh` executable.

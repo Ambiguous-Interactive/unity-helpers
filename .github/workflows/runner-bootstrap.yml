@@ -21,17 +21,13 @@ name: Runner Bootstrap (Windows)
 # onto the runner host.
 #
 # Targeting a SPECIFIC runner (HARD-FAIL on wrong target):
-#   * The repo's runner topology currently labels both Windows runners
-#     uniformly (`self-hosted, Windows, RAM-64GB`); only ELI-MACHINE carries
-#     the additional `fast` label (the org runner topology).
-#   * To bootstrap one specific machine without affecting the other, take
-#     the OTHER runner offline (gh CLI or Actions UI -> Runners) BEFORE
-#     dispatching this workflow, then bring it back online afterwards.
-#   * If the dispatch lands on the wrong runner the workflow HARD-FAILS with
-#     `::error::` and exit 1 (NOT a silent ::warning::). This is by design:
-#     a silent bootstrap of the WRONG (healthy) machine is operator-fatal.
-#   * Long-term fix: add machine-name labels to runner agents so the
-#     `runs-on:` set can include the runner name itself.
+#   * Each Windows runner must carry a custom label matching its runner name
+#     (`DAD-MACHINE` or `ELI-MACHINE`).
+#   * The bootstrap job includes the selected runner name in `runs-on`, so the
+#     GitHub scheduler can only assign a runner that has the machine-name label.
+#   * If labels drift and the dispatch somehow lands on the wrong runner, the
+#     identity step still HARD-FAILS with `::error::` and exit 1. This is by
+#     design: a silent bootstrap of the WRONG machine is operator-fatal.
 #
 # Idempotent: the bootstrap script is safe to re-run on a healthy host
 # (every prereq is detected first and remediated only when missing). A
@@ -58,12 +54,11 @@ on:
       runner-label:
         description: >-
           (HARD-FAIL on wrong target) Name of the runner you want to bootstrap
-          (DAD-MACHINE or ELI-MACHINE). Both runners share the same label set,
-          so the scheduler may land on either machine. If it lands on the
-          WRONG one, this workflow FAILS FAST with exit 1 -- it does NOT
-          silently bootstrap the unintended machine. Take the unwanted runner
-          offline (Settings -> Runners) BEFORE dispatching to guarantee
-          targeting.
+          (DAD-MACHINE or ELI-MACHINE). The selected runner name is also a
+          required runs-on label, so each runner must have a matching custom
+          label. If labels drift and dispatch lands on the WRONG machine, this
+          workflow FAILS FAST with exit 1; it never silently bootstraps the
+          unintended machine.
         required: true
         type: choice
         options:
@@ -122,7 +117,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
-          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
+          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB,${{ inputs.runner-label }}"
           REQUIRED_RUNNER_NAME: ${{ inputs.runner-label }}
         # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml and
         # unity-tests.yml. CRITICAL: this preflight must NEVER make CI more broken
@@ -172,7 +167,7 @@ jobs:
           matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
             [ .[]
               | select(.status == "online")
-              | select(($labels | all(. as $l | (.labels // []) | map(.name) | index($l) | type == "number")))
+              | select((($labels - ((.labels // []) | map(.name))) | length) == 0)
             ] | length
           ' < "${runners_json}")"
           echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
@@ -188,10 +183,9 @@ jobs:
           fi
           # F12: the label match above is necessary but not sufficient when the
           # operator named a SPECIFIC runner. Require that the named runner is
-          # also online (otherwise the dispatch would land on the other
-          # machine, which the bootstrap job's "Confirm runner identity" step
-          # then HARD-FAILS on -- catching it here gives a clearer error
-          # before consuming a self-hosted slot).
+          # also online and carries the full required label set (otherwise the
+          # bootstrap job would queue forever or the identity step would
+          # HARD-FAIL on a mislabelled runner).
           named_online="$(jq --arg name "${REQUIRED_RUNNER_NAME}" '
             [ .[] | select(.name == $name) | select(.status == "online") ] | length
           ' < "${runners_json}")"
@@ -200,6 +194,26 @@ jobs:
             {
               echo "::error::Requested runner '${REQUIRED_RUNNER_NAME}' is not currently online."
               echo "Bring it online via Settings -> Runners (or the runner-host service) before dispatching."
+              echo "See docs/runbooks/unity-runners-after-transfer.md."
+            }
+            jq --arg name "${REQUIRED_RUNNER_NAME}" '
+              [ .[] | select(.name == $name) | {name, status, busy, labels: [(.labels // [])[].name]} ]
+            ' < "${runners_json}"
+            exit 1
+          fi
+          named_matching="$(jq --arg name "${REQUIRED_RUNNER_NAME}" --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
+            [
+              .[]
+              | select(.name == $name)
+              | select(.status == "online")
+              | select((($labels - ((.labels // []) | map(.name))) | length) == 0)
+            ] | length
+          ' < "${runners_json}")"
+          echo "Named runner has required labels (name='${REQUIRED_RUNNER_NAME}'): ${named_matching}"
+          if [ "${named_matching}" -lt 1 ]; then
+            {
+              echo "::error::Requested runner '${REQUIRED_RUNNER_NAME}' is online but does not expose every required label (${REQUIRED_LABELS})."
+              echo "Add a custom '${REQUIRED_RUNNER_NAME}' label to that runner before dispatching bootstrap."
               echo "See docs/runbooks/unity-runners-after-transfer.md."
             }
             jq --arg name "${REQUIRED_RUNNER_NAME}" '
@@ -216,14 +230,11 @@ jobs:
     name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} ${{ inputs.runner-label }}
     needs:
       - runner-preflight
-    # Cannot dynamically pin to a specific runner without machine-name labels
-    # configured on the runners themselves (operator action; not yet done in
-    # this org). Use the documented allowlisted set; operator takes the
-    # unwanted runner offline before dispatching when targeting is needed.
-    # The "Confirm runner identity" step below HARD-FAILS if the dispatch
-    # lands on the wrong machine (see header comment for the chicken-and-egg
-    # rationale around `shell: powershell` for the rest of this job).
-    runs-on: [self-hosted, Windows, RAM-64GB]
+    # The selected runner name is a required custom label. GitHub's runner
+    # selection is cumulative for `runs-on` arrays, so this queues only on the
+    # named machine when runner labels are configured correctly. The identity
+    # step remains a fail-safe against label drift.
+    runs-on: [self-hosted, Windows, RAM-64GB, "${{ inputs.runner-label }}"]
     # F13: inherit workflow-level permissions (contents: read, actions: read).
     # No job-level override -- the previous explicit block silently dropped
     # `actions: read` and shadowed the workflow-level intent.
@@ -263,12 +274,11 @@ jobs:
           # the runner the operator did NOT intend.
           if (-not [string]::IsNullOrWhiteSpace($actual) -and -not [string]::IsNullOrWhiteSpace($requested)) {
               if (-not [string]::Equals($actual, $requested, [System.StringComparison]::OrdinalIgnoreCase)) {
-                  Write-Host ("::error::Bootstrap dispatched to '$actual' but operator requested '$requested'. Cancel this run, take '$actual' offline (Settings -> Runners or 'gh api -X POST " +
-                  "orgs/<org>/actions/runners/<id>/...'), then re-dispatch so the run lands on '$requested'. Alternatively, add machine-name labels to runner agents so 'runs-on:' can pin to a " +
-                  "specific runner.")
+                  Write-Host ("::error::Bootstrap dispatched to '$actual' but operator requested '$requested'. Verify that the '$requested' runner has a custom '$requested' label and that no other " +
+                  "runner carries that label, then re-dispatch. The bootstrap job's runs-on label set is expected to pin the requested runner.")
                   if ($env:GITHUB_STEP_SUMMARY) {
                       Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("## Runner Bootstrap (FAILED: wrong target)`n`n- Requested runner: ``$requested```n- Actual runner: ``$actual```n- Action: " +
-                      "hard-fail; take ``$actual`` offline and re-dispatch.")
+                      "hard-fail; fix machine-name runner labels and re-dispatch.")
                   }
                   exit 1
               }

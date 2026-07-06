@@ -16,6 +16,7 @@ function Write-Info($msg) {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
 $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.yml'
+$actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
 $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
@@ -27,6 +28,10 @@ if (-not (Test-Path -LiteralPath $workflowPath)) {
 }
 if (-not (Test-Path -LiteralPath $runnerBootstrapPath)) {
     Write-Host "::error::Runner bootstrap workflow not found: $runnerBootstrapPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $actionlintPath)) {
+    Write-Host "::error::Actionlint config not found: $actionlintPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
@@ -101,9 +106,52 @@ function Invoke-EnsureEditorWatchdogProbe {
         -StallKnob 'TEST_STALL_SECONDS'
 }
 
+function Get-WorkflowJobTexts {
+    param([string[]]$WorkflowLines)
+
+    $texts = @{}
+    $insideWorkflowJobs = $false
+    for ($lineIndex = 0; $lineIndex -lt $WorkflowLines.Count; $lineIndex++) {
+        if ($WorkflowLines[$lineIndex] -match '^jobs:\s*$') {
+            $insideWorkflowJobs = $true
+            continue
+        }
+
+        if (-not $insideWorkflowJobs) {
+            continue
+        }
+
+        if ($WorkflowLines[$lineIndex] -match '^[A-Za-z0-9_-]+:\s*$') {
+            break
+        }
+
+        $jobMatch = [regex]::Match($WorkflowLines[$lineIndex], '^  ([A-Za-z0-9_-]+):\s*$')
+        if (-not $jobMatch.Success) {
+            continue
+        }
+
+        $jobId = $jobMatch.Groups[1].Value
+        $start = $lineIndex
+        $end = $WorkflowLines.Count
+        for ($nextLineIndex = $lineIndex + 1; $nextLineIndex -lt $WorkflowLines.Count; $nextLineIndex++) {
+            if ($WorkflowLines[$nextLineIndex] -match '^  [A-Za-z0-9_-]+:\s*$') {
+                $end = $nextLineIndex
+                break
+            }
+        }
+
+        $texts[$jobId] = (@($WorkflowLines[$start..($end - 1)]) -join "`n")
+        $lineIndex = $end - 1
+    }
+
+    return $texts
+}
+
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
+[string[]]$runnerBootstrapLines = Get-Content -LiteralPath $runnerBootstrapPath
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
+[string]$actionlintContent = Get-Content -LiteralPath $actionlintPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
@@ -115,7 +163,8 @@ $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | Conver
 )
 [bool]$failed = $false
 [bool]$insideJobs = $false
-$jobTexts = @{}
+$jobTexts = Get-WorkflowJobTexts -WorkflowLines $lines
+$runnerBootstrapJobTexts = Get-WorkflowJobTexts -WorkflowLines $runnerBootstrapLines
 
 if ($unityVersions.Count -lt 1) {
     Write-Host "::error file=.github/unity-versions.json::Unity CI version config must define at least one entry in all[]."
@@ -202,6 +251,30 @@ if (-not $runnerBootstrapInvokesMaintenanceFunction) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
+}
+
+$runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight')) { $runnerBootstrapJobTexts['runner-preflight'] } else { '' }
+$bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
+$requiredLabelsPattern = '(?m)^\s+REQUIRED_LABELS:\s*"self-hosted,Windows,RAM-64GB,\$\{\{\s*inputs\.runner-label\s*\}\}"\s*$'
+$bootstrapRunsOnPattern = '(?m)^\s+runs-on:\s*\[self-hosted,\s*Windows,\s*RAM-64GB,\s*"\$\{\{\s*inputs\.runner-label\s*\}\}"\]\s*$'
+$runnerBootstrapPinsRequestedMachine = (
+    $runnerBootstrapJobTexts.ContainsKey('runner-preflight') -and
+    $runnerBootstrapJobTexts.ContainsKey('bootstrap') -and
+    $runnerPreflightJob -match $requiredLabelsPattern -and
+    $runnerPreflightJob.Contains('select((($labels - ((.labels // []) | map(.name))) | length) == 0)') -and
+    -not $runnerPreflightJob.Contains('($labels | all(. as $l | (.labels // [])') -and
+    $bootstrapJob -match $bootstrapRunsOnPattern -and
+    $bootstrapJob.Contains('custom ''$requested'' label') -and
+    $actionlintContent.Contains('- DAD-MACHINE') -and
+    $actionlintContent.Contains('- ELI-MACHINE') -and
+    -not $runnerBootstrapContent.Contains('take the unwanted runner offline') -and
+    -not $runnerBootstrapContent.Contains('take ``$actual`` offline')
+)
+if (-not $runnerBootstrapPinsRequestedMachine) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must include the selected machine-name label in runs-on and preflight labels so operator-dispatched maintenance cannot silently run on the wrong self-hosted runner."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner bootstrap pins the requested machine with a machine-name label."
 }
 
 $timeoutEventsPreserveReason = (

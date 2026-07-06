@@ -9,6 +9,10 @@ self-hosted-runner:
     # runner-bootstrap.yml). Add additional custom labels here as new runner
     # pools are introduced.
     - RAM-64GB
+    # Machine-name labels used by runner-bootstrap.yml to pin maintenance to one
+    # specific self-hosted Windows runner.
+    - DAD-MACHINE
+    - ELI-MACHINE
     # Speed marker reserved on the org's runners for future opt-in (e.g.,
     # hotfix dispatch); no currently-active workflow requests it. actionlint
     # still allows the label so a future workflow can opt in without churn.
