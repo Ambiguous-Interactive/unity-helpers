@@ -11,6 +11,7 @@ on:
       - "scripts/verify-devcontainer-tools.sh"
       - "scripts/tests/test-validate-devcontainer-urls.sh"
       - "scripts/tests/test-post-create.sh"
+      - ".github/workflows/build-publish-devcontainer.yml"
       - ".github/workflows/validate-devcontainer.yml"
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - "scripts/verify-devcontainer-tools.sh"
       - "scripts/tests/test-validate-devcontainer-urls.sh"
       - "scripts/tests/test-post-create.sh"
+      - ".github/workflows/build-publish-devcontainer.yml"
       - ".github/workflows/validate-devcontainer.yml"
 
 permissions:

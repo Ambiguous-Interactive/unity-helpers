@@ -108,6 +108,7 @@ nul.meta
 # Placeholder files (root level only)
 /PlaceHolderSummary.md
 /PlaceHolderSummary.md.meta
+/[Pp][Rr]-[Dd]escription.md*
 
 # Unity Editor Analyzers (built DLLs)
 Editor/Analyzers/*.dll

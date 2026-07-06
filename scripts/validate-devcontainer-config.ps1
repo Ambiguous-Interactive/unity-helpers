@@ -23,6 +23,8 @@ Set-StrictMode -Version Latest
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $devcontainerPath = Join-Path $repoRoot '.devcontainer' 'devcontainer.json'
 $preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit'
+$publishWorkflowPath = Join-Path $repoRoot '.github' 'workflows' 'build-publish-devcontainer.yml'
+$validateWorkflowPath = Join-Path $repoRoot '.github' 'workflows' 'validate-devcontainer.yml'
 
 # ── Validate files exist ────────────────────────────────────────────────────
 
@@ -36,9 +38,73 @@ if (-not (Test-Path $preCommitPath)) {
     exit 1
 }
 
+if (-not (Test-Path $publishWorkflowPath)) {
+    Write-Error "Devcontainer publish workflow not found at: $publishWorkflowPath"
+    exit 1
+}
+
+if (-not (Test-Path $validateWorkflowPath)) {
+    Write-Error "Devcontainer validation workflow not found at: $validateWorkflowPath"
+    exit 1
+}
+
 # ── Read devcontainer.json ──────────────────────────────────────────────────
 
 $devcontainerContent = Get-Content $devcontainerPath -Raw
+$publishWorkflowContent = Get-Content $publishWorkflowPath -Raw
+$validateWorkflowContent = Get-Content $validateWorkflowPath -Raw
+
+$expectedImageName = 'ambiguous-interactive/unity-helpers/devcontainer'
+$expectedImageReference = "ghcr.io/$expectedImageName"
+$legacyImageReference = 'ghcr.io/wallstop/unity-helpers/devcontainer'
+
+if ($devcontainerContent.Contains($legacyImageReference) -or $publishWorkflowContent.Contains($legacyImageReference)) {
+    Write-Error "Devcontainer image references must use $expectedImageReference, not $legacyImageReference."
+    exit 1
+}
+
+$devcontainerUsesCurrentCache = (
+    $devcontainerContent.Contains("${expectedImageReference}:buildcache") -and
+    $devcontainerContent.Contains("${expectedImageReference}:latest")
+)
+if (-not $devcontainerUsesCurrentCache) {
+    Write-Error "devcontainer.json must cache from $expectedImageReference buildcache and latest tags."
+    exit 1
+}
+
+$publishWorkflowUsesCurrentImage = $publishWorkflowContent.Contains("IMAGE_NAME: $expectedImageName")
+if (-not $publishWorkflowUsesCurrentImage) {
+    Write-Error "build-publish-devcontainer.yml must publish IMAGE_NAME: $expectedImageName."
+    exit 1
+}
+
+$publishWorkflowHasPackagePermission = $publishWorkflowContent.Contains('packages: write')
+if (-not $publishWorkflowHasPackagePermission) {
+    Write-Error "build-publish-devcontainer.yml must grant packages: write for GHCR publishing."
+    exit 1
+}
+
+$publishWorkflowHasSourceLabel = $publishWorkflowContent.Contains('org.opencontainers.image.source=https://github.com/${{ github.repository }}')
+if (-not $publishWorkflowHasSourceLabel) {
+    Write-Error "build-publish-devcontainer.yml must publish an org.opencontainers.image.source label so GHCR links the image to this repository."
+    exit 1
+}
+
+$publishWorkflowRunsConfigValidation = $publishWorkflowContent.Contains('./scripts/validate-devcontainer-config.ps1 -VerboseOutput')
+if (-not $publishWorkflowRunsConfigValidation) {
+    Write-Error "build-publish-devcontainer.yml must run validate-devcontainer-config.ps1 before publishing to GHCR."
+    exit 1
+}
+
+$validateWorkflowWatchesPublishWorkflow = $validateWorkflowContent.Contains('.github/workflows/build-publish-devcontainer.yml')
+if (-not $validateWorkflowWatchesPublishWorkflow) {
+    Write-Error "validate-devcontainer.yml must run when build-publish-devcontainer.yml changes."
+    exit 1
+}
+
+if ($VerboseOutput) {
+    Write-Host "Devcontainer image namespace and GHCR publish metadata are valid." -ForegroundColor Green
+}
 
 # Extract all "[language]" entries from devcontainer.json
 # Matches patterns like: "[javascript]", "[csharp]", etc.

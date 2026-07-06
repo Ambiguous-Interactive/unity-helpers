@@ -1717,6 +1717,13 @@ function Run-ReleasePackageContentContractTests {
     $validatorContent.Contains('[System.IO.Path]::GetRelativePath($rootPath, $childPath)') -and
     -not $validatorContent.Contains('.FullName.Replace(')
   )
+  $validatorRejectsPrDescriptionArtifacts = (
+    $validatorContent.Contains('$forbiddenRootMarkdownArtifactPrefixes') -and
+    $validatorContent.Contains("'pr-description.md'") -and
+    $validatorContent.Contains('.StartsWith($forbiddenRootMarkdownArtifactPrefix') -and
+    $validatorContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
+    $validatorContent.Contains('Forbidden release artifact included in npm package')
+  )
   $productionPowerShellScriptsWithStringPathExtraction = @(
     Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Recurse -File -Filter '*.ps1' |
       Where-Object { $_.FullName -notmatch '[\\/](scripts[\\/])?tests[\\/]' } |
@@ -1778,6 +1785,11 @@ function Run-ReleasePackageContentContractTests {
     -TestName 'production PowerShell scripts avoid string-based FullName relative paths' `
     -Passed ($productionPowerShellScriptsWithStringPathExtraction.Count -eq 0) `
     -Message "Scripts still using string-based FullName relative path extraction: $($productionPowerShellScriptsWithStringPathExtraction -join ', ')"
+
+  Write-TestResult `
+    -TestName 'npm package validator rejects PR description artifacts explicitly' `
+    -Passed $validatorRejectsPrDescriptionArtifacts `
+    -Message 'Expected validate-npm-package.ps1 to reject pr-description.md case variants before package publication.'
 
   Write-TestResult `
     -TestName 'npm package validator uses case-sensitive package membership checks' `

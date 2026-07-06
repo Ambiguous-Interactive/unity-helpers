@@ -338,26 +338,36 @@ jobs:
           # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
           # reliably the repo root post-checkout (actions/checkout@v7 above).
           #
-          # TODO(unity-helpers): scripts/unity/maintain-windows-runner.ps1 (and
-          # the scripts/unity/bootstrap-windows-runner.ps1 it wraps, plus the
-          # .github/actions/assert-unity-host-prereqs composite) were NOT ported
-          # in this batch -- they are the host-OS remediation backend (VC++
-          # redist, long-paths, Defender exclusions, pwsh, UCRT installs). Until
-          # they are ported from DxMessaging, this workflow HARD-FAILS below with
-          # a clear "script not found" error instead of silently doing nothing.
-          # The runner-preflight job above (runner online + label check) still
-          # works standalone; only this maintenance step needs the backend.
+          # The maintenance script audits/remediates host prerequisites first
+          # (VC++ redists, UCRT, long paths, pwsh, Defender exclusions), then
+          # verifies every Unity version from .github/unity-versions.json through
+          # ensure-editor.ps1 so installed editors, required modules, and native
+          # startup health stay aligned with the CI matrix.
           $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
           if (-not (Test-Path -LiteralPath $script)) {
-              Write-Host "::error::Runner maintenance script not found at $script (see TODO(unity-helpers) in this workflow: scripts/unity/maintain-windows-runner.ps1 has not been ported yet)."
+              Write-Host "::error::Runner maintenance script not found at $script."
               exit 1
           }
 
           $code = 0
           try {
               Start-Transcript -Path $logPath -Force | Out-Null
-              . $script
-              $unityVersions = @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1')
+              $unityVersionsPath = Join-Path $env:GITHUB_WORKSPACE '.github\unity-versions.json'
+              if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
+                  Write-Host "::error::Unity versions file not found at $unityVersionsPath."
+                  exit 1
+              }
+              $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
+              $unityVersions = @(
+                  $unityVersionsConfig.all |
+                      ForEach-Object { [string]$_ } |
+                      Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+              )
+              if ($unityVersions.Count -lt 1) {
+                  Write-Host "::error::.github/unity-versions.json must define at least one Unity version in all[]."
+                  exit 1
+              }
+              Write-Host "Unity versions from .github/unity-versions.json: $($unityVersions -join ', ')"
               $provisioningProfile = 'StandaloneWindowsIl2Cpp'
               $installRoot = if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }
               $maintenanceArgs = @{
@@ -370,7 +380,8 @@ jobs:
               if ($detectOnly) {
                   $maintenanceArgs.DetectOnly = $true
               }
-              $code = Invoke-WindowsRunnerMaintenance @maintenanceArgs
+              & $script @maintenanceArgs
+              $code = $LASTEXITCODE
           } finally {
               try { Stop-Transcript | Out-Null } catch { Write-Host "::notice::Stop-Transcript: $($_.Exception.Message) (non-fatal)" }
           }

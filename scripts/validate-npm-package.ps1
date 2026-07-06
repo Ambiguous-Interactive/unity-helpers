@@ -217,6 +217,10 @@ try {
     'scripts.meta'
   )
 
+  $forbiddenRootMarkdownArtifactPrefixes = @(
+    'pr-description.md'
+  )
+
   foreach ($entry in $forbiddenPackageEntries) {
     $entryPath = Join-Path $packageDir $entry
     if (Test-Path $entryPath) {
@@ -226,6 +230,11 @@ try {
 
   $topLevelEntries = Get-ChildItem -LiteralPath $packageDir -Force | ForEach-Object { $_.Name }
   foreach ($entry in $topLevelEntries) {
+    foreach ($forbiddenRootMarkdownArtifactPrefix in $forbiddenRootMarkdownArtifactPrefixes) {
+      if ($entry.StartsWith($forbiddenRootMarkdownArtifactPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $errors += "Forbidden release artifact included in npm package: $entry"
+      }
+    }
     if ($entry -cnotin $allowedTopLevelEntries) {
       $errors += "Unexpected top-level entry included in npm package: $entry"
     }

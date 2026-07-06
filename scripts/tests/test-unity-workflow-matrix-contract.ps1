@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+# cspell:ignore Redist
 # Contract test: a job skipped by a job-level `if:` before matrix expansion must
 # not use `matrix.*` in the job display name. GitHub renders those skipped names
 # literally, which hides the actual gated job behind unresolved expressions.
@@ -14,17 +15,167 @@ function Write-Info($msg) {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
+$runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.yml'
+$unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
+$windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
+$windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
     exit 1
 }
+if (-not (Test-Path -LiteralPath $runnerBootstrapPath)) {
+    Write-Host "::error::Runner bootstrap workflow not found: $runnerBootstrapPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
+    Write-Host "::error::Unity versions config not found: $unityVersionsPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $windowsRunnerBootstrapPath)) {
+    Write-Host "::error::Windows runner bootstrap script not found: $windowsRunnerBootstrapPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $windowsRunnerMaintenancePath)) {
+    Write-Host "::error::Windows runner maintenance script not found: $windowsRunnerMaintenancePath"
+    exit 1
+}
 
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
+[string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
+[string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
+[string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
+$unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
+[string[]]$unityVersions = @(
+    $unityVersionsConfig.all |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+)
 [bool]$failed = $false
 [bool]$insideJobs = $false
 $jobTexts = @{}
+
+if ($unityVersions.Count -lt 1) {
+    Write-Host "::error file=.github/unity-versions.json::Unity CI version config must define at least one entry in all[]."
+    $failed = $true
+} elseif ($unityVersions[-1] -ne '6000.5.2f1') {
+    Write-Host "::error file=.github/unity-versions.json::Unity 6000.5.2f1 must be the latest tracked Unity version so Unity 6000.5 regressions are caught in CI."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity version source of truth includes Unity 6000.5.2f1 as the latest version."
+}
+
+$runnerUsesUnityVersionsConfig = (
+    $runnerBootstrapContent.Contains('.github\unity-versions.json') -and
+    $runnerBootstrapContent.Contains('ConvertFrom-Json') -and
+    $runnerBootstrapContent.Contains('Unity versions from .github/unity-versions.json')
+)
+if (-not $runnerUsesUnityVersionsConfig) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must read .github/unity-versions.json so self-hosted runner provisioning cannot drift from the Unity test matrix."
+    $failed = $true
+} elseif ($runnerBootstrapContent -match "(?s)\`$unityVersions\s*=\s*@\(\s*'\d+\.\d+\.\d+f\d+'") {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must not hardcode a Unity version array; update .github/unity-versions.json instead."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner bootstrap uses .github/unity-versions.json instead of a hardcoded Unity version array."
+}
+
+$runnerBootstrapBackendPresent = (
+    $runnerBootstrapContent.Contains('scripts\unity\maintain-windows-runner.ps1') -and
+    -not $runnerBootstrapContent.Contains('has not been ported yet') -and
+    $windowsRunnerBootstrapContent.Contains('function Invoke-WindowsRunnerBootstrap') -and
+    $windowsRunnerBootstrapContent.Contains('VC++ 2010 SP1 x64 redistributable') -and
+    $windowsRunnerBootstrapContent.Contains('VC++ 2015-2022 x64 redistributable') -and
+    $windowsRunnerBootstrapContent.Contains('PowerShell 7') -and
+    $windowsRunnerBootstrapContent.Contains('Assert-RunnerMicrosoftAuthenticodeSignature') -and
+    $windowsRunnerBootstrapContent.Contains('$script:VcRedist2010X64Sha256') -and
+    $windowsRunnerBootstrapContent.Contains('unity-runner-bootstrap-installers') -and
+    $windowsRunnerBootstrapContent.Contains('function Test-RunnerPowerShell7Present') -and
+    $windowsRunnerBootstrapContent.Contains("[Alias('DetectOnly')]") -and
+    $windowsRunnerBootstrapContent.Contains('$RunnerBootstrapDetectOnly') -and
+    $windowsRunnerBootstrapContent.Contains('$wingetOutput = @(& winget @arguments 2>&1)') -and
+    $windowsRunnerBootstrapContent.Contains('$wingetExitCode = $LASTEXITCODE') -and
+    $windowsRunnerMaintenanceContent.Contains('function Invoke-WindowsRunnerMaintenance') -and
+    $windowsRunnerMaintenanceContent.Contains('ensure-editor.ps1') -and
+    $windowsRunnerMaintenanceContent.Contains('-RequireHealthyExisting') -and
+    $windowsRunnerMaintenanceContent.Contains("[Alias('DetectOnly')]") -and
+    $windowsRunnerMaintenanceContent.Contains('$RunnerMaintenanceDetectOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('$maintenanceDetectOnly = [bool]$DetectOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('$bootstrapOutput = @(Invoke-WindowsRunnerBootstrap') -and
+    $windowsRunnerMaintenanceContent.Contains('$ensureEditorOutput = @(& $ensureEditorScript @arguments 2>&1)')
+)
+if (-not $runnerBootstrapBackendPresent) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must have a real scripts/unity Windows maintenance backend that audits host prerequisites, verifies Microsoft installers before execution, keeps installers out of uploaded artifacts, preserves detect-only flags across script loading, captures child success streams before returning scalar exit codes, and verifies Unity editors with ensure-editor.ps1."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner bootstrap Windows maintenance backend contract."
+}
+
+$runnerBootstrapAvoidsDotSourceClobber = (
+    -not $runnerBootstrapContent.Contains('. $script') -and
+    $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
+    $runnerBootstrapContent.Contains('UnityVersions = $unityVersions') -and
+    $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
+    $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
+    $runnerBootstrapContent.Contains('$code = $LASTEXITCODE')
+)
+if (-not $runnerBootstrapAvoidsDotSourceClobber) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap workflow must invoke the maintenance script directly and read LASTEXITCODE; dot-sourcing a script with top-level params can clobber detect-only variables."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner bootstrap avoids dot-sourced parameter clobber."
+}
+
+$detectOnly = $true
+. $windowsRunnerMaintenancePath
+if (-not $detectOnly) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Dot-sourcing maintain-windows-runner.ps1 must not clobber a caller `$detectOnly variable."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked maintenance script dot-source does not clobber caller detect-only variable."
+}
+
+$detectOnlyOutput = & pwsh -NoProfile -File $windowsRunnerMaintenancePath -UnityVersions '2022.3.45f1' -DetectOnly 2>&1
+$detectOnlyExitCode = $LASTEXITCODE
+if ($detectOnlyExitCode -ne 2) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Detect-only maintenance on a non-Windows host must exit 2 before remediation. Exit $detectOnlyExitCode. Output: $($detectOnlyOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked maintenance detect-only execution returns missing-prerequisite code 2 without remediation."
+}
+
+$workflowShapeScriptPath = ''
+$workflowShapeOutput = @()
+$workflowShapeExitCode = 1
+try {
+    $workflowShapeScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-workflow-shape-$PID-$(Get-Random).ps1"
+    @"
+`$script = '$($windowsRunnerMaintenancePath.Replace("'", "''"))'
+`$maintenanceArgs = @{
+    UnityVersions = @('2022.3.45f1')
+    ProvisioningProfile = 'StandaloneWindowsIl2Cpp'
+    InstallRoot = 'C:\Unity\Editors'
+    Force = `$true
+    DiagnosticsRoot = ''
+    DetectOnly = `$true
+}
+& `$script @maintenanceArgs
+exit `$LASTEXITCODE
+"@ | Set-Content -LiteralPath $workflowShapeScriptPath -Encoding UTF8
+    $workflowShapeOutput = & pwsh -NoProfile -File $workflowShapeScriptPath 2>&1
+    $workflowShapeExitCode = $LASTEXITCODE
+} finally {
+    if ($workflowShapeScriptPath -and (Test-Path -LiteralPath $workflowShapeScriptPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $workflowShapeScriptPath -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($workflowShapeExitCode -ne 2) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Workflow-style hashtable splatting into maintain-windows-runner.ps1 must bind named parameters and return detect-only exit 2 on a non-Windows host. Exit $workflowShapeExitCode. Output: $($workflowShapeOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked workflow-style maintenance hashtable splatting binds named parameters."
+}
 
 $hasPrCancelConcurrency = (
     $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and

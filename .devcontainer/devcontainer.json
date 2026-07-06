@@ -7,8 +7,8 @@
     "dockerfile": "Dockerfile",
     "context": "..",
     "cacheFrom": [
-      "ghcr.io/wallstop/unity-helpers/devcontainer:buildcache",
-      "ghcr.io/wallstop/unity-helpers/devcontainer:latest"
+      "ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache",
+      "ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest"
     ]
   },
   // Features to add to the dev container

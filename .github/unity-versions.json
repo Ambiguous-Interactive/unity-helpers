@@ -1,5 +1,5 @@
 {
   "_comment": "Canonical Unity version source of truth for all CI. The newest entry of `all` (last element) is the 'latest' tracked by unity-benchmarks. `release` is the version release/publish flows pin. Bump versions HERE so every consumer stays in sync.",
-  "all": ["2021.3.45f1", "2022.3.45f1", "6000.3.16f1"],
+  "all": ["2021.3.45f1", "2022.3.45f1", "6000.3.16f1", "6000.5.2f1"],
   "release": "2022.3.45f1"
 }

@@ -17,7 +17,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: wallstop/unity-helpers/devcontainer
+  IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer
 
 jobs:
   publish-devcontainer:
@@ -28,6 +28,10 @@ jobs:
 
       - name: Validate Dockerfile download URLs
         run: bash scripts/validate-devcontainer-urls.sh
+
+      - name: Validate devcontainer config
+        shell: pwsh
+        run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput
 
       - name: Validate post-create script
         run: bash scripts/tests/test-post-create.sh --verbose
@@ -50,6 +54,8 @@ jobs:
         uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-
