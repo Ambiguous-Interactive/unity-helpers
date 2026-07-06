@@ -5,18 +5,16 @@
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
-  "overrideReferences": true,
-  "precompiledReferences": [
-    "System.Text.Json.dll",
-    "System.Text.Encodings.Web.dll",
-    "Microsoft.Bcl.AsyncInterfaces.dll",
-    "protobuf-net.dll",
-    "protobuf-net.Core.dll",
-    "System.Collections.Immutable.dll",
-    "System.Runtime.CompilerServices.Unsafe.dll"
-  ],
+  "overrideReferences": false,
+  "precompiledReferences": [],
   "autoReferenced": true,
   "defineConstraints": [],
-  "versionDefines": [],
+  "versionDefines": [
+    {
+      "name": "odininspector",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
+    }
+  ],
   "noEngineReferences": false
 }

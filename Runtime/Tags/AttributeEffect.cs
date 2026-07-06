@@ -13,6 +13,11 @@ namespace WallstopStudios.UnityHelpers.Tags
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Utils;
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+    using AttributeEffectBase = Sirenix.OdinInspector.SerializedScriptableObject;
+#else
+    using AttributeEffectBase = UnityEngine.ScriptableObject;
+#endif
 
     /// <summary>
     /// Determines which handles are considered the "same stack" when evaluating stacking policies.
@@ -103,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </remarks>
     [Serializable]
     [CreateAssetMenu(menuName = "Wallstop Studios/Unity Helpers/Attribute Effect")]
-    public sealed class AttributeEffect : ScriptableObject, IEquatable<AttributeEffect>
+    public sealed class AttributeEffect : AttributeEffectBase, IEquatable<AttributeEffect>
     {
         /// <summary>
         /// Gets a human-readable description of this effect based on its modifications.

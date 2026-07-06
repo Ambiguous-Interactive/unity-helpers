@@ -34,15 +34,20 @@ This validates assembly references and Unity version-define expressions. Skippin
 
 **When `overrideReferences` is `true`, each assembly must independently list ALL precompiled DLLs directly used by source compiled into that assembly.**
 
-Unity's `overrideReferences: true` means the assembly can ONLY see the DLLs explicitly listed in its `precompiledReferences`. Precompiled references do not propagate transitively, but runtime assemblies in this package intentionally avoid Sirenix base types. Do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`; add them only when the assembly directly compiles Odin/Sirenix source.
+Unity's `overrideReferences: true` means the assembly can ONLY see the DLLs explicitly listed in its `precompiledReferences`. Precompiled references do not propagate transitively. Do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`; add them only when an `overrideReferences: true` assembly directly compiles Odin/Sirenix source. The runtime asmdef uses `overrideReferences: false` for its guarded Odin base aliases so no-Odin registry installs do not name missing Sirenix DLLs.
 
 ### Optional Odin Integration
 
-This package uses the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol for Odin-specific source. Runtime singleton base classes remain Sirenix-free:
+This package uses the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol for Odin-specific source. Runtime singleton base classes use conditional aliases so Odin projects keep Odin serialization and non-Odin projects use Unity bases:
 
 ```csharp
-public abstract class ScriptableObjectSingleton<T> : ScriptableObject
-    where T : ScriptableObjectSingleton<T>
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+using ScriptableObjectSingletonBase = Sirenix.OdinInspector.SerializedScriptableObject;
+#else
+using ScriptableObjectSingletonBase = UnityEngine.ScriptableObject;
+#endif
+
+public abstract class ScriptableObjectSingleton<T> : ScriptableObjectSingletonBase
 ```
 
 Odin-specific drawers, inspectors, and test targets stay behind:
@@ -114,7 +119,7 @@ When creating a new test assembly that uses types from the Runtime assembly:
 }
 ```
 
-**Note**: Add Sirenix DLLs to `precompiledReferences` only when the test assembly directly compiles Odin-specific source. Test assemblies that include Odin test targets must also define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from the `odininspector` package in `versionDefines`.
+**Note**: Add Sirenix DLLs to `precompiledReferences` only when an `overrideReferences: true` assembly directly compiles Odin-specific source. Test assemblies that include Odin test targets must also define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from the `odininspector` package in `versionDefines`.
 
 ---
 
@@ -142,12 +147,12 @@ There is no implicit reference conversion from 'X' to 'UnityEngine.ScriptableObj
 
 ## Anti-Patterns
 
-| Anti-Pattern                                            | Why It's Wrong                                       | Correct Approach                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------- |
-| Creating child asmdef without checking direct DLL usage | Missing direct dependencies cause CS0012             | Audit child source and list needed DLLs                          |
-| Assuming assembly references propagate precompiled DLLs | Unity does not propagate precompiled refs            | Each assembly lists its own precompiled DLLs                     |
-| Using global `ODIN_INSPECTOR` in package source         | A project-wide define can activate code without DLLs | Use `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from `odininspector` |
-| Adding Sirenix DLLs to runtime asmdefs                  | Registry installs can fail without Odin              | Keep runtime asmdefs Sirenix-free                                |
+| Anti-Pattern                                            | Why It's Wrong                                       | Correct Approach                                                                            |
+| ------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Creating child asmdef without checking direct DLL usage | Missing direct dependencies cause CS0012             | Audit child source and list needed DLLs                                                     |
+| Assuming assembly references propagate precompiled DLLs | Unity does not propagate precompiled refs            | Each assembly lists its own precompiled DLLs                                                |
+| Using global `ODIN_INSPECTOR` in package source         | A project-wide define can activate code without DLLs | Use `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from `odininspector`                            |
+| Adding unguarded Sirenix runtime source                 | Registry installs can fail without Odin              | Gate runtime Odin bases behind `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` with Unity fallbacks |
 
 ---
 

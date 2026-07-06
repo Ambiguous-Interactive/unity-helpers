@@ -14,6 +14,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+    using Sirenix.OdinInspector;
+#endif
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -180,6 +183,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(instance.gameObject);
 
             Assert.IsInstanceOf<MonoBehaviour>(instance);
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+            Assert.IsInstanceOf<SerializedMonoBehaviour>(instance);
+#endif
         }
 
         [Test]

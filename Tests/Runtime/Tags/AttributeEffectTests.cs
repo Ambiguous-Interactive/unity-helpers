@@ -8,11 +8,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Tags;
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+    using Sirenix.OdinInspector;
+#endif
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class AttributeEffectTests : AttributeTagsTestBase
     {
+        [Test]
+        public void AttributeEffectUsesExpectedScriptableObjectBase()
+        {
+            AttributeEffect effect = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+
+            Assert.IsInstanceOf<ScriptableObject>(effect);
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+            Assert.IsInstanceOf<SerializedScriptableObject>(effect);
+#endif
+        }
+
         [Test]
         public void HumanReadableDescriptionFormatsAllModificationTypes()
         {

@@ -460,8 +460,8 @@ foreach ($file in $asmdefFilesToValidate) {
 }
 
 # 6. Optional Odin integration is validated by scripts/tests/test-sync-script-contracts.ps1.
-#    Do not require Sirenix DLLs just because an assembly references the runtime asmdef:
-#    Runtime code intentionally stays Sirenix-free so registry installs compile without Odin.
+#    Runtime Odin bases are allowed only through the package-owned odininspector version define;
+#    unguarded Sirenix references still fail the dedicated contract test.
 
 # Also validate any .asmref files
 $asmrefFiles = @()

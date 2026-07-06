@@ -291,7 +291,8 @@ Optional parameters:
 
 ## Odin Inspector Compatibility
 
-Runtime ScriptableObjects in this package stay Sirenix-free. Use the package's own
+Runtime ScriptableObjects in this package use Unity bases unless the package-owned
+Odin define enables guarded Sirenix bases. Use the package's own
 attributes in runtime assets, and put Odin-specific drawers, editors, and tests in
 the dedicated Odin integration folders.
 

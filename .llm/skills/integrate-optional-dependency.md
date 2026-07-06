@@ -375,7 +375,7 @@ When optional dependencies affect assembly definitions, use Version Defines:
 
 When an assembly has `"overrideReferences": true`, it can ONLY see precompiled DLLs explicitly listed in its `precompiledReferences`. These references do NOT propagate transitively through assembly references.
 
-**Example**: an assembly that directly compiles Odin test targets derived from `SerializedScriptableObject` must include `Sirenix.Serialization.dll` in its own `precompiledReferences` and gate those files with `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`. Runtime singleton base classes are Sirenix-free, so do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`.
+**Example**: an assembly that directly compiles Odin test targets derived from `SerializedScriptableObject` must include `Sirenix.Serialization.dll` in its own `precompiledReferences` and gate those files with `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`. Runtime conditional Odin base aliases are the only runtime Sirenix use; do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`.
 
 **When splitting assemblies**: Always audit the parent assembly's `precompiledReferences` and propagate required DLLs to each child. See [manage-assembly-definitions](./manage-assembly-definitions.md) for the full checklist.
 

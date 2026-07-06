@@ -338,7 +338,7 @@ error CS0311: The type 'X' cannot be used as type parameter 'T' in the generic t
 There is no implicit reference conversion from 'X' to 'UnityEngine.MonoBehaviour'.
 ```
 
-**Cause**: The assembly definition has `overrideReferences: true` and directly compiles source that references Odin/Sirenix types, but the matching Sirenix DLL is missing from `precompiledReferences`. Runtime singleton base classes are intentionally Sirenix-free; do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`.
+**Cause**: The assembly definition has `overrideReferences: true` and directly compiles source that references Odin/Sirenix types, but the matching Sirenix DLL is missing from `precompiledReferences`. Runtime conditional Odin base aliases are package-owned and guarded; do not add Sirenix DLLs merely because another assembly references `WallstopStudios.UnityHelpers`.
 
 **Fix**: Add the exact Sirenix DLL used by the affected source to the `precompiledReferences` array in that `.asmdef` file:
 
@@ -351,7 +351,7 @@ There is no implicit reference conversion from 'X' to 'UnityEngine.MonoBehaviour
 
 **Prevention**: The [manage-assembly-definitions](./manage-assembly-definitions.md) skill documents this requirement in detail. Add Sirenix DLLs only to assemblies that directly compile Odin-specific source, and gate those files with `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`.
 
-**Linter**: `pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1` verifies optional Odin guard and asmdef contracts, including that runtime stays Sirenix-free and Odin test/editor asmdefs define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from `odininspector`.
+**Linter**: `pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1` verifies optional Odin guard and asmdef contracts, including guarded runtime Odin base aliases with Unity fallbacks and Odin test/editor asmdefs defining `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from `odininspector`.
 
 ---
 

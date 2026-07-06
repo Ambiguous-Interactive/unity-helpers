@@ -27,6 +27,44 @@ function Write-RunnerBootstrapWarning {
     Write-Host "::warning::$Message"
 }
 
+function Get-WindowsRunnerBootstrapScriptRoot {
+    if ($PSScriptRoot) {
+        return $PSScriptRoot
+    }
+
+    return Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+
+function Get-WindowsRunnerBootstrapRepoRoot {
+    $scriptRoot = Get-WindowsRunnerBootstrapScriptRoot
+    $current = Get-Item -LiteralPath $scriptRoot
+    while ($null -ne $current) {
+        $unityVersionsPath = Join-Path $current.FullName '.github/unity-versions.json'
+        if (Test-Path -LiteralPath $unityVersionsPath -PathType Leaf) {
+            return $current.FullName
+        }
+
+        $current = $current.Parent
+    }
+
+    return (Get-Item -LiteralPath (Join-Path $scriptRoot '../..')).FullName
+}
+
+function Get-WindowsRunnerBootstrapDefaultDiagnosticsRoot {
+    return Join-Path (Get-WindowsRunnerBootstrapRepoRoot) '.artifacts/runner-bootstrap'
+}
+
+function Resolve-WindowsRunnerBootstrapDetectOnly {
+    param([bool]$DetectOnly)
+
+    if ($env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -eq '1') {
+        Write-RunnerBootstrapInfo 'UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 -> forcing DetectOnly.'
+        return $true
+    }
+
+    return $DetectOnly
+}
+
 function Test-RunnerIsWindows {
     return [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
 }
@@ -430,15 +468,24 @@ function Invoke-WindowsRunnerBootstrap {
         [string]$DiagnosticsRoot = $script:WindowsRunnerBootstrapDefaultDiagnosticsRoot
     )
 
+    $bootstrapDetectOnly = Resolve-WindowsRunnerBootstrapDetectOnly -DetectOnly ([bool]$DetectOnly)
+    $bootstrapDiagnosticsRoot = if ([string]::IsNullOrWhiteSpace($DiagnosticsRoot)) {
+        Get-WindowsRunnerBootstrapDefaultDiagnosticsRoot
+    } else {
+        [string]$DiagnosticsRoot
+    }
+
     $statuses = @(Get-WindowsRunnerPrerequisiteStatus)
-    Write-WindowsRunnerPrerequisiteSummary -Statuses $statuses -DiagnosticsRoot $DiagnosticsRoot
+    Write-WindowsRunnerPrerequisiteSummary -Statuses $statuses -DiagnosticsRoot $bootstrapDiagnosticsRoot
     $missing = @($statuses | Where-Object { -not $_.Present })
     if ($missing.Count -eq 0) {
-        Add-RunnerDefenderExclusions -UnityInstallRoot $UnityInstallRoot
+        if (-not $bootstrapDetectOnly) {
+            Add-RunnerDefenderExclusions -UnityInstallRoot $UnityInstallRoot
+        }
         return 0
     }
 
-    if ($DetectOnly) {
+    if ($bootstrapDetectOnly) {
         return 2
     }
 
@@ -448,10 +495,10 @@ function Invoke-WindowsRunnerBootstrap {
                 throw $status.Remediation
             }
             'VC++ 2010 SP1 x64 redistributable' {
-                Install-RunnerVcRedist2010X64 -DiagnosticsRoot $DiagnosticsRoot
+                Install-RunnerVcRedist2010X64 -DiagnosticsRoot $bootstrapDiagnosticsRoot
             }
             'VC++ 2015-2022 x64 redistributable' {
-                Install-RunnerVcRedist2015To2022X64 -DiagnosticsRoot $DiagnosticsRoot
+                Install-RunnerVcRedist2015To2022X64 -DiagnosticsRoot $bootstrapDiagnosticsRoot
             }
             'Universal CRT' {
                 Write-RunnerBootstrapWarning $status.Remediation
@@ -466,7 +513,7 @@ function Invoke-WindowsRunnerBootstrap {
     }
 
     $after = @(Get-WindowsRunnerPrerequisiteStatus)
-    Write-WindowsRunnerPrerequisiteSummary -Statuses $after -DiagnosticsRoot $DiagnosticsRoot
+    Write-WindowsRunnerPrerequisiteSummary -Statuses $after -DiagnosticsRoot $bootstrapDiagnosticsRoot
     $stillMissing = @($after | Where-Object { -not $_.Present })
     if ($stillMissing.Count -gt 0) {
         foreach ($status in $stillMissing) {

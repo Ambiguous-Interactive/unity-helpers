@@ -298,7 +298,7 @@ $runnerBootstrapBackendPresent = (
     $windowsRunnerMaintenanceContent.Contains('RequireHealthyExisting') -and
     $windowsRunnerMaintenanceContent.Contains("[Alias('DetectOnly')]") -and
     $windowsRunnerMaintenanceContent.Contains('$RunnerMaintenanceDetectOnly') -and
-    $windowsRunnerMaintenanceContent.Contains('$maintenanceDetectOnly = [bool]$DetectOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('$maintenanceDetectOnly = Resolve-RunnerMaintenanceDetectOnly -DetectOnly ([bool]$DetectOnly)') -and
     $windowsRunnerMaintenanceContent.Contains('$bootstrapOutput = @(Invoke-WindowsRunnerBootstrap') -and
     $ensureEditorUsesNamedSplat -and
     $windowsRunnerMaintenanceContent.Contains('UnityVersion') -and
@@ -607,6 +607,82 @@ if ($detectOnlyExitCode -ne 2) {
     Write-Info "Checked maintenance detect-only execution returns missing-prerequisite code 2 without remediation."
 }
 
+$bootstrapEnvDiagnostics = ''
+$bootstrapEnvOutput = @()
+$bootstrapEnvExitCode = 1
+$oldDisableAutoBootstrap = $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP
+try {
+    $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
+    $bootstrapEnvDiagnostics = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-bootstrap-env-$PID-$(Get-Random)"
+    $bootstrapEnvOutput = & pwsh -NoProfile -File $windowsRunnerBootstrapPath -DiagnosticsRoot $bootstrapEnvDiagnostics 2>&1
+    $bootstrapEnvExitCode = $LASTEXITCODE
+} finally {
+    if ($oldDisableAutoBootstrap) {
+        $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = $oldDisableAutoBootstrap
+    } else {
+        Remove-Item Env:\UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -ErrorAction SilentlyContinue
+    }
+    if ($bootstrapEnvDiagnostics -and (Test-Path -LiteralPath $bootstrapEnvDiagnostics -PathType Container)) {
+        Remove-Item -LiteralPath $bootstrapEnvDiagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($bootstrapEnvExitCode -ne 2) {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 must force direct bootstrap script execution into detect-only mode. Exit $bootstrapEnvExitCode. Output: $($bootstrapEnvOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked direct bootstrap honors UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1."
+}
+
+$healthyBootstrapDetectOnlyScriptPath = ''
+$healthyBootstrapDetectOnlyOutput = @()
+$healthyBootstrapDetectOnlyExitCode = 1
+$oldDisableAutoBootstrap = $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP
+try {
+    $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
+    $healthyBootstrapDetectOnlyScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-healthy-bootstrap-detect-only-$PID-$(Get-Random).ps1"
+    @"
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+. '$($windowsRunnerBootstrapPath.Replace("'", "''"))'
+
+function Get-WindowsRunnerPrerequisiteStatus {
+    return @(
+        [pscustomobject]@{
+            Name        = 'Windows host'
+            Present     = `$true
+            Remediation = 'Run this script on the self-hosted Windows Unity runner.'
+        }
+    )
+}
+
+function Add-RunnerDefenderExclusions {
+    param([string]`$UnityInstallRoot)
+    throw "Defender exclusions should not run in detect-only mode. Root=`$UnityInstallRoot"
+}
+
+`$code = Invoke-WindowsRunnerBootstrap -UnityInstallRoot 'C:\Unity\Editors' -DiagnosticsRoot ''
+Write-Output "healthy detect-only code: `$code"
+exit `$code
+"@ | Set-Content -LiteralPath $healthyBootstrapDetectOnlyScriptPath -Encoding UTF8
+    $healthyBootstrapDetectOnlyOutput = & pwsh -NoProfile -File $healthyBootstrapDetectOnlyScriptPath 2>&1
+    $healthyBootstrapDetectOnlyExitCode = $LASTEXITCODE
+} finally {
+    if ($oldDisableAutoBootstrap) {
+        $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = $oldDisableAutoBootstrap
+    } else {
+        Remove-Item Env:\UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -ErrorAction SilentlyContinue
+    }
+    if ($healthyBootstrapDetectOnlyScriptPath -and (Test-Path -LiteralPath $healthyBootstrapDetectOnlyScriptPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $healthyBootstrapDetectOnlyScriptPath -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($healthyBootstrapDetectOnlyExitCode -ne 0 -or (($healthyBootstrapDetectOnlyOutput -join ' ') -notmatch 'healthy detect-only code: 0')) {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::Detect-only bootstrap on a healthy host must return success without mutating Defender exclusions. Exit $healthyBootstrapDetectOnlyExitCode. Output: $($healthyBootstrapDetectOnlyOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked healthy direct bootstrap detect-only avoids Defender mutation."
+}
+
 $workflowShapeScriptPath = ''
 $workflowShapeOutput = @()
 $workflowShapeExitCode = 1
@@ -706,6 +782,116 @@ if ($ensureEditorShapeExitCode -ne 0 -or (($ensureEditorShapeOutput -join ' ') -
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked maintenance passes named parameters to ensure-editor."
+}
+
+$manualDefaultsRoot = ''
+$manualDefaultsOutput = @()
+$manualDefaultsExitCode = 1
+$oldDisableAutoBootstrap = $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP
+try {
+    $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
+    $manualDefaultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-manual-defaults-$PID-$(Get-Random)"
+    $manualScriptsRoot = Join-Path $manualDefaultsRoot 'scripts/unity'
+    $manualGithubRoot = Join-Path $manualDefaultsRoot '.github'
+    New-Item -ItemType Directory -Force -Path $manualScriptsRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $manualGithubRoot | Out-Null
+    Copy-Item -LiteralPath $windowsRunnerMaintenancePath -Destination (Join-Path $manualScriptsRoot 'maintain-windows-runner.ps1') -Force
+    @'
+function Invoke-WindowsRunnerBootstrap {
+    param(
+        [switch]$DetectOnly,
+        [string]$UnityInstallRoot,
+        [string]$DiagnosticsRoot
+    )
+
+    if (-not $DetectOnly) {
+        throw 'UH_RUNNER_DISABLE_AUTO_BOOTSTRAP was not forwarded to bootstrap.'
+    }
+    if ([string]::IsNullOrWhiteSpace($DiagnosticsRoot)) {
+        throw 'Manual maintenance did not pass a default DiagnosticsRoot to bootstrap.'
+    }
+    if ($DiagnosticsRoot -notmatch '\.artifacts[\\/]+runner-bootstrap$') {
+        throw "Unexpected bootstrap DiagnosticsRoot: $DiagnosticsRoot"
+    }
+
+    Write-Output "fake bootstrap ok: detect=$([bool]$DetectOnly) diagnostics=$DiagnosticsRoot root=$UnityInstallRoot"
+    return 0
+}
+'@ | Set-Content -LiteralPath (Join-Path $manualScriptsRoot 'bootstrap-windows-runner.ps1') -Encoding UTF8
+    @'
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^\d+\.\d+\.\d+f\d+$')]
+    [string]$UnityVersion,
+
+    [string]$InstallRoot,
+    [string]$DiagnosticsPath,
+    [switch]$CiManagedOnly,
+
+    [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
+    [string]$ProvisioningProfile = 'Full',
+
+    [switch]$RequireHealthyExisting
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
+    throw "Bad UnityVersion: $UnityVersion"
+}
+if ($InstallRoot -ne 'C:\Unity\Editors') {
+    throw "Bad InstallRoot: $InstallRoot"
+}
+if ($ProvisioningProfile -ne 'StandaloneWindowsIl2Cpp') {
+    throw "Bad ProvisioningProfile: $ProvisioningProfile"
+}
+if (-not $CiManagedOnly) {
+    throw 'CiManagedOnly was not bound.'
+}
+if (-not $RequireHealthyExisting) {
+    throw 'UH_RUNNER_DISABLE_AUTO_BOOTSTRAP did not force RequireHealthyExisting.'
+}
+if ($DiagnosticsPath -notmatch '\.artifacts[\\/]+runner-bootstrap[\\/]+unity-\d+\.\d+\.\d+f\d+$') {
+    throw "Bad DiagnosticsPath: $DiagnosticsPath"
+}
+
+Write-Output "fake ensure-editor ok: $UnityVersion diagnostics=$DiagnosticsPath"
+'@ | Set-Content -LiteralPath (Join-Path $manualScriptsRoot 'ensure-editor.ps1') -Encoding UTF8
+    @'
+{
+  "all": [
+    "2021.3.45f1",
+    "6000.5.2f1"
+  ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $manualGithubRoot 'unity-versions.json') -Encoding UTF8
+
+    $manualDefaultsOutput = & pwsh -NoProfile -File (Join-Path $manualScriptsRoot 'maintain-windows-runner.ps1') 2>&1
+    $manualDefaultsExitCode = $LASTEXITCODE
+} finally {
+    if ($oldDisableAutoBootstrap) {
+        $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = $oldDisableAutoBootstrap
+    } else {
+        Remove-Item Env:\UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -ErrorAction SilentlyContinue
+    }
+    if ($manualDefaultsRoot -and (Test-Path -LiteralPath $manualDefaultsRoot -PathType Container)) {
+        Remove-Item -LiteralPath $manualDefaultsRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+$manualDefaultsText = $manualDefaultsOutput -join ' '
+if (
+    $manualDefaultsExitCode -ne 0 -or
+    $manualDefaultsText -notmatch 'Unity versions from \.github[\\/]unity-versions\.json: 2021\.3\.45f1, 6000\.5\.2f1' -or
+    $manualDefaultsText -notmatch 'fake bootstrap ok: detect=True' -or
+    $manualDefaultsText -notmatch 'fake ensure-editor ok: 2021\.3\.45f1' -or
+    $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.5\.2f1'
+) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked direct manual maintenance defaults match workflow provisioning inputs."
 }
 
 $ensureEditorWatchdogImported = $false

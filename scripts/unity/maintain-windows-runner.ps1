@@ -36,15 +36,31 @@ function Get-UnityMaintenanceScriptRoot {
     return Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
-function Invoke-WindowsRunnerMaintenance {
-    [CmdletBinding()]
+function Get-UnityMaintenanceRepoRoot {
+    $scriptRoot = Get-UnityMaintenanceScriptRoot
+    $current = Get-Item -LiteralPath $scriptRoot
+    while ($null -ne $current) {
+        $unityVersionsPath = Join-Path $current.FullName '.github/unity-versions.json'
+        if (Test-Path -LiteralPath $unityVersionsPath -PathType Leaf) {
+            return $current.FullName
+        }
+
+        $current = $current.Parent
+    }
+
+    return (Get-Item -LiteralPath (Join-Path $scriptRoot '../..')).FullName
+}
+
+function Get-RunnerMaintenanceDefaultDiagnosticsRoot {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    return Join-Path $RepoRoot '.artifacts/runner-bootstrap'
+}
+
+function Resolve-RunnerMaintenanceUnityVersions {
     param(
-        [Parameter(Mandatory = $true)][string[]]$UnityVersions,
-        [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
-        [string]$ProvisioningProfile = 'StandaloneWindowsIl2Cpp',
-        [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
-        [switch]$DetectOnly,
-        [string]$DiagnosticsRoot = ''
+        [AllowNull()][string[]]$UnityVersions,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
     $versions = @(
@@ -52,10 +68,53 @@ function Invoke-WindowsRunnerMaintenance {
             ForEach-Object { [string]$_ } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
-    if ($versions.Count -lt 1) {
-        throw 'Invoke-WindowsRunnerMaintenance requires at least one Unity version.'
+    if ($versions.Count -gt 0) {
+        return $versions
     }
 
+    $unityVersionsPath = Join-Path $RepoRoot '.github/unity-versions.json'
+    if (-not (Test-Path -LiteralPath $unityVersionsPath -PathType Leaf)) {
+        throw "Invoke-WindowsRunnerMaintenance requires Unity versions or a checkout with .github/unity-versions.json. Missing: $unityVersionsPath"
+    }
+
+    $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
+    $versions = @(
+        @($unityVersionsConfig.all) |
+            ForEach-Object { [string]$_ } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    if ($versions.Count -lt 1) {
+        throw '.github/unity-versions.json must define at least one Unity version in all[].'
+    }
+
+    Write-RunnerMaintenanceInfo "Unity versions from .github/unity-versions.json: $($versions -join ', ')"
+    return $versions
+}
+
+function Resolve-RunnerMaintenanceDetectOnly {
+    param([bool]$DetectOnly)
+
+    if ($env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -eq '1') {
+        Write-RunnerMaintenanceInfo 'UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 -> forcing DetectOnly.'
+        return $true
+    }
+
+    return $DetectOnly
+}
+
+function Invoke-WindowsRunnerMaintenance {
+    [CmdletBinding()]
+    param(
+        [string[]]$UnityVersions = @(),
+        [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
+        [string]$ProvisioningProfile = 'StandaloneWindowsIl2Cpp',
+        [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
+        [switch]$DetectOnly,
+        [string]$DiagnosticsRoot = ''
+    )
+
+    $repoRoot = Get-UnityMaintenanceRepoRoot
+    $versions = @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions $UnityVersions -RepoRoot $repoRoot)
     $scriptRoot = Get-UnityMaintenanceScriptRoot
     $bootstrapScript = Join-Path $scriptRoot 'bootstrap-windows-runner.ps1'
     $ensureEditorScript = Join-Path $scriptRoot 'ensure-editor.ps1'
@@ -66,8 +125,12 @@ function Invoke-WindowsRunnerMaintenance {
         throw "Missing Unity editor provisioning script: $ensureEditorScript"
     }
 
-    $maintenanceDetectOnly = [bool]$DetectOnly
-    $maintenanceDiagnosticsRoot = [string]$DiagnosticsRoot
+    $maintenanceDetectOnly = Resolve-RunnerMaintenanceDetectOnly -DetectOnly ([bool]$DetectOnly)
+    $maintenanceDiagnosticsRoot = if ([string]::IsNullOrWhiteSpace($DiagnosticsRoot)) {
+        Get-RunnerMaintenanceDefaultDiagnosticsRoot -RepoRoot $repoRoot
+    } else {
+        [string]$DiagnosticsRoot
+    }
     $maintenanceInstallRoot = [string]$InstallRoot
     $maintenanceProvisioningProfile = [string]$ProvisioningProfile
 

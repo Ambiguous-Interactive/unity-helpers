@@ -10,6 +10,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     using Core.Extension;
     using Core.Helper;
     using UnityEngine;
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+    using RuntimeSingletonBase = Sirenix.OdinInspector.SerializedMonoBehaviour;
+#else
+    using RuntimeSingletonBase = UnityEngine.MonoBehaviour;
+#endif
 
     /// <summary>
     /// Provides a simple, robust runtime singleton pattern for components.
@@ -27,13 +32,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// - Instance cache is cleared on domain reload before scene load via <see cref="RuntimeSingletonRegistry"/>.
     /// - Call <see cref="ClearInstance"/> to manually drop a stale reference in editor tooling or at runtime.
     ///
-    /// Odin compatibility: this runtime type intentionally derives from <see cref="MonoBehaviour"/>
-    /// so registry installs never require Sirenix assemblies. Odin editor integration remains optional
-    /// in the editor assembly.
+    /// Odin compatibility: this runtime type derives from Odin's serialized base when the
+    /// <c>odininspector</c> package is installed; otherwise it falls back to <see cref="MonoBehaviour"/>.
     /// </remarks>
     /// <typeparam name="T">Concrete singleton component type that derives from this base.</typeparam>
     [DisallowMultipleComponent]
-    public abstract class RuntimeSingleton<T> : MonoBehaviour
+    public abstract class RuntimeSingleton<T> : RuntimeSingletonBase
         where T : RuntimeSingleton<T>
     {
         /// <summary>

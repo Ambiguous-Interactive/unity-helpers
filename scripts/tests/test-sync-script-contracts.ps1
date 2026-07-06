@@ -637,10 +637,63 @@ function Run-OptionalOdinIntegrationContractTests {
     -Passed ($unguardedSirenixReferences.Count -eq 0) `
     -Message "Unguarded references: $($unguardedSirenixReferences -join ', ')"
 
+  $runtimeOdinBaseContracts = @(
+    @{
+      Path = 'Runtime/Utils/RuntimeSingleton.cs'
+      Alias = 'RuntimeSingletonBase'
+      OdinBase = 'SerializedMonoBehaviour'
+      UnityBase = 'MonoBehaviour'
+      ClassPattern = 'class\s+RuntimeSingleton\s*<\s*T\s*>\s*:\s*RuntimeSingletonBase\b'
+    },
+    @{
+      Path = 'Runtime/Utils/ScriptableObjectSingleton.cs'
+      Alias = 'ScriptableObjectSingletonBase'
+      OdinBase = 'SerializedScriptableObject'
+      UnityBase = 'ScriptableObject'
+      ClassPattern = 'class\s+ScriptableObjectSingleton\s*<\s*T\s*>\s*:\s*ScriptableObjectSingletonBase\b'
+    },
+    @{
+      Path = 'Runtime/Tags/AttributeEffect.cs'
+      Alias = 'AttributeEffectBase'
+      OdinBase = 'SerializedScriptableObject'
+      UnityBase = 'ScriptableObject'
+      ClassPattern = 'class\s+AttributeEffect\s*:\s*AttributeEffectBase\s*,\s*IEquatable\s*<\s*AttributeEffect\s*>'
+    }
+  )
+  $missingRuntimeOdinBaseContracts = New-Object System.Collections.Generic.List[string]
+  foreach ($contract in $runtimeOdinBaseContracts) {
+    $contractPath = Join-Path $repoRoot $contract.Path
+    if (-not (Test-Path $contractPath)) {
+      $missingRuntimeOdinBaseContracts.Add("$($contract.Path): missing file") | Out-Null
+      continue
+    }
+
+    $content = Get-Content -Path $contractPath -Raw
+    $alias = [regex]::Escape($contract.Alias)
+    $odinBase = [regex]::Escape($contract.OdinBase)
+    $unityBase = [regex]::Escape($contract.UnityBase)
+    $conditionalAliasPattern =
+      "(?s)#\s*if\s+$odinSymbolPattern\b.*?using\s+$alias\s*=\s*Sirenix\.OdinInspector\.$odinBase\s*;.*?#\s*else\b.*?using\s+$alias\s*=\s*UnityEngine\.$unityBase\s*;.*?#\s*endif\b"
+    if ($content -notmatch $conditionalAliasPattern) {
+      $missingRuntimeOdinBaseContracts.Add("$($contract.Path): missing conditional $($contract.Alias) alias") | Out-Null
+    }
+
+    if ($content -notmatch $contract.ClassPattern) {
+      $missingRuntimeOdinBaseContracts.Add("$($contract.Path): class does not inherit from $($contract.Alias)") | Out-Null
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'runtime Odin base types use conditional aliases with Unity fallbacks' `
+    -Passed ($missingRuntimeOdinBaseContracts.Count -eq 0) `
+    -Message "Missing contracts: $($missingRuntimeOdinBaseContracts -join ', ')"
+
   $requiredOdinSymbolAsmdefs = @(
+    'Runtime/WallstopStudios.UnityHelpers.asmdef',
     'Editor/WallstopStudios.UnityHelpers.Editor.asmdef',
     'Tests/Editor/CustomDrawers/WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.asmdef',
     'Tests/Editor/CustomEditors/WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors.asmdef',
+    'Tests/Editor/Utils/WallstopStudios.UnityHelpers.Tests.Editor.Utils.asmdef',
     'Tests/Editor/WallstopStudios.UnityHelpers.Tests.Editor.asmdef',
     'Tests/Runtime/WallstopStudios.UnityHelpers.Tests.Runtime.asmdef'
   )
@@ -671,11 +724,16 @@ function Run-OptionalOdinIntegrationContractTests {
   }
 
   Write-TestResult `
-    -TestName 'editor and Odin test asmdefs define package-owned Odin symbol from package presence' `
+    -TestName 'runtime, editor, and Odin test asmdefs define package-owned Odin symbol from package presence' `
     -Passed ($missingOdinVersionDefines.Count -eq 0) `
     -Message "Missing odininspector versionDefines: $($missingOdinVersionDefines -join ', ')"
 
   $missingOdinOverrideReferences = New-Object System.Collections.Generic.List[string]
+  $odinEditorApiAsmdefs = @(
+    'Tests/Editor/CustomDrawers/WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.asmdef',
+    'Tests/Editor/CustomEditors/WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors.asmdef',
+    'Tests/Editor/WallstopStudios.UnityHelpers.Tests.Editor.asmdef'
+  )
   foreach ($asmdefRelativePath in $requiredOdinSymbolAsmdefs) {
     $asmdefPath = Join-Path $repoRoot $asmdefRelativePath
     if (-not (Test-Path $asmdefPath)) {
@@ -694,7 +752,7 @@ function Run-OptionalOdinIntegrationContractTests {
       'Sirenix.Serialization.dll',
       'Sirenix.OdinInspector.Attributes.dll'
     )
-    if ($asmdefRelativePath -like 'Tests/Editor/*') {
+    if ($asmdefRelativePath -in $odinEditorApiAsmdefs) {
       $requiredReferences += 'Sirenix.OdinInspector.Editor.dll'
     }
 
@@ -713,25 +771,29 @@ function Run-OptionalOdinIntegrationContractTests {
   $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
   $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json
   $runtimePrecompiledReferences = @($runtimeAsmdef.precompiledReferences)
+  $runtimeOverrideReferences = $runtimeAsmdef.PSObject.Properties['overrideReferences'] -and
+    $runtimeAsmdef.overrideReferences -eq $true
+  $runtimeHasOdinVersionDefine = @(
+    @($runtimeAsmdef.versionDefines) |
+      Where-Object {
+        [string]$_.name -eq 'odininspector' -and
+        [string]$_.define -eq $odinSymbol -and
+        [string]$_.expression
+      }
+  ).Count -gt 0
   $runtimeSirenixPrecompiledReferences = @(
     $runtimePrecompiledReferences |
       Where-Object { [string]$_ -match '^Sirenix\.' }
   )
-  $runtimeOdinVersionDefines = @(
-    @($runtimeAsmdef.versionDefines) |
-      Where-Object {
-        [string]$_.name -eq 'odininspector' -or
-        [string]$_.define -eq $odinSymbol
-      }
-  )
 
   Write-TestResult `
-    -TestName 'runtime asmdef stays Sirenix-free for registry installs without Odin' `
+    -TestName 'runtime asmdef uses editor-style auto references for optional Odin bases' `
     -Passed (
-      $runtimeSirenixPrecompiledReferences.Count -eq 0 -and
-      $runtimeOdinVersionDefines.Count -eq 0
+      $runtimeHasOdinVersionDefine -and
+      -not $runtimeOverrideReferences -and
+      $runtimeSirenixPrecompiledReferences.Count -eq 0
     ) `
-    -Message "Runtime Sirenix precompiledReferences: $($runtimeSirenixPrecompiledReferences -join ', '); runtime Odin versionDefines: $($runtimeOdinVersionDefines.Count)"
+    -Message "Runtime Odin versionDefine present: $runtimeHasOdinVersionDefine; overrideReferences: $runtimeOverrideReferences; runtime Sirenix precompiledReferences: $($runtimeSirenixPrecompiledReferences -join ', ')"
 
   $editorAsmdefPath = Join-Path $repoRoot 'Editor/WallstopStudios.UnityHelpers.Editor.asmdef'
   $editorAsmdef = Get-Content -Path $editorAsmdefPath -Raw | ConvertFrom-Json
