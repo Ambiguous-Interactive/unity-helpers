@@ -272,6 +272,55 @@ jobs:
           fi
           echo "::endgroup::"
 
+  # Ensure the self-hosted runner has every editor declared in
+  # .github/unity-versions.json before the licensed matrix starts. Each matrix
+  # leg still uses RequireHealthyExisting so drift is caught at the exact leg,
+  # but missing editors are repaired once here instead of after a red matrix run.
+  runner-maintenance:
+    name: Self-hosted Unity editor maintenance
+    needs:
+      - matrix-config
+      - runner-preflight
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected) &&
+        needs.runner-preflight.result == 'success' &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    timeout-minutes: 360
+    steps:
+      - name: Enable Git long paths
+        shell: powershell
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          persist-credentials: false
+
+      - name: Maintain Unity editors
+        shell: powershell
+        run: |
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -ProvisioningProfile StandaloneWindowsIl2Cpp `
+            -DiagnosticsRoot '.artifacts\runner-bootstrap'
+
+      - name: Upload Unity runner maintenance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-runner-maintenance
+          path: .artifacts/runner-bootstrap
+          if-no-files-found: warn
+          retention-days: 14
+
   # FAST tier: editmode + playmode across all versions. The expensive standalone
   # IL2CPP legs live in unity-tests-standalone, which `needs:` this job -- so a
   # fundamental break here (compile error in any editmode leg, mass runtime failure
@@ -281,11 +330,13 @@ jobs:
     needs:
       - matrix-config
       - runner-preflight
+      - runner-maintenance
     if: >-
       ${{
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
+        needs.runner-maintenance.result == 'success' &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]

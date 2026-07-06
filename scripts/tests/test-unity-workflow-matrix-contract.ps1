@@ -563,6 +563,33 @@ if (-not $unityWorkflowRunnerPreflightsUseStableMatcher) {
     Write-Info "Checked Unity workflow runner-preflight label matchers use the stable set-difference form."
 }
 
+$unityTestsRunnerMaintenanceJob = if ($jobTexts.ContainsKey('runner-maintenance')) { $jobTexts['runner-maintenance'] } else { '' }
+$unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['unity-tests'] } else { '' }
+$benchmarksRunnerMaintenanceJob = if ($benchmarksJobTexts.ContainsKey('runner-maintenance')) { $benchmarksJobTexts['runner-maintenance'] } else { '' }
+$benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
+$unityWorkflowsRunMaintenanceBeforeMatrix = (
+    $jobTexts.ContainsKey('runner-maintenance') -and
+    $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
+    $unityTestsRunnerMaintenanceJob.Contains('scripts\unity\maintain-windows-runner.ps1') -and
+    $benchmarksRunnerMaintenanceJob.Contains('scripts\unity\maintain-windows-runner.ps1') -and
+    $unityTestsRunnerMaintenanceJob.Contains('-ProvisioningProfile StandaloneWindowsIl2Cpp') -and
+    $benchmarksRunnerMaintenanceJob.Contains('-ProvisioningProfile StandaloneWindowsIl2Cpp') -and
+    $unityTestsRunnerMaintenanceJob.Contains('.artifacts\runner-bootstrap') -and
+    $benchmarksRunnerMaintenanceJob.Contains('.artifacts\runner-bootstrap') -and
+    $unityTestsRunnerMaintenanceJob.Contains("needs.runner-preflight.result == 'success'") -and
+    $benchmarksRunnerMaintenanceJob.Contains("needs.runner-preflight.result == 'success'") -and
+    $unityTestsMatrixJob.Contains('- runner-maintenance') -and
+    $benchmarksMatrixJob.Contains('- runner-maintenance') -and
+    $unityTestsMatrixJob.Contains("needs.runner-maintenance.result == 'success'") -and
+    $benchmarksMatrixJob.Contains("needs.runner-maintenance.result == 'success'")
+)
+if (-not $unityWorkflowsRunMaintenanceBeforeMatrix) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 as a self-hosted maintenance gate before licensed matrix jobs so .github/unity-versions.json additions cannot outpace installed editors. Keep .github/workflows/unity-benchmarks.yml in sync."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity workflows run runner maintenance before self-hosted matrices."
+}
+
 $timeoutEventsPreserveReason = (
     $ensureEditorContent.Contains('reason         = $Reason') -and
     $ensureEditorContent.Contains('stallSeconds   = $StallSeconds') -and

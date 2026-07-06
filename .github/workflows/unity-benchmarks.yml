@@ -162,14 +162,61 @@ jobs:
           fi
           echo "::endgroup::"
 
+  runner-maintenance:
+    name: Self-hosted Unity editor maintenance
+    needs:
+      - matrix-config
+      - runner-preflight
+    if: >-
+      ${{
+        needs.runner-preflight.result == 'success' &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
+    runs-on: [self-hosted, Windows, RAM-64GB]
+    timeout-minutes: 360
+    steps:
+      - name: Enable Git long paths
+        shell: powershell
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          persist-credentials: false
+
+      - name: Maintain Unity editors
+        shell: powershell
+        run: |
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -ProvisioningProfile StandaloneWindowsIl2Cpp `
+            -DiagnosticsRoot '.artifacts\runner-bootstrap'
+
+      - name: Upload Unity runner maintenance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unity-benchmark-runner-maintenance
+          path: .artifacts/runner-bootstrap
+          if-no-files-found: warn
+          retention-days: 90
+
   benchmarks:
     name: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
     needs:
       - matrix-config
       - runner-preflight
+      - runner-maintenance
     # Skip the self-hosted matrix entirely when license/lock secrets are absent,
     # so a secret-less repo does not queue forever on a nonexistent runner.
-    if: ${{ needs.matrix-config.outputs.has-required-secrets == 'true' }}
+    if: >-
+      ${{
+        needs.runner-maintenance.result == 'success' &&
+        needs.matrix-config.outputs.has-required-secrets == 'true'
+      }}
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 660
     strategy:
