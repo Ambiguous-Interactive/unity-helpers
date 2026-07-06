@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Runtime.CompilerServices;
+    using System.Threading.Tasks;
     using UnityEngine;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
