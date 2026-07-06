@@ -45,6 +45,7 @@ $actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
 $runnerRunbookPath = Join-Path $repoRoot 'docs/runbooks/unity-runners-after-transfer.md'
 $runnerDiagnosticsActionPath = Join-Path $repoRoot '.github/actions/print-self-hosted-runner-diagnostics/action.yml'
 $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
+$integrationPackagesPath = Join-Path $repoRoot '.github/integration-packages.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
@@ -75,6 +76,10 @@ if (-not (Test-Path -LiteralPath $runnerDiagnosticsActionPath)) {
 }
 if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
     Write-Host "::error::Unity versions config not found: $unityVersionsPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $integrationPackagesPath)) {
+    Write-Host "::error::Integration package config not found: $integrationPackagesPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $windowsRunnerBootstrapPath)) {
@@ -198,6 +203,7 @@ function Get-WorkflowJobTexts {
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
+$integrationPackagesConfig = Get-Content -LiteralPath $integrationPackagesPath -Raw | ConvertFrom-Json
 [string[]]$unityVersions = @(
     $unityVersionsConfig.all |
         ForEach-Object { [string]$_ } |
@@ -250,6 +256,35 @@ if ($unityVersions.Count -lt 1) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity version source of truth includes Unity 6000.5.2f1 as the latest version."
+}
+
+$integrationPackagesNode = $integrationPackagesConfig.PSObject.Properties['packages']
+$reflexVersionNode = $null
+if ($integrationPackagesNode -and $null -ne $integrationPackagesNode.Value) {
+    $reflexVersionNode = $integrationPackagesNode.Value.PSObject.Properties['com.gustavopsantos.reflex']
+}
+$reflexVersionText = if ($reflexVersionNode) { [string]$reflexVersionNode.Value } else { $null }
+if ([string]::IsNullOrWhiteSpace($reflexVersionText)) {
+    Write-Host "::error file=.github/integration-packages.json::Integration package config must pin com.gustavopsantos.reflex so REFLEX_PRESENT integration legs are deterministic."
+    $failed = $true
+} else {
+    $semverMatch = [regex]::Match($reflexVersionText, '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$')
+    if (-not $semverMatch.Success) {
+        Write-Host "::error file=.github/integration-packages.json::Reflex pin '$reflexVersionText' must be a plain MAJOR.MINOR.PATCH semantic version so Unity 6000.5 compatibility can be compared."
+        $failed = $true
+    } else {
+        $reflexVersion = [version]::new(
+            [int]$semverMatch.Groups['major'].Value,
+            [int]$semverMatch.Groups['minor'].Value,
+            [int]$semverMatch.Groups['patch'].Value
+        )
+        if ($reflexVersion -lt [version]'14.3.1') {
+            Write-Host "::error file=.github/integration-packages.json::Reflex integration pin must stay at 14.3.1 or newer; older pins use non-generic TreeView editor APIs that fail to compile on Unity 6000.5."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked Reflex integration pin $reflexVersionText is compatible with Unity 6000.5 TreeView API changes."
+        }
+    }
 }
 
 $runnerUsesUnityVersionsConfig = (

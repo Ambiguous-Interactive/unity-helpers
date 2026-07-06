@@ -1,13 +1,13 @@
 {
   "_comment": "Canonical single source for the OpenUPM scoped registry and PINNED third-party dependency-injection container packages (Reflex / VContainer / Zenject-Extenject) used by the integration test legs. Consumed by scripts/unity/run-ci-tests.ps1 (ephemeral manifest, integration legs only via -IncludeIntegrations). The Runtime/Integrations and Tests/{Editor,Runtime}/Integrations asmdefs gate on REFLEX_PRESENT / VCONTAINER_PRESENT / ZENJECT_PRESENT, which Unity defines automatically (via each asmdef's versionDefines) ONLY when the matching package below is installed; installing them here is what makes those integration assemblies compile and their tests run. Bump versions/scopes HERE only.",
-  "_note_pins": "Pins are the OpenUPM 'latest' dist-tag as of 2026-06: Reflex 14.3.0, VContainer 1.18.0, Extenject 9.2.0-stcf3 (the same Extenject pin DxMessaging uses; the only OpenUPM-published Extenject build with proper meta files). A wrong pin only surfaces at the first real self-hosted CI run (the package fails to resolve); confirm against https://openupm.com if an integration leg reports a package-resolution failure. # TODO(unity-helpers): confirm pins on first self-hosted integration run.",
+  "_note_pins": "Pins are the OpenUPM 'latest' dist-tag as of 2026-07: Reflex 14.3.1, VContainer 1.18.0, Extenject 9.2.0-stcf3 (the same Extenject pin DxMessaging uses; the only OpenUPM-published Extenject build with proper meta files). Reflex 14.3.1 is the first pin with Unity 6000.5-compatible generic TreeView editor tooling; 14.3.0 fails compilation on Unity 6000.5. A wrong pin only surfaces at the first real self-hosted CI run (the package fails to resolve or compile); confirm against https://openupm.com if an integration leg reports a package-resolution failure. # TODO(unity-helpers): confirm pins on first self-hosted integration run.",
   "registry": {
     "name": "package.openupm.com",
     "url": "https://package.openupm.com",
     "scopes": ["com.gustavopsantos", "jp.hadashikick", "com.svermeulen"]
   },
   "packages": {
-    "com.gustavopsantos.reflex": "14.3.0",
+    "com.gustavopsantos.reflex": "14.3.1",
     "jp.hadashikick.vcontainer": "1.18.0",
     "com.svermeulen.extenject": "9.2.0-stcf3"
   },
