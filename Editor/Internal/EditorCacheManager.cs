@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
             WEnumToggleButtonsDrawer.ClearCache();
             WShowIfPropertyDrawer.ClearCache();
             InLineEditorShared.ClearCache();
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
             WEnumToggleButtonsOdinDrawer.ClearCache();
             WShowIfOdinDrawer.ClearCache();
             IntDropDownOdinDrawer.ClearCache();

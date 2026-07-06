@@ -9,7 +9,7 @@ This package includes two lightweight, production‑ready singleton helpers that
 - `RuntimeSingleton<T>` — a component singleton that ensures one instance exists in play mode, optionally persists across scenes, and self‑initializes when first accessed.
 - `ScriptableObjectSingleton<T>` — a configuration/data singleton backed by a single asset under `Resources/`, with an editor auto‑creator to keep assets present and correctly placed.
 
-> Odin compatibility: When Odin Inspector is present (`ODIN_INSPECTOR` defined), these types derive from `SerializedMonoBehaviour` / `SerializedScriptableObject` for richer serialization. Without Odin, they fall back to Unity base types. No code changes required.
+> Odin compatibility: this package's runtime/editor assemblies define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from the `odininspector` package. When that assembly-scoped symbol is active, these types derive from `SerializedMonoBehaviour` / `SerializedScriptableObject` for richer serialization. Without Odin, they fall back to Unity base types. Consumer assemblies do not inherit this symbol; use a project-local asmdef version define for your own conditional Odin code.
 
 ## TL;DR — What Problem This Solves
 
@@ -82,8 +82,9 @@ Contents
 
 ## Odin Compatibility
 
-- With Odin installed (symbol `ODIN_INSPECTOR`), base classes inherit from `SerializedMonoBehaviour` and `SerializedScriptableObject` to enable serialization of complex types (dictionaries, polymorphic fields) with Odin drawers.
+- With Odin installed as the `odininspector` package, the package's base classes inherit from `SerializedMonoBehaviour` and `SerializedScriptableObject` to enable serialization of complex types (dictionaries, polymorphic fields) with Odin drawers.
 - Without Odin, bases inherit from Unity’s `MonoBehaviour`/`ScriptableObject` with no behavior change.
+- Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol. If your own code conditionally references Odin types, define a project-local asmdef version define for `odininspector`.
 
 <a id="when-to-use"></a>
 

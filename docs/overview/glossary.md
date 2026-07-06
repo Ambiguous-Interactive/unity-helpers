@@ -31,7 +31,7 @@ Quick reference for terms used throughout Unity Helpers documentation.
 - Automatic integration with Odin Inspector when installed
 - Base classes switch from MonoBehaviour → SerializedMonoBehaviour
 - Enables serialization of dictionaries, polymorphic fields, etc.
-- No code changes required - works automatically via #if ODIN_INSPECTOR
+- No code changes required when Odin is installed as the `odininspector` package; manual integrations should use a project-local asmdef version define
 - See: [Singletons - Odin Compatibility](../features/utilities/singletons.md#odin-compatibility)
 
 ### Pooled Buffers

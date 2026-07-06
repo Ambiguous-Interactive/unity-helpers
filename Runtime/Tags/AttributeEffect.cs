@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Utils;
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
 #endif
 
@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     [Serializable]
     [CreateAssetMenu(menuName = "Wallstop Studios/Unity Helpers/Attribute Effect")]
     public sealed class AttributeEffect :
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
         SerializedScriptableObject
 #else
         ScriptableObject
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// The duration in seconds for this effect. Only used when <see cref="durationType"/> is <see cref="ModifierDurationType.Duration"/>.
         /// </summary>
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
         [ShowIf("@durationType == ModifierDurationType.Duration")]
 #else
         [WShowIf(
@@ -159,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// A poison effect with resetDurationOnReapplication=true will restart its 5-second timer
         /// each time the poison is reapplied, preventing stacking but extending the effect.
         /// </example>
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
         [ShowIf("@durationType == ModifierDurationType.Duration")]
 #else
         [WShowIf(

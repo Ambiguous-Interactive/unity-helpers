@@ -21,7 +21,7 @@ Param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# cspell:ignore Eqi
+# cspell:ignore Eqi asmdefs odininspector WALLSTOP
 
 $script:TestsPassed = 0
 $script:TestsFailed = 0
@@ -417,6 +417,235 @@ function Run-UnityCiScriptContractTests {
     -TestName 'run-ci-tests.ps1 defines every Write-Ci* helper it calls' `
     -Passed ($missingDefinitions.Count -eq 0) `
     -Message "Missing helper definitions: $($missingDefinitions -join ', ')"
+}
+
+function Run-OptionalOdinIntegrationContractTests {
+  Write-Host ""
+  Write-Host "Optional Odin integration contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $productionRoots = @('Runtime', 'Editor')
+  $sourceFiles = New-Object System.Collections.Generic.List[string]
+  foreach ($productionRoot in $productionRoots) {
+    $rootPath = Join-Path $repoRoot $productionRoot
+    if (-not (Test-Path $rootPath)) {
+      continue
+    }
+
+    Get-ChildItem -Path $rootPath -Recurse -Filter '*.cs' -File |
+      ForEach-Object { $sourceFiles.Add($_.FullName) | Out-Null }
+  }
+
+  $odinSymbol = 'WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR'
+  $odinSymbolPattern = [regex]::Escape($odinSymbol)
+  $expressionRequiresOdinSymbol = {
+    param([string]$Expression)
+
+    if ([string]::IsNullOrWhiteSpace($Expression)) {
+      return $false
+    }
+
+    if ($Expression -notmatch "\b$odinSymbolPattern\b") {
+      return $false
+    }
+
+    if ($Expression -match '\|\|') {
+      return $false
+    }
+
+    if ($Expression -match "!\s*\(*\s*$odinSymbolPattern\b") {
+      return $false
+    }
+
+    return $true
+  }
+  $directOdinGuardViolations = New-Object System.Collections.Generic.List[string]
+  $unguardedSirenixReferences = New-Object System.Collections.Generic.List[string]
+  foreach ($sourceFile in $sourceFiles) {
+    $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $sourceFile).Replace('\', '/')
+    $lines = @(Get-Content -Path $sourceFile)
+    $preprocessorStack = New-Object System.Collections.Generic.List[object]
+    $insideBlockComment = $false
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+      $codeLine = $lines[$i]
+
+      if ($insideBlockComment) {
+        $commentEnd = $codeLine.IndexOf('*/')
+        if ($commentEnd -lt 0) {
+          continue
+        }
+
+        $codeLine = $codeLine.Substring($commentEnd + 2)
+        $insideBlockComment = $false
+      }
+
+      while ($codeLine.Contains('/*')) {
+        $commentStart = $codeLine.IndexOf('/*')
+        $commentEnd = $codeLine.IndexOf('*/', $commentStart + 2)
+        if ($commentEnd -lt 0) {
+          $codeLine = $codeLine.Substring(0, $commentStart)
+          $insideBlockComment = $true
+          break
+        }
+
+        $codeLine =
+          $codeLine.Substring(0, $commentStart) +
+          $codeLine.Substring($commentEnd + 2)
+      }
+
+      $codeLine = [regex]::Replace($codeLine, '//.*$', '')
+      $trimmedCodeLine = $codeLine.TrimStart()
+      if ([string]::IsNullOrWhiteSpace($trimmedCodeLine)) {
+        continue
+      }
+
+      if ($trimmedCodeLine -match '^#\s*(?<directive>if|elif)\b(?<expr>.*)$') {
+        $directive = $Matches['directive']
+        $expression = $Matches['expr']
+        if ($expression -match '\bODIN_INSPECTOR\b') {
+          $directOdinGuardViolations.Add("${relativePath}:$($i + 1)") | Out-Null
+        }
+
+        if ($directive -eq 'if') {
+          $parentGuard =
+            $preprocessorStack.Count -gt 0 -and
+            [bool]$preprocessorStack[$preprocessorStack.Count - 1].CurrentGuard
+          $currentGuard = $parentGuard -or (& $expressionRequiresOdinSymbol $expression)
+          $preprocessorStack.Add(
+            [PSCustomObject]@{
+              ParentGuard = $parentGuard
+              CurrentGuard = $currentGuard
+            }
+          ) | Out-Null
+        }
+        elseif ($preprocessorStack.Count -gt 0) {
+          $currentFrame = $preprocessorStack[$preprocessorStack.Count - 1]
+          $currentFrame.CurrentGuard = [bool]$currentFrame.ParentGuard -or
+            (& $expressionRequiresOdinSymbol $expression)
+        }
+
+        continue
+      }
+
+      if ($trimmedCodeLine -match '^#\s*else\b') {
+        if ($preprocessorStack.Count -gt 0) {
+          $currentFrame = $preprocessorStack[$preprocessorStack.Count - 1]
+          $currentFrame.CurrentGuard = [bool]$currentFrame.ParentGuard
+        }
+
+        continue
+      }
+
+      if ($trimmedCodeLine -match '^#\s*endif\b') {
+        if ($preprocessorStack.Count -gt 0) {
+          $preprocessorStack.RemoveAt($preprocessorStack.Count - 1)
+        }
+
+        continue
+      }
+
+      $guardIsActive =
+        $preprocessorStack.Count -gt 0 -and
+        [bool]$preprocessorStack[$preprocessorStack.Count - 1].CurrentGuard
+
+      $hasCompileTimeSirenixReference = $codeLine -match '^\s*using\s+Sirenix\.' -or
+        $codeLine -match ':\s*OdinAttributeDrawer\s*<' -or
+        $codeLine -match '\bSerialized(?:MonoBehaviour|ScriptableObject)\b' -or
+        $codeLine -match 'typeof\s*\(\s*Serialized(?:MonoBehaviour|ScriptableObject)\s*\)' -or
+        $codeLine -match '^\s*\[ShowIf\s*\('
+
+      if ($hasCompileTimeSirenixReference -and -not $guardIsActive) {
+        $unguardedSirenixReferences.Add("${relativePath}:$($i + 1)") | Out-Null
+      }
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'production Odin preprocessor guards use package-owned symbol' `
+    -Passed ($directOdinGuardViolations.Count -eq 0) `
+    -Message "Direct ODIN_INSPECTOR guards: $($directOdinGuardViolations -join ', ')"
+
+  Write-TestResult `
+    -TestName 'production Sirenix compile-time references are inside package-symbol branches' `
+    -Passed ($unguardedSirenixReferences.Count -eq 0) `
+    -Message "Unguarded references: $($unguardedSirenixReferences -join ', ')"
+
+  $requiredAsmdefs = @(
+    'Runtime/WallstopStudios.UnityHelpers.asmdef',
+    'Editor/WallstopStudios.UnityHelpers.Editor.asmdef'
+  )
+  $missingOdinVersionDefines = New-Object System.Collections.Generic.List[string]
+  foreach ($asmdefRelativePath in $requiredAsmdefs) {
+    $asmdefPath = Join-Path $repoRoot $asmdefRelativePath
+    if (-not (Test-Path $asmdefPath)) {
+      $missingOdinVersionDefines.Add("${asmdefRelativePath}: missing file") | Out-Null
+      continue
+    }
+
+    $asmdef = Get-Content -Path $asmdefPath -Raw | ConvertFrom-Json
+    $hasVersionDefine = $false
+    foreach ($versionDefine in @($asmdef.versionDefines)) {
+      if (
+        [string]$versionDefine.name -eq 'odininspector' -and
+        [string]$versionDefine.define -eq $odinSymbol -and
+        [string]$versionDefine.expression
+      ) {
+        $hasVersionDefine = $true
+        break
+      }
+    }
+
+    if (-not $hasVersionDefine) {
+      $missingOdinVersionDefines.Add($asmdefRelativePath) | Out-Null
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'runtime and editor asmdefs define package-owned Odin symbol from package presence' `
+    -Passed ($missingOdinVersionDefines.Count -eq 0) `
+    -Message "Missing odininspector versionDefines: $($missingOdinVersionDefines -join ', ')"
+
+  $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
+  $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json
+  $runtimePrecompiledReferences = @($runtimeAsmdef.precompiledReferences)
+  $requiredRuntimeOdinReferences = @(
+    'Sirenix.Serialization.dll',
+    'Sirenix.OdinInspector.Attributes.dll'
+  )
+  $missingRuntimeOdinReferences = @(
+    $requiredRuntimeOdinReferences |
+      Where-Object { $_ -notin $runtimePrecompiledReferences }
+  )
+
+  Write-TestResult `
+    -TestName 'runtime asmdef exposes Odin runtime DLLs when package-owned symbol is active' `
+    -Passed ($missingRuntimeOdinReferences.Count -eq 0) `
+    -Message "Missing Runtime precompiledReferences: $($missingRuntimeOdinReferences -join ', ')"
+
+  $editorAsmdefPath = Join-Path $repoRoot 'Editor/WallstopStudios.UnityHelpers.Editor.asmdef'
+  $editorAsmdef = Get-Content -Path $editorAsmdefPath -Raw | ConvertFrom-Json
+  $editorOverrideReferences = $editorAsmdef.PSObject.Properties['overrideReferences'] -and
+    $editorAsmdef.overrideReferences -eq $true
+  $editorPrecompiledReferences = @($editorAsmdef.precompiledReferences)
+  $requiredEditorOdinReferences = @(
+    'Sirenix.Serialization.dll',
+    'Sirenix.OdinInspector.Attributes.dll',
+    'Sirenix.OdinInspector.Editor.dll'
+  )
+  $missingEditorOdinReferences = @()
+  if ($editorOverrideReferences) {
+    $missingEditorOdinReferences = @(
+      $requiredEditorOdinReferences |
+        Where-Object { $_ -notin $editorPrecompiledReferences }
+    )
+  }
+
+  Write-TestResult `
+    -TestName 'editor asmdef keeps Odin editor assemblies visible' `
+    -Passed (-not $editorOverrideReferences -or $missingEditorOdinReferences.Count -eq 0) `
+    -Message "Editor overrideReferences=true missing precompiledReferences: $($missingEditorOdinReferences -join ', ')"
 }
 
 function Run-HookInstallContractTests {
@@ -1846,6 +2075,7 @@ Run-CspellContractTests
 Run-AgentValidationContractTests
 Run-PowerShellPathBindingContractTests
 Run-UnityCiScriptContractTests
+Run-OptionalOdinIntegrationContractTests
 Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
 Run-PrePushLastResortGuidanceContractTests

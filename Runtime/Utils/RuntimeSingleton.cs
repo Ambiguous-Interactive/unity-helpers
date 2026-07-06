@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using Core.Extension;
     using Core.Helper;
     using UnityEngine;
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
 #endif
 
@@ -30,14 +30,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// - Instance cache is cleared on domain reload before scene load via <see cref="RuntimeSingletonRegistry"/>.
     /// - Call <see cref="ClearInstance"/> to manually drop a stale reference in editor tooling or at runtime.
     ///
-    /// ODIN compatibility: When the <c>ODIN_INSPECTOR</c> symbol is defined, this class derives from
-    /// <c>Sirenix.OdinInspector.SerializedMonoBehaviour</c> for richer serialization; otherwise it derives from
-    /// <see cref="MonoBehaviour"/>.
+    /// ODIN compatibility: When Odin Inspector is installed as the <c>odininspector</c> package, or when the
+    /// <c>WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</c> symbol is defined explicitly, this class derives from
+    /// <c>Sirenix.OdinInspector.SerializedMonoBehaviour</c> for richer serialization; otherwise it derives from <see cref="MonoBehaviour"/>.
     /// </remarks>
     /// <typeparam name="T">Concrete singleton component type that derives from this base.</typeparam>
     [DisallowMultipleComponent]
     public abstract class RuntimeSingleton<T> :
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
         SerializedMonoBehaviour
 #else
         MonoBehaviour

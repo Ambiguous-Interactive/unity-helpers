@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System;
     using System.Collections.Generic;
     using System.Reflection;

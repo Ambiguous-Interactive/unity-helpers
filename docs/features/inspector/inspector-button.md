@@ -1156,7 +1156,7 @@ public class AnimationTester : MonoBehaviour
 WButton works automatically with:
 
 - All Unity Objects (`MonoBehaviour`, `ScriptableObject`, etc.)
-- **Odin Inspector's `SerializedMonoBehaviour` and `SerializedScriptableObject`** (when `ODIN_INSPECTOR` is defined)
+- **Odin Inspector's `SerializedMonoBehaviour` and `SerializedScriptableObject`** when this package's Odin integration is active
 
 **When do you need `WButtonEditorHelper`?**
 
@@ -1168,18 +1168,14 @@ Only when you create **custom Odin editors** that override the default behavior.
 
 **No setup required!** WButton automatically works with Odin's base types:
 
+This example assumes your assembly references Odin. If your own assembly conditionally compiles Odin code, define a project-local asmdef version define for `odininspector`; consumer assemblies do not inherit this package's internal `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol.
+
 ```csharp
-#if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
-#endif
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
 
-#if ODIN_INSPECTOR
 public class MyComponent : SerializedMonoBehaviour
-#else
-public class MyComponent : MonoBehaviour
-#endif
 {
     [WButton("Test Button")]
     private void TestMethod()
@@ -1198,7 +1194,6 @@ WButton will appear automatically in the inspector - no additional code needed!
 If you create a **custom Odin editor** for your type, you need to manually integrate WButton using `WButtonEditorHelper`:
 
 ```csharp
-#if UNITY_EDITOR && ODIN_INSPECTOR
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
@@ -1227,7 +1222,6 @@ public class MyComponentEditor : OdinEditor
         _wButtonHelper.DrawButtonsAtBottomAndProcessInvocations(this);
     }
 }
-#endif
 ```
 
 ---

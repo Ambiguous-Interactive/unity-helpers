@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Asset change detection loop reset utility**: Added `AssetChangeDetectionUtility.ResetLoopProtection()` so editor tooling can resume `[DetectAssetChanged]` dispatch after a recursive callback has tripped loop protection, without requiring a domain reload.
 - **Feel-good randomness helpers**: Added `ExactAveragePrd`, `BadLuckProtection`, and `WeightedShuffleBag<T>` for player-facing randomness that reduces streak frustration while keeping deterministic, testable behavior. `ExactAveragePrd` solves the pseudo-random distribution coefficient for a configured long-run average, `BadLuckProtection` implements pity-timer chance ramps and optional hard guarantees, and `WeightedShuffleBag<T>` emits exact weighted ticket counts before repeating. The helpers expose explicit restore APIs so save/load systems can persist pity/deck state.
 
+### Fixed
+
+- **Optional Odin Inspector integration without Odin assemblies**: Runtime singletons, `AttributeEffect`, Odin drawers, and Odin-backed WButton inspectors now compile against Unity's built-in base types unless Odin is installed as the `odininspector` package or the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` define is explicitly enabled. Projects that still define the global `ODIN_INSPECTOR` symbol without shipping Sirenix assemblies no longer fail package compilation.
+
 ## [3.4.0] - 2026-07-01
 
 See [the roadmap](./docs/overview/roadmap.md) for details

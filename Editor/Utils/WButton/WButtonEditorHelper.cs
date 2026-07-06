@@ -17,7 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     /// <example>
     /// <code>
     /// // Example with Odin Inspector's SerializedMonoBehaviour
-    /// #if ODIN_INSPECTOR
     /// using Sirenix.OdinInspector.Editor;
     ///
     /// public class MyOdinEditor : OdinEditor
@@ -42,7 +41,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     ///         _wButtonHelper.DrawButtonsAtBottomAndProcessInvocations(this);
     ///     }
     /// }
-    /// #endif
     /// </code>
     /// </example>
     public sealed class WButtonEditorHelper
