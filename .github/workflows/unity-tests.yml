@@ -272,55 +272,6 @@ jobs:
           fi
           echo "::endgroup::"
 
-  # Ensure the self-hosted runner has every editor declared in
-  # .github/unity-versions.json before the licensed matrix starts. Each matrix
-  # leg still uses RequireHealthyExisting so drift is caught at the exact leg,
-  # but missing editors are repaired once here instead of after a red matrix run.
-  runner-maintenance:
-    name: Self-hosted Unity editor maintenance
-    needs:
-      - matrix-config
-      - runner-preflight
-    if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected) &&
-        needs.runner-preflight.result == 'success' &&
-        needs.matrix-config.outputs.has-required-secrets == 'true'
-      }}
-    runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 360
-    steps:
-      - name: Enable Git long paths
-        shell: powershell
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        run: git config --global core.longpaths true
-
-      - name: Checkout
-        uses: actions/checkout@v7
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        with:
-          persist-credentials: false
-
-      - name: Maintain Unity editors
-        shell: powershell
-        run: |
-          .\scripts\unity\maintain-windows-runner.ps1 `
-            -ProvisioningProfile StandaloneWindowsIl2Cpp `
-            -DiagnosticsRoot '.artifacts\runner-bootstrap'
-
-      - name: Upload Unity runner maintenance diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unity-runner-maintenance
-          path: .artifacts/runner-bootstrap
-          if-no-files-found: warn
-          retention-days: 14
-
   # FAST tier: editmode + playmode across all versions. The expensive standalone
   # IL2CPP legs live in unity-tests-standalone, which `needs:` this job -- so a
   # fundamental break here (compile error in any editmode leg, mass runtime failure
@@ -330,17 +281,15 @@ jobs:
     needs:
       - matrix-config
       - runner-preflight
-      - runner-maintenance
     if: >-
       ${{
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.runner-maintenance.result == 'success' &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 660
+    timeout-minutes: 1200
     strategy:
       # Default false keeps the full matrix running so cross-version
       # compatibility stays visible on a red run. workflow_dispatch can flip
@@ -355,7 +304,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
       - name: Enable Git long paths
-        shell: pwsh
+        shell: powershell
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         run: git config --global core.longpaths true
@@ -367,6 +316,36 @@ jobs:
         with:
           lfs: true
           persist-credentials: false
+
+      - name: Maintain Unity editor on selected runner
+        timeout-minutes: 360
+        shell: powershell
+        run: |
+          $artifactsPath = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
+          $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
+          New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
+          $provisioningProfile = if ('${{ matrix.test-mode }}' -eq 'standalone') {
+            'StandaloneWindowsIl2Cpp'
+          } else {
+            'EditorOnly'
+          }
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -UnityVersions '${{ matrix.unity-version }}' `
+            -ProvisioningProfile $provisioningProfile `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot
+          $pwshCandidates = @(
+            (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+            (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' }),
+            $(if ($env:LocalAppData) { Join-Path $env:LocalAppData 'Microsoft\WindowsApps\pwsh.exe' })
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+          if (-not $pwshPath) {
+            throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'
+          }
+          $pwshDirectory = Split-Path -Parent $pwshPath
+          $pwshDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
         # Composite action runs PowerShell internally; `shell: bash` on a
@@ -493,7 +472,7 @@ jobs:
         # is the ~40-min SINGLE_THREADED EditMode baseline, so 90 gives >2x headroom
         # yet fails a hang ~60 min sooner than the old blanket 150 (a dead Unity
         # Accelerator once stalled EditMode for the full 150 and produced no
-        # results.xml). All values stay under the job timeout (660) so the step
+        # results.xml). All values stay under the job timeout (1200) so the step
         # clock fires first and releases the shared Unity seat.
         timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 150) || 90 }}
         shell: pwsh
@@ -623,7 +602,7 @@ jobs:
         needs.matrix-config.outputs.matrix-include-standalone != '[]'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 660
+    timeout-minutes: 1200
     strategy:
       fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
       max-parallel: 1
@@ -633,7 +612,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-standalone) }}
     steps:
       - name: Enable Git long paths
-        shell: pwsh
+        shell: powershell
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         run: git config --global core.longpaths true
@@ -645,6 +624,36 @@ jobs:
         with:
           lfs: true
           persist-credentials: false
+
+      - name: Maintain Unity editor on selected runner
+        timeout-minutes: 360
+        shell: powershell
+        run: |
+          $artifactsPath = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
+          $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
+          New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
+          $provisioningProfile = if ('${{ matrix.test-mode }}' -eq 'standalone') {
+            'StandaloneWindowsIl2Cpp'
+          } else {
+            'EditorOnly'
+          }
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -UnityVersions '${{ matrix.unity-version }}' `
+            -ProvisioningProfile $provisioningProfile `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot
+          $pwshCandidates = @(
+            (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+            (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' }),
+            $(if ($env:LocalAppData) { Join-Path $env:LocalAppData 'Microsoft\WindowsApps\pwsh.exe' })
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+          if (-not $pwshPath) {
+            throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'
+          }
+          $pwshDirectory = Split-Path -Parent $pwshPath
+          $pwshDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
         # Composite action runs PowerShell internally; `shell: bash` on a
@@ -771,7 +780,7 @@ jobs:
         # is the ~40-min SINGLE_THREADED EditMode baseline, so 90 gives >2x headroom
         # yet fails a hang ~60 min sooner than the old blanket 150 (a dead Unity
         # Accelerator once stalled EditMode for the full 150 and produced no
-        # results.xml). All values stay under the job timeout (660) so the step
+        # results.xml). All values stay under the job timeout (1200) so the step
         # clock fires first and releases the shared Unity seat.
         timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 150) || 90 }}
         shell: pwsh
@@ -912,7 +921,7 @@ jobs:
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 660
+    timeout-minutes: 1200
     strategy:
       # See the unity-tests job: default false for full visibility;
       # workflow_dispatch can opt into abort-on-first-failure.
@@ -926,7 +935,7 @@ jobs:
         test-mode: ["editmode", "playmode"]
     steps:
       - name: Enable Git long paths
-        shell: pwsh
+        shell: powershell
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         run: git config --global core.longpaths true
@@ -938,6 +947,32 @@ jobs:
         with:
           lfs: true
           persist-credentials: false
+
+      - name: Maintain Unity editor on selected runner
+        timeout-minutes: 360
+        shell: powershell
+        run: |
+          $artifactsPath = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded'
+          $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
+          New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
+          $provisioningProfile = 'EditorOnly'
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -UnityVersions '${{ matrix.unity-version }}' `
+            -ProvisioningProfile $provisioningProfile `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot
+          $pwshCandidates = @(
+            (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+            (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' }),
+            $(if ($env:LocalAppData) { Join-Path $env:LocalAppData 'Microsoft\WindowsApps\pwsh.exe' })
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+          if (-not $pwshPath) {
+            throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'
+          }
+          $pwshDirectory = Split-Path -Parent $pwshPath
+          $pwshDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
         # Composite action runs PowerShell internally; `shell: bash` on a
@@ -1036,7 +1071,7 @@ jobs:
         # min -- >2x the ~40-min healthy SINGLE_THREADED EditMode baseline -- is the
         # fail-fast cap. The old 150 let a dead-Accelerator EditMode stall burn the
         # full window and emit no results.xml; 90 surfaces that ~60 min sooner and
-        # releases the shared Unity seat. Stays under the job timeout (660).
+        # releases the shared Unity seat. Stays under the job timeout (1200).
         timeout-minutes: 90
         shell: pwsh
         env:

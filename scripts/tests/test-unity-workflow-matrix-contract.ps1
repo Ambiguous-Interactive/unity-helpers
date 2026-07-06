@@ -563,31 +563,64 @@ if (-not $unityWorkflowRunnerPreflightsUseStableMatcher) {
     Write-Info "Checked Unity workflow runner-preflight label matchers use the stable set-difference form."
 }
 
-$unityTestsRunnerMaintenanceJob = if ($jobTexts.ContainsKey('runner-maintenance')) { $jobTexts['runner-maintenance'] } else { '' }
+function Test-UnityJobMaintainsSelectedRunner {
+    param([Parameter(Mandatory = $true)][string]$JobText)
+
+    $maintenanceIndex = $JobText.IndexOf('- name: Maintain Unity editor on selected runner')
+    $provisionIndex = $JobText.IndexOf('- name: Provision Unity Editor')
+    $firstPwshShellIndex = $JobText.IndexOf('shell: pwsh')
+    $runnerDiagnosticsIndex = $JobText.IndexOf('- name: Print runner diagnostics')
+    $cacheIndex = $JobText.IndexOf('- name: Cache Unity Library and package caches')
+    $setupNodeIndex = $JobText.IndexOf('- name: Setup Node.js')
+    $computeIndex = $JobText.IndexOf('- name: Compute')
+    $licenseValidationIndex = $JobText.IndexOf('- name: Validate Unity license secrets')
+    $maintenanceUsesWindowsPowerShell = $JobText -match '(?s)- name: Maintain Unity editor on selected runner.*?shell:\s*powershell'
+    $maintenancePublishesPowerShell7Path = (
+        $JobText -match '(?s)- name: Maintain Unity editor on selected runner.*?\$env:GITHUB_PATH' -and
+        $JobText.Contains('PowerShell\7\pwsh.exe') -and
+        $JobText.Contains('pwsh.exe was not found for later GitHub Actions steps')
+    )
+    $jobTimeoutCoversMaintenanceBudget = $JobText -match '(?m)^\s+timeout-minutes:\s*1200\s*$'
+
+    return (
+        $maintenanceIndex -ge 0 -and
+        $provisionIndex -ge 0 -and
+        $maintenanceIndex -lt $provisionIndex -and
+        ($firstPwshShellIndex -lt 0 -or $maintenanceIndex -lt $firstPwshShellIndex) -and
+        ($runnerDiagnosticsIndex -lt 0 -or $maintenanceIndex -lt $runnerDiagnosticsIndex) -and
+        ($cacheIndex -lt 0 -or $maintenanceIndex -lt $cacheIndex) -and
+        ($setupNodeIndex -lt 0 -or $maintenanceIndex -lt $setupNodeIndex) -and
+        ($computeIndex -lt 0 -or $maintenanceIndex -lt $computeIndex) -and
+        ($licenseValidationIndex -lt 0 -or $maintenanceIndex -lt $licenseValidationIndex) -and
+        $maintenanceUsesWindowsPowerShell -and
+        $maintenancePublishesPowerShell7Path -and
+        $jobTimeoutCoversMaintenanceBudget -and
+        $JobText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
+        $JobText.Contains('-UnityVersions ''${{ matrix.unity-version }}''') -and
+        $JobText.Contains('-ProvisioningProfile $provisioningProfile') -and
+        $JobText.Contains('provisioning/runner-maintenance') -and
+        -not $JobText.Contains('- runner-maintenance') -and
+        -not $JobText.Contains('needs.runner-maintenance.result')
+    )
+}
+
 $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['unity-tests'] } else { '' }
-$benchmarksRunnerMaintenanceJob = if ($benchmarksJobTexts.ContainsKey('runner-maintenance')) { $benchmarksJobTexts['runner-maintenance'] } else { '' }
+$unityTestsStandaloneJob = if ($jobTexts.ContainsKey('unity-tests-standalone')) { $jobTexts['unity-tests-standalone'] } else { '' }
+$unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
-$unityWorkflowsRunMaintenanceBeforeMatrix = (
-    $jobTexts.ContainsKey('runner-maintenance') -and
-    $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
-    $unityTestsRunnerMaintenanceJob.Contains('scripts\unity\maintain-windows-runner.ps1') -and
-    $benchmarksRunnerMaintenanceJob.Contains('scripts\unity\maintain-windows-runner.ps1') -and
-    $unityTestsRunnerMaintenanceJob.Contains('-ProvisioningProfile StandaloneWindowsIl2Cpp') -and
-    $benchmarksRunnerMaintenanceJob.Contains('-ProvisioningProfile StandaloneWindowsIl2Cpp') -and
-    $unityTestsRunnerMaintenanceJob.Contains('.artifacts\runner-bootstrap') -and
-    $benchmarksRunnerMaintenanceJob.Contains('.artifacts\runner-bootstrap') -and
-    $unityTestsRunnerMaintenanceJob.Contains("needs.runner-preflight.result == 'success'") -and
-    $benchmarksRunnerMaintenanceJob.Contains("needs.runner-preflight.result == 'success'") -and
-    $unityTestsMatrixJob.Contains('- runner-maintenance') -and
-    $benchmarksMatrixJob.Contains('- runner-maintenance') -and
-    $unityTestsMatrixJob.Contains("needs.runner-maintenance.result == 'success'") -and
-    $benchmarksMatrixJob.Contains("needs.runner-maintenance.result == 'success'")
+$unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
+    -not $jobTexts.ContainsKey('runner-maintenance') -and
+    -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
+    (Test-UnityJobMaintainsSelectedRunner -JobText $unityTestsMatrixJob) -and
+    (Test-UnityJobMaintainsSelectedRunner -JobText $unityTestsStandaloneJob) -and
+    (Test-UnityJobMaintainsSelectedRunner -JobText $unityTestsSingleThreadedJob) -and
+    (Test-UnityJobMaintainsSelectedRunner -JobText $benchmarksMatrixJob)
 )
-if (-not $unityWorkflowsRunMaintenanceBeforeMatrix) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 as a self-hosted maintenance gate before licensed matrix jobs so .github/unity-versions.json additions cannot outpace installed editors. Keep .github/workflows/unity-benchmarks.yml in sync."
+if (-not $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 inside each self-hosted Unity job before any pwsh-dependent setup and before Provision Unity Editor, using Windows PowerShell so missing PowerShell 7 can be bootstrapped on the exact selected runner. The maintenance step must publish the discovered PowerShell 7 directory through GITHUB_PATH for later steps. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity workflows run runner maintenance before self-hosted matrices."
+    Write-Info "Checked Unity workflows maintain editors on the selected runner before pwsh-dependent setup and provisioning."
 }
 
 $timeoutEventsPreserveReason = (

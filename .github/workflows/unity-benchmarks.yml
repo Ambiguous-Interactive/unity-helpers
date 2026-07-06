@@ -162,63 +162,19 @@ jobs:
           fi
           echo "::endgroup::"
 
-  runner-maintenance:
-    name: Self-hosted Unity editor maintenance
-    needs:
-      - matrix-config
-      - runner-preflight
-    if: >-
-      ${{
-        needs.runner-preflight.result == 'success' &&
-        needs.matrix-config.outputs.has-required-secrets == 'true'
-      }}
-    runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 360
-    steps:
-      - name: Enable Git long paths
-        shell: powershell
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        run: git config --global core.longpaths true
-
-      - name: Checkout
-        uses: actions/checkout@v7
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        with:
-          persist-credentials: false
-
-      - name: Maintain Unity editors
-        shell: powershell
-        run: |
-          .\scripts\unity\maintain-windows-runner.ps1 `
-            -ProvisioningProfile StandaloneWindowsIl2Cpp `
-            -DiagnosticsRoot '.artifacts\runner-bootstrap'
-
-      - name: Upload Unity runner maintenance diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unity-benchmark-runner-maintenance
-          path: .artifacts/runner-bootstrap
-          if-no-files-found: warn
-          retention-days: 90
-
   benchmarks:
     name: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
     needs:
       - matrix-config
       - runner-preflight
-      - runner-maintenance
     # Skip the self-hosted matrix entirely when license/lock secrets are absent,
     # so a secret-less repo does not queue forever on a nonexistent runner.
     if: >-
       ${{
-        needs.runner-maintenance.result == 'success' &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 660
+    timeout-minutes: 1200
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -229,7 +185,7 @@ jobs:
           - playmode
     steps:
       - name: Enable Git long paths
-        shell: pwsh
+        shell: powershell
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         run: git config --global core.longpaths true
@@ -241,6 +197,32 @@ jobs:
         with:
           lfs: true
           persist-credentials: false
+
+      - name: Maintain Unity editor on selected runner
+        timeout-minutes: 360
+        shell: powershell
+        run: |
+          $artifactsPath = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
+          $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
+          New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
+          $provisioningProfile = 'EditorOnly'
+          .\scripts\unity\maintain-windows-runner.ps1 `
+            -UnityVersions '${{ matrix.unity-version }}' `
+            -ProvisioningProfile $provisioningProfile `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot
+          $pwshCandidates = @(
+            (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1),
+            (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' }),
+            $(if ($env:LocalAppData) { Join-Path $env:LocalAppData 'Microsoft\WindowsApps\pwsh.exe' })
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+          if (-not $pwshPath) {
+            throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'
+          }
+          $pwshDirectory = Split-Path -Parent $pwshPath
+          $pwshDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
         # Never use plain `shell: bash` on self-hosted Windows runners (the WSL
