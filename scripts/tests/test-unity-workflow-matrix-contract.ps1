@@ -59,12 +59,17 @@ function Import-EnsureEditorWatchdogFunctions {
 
     foreach ($name in @(
         'ConvertTo-ProcessArgumentLine',
+        'Get-EnsureEditorRetryDelaySeconds',
         'Get-EnsureEditorProgressStallSeconds',
         'Get-EnsureEditorProgressNoticeIntervalSeconds',
+        'Get-EnsureEditorQuarantineMoveRetryAttempts',
+        'Invoke-WithRetry',
+        'Test-IsPathInsideDirectory',
         'Get-CollapsedCliOutputTail',
         'Get-CliProgressTriple',
         'Get-LastCliProgressMessage',
-        'Invoke-UnityCliCaptureWithTimeout'
+        'Invoke-UnityCliCaptureWithTimeout',
+        'Move-UnityInstallDirectoryToQuarantine'
     )) {
         $functionAst = $ast.FindAll(
             {
@@ -210,6 +215,19 @@ if (-not $timeoutEventsPreserveReason) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked ensure-editor timeout events preserve timeout reason."
+}
+
+$quarantineMoveUsesDedicatedRetryBudget = (
+    $ensureEditorContent.Contains('function Get-EnsureEditorQuarantineMoveRetryAttempts') -and
+    $ensureEditorContent.Contains('UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS') -and
+    $ensureEditorContent.Contains('$quarantineMoveAttempts = Get-EnsureEditorQuarantineMoveRetryAttempts') -and
+    $ensureEditorContent.Contains('Invoke-WithRetry -MaxAttempts $quarantineMoveAttempts')
+)
+if (-not $quarantineMoveUsesDedicatedRetryBudget) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor quarantine moves must use a dedicated retry-attempt budget so delayed Unity uninstaller/indexer/antivirus handles do not exhaust the old hardcoded three-attempt window."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked ensure-editor quarantine moves use the dedicated retry budget."
 }
 
 $detectOnly = $true
@@ -394,6 +412,63 @@ exit 0
         $failed = $true
     } elseif ($VerboseOutput) {
         Write-Info "Checked chatty no-advance Unity CLI output is bounded by the wall-clock timeout."
+    }
+
+    $quarantineRetryRoot = ''
+    $oldRetryDelay = $env:UH_ENSURE_EDITOR_RETRY_DELAY_SECONDS
+    $oldQuarantineAttempts = $env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS
+    $script:quarantineMoveRetryAttempts = 0
+    try {
+        $env:UH_ENSURE_EDITOR_RETRY_DELAY_SECONDS = '0'
+        $env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS = '5'
+        $quarantineRetryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-quarantine-retry-$PID-$(Get-Random)"
+        $version = '6000.5.2f1'
+        $installDirectory = Join-Path $quarantineRetryRoot $version
+        New-Item -ItemType Directory -Force -Path (Join-Path $installDirectory 'Editor') | Out-Null
+
+        function script:Stop-StaleUnityProvisioningProcesses {
+            param(
+                [string]$InstallRoot,
+                [string]$Version,
+                [string]$Reason
+            )
+        }
+
+        function script:Move-Item {
+            param(
+                [string]$LiteralPath,
+                [string]$Destination,
+                [switch]$Force
+            )
+
+            $script:quarantineMoveRetryAttempts++
+            if ($script:quarantineMoveRetryAttempts -lt 5) {
+                throw "simulated Windows file lock on attempt $script:quarantineMoveRetryAttempts"
+            }
+
+            Microsoft.PowerShell.Management\Move-Item -LiteralPath $LiteralPath -Destination $Destination -Force:$Force
+        }
+
+        Move-UnityInstallDirectoryToQuarantine -InstallDirectory $installDirectory -InstallRoot $quarantineRetryRoot -Version $version 6>$null
+        $quarantinedDirectories = @(Get-ChildItem -LiteralPath (Join-Path $quarantineRetryRoot '_quarantine') -Directory -ErrorAction SilentlyContinue)
+        if ($script:quarantineMoveRetryAttempts -ne 5 -or $quarantinedDirectories.Count -ne 1 -or (Test-Path -LiteralPath $installDirectory -PathType Container)) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor quarantine move retry must continue past the old three-attempt window when the dedicated retry budget allows it. Attempts=$script:quarantineMoveRetryAttempts. Quarantined=$($quarantinedDirectories.Count). SourceStillExists=$(Test-Path -LiteralPath $installDirectory -PathType Container)."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked quarantine move retry survives delayed file-lock release."
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor quarantine move retry regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        if ($oldRetryDelay) { $env:UH_ENSURE_EDITOR_RETRY_DELAY_SECONDS = $oldRetryDelay } else { Remove-Item Env:\UH_ENSURE_EDITOR_RETRY_DELAY_SECONDS -ErrorAction SilentlyContinue }
+        if ($oldQuarantineAttempts) { $env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS = $oldQuarantineAttempts } else { Remove-Item Env:\UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS -ErrorAction SilentlyContinue }
+        Remove-Item Function:\Move-Item -ErrorAction SilentlyContinue
+        Remove-Item Function:\Stop-StaleUnityProvisioningProcesses -ErrorAction SilentlyContinue
+        Remove-Variable -Name quarantineMoveRetryAttempts -Scope Script -ErrorAction SilentlyContinue
+        if ($quarantineRetryRoot -and (Test-Path -LiteralPath $quarantineRetryRoot -PathType Container)) {
+            Remove-Item -LiteralPath $quarantineRetryRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

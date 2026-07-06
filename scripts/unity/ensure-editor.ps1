@@ -486,6 +486,31 @@ function Get-EnsureEditorInstallRetryAttempts {
     return $Default
 }
 
+function Get-EnsureEditorQuarantineMoveRetryAttempts {
+    # Single source of truth for Move-Item attempts when quarantining a partial
+    # Unity editor tree before reinstall. Unity's Windows uninstaller can return
+    # before the install directory is fully released/removed, and the runner has
+    # observed the editor directory remain locked beyond the old 3-attempt window.
+    # Keep this separate from install retry attempts: a quarantine retry is cheap
+    # compared with a fresh multi-GB editor install and it protects the recovery path
+    # from transient uninstaller/indexer/antivirus handles. Honors
+    # UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS for tests/operators; invalid
+    # values are ignored with a warning. A value below 1 is invalid.
+    param([int]$Default = 8)
+
+    if ($env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS) {
+        $parsed = 0
+        if (
+            [int]::TryParse($env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS, [ref]$parsed) -and
+            $parsed -ge 1
+        ) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS='$env:UH_ENSURE_EDITOR_QUARANTINE_MOVE_RETRY_ATTEMPTS'; using $Default attempt(s)."
+    }
+    return $Default
+}
+
 function Get-EnsureEditorAndroidInstallRetryAttempts {
     # Single source of truth for the DEDICATED Android module-install retry count
     # used by Install-UnityAndroidModules. The Android SDK/NDK is a multi-GB Google
@@ -2767,8 +2792,9 @@ function Move-UnityInstallDirectoryToQuarantine {
     # Step 1b), which avoids reaching this quarantine for a not-module-manageable
     # editor in the first place.
     $moveAttempt = [ref] 0
+    $quarantineMoveAttempts = Get-EnsureEditorQuarantineMoveRetryAttempts
     try {
-        Invoke-WithRetry -MaxAttempts 3 -DelaySeconds (Get-EnsureEditorRetryDelaySeconds) -Action {
+        Invoke-WithRetry -MaxAttempts $quarantineMoveAttempts -DelaySeconds (Get-EnsureEditorRetryDelaySeconds) -Action {
             $moveAttempt.Value++
             if ($moveAttempt.Value -gt 1) {
                 Stop-StaleUnityProvisioningProcesses -InstallRoot $InstallRoot -Version $Version -Reason "retry $($moveAttempt.Value) before quarantining $InstallDirectory (a process is still holding the editor tree)"
@@ -2781,7 +2807,7 @@ function Move-UnityInstallDirectoryToQuarantine {
         # console width; a Write-Host "::error::..." line is not) so the operator
         # sees the exact locked path and the remediation instead of a wrapped
         # Move-Item stack trace. Then rethrow so the run still fails loudly.
-        Write-Host ("::error::Could not quarantine Unity $Version install '$InstallDirectory' for repair: a process is holding a handle on the editor tree and the stale-process sweep could not release it ($($_.Exception.Message)). " +
+        Write-Host ("::error::Could not quarantine Unity $Version install '$InstallDirectory' for repair after $quarantineMoveAttempts move attempt(s): a process is holding a handle on the editor tree and the stale-process sweep could not release it ($($_.Exception.Message)). " +
             "This blocks the automatic quarantine+reinstall that recovers a base editor whose modules cannot be added (Unity CLI 'install-modules' exit 6 / 'Try reinstalling this editor with Unity Hub'). " +
             "Remediation on the runner: ensure no Unity.exe/Unity Hub/indexer/antivirus process is holding C:\\...\\$Version\\Editor (Sysinternals handle64.exe `"$InstallDirectory`" finds the locker), then re-run; or manually delete '$InstallDirectory' and let ensure-editor.ps1 reinstall the editor with its modules.")
         throw
