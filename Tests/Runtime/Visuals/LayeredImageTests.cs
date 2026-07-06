@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Visuals;
@@ -74,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [Test]
-        public void ForceUpdateAdvancesBackgroundBeforePanelAttachment()
+        public void ForceUpdateDoesNotAdvanceBackgroundBeforePanelAttachment()
         {
             Sprite red = VisualsTestHelpers.CreateSprite(
                 _trackedObjects,
@@ -100,41 +101,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.Update(force: true);
 
-            Assert.AreSame(computed[1], image.style.backgroundImage.value.texture);
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
         }
 
-        [TestCase(0f)]
-        [TestCase(-1f)]
-        [TestCase(float.NaN)]
-        [TestCase(float.PositiveInfinity)]
-        [TestCase(float.NegativeInfinity)]
-        [TestCase(float.Epsilon)]
-        public void ForceUpdateDoesNotAdvanceBackgroundWhenFpsCannotPlay(float fps)
+        [UnityTest]
+        public IEnumerator ForceUpdateDoesNotAdvanceBackgroundWhenAttachedAndFpsCannotPlay()
         {
-            Sprite red = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                1,
-                1,
-                (_, _) => new Color(1f, 0f, 0f, 1f),
-                pivot: Vector2.zero
-            );
-            Sprite blue = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                1,
-                1,
-                (_, _) => new Color(0f, 0f, 1f, 1f),
-                pivot: Vector2.zero
-            );
-            AnimatedSpriteLayer layer = new(new[] { red, blue });
+            if (!Application.isPlaying)
+            {
+                Assert.Ignore("LayeredImage panel playback is covered in PlayMode.");
+            }
 
-            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear, fps: fps);
-            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+            float[] fpsValues =
+            {
+                0f,
+                -1f,
+                float.NaN,
+                float.PositiveInfinity,
+                float.NegativeInfinity,
+                float.Epsilon,
+            };
 
-            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+            foreach (float fps in fpsValues)
+            {
+                LayeredImage image = CreateLayeredImage(
+                    new[] { layer },
+                    Color.clear,
+                    fps: fps,
+                    updatesSelf: true
+                );
+                Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(
+                    image,
+                    _trackedObjects
+                );
 
-            Assert.DoesNotThrow(() => image.Update(force: true));
+                yield return AttachToRuntimePanel(image);
 
-            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+                Assert.IsFalse(image.SelfUpdateActiveForTests);
+                Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+
+                Assert.DoesNotThrow(() => image.Update(force: true));
+
+                Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+            }
         }
 
         [UnityTest]
@@ -142,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             if (!Application.isPlaying)
             {
-                Assert.Ignore("LayeredImage self-update coroutines run only in PlayMode.");
+                Assert.Ignore("LayeredImage self-update scheduling is covered in PlayMode.");
             }
 
             AnimatedSpriteLayer layer = CreateRgbLayer();
@@ -154,6 +164,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 updatesSelf: true
             );
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+
+            yield return AttachToRuntimePanel(image);
+
             Assert.IsTrue(image.SelfUpdateActiveForTests);
 
             yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
@@ -176,7 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             if (!Application.isPlaying)
             {
-                Assert.Ignore("LayeredImage self-update coroutines run only in PlayMode.");
+                Assert.Ignore("LayeredImage self-update scheduling is covered in PlayMode.");
             }
 
             AnimatedSpriteLayer layer = CreateRgbLayer();
@@ -188,6 +202,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 updatesSelf: true
             );
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+
+            yield return AttachToRuntimePanel(image);
+
             Assert.IsTrue(image.SelfUpdateActiveForTests);
 
             yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
@@ -204,14 +222,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             yield return WaitUntilBackgroundIs(image, computed[2], "resumed self-update");
         }
 
-        [Test]
-        public void SelfUpdateDetachesEditorTickWhenFpsIsZero()
+        [UnityTest]
+        public IEnumerator SelfUpdateStopsWhenRemovedFromPanel()
         {
-            if (Application.isPlaying)
+            if (!Application.isPlaying)
             {
-                Assert.Ignore("LayeredImage editor ticks run only in EditMode.");
+                Assert.Ignore("LayeredImage self-update scheduling is covered in PlayMode.");
             }
 
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: 60f,
+                updatesSelf: true
+            );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            yield return AttachToRuntimePanel(image);
+
+            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            yield return WaitUntilBackgroundIs(image, computed[1], "attached self-update");
+
+            image.RemoveFromHierarchy();
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Texture2D detachedFrame = image.style.backgroundImage.value.texture;
+
+            yield return null;
+            yield return null;
+
+            Assert.AreSame(
+                detachedFrame,
+                image.style.backgroundImage.value.texture,
+                "Expected panel detachment to stop self-update playback."
+            );
+        }
+
+        [Test]
+        public void SelfUpdateDoesNotStartBeforePanelAttachment()
+        {
             AnimatedSpriteLayer layer = CreateRgbLayer();
             LayeredImage image = CreateLayeredImage(
                 new[] { layer },
@@ -219,11 +269,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 fps: 60f,
                 updatesSelf: true
             );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
 
-            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
 
-            image.Fps = 0f;
+            image.Update(force: true);
 
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
             Assert.IsFalse(image.SelfUpdateActiveForTests);
         }
 
@@ -651,6 +704,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
 
             return new AnimatedSpriteLayer(new[] { red, green, blue });
+        }
+
+        private IEnumerator AttachToRuntimePanel(LayeredImage image)
+        {
+            GameObject host = Track(new GameObject("LayeredImagePanelHost"));
+            host.SetActive(false);
+            PanelSettings panelSettings = Track(ScriptableObject.CreateInstance<PanelSettings>());
+
+            UIDocument document = host.AddComponent<UIDocument>();
+            document.panelSettings = panelSettings;
+            host.SetActive(true);
+
+            yield return null;
+
+            Assert.IsTrue(document.rootVisualElement != null);
+            document.rootVisualElement.Add(image);
+
+            yield return null;
+
+            Assert.IsTrue(image.panel != null);
         }
 
         private static IEnumerator WaitUntilBackgroundIs(
