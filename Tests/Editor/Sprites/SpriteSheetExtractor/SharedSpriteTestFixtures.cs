@@ -846,21 +846,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             // Clean up any leftover "Temp N" folders before creating directories
             TempFolderCleanupUtility.CleanupTempDuplicates();
-
-            if (!AssetDatabase.IsValidFolder(DynamicAssetsDir))
-            {
-                string[] parts = DynamicAssetsDir.Split('/');
-                string currentPath = parts[0]; // "Assets"
-                for (int i = 1; i < parts.Length; i++)
-                {
-                    string nextPath = currentPath + "/" + parts[i];
-                    if (!AssetDatabase.IsValidFolder(nextPath))
-                    {
-                        AssetDatabase.CreateFolder(currentPath, parts[i]);
-                    }
-                    currentPath = nextPath;
-                }
-            }
+            AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }
 
         private static void CreateAllFixtures()
