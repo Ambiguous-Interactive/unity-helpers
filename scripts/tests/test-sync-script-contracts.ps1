@@ -1108,8 +1108,8 @@ function Run-DocumentationWorkflowContractTests {
   $usesCanonicalDocLinkLinter = (
     $validateLinksBlock.Success -and
     $validateLinkFormatBlock.Success -and
-    $validateLinksBlock.Value.Contains('./scripts/lint-doc-links.ps1 -VerboseOutput') -and
-    $validateLinkFormatBlock.Value.Contains('./scripts/lint-doc-links.ps1 -VerboseOutput')
+    $validateLinksBlock.Value.Contains('./scripts/lint-doc-links.ps1 -Mode Targets -VerboseOutput') -and
+    $validateLinkFormatBlock.Value.Contains('./scripts/lint-doc-links.ps1 -Mode Format -VerboseOutput')
   )
 
   $preservesRequiredCheckNames = (
@@ -1147,7 +1147,7 @@ function Run-DocumentationWorkflowContractTests {
   Write-TestResult `
     -TestName 'validate-docs delegates link checks to canonical linter' `
     -Passed $usesCanonicalDocLinkLinter `
-    -Message 'Expected validate-docs.yml link jobs to invoke scripts/lint-doc-links.ps1 -VerboseOutput.'
+    -Message 'Expected validate-docs.yml link jobs to invoke scripts/lint-doc-links.ps1 with distinct Targets and Format modes.'
 
   Write-TestResult `
     -TestName 'validate-docs bounds link-check job runtime' `
@@ -2033,7 +2033,8 @@ function Run-ReleasePackageContentContractTests {
   $validatorRejectsPrDescriptionArtifacts = (
     $validatorContent.Contains('$forbiddenRootMarkdownArtifactPrefixes') -and
     $validatorContent.Contains("'pr-description.md'") -and
-    $validatorContent.Contains('.StartsWith($forbiddenRootMarkdownArtifactPrefix') -and
+    $validatorContent.Contains('function Test-ForbiddenRootMarkdownArtifact') -and
+    $validatorContent.Contains('.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)') -and
     $validatorContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
     $validatorContent.Contains('Forbidden release artifact included in npm package')
   )

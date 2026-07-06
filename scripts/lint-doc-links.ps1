@@ -1,8 +1,11 @@
+[CmdletBinding(PositionalBinding = $false)]
 Param(
     [string[]]$Paths,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AdditionalPaths,
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [ValidateSet('All', 'Targets', 'Format')]
+    [string]$Mode = 'All'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -289,6 +292,8 @@ $missingRelativePrefixPattern = [regex]'\]\((?<target>[a-zA-Z][^)]*)\)'
 $absoluteGitHubPagesPrefixPattern = [regex]'\]\((?<target>/unity-helpers(?:/[^)]*)?)\)'
 
 $violationCount = 0
+$checkTargets = $Mode -eq 'All' -or $Mode -eq 'Targets'
+$checkFormat = $Mode -eq 'All' -or $Mode -eq 'Format'
 $codeDocsPattern = [regex]'(?i)docs[\\/][A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?'
 $codeFileExtensions = @('.cs', '.csproj', '.props', '.targets', '.ps1', '.psm1', '.psd1', '.py', '.ts', '.tsx', '.js', '.jsx', '.json', '.yml', '.yaml', '.sh', '.cmd')
 
@@ -398,17 +403,19 @@ $mdFiles | ForEach-Object {
         }
     }
 
-    foreach ($entry in $linkDefinitions.GetEnumerator()) {
-        $definitionTarget = $entry.Value.Target
-        $definitionLine = $entry.Value.LineNumber
-        if (-not $definitionTarget) { continue }
-        if (-not (Is-LocalTarget $definitionTarget)) { continue }
+    if ($checkTargets) {
+        foreach ($entry in $linkDefinitions.GetEnumerator()) {
+            $definitionTarget = $entry.Value.Target
+            $definitionLine = $entry.Value.LineNumber
+            if (-not $definitionTarget) { continue }
+            if (-not (Is-LocalTarget $definitionTarget)) { continue }
 
-        $resolvedDefinition = Resolve-LocalPath -SourceFile $file -Target $definitionTarget -RepoRoot $repoRoot
-        if (-not $resolvedDefinition) {
-            $violationCount++
-            $targetKind = Get-LocalTargetKind $definitionTarget
-            Write-Violation -File $file -LineNumber $definitionLine -Message "Reference link target '$definitionTarget' does not resolve to an existing $targetKind" -Line ''
+            $resolvedDefinition = Resolve-LocalPath -SourceFile $file -Target $definitionTarget -RepoRoot $repoRoot
+            if (-not $resolvedDefinition) {
+                $violationCount++
+                $targetKind = Get-LocalTargetKind $definitionTarget
+                Write-Violation -File $file -LineNumber $definitionLine -Message "Reference link target '$definitionTarget' does not resolve to an existing $targetKind" -Line ''
+            }
         }
     }
 
@@ -423,108 +430,113 @@ $mdFiles | ForEach-Object {
         }
         if ($inFence) { continue }
 
-        # Check for inline code that mentions .md files (but not bare extension references)
-        # Uses proper backtick-pair parsing to avoid matching text between separate code spans
-        foreach ($match in $codeSpanPattern.Matches($line)) {
-            $content = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
-            # Skip glob patterns and bare extensions: .md, *.md, **/*.md, .json, etc.
-            if ($content -match '^(\*\*/|\./)?(\*)?\.[\w]+$') { continue }
-            $markdownPathMatch = $codeSpanMarkdownPathPattern.Match($content)
-            if (-not $markdownPathMatch.Success) { continue }
-            $violationCount++
-            $markdownPath = $markdownPathMatch.Groups['path'].Value
-            Write-Violation -File $file -LineNumber $lineNo -Message "Inline code mentions markdown file '$markdownPath'; use a human-readable link instead" -Line $line
-        }
-
-        $stripped = $linkPattern.Replace($line, '')
-        $stripped = $anglePattern.Replace($stripped, '')
-        $stripped = $codeSpanPattern.Replace($stripped, '')
-
-        if ($mdPattern.IsMatch($stripped)) {
-            $violationCount++
-            Write-Violation -File $file -LineNumber $lineNo -Message "Bare .md mention; convert to [Readable Text](file.md)" -Line $line
-        }
-
-        foreach ($m in $filenameTextLinkPattern.Matches($line)) {
-            $text = $m.Groups['text'].Value
-            $target = $m.Groups['target'].Value
-            if ($text -match '\.md') {
+        if ($checkFormat) {
+            # Check for inline code that mentions .md files (but not bare extension references)
+            # Uses proper backtick-pair parsing to avoid matching text between separate code spans
+            foreach ($match in $codeSpanPattern.Matches($line)) {
+                $content = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+                # Skip glob patterns and bare extensions: .md, *.md, **/*.md, .json, etc.
+                if ($content -match '^(\*\*/|\./)?(\*)?\.[\w]+$') { continue }
+                $markdownPathMatch = $codeSpanMarkdownPathPattern.Match($content)
+                if (-not $markdownPathMatch.Success) { continue }
                 $violationCount++
-                Write-Violation -File $file -LineNumber $lineNo -Message "Link text is a filename; use human-readable text for $target" -Line $line
+                $markdownPath = $markdownPathMatch.Groups['path'].Value
+                Write-Violation -File $file -LineNumber $lineNo -Message "Inline code mentions markdown file '$markdownPath'; use a human-readable link instead" -Line $line
             }
-        }
 
-        # Check for absolute GitHub Pages paths (e.g., /unity-helpers/ or /unity-helpers/docs/...)
-        # These break in CI because /unity-helpers is the GitHub Pages baseurl, not a real directory
-        # IMPORTANT: First strip inline code (backticks) to avoid false positives from example links
-        $lineWithoutInlineCode = $codeSpanPattern.Replace($line, '')
-        foreach ($match in $absoluteGitHubPagesPrefixPattern.Matches($lineWithoutInlineCode)) {
-            $target = $match.Groups['target'].Value
-            $violationCount++
-            # Provide helpful fix suggestion
-            $suggestedFix = $target -replace '^/unity-helpers/?', './'
-            if ($suggestedFix -eq './') { $suggestedFix = './README.md' }
-            Write-Violation -File $file -LineNumber $lineNo -Message "Absolute GitHub Pages path '$target' will break in CI; use relative path instead (e.g., '$suggestedFix')" -Line $line
-        }
+            $stripped = $linkPattern.Replace($line, '')
+            $stripped = $anglePattern.Replace($stripped, '')
+            $stripped = $codeSpanPattern.Replace($stripped, '')
 
-        # Check for internal links missing ./ or ../ relative prefix
-        # This is CRITICAL for GitHub Pages - jekyll-relative-links requires explicit relative paths
-        # Skip: external links (http/https/mailto), anchors (#), images (!), and links already with ./
-        # IMPORTANT: First strip inline code (backticks) to avoid false positives from example links
-        # LIMITATIONS of inline code stripping:
-        # - Does not handle escaped backticks (\`) - these are rare in practice
-        # - Triple+ backticks on same line may have unexpected interactions
-        # - Nested backticks are not standard markdown
-        # The -replace pattern removes double-backtick spans first (``text``), then single spans
-        foreach ($match in $missingRelativePrefixPattern.Matches($lineWithoutInlineCode)) {
-            $target = $match.Groups['target'].Value
-            # Skip external links (http:// https:// mailto: etc.)
-            if ($target -match '^[a-zA-Z][a-zA-Z0-9+\.-]*:') { continue }
-            # Skip if target is empty or starts with ./ or ../
-            if ($target -match '^\.\.?/') { continue }
-            # Skip anchor-only links
-            if ($target.StartsWith('#')) { continue }
-            # This is a bare path without relative prefix - flag it
-            $violationCount++
-            Write-Violation -File $file -LineNumber $lineNo -Message "Internal link '$target' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths" -Line $line
-        }
-
-        foreach ($match in $standardLinkPattern.Matches($lineWithoutInlineCode)) {
-            $rawTarget = $match.Groups['target'].Value
-            $resolvedTarget = Get-MarkdownLinkTarget $rawTarget
-            if (-not $resolvedTarget) { continue }
-            if (-not (Is-LocalTarget $resolvedTarget)) { continue }
-
-            $linkPath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
-            if (-not $linkPath) {
+            if ($mdPattern.IsMatch($stripped)) {
                 $violationCount++
-                $targetKind = Get-LocalTargetKind $resolvedTarget
-                Write-Violation -File $file -LineNumber $lineNo -Message "Markdown link target '$resolvedTarget' does not resolve to an existing $targetKind" -Line $line
+                Write-Violation -File $file -LineNumber $lineNo -Message "Bare .md mention; convert to [Readable Text](file.md)" -Line $line
             }
-        }
 
-        foreach ($match in $imagePattern.Matches($line)) {
-            $rawTarget = $match.Groups['target'].Value
-            $resolvedTarget = Get-MarkdownLinkTarget $rawTarget
-            if ($resolvedTarget -and (Is-LocalTarget $resolvedTarget)) {
-                $imagePath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
-                if (-not $imagePath) {
+            foreach ($m in $filenameTextLinkPattern.Matches($line)) {
+                $text = $m.Groups['text'].Value
+                $target = $m.Groups['target'].Value
+                if ($text -match '\.md') {
                     $violationCount++
-                    Write-Violation -File $file -LineNumber $lineNo -Message "Image target '$resolvedTarget' does not resolve to a file" -Line $line
+                    Write-Violation -File $file -LineNumber $lineNo -Message "Link text is a filename; use human-readable text for $target" -Line $line
                 }
             }
+
+            # Check for absolute GitHub Pages paths (e.g., /unity-helpers/ or /unity-helpers/docs/...)
+            # These break in CI because /unity-helpers is the GitHub Pages baseurl, not a real directory
+            # IMPORTANT: First strip inline code (backticks) to avoid false positives from example links
+            $lineWithoutInlineCode = $codeSpanPattern.Replace($line, '')
+            foreach ($match in $absoluteGitHubPagesPrefixPattern.Matches($lineWithoutInlineCode)) {
+                $target = $match.Groups['target'].Value
+                $violationCount++
+                # Provide helpful fix suggestion
+                $suggestedFix = $target -replace '^/unity-helpers/?', './'
+                if ($suggestedFix -eq './') { $suggestedFix = './README.md' }
+                Write-Violation -File $file -LineNumber $lineNo -Message "Absolute GitHub Pages path '$target' will break in CI; use relative path instead (e.g., '$suggestedFix')" -Line $line
+            }
+
+            # Check for internal links missing ./ or ../ relative prefix
+            # This is CRITICAL for GitHub Pages - jekyll-relative-links requires explicit relative paths
+            # Skip: external links (http/https/mailto), anchors (#), images (!), and links already with ./
+            # IMPORTANT: First strip inline code (backticks) to avoid false positives from example links
+            # LIMITATIONS of inline code stripping:
+            # - Does not handle escaped backticks (\`) - these are rare in practice
+            # - Triple+ backticks on same line may have unexpected interactions
+            # - Nested backticks are not standard markdown
+            # The -replace pattern removes double-backtick spans first (``text``), then single spans
+            foreach ($match in $missingRelativePrefixPattern.Matches($lineWithoutInlineCode)) {
+                $target = $match.Groups['target'].Value
+                # Skip external links (http:// https:// mailto: etc.)
+                if ($target -match '^[a-zA-Z][a-zA-Z0-9+\.-]*:') { continue }
+                # Skip if target is empty or starts with ./ or ../
+                if ($target -match '^\.\.?/') { continue }
+                # Skip anchor-only links
+                if ($target.StartsWith('#')) { continue }
+                # This is a bare path without relative prefix - flag it
+                $violationCount++
+                Write-Violation -File $file -LineNumber $lineNo -Message "Internal link '$target' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths" -Line $line
+            }
         }
 
-        foreach ($match in $imageReferencePattern.Matches($line)) {
-            $label = $match.Groups['label'].Value.Trim()
-            if ($linkDefinitions.ContainsKey($label)) {
-                $definition = $linkDefinitions[$label]
-                $resolvedTarget = $definition.Target
+        if ($checkTargets) {
+            $lineWithoutInlineCode = $codeSpanPattern.Replace($line, '')
+            foreach ($match in $standardLinkPattern.Matches($lineWithoutInlineCode)) {
+                $rawTarget = $match.Groups['target'].Value
+                $resolvedTarget = Get-MarkdownLinkTarget $rawTarget
+                if (-not $resolvedTarget) { continue }
+                if (-not (Is-LocalTarget $resolvedTarget)) { continue }
+
+                $linkPath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
+                if (-not $linkPath) {
+                    $violationCount++
+                    $targetKind = Get-LocalTargetKind $resolvedTarget
+                    Write-Violation -File $file -LineNumber $lineNo -Message "Markdown link target '$resolvedTarget' does not resolve to an existing $targetKind" -Line $line
+                }
+            }
+
+            foreach ($match in $imagePattern.Matches($line)) {
+                $rawTarget = $match.Groups['target'].Value
+                $resolvedTarget = Get-MarkdownLinkTarget $rawTarget
                 if ($resolvedTarget -and (Is-LocalTarget $resolvedTarget)) {
                     $imagePath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
                     if (-not $imagePath) {
                         $violationCount++
-                        Write-Violation -File $file -LineNumber $lineNo -Message "Image reference '$label' points to '$resolvedTarget' which does not resolve" -Line $line
+                        Write-Violation -File $file -LineNumber $lineNo -Message "Image target '$resolvedTarget' does not resolve to a file" -Line $line
+                    }
+                }
+            }
+
+            foreach ($match in $imageReferencePattern.Matches($line)) {
+                $label = $match.Groups['label'].Value.Trim()
+                if ($linkDefinitions.ContainsKey($label)) {
+                    $definition = $linkDefinitions[$label]
+                    $resolvedTarget = $definition.Target
+                    if ($resolvedTarget -and (Is-LocalTarget $resolvedTarget)) {
+                        $imagePath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
+                        if (-not $imagePath) {
+                            $violationCount++
+                            Write-Violation -File $file -LineNumber $lineNo -Message "Image reference '$label' points to '$resolvedTarget' which does not resolve" -Line $line
+                        }
                     }
                 }
             }
@@ -538,40 +550,42 @@ $mdFiles | ForEach-Object {
 # Test files remain excluded because their fixture content is encoded as live string
 # literals — masking only protects comments, and rewriting every fictional fixture
 # string is out of scope for this lint.
-$codeFiles = $gitFiles | Where-Object {
-    $ext = [System.IO.Path]::GetExtension($_)
-    if (-not ($codeFileExtensions -contains $ext)) { return $false }
-    if ($_ -match '(?i)(^|[\\/])tests?[\\/]') { return $false }
-    if ($_ -match '(?i)(^|[\\/])test_[^\\/]+\.py$') { return $false }
-    if ($_ -match '(?i)(^|[\\/])[^\\/]+_test\.py$') { return $false }
-    return $true
-}
-
-$codeFiles | ForEach-Object {
-    $relativePath = $_
-    $file = Join-Path $repoRoot $relativePath
-    if (-not (Test-Path -LiteralPath $file)) { return }
-    $language = Get-LanguageFromExtension -Path $file
-    if (-not $language) { return }
-    Write-Verbose "Scanning code file: $relativePath (language: $language)"
-    $text = [System.IO.File]::ReadAllText($file)
-    if (-not $codeDocsPattern.IsMatch($text)) { return }
-    $lines = @($text -split '\r?\n')
-    if ($lines.Count -gt 1 -and $lines[-1] -eq '') {
-        $lines = $lines[0..($lines.Count - 2)]
+if ($checkTargets) {
+    $codeFiles = $gitFiles | Where-Object {
+        $ext = [System.IO.Path]::GetExtension($_)
+        if (-not ($codeFileExtensions -contains $ext)) { return $false }
+        if ($_ -match '(?i)(^|[\\/])tests?[\\/]') { return $false }
+        if ($_ -match '(?i)(^|[\\/])test_[^\\/]+\.py$') { return $false }
+        if ($_ -match '(?i)(^|[\\/])[^\\/]+_test\.py$') { return $false }
+        return $true
     }
-    $maskedLines = Get-CommentMaskedLines -Lines $lines -Language $language
-    for ($index = 0; $index -lt $lines.Length; $index++) {
-        $originalLine = $lines[$index]
-        $scanLine = if ($index -lt $maskedLines.Length) { $maskedLines[$index] } else { $originalLine }
-        $lineNo = $index + 1
-        foreach ($match in $codeDocsPattern.Matches($scanLine)) {
-            $rawTarget = $match.Value
-            $normalizedTarget = $rawTarget -replace '\\', '/'
-            $resolvedPath = Resolve-LocalPath -SourceFile $file -Target $normalizedTarget -RepoRoot $repoRoot
-            if (-not $resolvedPath) {
-                $violationCount++
-                Write-Violation -File $file -LineNumber $lineNo -Message "Source reference '$normalizedTarget' does not resolve to an existing markdown file" -Line $originalLine
+
+    $codeFiles | ForEach-Object {
+        $relativePath = $_
+        $file = Join-Path $repoRoot $relativePath
+        if (-not (Test-Path -LiteralPath $file)) { return }
+        $language = Get-LanguageFromExtension -Path $file
+        if (-not $language) { return }
+        Write-Verbose "Scanning code file: $relativePath (language: $language)"
+        $text = [System.IO.File]::ReadAllText($file)
+        if (-not $codeDocsPattern.IsMatch($text)) { return }
+        $lines = @($text -split '\r?\n')
+        if ($lines.Count -gt 1 -and $lines[-1] -eq '') {
+            $lines = $lines[0..($lines.Count - 2)]
+        }
+        $maskedLines = Get-CommentMaskedLines -Lines $lines -Language $language
+        for ($index = 0; $index -lt $lines.Length; $index++) {
+            $originalLine = $lines[$index]
+            $scanLine = if ($index -lt $maskedLines.Length) { $maskedLines[$index] } else { $originalLine }
+            $lineNo = $index + 1
+            foreach ($match in $codeDocsPattern.Matches($scanLine)) {
+                $rawTarget = $match.Value
+                $normalizedTarget = $rawTarget -replace '\\', '/'
+                $resolvedPath = Resolve-LocalPath -SourceFile $file -Target $normalizedTarget -RepoRoot $repoRoot
+                if (-not $resolvedPath) {
+                    $violationCount++
+                    Write-Violation -File $file -LineNumber $lineNo -Message "Source reference '$normalizedTarget' does not resolve to an existing markdown file" -Line $originalLine
+                }
             }
         }
     }

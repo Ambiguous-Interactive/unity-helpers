@@ -256,6 +256,58 @@ function Invoke-ValidatorExpectingUntrackedPayloadFailure {
     -Message "Expected validator to fail with '$expectedMessage'. Exit: $validatorExitCode. Output: $validatorOutputText"
 }
 
+function Invoke-ValidatorExpectingForbiddenRootArtifactFailure {
+  param(
+    [string]$RelativePath,
+    [string]$TestName
+  )
+
+  $canaryPath = Join-Path $repoRoot $RelativePath
+  if (Test-Path -LiteralPath $canaryPath) {
+    Write-TestResult -TestName $TestName -Passed $false -Message "Canary path already exists: $RelativePath"
+    return
+  }
+
+  $packageJsonOriginalContent = Get-Content -LiteralPath $packageJsonPath -Raw
+  $validatorExitCode = 0
+  $validatorOutput = $null
+  try {
+    $packageJsonObject = $packageJsonOriginalContent | ConvertFrom-Json
+    $packageFiles = @($packageJsonObject.files | ForEach-Object { [string]$_ })
+    if ($RelativePath -notin $packageFiles) {
+      $packageFiles += $RelativePath
+    }
+    $packageJsonObject.files = $packageFiles
+    Set-Content -LiteralPath $packageJsonPath -Value ($packageJsonObject | ConvertTo-Json -Depth 100) -NoNewline
+
+    Set-Content -LiteralPath $canaryPath -Value "# Package Validator Forbidden Artifact Canary`n" -NoNewline
+    Push-Location $repoRoot
+    try {
+      $validatorOutput = & pwsh -NoProfile -File $validatorPath *>&1
+      $validatorExitCode = $LASTEXITCODE
+    }
+    finally {
+      Pop-Location
+    }
+  }
+  finally {
+    Set-Content -LiteralPath $packageJsonPath -Value $packageJsonOriginalContent -NoNewline
+    Remove-Item -LiteralPath $canaryPath -Force -ErrorAction SilentlyContinue
+  }
+
+  $validatorOutputText = ($validatorOutput | Out-String).Trim()
+  $forbiddenMessage = "Forbidden release artifact included in npm package: $RelativePath"
+  $duplicateMessages = @(
+    "Unexpected top-level entry included in npm package: $RelativePath",
+    "File in npm package but not tracked in git repo: $RelativePath"
+  )
+  $duplicateDiagnostics = @($duplicateMessages | Where-Object { $validatorOutputText.Contains($_) })
+  Write-TestResult `
+    -TestName $TestName `
+    -Passed ($validatorExitCode -ne 0 -and $validatorOutputText.Contains($forbiddenMessage) -and $duplicateDiagnostics.Count -eq 0) `
+    -Message "Expected validator to fail with '$forbiddenMessage' and without duplicate generic diagnostics. Duplicates: $($duplicateDiagnostics -join '; '). Exit: $validatorExitCode. Output: $validatorOutputText"
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath)) {
   Write-TestResult -TestName 'validate-npm-package script exists' -Passed $false -Message "Missing validator: $validatorPath"
 }
@@ -263,6 +315,10 @@ else {
   Invoke-ValidatorExpectingUntrackedPayloadFailure `
     -RelativePath 'docs/package-validator-untracked-payload-canary.md' `
     -TestName 'validate-npm-package rejects untracked payload files'
+
+  Invoke-ValidatorExpectingForbiddenRootArtifactFailure `
+    -RelativePath 'pr-description.md' `
+    -TestName 'validate-npm-package reports forbidden root artifacts once'
 
   if (Test-Path -LiteralPath $caseOnlyCanaryPath) {
     Write-Info "Skipping case-only payload canary because $caseOnlyCanaryRelativePath resolves on this filesystem."

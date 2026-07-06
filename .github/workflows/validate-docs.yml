@@ -47,7 +47,7 @@ jobs:
 
       - name: Check internal markdown links exist
         shell: pwsh
-        run: ./scripts/lint-doc-links.ps1 -VerboseOutput
+        run: ./scripts/lint-doc-links.ps1 -Mode Targets -VerboseOutput
 
   validate-link-format:
     name: Validate Link Format
@@ -59,7 +59,7 @@ jobs:
 
       - name: Check markdown link format
         shell: pwsh
-        run: ./scripts/lint-doc-links.ps1 -VerboseOutput
+        run: ./scripts/lint-doc-links.ps1 -Mode Format -VerboseOutput
 
   build-mkdocs-test:
     name: Build MkDocs Site

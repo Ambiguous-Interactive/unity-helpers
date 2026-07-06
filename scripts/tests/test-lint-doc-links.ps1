@@ -108,7 +108,8 @@ function Invoke-LintInFixture {
     param(
         [string]$FixtureRoot,
         [string]$WorkingDirectory = $FixtureRoot,
-        [string[]]$Paths = @()
+        [string[]]$Paths = @(),
+        [string]$Mode = ''
     )
 
     $lintCopy = Join-Path $FixtureRoot 'scripts/lint-doc-links.ps1'
@@ -119,6 +120,10 @@ function Invoke-LintInFixture {
         if ($Paths -and $Paths.Count -gt 0) {
             $arguments += '-Paths'
             $arguments += $Paths
+        }
+        if (-not [string]::IsNullOrWhiteSpace($Mode)) {
+            $arguments += '-Mode'
+            $arguments += $Mode
         }
 
         $output = & pwsh @arguments *>&1
@@ -156,8 +161,12 @@ function Invoke-TestCase {
         if ($Case.PSObject.Properties['Paths']) {
             $paths = @($Case.Paths)
         }
+        $mode = ''
+        if ($Case.PSObject.Properties['Mode']) {
+            $mode = [string]$Case.Mode
+        }
 
-        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory -Paths $paths
+        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory -Paths $paths -Mode $mode
 
         $reasons = @()
 
@@ -655,6 +664,37 @@ class Foo {
             Paths = @('docs/readme.md', 'README.md')
             ExpectedExit = 'nonzero'
             ExpectedOutputContains = @('Bare .md mention')
+        }
+        [pscustomobject]@{
+            Name = 'Pass_FormatModeSkipsBrokenLocalTarget'
+            Mode = 'Format'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = "See [missing](./docs/missing.md).`n" }
+            )
+            ExpectedExit = 0
+            ExpectedOutputContains = @('Markdown link lint passed')
+            ExpectedOutputNotContains = @('does not resolve to an existing markdown file')
+        }
+        [pscustomobject]@{
+            Name = 'Pass_TargetModeSkipsMissingRelativePrefix'
+            Mode = 'Targets'
+            Files = @(
+                [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
+                [pscustomobject]@{ Path = 'README.md'; Content = "See [readme](docs/readme.md).`n" }
+            )
+            ExpectedExit = 0
+            ExpectedOutputContains = @('Markdown link lint passed')
+            ExpectedOutputNotContains = @('jekyll-relative-links')
+        }
+        [pscustomobject]@{
+            Name = 'Fail_TargetModeCatchesBrokenLocalTarget'
+            Mode = 'Targets'
+            Files = @(
+                [pscustomobject]@{ Path = 'README.md'; Content = "See [missing](./docs/missing.md).`n" }
+            )
+            ExpectedExit = 'nonzero'
+            ExpectedOutputContains = @('docs/missing.md', 'does not resolve to an existing markdown file')
+            ExpectedOutputNotContains = @('jekyll-relative-links')
         }
     )
 
