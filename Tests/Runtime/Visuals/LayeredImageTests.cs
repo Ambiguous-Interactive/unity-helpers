@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             IEnumerable<AnimatedSpriteLayer> layers,
             Color backgroundColor,
             float pixelCutoff = 0.01f,
-            int fps = AnimatedSpriteLayer.FrameRate
+            float fps = AnimatedSpriteLayer.FrameRate
         )
         {
             return new LayeredImage(
