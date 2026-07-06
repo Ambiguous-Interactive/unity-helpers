@@ -97,7 +97,39 @@ function Test-RepoIndexedPath {
         return $false
     }
 
+    if ($repoRelativePath -eq '.') {
+        return $true
+    }
+
     return $repoFileSet.Contains($repoRelativePath)
+}
+
+function Add-RepoIndexedPath {
+    param([string]$RepoRelativePath)
+
+    if ([string]::IsNullOrWhiteSpace($RepoRelativePath)) {
+        return
+    }
+
+    $normalized = $RepoRelativePath -replace '\\', '/'
+    $repoFileSet.Add($normalized) | Out-Null
+
+    $directory = [System.IO.Path]::GetDirectoryName($normalized)
+    while (-not [string]::IsNullOrWhiteSpace($directory)) {
+        $directory = $directory -replace '\\', '/'
+        $repoFileSet.Add($directory) | Out-Null
+        $directory = [System.IO.Path]::GetDirectoryName($directory)
+    }
+}
+
+function Get-LocalTargetKind {
+    param([string]$Target)
+
+    if ($Target -match '(?i)\.md($|[?#])') {
+        return 'markdown file'
+    }
+
+    return 'local file or directory'
 }
 
 function Write-Violation {
@@ -187,8 +219,15 @@ function Resolve-LocalPath {
         $normalized = $normalized.Substring('/unity-helpers'.Length)
     }
 
-    while ($normalized.StartsWith('./')) {
+    $pointsAtSourceDirectory = ($normalized -eq '.' -or $normalized -eq './')
+    while ($normalized.StartsWith('./') -and $normalized.Length -gt 2) {
         $normalized = $normalized.Substring(2)
+    }
+
+    if ($pointsAtSourceDirectory) {
+        $normalized = '.'
+    } elseif ($normalized.Length -gt 1) {
+        $normalized = $normalized.TrimEnd('/')
     }
 
     $normalized = $normalized.Trim()
@@ -295,7 +334,7 @@ if (-not $allGitFiles) {
 
 foreach ($gitFile in $allGitFiles) {
     if (-not [string]::IsNullOrWhiteSpace($gitFile)) {
-        $repoFileSet.Add($gitFile) | Out-Null
+        Add-RepoIndexedPath -RepoRelativePath $gitFile
     }
 }
 
@@ -364,12 +403,12 @@ $mdFiles | ForEach-Object {
         $definitionLine = $entry.Value.LineNumber
         if (-not $definitionTarget) { continue }
         if (-not (Is-LocalTarget $definitionTarget)) { continue }
-        if ($definitionTarget -notmatch '(?i)\.md($|[?#])') { continue }
 
         $resolvedDefinition = Resolve-LocalPath -SourceFile $file -Target $definitionTarget -RepoRoot $repoRoot
         if (-not $resolvedDefinition) {
             $violationCount++
-            Write-Violation -File $file -LineNumber $definitionLine -Message "Reference link target '$definitionTarget' does not resolve to an existing markdown file" -Line ''
+            $targetKind = Get-LocalTargetKind $definitionTarget
+            Write-Violation -File $file -LineNumber $definitionLine -Message "Reference link target '$definitionTarget' does not resolve to an existing $targetKind" -Line ''
         }
     }
 
@@ -450,17 +489,17 @@ $mdFiles | ForEach-Object {
             Write-Violation -File $file -LineNumber $lineNo -Message "Internal link '$target' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths" -Line $line
         }
 
-        foreach ($match in $standardLinkPattern.Matches($line)) {
+        foreach ($match in $standardLinkPattern.Matches($lineWithoutInlineCode)) {
             $rawTarget = $match.Groups['target'].Value
             $resolvedTarget = Get-MarkdownLinkTarget $rawTarget
             if (-not $resolvedTarget) { continue }
             if (-not (Is-LocalTarget $resolvedTarget)) { continue }
-            if ($resolvedTarget -notmatch '(?i)\.md($|[?#])') { continue }
 
             $linkPath = Resolve-LocalPath -SourceFile $file -Target $resolvedTarget -RepoRoot $repoRoot
             if (-not $linkPath) {
                 $violationCount++
-                Write-Violation -File $file -LineNumber $lineNo -Message "Markdown link target '$resolvedTarget' does not resolve to an existing markdown file" -Line $line
+                $targetKind = Get-LocalTargetKind $resolvedTarget
+                Write-Violation -File $file -LineNumber $lineNo -Message "Markdown link target '$resolvedTarget' does not resolve to an existing $targetKind" -Line $line
             }
         }
 

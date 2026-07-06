@@ -40,217 +40,26 @@ jobs:
   validate-links:
     name: Validate Internal Links
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Check internal markdown links exist
-        run: |
-          #!/bin/bash
-          set -euo pipefail
-
-          echo "Validating that internal markdown links point to existing files..."
-
-          errors=0
-
-          # URL-decode function (handles %XX encoding like %20 for spaces)
-          # SECURITY NOTE: This uses printf '%b' with hex escape sequences. The input
-          # comes from markdown files in our repo (trusted source). If adapting this
-          # for untrusted input, validate that %XX sequences only contain valid hex.
-          # Edge case: % followed by non-hex chars will produce undefined output,
-          # but this is acceptable for our use case (repo-owned markdown files).
-          urldecode() {
-            local url_encoded="${1//+/ }"
-            printf '%b' "${url_encoded//%/\\x}"
-          }
-
-          # Remove inline code spans (content between backticks) from a line
-          # This prevents example links in inline code from being parsed
-          # LIMITATIONS:
-          # - Does not handle escaped backticks (\`) - these are rare in practice
-          # - Triple+ backticks on same line may have unexpected interactions
-          # - Nested backticks (e.g., `text with ` inside`) are not standard markdown
-          # The sed regex removes double-backtick spans first (``text``), then single
-          # backtick spans (`text`). This handles common cases; exotic patterns should
-          # be placed in fenced code blocks instead of inline code.
-          strip_inline_code() {
-            local line
-            line="$1"
-            # Remove content between backticks (handles single and double backticks)
-            # Using sed to handle multiple inline code spans per line
-            # shellcheck disable=SC2016
-            echo "$line" | sed -E 's/``[^`]*``//g; s/`[^`]*`//g'
-          }
-
-          # Find all markdown files
-          while IFS= read -r -d '' mdfile; do
-            dir=$(dirname "$mdfile")
-            in_code_block=false
-
-            # Process file line by line to track code blocks
-            while IFS= read -r line || [[ -n "$line" ]]; do
-              # Check for code fence start/end (``` or ~~~)
-              # Store fence pattern in variable to avoid shellcheck regex parse issues
-              fence_pattern='^[[:space:]]*(```|~~~)'
-              if [[ "$line" =~ $fence_pattern ]]; then
-                if [[ "$in_code_block" == "true" ]]; then
-                  in_code_block=false
-                else
-                  in_code_block=true
-                fi
-                continue
-              fi
-
-              # Skip lines inside code blocks
-              if [[ "$in_code_block" == "true" ]]; then
-                continue
-              fi
-
-              # Strip inline code before extracting links (example links in backticks)
-              stripped_line=$(strip_inline_code "$line")
-
-              # Extract markdown links from this line: [text](link)
-              # Uses grep -oE (POSIX extended regex) + sed instead of grep -oP (GNU Perl regex)
-              # grep -oP is unavailable on macOS and non-GNU systems
-              # LIMITATION: The pattern \]\([^)]+\) cannot handle URLs containing parentheses
-              # like [text](./path/file(1).md). This is valid markdown syntax but rare in this
-              # codebase. For files with parentheses in names, consider renaming them.
-              # A full markdown parser would handle balanced parens but adds complexity.
-              while read -r link; do
-                # Skip empty lines from grep/sed output
-                [[ -z "$link" ]] && continue
-
-                # Skip external links, anchors, and mailto
-                if [[ "$link" =~ ^https?:// ]] || [[ "$link" =~ ^# ]] || [[ "$link" =~ ^mailto: ]]; then
-                  continue
-                fi
-
-                # Remove anchor from link if present
-                link_without_anchor="${link%%#*}"
-
-                # Skip if empty (was just an anchor)
-                if [[ -z "$link_without_anchor" ]]; then
-                  continue
-                fi
-
-                # URL-decode the path (handles %20 for spaces, etc.)
-                decoded_path=$(urldecode "$link_without_anchor")
-
-                # Skip Samples~ folder links - Unity Package Manager convention
-                # The ~ suffix tells Unity to exclude this folder from the Asset Database
-                # These folders exist but may cause path resolution issues with special chars
-                if [[ "$decoded_path" == *"Samples~"* ]]; then
-                  continue
-                fi
-
-                # Resolve the link path relative to the markdown file's directory
-                if [[ "$decoded_path" == /* ]]; then
-                  # Absolute path from repo root
-                  target_path=".${decoded_path}"
-                else
-                  # Relative path
-                  target_path="$dir/$decoded_path"
-                fi
-
-                # Normalize the path
-                target_path=$(realpath -m "$target_path" 2>/dev/null || echo "$target_path")
-
-                # Check if target exists
-                if [[ ! -e "$target_path" ]]; then
-                  echo "Broken link in $mdfile: $link -> $target_path (file not found)"
-                  errors=$((errors + 1))
-                fi
-              done < <(echo "$stripped_line" | grep -oE '\]\([^)]+\)' 2>/dev/null | sed 's/^](//;s/)$//' || true)
-            done < "$mdfile"
-          done < <(find . -name "*.md" -type f -not -path "./node_modules/*" -print0)
-
-          if [[ $errors -gt 0 ]]; then
-            echo ""
-            echo "Found $errors broken internal link(s)"
-            exit 1
-          fi
-
-          echo "All internal links are valid"
+        shell: pwsh
+        run: ./scripts/lint-doc-links.ps1 -VerboseOutput
 
   validate-link-format:
     name: Validate Link Format
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Check markdown link format
-        run: |
-          #!/bin/bash
-          set -euo pipefail
-
-          echo "Checking that internal markdown links use proper relative format (./ or ../)..."
-
-          # Find links that don't start with ./, ../, http, https, #, or mailto
-          # These are internal links that should have a relative prefix
-          # IMPORTANT: Skip content inside code blocks (```) and inline code (backticks)
-
-          # Remove inline code spans (content between backticks) from a line
-          # LIMITATIONS: Same as above (escaped backticks, nested backticks not handled).
-          # For complex examples, use fenced code blocks which are skipped entirely.
-          strip_inline_code() {
-            local line
-            line="$1"
-            # shellcheck disable=SC2016
-            echo "$line" | sed -E 's/``[^`]*``//g; s/`[^`]*`//g'
-          }
-
-          violations=""
-
-          while IFS= read -r -d '' mdfile; do
-            in_code_block=false
-            line_num=0
-
-            while IFS= read -r line || [[ -n "$line" ]]; do
-              line_num=$((line_num + 1))
-
-              # Check for code fence start/end (``` or ~~~)
-              # Store fence pattern in variable to avoid shellcheck regex parse issues
-              fence_pattern='^[[:space:]]*(```|~~~)'
-              if [[ "$line" =~ $fence_pattern ]]; then
-                if [[ "$in_code_block" == "true" ]]; then
-                  in_code_block=false
-                else
-                  in_code_block=true
-                fi
-                continue
-              fi
-
-              # Skip lines inside code blocks
-              if [[ "$in_code_block" == "true" ]]; then
-                continue
-              fi
-
-              # Strip inline code before checking links (example links in backticks)
-              stripped_line=$(strip_inline_code "$line")
-
-              # Check for links missing relative prefix (./ or ../)
-              # Match ](something) where something starts with a letter (not ./ ../ http # mailto)
-              if echo "$stripped_line" | grep -qE '\]\([a-zA-Z]' && \
-                 ! echo "$stripped_line" | grep -qE '\]\(\.\./|\]\(\./|\]\(https?://|\]\(#|\]\(mailto:'; then
-                violations="${violations}${mdfile}:${line_num}:${line}"$'\n'
-              fi
-            done < "$mdfile"
-          done < <(find . -name "*.md" -type f -not -path "./node_modules/*" -print0)
-
-          if [[ -n "$violations" ]]; then
-            echo "Found markdown links missing relative prefix (./ or ../):"
-            echo ""
-            echo "$violations"
-            echo ""
-            echo "Links to local files should use relative paths like:"
-            echo "  - Use ./file format instead of bare file"
-            echo "  - Use ./docs/file format instead of docs/file"
-            echo ""
-            exit 1
-          fi
-
-          echo "All internal links use proper relative format"
+        shell: pwsh
+        run: ./scripts/lint-doc-links.ps1 -VerboseOutput
 
   build-mkdocs-test:
     name: Build MkDocs Site

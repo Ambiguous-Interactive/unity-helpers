@@ -1085,6 +1085,81 @@ function Run-PrePushLastResortGuidanceContractTests {
     -Message "Stale guidance: $($staleGuidanceHits -join '; ')"
 }
 
+function Run-DocumentationWorkflowContractTests {
+  Write-Host ""
+  Write-Host "Documentation workflow contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $workflowPath = Join-Path $repoRoot '.github/workflows/validate-docs.yml'
+
+  if (-not (Test-Path $workflowPath)) {
+    Write-TestResult `
+      -TestName 'validate-docs workflow exists' `
+      -Passed $false `
+      -Message "Missing file: $workflowPath"
+    return
+  }
+
+  $workflowContent = Get-Content -Path $workflowPath -Raw
+  $validateLinksBlock = [regex]::Match($workflowContent, '(?ms)^\s*validate-links:\s*.*?(?=^\s*validate-link-format:)')
+  $validateLinkFormatBlock = [regex]::Match($workflowContent, '(?ms)^\s*validate-link-format:\s*.*?(?=^\s*build-mkdocs-test:)')
+
+  $usesCanonicalDocLinkLinter = (
+    $validateLinksBlock.Success -and
+    $validateLinkFormatBlock.Success -and
+    $validateLinksBlock.Value.Contains('./scripts/lint-doc-links.ps1 -VerboseOutput') -and
+    $validateLinkFormatBlock.Value.Contains('./scripts/lint-doc-links.ps1 -VerboseOutput')
+  )
+
+  $preservesRequiredCheckNames = (
+    $validateLinksBlock.Success -and
+    $validateLinkFormatBlock.Success -and
+    $validateLinksBlock.Value.Contains('name: Validate Internal Links') -and
+    $validateLinkFormatBlock.Value.Contains('name: Validate Link Format')
+  )
+
+  $hasBoundedLinkJobTimeouts = (
+    $validateLinksBlock.Success -and
+    $validateLinkFormatBlock.Success -and
+    $validateLinksBlock.Value.Contains('timeout-minutes: 5') -and
+    $validateLinkFormatBlock.Value.Contains('timeout-minutes: 5')
+  )
+
+  $slowInlineScannerPatterns = @(
+    'find . -name "*.md"',
+    'strip_inline_code()',
+    "grep -qE '\]\([a-zA-Z]'",
+    "grep -oE '\]\([^)]+\)'"
+  )
+  $slowInlineScannerHits = @()
+  foreach ($pattern in $slowInlineScannerPatterns) {
+    if ($workflowContent.Contains($pattern)) {
+      $slowInlineScannerHits += $pattern
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'validate-docs preserves required link-check job names' `
+    -Passed $preservesRequiredCheckNames `
+    -Message 'Expected Validate Documentation to keep Validate Internal Links and Validate Link Format jobs for branch-protection continuity.'
+
+  Write-TestResult `
+    -TestName 'validate-docs delegates link checks to canonical linter' `
+    -Passed $usesCanonicalDocLinkLinter `
+    -Message 'Expected validate-docs.yml link jobs to invoke scripts/lint-doc-links.ps1 -VerboseOutput.'
+
+  Write-TestResult `
+    -TestName 'validate-docs bounds link-check job runtime' `
+    -Passed $hasBoundedLinkJobTimeouts `
+    -Message 'Expected validate-docs.yml link jobs to have timeout-minutes: 5.'
+
+  Write-TestResult `
+    -TestName 'validate-docs avoids duplicated slow inline markdown scanner' `
+    -Passed ($slowInlineScannerHits.Count -eq 0) `
+    -Message "Slow inline scanner patterns found: $($slowInlineScannerHits -join ', ')"
+}
+
 function Run-ReleaseDrafterChangelogVersionContractTests {
   Write-Host ""
   Write-Host "Release drafter changelog version contracts:" -ForegroundColor Magenta
@@ -2088,6 +2163,7 @@ Run-OptionalOdinIntegrationContractTests
 Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
 Run-PrePushLastResortGuidanceContractTests
+Run-DocumentationWorkflowContractTests
 Run-ReleaseDrafterChangelogVersionContractTests
 Run-ReleaseWorkflowChangelogContractTests
 Run-ReleaseWorkflowGitHubCliContractTests
