@@ -50,6 +50,24 @@ function Get-RunnerRegistryDword {
     }
 }
 
+function Get-RunnerObjectPropertyValue {
+    param(
+        [AllowNull()][object]$InputObject,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($null -eq $InputObject) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
 function Test-RunnerUninstallDisplayName {
     param([Parameter(Mandatory = $true)][string]$Pattern)
 
@@ -67,7 +85,14 @@ function Test-RunnerUninstallDisplayName {
             ForEach-Object {
                 try { Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Stop } catch { $null }
             } |
-            Where-Object { $_ -and $_.DisplayName -and ([string]$_.DisplayName -match $Pattern) }
+            Where-Object {
+                $displayName = Get-RunnerObjectPropertyValue -InputObject $_ -Name 'DisplayName'
+                if ($null -eq $displayName) {
+                    return $false
+                }
+
+                return [string]$displayName -match $Pattern
+            }
         if ($matches) {
             return $true
         }

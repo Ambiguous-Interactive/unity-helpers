@@ -177,6 +177,72 @@ if ($workflowShapeExitCode -ne 2) {
     Write-Info "Checked workflow-style maintenance hashtable splatting binds named parameters."
 }
 
+$sparseRegistryScriptPath = ''
+$sparseRegistryOutput = @()
+$sparseRegistryExitCode = 1
+try {
+    $sparseRegistryScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-sparse-registry-$PID-$(Get-Random).ps1"
+    @"
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+. '$($windowsRunnerBootstrapPath.Replace("'", "''"))'
+
+function Test-Path {
+    param(
+        [string]`$LiteralPath,
+        [object]`$PathType,
+        [object]`$ErrorAction
+    )
+    return `$true
+}
+
+function Get-ChildItem {
+    param(
+        [string]`$LiteralPath,
+        [object]`$ErrorAction
+    )
+    return @(
+        [pscustomobject]@{ PSPath = 'registry-entry-without-display-name' },
+        [pscustomobject]@{ PSPath = 'registry-entry-that-throws' },
+        [pscustomobject]@{ PSPath = 'registry-entry-with-display-name' }
+    )
+}
+
+function Get-ItemProperty {
+    param(
+        [string]`$LiteralPath,
+        [object]`$ErrorAction
+    )
+    if (`$LiteralPath -eq 'registry-entry-that-throws') {
+        throw 'Unreadable uninstall registry entry'
+    }
+
+    if (`$LiteralPath -eq 'registry-entry-with-display-name') {
+        return [pscustomobject]@{ DisplayName = 'Microsoft Visual C++ 2022 Redistributable (x64)' }
+    }
+
+    return [pscustomobject]@{ QuietUninstallString = 'msiexec /x {FAKE}' }
+}
+
+if (-not (Test-RunnerUninstallDisplayName -Pattern 'Microsoft Visual C\+\+ 2022.*\(x64\)')) {
+    Write-Host 'Expected sparse registry probe to find the later matching DisplayName.'
+    exit 7
+}
+"@ | Set-Content -LiteralPath $sparseRegistryScriptPath -Encoding UTF8
+    $sparseRegistryOutput = & pwsh -NoProfile -File $sparseRegistryScriptPath 2>&1
+    $sparseRegistryExitCode = $LASTEXITCODE
+} finally {
+    if ($sparseRegistryScriptPath -and (Test-Path -LiteralPath $sparseRegistryScriptPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $sparseRegistryScriptPath -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($sparseRegistryExitCode -ne 0) {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::Windows runner bootstrap must tolerate uninstall registry entries without DisplayName under StrictMode. Exit $sparseRegistryExitCode. Output: $($sparseRegistryOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
+}
+
 $hasPrCancelConcurrency = (
     $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
     $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
