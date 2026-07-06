@@ -467,6 +467,18 @@ If your instance method on a MonoBehaviour isn't being called:
 - **Avoid `SearchPrefabs` in large projects** - it loads all prefabs to check for components
 - **Avoid `SearchSceneObjects` with many open scenes** - searches all loaded scenes
 
+### Resetting Loop Protection
+
+If a callback repeatedly creates more matching asset changes, the watcher enters loop protection and skips additional batches until it is reset. After fixing the callback or clearing the bad state, editor tools can resume dispatch without a domain reload:
+
+```csharp
+using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
+
+AssetChangeDetectionUtility.ResetLoopProtection();
+```
+
+The reset clears only loop-protection state and queued changes. It preserves discovered watchers and subscriptions.
+
 ### Null Reference Exceptions
 
 - Remember: asset parameter is `null` for deletion events

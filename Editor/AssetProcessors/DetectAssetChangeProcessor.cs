@@ -260,6 +260,14 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             DiagnosticsEnabled = settings?.DiagnosticsEnabled ?? false;
         }
 
+        internal static void ResetLoopProtection()
+        {
+            _loopProtectionActive = false;
+            _consecutiveChangeBatches = 0;
+            _lastChangeProcessTimestamp = 0d;
+            PendingAssetChanges.Clear();
+        }
+
         internal static bool ValidateMethodSignatureForTesting(
             Type declaringType,
             string methodName

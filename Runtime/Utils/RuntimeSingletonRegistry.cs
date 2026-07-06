@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Collections.Generic;
     using System.Text;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Non-generic registry to manage RuntimeSingleton instance clearing.
@@ -155,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     builder.Append(" '");
                     builder.Append(liveInstance.name);
                     builder.Append("'#");
-                    builder.Append(liveInstance.GetInstanceID());
+                    builder.Append(liveInstance.GetUnityObjectId());
                     if (liveInstance is Component component && component.gameObject != null)
                     {
                         builder.Append(" scene='");

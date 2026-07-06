@@ -160,6 +160,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             StringAssert.Contains(nameof(TestRuntimeSingleton), description);
             StringAssert.Contains(instance.name, description);
+            StringAssert.Contains($"#{instance.GetUnityObjectId()}", description);
         }
 
         [Test]

@@ -317,15 +317,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             // First clean any numbered duplicates from previous failed runs
             // This prevents Unity from creating "Temp 1", "Temp 2", etc.
             TempFolderCleanupUtility.CleanupTempDuplicates();
-
-            if (!AssetDatabase.IsValidFolder("Assets/Temp"))
-            {
-                AssetDatabase.CreateFolder("Assets", "Temp");
-            }
-            if (!AssetDatabase.IsValidFolder(DynamicAssetsDir))
-            {
-                AssetDatabase.CreateFolder("Assets/Temp", "DynamicPrefabFixtures");
-            }
+            AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }
 
         private static void ReleaseDynamicFixtures()

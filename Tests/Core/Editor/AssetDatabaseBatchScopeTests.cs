@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
@@ -3311,6 +3312,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             }
         }
 
+        private static void DeleteDiskPathAndMeta(string absolutePath)
+        {
+            if (Directory.Exists(absolutePath))
+            {
+                Directory.Delete(absolutePath, recursive: true);
+            }
+
+            string metaPath = absolutePath + ".meta";
+            if (File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
+
         [Test]
         public void EnsureAssetFolderCreatesSingleLevelFolder()
         {
@@ -3363,6 +3378,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             finally
             {
                 DeleteEnsureFolderTestRoot();
+            }
+        }
+
+        [Test]
+        public void EnsureAssetFolderImportsExistingDiskFolderWithoutNumberedDuplicate()
+        {
+            DeleteEnsureFolderTestRoot();
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string absoluteRoot = Path.Combine(projectRoot, EnsureFolderTestRoot);
+            string absoluteDuplicate = absoluteRoot + " 1";
+            try
+            {
+                DeleteDiskPathAndMeta(absoluteDuplicate);
+                DeleteDiskPathAndMeta(absoluteRoot);
+                Directory.CreateDirectory(absoluteRoot);
+
+                bool created = AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot);
+
+                Assert.That(created, Is.True, "EnsureAssetFolder should adopt the on-disk folder.");
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot),
+                    Is.True,
+                    "The intended folder should be registered with the AssetDatabase."
+                );
+                Assert.That(
+                    Directory.Exists(absoluteDuplicate),
+                    Is.False,
+                    "EnsureAssetFolder should not create a numbered duplicate folder on disk."
+                );
+                Assert.That(
+                    AssetDatabase.IsValidFolder(EnsureFolderTestRoot + " 1"),
+                    Is.False,
+                    "EnsureAssetFolder should not leave a numbered duplicate in the AssetDatabase."
+                );
+            }
+            finally
+            {
+                DeleteEnsureFolderTestRoot();
+                DeleteDiskPathAndMeta(absoluteDuplicate);
+                DeleteDiskPathAndMeta(absoluteRoot);
+                AssetDatabase.Refresh();
             }
         }
 

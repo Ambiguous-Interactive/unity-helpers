@@ -449,6 +449,64 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        public void PublicResetLoopProtectionResumesDispatchWithoutDroppingSubscriptions()
+        {
+            CreatePayloadAssetAt(PayloadPath);
+            ClearTestState();
+            ResetProcessorWithCleanState();
+
+            double fakeTime = 0;
+            DetectAssetChangeProcessor.TimeProvider = () => fakeTime;
+            DetectAssetChangeProcessor.LoopWindowSecondsOverride = 30d;
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("potentially infinite asset change loop", RegexOptions.Singleline)
+            );
+
+            int iterations = DetectAssetChangeProcessor.MaxConsecutiveChangeSetsWithinWindow;
+            for (int i = 0; i < iterations; i++)
+            {
+                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                    new[] { PayloadPath },
+                    null,
+                    null,
+                    null
+                );
+            }
+
+            DetectAssetChangeProcessor.AssetWatcherSettings protectedSettings =
+                DetectAssetChangeProcessor.GetSettingsForTesting();
+            Assert.IsTrue(protectedSettings.LoopProtectionActive);
+            int invocationCountAfterLoopProtection = TestLoopingHandler.InvocationCount;
+
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                new[] { PayloadPath },
+                null,
+                null,
+                null
+            );
+            Assert.AreEqual(invocationCountAfterLoopProtection, TestLoopingHandler.InvocationCount);
+
+            AssetChangeDetectionUtility.ResetLoopProtection();
+
+            DetectAssetChangeProcessor.AssetWatcherSettings resetSettings =
+                DetectAssetChangeProcessor.GetSettingsForTesting();
+            Assert.IsFalse(resetSettings.LoopProtectionActive);
+            Assert.AreEqual(0, resetSettings.ConsecutiveChangeBatches);
+            Assert.AreEqual(0, resetSettings.PendingAssetChanges.Count);
+
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                new[] { PayloadPath },
+                null,
+                null,
+                null
+            );
+
+            Assert.Greater(TestLoopingHandler.InvocationCount, invocationCountAfterLoopProtection);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
         public void LogsErrorWhenMethodReturnsNonVoid()
         {
             Regex expected = new(

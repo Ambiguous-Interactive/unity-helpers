@@ -825,6 +825,72 @@ public sealed class PoisonDamageBehavior : EffectBehavior
 
 Pair this with a health component that owns mutable current-health state instead of modelling `CurrentHealth` as an Attribute.
 
+### Current Resource Ownership Pattern
+
+For health, mana, stamina, ammo, shields, and similar resources, keep one component responsible for mutable current state and use Attributes only for caps or rates. This avoids hidden restore bugs when an effect expires.
+
+```csharp
+public sealed class PlayerHealth : AttributesComponent
+{
+    [SerializeField]
+    private float currentHealth = 100f;
+
+    public Attribute MaxHealth = 100f;
+
+    public float CurrentHealth => currentHealth;
+
+    public float NormalizedHealth =>
+        MaxHealth.CurrentValue <= 0f ? 0f : currentHealth / MaxHealth.CurrentValue;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        currentHealth = Mathf.Clamp(currentHealth, 0f, MaxHealth.CurrentValue);
+        OnAttributeModified += HandleAttributeModified;
+    }
+
+    public void ApplyDamage(float amount)
+    {
+        if (amount <= 0f)
+        {
+            return;
+        }
+
+        SetCurrentHealth(currentHealth - amount);
+    }
+
+    public void ApplyHealing(float amount)
+    {
+        if (amount <= 0f)
+        {
+            return;
+        }
+
+        SetCurrentHealth(currentHealth + amount);
+    }
+
+    private void SetCurrentHealth(float value)
+    {
+        currentHealth = Mathf.Clamp(value, 0f, MaxHealth.CurrentValue);
+    }
+
+    private void HandleAttributeModified(string attributeName, float oldValue, float newValue)
+    {
+        if (attributeName == nameof(MaxHealth))
+        {
+            SetCurrentHealth(currentHealth);
+        }
+    }
+}
+```
+
+| Resource concern  | Recommended owner                         | Reason                                                          |
+| ----------------- | ----------------------------------------- | --------------------------------------------------------------- |
+| Current value     | Gameplay component field/property         | Damage, healing, save/load, and UI use explicit APIs            |
+| Maximum value     | `Attribute`                               | Buffs, equipment, and effects can modify the cap                |
+| Regeneration rate | `Attribute`                               | Effects commonly modify rates or multipliers                    |
+| Damage over time  | `EffectBehavior` calling the resource API | The effect schedules the tick; the resource still owns mutation |
+
 ### 3) Equipment Aura: +10 Defense while equipped
 
 - durationType: Infinite

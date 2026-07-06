@@ -131,19 +131,31 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             _timer = Stopwatch.StartNew();
+            Render(0);
             Fps = fps;
-            Update();
         }
 
         public void Update(bool force = false)
         {
-            if (panel == null)
+            if (panel == null && !force)
             {
                 return;
             }
 
             if (_computed.Length == 0)
             {
+                return;
+            }
+
+            if (_fps <= 0)
+            {
+                if (!force)
+                {
+                    return;
+                }
+
+                _index = _index.WrappedIncrement(_computed.Length);
+                Render(_index);
                 return;
             }
 

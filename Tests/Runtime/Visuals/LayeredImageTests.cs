@@ -50,6 +50,87 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [Test]
+        public void ConstructorAssignsInitialBackgroundBeforePanelAttachment()
+        {
+            Sprite sprite = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                3,
+                2,
+                (_, _) => new Color(1f, 0f, 0f, 1f),
+                pivot: Vector2.zero
+            );
+            AnimatedSpriteLayer layer = new(new[] { sprite });
+
+            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear);
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            Assert.That(computed, Has.Length.EqualTo(1));
+            Assert.IsTrue(computed[0] != null);
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+            Assert.That(image.style.width.value.value, Is.EqualTo(computed[0].width));
+            Assert.That(image.style.height.value.value, Is.EqualTo(computed[0].height));
+        }
+
+        [Test]
+        public void ForceUpdateAdvancesBackgroundBeforePanelAttachment()
+        {
+            Sprite red = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(1f, 0f, 0f, 1f),
+                pivot: Vector2.zero
+            );
+            Sprite blue = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(0f, 0f, 1f, 1f),
+                pivot: Vector2.zero
+            );
+            AnimatedSpriteLayer layer = new(new[] { red, blue });
+
+            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear);
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            Assert.That(computed, Has.Length.EqualTo(2));
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+
+            image.Update(force: true);
+
+            Assert.AreSame(computed[1], image.style.backgroundImage.value.texture);
+        }
+
+        [Test]
+        public void ForceUpdateAdvancesBackgroundWhenFpsIsZero()
+        {
+            Sprite red = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(1f, 0f, 0f, 1f),
+                pivot: Vector2.zero
+            );
+            Sprite blue = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(0f, 0f, 1f, 1f),
+                pivot: Vector2.zero
+            );
+            AnimatedSpriteLayer layer = new(new[] { red, blue });
+
+            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear, fps: 0);
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+
+            image.Update(force: true);
+
+            Assert.AreSame(computed[1], image.style.backgroundImage.value.texture);
+        }
+
+        [Test]
         public void ComputeTexturesCropsToVisiblePixels()
         {
             Sprite sprite = VisualsTestHelpers.CreateSprite(
@@ -407,18 +488,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                     .Approximately(new Color32(255, 0, 0, 255)),
                 "Expected parallel blending path to produce correct color."
             );
+            Assert.IsTrue(
+                VisualsTestHelpers.GetPixel(frame, 0, 0).Approximately(new Color32(255, 0, 0, 255)),
+                "Expected lower-left corner to survive parallel blending."
+            );
+            Assert.IsTrue(
+                VisualsTestHelpers
+                    .GetPixel(frame, 49, 0)
+                    .Approximately(new Color32(255, 0, 0, 255)),
+                "Expected lower-right corner to survive parallel blending."
+            );
+            Assert.IsTrue(
+                VisualsTestHelpers
+                    .GetPixel(frame, 0, 49)
+                    .Approximately(new Color32(255, 0, 0, 255)),
+                "Expected upper-left corner to survive parallel blending."
+            );
+            Assert.IsTrue(
+                VisualsTestHelpers
+                    .GetPixel(frame, 49, 49)
+                    .Approximately(new Color32(255, 0, 0, 255)),
+                "Expected upper-right corner to survive parallel blending."
+            );
         }
 
         private LayeredImage CreateLayeredImage(
             IEnumerable<AnimatedSpriteLayer> layers,
             Color backgroundColor,
-            float pixelCutoff = 0.01f
+            float pixelCutoff = 0.01f,
+            int fps = AnimatedSpriteLayer.FrameRate
         )
         {
             return new LayeredImage(
                 layers,
                 backgroundColor,
-                fps: AnimatedSpriteLayer.FrameRate,
+                fps: fps,
                 updatesSelf: false,
                 pixelCutoff: pixelCutoff
             );
