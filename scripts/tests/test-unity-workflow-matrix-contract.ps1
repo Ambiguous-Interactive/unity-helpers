@@ -81,6 +81,16 @@ if (-not $runnerUsesUnityVersionsConfig) {
     Write-Info "Checked runner bootstrap uses .github/unity-versions.json instead of a hardcoded Unity version array."
 }
 
+$ensureEditorUsesNamedSplat = (
+    (
+        $windowsRunnerMaintenanceContent.Contains('$ensureEditorArgs = @{') -and
+        $windowsRunnerMaintenanceContent.Contains('$ensureEditorOutput = @(& $ensureEditorScript @ensureEditorArgs 2>&1)')
+    ) -or (
+        $windowsRunnerMaintenanceContent.Contains('$ensureEditorArguments = @{') -and
+        $windowsRunnerMaintenanceContent.Contains('$ensureEditorOutput = @(& $ensureEditorScript @ensureEditorArguments 2>&1)')
+    )
+)
+
 $runnerBootstrapBackendPresent = (
     $runnerBootstrapContent.Contains('scripts\unity\maintain-windows-runner.ps1') -and
     -not $runnerBootstrapContent.Contains('has not been ported yet') -and
@@ -98,12 +108,16 @@ $runnerBootstrapBackendPresent = (
     $windowsRunnerBootstrapContent.Contains('$wingetExitCode = $LASTEXITCODE') -and
     $windowsRunnerMaintenanceContent.Contains('function Invoke-WindowsRunnerMaintenance') -and
     $windowsRunnerMaintenanceContent.Contains('ensure-editor.ps1') -and
-    $windowsRunnerMaintenanceContent.Contains('-RequireHealthyExisting') -and
+    $windowsRunnerMaintenanceContent.Contains('RequireHealthyExisting') -and
     $windowsRunnerMaintenanceContent.Contains("[Alias('DetectOnly')]") -and
     $windowsRunnerMaintenanceContent.Contains('$RunnerMaintenanceDetectOnly') -and
     $windowsRunnerMaintenanceContent.Contains('$maintenanceDetectOnly = [bool]$DetectOnly') -and
     $windowsRunnerMaintenanceContent.Contains('$bootstrapOutput = @(Invoke-WindowsRunnerBootstrap') -and
-    $windowsRunnerMaintenanceContent.Contains('$ensureEditorOutput = @(& $ensureEditorScript @arguments 2>&1)')
+    $ensureEditorUsesNamedSplat -and
+    $windowsRunnerMaintenanceContent.Contains('UnityVersion') -and
+    $windowsRunnerMaintenanceContent.Contains('CiManagedOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('RequireHealthyExisting = $true') -and
+    -not $windowsRunnerMaintenanceContent.Contains('$ensureEditorOutput = @(& $ensureEditorScript @arguments 2>&1)')
 )
 if (-not $runnerBootstrapBackendPresent) {
     Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must have a real scripts/unity Windows maintenance backend that audits host prerequisites, verifies Microsoft installers before execution, keeps installers out of uploaded artifacts, preserves detect-only flags across script loading, captures child success streams before returning scalar exit codes, and verifies Unity editors with ensure-editor.ps1."
@@ -175,6 +189,74 @@ if ($workflowShapeExitCode -ne 2) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked workflow-style maintenance hashtable splatting binds named parameters."
+}
+
+$ensureEditorShapeRoot = ''
+$ensureEditorShapeOutput = @()
+$ensureEditorShapeExitCode = 1
+try {
+    $ensureEditorShapeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-ensure-shape-$PID-$(Get-Random)"
+    New-Item -ItemType Directory -Force -Path $ensureEditorShapeRoot | Out-Null
+    Copy-Item -LiteralPath $windowsRunnerMaintenancePath -Destination (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') -Force
+    @"
+function Invoke-WindowsRunnerBootstrap {
+    param(
+        [switch]`$DetectOnly,
+        [string]`$UnityInstallRoot,
+        [string]`$DiagnosticsRoot
+    )
+
+    return 0
+}
+"@ | Set-Content -LiteralPath (Join-Path $ensureEditorShapeRoot 'bootstrap-windows-runner.ps1') -Encoding UTF8
+    @"
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = `$true)]
+    [ValidatePattern('^\d+\.\d+\.\d+f\d+`$')]
+    [string]`$UnityVersion,
+
+    [string]`$InstallRoot,
+    [string]`$DiagnosticsPath,
+    [switch]`$CiManagedOnly,
+
+    [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
+    [string]`$ProvisioningProfile = 'Full',
+
+    [switch]`$RequireHealthyExisting
+)
+
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+
+if (`$UnityVersion -ne '2022.3.45f1') { throw "Bad UnityVersion: `$UnityVersion" }
+if (`$InstallRoot -ne 'C:\Unity\Editors') { throw "Bad InstallRoot: `$InstallRoot" }
+if (`$ProvisioningProfile -ne 'StandaloneWindowsIl2Cpp') { throw "Bad ProvisioningProfile: `$ProvisioningProfile" }
+if (-not `$CiManagedOnly) { throw 'CiManagedOnly was not bound.' }
+if (-not `$RequireHealthyExisting) { throw 'RequireHealthyExisting was not bound.' }
+if (`$DiagnosticsPath -notmatch 'unity-2022\.3\.45f1`$') { throw "Bad DiagnosticsPath: `$DiagnosticsPath" }
+
+Write-Output "fake ensure-editor ok: `$UnityVersion"
+"@ | Set-Content -LiteralPath (Join-Path $ensureEditorShapeRoot 'ensure-editor.ps1') -Encoding UTF8
+
+    $ensureEditorShapeDiagnostics = Join-Path $ensureEditorShapeRoot 'diagnostics'
+    $ensureEditorShapeOutput = & pwsh -NoProfile -File (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') `
+        -UnityVersions '2022.3.45f1' `
+        -ProvisioningProfile 'StandaloneWindowsIl2Cpp' `
+        -InstallRoot 'C:\Unity\Editors' `
+        -DetectOnly `
+        -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
+    $ensureEditorShapeExitCode = $LASTEXITCODE
+} finally {
+    if ($ensureEditorShapeRoot -and (Test-Path -LiteralPath $ensureEditorShapeRoot -PathType Container)) {
+        Remove-Item -LiteralPath $ensureEditorShapeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($ensureEditorShapeExitCode -ne 0 -or (($ensureEditorShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1')) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must pass named parameters to ensure-editor.ps1 so Windows PowerShell 5.1 does not bind '-UnityVersion' as the UnityVersion value. Exit $ensureEditorShapeExitCode. Output: $($ensureEditorShapeOutput -join ' ')"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked maintenance passes named parameters to ensure-editor."
 }
 
 $sparseRegistryScriptPath = ''

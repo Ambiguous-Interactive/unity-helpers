@@ -110,24 +110,21 @@ function Invoke-WindowsRunnerMaintenance {
             Join-Path $maintenanceDiagnosticsRoot "unity-$safeVersion"
         }
 
-        $arguments = @(
-            '-UnityVersion',
-            $version,
-            '-InstallRoot',
-            $maintenanceInstallRoot,
-            '-ProvisioningProfile',
-            $maintenanceProvisioningProfile,
-            '-CiManagedOnly'
-        )
+        $ensureEditorArgs = @{
+            UnityVersion = $version
+            InstallRoot = $maintenanceInstallRoot
+            ProvisioningProfile = $maintenanceProvisioningProfile
+            CiManagedOnly = $true
+        }
         if (-not [string]::IsNullOrWhiteSpace($versionDiagnosticsRoot)) {
-            $arguments += @('-DiagnosticsPath', $versionDiagnosticsRoot)
+            $ensureEditorArgs.DiagnosticsPath = $versionDiagnosticsRoot
         }
         if ($maintenanceDetectOnly) {
-            $arguments += '-RequireHealthyExisting'
+            $ensureEditorArgs.RequireHealthyExisting = $true
         }
 
         try {
-            $ensureEditorOutput = @(& $ensureEditorScript @arguments 2>&1)
+            $ensureEditorOutput = @(& $ensureEditorScript @ensureEditorArgs 2>&1)
             foreach ($line in $ensureEditorOutput) {
                 if ($null -ne $line) {
                     Write-RunnerMaintenanceInfo "[ensure-editor] $line"
