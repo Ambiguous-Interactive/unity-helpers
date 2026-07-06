@@ -1,5 +1,7 @@
 # Random Number Generators
 
+<!-- cspell:ignore PRD Prd -->
+
 **TL;DR:** Use `PRNG.Instance` for 10-15x faster random generation than `UnityEngine.Random`, with a rich API for vectors, colors, weighted selection, and more.
 
 ---
@@ -13,6 +15,7 @@ Unity Helpers provides 15+ high-performance pseudo-random number generators (PRN
 - **10-15x faster** than `UnityEngine.Random` (see [benchmarks](../../performance/random-performance.md))
 - **Thread-safe** access via `PRNG.Instance` (thread-local)
 - **Rich API** — vectors, colors, Gaussian distributions, weighted selection, subset sampling
+- **Feel-good randomness** — exact-average PRD, pity timers, and weighted shuffle bags
 - **Seedable** — reproducible results for replays and testing
 - **IL2CPP compatible** — no reflection, AOT-safe
 
@@ -162,6 +165,47 @@ string[] items = { "Common", "Rare", "Epic", "Legendary" };
 float[] weights = { 60f, 25f, 12f, 3f };
 string drop = random.NextWeighted(items.Zip(weights, (x, y) => (x, y)));
 ```
+
+### Feel-Good Randomness
+
+Use these helpers when independent rolls are mathematically fair but feel bad to players because they create long streaks or clumps.
+
+```csharp
+// Exact-average pseudo-random distribution:
+// long-run success rate remains 25%, but failure streaks increase the next chance.
+if (ExactAveragePrd.TryCreate(0.25f, out ExactAveragePrd critChance))
+{
+    bool criticalHit = critChance.Roll(random);
+}
+
+// Bad-luck protection / pity timer:
+// starts at 10%, adds 5% after each failure, and guarantees success after 10 failures.
+if (BadLuckProtection.TryCreate(0.10f, 0.05f, 10, out BadLuckProtection rareDrop))
+{
+    bool dropped = rareDrop.Roll(random);
+}
+
+// Weighted shuffle bag:
+// each three-draw cycle contains exactly two common tickets and one rare ticket.
+WeightedShuffleBag<string> bag = new();
+bag.TryAdd("Common", 2);
+bag.TryAdd("Rare", 1);
+bag.TryNext(random, out string reward);
+```
+
+`ExactAveragePrd` intentionally rejects very small non-zero targets below
+`ExactAveragePrd.MinimumPositiveTargetChance`; use `BadLuckProtection` or a
+`WeightedShuffleBag<T>` for ultra-rare rewards. The stateful helpers expose restore
+APIs (`TrySetFailuresSinceSuccess`, `TryRestoreRemaining`, and copy helpers for bag
+tickets) so save/load systems can persist pity and deck state explicitly.
+
+Choose the helper by design goal:
+
+| Goal                                                  | Helper                  | Behavior                                                                  |
+| ----------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------- |
+| Preserve exact long-run chance while reducing streaks | `ExactAveragePrd`       | Chance rises after failures by a solved coefficient and resets on success |
+| Guarantee eventual success after a dry streak         | `BadLuckProtection`     | Chance ramps by a fixed amount and can force a success after N failures   |
+| Avoid repeated clumps in finite weighted sets         | `WeightedShuffleBag<T>` | Draws without replacement until every weighted ticket has appeared        |
 
 ### Collection Operations
 
