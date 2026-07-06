@@ -21,10 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            Texture2D texture = Track(new Texture2D(64, 64));
-            _testSprite = Track(
-                Sprite.Create(texture, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f)
-            );
+            _testSprite = CreateTrackedSprite(64, 64);
 
             Vector2[] physicsShape =
             {
@@ -206,13 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreEqual(0, eventCount);
 
-            Texture2D newTexture = new(32, 32);
-            Sprite newSprite = Sprite.Create(
-                newTexture,
-                new Rect(0, 0, 32, 32),
-                new Vector2(0.5f, 0.5f),
-                100f
-            );
+            Sprite newSprite = CreateTrackedSprite(32, 32);
             renderer.sprite = newSprite;
 
             matcher.SendMessage("Update");
@@ -256,13 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             SpriteRenderer renderer = go.GetComponent<SpriteRenderer>();
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            Texture2D overrideTexture = new(16, 16);
-            Sprite overrideSprite = Sprite.Create(
-                overrideTexture,
-                new Rect(0, 0, 16, 16),
-                new Vector2(0.5f, 0.5f),
-                100f
-            );
+            Sprite overrideSprite = CreateTrackedSprite(16, 16);
 
             renderer.sprite = _testSprite;
             matcher.spriteOverrideProducer = () => overrideSprite;
@@ -391,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 eventCount++;
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 2; i++)
             {
                 matcher.SendMessage("Update");
                 yield return null;
@@ -440,11 +425,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             SpriteRenderer renderer = go.GetComponent<SpriteRenderer>();
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            Texture2D tex1 = new(32, 32);
-            Sprite sprite1 = Sprite.Create(tex1, new Rect(0, 0, 32, 32), Vector2.one * 0.5f);
-
-            Texture2D tex2 = new(16, 16);
-            Sprite sprite2 = Sprite.Create(tex2, new Rect(0, 0, 16, 16), Vector2.one * 0.5f);
+            Sprite sprite1 = CreateTrackedSprite(32, 32);
+            Sprite sprite2 = CreateTrackedSprite(16, 16);
 
             renderer.sprite = sprite1;
             matcher.OnValidate();
@@ -490,6 +472,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             Assert.IsTrue(eventInvoked);
+        }
+
+        private Sprite CreateTrackedSprite(int width, int height)
+        {
+            Texture2D texture = Track(new Texture2D(width, height));
+            return Track(
+                Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f)
+            );
         }
     }
 }

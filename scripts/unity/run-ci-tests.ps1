@@ -384,6 +384,63 @@ function Clear-UnityPackageManagerRetryState {
     Write-Host "::endgroup::"
 }
 
+function Clear-StaleUnityCompilationCache {
+    param(
+        [Parameter(Mandatory = $true)][string]$Project,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $libraryPath = Join-Path $Project 'Library'
+    if (-not (Test-Path -LiteralPath $libraryPath -PathType Container)) {
+        return
+    }
+
+    $markerPath = Join-Path $libraryPath '.unity-helpers-repo-root.txt'
+    $currentRepoRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $previousRepoRoot = ''
+    if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+        try {
+            $previousRepoRoot = (Get-Content -LiteralPath $markerPath -Raw).Trim()
+        } catch {
+            $previousRepoRoot = ''
+        }
+    }
+
+    if ($previousRepoRoot -ceq $currentRepoRoot) {
+        return
+    }
+
+    $reason = if ([string]::IsNullOrWhiteSpace($previousRepoRoot)) {
+        'repo-root marker is missing or unreadable'
+    } else {
+        "repo-root marker changed from '$previousRepoRoot' to '$currentRepoRoot'"
+    }
+
+    Write-Host "::group::Unity compilation cache root check"
+    Write-Host "Clearing Unity compilation cache because $reason."
+    foreach ($relativePath in @(
+            'Bee',
+            'ScriptAssemblies',
+            'PlayerScriptAssemblies',
+            'Il2cppBuildCache'
+        )) {
+        $path = Join-Path $libraryPath $relativePath
+        if (Test-Path -LiteralPath $path) {
+            Write-Host "Removing $path"
+            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+        } else {
+            Write-Host "Already absent: $path"
+        }
+    }
+
+    Set-Content -LiteralPath $markerPath -Value $currentRepoRoot -Encoding utf8
+    Write-Host "Wrote repo-root marker: $markerPath"
+    Write-Host "::endgroup::"
+}
+
 function Write-UnityPackageManagerDiagnostics {
     param(
         [string]$Project,
@@ -3143,6 +3200,7 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
 $LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
+Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
 
 Write-Host "::group::Ephemeral Unity project"
 Write-Host "RepoRoot: $RepoRoot"

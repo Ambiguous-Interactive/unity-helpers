@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# cspell:ignore ims msiexec Redist WindowsApps
+# cspell:ignore Il2cpp ims msiexec Redist WindowsApps
 # Contract test: a job skipped by a job-level `if:` before matrix expansion must
 # not use `matrix.*` in the job display name. GitHub renders those skipped names
 # literally, which hides the actual gated job behind unresolved expressions.
@@ -49,6 +49,7 @@ $integrationPackagesPath = Join-Path $repoRoot '.github/integration-packages.jso
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
+$runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
@@ -92,6 +93,10 @@ if (-not (Test-Path -LiteralPath $windowsRunnerMaintenancePath)) {
 }
 if (-not (Test-Path -LiteralPath $ensureEditorPath)) {
     Write-Host "::error::Unity ensure-editor script not found: $ensureEditorPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $runCiTestsPath)) {
+    Write-Host "::error::Unity run-ci-tests script not found: $runCiTestsPath"
     exit 1
 }
 
@@ -150,6 +155,35 @@ function Invoke-EnsureEditorWatchdogProbe {
         -StallKnob 'TEST_STALL_SECONDS'
 }
 
+function Import-RunCiTestsFunction {
+    param(
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [Parameter(Mandatory = $true)][string]$FunctionName
+    )
+
+    $tokens = $null
+    $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$errors)
+    if ($errors -and $errors.Count -gt 0) {
+        $details = @($errors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" })
+        throw "run-ci-tests.ps1 has parse errors: $($details -join '; ')"
+    }
+
+    $functionAst = $ast.FindAll(
+        {
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq $FunctionName
+        },
+        $true
+    ) | Select-Object -First 1
+    if (-not $functionAst) {
+        throw "Function '$FunctionName' not found in run-ci-tests.ps1"
+    }
+
+    Invoke-Expression "function script:$FunctionName $($functionAst.Body.Extent.Text)"
+}
+
 function Get-WorkflowJobTexts {
     param([string[]]$WorkflowLines)
 
@@ -202,6 +236,7 @@ function Get-WorkflowJobTexts {
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
+[string]$runCiTestsContent = Get-Content -LiteralPath $runCiTestsPath -Raw
 $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
 $integrationPackagesConfig = Get-Content -LiteralPath $integrationPackagesPath -Raw | ConvertFrom-Json
 [string[]]$unityVersions = @(
@@ -246,6 +281,67 @@ if (-not $runnerMaintenanceFunctionAst) {
 $runnerMaintenanceFunctionParameters = @()
 if ($runnerMaintenanceFunctionAst -and $runnerMaintenanceFunctionAst.Body.ParamBlock) {
     $runnerMaintenanceFunctionParameters = @($runnerMaintenanceFunctionAst.Body.ParamBlock.Parameters)
+}
+
+$ensureEditorTokens = $null
+$ensureEditorParseErrors = $null
+$ensureEditorAst = [System.Management.Automation.Language.Parser]::ParseFile(
+    $ensureEditorPath,
+    [ref]$ensureEditorTokens,
+    [ref]$ensureEditorParseErrors
+)
+if ($ensureEditorParseErrors -and $ensureEditorParseErrors.Count -gt 0) {
+    $details = @($ensureEditorParseErrors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" })
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Could not parse ensure-editor script: $($details -join '; ')"
+    $failed = $true
+}
+
+function Get-FunctionAstByName {
+    param(
+        [Parameter(Mandatory = $true)]$Ast,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $Ast.FindAll(
+        {
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq $Name
+        },
+        $true
+    ) | Select-Object -First 1
+}
+
+function Get-FunctionCommandNames {
+    param([Parameter(Mandatory = $true)]$FunctionAst)
+
+    @(
+        $FunctionAst.Body.FindAll(
+            {
+                param($node)
+                $node -is [System.Management.Automation.Language.CommandAst]
+            },
+            $true
+        ) | ForEach-Object { $_.GetCommandName() } | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        }
+    )
+}
+
+function Get-CommandIndex {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Commands,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [int]$StartIndex = 0
+    )
+
+    for ($index = [Math]::Max(0, $StartIndex); $index -lt $Commands.Count; $index++) {
+        if ($Commands[$index] -eq $Name) {
+            return $index
+        }
+    }
+
+    return -1
 }
 
 if ($unityVersions.Count -lt 1) {
@@ -424,6 +520,176 @@ if (-not $runnerMaintenanceHasNoDeadForceSurface) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner maintenance exposes no dead Force switch."
+}
+
+$runCiTestsClearsStaleCompilationCache = (
+    $runCiTestsContent.Contains('function Clear-StaleUnityCompilationCache') -and
+    $runCiTestsContent.Contains('.unity-helpers-repo-root.txt') -and
+    $runCiTestsContent.Contains('Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot') -and
+    $runCiTestsContent.Contains("'Bee'") -and
+    $runCiTestsContent.Contains("'ScriptAssemblies'") -and
+    $runCiTestsContent.Contains("'PlayerScriptAssemblies'") -and
+    $runCiTestsContent.Contains("'Il2cppBuildCache'") -and
+    $runCiTestsContent.Contains('Set-Content -LiteralPath $markerPath -Value $currentRepoRoot')
+)
+if (-not $runCiTestsClearsStaleCompilationCache) {
+    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::Unity CI must clear restored compilation caches when the cached Library was produced under a different repo root, otherwise Bee can reuse stale absolute precompiled-reference paths from another runner drive."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity CI clears stale compilation caches when the restored Library repo-root marker differs."
+}
+
+try {
+    Import-RunCiTestsFunction -ScriptPath $runCiTestsPath -FunctionName 'Clear-StaleUnityCompilationCache'
+} catch {
+    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::Could not import Clear-StaleUnityCompilationCache for behavioral tests: $($_.Exception.Message)"
+    $failed = $true
+}
+
+$compilationCacheDirectories = @(
+    'Bee',
+    'ScriptAssemblies',
+    'PlayerScriptAssemblies',
+    'Il2cppBuildCache'
+)
+
+function New-UnityCompilationCacheFixture {
+    param([string]$MarkerValue)
+
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cache-contract-$PID-$(Get-Random)"
+    $project = Join-Path $root 'project'
+    $library = Join-Path $project 'Library'
+    New-Item -ItemType Directory -Force -Path $library | Out-Null
+
+    $sentinels = @{}
+    foreach ($directory in $script:compilationCacheDirectories) {
+        $path = Join-Path $library $directory
+        New-Item -ItemType Directory -Force -Path $path | Out-Null
+        $sentinel = Join-Path $path 'sentinel.txt'
+        Set-Content -LiteralPath $sentinel -Value $directory -Encoding utf8
+        $sentinels[$directory] = $sentinel
+    }
+
+    $packageCache = Join-Path $library 'PackageCache'
+    New-Item -ItemType Directory -Force -Path $packageCache | Out-Null
+    $packageCacheSentinel = Join-Path $packageCache 'sentinel.txt'
+    Set-Content -LiteralPath $packageCacheSentinel -Value 'package-cache' -Encoding utf8
+
+    $markerPath = Join-Path $library '.unity-helpers-repo-root.txt'
+    if ($PSBoundParameters.ContainsKey('MarkerValue')) {
+        Set-Content -LiteralPath $markerPath -Value $MarkerValue -Encoding utf8
+    }
+
+    [pscustomobject]@{
+        Root = $root
+        Project = $project
+        Library = $library
+        MarkerPath = $markerPath
+        Sentinels = $sentinels
+        PackageCacheSentinel = $packageCacheSentinel
+    }
+}
+
+function Get-NormalizedContractRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+}
+
+function Test-CompilationCacheDirsAbsent {
+    param([Parameter(Mandatory = $true)]$Fixture)
+
+    foreach ($directory in $script:compilationCacheDirectories) {
+        $path = Join-Path $Fixture.Library $directory
+        if (Test-Path -LiteralPath $path) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Test-CompilationCacheSentinelsPresent {
+    param([Parameter(Mandatory = $true)]$Fixture)
+
+    foreach ($directory in $script:compilationCacheDirectories) {
+        if (-not (Test-Path -LiteralPath $Fixture.Sentinels[$directory] -PathType Leaf)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Test-UnityCompilationCacheBehavior {
+    $fixtures = @()
+    $matchingMarkerRoot = ''
+    try {
+        $missingMarkerFixture = New-UnityCompilationCacheFixture
+        $fixtures += $missingMarkerFixture
+        $missingMarkerRepoRoot = Join-Path $missingMarkerFixture.Root 'repo'
+        New-Item -ItemType Directory -Force -Path $missingMarkerRepoRoot | Out-Null
+        Clear-StaleUnityCompilationCache -Project $missingMarkerFixture.Project -RepoRoot $missingMarkerRepoRoot
+        $missingMarkerValue = if (Test-Path -LiteralPath $missingMarkerFixture.MarkerPath -PathType Leaf) {
+            (Get-Content -LiteralPath $missingMarkerFixture.MarkerPath -Raw).Trim()
+        } else {
+            ''
+        }
+        $missingMarkerExpectedRoot = Get-NormalizedContractRoot -Path $missingMarkerRepoRoot
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $missingMarkerFixture) -or
+            -not (Test-Path -LiteralPath $missingMarkerFixture.PackageCacheSentinel -PathType Leaf) -or
+            $missingMarkerValue -cne $missingMarkerExpectedRoot) {
+            return 'missing marker must clear compilation outputs, preserve PackageCache, and write the normalized repo-root marker'
+        }
+
+        $changedMarkerFixture = New-UnityCompilationCacheFixture -MarkerValue 'E:/actions-runner/_work/unity-helpers/unity-helpers'
+        $fixtures += $changedMarkerFixture
+        $changedMarkerRepoRoot = Join-Path $changedMarkerFixture.Root 'repo'
+        New-Item -ItemType Directory -Force -Path $changedMarkerRepoRoot | Out-Null
+        Clear-StaleUnityCompilationCache -Project $changedMarkerFixture.Project -RepoRoot $changedMarkerRepoRoot
+        $changedMarkerValue = (Get-Content -LiteralPath $changedMarkerFixture.MarkerPath -Raw).Trim()
+        $changedMarkerExpectedRoot = Get-NormalizedContractRoot -Path $changedMarkerRepoRoot
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $changedMarkerFixture) -or
+            -not (Test-Path -LiteralPath $changedMarkerFixture.PackageCacheSentinel -PathType Leaf) -or
+            $changedMarkerValue -cne $changedMarkerExpectedRoot) {
+            return 'changed marker must clear compilation outputs, preserve PackageCache, and rewrite the normalized repo-root marker'
+        }
+
+        $matchingMarkerRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cache-contract-root-$PID-$(Get-Random)"
+        New-Item -ItemType Directory -Force -Path $matchingMarkerRoot | Out-Null
+        $matchingMarkerValue = Get-NormalizedContractRoot -Path $matchingMarkerRoot
+        $matchingMarkerFixture = New-UnityCompilationCacheFixture -MarkerValue $matchingMarkerValue
+        $fixtures += $matchingMarkerFixture
+        Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
+        $matchingMarkerAfter = (Get-Content -LiteralPath $matchingMarkerFixture.MarkerPath -Raw).Trim()
+        if (-not (Test-CompilationCacheSentinelsPresent -Fixture $matchingMarkerFixture) -or
+            -not (Test-Path -LiteralPath $matchingMarkerFixture.PackageCacheSentinel -PathType Leaf) -or
+            $matchingMarkerAfter -cne $matchingMarkerValue) {
+            return 'matching marker must preserve compilation-cache sentinels, PackageCache, and marker contents'
+        }
+
+        return ''
+    } finally {
+        foreach ($fixture in $fixtures) {
+            if ($fixture.Root -and (Test-Path -LiteralPath $fixture.Root)) {
+                Remove-Item -LiteralPath $fixture.Root -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+        if ($matchingMarkerRoot -and (Test-Path -LiteralPath $matchingMarkerRoot)) {
+            Remove-Item -LiteralPath $matchingMarkerRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+$compilationCacheBehaviorFailure = Test-UnityCompilationCacheBehavior
+if ($compilationCacheBehaviorFailure) {
+    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::Clear-StaleUnityCompilationCache behavior regression: $compilationCacheBehaviorFailure."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked stale Unity compilation cache cleanup behavior with no-Unity temp fixtures."
 }
 
 $maintenanceForceDetectorFixtures = @(
@@ -630,6 +896,27 @@ function Test-UnityJobMaintainsSelectedRunner {
         -not $JobText.Contains('Join-Path $env:LocalAppData ''Microsoft\WindowsApps\pwsh.exe''')
     )
     $jobTimeoutCoversMaintenanceBudget = $JobText -match '(?m)^\s+timeout-minutes:\s*1200\s*$'
+    $maintenanceStepEndCandidates = @(
+        $runnerDiagnosticsIndex,
+        $cacheIndex,
+        $setupNodeIndex,
+        $computeIndex,
+        $licenseValidationIndex,
+        $provisionIndex
+    ) | Where-Object { $_ -gt $maintenanceIndex } | Sort-Object
+    $maintenanceStepText = ''
+    if ($maintenanceIndex -ge 0 -and $maintenanceStepEndCandidates.Count -gt 0) {
+        $maintenanceStepEndIndex = $maintenanceStepEndCandidates[0]
+        $maintenanceStepText = $JobText.Substring(
+            $maintenanceIndex,
+            $maintenanceStepEndIndex - $maintenanceIndex
+        )
+    }
+    $maintenanceStepAllowsRepair = (
+        $maintenanceStepText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
+        -not $maintenanceStepText.Contains('-RequireHealthyExisting') -and
+        -not $maintenanceStepText.Contains('-RequireHealthyExistingEditors')
+    )
 
     return (
         $maintenanceIndex -ge 0 -and
@@ -648,6 +935,7 @@ function Test-UnityJobMaintainsSelectedRunner {
         $JobText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
         $JobText.Contains('-UnityVersions ''${{ matrix.unity-version }}''') -and
         $JobText.Contains('-ProvisioningProfile $provisioningProfile') -and
+        $maintenanceStepAllowsRepair -and
         $JobText.Contains('provisioning/runner-maintenance') -and
         -not $JobText.Contains('- runner-maintenance') -and
         -not $JobText.Contains('needs.runner-maintenance.result')
@@ -667,7 +955,7 @@ $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
     (Test-UnityJobMaintainsSelectedRunner -JobText $benchmarksMatrixJob)
 )
 if (-not $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 inside each self-hosted Unity job before any pwsh-dependent setup and before Provision Unity Editor, using Windows PowerShell so missing PowerShell 7 can be bootstrapped on the exact selected runner. The maintenance step must publish the discovered PowerShell 7 directory through GITHUB_PATH for later steps. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 inside each self-hosted Unity job before any pwsh-dependent setup and before Provision Unity Editor, using Windows PowerShell so missing PowerShell 7 can be bootstrapped on the exact selected runner. The maintenance step must publish the discovered PowerShell 7 directory through GITHUB_PATH for later steps and must not force Unity editor verification-only mode; CI maintenance is the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity workflows maintain editors on the selected runner before pwsh-dependent setup and provisioning."
@@ -697,6 +985,51 @@ if (-not $quarantineMoveUsesDedicatedRetryBudget) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked ensure-editor quarantine moves use the dedicated retry budget."
+}
+
+$installAtomicFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Install-UnityEditorModulesViaAtomicReinstall'
+$ensureModulesFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Ensure-UnityCiModules'
+$installAtomicCommands = if ($installAtomicFunctionAst) {
+    Get-FunctionCommandNames -FunctionAst $installAtomicFunctionAst
+} else {
+    @()
+}
+$ensureModulesCommands = if ($ensureModulesFunctionAst) {
+    Get-FunctionCommandNames -FunctionAst $ensureModulesFunctionAst
+} else {
+    @()
+}
+$atomicInPlaceInstallIndex = Get-CommandIndex `
+    -Commands $installAtomicCommands `
+    -Name 'Install-UnityEditorWithCiModules'
+$quarantineFallbackIndex = Get-CommandIndex `
+    -Commands $installAtomicCommands `
+    -Name 'Repair-UnityEditorWithCiModules' `
+    -StartIndex ($atomicInPlaceInstallIndex + 1)
+$moduleManageabilityProbeIndex = Get-CommandIndex `
+    -Commands $ensureModulesCommands `
+    -Name 'Test-UnityEditorModuleManageable'
+$atomicRouteIndex = Get-CommandIndex `
+    -Commands $ensureModulesCommands `
+    -Name 'Install-UnityEditorModulesViaAtomicReinstall' `
+    -StartIndex ($moduleManageabilityProbeIndex + 1)
+$coreModuleRepairIndex = Get-CommandIndex `
+    -Commands $ensureModulesCommands `
+    -Name 'Repair-UnityEditorWithCiModules'
+$ensureEditorPrefersAtomicModuleRepair = (
+    $installAtomicFunctionAst -and
+    $ensureModulesFunctionAst -and
+    $moduleManageabilityProbeIndex -ge 0 -and
+    $atomicRouteIndex -gt $moduleManageabilityProbeIndex -and
+    ($coreModuleRepairIndex -lt 0 -or $coreModuleRepairIndex -gt $atomicRouteIndex) -and
+    $atomicInPlaceInstallIndex -ge 0 -and
+    $quarantineFallbackIndex -gt $atomicInPlaceInstallIndex
+)
+if (-not $ensureEditorPrefersAtomicModuleRepair) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::When an existing Unity editor is missing required CI modules and Unity CLI reports it is not module-manageable, ensure-editor.ps1 must try the atomic in-place 'install -m' repair before any quarantine fallback. This avoids making a locked editor directory the first repair step for 6000.5 standalone runners."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked ensure-editor prefers atomic in-place module repair before quarantine fallback."
 }
 
 $detectOnly = $true
