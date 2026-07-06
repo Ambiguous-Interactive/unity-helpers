@@ -4,9 +4,11 @@
 namespace WallstopStudios.UnityHelpers.Tests.Visuals
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Visuals;
@@ -101,8 +103,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.AreSame(computed[1], image.style.backgroundImage.value.texture);
         }
 
-        [Test]
-        public void ForceUpdateAdvancesBackgroundWhenFpsIsZero()
+        [TestCase(0f)]
+        [TestCase(-1f)]
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        [TestCase(float.Epsilon)]
+        public void ForceUpdateDoesNotAdvanceBackgroundWhenFpsCannotPlay(float fps)
         {
             Sprite red = VisualsTestHelpers.CreateSprite(
                 _trackedObjects,
@@ -120,14 +127,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
             AnimatedSpriteLayer layer = new(new[] { red, blue });
 
-            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear, fps: 0);
+            LayeredImage image = CreateLayeredImage(new[] { layer }, Color.clear, fps: fps);
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
 
             Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
 
-            image.Update(force: true);
+            Assert.DoesNotThrow(() => image.Update(force: true));
 
-            Assert.AreSame(computed[1], image.style.backgroundImage.value.texture);
+            Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
+        }
+
+        [UnityTest]
+        public IEnumerator SelfUpdateStaysPausedWhenFpsIsZero()
+        {
+            if (!Application.isPlaying)
+            {
+                Assert.Ignore("LayeredImage self-update coroutines run only in PlayMode.");
+            }
+
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: 60f,
+                updatesSelf: true
+            );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+            Assert.IsTrue(image.SelfUpdateActiveForTests);
+
+            yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
+
+            image.Fps = 0f;
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Texture2D pausedFrame = image.style.backgroundImage.value.texture;
+
+            yield return null;
+
+            Assert.AreSame(
+                pausedFrame,
+                image.style.backgroundImage.value.texture,
+                "Expected FPS zero to keep playback paused after the next frame."
+            );
+        }
+
+        [UnityTest]
+        public IEnumerator SelfUpdateResumesAfterFpsReturnsPositive()
+        {
+            if (!Application.isPlaying)
+            {
+                Assert.Ignore("LayeredImage self-update coroutines run only in PlayMode.");
+            }
+
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: 60f,
+                updatesSelf: true
+            );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+            Assert.IsTrue(image.SelfUpdateActiveForTests);
+
+            yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
+
+            image.Fps = 0f;
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Texture2D pausedFrame = image.style.backgroundImage.value.texture;
+            yield return null;
+            Assert.AreSame(pausedFrame, image.style.backgroundImage.value.texture);
+
+            image.Fps = 60f;
+            Assert.IsTrue(image.SelfUpdateActiveForTests);
+
+            yield return WaitUntilBackgroundIs(image, computed[2], "resumed self-update");
+        }
+
+        [Test]
+        public void SelfUpdateDetachesEditorTickWhenFpsIsZero()
+        {
+            if (Application.isPlaying)
+            {
+                Assert.Ignore("LayeredImage editor ticks run only in EditMode.");
+            }
+
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: 60f,
+                updatesSelf: true
+            );
+
+            Assert.IsTrue(image.SelfUpdateActiveForTests);
+
+            image.Fps = 0f;
+
+            Assert.IsFalse(image.SelfUpdateActiveForTests);
         }
 
         [Test]
@@ -516,15 +613,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             IEnumerable<AnimatedSpriteLayer> layers,
             Color backgroundColor,
             float pixelCutoff = 0.01f,
-            float fps = AnimatedSpriteLayer.FrameRate
+            float fps = AnimatedSpriteLayer.FrameRate,
+            bool updatesSelf = false
         )
         {
             return new LayeredImage(
                 layers,
                 backgroundColor,
                 fps: fps,
-                updatesSelf: false,
+                updatesSelf: updatesSelf,
                 pixelCutoff: pixelCutoff
+            );
+        }
+
+        private AnimatedSpriteLayer CreateRgbLayer()
+        {
+            Sprite red = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(1f, 0f, 0f, 1f),
+                pivot: Vector2.zero
+            );
+            Sprite green = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(0f, 1f, 0f, 1f),
+                pivot: Vector2.zero
+            );
+            Sprite blue = VisualsTestHelpers.CreateSprite(
+                _trackedObjects,
+                1,
+                1,
+                (_, _) => new Color(0f, 0f, 1f, 1f),
+                pivot: Vector2.zero
+            );
+
+            return new AnimatedSpriteLayer(new[] { red, green, blue });
+        }
+
+        private static IEnumerator WaitUntilBackgroundIs(
+            LayeredImage image,
+            Texture2D expected,
+            string description,
+            float timeoutSeconds = 0.5f
+        )
+        {
+            float timeout = Time.time + timeoutSeconds;
+            while (Time.time < timeout)
+            {
+                if (ReferenceEquals(image.style.backgroundImage.value.texture, expected))
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            Assert.AreSame(
+                expected,
+                image.style.backgroundImage.value.texture,
+                $"Timed out waiting for {description}."
             );
         }
     }

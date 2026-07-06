@@ -31,6 +31,19 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             return alpha <= cutoff + fudge;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool CanPlayTimed(float fps)
+        {
+            if (fps <= 0 || float.IsNaN(fps) || float.IsInfinity(fps))
+            {
+                return false;
+            }
+
+            double frameMilliseconds = 1000d / fps;
+            return frameMilliseconds > 0
+                && frameMilliseconds <= TimeSpan.MaxValue.TotalMilliseconds;
+        }
+
         public float Fps
         {
             get => _fps;
@@ -38,34 +51,83 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             {
                 if (_fps == value)
                 {
+                    if (!CanPlayTimed(value))
+                    {
+                        StopSelfUpdate();
+                    }
+
                     return;
                 }
 
+                StopSelfUpdate();
                 _fps = value;
-                if (_updatesSelf && _computed.Length > 1 && _fps > 0)
+                if (!_updatesSelf || _computed.Length <= 1 || !CanPlayTimed(_fps))
                 {
-#if UNITY_EDITOR
-                    if (Application.isEditor && !Application.isPlaying && !_tickAttached)
-                    {
-                        EditorApplication.update += () => Update(force: false);
-                        _tickAttached = true;
-                        return;
-                    }
-#endif
-                    if (Application.isPlaying)
-                    {
-                        if (_coroutine != null)
-                        {
-                            CoroutineHandler.Instance.StopCoroutine(_coroutine);
-                        }
+                    return;
+                }
 
-                        _coroutine = CoroutineHandler.Instance.StartFunctionAsCoroutine(
-                            () => Update(force: true),
-                            1f / _fps
-                        );
-                    }
+#if UNITY_EDITOR
+                if (Application.isEditor && !Application.isPlaying)
+                {
+                    StartEditorTick();
+                    return;
+                }
+#endif
+                if (Application.isPlaying)
+                {
+                    _coroutine = CoroutineHandler.Instance.StartFunctionAsCoroutine(
+                        () => Update(force: true),
+                        1f / _fps
+                    );
                 }
             }
+        }
+
+#if UNITY_EDITOR
+        private void StartEditorTick()
+        {
+            if (_tickAttached)
+            {
+                return;
+            }
+
+            EditorApplication.update += HandleEditorUpdate;
+            _tickAttached = true;
+        }
+
+        private void StopEditorTick()
+        {
+            if (!_tickAttached)
+            {
+                return;
+            }
+
+            EditorApplication.update -= HandleEditorUpdate;
+            _tickAttached = false;
+        }
+
+        private void HandleEditorUpdate()
+        {
+            Update(force: false);
+        }
+#endif
+
+        private void StopSelfUpdate()
+        {
+#if UNITY_EDITOR
+            StopEditorTick();
+#endif
+            if (_coroutine == null)
+            {
+                return;
+            }
+
+            if (CoroutineHandler.HasInstance)
+            {
+                CoroutineHandler.Instance.StopCoroutine(_coroutine);
+            }
+
+            _coroutine = null;
         }
 
         private const int ParallelBlendThreshold = 2048;
@@ -73,6 +135,18 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private readonly AnimatedSpriteLayer[] _layers;
         private readonly Texture2D[] _computed;
         internal Texture2D[] ComputedTexturesForTests => _computed;
+        internal bool SelfUpdateActiveForTests
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return _tickAttached || _coroutine != null;
+#else
+                return _coroutine != null;
+#endif
+            }
+        }
+
         private readonly Color _backgroundColor;
         private readonly Rect? _largestArea;
         private readonly Stopwatch _timer;
@@ -147,15 +221,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 return;
             }
 
-            if (_fps <= 0)
+            if (!CanPlayTimed(_fps))
             {
-                if (!force)
-                {
-                    return;
-                }
-
-                _index = _index.WrappedIncrement(_computed.Length);
-                Render(_index);
                 return;
             }
 
