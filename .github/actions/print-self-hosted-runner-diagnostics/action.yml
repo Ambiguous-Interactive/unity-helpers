@@ -169,20 +169,13 @@ runs:
                 Write-Output ("  - " + $dir)
             }
         }
-    # TODO(unity-helpers): DxMessaging ran an `assert-unity-host-prereqs`
-    # composite here to detect missing Windows host prerequisites
-    # (the Visual C++ runtime, long-paths, Defender exclusions, pwsh, the
-    # Universal C Runtime) -- the class of failure that surfaces as Unity.exe
-    # STATUS_DLL_NOT_FOUND (0xC0000135). That composite plus its
-    # scripts/unity/bootstrap-windows-runner.ps1 / maintain-windows-runner.ps1
-    # backends were NOT ported in this batch (out of scope). The diagnostic
-    # emission above (PATH walk, bash resolution, Git compression tools) still
-    # runs. To restore the host prerequisite assertion, port
-    # .github/actions/assert-unity-host-prereqs/ and its PowerShell backends
-    # from DxMessaging, then re-add the step:
-    #     - name: Assert Unity host prerequisites
-    #       uses: ./.github/actions/assert-unity-host-prereqs
-    #       with:
-    #         auto-install: "false"
-    # Until then this composite is detect/diagnose-only, which is a safe
-    # superset of "do nothing extra" -- it never fails the job on its own.
+    # Host prerequisite remediation now lives in the operator-dispatched
+    # .github/workflows/runner-bootstrap.yml workflow. That workflow pins the
+    # requested Windows runner by machine-name label and calls
+    # scripts/unity/bootstrap-windows-runner.ps1 plus
+    # scripts/unity/maintain-windows-runner.ps1 to manage VC++ redistributables,
+    # long paths, Defender exclusions, PowerShell 7, UCRT, and Unity editor
+    # health. This diagnostics composite intentionally remains non-mutating and
+    # cheap: it surfaces PATH, shell, and compression-tool state before
+    # ensure-editor.ps1 fails fast with RequireHealthyExisting when an editor or
+    # host prerequisite is missing. Use runner-bootstrap.yml for repair.

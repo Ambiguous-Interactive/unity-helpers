@@ -17,6 +17,8 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
 $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.yml'
 $actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
+$runnerRunbookPath = Join-Path $repoRoot 'docs/runbooks/unity-runners-after-transfer.md'
+$runnerDiagnosticsActionPath = Join-Path $repoRoot '.github/actions/print-self-hosted-runner-diagnostics/action.yml'
 $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
@@ -32,6 +34,14 @@ if (-not (Test-Path -LiteralPath $runnerBootstrapPath)) {
 }
 if (-not (Test-Path -LiteralPath $actionlintPath)) {
     Write-Host "::error::Actionlint config not found: $actionlintPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $runnerRunbookPath)) {
+    Write-Host "::error::Unity runner runbook not found: $runnerRunbookPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $runnerDiagnosticsActionPath)) {
+    Write-Host "::error::Self-hosted runner diagnostics action not found: $runnerDiagnosticsActionPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
@@ -152,6 +162,8 @@ function Get-WorkflowJobTexts {
 [string[]]$runnerBootstrapLines = Get-Content -LiteralPath $runnerBootstrapPath
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
 [string]$actionlintContent = Get-Content -LiteralPath $actionlintPath -Raw
+[string]$runnerRunbookContent = Get-Content -LiteralPath $runnerRunbookPath -Raw
+[string]$runnerDiagnosticsActionContent = Get-Content -LiteralPath $runnerDiagnosticsActionPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
@@ -235,6 +247,26 @@ if (-not $runnerBootstrapBackendPresent) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap Windows maintenance backend contract."
+}
+
+$runnerBootstrapDocsCurrent = (
+    $runnerRunbookContent.Contains('.github/workflows/runner-bootstrap.yml') -and
+    $runnerRunbookContent.Contains('scripts/unity/bootstrap-windows-runner.ps1') -and
+    $runnerRunbookContent.Contains('scripts/unity/maintain-windows-runner.ps1') -and
+    $runnerRunbookContent.Contains('workflow_dispatch') -and
+    $runnerRunbookContent.Contains('DAD-MACHINE') -and
+    $runnerRunbookContent.Contains('ELI-MACHINE') -and
+    $runnerDiagnosticsActionContent.Contains('runner-bootstrap.yml') -and
+    $runnerDiagnosticsActionContent.Contains('ensure-editor.ps1') -and
+    -not $runnerRunbookContent.Contains('was **not** ported') -and
+    -not $runnerRunbookContent.Contains('When the backend scripts are ported') -and
+    -not $runnerDiagnosticsActionContent.Contains('were NOT ported')
+)
+if (-not $runnerBootstrapDocsCurrent) {
+    Write-Host "::error file=docs/runbooks/unity-runners-after-transfer.md::.github/workflows/runner-bootstrap.yml and the self-hosted diagnostics action comments must describe the current Windows maintenance backend, not stale manual-only TODO text."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner bootstrap runbook and diagnostics comments describe the current maintenance backend."
 }
 
 $runnerBootstrapInvokesMaintenanceFunction = (

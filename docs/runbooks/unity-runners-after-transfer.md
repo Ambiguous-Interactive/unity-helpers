@@ -165,15 +165,17 @@ On a self-hosted Windows runner, `shell: bash` can resolve to the WSL stub at `C
 
 If `Unity.exe` fails at startup with `-1073741515` / `0xC0000135` (STATUS_DLL_NOT_FOUND), the host is missing an OS-level dependency Unity imports — most commonly the Microsoft Visual C++ Redistributables (both the 2010 SP1 and the 2015-2022 x64 generations). This is an OS-level fix; `ensure-editor.ps1`'s Unity-reinstall retry loop cannot repair it (the missing DLL is on the OS, not in the Unity install). `ensure-editor.ps1` detects this case and short-circuits with a clear error rather than retrying futilely.
 
-> **TODO(unity-helpers):** The automated host-prerequisite remediation backend that DxMessaging ships — `scripts/unity/bootstrap-windows-runner.ps1`, `scripts/unity/maintain-windows-runner.ps1`, and the `.github/actions/assert-unity-host-prereqs` composite — was **not** ported in this batch. Until it is, `.github/workflows/runner-bootstrap.yml` hard-fails its maintenance step with a clear "script not found" error, and the runner host must be prepared manually:
->
-> 1. Install the Microsoft Visual C++ 2010 SP1 x64 Redistributable (provides `MSVCP100.dll` / `MSVCR100.dll`).
-> 2. Install the Microsoft Visual C++ 2015-2022 x64 Redistributable (provides `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, `MSVCP140.dll`).
-> 3. Enable Windows long paths (`git config --system core.longpaths true` and the `LongPathsEnabled` registry value).
-> 4. Add Windows Defender exclusions for the Unity install root and the runner work directory to avoid scan-induced timeouts.
-> 5. Install PowerShell 7 (see above).
->
-> Re-run the queued Unity workflow once the host is prepared. When the backend scripts are ported, this section should point at them and `runner-bootstrap.yml` will perform these steps automatically.
+The manual `workflow_dispatch` workflow `.github/workflows/runner-bootstrap.yml` is the supported remediation path for this state. Dispatch it with the affected machine-name label (`DAD-MACHINE` or `ELI-MACHINE`) and leave `detect-only` disabled to run host maintenance. The workflow calls `scripts/unity/maintain-windows-runner.ps1`, which first runs `scripts/unity/bootstrap-windows-runner.ps1` for OS prerequisites and then verifies every Unity editor listed in `.github/unity-versions.json` through `ensure-editor.ps1`.
+
+For emergency manual repair, apply the same host prerequisites that the bootstrap backend manages:
+
+1. Install the Microsoft Visual C++ 2010 SP1 x64 Redistributable (provides `MSVCP100.dll` / `MSVCR100.dll`).
+2. Install the Microsoft Visual C++ 2015-2022 x64 Redistributable (provides `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, `MSVCP140.dll`).
+3. Enable Windows long paths (`git config --system core.longpaths true` and the `LongPathsEnabled` registry value).
+4. Add Windows Defender exclusions for the Unity install root and the runner work directory to avoid scan-induced timeouts.
+5. Install PowerShell 7 (see above).
+
+Re-run the queued Unity workflow once the bootstrap run completes successfully or the host is prepared manually. If the bootstrap dispatch stays queued, first verify that the target runner is online and carries the matching machine-name label; do not remove that label from `runner-bootstrap.yml` to force scheduling.
 
 ## Required secrets
 
