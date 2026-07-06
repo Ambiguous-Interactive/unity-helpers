@@ -19,6 +19,7 @@ $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.y
 $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
+$ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
@@ -40,12 +41,67 @@ if (-not (Test-Path -LiteralPath $windowsRunnerMaintenancePath)) {
     Write-Host "::error::Windows runner maintenance script not found: $windowsRunnerMaintenancePath"
     exit 1
 }
+if (-not (Test-Path -LiteralPath $ensureEditorPath)) {
+    Write-Host "::error::Unity ensure-editor script not found: $ensureEditorPath"
+    exit 1
+}
+
+function Import-EnsureEditorWatchdogFunctions {
+    param([Parameter(Mandatory = $true)][string]$ScriptPath)
+
+    $tokens = $null
+    $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$errors)
+    if ($errors -and $errors.Count -gt 0) {
+        $details = @($errors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" })
+        throw "ensure-editor.ps1 has parse errors: $($details -join '; ')"
+    }
+
+    foreach ($name in @(
+        'ConvertTo-ProcessArgumentLine',
+        'Get-EnsureEditorProgressStallSeconds',
+        'Get-EnsureEditorProgressNoticeIntervalSeconds',
+        'Get-CollapsedCliOutputTail',
+        'Get-CliProgressTriple',
+        'Get-LastCliProgressMessage',
+        'Invoke-UnityCliCaptureWithTimeout'
+    )) {
+        $functionAst = $ast.FindAll(
+            {
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            },
+            $true
+        ) | Select-Object -First 1
+        if (-not $functionAst) {
+            throw "Function '$name' not found in ensure-editor.ps1"
+        }
+
+        Invoke-Expression "function script:$name $($functionAst.Body.Extent.Text)"
+    }
+}
+
+function Invoke-EnsureEditorWatchdogProbe {
+    param(
+        [Parameter(Mandatory = $true)][string]$ChildCommand,
+        [int]$StallSeconds = 1,
+        [int]$TimeoutSeconds = 30
+    )
+
+    return Invoke-UnityCliCaptureWithTimeout `
+        -Arguments @('-NoProfile', '-Command', $ChildCommand) `
+        -TimeoutSeconds $TimeoutSeconds `
+        -TimeoutKnob 'TEST_TIMEOUT_SECONDS' `
+        -StallSeconds $StallSeconds `
+        -StallKnob 'TEST_STALL_SECONDS'
+}
 
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
+[string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
 [string[]]$unityVersions = @(
     $unityVersionsConfig.all |
@@ -141,6 +197,19 @@ if (-not $runnerBootstrapInvokesMaintenanceFunction) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
+}
+
+$timeoutEventsPreserveReason = (
+    $ensureEditorContent.Contains('reason         = $Reason') -and
+    $ensureEditorContent.Contains('stallSeconds   = $StallSeconds') -and
+    $ensureEditorContent.Contains("'no-output-stall'") -and
+    $ensureEditorContent.Contains("-Reason `$timeoutReason -StallSeconds `$eventStallSeconds")
+)
+if (-not $timeoutEventsPreserveReason) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor timeout events must record whether the wrapper killed the Unity CLI for wall-clock timeout or no-output heartbeat stall, including the stall threshold for stall kills."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked ensure-editor timeout events preserve timeout reason."
 }
 
 $detectOnly = $true
@@ -261,6 +330,71 @@ if ($ensureEditorShapeExitCode -ne 0 -or (($ensureEditorShapeOutput -join ' ') -
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked maintenance passes named parameters to ensure-editor."
+}
+
+$ensureEditorWatchdogImported = $false
+try {
+    Import-EnsureEditorWatchdogFunctions -ScriptPath $ensureEditorPath
+    $script:UnityCliPath = (Get-Command pwsh).Source
+    $ensureEditorWatchdogImported = $true
+} catch {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Could not import ensure-editor watchdog functions for regression tests: $($_.Exception.Message)"
+    $failed = $true
+}
+
+if ($ensureEditorWatchdogImported) {
+    $repeatedProgressChild = @'
+1..20 | ForEach-Object {
+    Write-Host '{"type":"progress","pct":50,"msg":"Installing Unity (6000.5.2f1)...","phase":"install"}'
+    Start-Sleep -Milliseconds 250
+}
+exit 0
+'@
+
+    $repeatedProgressStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $repeatedProgressResult = Invoke-EnsureEditorWatchdogProbe -ChildCommand $repeatedProgressChild -StallSeconds 4 -TimeoutSeconds 30 6>$null
+    $repeatedProgressStopwatch.Stop()
+    if ($repeatedProgressResult.StallKilled -or $repeatedProgressResult.TimedOutWallClock -or $repeatedProgressResult.ExitCode -ne 0 -or $repeatedProgressStopwatch.Elapsed.TotalSeconds -gt 20) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor watchdog must not heartbeat-stall repeated identical Unity progress output while the CLI is still emitting lines. Exit $($repeatedProgressResult.ExitCode). StallKilled=$($repeatedProgressResult.StallKilled). TimedOutWallClock=$($repeatedProgressResult.TimedOutWallClock). Elapsed=$([Math]::Round($repeatedProgressStopwatch.Elapsed.TotalSeconds, 2))s. Output: $(@($repeatedProgressResult.Output) -join ' ')"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked repeated identical Unity progress output resets the ensure-editor heartbeat."
+    }
+
+    $quietStallChild = @'
+Write-Host '{"type":"progress","pct":50,"msg":"Installing Unity (6000.5.2f1)...","phase":"install"}'
+Start-Sleep -Seconds 20
+exit 0
+'@
+
+    $quietStallStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $quietStallResult = Invoke-EnsureEditorWatchdogProbe -ChildCommand $quietStallChild -StallSeconds 4 -TimeoutSeconds 30 6>$null
+    $quietStallStopwatch.Stop()
+    $quietCapturedProgress = ((@($quietStallResult.Output) -join "`n") -match '"type"\s*:\s*"progress"')
+    if (-not $quietCapturedProgress -or -not $quietStallResult.StallKilled -or $quietStallResult.TimedOutWallClock -or $quietStallResult.ExitCode -ne 125 -or $quietStallStopwatch.Elapsed.TotalSeconds -gt 15) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor watchdog must still kill a quiet Unity CLI after the heartbeat stall window. Exit $($quietStallResult.ExitCode). StallKilled=$($quietStallResult.StallKilled). TimedOutWallClock=$($quietStallResult.TimedOutWallClock). Elapsed=$([Math]::Round($quietStallStopwatch.Elapsed.TotalSeconds, 2))s. Output: $(@($quietStallResult.Output) -join ' ')"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked quiet Unity CLI output still trips the ensure-editor heartbeat."
+    }
+
+    $chattyWallClockChild = @'
+1..60 | ForEach-Object {
+    Write-Host '{"type":"progress","pct":50,"msg":"Installing Unity (6000.5.2f1)...","phase":"install"}'
+    Start-Sleep -Milliseconds 250
+}
+exit 0
+'@
+
+    $chattyWallClockStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $chattyWallClockResult = Invoke-EnsureEditorWatchdogProbe -ChildCommand $chattyWallClockChild -StallSeconds 4 -TimeoutSeconds 6 6>$null
+    $chattyWallClockStopwatch.Stop()
+    if ($chattyWallClockResult.StallKilled -or -not $chattyWallClockResult.TimedOutWallClock -or $chattyWallClockResult.ExitCode -ne 124 -or $chattyWallClockStopwatch.Elapsed.TotalSeconds -gt 15) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor watchdog must let wall-clock timeout, not heartbeat stall, bound a chatty no-advance Unity CLI. Exit $($chattyWallClockResult.ExitCode). StallKilled=$($chattyWallClockResult.StallKilled). TimedOutWallClock=$($chattyWallClockResult.TimedOutWallClock). Elapsed=$([Math]::Round($chattyWallClockStopwatch.Elapsed.TotalSeconds, 2))s. Output: $(@($chattyWallClockResult.Output) -join ' ')"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked chatty no-advance Unity CLI output is bounded by the wall-clock timeout."
+    }
 }
 
 $sparseRegistryScriptPath = ''
@@ -493,5 +627,5 @@ if ($failed) {
     exit 1
 }
 
-Write-Host "[test-unity-workflow-matrix-contract] OK: gated dynamic-matrix jobs do not use matrix expressions in job names." -ForegroundColor Green
+Write-Host "[test-unity-workflow-matrix-contract] OK: Unity workflow and runner contracts passed." -ForegroundColor Green
 exit 0
