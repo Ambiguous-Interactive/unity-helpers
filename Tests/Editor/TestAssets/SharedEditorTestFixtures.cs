@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestUtils;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -333,6 +334,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     AssetDatabase.DeleteAsset(DynamicAssetsDir);
                 }
             }
+
+            // Clean up "Temp N" duplicates after deleting dynamic assets and folders.
+            TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
         }
 
         /// <summary>
@@ -431,6 +435,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void EnsureDynamicAssetsDirectory()
         {
+            // Clean up any leftover "Temp N" folders before creating directories.
+            TempFolderCleanupUtility.CleanupTempDuplicates();
             AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }
     }

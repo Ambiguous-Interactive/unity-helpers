@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
     using System.Collections.Generic;
     using UnityEditor;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestUtils;
 
     /// <summary>
     /// Defines the types of folder templates available for test fixtures.
@@ -217,10 +218,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
                 {
                     foreach (TemplateType templateType in TemplateFolders.Keys)
                     {
-                        DeleteTemplateFolders(templateType);
+                        DeleteTemplateFolders(templateType, cleanupTempDuplicates: false);
                     }
                 }
 
+                TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
                 ReferenceCounts.Clear();
                 CreatedTemplates.Clear();
             }
@@ -245,34 +247,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
                 return;
             }
 
+            if (TemplateUsesTempFolder(folders))
+            {
+                TempFolderCleanupUtility.CleanupTempDuplicates();
+            }
+
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 foreach (string folderPath in folders)
                 {
-                    if (AssetDatabase.IsValidFolder(folderPath))
-                    {
-                        continue;
-                    }
-
-                    string[] parts = folderPath.Split('/');
-                    string currentPath = parts[0];
-
-                    for (int i = 1; i < parts.Length; i++)
-                    {
-                        string nextPath = currentPath + "/" + parts[i];
-                        if (!AssetDatabase.IsValidFolder(nextPath))
-                        {
-                            AssetDatabase.CreateFolder(currentPath, parts[i]);
-                        }
-                        currentPath = nextPath;
-                    }
+                    AssetDatabaseBatchHelper.EnsureAssetFolder(folderPath);
                 }
             }
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
         }
 
-        private static void DeleteTemplateFolders(TemplateType templateType)
+        private static void DeleteTemplateFolders(
+            TemplateType templateType,
+            bool cleanupTempDuplicates = true
+        )
         {
             if (!TemplateFolders.TryGetValue(templateType, out string[] folders))
             {
@@ -290,6 +284,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
                     }
                 }
             }
+
+            if (cleanupTempDuplicates && TemplateUsesTempFolder(folders))
+            {
+                TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
+            }
+        }
+
+        private static bool TemplateUsesTempFolder(string[] folders)
+        {
+            foreach (string folderPath in folders)
+            {
+                if (
+                    string.Equals(folderPath, "Assets/Temp", StringComparison.OrdinalIgnoreCase)
+                    || folderPath.StartsWith("Assets/Temp/", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 #endif

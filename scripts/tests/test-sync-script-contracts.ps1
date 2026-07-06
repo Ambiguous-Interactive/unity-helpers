@@ -419,6 +419,71 @@ function Run-UnityCiScriptContractTests {
     -Message "Missing helper definitions: $($missingDefinitions -join ', ')"
 }
 
+function Run-TestFixtureTempFolderContractTests {
+  Write-Host ""
+  Write-Host "Shared test fixture temp-folder contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $fixturePaths = @(
+    'Tests/Editor/TestAssets/SharedEditorTestFixtures.cs',
+    'Tests/Editor/TestAssets/SharedPrefabTestFixtures.cs',
+    'Tests/Editor/TestAssets/SharedTextureTestFixtures.cs',
+    'Tests/Editor/Sprites/SpriteSheetExtractor/SharedSpriteTestFixtures.cs',
+    'Tests/Editor/TestUtils/FolderTemplateManager.cs'
+  )
+
+  $missingFiles = New-Object System.Collections.Generic.List[string]
+  $rawCreateFolderViolations = New-Object System.Collections.Generic.List[string]
+  $missingEnsureFolder = New-Object System.Collections.Generic.List[string]
+  $missingTempCleanup = New-Object System.Collections.Generic.List[string]
+
+  foreach ($relativePath in $fixturePaths) {
+    $path = Join-Path $repoRoot $relativePath
+    if (-not (Test-Path $path)) {
+      $missingFiles.Add($relativePath) | Out-Null
+      continue
+    }
+
+    $content = Get-Content -Path $path -Raw
+    if ($content -notmatch 'Assets/Temp') {
+      continue
+    }
+
+    if ($content -match 'AssetDatabase\.CreateFolder\s*\(') {
+      $rawCreateFolderViolations.Add($relativePath) | Out-Null
+    }
+
+    if ($content -notmatch 'AssetDatabaseBatchHelper\.EnsureAssetFolder\s*\(') {
+      $missingEnsureFolder.Add($relativePath) | Out-Null
+    }
+
+    if ($content -notmatch 'TempFolderCleanupUtility\.CleanupTempDuplicates') {
+      $missingTempCleanup.Add($relativePath) | Out-Null
+    }
+  }
+
+  Write-TestResult `
+    -TestName 'shared temp fixture managers exist' `
+    -Passed ($missingFiles.Count -eq 0) `
+    -Message "Missing fixture manager files: $($missingFiles -join ', ')"
+
+  Write-TestResult `
+    -TestName 'shared temp fixture managers avoid raw AssetDatabase.CreateFolder' `
+    -Passed ($rawCreateFolderViolations.Count -eq 0) `
+    -Message "Use AssetDatabaseBatchHelper.EnsureAssetFolder instead: $($rawCreateFolderViolations -join ', ')"
+
+  Write-TestResult `
+    -TestName 'shared temp fixture managers use EnsureAssetFolder' `
+    -Passed ($missingEnsureFolder.Count -eq 0) `
+    -Message "Missing AssetDatabaseBatchHelper.EnsureAssetFolder: $($missingEnsureFolder -join ', ')"
+
+  Write-TestResult `
+    -TestName 'shared temp fixture managers clean numbered Temp duplicates' `
+    -Passed ($missingTempCleanup.Count -eq 0) `
+    -Message "Missing TempFolderCleanupUtility cleanup: $($missingTempCleanup -join ', ')"
+}
+
 function Run-OptionalOdinIntegrationContractTests {
   Write-Host ""
   Write-Host "Optional Odin integration contracts:" -ForegroundColor Magenta
@@ -2160,6 +2225,7 @@ Run-CspellContractTests
 Run-AgentValidationContractTests
 Run-PowerShellPathBindingContractTests
 Run-UnityCiScriptContractTests
+Run-TestFixtureTempFolderContractTests
 Run-OptionalOdinIntegrationContractTests
 Run-HookInstallContractTests
 Run-RepoLocalPrettierContractTests
