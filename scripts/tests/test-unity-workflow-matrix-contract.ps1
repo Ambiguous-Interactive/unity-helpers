@@ -13,6 +13,30 @@ function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
 }
 
+function Test-RunnerBootstrapPassesMaintenanceForce {
+    param([Parameter(Mandatory = $true)][string]$Content)
+
+    $maintenanceArgsHashtablePrefixPattern = '\$maintenanceArgs\s*(?:=|\+=)\s*(?:\[[^\]\r\n]+\]\s*)?@\{'
+    $maintenanceArgsBlocks = @(
+        [regex]::Matches($Content, "(?im)$maintenanceArgsHashtablePrefixPattern(?<body>[^\r\n}]*)\}") +
+        [regex]::Matches($Content, "(?ims)$maintenanceArgsHashtablePrefixPattern\s*\r?\n(?<body>.*?)(?:^\s*\}|\z)")
+    )
+    $maintenanceArgsForceExpressionPattern = '(?:(?:\[[^\]\r\n]+\]\s*)?[''"]Force[''"]|\(\s*(?:\[[^\]\r\n]+\]\s*)?[''"]Force[''"]\s*\))'
+    $maintenanceArgsForceKeyPattern = '(?im)(?:^|;)\s*(?:Force|' + $maintenanceArgsForceExpressionPattern + ')\s*='
+    $maintenanceArgsHasForceKey = @(
+        $maintenanceArgsBlocks |
+            Where-Object { $_.Groups['body'].Value -match $maintenanceArgsForceKeyPattern }
+    ).Count -gt 0
+
+    $maintenanceArgsDirectForceAssignment = (
+        $Content -match ('(?im)\$maintenanceArgs(?:\.Force|\[\s*' + $maintenanceArgsForceExpressionPattern + '\s*\])\s*(?:[-+*/%]?=)') -or
+        $Content -match ('(?im)\$maintenanceArgs\.Item\(\s*' + $maintenanceArgsForceExpressionPattern + '\s*\)\s*(?:[-+*/%]?=)') -or
+        $Content -match ('(?im)\$maintenanceArgs\.(?:Add|Set_Item)\(\s*' + $maintenanceArgsForceExpressionPattern + '\s*,')
+    )
+
+    return $maintenanceArgsHasForceKey -or $maintenanceArgsDirectForceAssignment
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
 $benchmarksWorkflowPath = Join-Path $repoRoot '.github/workflows/unity-benchmarks.yml'
@@ -185,6 +209,39 @@ $jobTexts = Get-WorkflowJobTexts -WorkflowLines $lines
 $benchmarksJobTexts = Get-WorkflowJobTexts -WorkflowLines $benchmarksWorkflowLines
 $runnerBootstrapJobTexts = Get-WorkflowJobTexts -WorkflowLines $runnerBootstrapLines
 
+$maintenanceTokens = $null
+$maintenanceParseErrors = $null
+$windowsRunnerMaintenanceAst = [System.Management.Automation.Language.Parser]::ParseFile(
+    $windowsRunnerMaintenancePath,
+    [ref]$maintenanceTokens,
+    [ref]$maintenanceParseErrors
+)
+if ($maintenanceParseErrors -and $maintenanceParseErrors.Count -gt 0) {
+    $details = @($maintenanceParseErrors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" })
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Could not parse runner maintenance script: $($details -join '; ')"
+    $failed = $true
+}
+
+$runnerMaintenanceScriptParameters = @()
+if ($windowsRunnerMaintenanceAst.ParamBlock) {
+    $runnerMaintenanceScriptParameters = @($windowsRunnerMaintenanceAst.ParamBlock.Parameters)
+}
+$runnerMaintenanceFunctionAst = $windowsRunnerMaintenanceAst.FindAll(
+    {
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-WindowsRunnerMaintenance'
+    },
+    $true
+) | Select-Object -First 1
+if (-not $runnerMaintenanceFunctionAst) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance script must define Invoke-WindowsRunnerMaintenance."
+    $failed = $true
+}
+$runnerMaintenanceFunctionParameters = @()
+if ($runnerMaintenanceFunctionAst -and $runnerMaintenanceFunctionAst.Body.ParamBlock) {
+    $runnerMaintenanceFunctionParameters = @($runnerMaintenanceFunctionAst.Body.ParamBlock.Parameters)
+}
+
 if ($unityVersions.Count -lt 1) {
     Write-Host "::error file=.github/unity-versions.json::Unity CI version config must define at least one entry in all[]."
     $failed = $true
@@ -292,6 +349,177 @@ if (-not $runnerBootstrapInvokesMaintenanceFunction) {
     Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
 }
 
+$runnerMaintenanceForceParameters = @(
+    @($runnerMaintenanceScriptParameters + $runnerMaintenanceFunctionParameters) |
+        Where-Object {
+            $parameterName = $_.Name.VariablePath.UserPath
+            $hasForceSurface = $parameterName -match '(?i)Force'
+
+            if (-not $hasForceSurface) {
+                foreach ($attribute in @($_.Attributes)) {
+                    $attributeTypeName = [string]$attribute.TypeName.FullName
+                    if ($attributeTypeName -notmatch '(?i)(^|\.)(Alias|AliasAttribute)$') {
+                        continue
+                    }
+
+                    foreach ($argument in @($attribute.PositionalArguments)) {
+                        if ($argument -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                            [string]::Equals($argument.Value, 'Force', [System.StringComparison]::OrdinalIgnoreCase)) {
+                            $hasForceSurface = $true
+                            break
+                        }
+                    }
+                }
+            }
+
+            $hasForceSurface
+        }
+)
+$runnerBootstrapPassesForceToMaintenance = Test-RunnerBootstrapPassesMaintenanceForce -Content $runnerBootstrapContent
+$runnerMaintenanceHasNoDeadForceSurface = (
+    $runnerMaintenanceForceParameters.Count -eq 0 -and
+    -not $runnerBootstrapPassesForceToMaintenance
+)
+if (-not $runnerMaintenanceHasNoDeadForceSurface) {
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must not expose or pass a Force switch unless it changes provisioning behavior. Remove the dead Force surface to avoid misleading operators."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked runner maintenance exposes no dead Force switch."
+}
+
+$maintenanceForceDetectorFixtures = @(
+    @{
+        Name = 'initial hashtable bare key'
+        Content = '$maintenanceArgs = @{ Force = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'initial hashtable quoted key'
+        Content = '$maintenanceArgs = @{ ''Force'' = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'initial hashtable parenthesized string key'
+        Content = '$maintenanceArgs = @{ (''Force'') = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'initial hashtable cast string key'
+        Content = '$maintenanceArgs = @{ ([string]''Force'') = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'initial hashtable unparenthesized cast key'
+        Content = '$maintenanceArgs = @{ [string]"Force" = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'merged hashtable bare key'
+        Content = '$maintenanceArgs += @{ Force = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'merged hashtable quoted key'
+        Content = '$maintenanceArgs += @{ "Force" = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'typed hashtable bare key'
+        Content = '$maintenanceArgs = [hashtable]@{ Force = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'ordered hashtable bare key'
+        Content = '$maintenanceArgs = [ordered]@{ Force = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'same-line merge after previous statement'
+        Content = '$maintenanceArgs = @{ DetectOnly = $true }; $maintenanceArgs += @{ Force = $true }'
+        Expected = $true
+    },
+    @{
+        Name = 'same-line merge inside conditional block'
+        Content = 'if ($true) { $maintenanceArgs += @{ Force = $true } }'
+        Expected = $true
+    },
+    @{
+        Name = 'dot assignment'
+        Content = '$maintenanceArgs.Force = $true'
+        Expected = $true
+    },
+    @{
+        Name = 'indexer assignment'
+        Content = '$maintenanceArgs["Force"] = $true'
+        Expected = $true
+    },
+    @{
+        Name = 'parenthesized indexer assignment'
+        Content = '$maintenanceArgs[("Force")] = $true'
+        Expected = $true
+    },
+    @{
+        Name = 'cast indexer assignment'
+        Content = '$maintenanceArgs[[string]"Force"] = $true'
+        Expected = $true
+    },
+    @{
+        Name = 'Item property assignment'
+        Content = '$maintenanceArgs.Item("Force") = $true'
+        Expected = $true
+    },
+    @{
+        Name = 'Add method'
+        Content = '$maintenanceArgs.Add("Force", $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'parenthesized Add method argument'
+        Content = '$maintenanceArgs.Add(("Force"), $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'cast Add method argument'
+        Content = '$maintenanceArgs.Add([string]"Force", $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'Set_Item method'
+        Content = '$maintenanceArgs.Set_Item("Force", $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'cast Set_Item method argument'
+        Content = '$maintenanceArgs.Set_Item(([string]"Force"), $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'unparenthesized cast Set_Item method argument'
+        Content = '$maintenanceArgs.Set_Item([string]"Force", $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'method call inside assignment'
+        Content = '$null = $maintenanceArgs.Add("Force", $true)'
+        Expected = $true
+    },
+    @{
+        Name = 'safe detect-only pass-through'
+        Content = '$maintenanceArgs = @{ DetectOnly = $true }'
+        Expected = $false
+    }
+)
+foreach ($fixture in $maintenanceForceDetectorFixtures) {
+    $actual = Test-RunnerBootstrapPassesMaintenanceForce -Content $fixture.Content
+    if ($actual -ne $fixture.Expected) {
+        Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Runner maintenance Force detector fixture '$($fixture.Name)' expected $($fixture.Expected) but got $actual."
+        $failed = $true
+    }
+}
+if ($VerboseOutput) {
+    Write-Info "Checked runner maintenance Force pass-through detector fixtures."
+}
+
 $runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight')) { $runnerBootstrapJobTexts['runner-preflight'] } else { '' }
 $bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
 $requiredLabelsPattern = '(?m)^\s+REQUIRED_LABELS:\s*"self-hosted,Windows,RAM-64GB,\$\{\{\s*inputs\.runner-label\s*\}\}"\s*$'
@@ -390,7 +618,6 @@ try {
     UnityVersions = @('2022.3.45f1')
     ProvisioningProfile = 'StandaloneWindowsIl2Cpp'
     InstallRoot = 'C:\Unity\Editors'
-    Force = `$true
     DiagnosticsRoot = ''
     DetectOnly = `$true
 }

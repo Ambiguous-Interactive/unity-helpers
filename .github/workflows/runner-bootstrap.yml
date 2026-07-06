@@ -384,7 +384,6 @@ jobs:
                   UnityVersions = $unityVersions
                   ProvisioningProfile = $provisioningProfile
                   InstallRoot = $installRoot
-                  Force = $true
                   DiagnosticsRoot = $artifactDir
               }
               if ($detectOnly) {

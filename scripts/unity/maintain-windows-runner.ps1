@@ -11,8 +11,6 @@ param(
     [string]$RunnerMaintenanceInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
     [Alias('DetectOnly')]
     [switch]$RunnerMaintenanceDetectOnly,
-    [Alias('Force')]
-    [switch]$RunnerMaintenanceForce,
     [Alias('DiagnosticsRoot')]
     [string]$RunnerMaintenanceDiagnosticsRoot = ''
 )
@@ -46,7 +44,6 @@ function Invoke-WindowsRunnerMaintenance {
         [string]$ProvisioningProfile = 'StandaloneWindowsIl2Cpp',
         [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
         [switch]$DetectOnly,
-        [switch]$Force,
         [string]$DiagnosticsRoot = ''
     )
 
@@ -70,7 +67,6 @@ function Invoke-WindowsRunnerMaintenance {
     }
 
     $maintenanceDetectOnly = [bool]$DetectOnly
-    $maintenanceForce = [bool]$Force
     $maintenanceDiagnosticsRoot = [string]$DiagnosticsRoot
     $maintenanceInstallRoot = [string]$InstallRoot
     $maintenanceProvisioningProfile = [string]$ProvisioningProfile
@@ -94,10 +90,6 @@ function Invoke-WindowsRunnerMaintenance {
     [int]$bootstrapCode = $bootstrapOutput[-1]
     if ($bootstrapCode -ne 0) {
         return $bootstrapCode
-    }
-
-    if ($maintenanceForce) {
-        Write-RunnerMaintenanceInfo 'Force requested; ensure-editor.ps1 will still choose the least destructive repair path for each editor.'
     }
 
     $failedVersions = New-Object System.Collections.Generic.List[string]
@@ -153,7 +145,6 @@ if ($MyInvocation.InvocationName -ne '.') {
         -ProvisioningProfile $RunnerMaintenanceProvisioningProfile `
         -InstallRoot $RunnerMaintenanceInstallRoot `
         -DetectOnly:$RunnerMaintenanceDetectOnly `
-        -Force:$RunnerMaintenanceForce `
         -DiagnosticsRoot $RunnerMaintenanceDiagnosticsRoot
     exit $exitCode
 }
