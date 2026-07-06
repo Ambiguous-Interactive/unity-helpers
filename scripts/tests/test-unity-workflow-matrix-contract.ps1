@@ -15,6 +15,7 @@ function Write-Info($msg) {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
+$benchmarksWorkflowPath = Join-Path $repoRoot '.github/workflows/unity-benchmarks.yml'
 $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.yml'
 $actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
 $runnerRunbookPath = Join-Path $repoRoot 'docs/runbooks/unity-runners-after-transfer.md'
@@ -26,6 +27,10 @@ $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $benchmarksWorkflowPath)) {
+    Write-Host "::error::Unity benchmarks workflow not found: $benchmarksWorkflowPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $runnerBootstrapPath)) {
@@ -159,6 +164,7 @@ function Get-WorkflowJobTexts {
 
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
+[string[]]$benchmarksWorkflowLines = Get-Content -LiteralPath $benchmarksWorkflowPath
 [string[]]$runnerBootstrapLines = Get-Content -LiteralPath $runnerBootstrapPath
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
 [string]$actionlintContent = Get-Content -LiteralPath $actionlintPath -Raw
@@ -176,6 +182,7 @@ $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | Conver
 [bool]$failed = $false
 [bool]$insideJobs = $false
 $jobTexts = Get-WorkflowJobTexts -WorkflowLines $lines
+$benchmarksJobTexts = Get-WorkflowJobTexts -WorkflowLines $benchmarksWorkflowLines
 $runnerBootstrapJobTexts = Get-WorkflowJobTexts -WorkflowLines $runnerBootstrapLines
 
 if ($unityVersions.Count -lt 1) {
@@ -289,12 +296,14 @@ $runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight
 $bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
 $requiredLabelsPattern = '(?m)^\s+REQUIRED_LABELS:\s*"self-hosted,Windows,RAM-64GB,\$\{\{\s*inputs\.runner-label\s*\}\}"\s*$'
 $bootstrapRunsOnPattern = '(?m)^\s+runs-on:\s*\[self-hosted,\s*Windows,\s*RAM-64GB,\s*"\$\{\{\s*inputs\.runner-label\s*\}\}"\]\s*$'
+$stableRunnerLabelMatcher = 'select((($labels - ((.labels // []) | map(.name))) | length) == 0)'
+$brokenRunnerLabelMatcher = '($labels | all(. as $l | (.labels // [])'
 $runnerBootstrapPinsRequestedMachine = (
     $runnerBootstrapJobTexts.ContainsKey('runner-preflight') -and
     $runnerBootstrapJobTexts.ContainsKey('bootstrap') -and
     $runnerPreflightJob -match $requiredLabelsPattern -and
-    $runnerPreflightJob.Contains('select((($labels - ((.labels // []) | map(.name))) | length) == 0)') -and
-    -not $runnerPreflightJob.Contains('($labels | all(. as $l | (.labels // [])') -and
+    $runnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
+    -not $runnerPreflightJob.Contains($brokenRunnerLabelMatcher) -and
     $bootstrapJob -match $bootstrapRunsOnPattern -and
     $bootstrapJob.Contains('custom ''$requested'' label') -and
     $actionlintContent.Contains('- DAD-MACHINE') -and
@@ -307,6 +316,23 @@ if (-not $runnerBootstrapPinsRequestedMachine) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap pins the requested machine with a machine-name label."
+}
+
+$unityTestsRunnerPreflightJob = if ($jobTexts.ContainsKey('runner-preflight')) { $jobTexts['runner-preflight'] } else { '' }
+$benchmarksRunnerPreflightJob = if ($benchmarksJobTexts.ContainsKey('runner-preflight')) { $benchmarksJobTexts['runner-preflight'] } else { '' }
+$unityWorkflowRunnerPreflightsUseStableMatcher = (
+    $jobTexts.ContainsKey('runner-preflight') -and
+    $benchmarksJobTexts.ContainsKey('runner-preflight') -and
+    $unityTestsRunnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
+    $benchmarksRunnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
+    -not $unityTestsRunnerPreflightJob.Contains($brokenRunnerLabelMatcher) -and
+    -not $benchmarksRunnerPreflightJob.Contains($brokenRunnerLabelMatcher)
+)
+if (-not $unityWorkflowRunnerPreflightsUseStableMatcher) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow runner-preflight label matching must use the set-difference matcher from runner-bootstrap.yml so visible runner inventories do not crash jq by treating label strings as runner objects. Keep .github/workflows/unity-benchmarks.yml in sync."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity workflow runner-preflight label matchers use the stable set-difference form."
 }
 
 $timeoutEventsPreserveReason = (

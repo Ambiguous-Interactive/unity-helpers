@@ -146,7 +146,7 @@ jobs:
           matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
             [ .[]
               | select(.status == "online")
-              | select(($labels | all(. as $l | (.labels // []) | map(.name) | index($l) | type == "number")))
+              | select((($labels - ((.labels // []) | map(.name))) | length) == 0)
             ] | length
           ' < "${runners_json}")"
           echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
