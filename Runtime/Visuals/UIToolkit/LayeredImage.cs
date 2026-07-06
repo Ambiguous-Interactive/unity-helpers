@@ -76,6 +76,11 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             return Math.Max(1L, (long)Math.Round(1000d / fps));
         }
 
+        private static TimeSpan GetFrameInterval(float fps)
+        {
+            return TimeSpan.FromMilliseconds(GetFrameIntervalMilliseconds(fps));
+        }
+
         private bool CanSelfUpdate()
         {
             return _updatesSelf && _computed.Length > 1 && CanPlayTimed(_fps);
@@ -126,6 +131,12 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private readonly Texture2D[] _computed;
         internal Texture2D[] ComputedTexturesForTests => _computed;
         internal bool SelfUpdateActiveForTests => _selfUpdateItem != null;
+
+        internal void SetElapsedSinceLastFrameForTests(TimeSpan elapsedSinceLastFrame)
+        {
+            _timer.Stop();
+            _lastTick = _timer.Elapsed - elapsedSinceLastFrame;
+        }
 
         private readonly Color _backgroundColor;
         private readonly Rect? _largestArea;
@@ -208,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             TimeSpan elapsed = _timer.Elapsed;
-            TimeSpan deltaTime = TimeSpan.FromMilliseconds(1000 / _fps);
+            TimeSpan deltaTime = GetFrameInterval(_fps);
 
             // Prevent time accumulation drift: if _lastTick has fallen significantly behind
             // (e.g., editor was paused/unfocused, or this is the first update after construction),

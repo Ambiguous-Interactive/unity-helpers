@@ -280,6 +280,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsFalse(image.SelfUpdateActiveForTests);
         }
 
+        [UnityTest]
+        public IEnumerator ManualUpdateUsesSelfUpdateRoundedFrameInterval()
+        {
+            if (!Application.isPlaying)
+            {
+                Assert.Ignore("LayeredImage panel playback is covered in PlayMode.");
+            }
+
+            yield return AssertManualUpdateAtElapsedSinceLastFrame(
+                fps: 64f,
+                elapsedMilliseconds: (1000d / 64f + 16d) / 2d,
+                expectedFrameIndex: 0,
+                description: "rounded-up scheduler interval"
+            );
+            yield return AssertManualUpdateAtElapsedSinceLastFrame(
+                fps: 61f,
+                elapsedMilliseconds: (1000d / 61f + 16d) / 2d,
+                expectedFrameIndex: 1,
+                description: "rounded-down scheduler interval"
+            );
+        }
+
+        private IEnumerator AssertManualUpdateAtElapsedSinceLastFrame(
+            float fps,
+            double elapsedMilliseconds,
+            int expectedFrameIndex,
+            string description
+        )
+        {
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: fps,
+                updatesSelf: false
+            );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            yield return AttachToRuntimePanel(image);
+
+            image.SetElapsedSinceLastFrameForTests(
+                TimeSpanFromFractionalMilliseconds(elapsedMilliseconds)
+            );
+            image.Update();
+
+            Assert.AreSame(
+                computed[expectedFrameIndex],
+                image.style.backgroundImage.value.texture,
+                $"Manual Update must use the scheduler-rounded frame interval for {description}."
+            );
+        }
+
+        private static TimeSpan TimeSpanFromFractionalMilliseconds(double milliseconds)
+        {
+            return TimeSpan.FromTicks(
+                (long)Math.Floor(milliseconds * TimeSpan.TicksPerMillisecond)
+            );
+        }
+
         [Test]
         public void ComputeTexturesCropsToVisiblePixels()
         {
