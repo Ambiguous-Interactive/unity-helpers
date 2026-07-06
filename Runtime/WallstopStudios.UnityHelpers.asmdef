@@ -13,18 +13,10 @@
     "protobuf-net.dll",
     "protobuf-net.Core.dll",
     "System.Collections.Immutable.dll",
-    "System.Runtime.CompilerServices.Unsafe.dll",
-    "Sirenix.Serialization.dll",
-    "Sirenix.OdinInspector.Attributes.dll"
+    "System.Runtime.CompilerServices.Unsafe.dll"
   ],
   "autoReferenced": true,
   "defineConstraints": [],
-  "versionDefines": [
-    {
-      "name": "odininspector",
-      "expression": "0.0.1",
-      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
-    }
-  ],
+  "versionDefines": [],
   "noEngineReferences": false
 }

@@ -240,7 +240,7 @@ pwsh -NoProfile -File scripts/lint-asmdef.ps1
 node scripts/run-prettier.js --write -- <file>
 ```
 
-**CRITICAL**: The asmdef linter checks that assemblies with `overrideReferences: true` referencing `WallstopStudios.UnityHelpers` include `Sirenix.Serialization.dll` in `precompiledReferences`. Missing this causes CS0012/CS0311 compilation errors when Odin Inspector is installed. See [manage-assembly-definitions](./manage-assembly-definitions.md) for the standard template.
+**CRITICAL**: The asmdef linter checks JSON shape, references, and Unity version-define grammar. For optional Odin code, also run `pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1`; it verifies that Sirenix references stay behind `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` and that the runtime asmdef remains Sirenix-free. See [manage-assembly-definitions](./manage-assembly-definitions.md).
 
 ### Skill File and Context Changes (`.llm/skills/*.md`, [context](../context.md))
 

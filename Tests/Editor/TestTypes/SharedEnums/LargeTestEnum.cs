@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     /// <summary>
     /// Large ten-option enum for pagination and scrolling tests.
     /// </summary>

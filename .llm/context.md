@@ -208,7 +208,7 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 | `WallstopStudios.UnityHelpers.Tests.Editor.*` | Feature-specific editor tests |
 | `WallstopStudios.UnityHelpers.Tests.Core`     | Shared test utilities         |
 
-**Critical**: Test assemblies use `overrideReferences: true`, so each must independently list ALL required precompiled DLLs. Include `Sirenix.Serialization.dll` if the assembly uses any type derived from `ScriptableObjectSingleton<T>`. See [manage-assembly-definitions](./skills/manage-assembly-definitions.md).
+**Critical**: Test assemblies use `overrideReferences: true`, so each must independently list ALL required precompiled DLLs it directly compiles against. Runtime singletons are Sirenix-free; only assemblies with Odin-specific source files should list Sirenix DLLs and define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from the `odininspector` package. See [manage-assembly-definitions](./skills/manage-assembly-definitions.md).
 
 ---
 

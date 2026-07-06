@@ -22,6 +22,12 @@
   ],
   "autoReferenced": false,
   "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-  "versionDefines": [],
+  "versionDefines": [
+    {
+      "name": "odininspector",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
+    }
+  ],
   "noEngineReferences": false
 }

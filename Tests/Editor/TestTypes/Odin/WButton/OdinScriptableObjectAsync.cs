@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.WButton
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System.Collections;
     using System.Threading.Tasks;
     using Sirenix.OdinInspector;

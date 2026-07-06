@@ -55,7 +55,7 @@ Tests/Editor/
 ```csharp
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.MyFeature
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums;
@@ -79,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.MyFeature
 ```csharp
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.MyFeature
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums;
@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.MyFeature
 ```csharp
 namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
@@ -233,7 +233,7 @@ Extract common test enums to `Tests/Editor/TestTypes/SharedEnums/`:
 // Tests/Editor/TestTypes/SharedEnums/SimpleTestEnum.cs
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     public enum SimpleTestEnum { One, Two, Three }
 #endif
 }
@@ -241,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums
 // Tests/Editor/TestTypes/SharedEnums/TestFlagsEnum.cs
 namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.SharedEnums
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System;
 
     [Flags]
@@ -279,7 +279,7 @@ public sealed class MyOdinDrawerTests : CommonTestBase
 All Odin-specific code must be wrapped in conditional compilation:
 
 ```csharp
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     // Odin-specific code here
 #endif
 ```

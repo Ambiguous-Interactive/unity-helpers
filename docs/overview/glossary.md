@@ -29,8 +29,8 @@ Quick reference for terms used throughout Unity Helpers documentation.
 ### Odin Compatibility
 
 - Automatic integration with Odin Inspector when installed
-- Base classes switch from MonoBehaviour → SerializedMonoBehaviour
-- Enables serialization of dictionaries, polymorphic fields, etc.
+- Runtime base classes stay on Unity's `MonoBehaviour` and `ScriptableObject` types so Sirenix assemblies are never required for registry installs
+- Editor integrations support Odin `SerializedMonoBehaviour` and `SerializedScriptableObject` targets when Odin is available
 - No code changes required when Odin is installed as the `odininspector` package; manual integrations should use a project-local asmdef version define
 - See: [Singletons - Odin Compatibility](../features/utilities/singletons.md#odin-compatibility)
 

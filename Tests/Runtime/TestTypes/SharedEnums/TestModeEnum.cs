@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.TestTypes.SharedEnums
 {
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     /// <summary>
     /// Test enum representing different operational modes for conditional display tests.
     /// </summary>

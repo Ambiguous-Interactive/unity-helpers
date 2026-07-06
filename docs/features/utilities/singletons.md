@@ -9,7 +9,7 @@ This package includes two lightweight, production‑ready singleton helpers that
 - `RuntimeSingleton<T>` — a component singleton that ensures one instance exists in play mode, optionally persists across scenes, and self‑initializes when first accessed.
 - `ScriptableObjectSingleton<T>` — a configuration/data singleton backed by a single asset under `Resources/`, with an editor auto‑creator to keep assets present and correctly placed.
 
-> Odin compatibility: this package's runtime/editor assemblies define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from the `odininspector` package. When that assembly-scoped symbol is active, these types derive from `SerializedMonoBehaviour` / `SerializedScriptableObject` for richer serialization. Without Odin, they fall back to Unity base types. Consumer assemblies do not inherit this symbol; use a project-local asmdef version define for your own conditional Odin code.
+> Odin compatibility: the runtime singleton base classes intentionally stay on Unity's `MonoBehaviour` / `ScriptableObject` base types so registry installs never require Sirenix assemblies. Odin-specific drawers and WButton editor integrations remain optional in the editor assembly. Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol; use a project-local asmdef version define for your own conditional Odin code.
 
 ## TL;DR — What Problem This Solves
 
@@ -82,8 +82,8 @@ Contents
 
 ## Odin Compatibility
 
-- With Odin installed as the `odininspector` package, the package's base classes inherit from `SerializedMonoBehaviour` and `SerializedScriptableObject` to enable serialization of complex types (dictionaries, polymorphic fields) with Odin drawers.
-- Without Odin, bases inherit from Unity’s `MonoBehaviour`/`ScriptableObject` with no behavior change.
+- The singleton base classes always inherit from Unity's `MonoBehaviour` and `ScriptableObject`, which keeps runtime code independent of Sirenix assemblies.
+- With Odin installed as the `odininspector` package, editor integrations for Odin `SerializedMonoBehaviour` and `SerializedScriptableObject` targets are enabled in this package's editor assembly.
 - Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol. If your own code conditionally references Odin types, define a project-local asmdef version define for `odininspector`.
 
 <a id="when-to-use"></a>
@@ -138,7 +138,7 @@ public sealed class GameServices : RuntimeSingleton<GameServices>
 GameServices.Instance.Log("Hello world");
 ```
 
-Odin note: With Odin installed, the class inherits `SerializedMonoBehaviour`, enabling dictionaries and other complex serialized types.
+Odin note: `RuntimeSingleton<T>` stays on Unity's `MonoBehaviour` base class. If a consumer type needs Odin serialization, derive that consumer type directly from Odin's base types where appropriate and keep the conditional Odin reference in the consumer assembly.
 
 Common pitfalls:
 
@@ -189,7 +189,7 @@ public sealed class AudioSettings : ScriptableObjectSingleton<AudioSettings>
 float vol = AudioSettings.Instance.musicVolume;
 ```
 
-Odin note: With Odin installed, the class inherits `SerializedScriptableObject`, so you can safely serialize complex collections without custom drawers.
+Odin note: `ScriptableObjectSingleton<T>` stays on Unity's `ScriptableObject` base class so the runtime assembly remains Sirenix-free. Keep Odin-only serialized fields in consumer assemblies that explicitly reference Odin.
 
 Asset management tips:
 

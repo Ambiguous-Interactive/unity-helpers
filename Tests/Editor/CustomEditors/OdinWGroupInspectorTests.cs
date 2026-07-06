@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System;
     using System.Collections;
     using NUnit.Framework;
@@ -89,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(editor, Is.TypeOf<WButtonOdinScriptableObjectInspector>());
             bool testCompleted = false;
             Exception caughtException = null;
+            WGroupIndentDiagnostics.Enabled = true;
             WGroupIndentDiagnostics.GroupNameFilter = "stats";
 
             yield return TestIMGUIExecutor.Run(() =>
@@ -126,6 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(editor, Is.TypeOf<WButtonOdinMonoBehaviourInspector>());
             bool testCompleted = false;
             Exception caughtException = null;
+            WGroupIndentDiagnostics.Enabled = true;
             WGroupIndentDiagnostics.GroupNameFilter = "stats";
 
             yield return TestIMGUIExecutor.Run(() =>

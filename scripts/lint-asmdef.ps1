@@ -459,68 +459,9 @@ foreach ($file in $asmdefFilesToValidate) {
   }
 }
 
-# 6. Check that assemblies referencing WallstopStudios.UnityHelpers with overrideReferences include Sirenix.Serialization.dll
-foreach ($file in $asmdefFilesToValidate) {
-  $relativePath = ConvertTo-RepoRelativePath -Path $file.FullName
-
-  try {
-    $content = Get-Content -Path $file.FullName -Raw
-    $json = $content | ConvertFrom-Json
-  }
-  catch {
-    # Already reported during JSON validation above
-    continue
-  }
-
-  $hasOverrideReferences = $false
-  if ($json.PSObject.Properties['overrideReferences'] -and $json.overrideReferences -eq $true) {
-    $hasOverrideReferences = $true
-  }
-
-  if (-not $hasOverrideReferences) {
-    continue
-  }
-
-  $referencesRuntime = $false
-  $jsonReferences = @()
-  if ($json.PSObject.Properties['references'] -and $null -ne $json.references) {
-    $jsonReferences = @($json.references)
-  }
-  if ($jsonReferences.Count -gt 0) {
-    foreach ($ref in $jsonReferences) {
-      if ($ref -eq 'WallstopStudios.UnityHelpers') {
-        $referencesRuntime = $true
-        break
-      }
-    }
-  }
-
-  if (-not $referencesRuntime) {
-    continue
-  }
-
-  $hasSirenixSerialization = $false
-  $jsonPrecompiledReferences = @()
-  if ($json.PSObject.Properties['precompiledReferences'] -and $null -ne $json.precompiledReferences) {
-    $jsonPrecompiledReferences = @($json.precompiledReferences)
-  }
-  if ($jsonPrecompiledReferences.Count -gt 0) {
-    foreach ($pcRef in $jsonPrecompiledReferences) {
-      if ($pcRef -eq 'Sirenix.Serialization.dll') {
-        $hasSirenixSerialization = $true
-        break
-      }
-    }
-  }
-
-  if (-not $hasSirenixSerialization) {
-    Write-Info "  [$relativePath] overrideReferences=true + references WallstopStudios.UnityHelpers but missing Sirenix.Serialization.dll"
-    $errorList += "[$relativePath] Missing 'Sirenix.Serialization.dll' in precompiledReferences. Required because assembly references WallstopStudios.UnityHelpers which contains types with conditional Odin inheritance (RuntimeSingleton, ScriptableObjectSingleton). See .llm/skills/manage-assembly-definitions.md"
-  }
-  else {
-    Write-Info "  [$relativePath] Sirenix.Serialization.dll present (required for WallstopStudios.UnityHelpers with overrideReferences)"
-  }
-}
+# 6. Optional Odin integration is validated by scripts/tests/test-sync-script-contracts.ps1.
+#    Do not require Sirenix DLLs just because an assembly references the runtime asmdef:
+#    Runtime code intentionally stays Sirenix-free so registry installs compile without Odin.
 
 # Also validate any .asmref files
 $asmrefFiles = @()

@@ -240,7 +240,7 @@ public enum ItemRarity
 
 ## Odin Inspector Compatibility
 
-All Unity Helpers inspector attributes are designed to work seamlessly with Odin Inspector. When Odin is installed (`ODIN_INSPECTOR` define symbol present), dedicated Odin drawers automatically activate.
+All Unity Helpers inspector attributes are designed to work seamlessly with Odin Inspector. When Odin is installed as the `odininspector` package, the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol activates dedicated Odin drawers.
 
 ### Attribute Comparison
 

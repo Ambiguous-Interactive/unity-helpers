@@ -36,7 +36,7 @@ For testing Odin drawers, see [test-odin-drawers](./test-odin-drawers.md).
 ```csharp
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector.Editor;
     using UnityEngine;
 
@@ -225,7 +225,7 @@ Editor/CustomDrawers/
 │   └── ValidationShared.cs              # WNotNull/ValidateAssignment helpers (542 lines)
 Editor/Core/Helper/
 │   └── EditorCacheHelper.cs             # Centralized style/string/texture caching
-├── Odin/                                # Odin-specific drawers (#if ODIN_INSPECTOR)
+├── Odin/                                # Odin-specific drawers (#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR)
 │   ├── WEnumToggleButtonsOdinDrawer.cs
 │   ├── WShowIfOdinDrawer.cs
 │   ├── WInLineEditorOdinDrawer.cs
@@ -294,7 +294,7 @@ For comprehensive testing patterns, see [test-odin-drawers](./test-odin-drawers.
 ```csharp
 namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using NUnit.Framework;
     using Sirenix.OdinInspector;
     using UnityEditor;
@@ -380,7 +380,7 @@ public class MyOdinComponent : SerializedMonoBehaviour
 ## Checklist for New Odin Drawer
 
 1. [ ] Create drawer in `Editor/CustomDrawers/Odin/`
-2. [ ] Place `#if UNITY_EDITOR && ODIN_INSPECTOR` **inside** namespace
+2. [ ] Place `#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` **inside** namespace
 3. [ ] Inherit from appropriate base class (`OdinAttributeDrawer<TAttribute>` or `OdinValueDrawer<TValue>`)
 4. [ ] Extract shared logic to `Editor/CustomDrawers/Utils/` if Unity PropertyDrawer exists
 5. [ ] Use type aliases for long namespace imports

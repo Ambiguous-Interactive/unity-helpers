@@ -1156,7 +1156,7 @@ public class AnimationTester : MonoBehaviour
 WButton works automatically with:
 
 - All Unity Objects (`MonoBehaviour`, `ScriptableObject`, etc.)
-- **Odin Inspector's `SerializedMonoBehaviour` and `SerializedScriptableObject`** when this package's Odin integration is active
+- **Odin Inspector's `SerializedMonoBehaviour` and `SerializedScriptableObject`** through this package's optional editor integration when Odin is installed
 
 **When do you need `WButtonEditorHelper`?**
 

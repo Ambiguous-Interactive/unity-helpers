@@ -35,21 +35,13 @@ namespace WallstopStudios.UnityHelpers.{Subsystem}
     using System.Collections.Generic;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
-#if ODIN_INSPECTOR
-    using Sirenix.OdinInspector;
-#endif
 
     /// <summary>
     /// Brief description of what this asset represents.
     /// </summary>
     [Serializable]
     [CreateAssetMenu(menuName = "Wallstop Studios/Unity Helpers/{Category}/{Asset Name}")]
-    public sealed class MyDataAsset :
-#if ODIN_INSPECTOR
-        SerializedScriptableObject
-#else
-        ScriptableObject
-#endif
+    public sealed class MyDataAsset : ScriptableObject
     {
         /// <summary>
         /// Description of the field's purpose.
@@ -78,9 +70,6 @@ namespace WallstopStudios.UnityHelpers.{Subsystem}
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Utils;
-#if ODIN_INSPECTOR
-    using Sirenix.OdinInspector;
-#endif
 
     /// <summary>
     /// Global configuration for {feature}.
@@ -131,11 +120,7 @@ Use the package's custom attributes to enhance the Unity Inspector experience:
 
 ```csharp
 // Show field only when condition is met
-#if ODIN_INSPECTOR
-[ShowIf("@durationType == ModifierDurationType.Duration")]
-#else
 [WShowIf(nameof(durationType), expectedValues: new object[] { ModifierDurationType.Duration })]
-#endif
 public float duration;
 
 // Show field when boolean is true
@@ -304,29 +289,26 @@ Optional parameters:
 
 ---
 
-## ODIN Inspector Compatibility
+## Odin Inspector Compatibility
 
-All ScriptableObjects should support both standard Unity Inspector and ODIN Inspector:
+Runtime ScriptableObjects in this package stay Sirenix-free. Use the package's own
+attributes in runtime assets, and put Odin-specific drawers, editors, and tests in
+the dedicated Odin integration folders.
 
 ```csharp
-public sealed class MyAsset :
-#if ODIN_INSPECTOR
-    SerializedScriptableObject  // Enables ODIN's advanced serialization
-#else
-    ScriptableObject
-#endif
+public sealed class MyAsset : ScriptableObject
 {
-    // Use conditional attributes for ODIN-specific features
-#if ODIN_INSPECTOR
-    [ShowIf("@showAdvanced")]
-    [BoxGroup("Advanced")]
-#else
     [WShowIf(nameof(showAdvanced))]
     [WGroup("Advanced")]
-#endif
     public float advancedValue;
 }
 ```
+
+If a test or editor-only integration must compile against Odin/Sirenix types, follow
+[integrate-odin-inspector](./integrate-odin-inspector.md) and
+[test-odin-drawers](./test-odin-drawers.md). Gate that source with
+`WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` and add only the directly used Sirenix DLLs
+to the owning asmdef.
 
 ---
 

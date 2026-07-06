@@ -127,16 +127,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
         internal static void LogDrawProperty(string groupName, string propertyPath, int indentLevel)
         {
-            if (MatchesGroupNameFilter(groupName))
-            {
-                ++DrawPropertyLogCount;
-            }
-
             if (!ShouldLog(groupName))
             {
                 return;
             }
 
+            ++DrawPropertyLogCount;
             Debug.Log(
                 $"{LogPrefix}DrawProperty: group={groupName ?? "(null)"}, "
                     + $"property={propertyPath}, indentLevel={indentLevel}, "

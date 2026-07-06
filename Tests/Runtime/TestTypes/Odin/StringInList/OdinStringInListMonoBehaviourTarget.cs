@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.TestTypes.Odin.StringInList
 {
-#if ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
     using WallstopStudios.UnityHelpers.Core.Attributes;
 

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Optional Odin Inspector integration without Odin assemblies**: Runtime singletons, `AttributeEffect`, Odin drawers, and Odin-backed WButton inspectors now compile against Unity's built-in base types unless Odin is installed as the `odininspector` package or the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` define is explicitly enabled. Projects that still define the global `ODIN_INSPECTOR` symbol without shipping Sirenix assemblies no longer fail package compilation.
+- **Optional Odin Inspector integration without Odin assemblies**: Runtime singletons and `AttributeEffect` no longer compile against Sirenix at all, while Odin drawers and Odin-backed WButton inspectors stay gated behind the package-owned `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` define from the `odininspector` package. Projects that still define the global `ODIN_INSPECTOR` symbol without shipping Sirenix assemblies no longer fail package compilation.
 
 ## [3.4.0] - 2026-07-01
 

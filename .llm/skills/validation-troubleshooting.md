@@ -322,7 +322,7 @@ If a site fails despite these settings, it likely needs an exclusion.
 
 When updating URLs, check consistency between source code metadata (`.cs` files) and documentation (`.md` files).
 
-### 18. CS0012/CS0311: Missing Sirenix.Serialization.dll in Assembly Definition
+### 18. CS0012/CS0311: Missing Optional Dependency DLL in Assembly Definition
 
 **Symptom**: Compilation fails with:
 
@@ -338,9 +338,9 @@ error CS0311: The type 'X' cannot be used as type parameter 'T' in the generic t
 There is no implicit reference conversion from 'X' to 'UnityEngine.MonoBehaviour'.
 ```
 
-**Cause**: The assembly definition has `overrideReferences: true` and references `WallstopStudios.UnityHelpers`, but is missing `Sirenix.Serialization.dll` in its `precompiledReferences`. This happens because `RuntimeSingleton<T>` and `ScriptableObjectSingleton<T>` conditionally inherit from Sirenix types (`SerializedMonoBehaviour` and `SerializedScriptableObject`) when `ODIN_INSPECTOR` is defined, and `overrideReferences: true` does not propagate precompiled references transitively.
+**Cause**: The assembly definition has `overrideReferences: true` and directly compiles source that references Odin/Sirenix types, but the matching Sirenix DLL is missing from `precompiledReferences`. Runtime singleton base classes are intentionally Sirenix-free; do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`.
 
-**Fix**: Add `"Sirenix.Serialization.dll"` to the `precompiledReferences` array in the affected `.asmdef` file:
+**Fix**: Add the exact Sirenix DLL used by the affected source to the `precompiledReferences` array in that `.asmdef` file:
 
 ```json
 "precompiledReferences": [
@@ -349,9 +349,9 @@ There is no implicit reference conversion from 'X' to 'UnityEngine.MonoBehaviour
 ]
 ```
 
-**Prevention**: The [manage-assembly-definitions](./manage-assembly-definitions.md) skill documents this requirement in detail. The standard test assembly template includes `Sirenix.Serialization.dll` by default — always use that template when creating new test assemblies.
+**Prevention**: The [manage-assembly-definitions](./manage-assembly-definitions.md) skill documents this requirement in detail. Add Sirenix DLLs only to assemblies that directly compile Odin-specific source, and gate those files with `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`.
 
-**Linter**: `pwsh -NoProfile -File scripts/lint-asmdef.ps1` detects assemblies that reference `WallstopStudios.UnityHelpers` with `overrideReferences: true` but are missing `Sirenix.Serialization.dll`.
+**Linter**: `pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1` verifies optional Odin guard and asmdef contracts, including that runtime stays Sirenix-free and Odin test/editor asmdefs define `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` from `odininspector`.
 
 ---
 

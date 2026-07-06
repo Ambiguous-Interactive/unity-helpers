@@ -235,13 +235,13 @@ namespace WallstopStudios.UnityHelpers.Core
 
 **Exception**: Unity-standard defines like `UNITY_EDITOR`, `UNITY_2021_3_OR_NEWER` may wrap entire file contents when necessary.
 
-**Third-party package defines** (`ODIN_INSPECTOR`, `VCONTAINER`, `ZENJECT`, etc.) should also be placed inside the namespace:
+**Third-party package defines** (`WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`, `VCONTAINER`, `ZENJECT`, etc.) should also be placed inside the namespace:
 
 ```csharp
 // ✅ CORRECT - Odin directive inside namespace
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector.Editor;
 
     public sealed class MyOdinDrawer : OdinAttributeDrawer<MyAttribute>
@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 }
 
 // ❌ INCORRECT - Odin directive outside namespace
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
     public sealed class MyOdinDrawer : OdinAttributeDrawer<MyAttribute>

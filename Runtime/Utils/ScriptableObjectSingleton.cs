@@ -11,9 +11,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-    using Sirenix.OdinInspector;
-#endif
 
     /// <summary>
     /// Provides a global, lazily loaded singleton pattern for <see cref="ScriptableObject"/> assets.
@@ -30,9 +27,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// The editor utility “ScriptableObject Singleton Creator” automatically creates and relocates assets to
     /// the correct path on editor load — see docs/features/editor-tools/editor-tools-guide.md#scriptableobject-singleton-creator.
     ///
-    /// ODIN compatibility: When Odin Inspector is installed as the <c>odininspector</c> package, or when the
-    /// <c>WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</c> symbol is defined explicitly, this class derives from
-    /// <c>Sirenix.OdinInspector.SerializedScriptableObject</c>; otherwise it derives from <see cref="ScriptableObject"/>.
+    /// Odin compatibility: this runtime type intentionally derives from <see cref="ScriptableObject"/>
+    /// so registry installs never require Sirenix assemblies. Odin editor integration remains optional
+    /// in the editor assembly.
     /// </remarks>
     /// <typeparam name="T">Concrete singleton ScriptableObject type that derives from this base.</typeparam>
     /// <threadsafety>
@@ -48,12 +45,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     ///   </description></item>
     /// </list>
     /// </threadsafety>
-    public abstract class ScriptableObjectSingleton<T> :
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-        SerializedScriptableObject
-#else
-        ScriptableObject
-#endif
+    public abstract class ScriptableObjectSingleton<T> : ScriptableObject
         where T : ScriptableObjectSingleton<T>
     {
         private static ScriptableObjectSingletonMetadata _metadataAsset;

@@ -27,6 +27,11 @@
       "name": "com.unity.2d.sprite",
       "expression": "1.0.0",
       "define": "UNITY_2D_SPRITE"
+    },
+    {
+      "name": "odininspector",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
     }
   ],
   "noEngineReferences": false

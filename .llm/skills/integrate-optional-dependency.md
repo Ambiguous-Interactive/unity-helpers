@@ -37,7 +37,7 @@ All optional dependency code should be wrapped in conditional compilation direct
 ```csharp
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using System;
     using Sirenix.OdinInspector.Editor;
     using UnityEngine;
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 **Incorrect** (directive outside namespace):
 
 ```csharp
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
     using System;
@@ -94,7 +94,7 @@ When both standard Unity and optional dependency implementations share logic, ex
 // WButtonOdinInspectorHelper.cs - Shared logic
 namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     internal static class WButtonOdinInspectorHelper
     {
         internal static void DrawInspectorGUI(Editor editor, /* params */)
@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 // WButtonOdinMonoBehaviourInspector.cs - Thin wrapper
 namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 {
-#if UNITY_EDITOR && ODIN_INSPECTOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     [CustomEditor(typeof(SerializedMonoBehaviour), true)]
     public sealed class WButtonOdinMonoBehaviourInspector : Editor
     {
@@ -166,12 +166,12 @@ private static readonly Dictionary<int, string> IntToStringCache = new(); // Dup
 
 ## Supported Optional Dependencies
 
-| Package        | Define Symbol    | File Location                                         |
-| -------------- | ---------------- | ----------------------------------------------------- |
-| Odin Inspector | `ODIN_INSPECTOR` | `Editor/CustomDrawers/Odin/`, `Editor/CustomEditors/` |
-| VContainer     | `VCONTAINER`     | `Runtime/Integrations/VContainer/`                    |
-| Zenject        | `ZENJECT`        | `Runtime/Integrations/Zenject/`                       |
-| Reflex         | `REFLEX`         | `Runtime/Integrations/Reflex/`                        |
+| Package        | Define Symbol                           | File Location                                         |
+| -------------- | --------------------------------------- | ----------------------------------------------------- |
+| Odin Inspector | `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` | `Editor/CustomDrawers/Odin/`, `Editor/CustomEditors/` |
+| VContainer     | `VCONTAINER`                            | `Runtime/Integrations/VContainer/`                    |
+| Zenject        | `ZENJECT`                               | `Runtime/Integrations/Zenject/`                       |
+| Reflex         | `REFLEX`                                | `Runtime/Integrations/Reflex/`                        |
 
 ### Dependency-Specific Skills
 
@@ -350,12 +350,12 @@ When optional dependencies affect assembly definitions, use Version Defines:
 ```json
 {
   "name": "WallstopStudios.UnityHelpers.Editor",
-  "references": ["WallstopStudios.UnityHelpers.Runtime"],
+  "references": ["WallstopStudios.UnityHelpers"],
   "versionDefines": [
     {
-      "name": "com.unity.odin-inspector",
-      "expression": "",
-      "define": "ODIN_INSPECTOR"
+      "name": "odininspector",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
     },
     {
       "name": "jp.hadashikick.vcontainer",
@@ -375,7 +375,7 @@ When optional dependencies affect assembly definitions, use Version Defines:
 
 When an assembly has `"overrideReferences": true`, it can ONLY see precompiled DLLs explicitly listed in its `precompiledReferences`. These references do NOT propagate transitively through assembly references.
 
-**Example**: `ScriptableObjectSingleton<T>` conditionally inherits from `SerializedScriptableObject` (Sirenix) when `ODIN_INSPECTOR` is defined. Any assembly using types derived from `ScriptableObjectSingleton<T>` must include `Sirenix.Serialization.dll` in its own `precompiledReferences`, even if a referenced assembly already lists it.
+**Example**: an assembly that directly compiles Odin test targets derived from `SerializedScriptableObject` must include `Sirenix.Serialization.dll` in its own `precompiledReferences` and gate those files with `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`. Runtime singleton base classes are Sirenix-free, so do not add Sirenix DLLs merely because an assembly references `WallstopStudios.UnityHelpers`.
 
 **When splitting assemblies**: Always audit the parent assembly's `precompiledReferences` and propagate required DLLs to each child. See [manage-assembly-definitions](./manage-assembly-definitions.md) for the full checklist.
 

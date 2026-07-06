@@ -425,10 +425,10 @@ function Run-OptionalOdinIntegrationContractTests {
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
-  $productionRoots = @('Runtime', 'Editor')
+  $sourceRoots = @('Runtime', 'Editor', 'Tests')
   $sourceFiles = New-Object System.Collections.Generic.List[string]
-  foreach ($productionRoot in $productionRoots) {
-    $rootPath = Join-Path $repoRoot $productionRoot
+  foreach ($sourceRoot in $sourceRoots) {
+    $rootPath = Join-Path $repoRoot $sourceRoot
     if (-not (Test-Path $rootPath)) {
       continue
     }
@@ -563,21 +563,24 @@ function Run-OptionalOdinIntegrationContractTests {
   }
 
   Write-TestResult `
-    -TestName 'production Odin preprocessor guards use package-owned symbol' `
+    -TestName 'Odin preprocessor guards use package-owned symbol' `
     -Passed ($directOdinGuardViolations.Count -eq 0) `
     -Message "Direct ODIN_INSPECTOR guards: $($directOdinGuardViolations -join ', ')"
 
   Write-TestResult `
-    -TestName 'production Sirenix compile-time references are inside package-symbol branches' `
+    -TestName 'Sirenix compile-time references are inside package-symbol branches' `
     -Passed ($unguardedSirenixReferences.Count -eq 0) `
     -Message "Unguarded references: $($unguardedSirenixReferences -join ', ')"
 
-  $requiredAsmdefs = @(
-    'Runtime/WallstopStudios.UnityHelpers.asmdef',
-    'Editor/WallstopStudios.UnityHelpers.Editor.asmdef'
+  $requiredOdinSymbolAsmdefs = @(
+    'Editor/WallstopStudios.UnityHelpers.Editor.asmdef',
+    'Tests/Editor/CustomDrawers/WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.asmdef',
+    'Tests/Editor/CustomEditors/WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors.asmdef',
+    'Tests/Editor/WallstopStudios.UnityHelpers.Tests.Editor.asmdef',
+    'Tests/Runtime/WallstopStudios.UnityHelpers.Tests.Runtime.asmdef'
   )
   $missingOdinVersionDefines = New-Object System.Collections.Generic.List[string]
-  foreach ($asmdefRelativePath in $requiredAsmdefs) {
+  foreach ($asmdefRelativePath in $requiredOdinSymbolAsmdefs) {
     $asmdefPath = Join-Path $repoRoot $asmdefRelativePath
     if (-not (Test-Path $asmdefPath)) {
       $missingOdinVersionDefines.Add("${asmdefRelativePath}: missing file") | Out-Null
@@ -603,26 +606,32 @@ function Run-OptionalOdinIntegrationContractTests {
   }
 
   Write-TestResult `
-    -TestName 'runtime and editor asmdefs define package-owned Odin symbol from package presence' `
+    -TestName 'editor and Odin test asmdefs define package-owned Odin symbol from package presence' `
     -Passed ($missingOdinVersionDefines.Count -eq 0) `
     -Message "Missing odininspector versionDefines: $($missingOdinVersionDefines -join ', ')"
 
   $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
   $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json
   $runtimePrecompiledReferences = @($runtimeAsmdef.precompiledReferences)
-  $requiredRuntimeOdinReferences = @(
-    'Sirenix.Serialization.dll',
-    'Sirenix.OdinInspector.Attributes.dll'
+  $runtimeSirenixPrecompiledReferences = @(
+    $runtimePrecompiledReferences |
+      Where-Object { [string]$_ -match '^Sirenix\.' }
   )
-  $missingRuntimeOdinReferences = @(
-    $requiredRuntimeOdinReferences |
-      Where-Object { $_ -notin $runtimePrecompiledReferences }
+  $runtimeOdinVersionDefines = @(
+    @($runtimeAsmdef.versionDefines) |
+      Where-Object {
+        [string]$_.name -eq 'odininspector' -or
+        [string]$_.define -eq $odinSymbol
+      }
   )
 
   Write-TestResult `
-    -TestName 'runtime asmdef exposes Odin runtime DLLs when package-owned symbol is active' `
-    -Passed ($missingRuntimeOdinReferences.Count -eq 0) `
-    -Message "Missing Runtime precompiledReferences: $($missingRuntimeOdinReferences -join ', ')"
+    -TestName 'runtime asmdef stays Sirenix-free for registry installs without Odin' `
+    -Passed (
+      $runtimeSirenixPrecompiledReferences.Count -eq 0 -and
+      $runtimeOdinVersionDefines.Count -eq 0
+    ) `
+    -Message "Runtime Sirenix precompiledReferences: $($runtimeSirenixPrecompiledReferences -join ', '); runtime Odin versionDefines: $($runtimeOdinVersionDefines.Count)"
 
   $editorAsmdefPath = Join-Path $repoRoot 'Editor/WallstopStudios.UnityHelpers.Editor.asmdef'
   $editorAsmdef = Get-Content -Path $editorAsmdefPath -Raw | ConvertFrom-Json
