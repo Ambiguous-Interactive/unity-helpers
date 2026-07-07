@@ -693,7 +693,7 @@ function Run-OptionalOdinIntegrationContractTests {
     'Editor/WallstopStudios.UnityHelpers.Editor.asmdef',
     'Tests/Editor/CustomDrawers/WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.asmdef',
     'Tests/Editor/CustomEditors/WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors.asmdef',
-    'Tests/Editor/Utils/WallstopStudios.UnityHelpers.Tests.Editor.Utils.asmdef',
+    'Tests/Editor/Utils/Odin/WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin.asmdef',
     'Tests/Editor/WallstopStudios.UnityHelpers.Tests.Editor.asmdef',
     'Tests/Runtime/WallstopStudios.UnityHelpers.Tests.Runtime.asmdef'
   )
@@ -767,6 +767,51 @@ function Run-OptionalOdinIntegrationContractTests {
     -TestName 'Odin-enabled overrideReferences test asmdefs keep Odin assemblies visible' `
     -Passed ($missingOdinOverrideReferences.Count -eq 0) `
     -Message "Missing Odin precompiledReferences: $($missingOdinOverrideReferences -join ', ')"
+
+  $generalEditorUtilsAsmdefPath = Join-Path $repoRoot 'Tests/Editor/Utils/WallstopStudios.UnityHelpers.Tests.Editor.Utils.asmdef'
+  $generalEditorUtilsAsmdef = Get-Content -Path $generalEditorUtilsAsmdefPath -Raw | ConvertFrom-Json
+  $generalEditorUtilsSirenixPrecompiledReferences = @(
+    @($generalEditorUtilsAsmdef.precompiledReferences) |
+      Where-Object { [string]$_ -match '^Sirenix\.' }
+  )
+  $generalEditorUtilsOdinVersionDefines = @(
+    @($generalEditorUtilsAsmdef.versionDefines) |
+      Where-Object {
+        [string]$_.name -eq 'odininspector' -or
+        [string]$_.define -eq $odinSymbol
+      }
+  )
+  $odinEditorUtilsAsmdefPath = Join-Path $repoRoot 'Tests/Editor/Utils/Odin/WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin.asmdef'
+  $odinEditorUtilsAsmdef = Get-Content -Path $odinEditorUtilsAsmdefPath -Raw | ConvertFrom-Json
+  $odinEditorUtilsDefineConstraints = @($odinEditorUtilsAsmdef.defineConstraints)
+  $odinEditorUtilsHasOdinConstraint = $odinSymbol -in $odinEditorUtilsDefineConstraints
+  $odinEditorUtilsHasUnityTestsConstraint = 'UNITY_INCLUDE_TESTS' -in $odinEditorUtilsDefineConstraints
+  $odinEditorUtilsTestPath = Join-Path $repoRoot 'Tests/Editor/Utils/Odin/ScriptableObjectSingletonOdinTests.cs'
+  $odinEditorUtilsTestContent = if (Test-Path $odinEditorUtilsTestPath) {
+    Get-Content -Path $odinEditorUtilsTestPath -Raw
+  } else {
+    ''
+  }
+  $odinEditorUtilsTestKeepsSingletonBaseCoverage = (
+    $odinEditorUtilsTestContent -match '#\s*if\s+UNITY_EDITOR\s+&&\s+WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR' -and
+    $odinEditorUtilsTestContent.Contains('using Sirenix.OdinInspector;') -and
+    $odinEditorUtilsTestContent -match 'ScriptableObjectSingletonOdinTests\s*:\s*CommonTestBase' -and
+    $odinEditorUtilsTestContent.Contains('Track(') -and
+    $odinEditorUtilsTestContent.Contains('ScriptableObject.CreateInstance<OdinScriptableObjectSingletonTestTarget>()') -and
+    $odinEditorUtilsTestContent.Contains('Is.InstanceOf<SerializedScriptableObject>()') -and
+    $odinEditorUtilsTestContent -match 'OdinScriptableObjectSingletonTestTarget\s*:\s*ScriptableObjectSingleton<\s*OdinScriptableObjectSingletonTestTarget\s*>'
+  )
+
+  Write-TestResult `
+    -TestName 'editor utils tests isolate Odin-only coverage in an Odin-gated asmdef' `
+    -Passed (
+      $generalEditorUtilsSirenixPrecompiledReferences.Count -eq 0 -and
+      $generalEditorUtilsOdinVersionDefines.Count -eq 0 -and
+      $odinEditorUtilsHasOdinConstraint -and
+      $odinEditorUtilsHasUnityTestsConstraint -and
+      $odinEditorUtilsTestKeepsSingletonBaseCoverage
+    ) `
+    -Message "General utils Sirenix references: $($generalEditorUtilsSirenixPrecompiledReferences -join ', '); general utils Odin versionDefines: $($generalEditorUtilsOdinVersionDefines -join ', '); Odin utils constraints: $($odinEditorUtilsDefineConstraints -join ', '); Odin singleton coverage present: $odinEditorUtilsTestKeepsSingletonBaseCoverage"
 
   $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
   $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json

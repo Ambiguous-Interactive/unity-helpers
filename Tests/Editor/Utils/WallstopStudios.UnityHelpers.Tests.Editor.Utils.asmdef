@@ -14,19 +14,9 @@
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
-  "precompiledReferences": [
-    "nunit.framework.dll",
-    "Sirenix.Serialization.dll",
-    "Sirenix.OdinInspector.Attributes.dll"
-  ],
+  "precompiledReferences": ["nunit.framework.dll"],
   "autoReferenced": false,
   "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-  "versionDefines": [
-    {
-      "name": "odininspector",
-      "expression": "0.0.1",
-      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
-    }
-  ],
+  "versionDefines": [],
   "noEngineReferences": false
 }

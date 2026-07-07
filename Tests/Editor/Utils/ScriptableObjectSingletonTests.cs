@@ -13,9 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-    using Sirenix.OdinInspector;
-#endif
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -528,9 +525,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestSingleton instance = TestSingleton.Instance;
 
             Assert.IsInstanceOf<ScriptableObject>(instance);
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-            Assert.IsInstanceOf<SerializedScriptableObject>(instance);
-#endif
             yield break;
         }
 

@@ -1,0 +1,29 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Utils.Odin",
+  "references": [
+    "UnityEditor.TestRunner",
+    "UnityEngine.TestRunner",
+    "WallstopStudios.UnityHelpers",
+    "WallstopStudios.UnityHelpers.Tests.Core"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "Sirenix.Serialization.dll",
+    "Sirenix.OdinInspector.Attributes.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"],
+  "versionDefines": [
+    {
+      "name": "odininspector",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
+    }
+  ],
+  "noEngineReferences": false
+}
