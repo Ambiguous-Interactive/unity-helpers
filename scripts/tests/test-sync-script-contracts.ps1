@@ -801,6 +801,18 @@ function Run-OptionalOdinIntegrationContractTests {
     $odinEditorUtilsTestContent.Contains('Is.InstanceOf<SerializedScriptableObject>()') -and
     $odinEditorUtilsTestContent -match 'OdinScriptableObjectSingletonTestTarget\s*:\s*ScriptableObjectSingleton<\s*OdinScriptableObjectSingletonTestTarget\s*>'
   )
+  $runtimeAssemblyInfoContent = Get-Content -Path (Join-Path $repoRoot 'Runtime/AssemblyInfo.cs') -Raw
+  $editorAssemblyInfoContent = Get-Content -Path (Join-Path $repoRoot 'Editor/AssemblyInfo.cs') -Raw
+  $assemblyReferenceValidationContent = Get-Content -Path (Join-Path $repoRoot 'Tests/Editor/Validation/AssemblyReferenceValidationTests.cs') -Raw
+  $odinEditorUtilsIvtEntry = 'InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin")'
+  $odinEditorUtilsValidationAllowsAbsentOptionalAsmdef = (
+    $runtimeAssemblyInfoContent.Contains($odinEditorUtilsIvtEntry) -and
+    $editorAssemblyInfoContent.Contains($odinEditorUtilsIvtEntry) -and
+    $assemblyReferenceValidationContent.Contains('UnityIncludeTestsDefine = "UNITY_INCLUDE_TESTS"') -and
+    $assemblyReferenceValidationContent.Contains('ShouldSkipWhenUnloaded') -and
+    $assemblyReferenceValidationContent.Contains('ExtractDefineConstraintsFromAsmdef') -and
+    $assemblyReferenceValidationContent.Contains('Optional test assembly not compiled because one or more define constraints are absent')
+  )
 
   Write-TestResult `
     -TestName 'editor utils tests isolate Odin-only coverage in an Odin-gated asmdef' `
@@ -809,9 +821,10 @@ function Run-OptionalOdinIntegrationContractTests {
       $generalEditorUtilsOdinVersionDefines.Count -eq 0 -and
       $odinEditorUtilsHasOdinConstraint -and
       $odinEditorUtilsHasUnityTestsConstraint -and
-      $odinEditorUtilsTestKeepsSingletonBaseCoverage
+      $odinEditorUtilsTestKeepsSingletonBaseCoverage -and
+      $odinEditorUtilsValidationAllowsAbsentOptionalAsmdef
     ) `
-    -Message "General utils Sirenix references: $($generalEditorUtilsSirenixPrecompiledReferences -join ', '); general utils Odin versionDefines: $($generalEditorUtilsOdinVersionDefines -join ', '); Odin utils constraints: $($odinEditorUtilsDefineConstraints -join ', '); Odin singleton coverage present: $odinEditorUtilsTestKeepsSingletonBaseCoverage"
+    -Message "General utils Sirenix references: $($generalEditorUtilsSirenixPrecompiledReferences -join ', '); general utils Odin versionDefines: $($generalEditorUtilsOdinVersionDefines -join ', '); Odin utils constraints: $($odinEditorUtilsDefineConstraints -join ', '); Odin singleton coverage present: $odinEditorUtilsTestKeepsSingletonBaseCoverage; optional asmdef validation present: $odinEditorUtilsValidationAllowsAbsentOptionalAsmdef"
 
   $runtimeAsmdefPath = Join-Path $repoRoot 'Runtime/WallstopStudios.UnityHelpers.asmdef'
   $runtimeAsmdef = Get-Content -Path $runtimeAsmdefPath -Raw | ConvertFrom-Json

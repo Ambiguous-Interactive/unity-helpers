@@ -39,6 +39,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             "Editor/AssemblyInfo.cs",
         };
 
+        private const string UnityIncludeTestsDefine = "UNITY_INCLUDE_TESTS";
+
         /// <summary>
         /// Verifies all production assemblies can be loaded.
         /// </summary>
@@ -96,19 +98,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<string> failedAssemblies = new();
             List<string> skippedAssemblies = new();
 
-            foreach (string assemblyName in DiscoverTestAssemblyNames())
+            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
             {
+                string assemblyName = asmdef.AssemblyName;
                 try
                 {
                     Assembly assembly = GetLoadedAssembly(assemblyName);
                     if (assembly == null)
                     {
-                        // Some test assemblies may not be compiled if their dependencies are not present
-                        // (e.g., VContainer, Zenject, Reflex integrations)
-                        if (IsOptionalIntegrationAssembly(assemblyName))
+                        if (asmdef.IsOptionalWhenUnloaded)
                         {
                             skippedAssemblies.Add(
-                                $"{assemblyName}: Optional integration assembly not compiled (expected)"
+                                $"{assemblyName}: Optional test assembly not compiled because one or more define constraints are absent"
                             );
                         }
                         else
@@ -297,10 +298,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             // Check that each test assembly has an InternalsVisibleTo entry in at least one AssemblyInfo
-            foreach (string testAssemblyName in DiscoverTestAssemblyNames())
+            foreach (TestAsmdefDescriptor testAsmdef in DiscoverTestAsmdefs())
             {
+                string testAssemblyName = testAsmdef.AssemblyName;
                 // Skip assemblies that are optional integrations
-                if (IsOptionalIntegrationAssembly(testAssemblyName))
+                if (testAsmdef.IsOptionalWhenUnloaded)
                 {
                     // Optional integrations should still have entries in case they are compiled
                     // Check if they have entries but don't fail if missing
@@ -408,6 +410,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 {
                     string asmdefContent = File.ReadAllText(asmdefPath);
                     string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
+                    string[] defineConstraints = ExtractDefineConstraintsFromAsmdef(asmdefContent);
 
                     if (string.IsNullOrEmpty(assemblyName))
                     {
@@ -418,9 +421,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     Assembly assembly = GetLoadedAssembly(assemblyName);
                     if (assembly == null)
                     {
-                        if (IsOptionalIntegrationAssembly(assemblyName))
+                        if (ShouldSkipWhenUnloaded(defineConstraints))
                         {
-                            // Expected for optional integrations
+                            // Expected when an optional dependency or target define is absent.
                             continue;
                         }
 
@@ -896,16 +899,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             List<string> names = new();
 
+            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
+            {
+                names.Add(asmdef.AssemblyName);
+            }
+
+            return names;
+        }
+
+        private static List<TestAsmdefDescriptor> DiscoverTestAsmdefs()
+        {
+            List<TestAsmdefDescriptor> descriptors = new();
+
             string packagePath = GetPackagePath();
             if (string.IsNullOrEmpty(packagePath))
             {
-                return names;
+                return descriptors;
             }
 
             string testsPath = Path.Combine(packagePath, "Tests");
             if (!Directory.Exists(testsPath))
             {
-                return names;
+                return descriptors;
             }
 
             string[] asmdefFiles = Directory.GetFiles(
@@ -920,11 +935,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
                 if (!string.IsNullOrEmpty(assemblyName))
                 {
-                    names.Add(assemblyName);
+                    descriptors.Add(
+                        new TestAsmdefDescriptor(
+                            assemblyName,
+                            ExtractDefineConstraintsFromAsmdef(asmdefContent)
+                        )
+                    );
                 }
             }
 
-            return names;
+            return descriptors;
         }
 
         private static Assembly GetLoadedAssembly(string assemblyName)
@@ -941,11 +961,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return null;
         }
 
-        private static bool IsOptionalIntegrationAssembly(string assemblyName)
+        private static bool ShouldSkipWhenUnloaded(IReadOnlyList<string> defineConstraints)
         {
-            return assemblyName.Contains(".Reflex")
-                || assemblyName.Contains(".VContainer")
-                || assemblyName.Contains(".Zenject");
+            foreach (string defineConstraint in defineConstraints)
+            {
+                if (string.IsNullOrWhiteSpace(defineConstraint))
+                {
+                    continue;
+                }
+
+                if (defineConstraint.Trim() == UnityIncludeTestsDefine)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private static HashSet<string> ParseInternalsVisibleToEntries(string content)
@@ -995,6 +1028,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return ExtractJsonStringValue(content, "rootNamespace");
         }
 
+        private static string[] ExtractDefineConstraintsFromAsmdef(string content)
+        {
+            return ExtractJsonStringArrayValue(content, "defineConstraints");
+        }
+
         private static string ExtractJsonStringValue(string content, string key)
         {
             string[] lines = content.Split('\n');
@@ -1030,6 +1068,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             return null;
+        }
+
+        private static string[] ExtractJsonStringArrayValue(string content, string key)
+        {
+            string quotedKey = "\"" + key + "\"";
+            int keyIndex = content.IndexOf(quotedKey, StringComparison.Ordinal);
+            if (keyIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int colonIndex = content.IndexOf(':', keyIndex + quotedKey.Length);
+            if (colonIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int arrayStartIndex = content.IndexOf('[', colonIndex + 1);
+            if (arrayStartIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int arrayEndIndex = content.IndexOf(']', arrayStartIndex + 1);
+            if (arrayEndIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            string arrayContent = content.Substring(
+                arrayStartIndex + 1,
+                arrayEndIndex - arrayStartIndex - 1
+            );
+            List<string> values = new();
+            int searchStart = 0;
+            while (searchStart < arrayContent.Length)
+            {
+                int startQuote = arrayContent.IndexOf('"', searchStart);
+                if (startQuote < 0)
+                {
+                    break;
+                }
+
+                int endQuote = arrayContent.IndexOf('"', startQuote + 1);
+                if (endQuote < 0)
+                {
+                    break;
+                }
+
+                values.Add(arrayContent.Substring(startQuote + 1, endQuote - startQuote - 1));
+                searchStart = endQuote + 1;
+            }
+
+            return values.ToArray();
         }
 
         private static string GetPackagePath()
@@ -1113,6 +1205,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         private static string GetScriptFilePath([CallerFilePath] string path = "") => path;
+
+        private sealed class TestAsmdefDescriptor
+        {
+            public TestAsmdefDescriptor(string assemblyName, string[] defineConstraints)
+            {
+                AssemblyName = assemblyName;
+                DefineConstraints = defineConstraints;
+            }
+
+            public string AssemblyName { get; }
+
+            public string[] DefineConstraints { get; }
+
+            public bool IsOptionalWhenUnloaded => ShouldSkipWhenUnloaded(DefineConstraints);
+        }
     }
 
     /// <summary>

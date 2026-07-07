@@ -26,6 +26,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Tags")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Tools")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Utils")]
+[assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Validation")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.VContainer")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.WButton")]
