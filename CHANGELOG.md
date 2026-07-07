@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-07-07
+
 ### Added
 
 - **Asset change detection loop reset utility**: Added `AssetChangeDetectionUtility.ResetLoopProtection()` so editor tooling can resume `[DetectAssetChanged]` dispatch after a recursive callback has tripped loop protection, without requiring a domain reload.

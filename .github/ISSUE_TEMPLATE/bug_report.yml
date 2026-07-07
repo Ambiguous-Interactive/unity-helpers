@@ -82,6 +82,7 @@ body:
       description: Which version of Unity Helpers are you using?
       options:
         # <!-- AUTO-UPDATED: package-versions -->
+        - "3.5.0"
         - "3.4.0"
         - "3.3.0"
         - "3.2.1"
@@ -110,7 +111,6 @@ body:
         - "2.0.3"
         - "2.0.1"
         - "2.0.0"
-        - "1.0.1"
         - "Other"
         # <!-- END AUTO-UPDATED: package-versions -->
     validations:

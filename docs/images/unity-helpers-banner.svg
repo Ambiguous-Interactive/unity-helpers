@@ -152,7 +152,7 @@
     <rect x="0" y="0" width="62" height="22" rx="11" ry="11" fill="#e94560" opacity="0.95"/>
     <text x="31" y="15" text-anchor="middle"
           font-family="'SF Mono', 'Fira Code', 'Consolas', monospace"
-          font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.5">v3.4.0</text>
+          font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.5">v3.5.0</text>
   </g>
 
   <!-- ============================================================== -->
