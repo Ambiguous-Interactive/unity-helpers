@@ -177,7 +177,7 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
         test-mode:
@@ -309,6 +309,7 @@ jobs:
           retention-days: 90
 
       - name: Acquire organization Unity lock
+        id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
         with:
@@ -375,14 +376,14 @@ jobs:
             -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}'
 
       - name: Return Unity license
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds

@@ -40,6 +40,7 @@ function Test-RunnerBootstrapPassesMaintenanceForce {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
 $benchmarksWorkflowPath = Join-Path $repoRoot '.github/workflows/unity-benchmarks.yml'
+$releaseWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
 $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.yml'
 $actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
 $runnerRunbookPath = Join-Path $repoRoot 'docs/runbooks/unity-runners-after-transfer.md'
@@ -57,6 +58,10 @@ if (-not (Test-Path -LiteralPath $workflowPath)) {
 }
 if (-not (Test-Path -LiteralPath $benchmarksWorkflowPath)) {
     Write-Host "::error::Unity benchmarks workflow not found: $benchmarksWorkflowPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $releaseWorkflowPath)) {
+    Write-Host "::error::Release workflow not found: $releaseWorkflowPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $runnerBootstrapPath)) {
@@ -230,9 +235,63 @@ function Get-WorkflowJobTexts {
     return $texts
 }
 
+function Test-UnityLockCleanupIsGated {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Jobs,
+        [Parameter(Mandatory = $true)][string]$WorkflowFile
+    )
+
+    $acquireUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1'
+    $releaseUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1'
+    $returnUses = './.github/actions/return-unity-license'
+    $requiredGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
+
+    $acquirePattern = '(?ms)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:.*?\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses)
+    $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+' + [regex]::Escape($requiredGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($returnUses)
+    $releasePattern = '(?ms)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses)
+    $failures = @()
+
+    foreach ($job in $Jobs.GetEnumerator()) {
+        $jobText = [string]$job.Value
+        $usesUnityLock = (
+            $jobText.Contains($acquireUses) -or
+            $jobText.Contains($releaseUses) -or
+            $jobText.Contains($returnUses)
+        )
+        if (-not $usesUnityLock) {
+            continue
+        }
+
+        $acquireIndex = $jobText.IndexOf('- name: Acquire organization Unity lock', [StringComparison]::Ordinal)
+        $returnIndex = $jobText.IndexOf('- name: Return Unity license', [StringComparison]::Ordinal)
+        $releaseIndex = $jobText.IndexOf('- name: Release organization Unity lock', [StringComparison]::Ordinal)
+
+        if ($jobText -notmatch $acquirePattern) {
+            $failures += "$($job.Key): acquire step must have id unity_lock before uses"
+        }
+        if ($jobText -notmatch $returnPattern) {
+            $failures += "$($job.Key): return-unity-license must be gated on successful unity_lock acquisition"
+        }
+        if ($jobText -notmatch $releasePattern) {
+            $failures += "$($job.Key): release-build-lock must be gated on successful unity_lock acquisition"
+        }
+        if (-not (0 -le $acquireIndex -and $acquireIndex -lt $returnIndex -and $returnIndex -lt $releaseIndex)) {
+            $failures += "$($job.Key): lock cleanup order must be acquire, return Unity license, then release lock"
+        }
+    }
+
+    if ($failures.Count -gt 0) {
+        Write-Host "::error file=$WorkflowFile::Unity lock cleanup contract failed: $($failures -join '; ')"
+        return $false
+    }
+
+    return $true
+}
+
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
 [string[]]$benchmarksWorkflowLines = Get-Content -LiteralPath $benchmarksWorkflowPath
+[string[]]$releaseWorkflowLines = Get-Content -LiteralPath $releaseWorkflowPath
 [string[]]$runnerBootstrapLines = Get-Content -LiteralPath $runnerBootstrapPath
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
 [string]$actionlintContent = Get-Content -LiteralPath $actionlintPath -Raw
@@ -253,6 +312,7 @@ $integrationPackagesConfig = Get-Content -LiteralPath $integrationPackagesPath -
 [bool]$insideJobs = $false
 $jobTexts = Get-WorkflowJobTexts -WorkflowLines $lines
 $benchmarksJobTexts = Get-WorkflowJobTexts -WorkflowLines $benchmarksWorkflowLines
+$releaseJobTexts = Get-WorkflowJobTexts -WorkflowLines $releaseWorkflowLines
 $runnerBootstrapJobTexts = Get-WorkflowJobTexts -WorkflowLines $runnerBootstrapLines
 
 $maintenanceTokens = $null
@@ -1751,6 +1811,34 @@ if (-not $hasPrCancelConcurrency) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity Tests pull_request concurrency cancellation contract."
+}
+
+$unityMatrixParallelismUsesRunnerSlots = (
+    $jobTexts.ContainsKey('unity-tests') -and
+    $jobTexts.ContainsKey('unity-tests-standalone') -and
+    $jobTexts.ContainsKey('unity-tests-single-threaded') -and
+    $benchmarksJobTexts.ContainsKey('benchmarks') -and
+    $jobTexts['unity-tests'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
+    $jobTexts['unity-tests-standalone'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
+    $jobTexts['unity-tests-single-threaded'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
+    $benchmarksJobTexts['benchmarks'] -match '(?m)^\s+max-parallel:\s*2\s*$'
+)
+if (-not $unityMatrixParallelismUsesRunnerSlots) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity self-hosted matrix jobs must use max-parallel: 2 so CI actually uses the two available Unity runner queue slots. Keep .github/workflows/unity-benchmarks.yml in sync."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity matrix jobs use the two available self-hosted runner slots."
+}
+
+$unityLockCleanupIsGated = (
+    (Test-UnityLockCleanupIsGated -Jobs $jobTexts -WorkflowFile '.github/workflows/unity-tests.yml') -and
+    (Test-UnityLockCleanupIsGated -Jobs $benchmarksJobTexts -WorkflowFile '.github/workflows/unity-benchmarks.yml') -and
+    (Test-UnityLockCleanupIsGated -Jobs $releaseJobTexts -WorkflowFile '.github/workflows/release.yml')
+)
+if (-not $unityLockCleanupIsGated) {
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity lock cleanup runs only after acquisition and before release."
 }
 
 $slowReportBudgetCount = ([regex]::Matches($workflowContent, [regex]::Escape('-FixtureBudgetSeconds 120'))).Count

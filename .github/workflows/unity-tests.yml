@@ -294,9 +294,9 @@ jobs:
       # Default false keeps the full matrix running so cross-version
       # compatibility stays visible on a red run. workflow_dispatch can flip
       # abort-on-first-failure to stop at the first failing leg for fast
-      # iteration (with max-parallel:1 that means "stop launching further legs").
+      # iteration (with max-parallel:2 that means "stop launching further legs").
       fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         # Ordered fast-tier include from matrix-config: editmode then playmode,
         # version-minor. matrix.unity-version / matrix.test-mode come from each
@@ -460,6 +460,7 @@ jobs:
           retention-days: 14
 
       - name: Acquire organization Unity lock
+        id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
         with:
@@ -520,14 +521,14 @@ jobs:
           }
 
       - name: Return Unity license
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
@@ -612,7 +613,7 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         # Standalone-tier include from matrix-config (empty -> this job is skipped
         # by the if-guard above -- single-mode dispatch pins run in the fast tier).
@@ -775,6 +776,7 @@ jobs:
           retention-days: 14
 
       - name: Acquire organization Unity lock
+        id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
         with:
@@ -835,14 +837,14 @@ jobs:
           }
 
       - name: Return Unity license
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
@@ -940,7 +942,7 @@ jobs:
       # See the unity-tests job: default false for full visibility;
       # workflow_dispatch can opt into abort-on-first-failure.
       fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode
         # only -- both are fast in-editor runs; the SINGLE_THREADED path does not need
@@ -1076,6 +1078,7 @@ jobs:
           retention-days: 14
 
       - name: Acquire organization Unity lock
+        id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
         with:
@@ -1131,14 +1134,14 @@ jobs:
           }
 
       - name: Return Unity license
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
@@ -1219,6 +1222,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Acquire organization Unity lock
+        id: unity_lock
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
@@ -1245,14 +1249,14 @@ jobs:
             --output "${output}"
 
       - name: Return Unity license
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: always()
+        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
