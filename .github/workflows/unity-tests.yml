@@ -317,7 +317,30 @@ jobs:
           lfs: true
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      # Single source of truth for the assembly include list: the same
+      # asmdef-discovery.js module the local discovery uses. Extracted into a
+      # composite action so all Unity workflows share one implementation.
+      # Uses Windows PowerShell inside the composite so empty legs can be skipped
+      # before runner maintenance installs or repairs PowerShell 7 / Unity.
+      - name: Compute test assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          target: "${{ matrix.test-mode }}"
+          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
+          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
+          # alongside core on EVERY version x mode leg. The matching run step passes
+          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
+          # manifest; without that the integration assemblies would not compile.
+          include-integrations: "true"
+
       - name: Maintain Unity editor on selected runner
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -363,6 +386,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub at
         # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
@@ -373,6 +397,7 @@ jobs:
           matrix-note: "default (organization lock wraps the Unity section)"
 
       - name: Cache Unity Library and package caches
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: actions/cache@v6
         env:
           PACKAGE_HASH: >-
@@ -400,28 +425,8 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22.18.0"
-
-      # Single source of truth for the assembly include list: the same
-      # asmdef-discovery.js module the local discovery uses. Extracted into a
-      # composite action so all Unity workflows share one implementation.
-      # shell: pwsh is enforced inside the composite.
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
-          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
-          # alongside core on EVERY version x mode leg. The matching run step passes
-          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
-          # manifest; without that the integration assemblies would not compile.
-          include-integrations: "true"
-
       - name: Validate Unity license secrets
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -470,7 +475,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -537,7 +542,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -641,7 +646,30 @@ jobs:
           lfs: true
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      # Single source of truth for the assembly include list: the same
+      # asmdef-discovery.js module the local discovery uses. Extracted into a
+      # composite action so all Unity workflows share one implementation.
+      # Uses Windows PowerShell inside the composite so empty legs can be skipped
+      # before runner maintenance installs or repairs PowerShell 7 / Unity.
+      - name: Compute test assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          target: "${{ matrix.test-mode }}"
+          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
+          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
+          # alongside core on EVERY version x mode leg. The matching run step passes
+          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
+          # manifest; without that the integration assemblies would not compile.
+          include-integrations: "true"
+
       - name: Maintain Unity editor on selected runner
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -687,6 +715,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub at
         # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
@@ -697,6 +726,7 @@ jobs:
           matrix-note: "gated standalone (organization lock wraps the Unity section)"
 
       - name: Cache Unity Library and package caches
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: actions/cache@v6
         env:
           PACKAGE_HASH: >-
@@ -724,28 +754,8 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22.18.0"
-
-      # Single source of truth for the assembly include list: the same
-      # asmdef-discovery.js module the local discovery uses. Extracted into a
-      # composite action so all Unity workflows share one implementation.
-      # shell: pwsh is enforced inside the composite.
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
-          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
-          # alongside core on EVERY version x mode leg. The matching run step passes
-          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
-          # manifest; without that the integration assemblies would not compile.
-          include-integrations: "true"
-
       - name: Validate Unity license secrets
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -794,7 +804,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -861,7 +871,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -980,7 +990,20 @@ jobs:
           lfs: true
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.18.0"
+
+      - name: Compute test assembly list
+        id: compute
+        uses: ./.github/actions/compute-unity-assemblies
+        with:
+          target: "${{ matrix.test-mode }}"
+          runtime-only: "false"
+
       - name: Maintain Unity editor on selected runner
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -1022,6 +1045,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub and fail. Never
         # use plain `shell: bash` on self-hosted Windows runners.
@@ -1030,6 +1054,7 @@ jobs:
           matrix-note: "single-threaded (organization lock wraps the Unity section)"
 
       - name: Cache Unity Library and package caches
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: actions/cache@v6
         env:
           PACKAGE_HASH: >-
@@ -1056,19 +1081,8 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22.18.0"
-
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "false"
-
       - name: Validate Unity license secrets
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -1104,7 +1118,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1166,7 +1180,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1247,7 +1261,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
@@ -1281,7 +1295,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}

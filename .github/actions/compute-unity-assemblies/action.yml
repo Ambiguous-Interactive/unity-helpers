@@ -35,7 +35,7 @@ runs:
   steps:
     - name: Compute assembly list
       id: compute
-      shell: pwsh
+      shell: powershell
       run: |
         $parts = @()
         if ("${{ inputs.include-perf }}" -eq "true") { $parts += "includePerf: true" }

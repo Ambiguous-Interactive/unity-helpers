@@ -250,8 +250,8 @@ function Test-UnityLockCleanupIsGated {
         [Parameter(Mandatory = $true)][string]$WorkflowFile
     )
 
-    $acquireUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1'
-    $releaseUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1'
+    $acquireUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0'
+    $releaseUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0'
     $returnUses = './.github/actions/return-unity-license'
     $requiredGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
 
@@ -963,6 +963,51 @@ if (-not $unityWorkflowRunnerPreflightsUseStableMatcher) {
     Write-Info "Checked Unity workflow runner-preflight label matchers use the stable set-difference form."
 }
 
+function Get-UnityWorkflowStepText {
+    param(
+        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][string]$StepName
+    )
+
+    $stepIndex = $JobText.IndexOf("- name: $StepName")
+    if ($stepIndex -lt 0) {
+        return ''
+    }
+
+    $remainingJobText = $JobText.Substring($stepIndex + 1)
+    $nextStepMatch = [regex]::Match($remainingJobText, '(?m)^ {6}- name:\s+')
+    $stepEndIndex = if ($nextStepMatch.Success) {
+        $stepIndex + 1 + $nextStepMatch.Index
+    } else {
+        $JobText.Length
+    }
+
+    return $JobText.Substring($stepIndex, $stepEndIndex - $stepIndex)
+}
+
+function Test-UnityWorkflowStepHasEmptyAssemblyGate {
+    param(
+        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][string]$StepName
+    )
+
+    $stepText = Get-UnityWorkflowStepText -JobText $JobText -StepName $StepName
+    return $stepText -match 'if:\s*\$\{\{\s*steps\.compute\.outputs\.is-empty\s*!=\s*''true''\s*\}\}'
+}
+
+$computeUnityAssembliesActionPath = Join-Path $repoRoot '.github/actions/compute-unity-assemblies/action.yml'
+$computeUnityAssembliesActionContent = Get-Content -Path $computeUnityAssembliesActionPath -Raw
+$computeUnityAssembliesActionUsesBootstrapSafeShell = (
+    $computeUnityAssembliesActionContent -match '(?m)^\s*shell:\s*powershell\s*$' -and
+    -not ($computeUnityAssembliesActionContent -match '(?m)^\s*shell:\s*pwsh\s*$')
+)
+if (-not $computeUnityAssembliesActionUsesBootstrapSafeShell) {
+    Write-Host "::error file=.github/actions/compute-unity-assemblies/action.yml::The compute-unity-assemblies action must use Windows PowerShell, not pwsh, so Unity jobs can skip empty matrix legs before runner maintenance installs or repairs PowerShell 7."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked compute-unity-assemblies can run before runner maintenance bootstraps PowerShell 7."
+}
+
 function Test-UnityJobMaintainsSelectedRunner {
     param([Parameter(Mandatory = $true)][string]$JobText)
 
@@ -990,12 +1035,25 @@ function Test-UnityJobMaintainsSelectedRunner {
         $JobText.Contains('Select-Object -Unique') -and
         -not $JobText.Contains('Join-Path $env:LocalAppData ''Microsoft\WindowsApps\pwsh.exe''')
     )
+    $setupNodeAndAssemblyComputeRunBeforeMaintenance = (
+        $setupNodeIndex -ge 0 -and
+        $computeIndex -ge 0 -and
+        $setupNodeIndex -lt $computeIndex -and
+        $computeIndex -lt $maintenanceIndex
+    )
+    $unityExpensiveStepsSkipEmptyAssemblyLegs = (
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Maintain Unity editor on selected runner') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Print runner diagnostics') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Cache Unity Library and package caches') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Validate Unity license secrets') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Provision Unity Editor') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Acquire organization Unity lock') -and
+        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Run Unity Test Runner')
+    )
     $jobTimeoutCoversMaintenanceBudget = $JobText -match '(?m)^\s+timeout-minutes:\s*1200\s*$'
     $maintenanceStepEndCandidates = @(
         $runnerDiagnosticsIndex,
         $cacheIndex,
-        $setupNodeIndex,
-        $computeIndex,
         $licenseValidationIndex,
         $provisionIndex
     ) | Where-Object { $_ -gt $maintenanceIndex } | Sort-Object
@@ -1024,11 +1082,11 @@ function Test-UnityJobMaintainsSelectedRunner {
         $maintenanceIndex -ge 0 -and
         $provisionIndex -ge 0 -and
         $maintenanceIndex -lt $provisionIndex -and
+        $setupNodeAndAssemblyComputeRunBeforeMaintenance -and
+        $unityExpensiveStepsSkipEmptyAssemblyLegs -and
         ($firstPwshShellIndex -lt 0 -or $maintenanceIndex -lt $firstPwshShellIndex) -and
         ($runnerDiagnosticsIndex -lt 0 -or $maintenanceIndex -lt $runnerDiagnosticsIndex) -and
         ($cacheIndex -lt 0 -or $maintenanceIndex -lt $cacheIndex) -and
-        ($setupNodeIndex -lt 0 -or $maintenanceIndex -lt $setupNodeIndex) -and
-        ($computeIndex -lt 0 -or $maintenanceIndex -lt $computeIndex) -and
         ($licenseValidationIndex -lt 0 -or $maintenanceIndex -lt $licenseValidationIndex) -and
         $maintenanceUsesWindowsPowerShell -and
         $maintenancePublishesPowerShell7Path -and
@@ -1057,10 +1115,10 @@ $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
     (Test-UnityJobMaintainsSelectedRunner -JobText $benchmarksMatrixJob)
 )
 if (-not $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must run scripts/unity/maintain-windows-runner.ps1 inside each self-hosted Unity job before any pwsh-dependent setup and before Provision Unity Editor, using Windows PowerShell so missing PowerShell 7 can be bootstrapped on the exact selected runner. The maintenance step must publish the discovered PowerShell 7 directory through GITHUB_PATH for later steps and must not force Unity editor verification-only mode; CI maintenance is the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must compute the test assembly list before runner maintenance; skip maintenance, diagnostics, cache, license validation, provisioning, lock acquisition, and Unity test execution when the selected leg is empty; and still run scripts/unity/maintain-windows-runner.ps1 inside each non-empty self-hosted Unity job before Provision Unity Editor. Maintenance must use Windows PowerShell, publish the discovered PowerShell 7 directory through GITHUB_PATH, and remain the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity workflows maintain editors on the selected runner before pwsh-dependent setup and provisioning."
+    Write-Info "Checked Unity workflows skip empty legs before runner maintenance and maintain editors before provisioning."
 }
 
 $timeoutEventsPreserveReason = (
