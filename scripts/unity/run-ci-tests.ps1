@@ -384,6 +384,24 @@ function Clear-UnityPackageManagerRetryState {
     Write-Host "::endgroup::"
 }
 
+function Get-UnityCompilationCacheRepoRootComparison {
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        return [System.StringComparison]::OrdinalIgnoreCase
+    }
+
+    return [System.StringComparison]::Ordinal
+}
+
+function Test-UnityCompilationCacheRepoRootMatch {
+    param(
+        [AllowNull()][string]$PreviousRepoRoot,
+        [AllowNull()][string]$CurrentRepoRoot,
+        [System.StringComparison]$Comparison = (Get-UnityCompilationCacheRepoRootComparison)
+    )
+
+    return [string]::Equals($PreviousRepoRoot, $CurrentRepoRoot, $Comparison)
+}
+
 function Clear-StaleUnityCompilationCache {
     param(
         [Parameter(Mandatory = $true)][string]$Project,
@@ -409,7 +427,7 @@ function Clear-StaleUnityCompilationCache {
         }
     }
 
-    if ($previousRepoRoot -ceq $currentRepoRoot) {
+    if (Test-UnityCompilationCacheRepoRootMatch -PreviousRepoRoot $previousRepoRoot -CurrentRepoRoot $currentRepoRoot) {
         return
     }
 

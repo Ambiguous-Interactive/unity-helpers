@@ -598,6 +598,8 @@ if (-not $runnerMaintenanceHasNoDeadForceSurface) {
 
 $runCiTestsClearsStaleCompilationCache = (
     $runCiTestsContent.Contains('function Clear-StaleUnityCompilationCache') -and
+    $runCiTestsContent.Contains('function Test-UnityCompilationCacheRepoRootMatch') -and
+    $runCiTestsContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
     $runCiTestsContent.Contains('.unity-helpers-repo-root.txt') -and
     $runCiTestsContent.Contains('Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot') -and
     $runCiTestsContent.Contains("'Bee'") -and
@@ -614,7 +616,13 @@ if (-not $runCiTestsClearsStaleCompilationCache) {
 }
 
 try {
-    Import-RunCiTestsFunction -ScriptPath $runCiTestsPath -FunctionName 'Clear-StaleUnityCompilationCache'
+    foreach ($runCiTestsFunctionName in @(
+            'Get-UnityCompilationCacheRepoRootComparison',
+            'Test-UnityCompilationCacheRepoRootMatch',
+            'Clear-StaleUnityCompilationCache'
+        )) {
+        Import-RunCiTestsFunction -ScriptPath $runCiTestsPath -FunctionName $runCiTestsFunctionName
+    }
 } catch {
     Write-Host "::error file=scripts/unity/run-ci-tests.ps1::Could not import Clear-StaleUnityCompilationCache for behavioral tests: $($_.Exception.Message)"
     $failed = $true
@@ -702,6 +710,19 @@ function Test-UnityCompilationCacheBehavior {
     $fixtures = @()
     $matchingMarkerRoot = ''
     try {
+        if (-not (Test-UnityCompilationCacheRepoRootMatch `
+                    -PreviousRepoRoot 'C:\Actions\_work\UnityHelpers' `
+                    -CurrentRepoRoot 'c:\actions\_WORK\unityhelpers' `
+                    -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
+            return 'Windows-style casing-only repo-root marker drift must not invalidate compilation caches'
+        }
+        if (Test-UnityCompilationCacheRepoRootMatch `
+                -PreviousRepoRoot 'C:\Actions\_work\UnityHelpers' `
+                -CurrentRepoRoot 'D:\Actions\_work\UnityHelpers' `
+                -Comparison ([System.StringComparison]::OrdinalIgnoreCase)) {
+            return 'different repo roots must still invalidate compilation caches under the Windows comparison'
+        }
+
         $missingMarkerFixture = New-UnityCompilationCacheFixture
         $fixtures += $missingMarkerFixture
         $missingMarkerRepoRoot = Join-Path $missingMarkerFixture.Root 'repo'
@@ -987,9 +1008,16 @@ function Test-UnityJobMaintainsSelectedRunner {
         )
     }
     $maintenanceStepAllowsRepair = (
-        $maintenanceStepText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
+        $maintenanceStepText.Contains('scripts\unity\maintain-windows-runner.ps1') -and
         -not $maintenanceStepText.Contains('-RequireHealthyExisting') -and
         -not $maintenanceStepText.Contains('-RequireHealthyExistingEditors')
+    )
+    $maintenanceInvokesFunctionAfterDotSource = (
+        $maintenanceStepText.Contains('$maintenanceScript = Join-Path $env:GITHUB_WORKSPACE ''scripts\unity\maintain-windows-runner.ps1''') -and
+        $maintenanceStepText.Contains('. $maintenanceScript') -and
+        $maintenanceStepText.Contains('$maintenanceExitCode = Invoke-WindowsRunnerMaintenance') -and
+        $maintenanceStepText.Contains('if ($maintenanceExitCode -ne 0)') -and
+        -not ($maintenanceStepText -match '(?m)^\s+\.\\scripts\\unity\\maintain-windows-runner\.ps1\s*`')
     )
 
     return (
@@ -1006,7 +1034,7 @@ function Test-UnityJobMaintainsSelectedRunner {
         $maintenancePublishesPowerShell7Path -and
         $maintenancePrefersRealPowerShell7Install -and
         $jobTimeoutCoversMaintenanceBudget -and
-        $JobText.Contains('.\scripts\unity\maintain-windows-runner.ps1') -and
+        $maintenanceInvokesFunctionAfterDotSource -and
         $JobText.Contains('-UnityVersions ''${{ matrix.unity-version }}''') -and
         $JobText.Contains('-ProvisioningProfile $provisioningProfile') -and
         $maintenanceStepAllowsRepair -and

@@ -206,10 +206,18 @@ jobs:
           $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
           New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
           $provisioningProfile = 'EditorOnly'
-          .\scripts\unity\maintain-windows-runner.ps1 `
+          $maintenanceScript = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
+          if (-not (Test-Path -LiteralPath $maintenanceScript -PathType Leaf)) {
+            throw "Runner maintenance script not found: $maintenanceScript"
+          }
+          . $maintenanceScript
+          $maintenanceExitCode = Invoke-WindowsRunnerMaintenance `
             -UnityVersions '${{ matrix.unity-version }}' `
             -ProvisioningProfile $provisioningProfile `
             -DiagnosticsRoot $maintenanceDiagnosticsRoot
+          if ($maintenanceExitCode -ne 0) {
+            throw "Runner maintenance failed with exit code $maintenanceExitCode."
+          }
           $pwshCandidates = @(
             (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
             $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' })
