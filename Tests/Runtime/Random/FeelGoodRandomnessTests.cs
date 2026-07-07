@@ -242,6 +242,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.False(bag.TryRestoreRemaining(new[] { "common", "rare", "rare" }));
         }
 
+        [Test]
+        public void WeightedShuffleBagCopyMethodsRejectReadOnlyDestinations()
+        {
+            WeightedShuffleBag<string> bag = new();
+            Assert.True(bag.TryAdd("common", 2));
+            Assert.True(bag.TryAdd("rare", 1));
+            ReadOnlyCollection<string> destination = new();
+            bool copiedConfigured = true;
+            bool copiedRemaining = true;
+
+            Assert.DoesNotThrow(() =>
+                copiedConfigured = bag.TryCopyConfiguredTicketsTo(destination)
+            );
+            Assert.DoesNotThrow(() => copiedRemaining = bag.TryCopyRemainingTicketsTo(destination));
+            Assert.False(copiedConfigured);
+            Assert.False(copiedRemaining);
+            Assert.That(destination, Is.Empty);
+        }
+
         private static double EstimateExpectedAttempts(double coefficient)
         {
             double expectedAttempts = 0d;
@@ -298,6 +317,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 SequenceRandom copy = new(_values);
                 copy._index = _index;
                 return copy;
+            }
+        }
+
+        private sealed class ReadOnlyCollection<T> : ICollection<T>
+        {
+            public int Count => 0;
+
+            public bool IsReadOnly => true;
+
+            public void Add(T item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void Clear()
+            {
+                throw new NotSupportedException();
+            }
+
+            public bool Contains(T item)
+            {
+                return false;
+            }
+
+            public void CopyTo(T[] array, int arrayIndex) { }
+
+            public IEnumerator<T> GetEnumerator()
+            {
+                yield break;
+            }
+
+            public bool Remove(T item)
+            {
+                throw new NotSupportedException();
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
             }
         }
     }

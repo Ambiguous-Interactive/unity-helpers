@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private static bool TryCopyTicketsTo(IReadOnlyList<T> source, ICollection<T> destination)
         {
-            if (destination == null)
+            if (destination == null || destination.IsReadOnly)
             {
                 return false;
             }
