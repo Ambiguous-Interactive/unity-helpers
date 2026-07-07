@@ -119,6 +119,7 @@ function Import-EnsureEditorWatchdogFunctions {
     foreach ($name in @(
         'ConvertTo-ProcessArgumentLine',
         'Get-EnsureEditorRetryDelaySeconds',
+        'Get-EnsureEditorInstallTimeoutSeconds',
         'Get-EnsureEditorProgressStallSeconds',
         'Get-EnsureEditorProgressNoticeIntervalSeconds',
         'Get-EnsureEditorQuarantineMoveRetryAttempts',
@@ -133,7 +134,8 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-CliProgressTriple',
         'Get-LastCliProgressMessage',
         'Invoke-UnityCliCaptureWithTimeout',
-        'Move-UnityInstallDirectoryToQuarantine'
+        'Move-UnityInstallDirectoryToQuarantine',
+        'Get-UnityProvisioningProfile'
     )) {
         $functionAst = $ast.FindAll(
             {
@@ -148,6 +150,13 @@ function Import-EnsureEditorWatchdogFunctions {
 
         Invoke-Expression "function script:$name $($functionAst.Body.Extent.Text)"
     }
+}
+
+function Get-EnsureEditorInstallTimeoutForProfile {
+    param([Parameter(Mandatory = $true)][string]$Profile)
+
+    $script:UnityProvisioningProfile = $Profile
+    return Get-EnsureEditorInstallTimeoutSeconds
 }
 
 function Invoke-EnsureEditorWatchdogProbe {
@@ -1489,6 +1498,48 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $oldInstallTimeout = $env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS
+    $oldProvisioningProfileVariable = Get-Variable -Name UnityProvisioningProfile -Scope Script -ErrorAction SilentlyContinue
+    $oldProvisioningProfile = if ($oldProvisioningProfileVariable) { [string]$oldProvisioningProfileVariable.Value } else { $null }
+    try {
+        Remove-Item Env:\UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS -ErrorAction SilentlyContinue
+        $editorOnlyInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'EditorOnly'
+        $standaloneInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'StandaloneWindowsIl2Cpp'
+        $androidInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'Android'
+        $fullInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'Full'
+
+        $env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS = '13'
+        $overrideInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'StandaloneWindowsIl2Cpp'
+
+        $env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS = 'not-an-int'
+        $invalidOverrideInstallTimeout = Get-EnsureEditorInstallTimeoutForProfile -Profile 'StandaloneWindowsIl2Cpp' 6>$null
+    } finally {
+        if ($oldInstallTimeout) {
+            $env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS = $oldInstallTimeout
+        } else {
+            Remove-Item Env:\UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS -ErrorAction SilentlyContinue
+        }
+        if ($oldProvisioningProfile) {
+            $script:UnityProvisioningProfile = $oldProvisioningProfile
+        } else {
+            Remove-Variable -Name UnityProvisioningProfile -Scope Script -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (
+        $editorOnlyInstallTimeout -ne 2700 -or
+        $standaloneInstallTimeout -lt 7200 -or
+        $androidInstallTimeout -lt 7200 -or
+        $fullInstallTimeout -lt 7200 -or
+        $overrideInstallTimeout -ne 13 -or
+        $invalidOverrideInstallTimeout -lt 7200
+    ) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor install wall-clock timeout must stay profile-aware: EditorOnly keeps 2700s, heavy module profiles need at least 7200s for cold Unity 6000.5 module installs, UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS must remain authoritative, and invalid overrides must fall back to the profile-aware default. Observed EditorOnly=$editorOnlyInstallTimeout Standalone=$standaloneInstallTimeout Android=$androidInstallTimeout Full=$fullInstallTimeout Override=$overrideInstallTimeout InvalidOverride=$invalidOverrideInstallTimeout."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked ensure-editor install timeout is profile-aware for heavy Unity module installs."
+    }
+
     $repeatedProgressChild = @'
 1..20 | ForEach-Object {
     Write-Host '{"type":"progress","pct":50,"msg":"Installing Unity (6000.5.2f1)...","phase":"install"}'

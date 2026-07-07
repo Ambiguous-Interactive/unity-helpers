@@ -332,13 +332,16 @@ function Get-EnsureEditorInstallTimeoutSeconds {
     # it returns 0 and the runner waits indefinitely, matching the prior
     # behavior, for the rare case an operator must allow an unbounded install.
     #
-    # Default rationale (2700s = 45 minutes): a healthy full CI module install
-    # (Windows IL2CPP + WebGL + Android SDK/NDK/OpenJDK + Linux Mono/IL2CPP) on a
-    # warm self-hosted runner completes in well under this; 45 minutes comfortably
-    # exceeds a slow-but-progressing install yet stays well under the Unity job's
-    # wall-clock budget, so a genuine HANG is killed (and retried) long before the
-    # GitHub job would be cancelled. StrictMode-safe: no collection reads.
-    param([int]$Default = 2700)
+    # Default rationale (PROFILE-AWARE): EditorOnly keeps the historical 2700s
+    # (45 min) bound because it installs only the base editor. Heavy module
+    # profiles get 7200s (2h): Unity 6000.5.2f1 Windows IL2CPP alternate-root
+    # repair has emitted steady live progress for the full old 2700s window before
+    # completion, and killing that slow-but-live install cascades into a doomed
+    # quarantine of the locked canonical editor. 7200s still stays under the
+    # 9000s whole-provisioning budget and the 180-minute workflow provisioning
+    # step, but gives cold 6000.5 module installs enough room to complete.
+    # StrictMode-safe: no collection reads.
+    param([int]$Default = -1)
 
     if ($env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS) {
         $parsed = 0
@@ -348,9 +351,21 @@ function Get-EnsureEditorInstallTimeoutSeconds {
         ) {
             return $parsed
         }
-        Write-Host "::warning::Ignoring invalid UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS='$env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS'; using $Default second(s)."
+        $defaultDescription = if ($Default -ge 0) { "$Default second(s)" } else { 'the profile-aware default' }
+        Write-Host "::warning::Ignoring invalid UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS='$env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS'; using $defaultDescription."
     }
-    return $Default
+    if ($Default -ge 0) {
+        return $Default
+    }
+
+    $profile = 'Full'
+    if (Get-Command Get-UnityProvisioningProfile -ErrorAction SilentlyContinue) {
+        $profile = Get-UnityProvisioningProfile
+    }
+    if ($profile -eq 'EditorOnly') {
+        return 2700
+    }
+    return 7200
 }
 
 function Get-EnsureEditorProgressStallSeconds {
@@ -387,11 +402,11 @@ function Get-EnsureEditorProgressStallSeconds {
     #   * StandaloneWindowsIl2Cpp/Android/Full -> 1800s (30 min; heavier payload, and
     #                                          a false kill here cascades into the
     #                                          module step, the real-world failure)
-    # Both stay well under the 2700s (45 min) wall-clock fallback, so a GENUINE quiet
-    # hang is still surfaced before the job is cancelled, while a slow-but-real
-    # unpack with live output is no longer killed mid-flight. The env override
-    # remains authoritative and is honored verbatim (tests set it small to force the
-    # stall path; 0 opts out).
+    # Both stay well under the install wall-clock fallback for their profile, so
+    # a GENUINE quiet hang is still surfaced before the job is cancelled, while a
+    # slow-but-real unpack with live output is no longer killed mid-flight. The
+    # env override remains authoritative and is honored verbatim (tests set it
+    # small to force the stall path; 0 opts out).
     # StrictMode-safe: no collection reads.
     param([int]$Default = -1)
 
