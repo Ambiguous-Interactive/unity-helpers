@@ -801,8 +801,14 @@ function Get-UnityEditorCandidates {
     )
 
     $candidates = New-Object System.Collections.Generic.List[string]
-    $candidates.Add((Join-Path $Root "$Version\Editor\Unity.exe"))
-    $candidates.Add((Join-Path $Root "$Version\Unity.exe"))
+    $versionRoot = Join-Path $Root $Version
+    $candidates.Add((Join-Path (Join-Path $versionRoot 'Editor') 'Unity.exe'))
+    $candidates.Add((Join-Path $versionRoot 'Unity.exe'))
+
+    $alternateRoot = Get-UnityCiAlternateInstallRoot -InstallRoot $Root
+    $alternateVersionRoot = Join-Path $alternateRoot $Version
+    $candidates.Add((Join-Path (Join-Path $alternateVersionRoot 'Editor') 'Unity.exe'))
+    $candidates.Add((Join-Path $alternateVersionRoot 'Unity.exe'))
 
     if ($IncludeHostInstalls -and ${env:ProgramFiles} -and ${env:ProgramFiles}.Trim().Length -gt 0) {
         $candidates.Add((Join-Path ${env:ProgramFiles} "Unity\Hub\Editor\$Version\Editor\Unity.exe"))
@@ -815,6 +821,17 @@ function Get-UnityEditorCandidates {
     }
 
     return @($candidates.ToArray() | Where-Object { $_ -and $_.Trim().Length -gt 0 })
+}
+
+function Get-UnityCiAlternateInstallRoot {
+    param([Parameter(Mandatory = $true)][string]$InstallRoot)
+
+    $fullRoot = [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    if ((Split-Path -Leaf $fullRoot) -eq '_ci-managed-editors') {
+        return $fullRoot
+    }
+
+    return (Join-Path $fullRoot '_ci-managed-editors')
 }
 
 function Find-UnityEditor {
@@ -830,6 +847,29 @@ function Find-UnityEditor {
         }
     }
 
+    return $null
+}
+
+function Find-UnityCiAlternateEditorWithCiModules {
+    param(
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$InstallRoot,
+        [Parameter(Mandatory = $true)][string]$Profile
+    )
+
+    $alternateRoot = Get-UnityCiAlternateInstallRoot -InstallRoot $InstallRoot
+    $alternateEditor = Find-UnityEditor -Version $Version -Root $alternateRoot
+    if (-not $alternateEditor) {
+        return $null
+    }
+
+    $missing = @(Get-MissingUnityCiModuleGroups -EditorPath $alternateEditor -Profile $Profile)
+    if ($missing.Count -eq 0) {
+        Write-CiNotice "Using reusable alternate-root CI editor for Unity $Version with provisioning profile '$Profile': $alternateEditor"
+        return $alternateEditor
+    }
+
+    Write-CiNotice "Alternate-root CI editor for Unity $Version exists at '$alternateEditor' but is missing required module groups for provisioning profile '$Profile': $($missing -join ', ')."
     return $null
 }
 
@@ -4020,6 +4060,40 @@ function Test-TextIndicatesEditorNotModuleManageable {
         ($value -match '(?i)No modules found for this editor')
 }
 
+function Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor {
+    param(
+        [string]$Message,
+        [string]$InstallRoot = '',
+        [string]$Version = ''
+    )
+
+    $value = [string]$Message
+    if ($value.Trim().Length -eq 0) {
+        return $false
+    }
+
+    if (($value -match '(?i)already[-\s]?installed') -or
+        ($value -match '(?i)editor already installed') -or
+        ($value -match '(?i)is already installed') -or
+        ($value -match '(?i)still missing on disk after the atomic install') -or
+        ($value -match '(?i)required CI module groups .* still missing .* after the atomic install')) {
+        return $true
+    }
+
+    if ($value -notmatch '(?i)being used by another process|cannot access the file|file lock|locked') {
+        return $false
+    }
+
+    if (-not $InstallRoot -or -not $Version) {
+        return $false
+    }
+
+    $normalizedMessage = $value.Replace('/', '\')
+    $normalizedRoot = ([System.IO.Path]::GetFullPath($InstallRoot)).Replace('/', '\').TrimEnd('\')
+    $canonicalVersionRoot = "$normalizedRoot\$Version"
+    return ($normalizedMessage.IndexOf($canonicalVersionRoot, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
 function Test-UnityEditorModuleManageable {
     # Best-effort, NON-THROWING probe: is the editor at $Version in a state where the
     # Unity CLI's `install-modules` can ADD modules to it? Returns a StrictMode-safe
@@ -4061,6 +4135,70 @@ function Test-UnityEditorModuleManageable {
     }
 
     return @{ Manageable = $true; Reason = ''; Output = $lines }
+}
+
+function Install-UnityEditorWithCiModulesInAlternateRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$InstallRoot,
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [string]$Profile = $(Get-UnityProvisioningProfile),
+        [switch]$ManagedOnly
+    )
+
+    $alternateRoot = Get-UnityCiAlternateInstallRoot -InstallRoot $InstallRoot
+    if (-not (Test-IsPathInsideDirectory -Path $alternateRoot -Directory $InstallRoot)) {
+        throw "Refusing alternate-root Unity $Version repair because the alternate install root '$alternateRoot' is outside the managed install root '$InstallRoot'."
+    }
+
+    return Invoke-WithUnityInstallLock -Version $Version -InstallRoot $InstallRoot -Action {
+        Assert-UnityProvisioningBudgetCanFit -Operation "alternate-root Unity $Version managed install" -MinimumSeconds 60
+        $previousRoot = $null
+        try {
+            $previousRoot = Get-UnityCliInstallRoot
+        } catch {
+            Write-CiNotice "Could not query the current Unity CLI install root before alternate-root repair: $($_.Exception.Message)"
+        }
+
+        try {
+            New-Item -ItemType Directory -Force -Path $alternateRoot | Out-Null
+            $existingAlternate = Find-UnityEditor -Version $Version -Root $alternateRoot
+            if ($existingAlternate) {
+                $existingAlternateMissing = @(Get-MissingUnityCiModuleGroups -EditorPath $existingAlternate -Profile $Profile)
+                if ($existingAlternateMissing.Count -eq 0) {
+                    Write-CiNotice "Using already repaired alternate-root CI editor for Unity $Version with provisioning profile '$Profile': $existingAlternate"
+                    return $existingAlternate
+                }
+
+                Write-Host "::warning::Quarantining partial alternate-root Unity $Version editor before retrying alternate-root repair: $existingAlternate (missing: $($existingAlternateMissing -join ', '))."
+                Move-UnityVersionInstallToQuarantine -Version $Version -InstallRoot $alternateRoot
+            }
+
+            Write-Host "::warning::Installing Unity $Version into alternate CI-managed root '$alternateRoot' because the existing editor tree could not be repaired in place. Reason: $Reason"
+            Set-UnityCliInstallPath -Root $alternateRoot
+            Confirm-UnityCliManagedInstallRoot -Root $alternateRoot | Out-Null
+
+            $resolved = Install-UnityEditorWithCiModules -Version $Version -InstallRoot $alternateRoot -Reason "alternate-root repair after existing editor repair was blocked: $Reason" -Profile $Profile -ManagedOnly:$true
+            $missing = @(Get-MissingUnityCiModuleGroups -EditorPath $resolved -Profile $Profile)
+            if ($missing.Count -gt 0) {
+                throw "Alternate-root Unity $Version install completed at '$resolved', but required CI module groups for provisioning profile '$Profile' are still missing on disk: $($missing -join ', ')."
+            }
+            if ($ManagedOnly -and -not (Test-IsPathInsideDirectory -Path $resolved -Directory $InstallRoot)) {
+                throw "Alternate-root Unity $Version install resolved outside the managed install root '$InstallRoot': $resolved"
+            }
+
+            $script:ProvisioningEditorPath = $resolved
+            Write-CiNotice "Unity $Version alternate-root repair succeeded: $resolved"
+            return $resolved
+        } finally {
+            $restoreRoot = if ($previousRoot) { $previousRoot } else { $InstallRoot }
+            try {
+                Set-UnityCliInstallPath -Root $restoreRoot
+            } catch {
+                Write-Host "::warning::Could not restore Unity CLI install path to '$restoreRoot' after alternate-root repair: $($_.Exception.Message)"
+            }
+        }
+    }
 }
 
 function Install-UnityEditorModulesViaAtomicReinstall {
@@ -4105,14 +4243,30 @@ function Install-UnityEditorModulesViaAtomicReinstall {
             if ($env:UH_UNITY_DISABLE_EDITOR_REPAIR -eq '1') {
                 throw
             }
-            # The atomic in-place install could not deliver the modules (e.g. the CLI
-            # could not overlay the existing tree). Fall back to the heavier
-            # quarantine+reinstall, which moves the version dir aside first. HONEST
-            # CAVEAT: if a cross-identity process holds a hard lock on the tree, that
-            # quarantine can still fail -- Move-UnityInstallDirectoryToQuarantine emits
-            # a wrap-immune ::error:: naming the residual as runner-side.
-            Write-Host "::warning::Atomic in-place reinstall for Unity $Version did not deliver the required modules ($inPlaceMessage); falling back to quarantine + reinstall."
-            return Repair-UnityEditorWithCiModules -Version $Version -EditorPath $EditorPath -InstallRoot $InstallRoot -Reason "atomic in-place reinstall did not deliver required modules ($inPlaceMessage)" -Profile $Profile -ManagedOnly:$ManagedOnly
+            $alternateFailureMessage = ''
+            if (Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message $inPlaceMessage -InstallRoot $InstallRoot -Version $Version) {
+                try {
+                    Write-Host "::warning::Atomic in-place reinstall for Unity $Version did not deliver the required modules ($inPlaceMessage); trying an alternate CI-managed install root before touching the locked editor tree."
+                    return Install-UnityEditorWithCiModulesInAlternateRoot -Version $Version -InstallRoot $InstallRoot -Reason "atomic in-place reinstall was pinned to the existing editor tree ($inPlaceMessage)" -Profile $Profile -ManagedOnly:$ManagedOnly
+                } catch {
+                    $alternateFailureMessage = $_.Exception.Message
+                    Write-Host "::warning::Alternate-root repair for Unity $Version also failed ($alternateFailureMessage); falling back to quarantine + reinstall."
+                }
+            } else {
+                Write-Host "::warning::Atomic in-place reinstall for Unity $Version failed for a reason that does not look pinned to the existing editor tree ($inPlaceMessage); falling back to quarantine + reinstall."
+            }
+
+            # The atomic in-place install and alternate-root install could not deliver
+            # the modules. Fall back to the heavier quarantine+reinstall, which moves
+            # the version dir aside first. HONEST CAVEAT: if a cross-identity process
+            # holds a hard lock on the tree, that quarantine can still fail --
+            # Move-UnityInstallDirectoryToQuarantine emits a wrap-immune ::error::
+            # naming the residual as runner-side.
+            $fallbackReason = "atomic in-place reinstall did not deliver required modules ($inPlaceMessage)"
+            if ($alternateFailureMessage) {
+                $fallbackReason += "; alternate-root repair also failed ($alternateFailureMessage)"
+            }
+            return Repair-UnityEditorWithCiModules -Version $Version -EditorPath $EditorPath -InstallRoot $InstallRoot -Reason $fallbackReason -Profile $Profile -ManagedOnly:$ManagedOnly
         }
     }
 }
@@ -4168,6 +4322,13 @@ function Ensure-UnityCiModules {
     if ($missing.Count -eq 0) {
         Write-CiNotice "All required Unity CI module groups for provisioning profile '$Profile' already present on disk for Unity $Version; nothing to install."
         return $EditorPath
+    }
+
+    if ($InstallRoot) {
+        $alternateEditor = Find-UnityCiAlternateEditorWithCiModules -Version $Version -InstallRoot $InstallRoot -Profile $Profile
+        if ($alternateEditor) {
+            return $alternateEditor
+        }
     }
 
     # Step 1b (ROOT-CAUSE SIDESTEP): modules ARE missing. Before driving the
@@ -4468,6 +4629,15 @@ if ($RequireHealthyExisting) {
 
     $script:ProvisioningEditorPath = $editor
     $missingModules = @(Get-MissingUnityCiModuleGroups -EditorPath $editor -Profile $ProvisioningProfile)
+    if ($missingModules.Count -gt 0) {
+        $alternateEditor = Find-UnityCiAlternateEditorWithCiModules -Version $UnityVersion -InstallRoot $InstallRoot -Profile $ProvisioningProfile
+        if ($alternateEditor) {
+            $editor = $alternateEditor
+            $script:ProvisioningEditorPath = $editor
+            $missingModules = @(Get-MissingUnityCiModuleGroups -EditorPath $editor -Profile $ProvisioningProfile)
+        }
+    }
+
     if ($missingModules.Count -gt 0) {
         Write-InstalledEditorDiagnostics -Version $UnityVersion -Root $InstallRoot -Reason "RequireHealthyExisting was set and required module groups are missing: $($missingModules -join ', ')."
         throw "Unity $UnityVersion is missing required CI module groups for provisioning profile '$ProvisioningProfile': $($missingModules -join ', '). CI test jobs fail fast instead of installing modules in-job; run scripts/unity/maintain-windows-runner.ps1 or dispatch .github/workflows/runner-bootstrap.yml to repair this editor."

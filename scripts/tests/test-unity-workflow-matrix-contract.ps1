@@ -119,6 +119,11 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-EnsureEditorQuarantineMoveRetryAttempts',
         'Invoke-WithRetry',
         'Test-IsPathInsideDirectory',
+        'Get-UnityCiAlternateInstallRoot',
+        'Get-UnityEditorCandidates',
+        'Find-UnityEditor',
+        'Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor',
+        'Install-UnityEditorModulesViaAtomicReinstall',
         'Get-CollapsedCliOutputTail',
         'Get-CliProgressTriple',
         'Get-LastCliProgressMessage',
@@ -1002,10 +1007,17 @@ $ensureModulesCommands = if ($ensureModulesFunctionAst) {
 $atomicInPlaceInstallIndex = Get-CommandIndex `
     -Commands $installAtomicCommands `
     -Name 'Install-UnityEditorWithCiModules'
+$alternateRootFallbackIndex = Get-CommandIndex `
+    -Commands $installAtomicCommands `
+    -Name 'Install-UnityEditorWithCiModulesInAlternateRoot' `
+    -StartIndex ($atomicInPlaceInstallIndex + 1)
 $quarantineFallbackIndex = Get-CommandIndex `
     -Commands $installAtomicCommands `
     -Name 'Repair-UnityEditorWithCiModules' `
-    -StartIndex ($atomicInPlaceInstallIndex + 1)
+    -StartIndex ($alternateRootFallbackIndex + 1)
+$alternateEditorReuseIndex = Get-CommandIndex `
+    -Commands $ensureModulesCommands `
+    -Name 'Find-UnityCiAlternateEditorWithCiModules'
 $moduleManageabilityProbeIndex = Get-CommandIndex `
     -Commands $ensureModulesCommands `
     -Name 'Test-UnityEditorModuleManageable'
@@ -1019,17 +1031,20 @@ $coreModuleRepairIndex = Get-CommandIndex `
 $ensureEditorPrefersAtomicModuleRepair = (
     $installAtomicFunctionAst -and
     $ensureModulesFunctionAst -and
+    $alternateEditorReuseIndex -ge 0 -and
     $moduleManageabilityProbeIndex -ge 0 -and
+    $alternateEditorReuseIndex -lt $moduleManageabilityProbeIndex -and
     $atomicRouteIndex -gt $moduleManageabilityProbeIndex -and
     ($coreModuleRepairIndex -lt 0 -or $coreModuleRepairIndex -gt $atomicRouteIndex) -and
     $atomicInPlaceInstallIndex -ge 0 -and
-    $quarantineFallbackIndex -gt $atomicInPlaceInstallIndex
+    $alternateRootFallbackIndex -gt $atomicInPlaceInstallIndex -and
+    $quarantineFallbackIndex -gt $alternateRootFallbackIndex
 )
 if (-not $ensureEditorPrefersAtomicModuleRepair) {
-    Write-Host "::error file=scripts/unity/ensure-editor.ps1::When an existing Unity editor is missing required CI modules and Unity CLI reports it is not module-manageable, ensure-editor.ps1 must try the atomic in-place 'install -m' repair before any quarantine fallback. This avoids making a locked editor directory the first repair step for 6000.5 standalone runners."
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::When an existing Unity editor is missing required CI modules and Unity CLI reports it is not module-manageable, ensure-editor.ps1 must first reuse a healthy alternate-root CI editor if present, then try the atomic in-place 'install -m' repair, then try an alternate-root atomic install, and only then fall back to quarantine. This avoids making a locked editor directory a hard prerequisite for 6000.5 standalone runners."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked ensure-editor prefers atomic in-place module repair before quarantine fallback."
+    Write-Info "Checked ensure-editor prefers healthy alternate-root reuse and alternate-root atomic repair before quarantine fallback."
 }
 
 $detectOnly = $true
@@ -1522,6 +1537,142 @@ exit 0
         if ($quarantineRetryRoot -and (Test-Path -LiteralPath $quarantineRetryRoot -PathType Container)) {
             Remove-Item -LiteralPath $quarantineRetryRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    $atomicFlowRoot = ''
+    try {
+        $atomicFlowRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-atomic-flow-$PID-$(Get-Random)"
+        $atomicFlowVersion = '6000.5.2f1'
+        $script:atomicFlowCalls = New-Object System.Collections.Generic.List[string]
+
+        function script:Write-CiNotice {
+            param([string]$Message)
+        }
+
+        function script:Invoke-WithUnityInstallLock {
+            param(
+                [string]$Version,
+                [string]$InstallRoot,
+                [scriptblock]$Action,
+                [int]$TimeoutMinutes = 180
+            )
+
+            return & $Action
+        }
+
+        function script:Install-UnityEditorWithCiModules {
+            param(
+                [string]$Version,
+                [string]$InstallRoot,
+                [string]$Reason,
+                [string]$Profile,
+                [switch]$ManagedOnly
+            )
+
+            $script:atomicFlowCalls.Add('in-place') | Out-Null
+            throw "Unity $Version repair install completed at '$InstallRoot\$Version\Editor\Unity.exe', but required CI module groups for provisioning profile '$Profile' are still missing on disk after the atomic install: windows-il2cpp."
+        }
+
+        function script:Install-UnityEditorWithCiModulesInAlternateRoot {
+            param(
+                [string]$Version,
+                [string]$InstallRoot,
+                [string]$Reason,
+                [string]$Profile,
+                [switch]$ManagedOnly
+            )
+
+            $script:atomicFlowCalls.Add('alternate-root') | Out-Null
+            return (Join-Path (Join-Path (Join-Path (Join-Path $InstallRoot '_ci-managed-editors') $Version) 'Editor') 'Unity.exe')
+        }
+
+        function script:Repair-UnityEditorWithCiModules {
+            param(
+                [string]$Version,
+                [string]$EditorPath,
+                [string]$InstallRoot,
+                [string]$Reason,
+                [string]$Profile,
+                [switch]$ManagedOnly
+            )
+
+            $script:atomicFlowCalls.Add('quarantine') | Out-Null
+            throw 'quarantine must not run when alternate-root repair succeeds'
+        }
+
+        $expectedAlternateFlowEditor = Join-Path (Join-Path (Join-Path (Join-Path $atomicFlowRoot '_ci-managed-editors') $atomicFlowVersion) 'Editor') 'Unity.exe'
+        $resolvedAtomicFlowEditor = Install-UnityEditorModulesViaAtomicReinstall `
+            -Version $atomicFlowVersion `
+            -EditorPath (Join-Path (Join-Path (Join-Path $atomicFlowRoot $atomicFlowVersion) 'Editor') 'Unity.exe') `
+            -InstallRoot $atomicFlowRoot `
+            -Reason 'contract test' `
+            -Profile 'StandaloneWindowsIl2Cpp' `
+            -ManagedOnly `
+            6>$null
+        $atomicFlowCallText = @($script:atomicFlowCalls.ToArray()) -join ','
+        if ($resolvedAtomicFlowEditor -ne $expectedAlternateFlowEditor -or $atomicFlowCallText -ne 'in-place,alternate-root') {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Atomic module repair must try alternate-root repair after an existing-editor-pinned in-place failure and must not quarantine when alternate-root repair succeeds. Calls='$atomicFlowCallText' Resolved='$resolvedAtomicFlowEditor' Expected='$expectedAlternateFlowEditor'."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked atomic module repair uses alternate-root fallback without quarantine when it succeeds."
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Atomic module repair alternate-root flow regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        foreach ($functionName in @(
+                'Write-CiNotice',
+                'Invoke-WithUnityInstallLock',
+                'Install-UnityEditorWithCiModules',
+                'Install-UnityEditorWithCiModulesInAlternateRoot',
+                'Repair-UnityEditorWithCiModules'
+            )) {
+            Remove-Item "Function:\$functionName" -ErrorAction SilentlyContinue
+        }
+        Remove-Variable -Name atomicFlowCalls -Scope Script -ErrorAction SilentlyContinue
+        if ($atomicFlowRoot -and (Test-Path -LiteralPath $atomicFlowRoot -PathType Container)) {
+            Remove-Item -LiteralPath $atomicFlowRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+$alternateInstallRootFixture = ''
+try {
+    $alternateInstallRootFixture = Join-Path ([System.IO.Path]::GetTempPath()) "unity-alternate-root-$PID-$(Get-Random)"
+    $alternateInstallVersion = '6000.5.2f1'
+    $alternateInstallRoot = Get-UnityCiAlternateInstallRoot -InstallRoot $alternateInstallRootFixture
+    $alternateEditorDirectory = Join-Path (Join-Path $alternateInstallRoot $alternateInstallVersion) 'Editor'
+    $alternateEditorPath = Join-Path $alternateEditorDirectory 'Unity.exe'
+    New-Item -ItemType Directory -Force -Path $alternateEditorDirectory | Out-Null
+    New-Item -ItemType File -Force -Path $alternateEditorPath | Out-Null
+
+    $resolvedAlternateEditor = Find-UnityEditor -Version $alternateInstallVersion -Root $alternateInstallRootFixture
+    $resolvedFullPath = if ($resolvedAlternateEditor) { [System.IO.Path]::GetFullPath($resolvedAlternateEditor) } else { '' }
+    $expectedFullPath = [System.IO.Path]::GetFullPath($alternateEditorPath)
+    $classifiesAlreadyInstalled = Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message 'Error: Editor already installed in this location.'
+    $classifiesMissingModules = Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message "Unity 6000.5.2f1 repair install completed at 'C:\Unity\Editors\6000.5.2f1\Editor\Unity.exe', but required CI module groups for provisioning profile 'StandaloneWindowsIl2Cpp' are still missing on disk after the atomic install: windows-il2cpp."
+    $classifiesCanonicalLock = Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor `
+        -Message "The process cannot access the file '$alternateInstallRootFixture\6000.5.2f1\Editor' because it is being used by another process." `
+        -InstallRoot $alternateInstallRootFixture `
+        -Version $alternateInstallVersion
+    $classifiesCacheLock = Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor `
+        -Message "The process cannot access the file '$alternateInstallRootFixture\_downloads\6000.5.2f1.tmp' because it is being used by another process." `
+        -InstallRoot $alternateInstallRootFixture `
+        -Version $alternateInstallVersion
+    $classifiesNetworkFailure = Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message 'Unity CDN request failed while downloading the editor archive.'
+
+    if ($resolvedFullPath -ne $expectedFullPath -or -not $classifiesAlreadyInstalled -or -not $classifiesMissingModules -or -not $classifiesCanonicalLock -or $classifiesCacheLock -or $classifiesNetworkFailure) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor must discover reusable alternate-root CI editors and classify only existing-editor-pinned atomic install failures for alternate-root fallback. Resolved='$resolvedFullPath' Expected='$expectedFullPath' AlreadyInstalled=$classifiesAlreadyInstalled MissingModules=$classifiesMissingModules CanonicalLock=$classifiesCanonicalLock CacheLock=$classifiesCacheLock NetworkFailure=$classifiesNetworkFailure."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked alternate-root editor discovery and atomic-failure classification."
+    }
+} catch {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Ensure-editor alternate-root fallback regression failed: $($_.Exception.Message)"
+    $failed = $true
+} finally {
+    if ($alternateInstallRootFixture -and (Test-Path -LiteralPath $alternateInstallRootFixture -PathType Container)) {
+        Remove-Item -LiteralPath $alternateInstallRootFixture -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
