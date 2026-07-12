@@ -9,10 +9,15 @@ inputs:
   unity-editor-path:
     description: "Path to the resolved Unity editor exe (exported to GITHUB_ENV by run-ci-tests.ps1). When empty there is nothing to return."
     required: false
+outputs:
+  resource-safe:
+    description: "Whether Unity confirmed that this runner no longer holds the license activation."
+    value: ${{ steps.return_license.outputs.resource-safe }}
 runs:
   using: composite
   steps:
     - name: Return Unity license
+      id: return_license
       shell: pwsh
       run: |
         Set-StrictMode -Version Latest
@@ -32,6 +37,7 @@ runs:
         # also reclaimed by the NEXT run's return-at-start even if every branch
         # below is skipped.
         try {
+          "resource-safe=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           $editorPath = '${{ inputs.unity-editor-path }}'
           if ([string]::IsNullOrWhiteSpace($editorPath)) {
             $editorPath = $env:UNITY_EDITOR_PATH
@@ -109,11 +115,13 @@ runs:
             }
 
             if ($returnedEntitlement -and $legacyFileUnavailable) {
+              "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
               Write-Host "::notice::Unity returned the entitlement license, then exited with code $exitCode while skipping legacy ULF return; treating the seat return as successful."
             } else {
               Write-Host "::warning::Unity license return exited with code $exitCode; the next run's return-at-start is the backstop for the leaked seat."
             }
           } else {
+            "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             Write-Host "::notice::Returned the Unity license seat."
           }
         } catch {

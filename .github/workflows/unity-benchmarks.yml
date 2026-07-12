@@ -392,6 +392,7 @@ jobs:
             -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}'
 
       - name: Return Unity license
+        id: return_unity_license
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
         uses: ./.github/actions/return-unity-license
         env:
@@ -405,6 +406,7 @@ jobs:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
           runner-id: ${{ runner.name }}
+          resource-safe: ${{ steps.return_unity_license.outputs.resource-safe }}
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
