@@ -250,8 +250,8 @@ function Test-UnityLockCleanupIsGated {
         [Parameter(Mandatory = $true)][string]$WorkflowFile
     )
 
-    $acquireUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1.2.0'
-    $releaseUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1.2.0'
+    $acquireUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1'
+    $releaseUses = 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1'
     $returnUses = './.github/actions/return-unity-license'
     $requiredGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
 
@@ -291,6 +291,59 @@ function Test-UnityLockCleanupIsGated {
 
     if ($failures.Count -gt 0) {
         Write-Host "::error file=$WorkflowFile::Unity lock cleanup contract failed: $($failures -join '; ')"
+        return $false
+    }
+
+    return $true
+}
+
+function Test-UnityLockAppConfiguration {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$WorkflowFile
+    )
+
+    $lockSteps = @(
+        [regex]::Matches(
+            $Content,
+            '(?ms)^\s+- name: (?:Acquire|Release) organization Unity lock\s*$.*?(?=^\s+- name:|\z)'
+        )
+    )
+    $failures = @()
+
+    if ($lockSteps.Count -eq 0) {
+        $failures += 'workflow must contain at least one Unity lock step'
+    }
+
+    foreach ($lockStep in $lockSteps) {
+        $stepText = $lockStep.Value
+        $expectedAction = if ($stepText.Contains('Acquire organization Unity lock')) {
+            'acquire-build-lock@v1'
+        } else {
+            'release-build-lock@v1'
+        }
+
+        if (-not $stepText.Contains($expectedAction)) {
+            $failures += "lock step must use $expectedAction"
+        }
+        if ($stepText -notmatch '(?m)^\s+runner-id:\s+\$\{\{ runner\.name \}\}\s*$') {
+            $failures += 'lock step must pass runner-id from runner.name'
+        }
+        if ($stepText -notmatch '(?m)^\s+BUILD_LOCK_APP_ID:\s+\$\{\{ secrets\.BUILD_LOCK_APP_ID \}\}\s*$') {
+            $failures += 'lock step must pass the GitHub App ID secret'
+        }
+        if ($stepText -notmatch '(?m)^\s+BUILD_LOCK_APP_PRIVATE_KEY:\s+\$\{\{ secrets\.BUILD_LOCK_APP_PRIVATE_KEY \}\}\s*$') {
+            $failures += 'lock step must pass the GitHub App private key secret'
+        }
+    }
+
+    $legacyTokenPattern = '(?:ORG_)?BUILD_LOCK_' + 'TOKEN'
+    if ($Content -match $legacyTokenPattern) {
+        $failures += 'legacy build lock tokens must not be referenced'
+    }
+
+    if ($failures.Count -gt 0) {
+        Write-Host "::error file=$WorkflowFile::Unity lock App configuration contract failed: $($failures -join '; ')"
         return $false
     }
 
@@ -1976,6 +2029,17 @@ if (-not $unityLockCleanupIsGated) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity lock cleanup runs only after acquisition and before release."
+}
+
+$unityLockUsesAppCredentials = (
+    (Test-UnityLockAppConfiguration -Content $workflowContent -WorkflowFile '.github/workflows/unity-tests.yml') -and
+    (Test-UnityLockAppConfiguration -Content ($benchmarksWorkflowLines -join "`n") -WorkflowFile '.github/workflows/unity-benchmarks.yml') -and
+    (Test-UnityLockAppConfiguration -Content ($releaseWorkflowLines -join "`n") -WorkflowFile '.github/workflows/release.yml')
+)
+if (-not $unityLockUsesAppCredentials) {
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity lock steps use matching runner identity and GitHub App credentials."
 }
 
 $slowReportBudgetCount = ([regex]::Matches($workflowContent, [regex]::Escape('-FixtureBudgetSeconds 120'))).Count
