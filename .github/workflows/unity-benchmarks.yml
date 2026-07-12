@@ -61,7 +61,7 @@ jobs:
             echo "latest-version=${latest}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Check for required secrets
+      - name: Check for required licensed workflow secrets
         id: check-secrets
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
