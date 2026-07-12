@@ -61,7 +61,7 @@ jobs:
             echo "latest-version=${latest}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Check for required Unity license secrets
+      - name: Check for required secrets
         id: check-secrets
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
