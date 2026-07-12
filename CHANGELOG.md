@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Unity license lock handoff after CI cleanup**: final Unity license returns now emit fail-closed cleanup proof to the organization build lock. Cleanup is bounded and non-masking, failed or cancelled acquisitions still release queued/owned lock state, and only a successful return command or exact allowlisted Unity responses permit the activation slot to enter cooldown instead of quarantine.
+
 ## [3.5.0] - 2026-07-07
 
 ### Added
