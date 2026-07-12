@@ -255,9 +255,9 @@ function Test-UnityLockCleanupIsGated {
     $returnUses = './.github/actions/return-unity-license'
     $requiredGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
 
-    $acquirePattern = '(?ms)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:.*?\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses)
+    $acquirePattern = '(?ms)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:.*?\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + '[ \t]*\r?$'
     $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+' + [regex]::Escape($requiredGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($returnUses)
-    $releasePattern = '(?ms)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses)
+    $releasePattern = '(?ms)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + '[ \t]*\r?$'
     $failures = @()
 
     foreach ($job in $Jobs.GetEnumerator()) {
@@ -318,12 +318,13 @@ function Test-UnityLockAppConfiguration {
     foreach ($lockStep in $lockSteps) {
         $stepText = $lockStep.Value
         $expectedAction = if ($stepText.Contains('Acquire organization Unity lock')) {
-            'acquire-build-lock@v1'
+            'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1'
         } else {
-            'release-build-lock@v1'
+            'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1'
         }
 
-        if (-not $stepText.Contains($expectedAction)) {
+        $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]*\r?$'
+        if ($stepText -notmatch $exactActionPattern) {
             $failures += "lock step must use $expectedAction"
         }
         if ($stepText -notmatch '(?m)^\s+runner-id:\s+\$\{\{ runner\.name \}\}\s*$') {
