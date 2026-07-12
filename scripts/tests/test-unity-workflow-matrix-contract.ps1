@@ -2045,6 +2045,19 @@ if (-not $unityLockUsesAppCredentials) {
     Write-Info "Checked Unity lock steps use matching runner identity and GitHub App credentials."
 }
 
+$legacyOrganizationLockToken = 'ORG_BUILD_LOCK_' + 'TOKEN'
+$unityLockRunbookUsesAppCredentials = (
+    $runnerRunbookContent.Contains('`BUILD_LOCK_APP_ID`') -and
+    $runnerRunbookContent.Contains('`BUILD_LOCK_APP_PRIVATE_KEY`') -and
+    -not $runnerRunbookContent.Contains($legacyOrganizationLockToken)
+)
+if (-not $unityLockRunbookUsesAppCredentials) {
+    Write-Host "::error file=docs/runbooks/unity-runners-after-transfer.md::Unity runner runbook must provision both build-lock GitHub App secrets and must not reference the legacy organization PAT."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity runner runbook provisions GitHub App credentials for the organization build lock."
+}
+
 $slowReportBudgetCount = ([regex]::Matches($workflowContent, [regex]::Escape('-FixtureBudgetSeconds 120'))).Count
 if ($slowReportBudgetCount -lt 3) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Unity slow-test reports must include a warn-only 120s fixture budget for main, standalone, and single-threaded legs."

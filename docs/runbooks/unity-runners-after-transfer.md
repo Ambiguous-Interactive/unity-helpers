@@ -200,6 +200,6 @@ Re-run the queued Unity workflow once the bootstrap run completes successfully o
 The Unity workflows expect the following repository (or organization) secrets. They are NOT provisioned by this batch; a maintainer must add them before the first self-hosted run:
 
 - `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD` — classic serial Unity activation (all three required together).
-- `ORG_BUILD_LOCK_TOKEN` — token for the `wallstop-organization-builds` org build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`).
+- `BUILD_LOCK_APP_ID`, `BUILD_LOCK_APP_PRIVATE_KEY` — dedicated GitHub App credentials for the `wallstop-organization-builds` organization build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`); both are required together and should be provisioned as organization secrets with access to this repository.
 - `UNITY_ACCELERATOR_ENDPOINT` — optional; enables the Unity Accelerator cache namespace when set.
 - `RUNNER_AUDIT_PAT` — optional; upgrades the runner-preflight soft pass to a hard pass (see above).
