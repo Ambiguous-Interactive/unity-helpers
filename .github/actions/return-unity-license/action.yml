@@ -21,6 +21,7 @@ runs:
       shell: pwsh
       run: |
         Set-StrictMode -Version Latest
+        . (Join-Path '${{ github.action_path }}' 'Classify-UnityLicenseReturn.ps1')
         # Pin $PSNativeCommandUseErrorActionPreference = $false (mirrors the
         # rationale in scripts/unity/run-ci-tests.ps1). PowerShell 7.4+
         # can ENABLE the native-error behavior so that `& <native>` THROWS on a
@@ -94,27 +95,7 @@ runs:
           Write-Host "::endgroup::"
 
           if ($exitCode -ne 0) {
-            $returnedEntitlement = $false
-            $legacyFileUnavailable = $false
-            try {
-              if (Test-Path -LiteralPath $returnLog -PathType Leaf) {
-                $returnedEntitlement = Select-String `
-                  -LiteralPath $returnLog `
-                  -Pattern 'Successfully returned the entitlement license' `
-                  -SimpleMatch `
-                  -Quiet
-                $legacyFileUnavailable = Select-String `
-                  -LiteralPath $returnLog `
-                  -Pattern 'Serial number unavailable for ULF return' `
-                  -SimpleMatch `
-                  -Quiet
-              }
-            } catch {
-              $returnedEntitlement = $false
-              $legacyFileUnavailable = $false
-            }
-
-            if ($returnedEntitlement -and $legacyFileUnavailable) {
+            if (Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog) {
               "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
               Write-Host "::notice::Unity returned the entitlement license, then exited with code $exitCode while skipping legacy ULF return; treating the seat return as successful."
             } else {

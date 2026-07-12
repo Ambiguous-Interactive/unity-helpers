@@ -394,13 +394,15 @@ jobs:
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outcome == 'success' }}
+        timeout-minutes: 5
+        continue-on-error: true
         uses: ./.github/actions/return-unity-license
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
-        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
+        if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
         with:
           lock-name: wallstop-organization-builds
