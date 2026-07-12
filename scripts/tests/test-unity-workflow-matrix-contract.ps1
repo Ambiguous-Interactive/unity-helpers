@@ -317,7 +317,9 @@ function Test-UnityLockAppConfiguration {
 
     foreach ($lockStep in $lockSteps) {
         $stepText = $lockStep.Value
-        $expectedAction = if ($stepText.Contains('Acquire organization Unity lock')) {
+        $isAcquireStep = $stepText.Contains('Acquire organization Unity lock')
+        $stepKind = if ($isAcquireStep) { 'Acquire' } else { 'Release' }
+        $expectedAction = if ($isAcquireStep) {
             'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1'
         } else {
             'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1'
@@ -325,16 +327,16 @@ function Test-UnityLockAppConfiguration {
 
         $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]*\r?$'
         if ($stepText -notmatch $exactActionPattern) {
-            $failures += "lock step must use $expectedAction"
+            $failures += "$stepKind lock step must use $expectedAction"
         }
         if ($stepText -notmatch '(?m)^\s+runner-id:\s+\$\{\{ runner\.name \}\}\s*$') {
-            $failures += 'lock step must pass runner-id from runner.name'
+            $failures += "$stepKind lock step must pass runner-id from runner.name"
         }
         if ($stepText -notmatch '(?m)^\s+BUILD_LOCK_APP_ID:\s+\$\{\{ secrets\.BUILD_LOCK_APP_ID \}\}\s*$') {
-            $failures += 'lock step must pass the GitHub App ID secret'
+            $failures += "$stepKind lock step must pass the GitHub App ID secret"
         }
         if ($stepText -notmatch '(?m)^\s+BUILD_LOCK_APP_PRIVATE_KEY:\s+\$\{\{ secrets\.BUILD_LOCK_APP_PRIVATE_KEY \}\}\s*$') {
-            $failures += 'lock step must pass the GitHub App private key secret'
+            $failures += "$stepKind lock step must pass the GitHub App private key secret"
         }
     }
 
