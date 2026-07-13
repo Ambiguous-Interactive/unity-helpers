@@ -7,10 +7,6 @@ function Test-UnityLicenseReturnResourceSafe {
         [Parameter(Mandatory = $true)][string]$LogPath
     )
 
-    if ($ExitCode -eq 0) {
-        return $true
-    }
-
     # Process termination is never proof of cleanup, even if a partial/stale log
     # happens to contain Unity's normal success markers.
     if ($ExitCode -in @(137, 143, -1073741510, -1073740791)) {
@@ -22,17 +18,25 @@ function Test-UnityLicenseReturnResourceSafe {
             return $false
         }
 
-        $lines = [System.Collections.Generic.HashSet[string]]::new(
-            [System.StringComparer]::Ordinal
-        )
+        $entitlementReturned = $false
+        $ulfReturned = $false
         foreach ($line in (Get-Content -LiteralPath $LogPath -ErrorAction Stop)) {
-            [void]$lines.Add(([string]$line).Trim())
+            $normalized = ([string]$line).Trim()
+            if (
+                $normalized -eq 'Successfully returned the entitlement license' -or
+                $normalized -eq '[Licensing::Module] Successfully returned the entitlement license'
+            ) {
+                $entitlementReturned = $true
+            }
+            if (
+                $normalized -eq 'Serial number unavailable for ULF return' -or
+                $normalized -match '^\[Licensing::Client\] Successfully returned ULF license with serial number\s*:\s*\S+$'
+            ) {
+                $ulfReturned = $true
+            }
         }
 
-        return (
-            $lines.Contains('Successfully returned the entitlement license') -and
-            $lines.Contains('Serial number unavailable for ULF return')
-        )
+        return $entitlementReturned -and $ulfReturned
     } catch {
         return $false
     }

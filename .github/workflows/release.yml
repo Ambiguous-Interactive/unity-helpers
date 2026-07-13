@@ -346,7 +346,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@cfdcf6e67d7720824d21c37aa6a8b9e70dbdd2af
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
@@ -357,6 +357,7 @@ jobs:
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Export Unity package
+        id: export_unitypackage
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -377,18 +378,23 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
+        with:
+          prior-return-log-path: .artifacts/unity/unitypackage-project/unitypackage-output/unity.log
+          prior-command-succeeded: ${{ steps.export_unitypackage.outcome == 'success' }}
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@v1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@cfdcf6e67d7720824d21c37aa6a8b9e70dbdd2af
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
           runner-id: ${{ runner.name }}
-          resource-safe: ${{ steps.return_unity_license.outputs.resource-safe }}
+          resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
+          resource-health: ${{ steps.return_unity_license.outputs.resource-health }}
+          resource-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}

@@ -9,16 +9,35 @@ inputs:
   unity-editor-path:
     description: "Path to the resolved Unity editor exe (exported to GITHUB_ENV by run-ci-tests.ps1). When empty there is nothing to return."
     required: false
+  prior-return-log-path:
+    description: "Path to a non-uploaded Unity log from licensed work that may already contain exact return evidence."
+    required: false
+  prior-command-succeeded:
+    description: "Set true only when the command that produced prior-return-log-path completed successfully."
+    required: false
+    default: "false"
 outputs:
   resource-safe:
     description: "Whether Unity confirmed that this runner no longer holds the license activation."
     value: ${{ steps.return_license.outputs.resource-safe }}
+  resource-cleanup-status:
+    description: "confirmed only when exact positive Unity return evidence was observed; otherwise unknown."
+    value: ${{ steps.return_license.outputs.resource-cleanup-status }}
+  resource-health:
+    description: "Return cleanup does not classify account health, so this remains healthy."
+    value: ${{ steps.return_license.outputs.resource-health }}
+  resource-reason:
+    description: "Stable cleanup evidence reason code."
+    value: ${{ steps.return_license.outputs.resource-reason }}
 runs:
   using: composite
   steps:
     - name: Return Unity license
       id: return_license
       shell: pwsh
+      env:
+        PRIOR_RETURN_LOG_PATH: ${{ inputs.prior-return-log-path }}
+        PRIOR_COMMAND_SUCCEEDED: ${{ inputs.prior-command-succeeded }}
       run: |
         Set-StrictMode -Version Latest
         . (Join-Path '${{ github.action_path }}' 'Classify-UnityLicenseReturn.ps1')
@@ -33,12 +52,28 @@ runs:
         # builds lack the variable; assigning it is harmless and StrictMode-safe.)
         $PSNativeCommandUseErrorActionPreference = $false
 
+        function Set-ConfirmedCleanupOutput {
+          "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "resource-cleanup-status=confirmed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "resource-reason=cleanup-confirmed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        }
+
+        function Test-PriorReturnEvidence {
+          if ($env:PRIOR_COMMAND_SUCCEEDED -ne 'true' -or [string]::IsNullOrWhiteSpace($env:PRIOR_RETURN_LOG_PATH)) {
+            return $false
+          }
+          return Test-UnityLicenseReturnResourceSafe -ExitCode 0 -LogPath $env:PRIOR_RETURN_LOG_PATH
+        }
+
         # Best-effort, never-fails seat return. Top-level try/catch + a final
-        # `exit 0` guarantee this step can never fail the build: a leaked seat is
-        # also reclaimed by the NEXT run's return-at-start even if every branch
-        # below is skipped.
+        # `exit 0` keep cleanup errors from masking the build result. Missing
+        # positive evidence remains unknown so the lock can quarantine this
+        # runner until an explicit, evidence-backed recovery.
         try {
           "resource-safe=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "resource-cleanup-status=unknown" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "resource-health=healthy" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "resource-reason=return-missing-positive-evidence" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           $editorPath = '${{ inputs.unity-editor-path }}'
           if ([string]::IsNullOrWhiteSpace($editorPath)) {
             $editorPath = $env:UNITY_EDITOR_PATH
@@ -47,11 +82,21 @@ runs:
           # Nothing to return when the editor path was never resolved (the Unity
           # run never reached the point of exporting UNITY_EDITOR_PATH).
           if ([string]::IsNullOrWhiteSpace($editorPath)) {
-            Write-Host "::notice::No Unity editor path resolved; nothing to return."
+            if (Test-PriorReturnEvidence) {
+              Set-ConfirmedCleanupOutput
+              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
+            } else {
+              Write-Host "::notice::No Unity editor path or exact prior return evidence resolved; cleanup remains unknown."
+            }
             exit 0
           }
           if (-not (Test-Path -LiteralPath $editorPath -PathType Leaf)) {
-            Write-Host "::notice::Resolved Unity editor path does not exist; nothing to return."
+            if (Test-PriorReturnEvidence) {
+              Set-ConfirmedCleanupOutput
+              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
+            } else {
+              Write-Host "::notice::Resolved Unity editor path does not exist and no exact prior return evidence was found; cleanup remains unknown."
+            }
             exit 0
           }
 
@@ -94,19 +139,18 @@ runs:
           $exitCode = $LASTEXITCODE
           Write-Host "::endgroup::"
 
-          if ($exitCode -ne 0) {
-            if (Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog) {
-              "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-              Write-Host "::notice::Unity returned the entitlement license, then exited with code $exitCode while skipping legacy ULF return; treating the seat return as successful."
+          if (Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog) {
+            Set-ConfirmedCleanupOutput
+            if ($exitCode -ne 0) {
+              Write-Host "::notice::Unity emitted exact entitlement and ULF return evidence before exiting with code $exitCode; treating cleanup as confirmed."
             } else {
-              Write-Host "::warning::Unity license return exited with code $exitCode; the next run's return-at-start is the backstop for the leaked seat."
+              Write-Host "::notice::Returned the Unity license seat with exact positive evidence."
             }
           } else {
-            "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host "::notice::Returned the Unity license seat."
+            Write-Host "::warning::Unity license return exited with code $exitCode without exact positive evidence; cleanup remains unknown."
           }
         } catch {
-          Write-Host "::warning::Unity license return step hit an unexpected error: $($_.Exception.Message). The next run's return-at-start is the backstop."
+          Write-Host "::warning::Unity license return step hit an unexpected error: $($_.Exception.Message). Cleanup remains unknown and lock release will quarantine this runner."
         }
         # Defense-in-depth: this step must never fail the build.
         exit 0
