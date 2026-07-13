@@ -2145,6 +2145,7 @@ $classificationCases = @(
         Expected = $true
     }
     @{ Name = 'dual exact normalized markers'; ExitCode = 1; Lines = @('  Successfully returned the entitlement license  ', "`tSerial number unavailable for ULF return"); Expected = $true }
+    @{ Name = 'case-altered markers'; ExitCode = 0; Lines = @('Successfully Returned the entitlement license', 'Serial Number unavailable for ULF return'); Expected = $false }
     @{ Name = 'generic success'; ExitCode = 1; Lines = @('License return succeeded'); Expected = $false }
     @{ Name = 'one marker'; ExitCode = 1; Lines = @('Successfully returned the entitlement license'); Expected = $false }
     @{ Name = 'negated marker substrings'; ExitCode = 1; Lines = @('Not Successfully returned the entitlement license', 'Not Serial number unavailable for ULF return'); Expected = $false }
