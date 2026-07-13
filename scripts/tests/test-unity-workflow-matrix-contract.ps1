@@ -2108,6 +2108,10 @@ $resourceSafeTrueAssignments = [regex]::Matches(
     $returnUnityLicenseActionContent,
     '(?m)^\s+"resource-safe=true"\s+\|\s+Out-File\s+-FilePath\s+\$env:GITHUB_OUTPUT\s+-Append\s*$'
 )
+$priorReturnEvidenceGuards = [regex]::Matches(
+    $returnUnityLicenseActionContent,
+    '(?m)^\s+if \(Test-PriorReturnEvidence\) \{\s*$'
+)
 $returnActionResourceProofContract = (
     $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-safe:\s*$.*?^\s+value:\s+\$\{\{ steps\.return_license\.outputs\.resource-safe \}\}\s*$' -and
     $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-cleanup-status:\s*$.*?^\s+value:\s+\$\{\{ steps\.return_license\.outputs\.resource-cleanup-status \}\}\s*$' -and
@@ -2123,7 +2127,8 @@ $returnActionResourceProofContract = (
     $returnUnityLicenseActionContent -match '(?m)^\s+"resource-reason=return-missing-positive-evidence"\s+\|\s+Out-File\s+-FilePath\s+\$env:GITHUB_OUTPUT\s+-Append\s*$' -and
     $returnUnityLicenseActionContent -match '(?ms)function Set-ConfirmedCleanupOutput \{.*?"resource-cleanup-status=confirmed".*?"resource-reason=cleanup-confirmed".*?\}' -and
     $returnUnityLicenseActionContent -match '(?ms)function Test-PriorReturnEvidence \{.*?PRIOR_COMMAND_SUCCEEDED.*?Test-UnityLicenseReturnResourceSafe -ExitCode 0 -LogPath \$env:PRIOR_RETURN_LOG_PATH.*?\}' -and
-    $returnUnityLicenseActionContent -match '(?ms)if \(Test-PriorReturnEvidence\) \{\s+Set-ConfirmedCleanupOutput' -and
+    $priorReturnEvidenceGuards.Count -eq 3 -and
+    $returnUnityLicenseActionContent -match '(?ms)if \(\[string\]::IsNullOrWhiteSpace\(\$env:UNITY_EMAIL\).*?\) \{\s+if \(Test-PriorReturnEvidence\) \{\s+Set-ConfirmedCleanupOutput' -and
     $returnUnityLicenseActionContent -match '(?ms)if \(Test-UnityLicenseReturnResourceSafe -ExitCode \$exitCode -LogPath \$returnLog\) \{\s+Set-ConfirmedCleanupOutput'
 )
 if (-not $returnActionResourceProofContract) {

@@ -100,11 +100,15 @@ runs:
             exit 0
           }
 
-          # Serial activation returns by account, so both credentials are required. If
-          # either is empty we cannot return -- warn (never echo the values) and
-          # exit 0 (the next run's return-at-start is the backstop).
+          # Serial activation returns by account, so both credentials are required
+          # unless the licensed command already proved cleanup. Never echo them.
           if ([string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -or [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)) {
-            Write-Host "::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set; cannot return the Unity license here. The next run's return-at-start is the backstop."
+            if (Test-PriorReturnEvidence) {
+              Set-ConfirmedCleanupOutput
+              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
+            } else {
+              Write-Host "::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set and no exact prior return evidence was found; cleanup remains unknown."
+            }
             exit 0
           }
 
