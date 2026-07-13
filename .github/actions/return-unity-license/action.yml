@@ -10,7 +10,7 @@ inputs:
     description: "Path to the resolved Unity editor exe (exported to GITHUB_ENV by run-ci-tests.ps1). When empty there is nothing to return."
     required: false
   prior-return-log-path:
-    description: "Path to a non-uploaded Unity log from licensed work that may already contain exact return evidence."
+    description: "Path to a Unity return log from licensed work that may already contain exact cleanup evidence; it must not expose unredacted credentials."
     required: false
   prior-command-succeeded:
     description: "Set true only when the command that produced prior-return-log-path completed successfully."

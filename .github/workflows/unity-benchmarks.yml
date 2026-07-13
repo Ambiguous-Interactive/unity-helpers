@@ -398,10 +398,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
         with:
-          prior-return-log-path: >-
-            ${{ matrix.test-mode == 'editmode' &&
-            format('.artifacts/unity/benchmarks-random/{0}/unity.log', matrix.unity-version) ||
-            format('.artifacts/unity/benchmarks/{0}-{1}/unity.log', matrix.unity-version, matrix.test-mode) }}
+          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
           prior-command-succeeded: >-
             ${{ (matrix.test-mode == 'editmode' &&
             steps.run_random_thorough.outcome == 'success') ||

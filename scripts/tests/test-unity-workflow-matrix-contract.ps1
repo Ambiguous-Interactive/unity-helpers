@@ -302,10 +302,10 @@ function Test-UnityLockCleanupIsGated {
         if ($jobText -notmatch $returnPattern) {
             $failures += "$($job.Key): return-unity-license must be identified, success-gated, bounded to five minutes, and non-masking"
         }
-        if (
-            $returnStep.Value -notmatch '(?m)^\s+prior-return-log-path:\s+\S.*$' -or
-            $returnStep.Value -notmatch '(?ms)^\s+prior-command-succeeded:\s+(?:>-\s*\r?\n\s*)?\$\{\{\s+.+?\s+\}\}\s*(?=^\s+env:)'
-        ) {
+        if ($returnStep.Success -and (
+                $returnStep.Value -notmatch '(?m)^\s+prior-return-log-path:\s+\S.*$' -or
+                $returnStep.Value -notmatch '(?ms)^\s+prior-command-succeeded:\s+(?:>-\s*\r?\n\s*)?\$\{\{\s+.+?\s+\}\}\s*(?=^\s+env:)'
+            )) {
             $failures += "$($job.Key): return-unity-license must classify the licensed command's log and successful outcome"
         }
         if ($jobText -notmatch $releasePattern) {
@@ -2098,6 +2098,16 @@ if (-not $unityLockCleanupIsGated) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity lock cleanup runs only after acquisition and before release."
+}
+
+$runnerTempReturnLogInput = [regex]::Escape('prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log')
+$testRunnerTempReturnLogs = [regex]::Matches($workflowContent, $runnerTempReturnLogInput).Count
+$benchmarkRunnerTempReturnLogs = [regex]::Matches(($benchmarksWorkflowLines -join "`n"), $runnerTempReturnLogInput).Count
+if ($testRunnerTempReturnLogs -ne 3 -or $benchmarkRunnerTempReturnLogs -ne 1) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::run-ci-tests.ps1 cleanup proof must come from its non-uploaded runner-temp return log (tests=$testRunnerTempReturnLogs, benchmarks=$benchmarkRunnerTempReturnLogs)."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked run-ci-tests workflows classify the runner-temp Unity return log.'
 }
 
 $resourceSafeFalseAssignments = [regex]::Matches(

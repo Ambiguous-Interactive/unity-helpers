@@ -544,7 +544,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
         with:
-          prior-return-log-path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/unity.log
+          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
           prior-command-succeeded: ${{ steps.run_tests.outcome == 'success' }}
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -886,7 +886,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
         with:
-          prior-return-log-path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/unity.log
+          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
           prior-command-succeeded: ${{ steps.run_tests.outcome == 'success' }}
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -1208,7 +1208,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
         with:
-          prior-return-log-path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/unity.log
+          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
           prior-command-succeeded: ${{ steps.run_tests.outcome == 'success' }}
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
