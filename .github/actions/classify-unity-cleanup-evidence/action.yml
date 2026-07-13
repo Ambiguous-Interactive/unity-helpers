@@ -1,0 +1,36 @@
+name: Classify Unity cleanup evidence
+description: >-
+  Cross-platform, classification-only adapter for sanitized Unity return logs.
+  It never attempts a second return from a different machine identity.
+inputs:
+  return-log-path:
+    description: Path to the dedicated sanitized Unity return log.
+    required: true
+  return-command-completed:
+    description: Set true only when the command responsible for the return log completed.
+    required: true
+outputs:
+  resource-safe:
+    description: Whether exact positive Unity return evidence was observed.
+    value: ${{ steps.classify.outputs.resource-safe }}
+  resource-cleanup-status:
+    description: confirmed or unknown.
+    value: ${{ steps.classify.outputs.resource-cleanup-status }}
+  resource-health:
+    description: Cleanup evidence does not classify account health; always healthy.
+    value: ${{ steps.classify.outputs.resource-health }}
+  resource-reason:
+    description: Stable cleanup evidence reason code.
+    value: ${{ steps.classify.outputs.resource-reason }}
+runs:
+  using: composite
+  steps:
+    - name: Classify exact Unity return evidence
+      id: classify
+      shell: node {0}
+      env:
+        CLASSIFIER_PATH: ${{ github.action_path }}/classify.js
+        RETURN_LOG_PATH: ${{ inputs.return-log-path }}
+        RETURN_COMMAND_COMPLETED: ${{ inputs.return-command-completed }}
+      run: |
+        require(process.env.CLASSIFIER_PATH).main();
