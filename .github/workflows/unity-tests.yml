@@ -145,6 +145,7 @@ jobs:
 
       - name: Check for required licensed workflow secrets
         id: check-secrets
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -178,8 +179,7 @@ jobs:
     # Only when we can prove the inventory is wrong do we fail hard.
     if: >-
       ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.event_name != 'pull_request' &&
         (github.event_name != 'push' || github.ref_protected)
       }}
     runs-on: ubuntu-latest
@@ -285,8 +285,7 @@ jobs:
       - runner-preflight
     if: >-
       ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.event_name != 'pull_request' &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
@@ -631,8 +630,7 @@ jobs:
       - unity-tests
     if: >-
       ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.event_name != 'pull_request' &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.outputs.has-required-secrets == 'true' &&
         needs.matrix-config.outputs.matrix-include-standalone != '[]'
@@ -980,8 +978,7 @@ jobs:
     if: >-
       ${{
         always() &&
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.event_name != 'pull_request' &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
@@ -1268,8 +1265,7 @@ jobs:
     if: >-
       ${{
         always() &&
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.event_name != 'pull_request' &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&

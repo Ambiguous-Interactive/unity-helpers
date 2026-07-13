@@ -32,4 +32,27 @@ assert.match(action, /shell:\s*node \{0\}/u);
 assert.doesNotMatch(action, /shell:\s*pwsh/u);
 assert.match(action, /resource-cleanup-status/u);
 
+const workflow = fs.readFileSync(path.join(root, ".github/workflows/unity-tests.yml"), "utf8");
+for (const job of [
+  "runner-preflight",
+  "unity-tests",
+  "unity-tests-standalone",
+  "unity-tests-single-threaded",
+  "unitypackage-smoke"
+]) {
+  const start = workflow.indexOf(`  ${job}:`);
+  assert.notEqual(start, -1, `missing job ${job}`);
+  const next = workflow.slice(start + 2).search(/^  [a-z0-9-]+:/mu);
+  const block = workflow.slice(start, next === -1 ? undefined : start + 2 + next);
+  assert.match(
+    block,
+    /github\.event_name != 'pull_request'/u,
+    `${job} must not run licensed PR code`
+  );
+}
+assert.match(
+  workflow,
+  /- name: Check for required licensed workflow secrets[\s\S]*?if: \$\{\{ github\.event_name != 'pull_request' \}\}/u
+);
+
 process.stdout.write("Portable Unity cleanup classifier tests passed.\n");
