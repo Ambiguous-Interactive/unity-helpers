@@ -23,14 +23,14 @@ function Test-UnityLicenseReturnResourceSafe {
         foreach ($line in (Get-Content -LiteralPath $LogPath -ErrorAction Stop)) {
             $normalized = ([string]$line).Trim()
             if (
-                $normalized -eq 'Successfully returned the entitlement license' -or
-                $normalized -eq '[Licensing::Module] Successfully returned the entitlement license'
+                $normalized -ceq 'Successfully returned the entitlement license' -or
+                $normalized -ceq '[Licensing::Module] Successfully returned the entitlement license'
             ) {
                 $entitlementReturned = $true
             }
             if (
-                $normalized -eq 'Serial number unavailable for ULF return' -or
-                $normalized -match '^\[Licensing::Client\] Successfully returned ULF license with serial number\s*:\s*\S+$'
+                $normalized -ceq 'Serial number unavailable for ULF return' -or
+                $normalized -cmatch '^\[Licensing::Client\] Successfully returned ULF license with serial number\s*:\s*\S+$'
             ) {
                 $ulfReturned = $true
             }
