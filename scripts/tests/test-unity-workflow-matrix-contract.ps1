@@ -2104,7 +2104,7 @@ $runnerTempReturnLogInput = [regex]::Escape('prior-return-log-path: ${{ runner.t
 $testRunnerTempReturnLogs = [regex]::Matches($workflowContent, $runnerTempReturnLogInput).Count
 $benchmarkRunnerTempReturnLogs = [regex]::Matches(($benchmarksWorkflowLines -join "`n"), $runnerTempReturnLogInput).Count
 if ($testRunnerTempReturnLogs -ne 3 -or $benchmarkRunnerTempReturnLogs -ne 1) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::run-ci-tests.ps1 cleanup proof must come from its non-uploaded runner-temp return log (tests=$testRunnerTempReturnLogs, benchmarks=$benchmarkRunnerTempReturnLogs)."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::run-ci-tests.ps1 cleanup proof must come from its non-uploaded runner-temp return log (tests=$testRunnerTempReturnLogs, benchmarks=$benchmarkRunnerTempReturnLogs)."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked run-ci-tests workflows classify the runner-temp Unity return log.'
