@@ -2,7 +2,9 @@
 
 const fs = require("node:fs");
 
-const TERMINATION_EXIT_CODES = new Set([137, 143, -1073741510, -1073740791]);
+const TERMINATION_EXIT_CODES = new Set([
+  137, 143, -1073741510, -1073740791, 3221225786, 3221226505
+]);
 const ENTITLEMENT_MARKERS = new Set([
   "Successfully returned the entitlement license",
   "[Licensing::Module] Successfully returned the entitlement license"
@@ -32,7 +34,12 @@ function classifyCleanupEvidence({ commandCompleted, logText }) {
     }
   }
 
-  return !TERMINATION_EXIT_CODES.has(recordedExitCode) && entitlementReturned && ulfReturned;
+  return (
+    recordedExitCode !== null &&
+    !TERMINATION_EXIT_CODES.has(recordedExitCode) &&
+    entitlementReturned &&
+    ulfReturned
+  );
 }
 
 function appendOutputs(outputPath, outputs) {

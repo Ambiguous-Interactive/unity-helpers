@@ -18,9 +18,22 @@ const positive = [
 const cases = [
   ["exact markers", true, positive, true],
   ["command incomplete", false, positive, false],
+  ["exit status missing", true, positive.replace("exit_return_rc=0\n", ""), false],
   ["entitlement only", true, "Successfully returned the entitlement license\n", false],
   ["case changed", true, positive.replace("Successfully", "successfully"), false],
-  ["terminated", true, positive.replace("exit_return_rc=0", "exit_return_rc=143"), false]
+  ["terminated", true, positive.replace("exit_return_rc=0", "exit_return_rc=143"), false],
+  [
+    "unsigned Windows termination",
+    true,
+    positive.replace("exit_return_rc=0", "exit_return_rc=3221225786"),
+    false
+  ],
+  [
+    "nontermination nonzero with exact evidence",
+    true,
+    positive.replace("exit_return_rc=0", "exit_return_rc=1"),
+    true
+  ]
 ];
 
 for (const [name, commandCompleted, logText, expected] of cases) {
