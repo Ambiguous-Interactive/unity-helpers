@@ -304,7 +304,7 @@ function Test-UnityLockCleanupIsGated {
         }
         if (
             $returnStep.Value -notmatch '(?m)^\s+prior-return-log-path:\s+\S.*$' -or
-            $returnStep.Value -notmatch '(?m)^\s+prior-command-succeeded:\s+\$\{\{\s+.+\s+\}\}\s*$'
+            $returnStep.Value -notmatch '(?ms)^\s+prior-command-succeeded:\s+(?:>-\s*\r?\n\s*)?\$\{\{\s+.+?\s+\}\}\s*(?=^\s+env:)'
         ) {
             $failures += "$($job.Key): return-unity-license must classify the licensed command's log and successful outcome"
         }

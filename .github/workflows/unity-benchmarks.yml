@@ -398,8 +398,14 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/return-unity-license
         with:
-          prior-return-log-path: ${{ matrix.test-mode == 'editmode' && format('.artifacts/unity/benchmarks-random/{0}/unity.log', matrix.unity-version) || format('.artifacts/unity/benchmarks/{0}-{1}/unity.log', matrix.unity-version, matrix.test-mode) }}
-          prior-command-succeeded: ${{ (matrix.test-mode == 'editmode' && steps.run_random_thorough.outcome == 'success') || (matrix.test-mode != 'editmode' && steps.run_tests.outcome == 'success') }}
+          prior-return-log-path: >-
+            ${{ matrix.test-mode == 'editmode' &&
+            format('.artifacts/unity/benchmarks-random/{0}/unity.log', matrix.unity-version) ||
+            format('.artifacts/unity/benchmarks/{0}-{1}/unity.log', matrix.unity-version, matrix.test-mode) }}
+          prior-command-succeeded: >-
+            ${{ (matrix.test-mode == 'editmode' &&
+            steps.run_random_thorough.outcome == 'success') ||
+            (matrix.test-mode != 'editmode' && steps.run_tests.outcome == 'success') }}
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
