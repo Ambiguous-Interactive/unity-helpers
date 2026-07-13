@@ -143,9 +143,13 @@ runs:
           $exitCode = $LASTEXITCODE
           Write-Host "::endgroup::"
 
-          if (Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog) {
+          $currentReturnConfirmed = Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog
+          $priorReturnConfirmed = -not $currentReturnConfirmed -and (Test-PriorReturnEvidence)
+          if ($currentReturnConfirmed -or $priorReturnConfirmed) {
             Set-ConfirmedCleanupOutput
-            if ($exitCode -ne 0) {
+            if ($priorReturnConfirmed) {
+              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence; the redundant helper added no stronger proof."
+            } elseif ($exitCode -ne 0) {
               Write-Host "::notice::Unity emitted exact entitlement and ULF return evidence before exiting with code $exitCode; treating cleanup as confirmed."
             } else {
               Write-Host "::notice::Returned the Unity license seat with exact positive evidence."

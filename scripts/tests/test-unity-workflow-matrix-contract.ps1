@@ -2139,7 +2139,7 @@ $returnActionResourceProofContract = (
     $returnUnityLicenseActionContent -match '(?ms)function Test-PriorReturnEvidence \{.*?PRIOR_COMMAND_SUCCEEDED.*?Test-UnityLicenseReturnResourceSafe -ExitCode 0 -LogPath \$env:PRIOR_RETURN_LOG_PATH.*?\}' -and
     $priorReturnEvidenceGuards.Count -eq 3 -and
     $returnUnityLicenseActionContent -match '(?ms)if \(\[string\]::IsNullOrWhiteSpace\(\$env:UNITY_EMAIL\).*?\) \{\s+if \(Test-PriorReturnEvidence\) \{\s+Set-ConfirmedCleanupOutput' -and
-    $returnUnityLicenseActionContent -match '(?ms)if \(Test-UnityLicenseReturnResourceSafe -ExitCode \$exitCode -LogPath \$returnLog\) \{\s+Set-ConfirmedCleanupOutput'
+    $returnUnityLicenseActionContent -match '(?ms)\$currentReturnConfirmed = Test-UnityLicenseReturnResourceSafe -ExitCode \$exitCode -LogPath \$returnLog\s+\$priorReturnConfirmed = -not \$currentReturnConfirmed -and \(Test-PriorReturnEvidence\)\s+if \(\$currentReturnConfirmed -or \$priorReturnConfirmed\) \{\s+Set-ConfirmedCleanupOutput'
 )
 if (-not $returnActionResourceProofContract) {
     Write-Host '::error file=.github/actions/return-unity-license/action.yml::Return action must default cleanup to unknown and confirm it only from exact current or prior return evidence.'
