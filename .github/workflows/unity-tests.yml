@@ -50,6 +50,13 @@ concurrency:
 jobs:
   matrix-config:
     name: Resolve Unity test matrix
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'push' || github.ref_protected)
+      }}
+    environment: unity-license
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -145,7 +152,11 @@ jobs:
 
       - name: Check for required licensed workflow secrets
         id: check-secrets
-        if: ${{ github.event_name != 'pull_request' }}
+        if: >-
+          ${{
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          }}
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -179,9 +190,11 @@ jobs:
     # Only when we can prove the inventory is wrong do we fail hard.
     if: >-
       ${{
-        github.event_name != 'pull_request' &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected)
       }}
+    environment: unity-license
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -285,10 +298,12 @@ jobs:
       - runner-preflight
     if: >-
       ${{
-        github.event_name != 'pull_request' &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
+    environment: unity-license
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
@@ -630,11 +645,13 @@ jobs:
       - unity-tests
     if: >-
       ${{
-        github.event_name != 'pull_request' &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.outputs.has-required-secrets == 'true' &&
         needs.matrix-config.outputs.matrix-include-standalone != '[]'
       }}
+    environment: unity-license
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
@@ -978,7 +995,8 @@ jobs:
     if: >-
       ${{
         always() &&
-        github.event_name != 'pull_request' &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
@@ -987,6 +1005,7 @@ jobs:
           needs.unity-tests-standalone.result == 'skipped') &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
+    environment: unity-license
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
@@ -1265,7 +1284,8 @@ jobs:
     if: >-
       ${{
         always() &&
-        github.event_name != 'pull_request' &&
+        (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
@@ -1275,6 +1295,7 @@ jobs:
         needs.unity-tests-single-threaded.result == 'success' &&
         needs.matrix-config.outputs.has-required-secrets == 'true'
       }}
+    environment: unity-license
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
