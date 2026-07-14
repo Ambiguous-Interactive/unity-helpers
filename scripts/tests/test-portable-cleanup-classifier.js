@@ -60,13 +60,15 @@ for (const job of [
   assert.notEqual(start, -1, `missing job ${job}`);
   const next = workflow.slice(start + 2).search(/^  [a-z0-9-]+:/mu);
   const block = workflow.slice(start, next === -1 ? undefined : start + 2 + next);
+  const jobIf = block.match(/^    if:\s*>-\s*\r?\n(?<expression>(?:^      .*\r?\n?)+)/mu);
+  assert.ok(jobIf, `${job} must have a multiline job-level if expression`);
   assert.match(
-    block,
+    jobIf.groups.expression,
     trustedPullRequestGuard,
     `${job} must admit same-repository PRs and reject forks`
   );
   assert.doesNotMatch(
-    block,
+    jobIf.groups.expression,
     /github\.event_name\s*!=\s*'pull_request'\s*&&/u,
     `${job} must not reject every pull request`
   );
