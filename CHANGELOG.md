@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Unity CLI install-path probes hanging under service accounts**: CI-managed editor provisioning now preserves an exact install-path confirmation captured before the watchdog stops a lingering Unity CLI process tree, so NetworkService runners can continue provisioning instead of discarding the confirmed path as a failed probe.
+
 ## [3.5.1] - 2026-07-12
 
 ### Fixed

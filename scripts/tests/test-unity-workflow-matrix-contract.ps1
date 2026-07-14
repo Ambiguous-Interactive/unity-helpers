@@ -127,6 +127,9 @@ function Import-EnsureEditorWatchdogFunctions {
         'ConvertTo-ProcessArgumentLine',
         'Get-EnsureEditorRetryDelaySeconds',
         'Get-EnsureEditorInstallTimeoutSeconds',
+        'Get-EnsureEditorProbeTimeoutSeconds',
+        'Get-EffectiveUnityCliTimeoutSeconds',
+        'Get-RemainingUnityProvisioningBudgetSeconds',
         'Get-EnsureEditorProgressStallSeconds',
         'Get-EnsureEditorProgressNoticeIntervalSeconds',
         'Get-EnsureEditorQuarantineMoveRetryAttempts',
@@ -140,7 +143,10 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-CollapsedCliOutputTail',
         'Get-CliProgressTriple',
         'Get-LastCliProgressMessage',
+        'Write-CiNotice',
         'Invoke-UnityCliCaptureWithTimeout',
+        'Invoke-UnityCliSafe',
+        'Get-UnityCliOutput',
         'Move-UnityInstallDirectoryToQuarantine',
         'Get-UnityProvisioningProfile'
     )) {
@@ -1713,6 +1719,76 @@ if ($ensureEditorWatchdogImported) {
         } else {
             Remove-Variable -Name UnityProvisioningProfile -Scope Script -ErrorAction SilentlyContinue
         }
+    }
+
+    $originalUnityCliCapture = ${function:Invoke-UnityCliCaptureWithTimeout}
+    $oldProvisioningDeadlineVariable = Get-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+    $oldProvisioningDeadline = if ($oldProvisioningDeadlineVariable) { $oldProvisioningDeadlineVariable.Value } else { $null }
+    try {
+        $script:ProvisioningDeadlineUtc = [DateTime]::MaxValue
+        $script:unityCliCaptureResult = @{
+            Success           = $false
+            ExitCode          = 124
+            Output            = @('D:\actions-runner\_work\_tool\qora-unity-editors')
+            StallKilled       = $false
+            TimedOutWallClock = $true
+        }
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param(
+                [string[]]$Arguments,
+                [int]$TimeoutSeconds,
+                [string]$TimeoutKnob,
+                [switch]$TimeoutAsWarning
+            )
+            return $script:unityCliCaptureResult
+        }
+
+        $discardedTimedOutOutput = Get-UnityCliOutput -Arguments @('install-path')
+        $acceptedTimedOutOutput = @(Get-UnityCliOutput -Arguments @('install-path') -AcceptCapturedOutputOnTimeout)
+        $acceptedTimedOutSetter = Invoke-UnityCliSafe `
+            -Arguments @('install-path', '-s', 'D:\actions-runner\_work\_tool\qora-unity-editors') `
+            -AcceptCapturedOutputPattern '^D:\\actions-runner\\_work\\_tool\\qora-unity-editors$'
+        $script:unityCliCaptureResult.Output = @('D:\unexpected-root')
+        $rejectedMismatchedSetter = Invoke-UnityCliSafe `
+            -Arguments @('install-path', '-s', 'D:\actions-runner\_work\_tool\qora-unity-editors') `
+            -AcceptCapturedOutputPattern '^D:\\actions-runner\\_work\\_tool\\qora-unity-editors$'
+        $script:unityCliCaptureResult.Output = @('D:\actions-runner\_work\_tool\qora-unity-editors')
+        $script:unityCliCaptureResult.TimedOutWallClock = $false
+        $rejectedNativeExitSetter = Invoke-UnityCliSafe `
+            -Arguments @('install-path', '-s', 'D:\actions-runner\_work\_tool\qora-unity-editors') `
+            -AcceptCapturedOutputPattern '^D:\\actions-runner\\_work\\_tool\\qora-unity-editors$'
+        if (
+            $null -ne $discardedTimedOutOutput -or
+            $acceptedTimedOutOutput.Count -ne 1 -or
+            $acceptedTimedOutOutput[0] -ne 'D:\actions-runner\_work\_tool\qora-unity-editors' -or
+            -not $acceptedTimedOutSetter -or
+            $rejectedMismatchedSetter -or
+            $rejectedNativeExitSetter
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Install-path probes must accept exact positive output captured before a wrapper timeout, while ordinary getter calls must continue rejecting timed-out output."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked install-path probes preserve exact output captured before wrapper timeout.'
+        }
+
+        if (
+            $ensureEditorContent -notmatch "Get-UnityCliOutput\s+-Arguments\s+@\('install-path'\)\s+-AcceptCapturedOutputOnTimeout" -or
+            $ensureEditorContent -notmatch 'Invoke-UnityCliSafe[^\r\n]+-AcceptCapturedOutputPattern'
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Install-path getter and setter wiring must opt into exact output recovery after a wrapper timeout."
+            $failed = $true
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Install-path timeout-output regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        ${function:Invoke-UnityCliCaptureWithTimeout} = $originalUnityCliCapture
+        if ($oldProvisioningDeadlineVariable) {
+            $script:ProvisioningDeadlineUtc = $oldProvisioningDeadline
+        } else {
+            Remove-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+        }
+        Remove-Variable -Name unityCliCaptureResult -Scope Script -ErrorAction SilentlyContinue
     }
 
     if (

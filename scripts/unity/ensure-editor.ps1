@@ -965,13 +965,31 @@ function Invoke-UnityCliSafe {
     # It echoes the command and surfaces any output via Write-Host so failures
     # remain diagnosable in CI logs. Captured-output callers should use
     # Get-UnityCliOutput instead; this one is for fire-and-forget effects.
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [string]$AcceptCapturedOutputPattern = ''
+    )
 
     $requestedTimeout = Get-EnsureEditorProbeTimeoutSeconds
     $effectiveTimeout = Get-EffectiveUnityCliTimeoutSeconds -RequestedSeconds $requestedTimeout
-    $result = Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout -TimeoutKnob 'UH_ENSURE_EDITOR_PROBE_TIMEOUT_SECONDS'
+    $acceptTimedOutOutput = -not [string]::IsNullOrWhiteSpace($AcceptCapturedOutputPattern)
+    $result = Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout -TimeoutKnob 'UH_ENSURE_EDITOR_PROBE_TIMEOUT_SECONDS' -TimeoutAsWarning:$acceptTimedOutOutput
     $exit = [int]$result.ExitCode
-    return ($exit -eq 0)
+    if ($exit -eq 0) {
+        return $true
+    }
+
+    $wrapperKilled = [bool]$result.StallKilled -or [bool]$result.TimedOutWallClock
+    if ($wrapperKilled -and $acceptTimedOutOutput) {
+        foreach ($line in @($result.Output)) {
+            if ([string]$line -match $AcceptCapturedOutputPattern) {
+                Write-CiNotice "Unity CLI emitted the expected completion output before its lingering process tree was stopped."
+                return $true
+            }
+        }
+    }
+
+    return $false
 }
 
 function Get-UnityCliOutput {
@@ -980,13 +998,20 @@ function Get-UnityCliOutput {
     # success, or $null on any failure. Does NOT echo to the success pipeline
     # of this script: the caller (run-ci-tests.ps1) reads our LAST stdout line
     # as the resolved editor path, so getter output must never leak there.
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [switch]$AcceptCapturedOutputOnTimeout
+    )
 
     $requestedTimeout = Get-EnsureEditorProbeTimeoutSeconds
     $effectiveTimeout = Get-EffectiveUnityCliTimeoutSeconds -RequestedSeconds $requestedTimeout
-    $result = Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout -TimeoutKnob 'UH_ENSURE_EDITOR_PROBE_TIMEOUT_SECONDS'
+    $result = Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout -TimeoutKnob 'UH_ENSURE_EDITOR_PROBE_TIMEOUT_SECONDS' -TimeoutAsWarning:$AcceptCapturedOutputOnTimeout
     if ($result.ExitCode -ne 0) {
-        return $null
+        $wrapperKilled = [bool]$result.StallKilled -or [bool]$result.TimedOutWallClock
+        if (-not $AcceptCapturedOutputOnTimeout -or -not $wrapperKilled) {
+            return $null
+        }
+        Write-CiNotice "Unity CLI output was captured before its lingering process tree was stopped."
     }
 
     # Normalize to an array of strings regardless of whether 0/1/many lines came
@@ -1144,7 +1169,8 @@ function Invoke-UnityCliCaptureWithTimeout {
         [int]$TimeoutSeconds = 2700,
         [string]$TimeoutKnob = 'UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS',
         [int]$StallSeconds = -1,
-        [string]$StallKnob = 'UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS'
+        [string]$StallKnob = 'UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS',
+        [switch]$TimeoutAsWarning
     )
 
     # Default the stall threshold from the env-aware helper when the caller did
@@ -1452,10 +1478,12 @@ function Invoke-UnityCliCaptureWithTimeout {
             # killed for "no stdout/stderr line in N seconds" (this branch) versus
             # "exceeded the total wall-clock budget" (the else branch below).
             $stallKnobName = if ($StallKnob) { $StallKnob } else { 'UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS' }
-            Write-Host "::error::Unity CLI command '$($Arguments -join ' ')' HEARTBEAT STALLED after $StallSeconds second(s) with no Unity CLI stdout/stderr line; the process tree was killed (sentinel exit $stallExitCode). Raise the threshold via $stallKnobName (0 disables the heartbeat detector). Last progress message: $lastProgress. Collapsed tail:`n$collapsedTail"
+            $annotation = if ($TimeoutAsWarning) { 'warning' } else { 'error' }
+            Write-Host "::$annotation::Unity CLI command '$($Arguments -join ' ')' HEARTBEAT STALLED after $StallSeconds second(s) with no Unity CLI stdout/stderr line; the process tree was killed (sentinel exit $stallExitCode). Raise the threshold via $stallKnobName (0 disables the heartbeat detector). Last progress message: $lastProgress. Collapsed tail:`n$collapsedTail"
         } else {
             $knob = if ($TimeoutKnob) { $TimeoutKnob } else { 'UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS' }
-            Write-Host "::error::Unity CLI command '$($Arguments -join ' ')' TIMED OUT after $TimeoutSeconds second(s) and the process tree was killed (sentinel exit $timeoutExitCode). Raise the limit via $knob (0 disables the timeout). Last progress message: $lastProgress. Collapsed tail:`n$collapsedTail"
+            $annotation = if ($TimeoutAsWarning) { 'warning' } else { 'error' }
+            Write-Host "::$annotation::Unity CLI command '$($Arguments -join ' ')' TIMED OUT after $TimeoutSeconds second(s) and the process tree was killed (sentinel exit $timeoutExitCode). Raise the limit via $knob (0 disables the timeout). Last progress message: $lastProgress. Collapsed tail:`n$collapsedTail"
         }
     }
 
@@ -1915,7 +1943,7 @@ function Get-UnityCliInstallRoot {
     # best-effort SET succeeded, so discovery does not depend on the (uncertain)
     # set flag. Take the last non-empty path-like stdout line; ignore banners
     # and decorated output.
-    $lines = Get-UnityCliOutput -Arguments @('install-path')
+    $lines = Get-UnityCliOutput -Arguments @('install-path') -AcceptCapturedOutputOnTimeout
     if (-not $lines) {
         return $null
     }
@@ -1950,11 +1978,13 @@ function Set-UnityCliInstallPath {
     # `--set`; if both fail, emit a ::notice:: (NOT an error) and continue.
     param([Parameter(Mandatory = $true)][string]$Root)
 
-    if (Invoke-UnityCliSafe -Arguments @('install-path', '-s', $Root)) {
+    $normalizedRoot = $Root.TrimEnd([char[]]@('\', '/'))
+    $confirmationPattern = '^All Unity Editors will be installed to\s+' + [regex]::Escape($normalizedRoot) + '[\\/]?$'
+    if (Invoke-UnityCliSafe -Arguments @('install-path', '-s', $Root) -AcceptCapturedOutputPattern $confirmationPattern) {
         return
     }
 
-    if (Invoke-UnityCliSafe -Arguments @('install-path', '--set', $Root)) {
+    if (Invoke-UnityCliSafe -Arguments @('install-path', '--set', $Root) -AcceptCapturedOutputPattern $confirmationPattern) {
         return
     }
 
