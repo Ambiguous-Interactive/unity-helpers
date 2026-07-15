@@ -3776,8 +3776,23 @@ function Ensure-UnityNativeStartupHealthy {
         throw "Unity $Version native startup probe failed with exit code $($result.ExitCode) ($($result.Description)), and UH_UNITY_DISABLE_EDITOR_REPAIR=1 disabled auto-repair. Probe log: $probeLog"
     }
 
+    $repairReason = "native startup probe failed with exit code $($result.ExitCode) ($($result.Description)). Probe log: $probeLog"
     Write-Host "::warning::Unity $Version native startup probe failed before the license lock; attempting one managed reinstall."
-    $repaired = Repair-UnityEditorWithCiModules -Version $Version -EditorPath $EditorPath -InstallRoot $InstallRoot -Reason "native startup probe failed with exit code $($result.ExitCode) ($($result.Description)). Probe log: $probeLog" -Profile $Profile -ManagedOnly:$ManagedOnly
+    try {
+        $repaired = Repair-UnityEditorWithCiModules -Version $Version -EditorPath $EditorPath -InstallRoot $InstallRoot -Reason $repairReason -Profile $Profile -ManagedOnly:$ManagedOnly
+    } catch {
+        $repairFailure = $_.Exception.Message
+        if (-not (Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message $repairFailure -InstallRoot $InstallRoot -Version $Version)) {
+            throw
+        }
+
+        Write-Host "::warning::Native-startup repair for Unity $Version could not replace the existing editor tree ($repairFailure); trying an alternate CI-managed install root."
+        try {
+            $repaired = Install-UnityEditorWithCiModulesInAlternateRoot -Version $Version -InstallRoot $InstallRoot -Reason "native-startup repair was pinned to the existing editor tree ($repairFailure)" -Profile $Profile -ManagedOnly:$ManagedOnly
+        } catch {
+            throw "Unity $Version native-startup repair was blocked at the existing editor tree ($repairFailure), and alternate-root repair also failed: $($_.Exception.Message)"
+        }
+    }
     # Repair-UnityEditorWithCiModules requests the selected provisioning profile,
     # then we re-run the disk-authoritative module check so a CLI success with
     # missing selected-profile children is still caught before the final native

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Unity CLI install-path probes hanging under service accounts**: CI-managed editor provisioning now preserves an exact install-path confirmation captured before the watchdog stops a lingering Unity CLI process tree, so NetworkService runners can continue provisioning instead of discarding the confirmed path as a failed probe.
 - **Unity repair installs timing out after materializing a usable editor**: atomic repair provisioning now continues to required-module verification when the Unity CLI exits nonzero or reaches its watchdog deadline after `Unity.exe` is resolvable, matching the base-install recovery path while still failing closed when any required CI module is absent.
+- **Locked corrupt editors blocking native-startup recovery**: when a failed native startup probe cannot quarantine the existing editor because another process still holds its tree, provisioning now installs and verifies the editor in the alternate CI-managed root instead of leaving the runner permanently unable to self-repair.
 
 ## [3.5.1] - 2026-07-12
 
