@@ -16,6 +16,8 @@ param(
 
     [switch]$WithWindowsIl2Cpp,
 
+    [string[]]$RequiredEditorPayloadRelativePath = @(),
+
     [switch]$RequireHealthyExisting
 )
 
@@ -2243,6 +2245,40 @@ function Test-IsPathInsideDirectory {
     return $fullPath.Equals($fullDirectory, $comparison) -or
         $fullPath.StartsWith($fullDirectory + [System.IO.Path]::DirectorySeparatorChar, $comparison) -or
         $fullPath.StartsWith($fullDirectory + [System.IO.Path]::AltDirectorySeparatorChar, $comparison)
+}
+
+function Get-MissingRequiredEditorPayloadPaths {
+    param(
+        [Parameter(Mandatory = $true)][string]$EditorPath,
+        [string[]]$RelativePaths = @()
+    )
+
+    $editorRoot = Split-Path -Parent $EditorPath
+    if (-not $editorRoot) {
+        throw "Could not resolve the Unity editor root from '$EditorPath'."
+    }
+
+    $missing = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($relativePath in @($RelativePaths)) {
+        $relative = [string]$relativePath
+        if ([string]::IsNullOrWhiteSpace($relative)) {
+            throw 'Required editor payload paths must be non-empty relative paths.'
+        }
+        if ([System.IO.Path]::IsPathRooted($relative)) {
+            throw "Required editor payload path must be relative to the Editor directory: '$relative'."
+        }
+
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path $editorRoot $relative))
+        if (-not (Test-IsPathInsideDirectory -Path $candidate -Directory $editorRoot)) {
+            throw "Required editor payload path escapes the Editor directory: '$relative'."
+        }
+        if ($seen.Add($relative) -and -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            $missing.Add($relative)
+        }
+    }
+
+    return @($missing.ToArray())
 }
 
 function Get-UnityEditorInstallDirectory {
@@ -4703,6 +4739,12 @@ if ($RequireHealthyExisting) {
         throw "Unity $UnityVersion is missing required CI module groups for provisioning profile '$ProvisioningProfile': $($missingModules -join ', '). CI test jobs fail fast instead of installing modules in-job; run scripts/unity/maintain-windows-runner.ps1 or dispatch .github/workflows/runner-bootstrap.yml to repair this editor."
     }
 
+    $missingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $editor -RelativePaths $RequiredEditorPayloadRelativePath)
+    if ($missingPayload.Count -gt 0) {
+        Write-InstalledEditorDiagnostics -Version $UnityVersion -Root $InstallRoot -Reason "RequireHealthyExisting was set and required editor payload is missing: $($missingPayload -join ', ')."
+        throw "Unity $UnityVersion required editor payload is missing: $($missingPayload -join ', '). CI test jobs fail fast instead of repairing when RequireHealthyExisting is set."
+    }
+
     if ($env:UH_UNITY_SKIP_NATIVE_STARTUP_PROBE -eq '1') {
         Write-CiNotice "Skipping Unity $UnityVersion native startup probe (UH_UNITY_SKIP_NATIVE_STARTUP_PROBE=1)."
     } else {
@@ -4834,6 +4876,25 @@ if (-not $editor) {
 
 $editor = Ensure-UnityNativeStartupHealthy -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
 $script:ProvisioningEditorPath = $editor
+$missingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $editor -RelativePaths $RequiredEditorPayloadRelativePath)
+if ($missingPayload.Count -gt 0) {
+    Ensure-UnityCli | Out-Null
+    Set-UnityCliInstallPath -Root $InstallRoot
+    if ($CiManagedOnly) {
+        Confirm-UnityCliManagedInstallRoot -Root $InstallRoot | Out-Null
+    }
+
+    $repairReason = "required editor payload is missing: $($missingPayload -join ', ')."
+    $editor = Repair-UnityEditorWithCiModules -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Reason $repairReason -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+    $script:ProvisioningEditorPath = $editor
+    $editor = Ensure-UnityNativeStartupHealthy -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+    $script:ProvisioningEditorPath = $editor
+
+    $missingAfterRepair = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $editor -RelativePaths $RequiredEditorPayloadRelativePath)
+    if ($missingAfterRepair.Count -gt 0) {
+        throw "Unity $UnityVersion repair completed, but required editor payload is missing: $($missingAfterRepair -join ', ')."
+    }
+}
 $script:ProvisioningFinalClassification = 'success'
 Write-CiNotice "Unity editor resolved: $editor"
 Write-Output $editor
