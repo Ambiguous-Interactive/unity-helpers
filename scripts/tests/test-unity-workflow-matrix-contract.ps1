@@ -1724,6 +1724,8 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $alternateInstallFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Install-UnityEditorWithCiModulesInAlternateRoot'
+    $alternateInstallContent = if ($alternateInstallFunctionAst) { $alternateInstallFunctionAst.Extent.Text } else { '' }
     $requiredPayloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("unity-required-payload-" + [guid]::NewGuid().ToString('N'))
     try {
         $editorPath = Join-Path $requiredPayloadRoot 'Editor\Unity.exe'
@@ -1752,10 +1754,14 @@ if ($ensureEditorWatchdogImported) {
             -not $ensureEditorContent.Contains('required editor payload is missing') -or
             -not $ensureEditorContent.Contains('UH_UNITY_DISABLE_EDITOR_REPAIR=1 disabled required-payload auto-repair') -or
             -not $ensureEditorContent.Contains('Using reusable alternate-root CI editor with complete required payload') -or
+            -not $alternateInstallContent.Contains('[string[]]$RequiredEditorPayloadRelativePath = @()') -or
+            -not $alternateInstallContent.Contains('Quarantining payload-incomplete alternate-root Unity') -or
+            -not $alternateInstallContent.Contains('Get-MissingRequiredEditorPayloadPaths') -or
+            -not $ensureEditorContent.Contains('-RequiredEditorPayloadRelativePath $RequiredEditorPayloadRelativePath') -or
             -not $ensureEditorContent.Contains('Required-payload repair for Unity') -or
             -not $ensureEditorContent.Contains('Install-UnityEditorWithCiModulesInAlternateRoot')
         ) {
-            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation must reject traversal, report only missing relative files, honor the repair-disable flag, and fall back to an alternate managed root when the damaged tree is locked. Missing='$($missingPayload -join ',')' TraversalRejected=$traversalRejected."
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation must reject traversal, report only missing relative files, honor the repair-disable flag, and make alternate-root reuse and locked-tree fallback payload-aware. Missing='$($missingPayload -join ',')' TraversalRejected=$traversalRejected."
             $failed = $true
         } elseif ($VerboseOutput) {
             Write-Info 'Checked required editor payload validation and repair contract.'
