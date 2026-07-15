@@ -138,6 +138,7 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-UnityCiAlternateInstallRoot',
         'Get-UnityEditorCandidates',
         'Find-UnityEditor',
+        'Get-MissingRequiredEditorPayloadPaths',
         'Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor',
         'Install-UnityEditorModulesViaAtomicReinstall',
         'Get-CollapsedCliOutputTail',
@@ -1723,6 +1724,46 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $requiredPayloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("unity-required-payload-" + [guid]::NewGuid().ToString('N'))
+    try {
+        $editorPath = Join-Path $requiredPayloadRoot 'Editor\Unity.exe'
+        $presentRelative = 'Data\Resources\present.meta'
+        $missingRelative = 'Data\Resources\missing.meta'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $editorPath) | Out-Null
+        New-Item -ItemType File -Force -Path $editorPath | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path (Split-Path -Parent $editorPath) 'Data\Resources') | Out-Null
+        New-Item -ItemType File -Force -Path (Join-Path (Split-Path -Parent $editorPath) $presentRelative) | Out-Null
+
+        $missingPayload = @(Get-MissingRequiredEditorPayloadPaths `
+            -EditorPath $editorPath `
+            -RelativePaths @($presentRelative, $missingRelative))
+        $traversalRejected = $false
+        try {
+            Get-MissingRequiredEditorPayloadPaths -EditorPath $editorPath -RelativePaths @('..\outside.txt') | Out-Null
+        } catch {
+            $traversalRejected = $true
+        }
+
+        if (
+            $missingPayload.Count -ne 1 -or
+            $missingPayload[0] -ne $missingRelative -or
+            -not $traversalRejected -or
+            -not $ensureEditorContent.Contains('[string[]]$RequiredEditorPayloadRelativePath') -or
+            -not $ensureEditorContent.Contains('required editor payload is missing') -or
+            -not $ensureEditorContent.Contains('Repair-UnityEditorWithCiModules')
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation must reject traversal, report only missing relative files, and drive managed quarantine/reinstall before licensed work. Missing='$($missingPayload -join ',')' TraversalRejected=$traversalRejected."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked required editor payload validation and repair contract.'
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        Remove-Item -LiteralPath $requiredPayloadRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $repairRecoveryFunctionNames = @(
         'Assert-UnityProvisioningBudgetCanFit',
         'Get-UnityCiModuleIds',
