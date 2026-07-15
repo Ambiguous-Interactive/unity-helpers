@@ -1866,10 +1866,10 @@ function Run-ReleasePublishTagPreparationContractTests {
   $tagPreparationSetsUpNodeForNpmChecks = (
     $verifyTagBlock.Success -and
     $prepareTagBlock.Success -and
-    $verifyTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
+    $verifyTagBlock.Value.Contains('uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38') -and
     $verifyTagBlock.Value.Contains('node-version: "22.18.0"') -and
     $verifyTagBlock.Value.IndexOf('Setup Node.js') -lt $verifyTagBlock.Value.IndexOf('Verify tag matches package metadata') -and
-    $prepareTagBlock.Value.Contains('uses: actions/setup-node@v6') -and
+    $prepareTagBlock.Value.Contains('uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38') -and
     $prepareTagBlock.Value.Contains('node-version: "22.18.0"') -and
     $prepareTagBlock.Value.IndexOf('Setup Node.js') -lt $prepareTagBlock.Value.IndexOf('Recheck release artifacts before tag mutation')
   )
