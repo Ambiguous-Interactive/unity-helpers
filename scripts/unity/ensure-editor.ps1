@@ -4741,6 +4741,20 @@ if ($RequireHealthyExisting) {
 
     $missingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $editor -RelativePaths $RequiredEditorPayloadRelativePath)
     if ($missingPayload.Count -gt 0) {
+        $alternateEditor = Find-UnityCiAlternateEditorWithCiModules -Version $UnityVersion -InstallRoot $InstallRoot -Profile $ProvisioningProfile
+        if ($alternateEditor) {
+            $alternateMissingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $alternateEditor -RelativePaths $RequiredEditorPayloadRelativePath)
+            if ($alternateMissingPayload.Count -eq 0) {
+                Write-CiNotice "Using reusable alternate-root CI editor with complete required payload for Unity ${UnityVersion}: $alternateEditor"
+                $editor = $alternateEditor
+                $script:ProvisioningEditorPath = $editor
+                $missingPayload = @()
+            } else {
+                Write-CiNotice "Alternate-root CI editor for Unity $UnityVersion is also missing required editor payload: $($alternateMissingPayload -join ', ')."
+            }
+        }
+    }
+    if ($missingPayload.Count -gt 0) {
         Write-InstalledEditorDiagnostics -Version $UnityVersion -Root $InstallRoot -Reason "RequireHealthyExisting was set and required editor payload is missing: $($missingPayload -join ', ')."
         throw "Unity $UnityVersion required editor payload is missing: $($missingPayload -join ', '). CI test jobs fail fast instead of repairing when RequireHealthyExisting is set."
     }
