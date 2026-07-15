@@ -11,6 +11,10 @@ const ENTITLEMENT_MARKERS = new Set([
 ]);
 const ULF_RETURN =
   /^\[Licensing::Client\] Successfully returned ULF license with serial number\s*:\s*\S+$/;
+const ULF_UNAVAILABLE_MARKERS = new Set([
+  "Serial number unavailable for ULF return",
+  "[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation"
+]);
 
 function classifyCleanupEvidence({ commandCompleted, logText }) {
   if (!commandCompleted || typeof logText !== "string") {
@@ -29,7 +33,7 @@ function classifyCleanupEvidence({ commandCompleted, logText }) {
     if (ENTITLEMENT_MARKERS.has(line)) {
       entitlementReturned = true;
     }
-    if (line === "Serial number unavailable for ULF return" || ULF_RETURN.test(line)) {
+    if (ULF_UNAVAILABLE_MARKERS.has(line) || ULF_RETURN.test(line)) {
       ulfReturned = true;
     }
   }

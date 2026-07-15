@@ -30,6 +30,7 @@ function Test-UnityLicenseReturnResourceSafe {
             }
             if (
                 $normalized -ceq 'Serial number unavailable for ULF return' -or
+                $normalized -ceq '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation' -or
                 $normalized -cmatch '^\[Licensing::Client\] Successfully returned ULF license with serial number\s*:\s*\S+$'
             ) {
                 $ulfReturned = $true
