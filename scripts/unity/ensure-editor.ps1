@@ -3015,14 +3015,14 @@ function Install-UnityEditorWithCiModules {
         # thousands of identical progress lines) so the tail is READABLE.
         $tail = Get-CollapsedCliOutputTail -Output $installResult.Output -MaxLines 40
         $resolvedAfterFailure = Resolve-InstalledEditor -Version $Version -Root $InstallRoot -ManagedOnly:$ManagedOnly
-        if ($installText -match '(?i)already installed|editor already installed|is already installed') {
-            if ($resolvedAfterFailure) {
-                Write-CiNotice "Unity repair install for $Version reported already-installed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; verifying modules against disk."
-                $resolved = $resolvedAfterFailure
-                $script:ProvisioningEditorPath = $resolved
-                break
-            }
+        if ($resolvedAfterFailure) {
+            Write-CiNotice "Unity repair install for $Version failed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; verifying modules against disk."
+            $resolved = $resolvedAfterFailure
+            $script:ProvisioningEditorPath = $resolved
+            break
+        }
 
+        if ($installText -match '(?i)already installed|editor already installed|is already installed') {
             if ($attempt -lt 2) {
                 Write-InstalledEditorDiagnostics -Version $Version -Root $InstallRoot -Reason "Unity repair install reported already-installed, but Unity.exe could not be resolved afterward."
                 Invoke-UnityVersionUninstallForRepair -Version $Version -Reason "Unity repair install reported already-installed, but Unity.exe could not be resolved." -InstallRoot $InstallRoot | Out-Null
