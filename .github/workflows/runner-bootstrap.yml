@@ -249,7 +249,7 @@ jobs:
       - name: Checkout
         # Shallow checkout: bootstrap only needs scripts/unity/* and a
         # composite action; no history depth required.
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -346,7 +346,7 @@ jobs:
           Write-Host "Resolved detect-only: $detectOnly (raw='$rawDetect')"
 
           # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
-          # reliably the repo root post-checkout (actions/checkout@v7 above).
+          # reliably the repo root post-checkout (actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 above).
           #
           # The maintenance script audits/remediates host prerequisites first
           # (VC++ redists, UCRT, long paths, pwsh, Defender exclusions), then
@@ -409,13 +409,13 @@ jobs:
           }
           if ($code -ne 0) { exit $code }
 
-      # F1: actions/upload-artifact@v7 -- matches the repo-wide pinned
+      # F1: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a -- matches the repo-wide pinned
       # version used by unity-tests.yml/unity-benchmarks.yml.
       # F19: if-no-files-found is `error` (not `warn`) so a missing transcript
       # is a HARD failure rather than a silent empty artifact upload.
       - name: Upload bootstrap transcript
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: runner-bootstrap-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .artifacts/runner-bootstrap/**

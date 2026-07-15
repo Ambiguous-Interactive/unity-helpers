@@ -35,7 +35,7 @@ jobs:
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - name: Resolve dispatch overrides
@@ -193,7 +193,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -201,7 +201,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "22.18.0"
 
@@ -267,7 +267,7 @@ jobs:
 
       - name: Cache Unity Library and package caches
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         env:
           PACKAGE_HASH: >-
             ${{ hashFiles(
@@ -315,7 +315,7 @@ jobs:
 
       - name: Upload Unity provisioning diagnostics
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-benchmark-provisioning-${{ matrix.unity-version }}-${{ matrix.test-mode }}
           path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
@@ -325,7 +325,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@cfdcf6e67d7720824d21c37aa6a8b9e70dbdd2af
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@f39ee38533b20592aa0fdf72b3e18d07c46325f3
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -409,7 +409,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@cfdcf6e67d7720824d21c37aa6a8b9e70dbdd2af
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@f39ee38533b20592aa0fdf72b3e18d07c46325f3
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -465,7 +465,7 @@ jobs:
 
       - name: Upload staged perf results
         if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: perf-results-${{ matrix.unity-version }}-${{ matrix.test-mode }}
           path: perf-staging
@@ -474,7 +474,7 @@ jobs:
 
       - name: Upload benchmark artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-benchmarks-${{ matrix.unity-version }}-${{ matrix.test-mode }}
           path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -497,13 +497,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           # Persist credentials so git-auto-commit-action can push.
           persist-credentials: true
 
       - name: Download staged perf results
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: perf-results-*
           path: perf-download
@@ -531,7 +531,7 @@ jobs:
       # Node 22 (matches the benchmarks job's setup-node) to run the pure-Node,
       # zero-dependency perf-delta tooling under scripts/unity/lib/.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "22.18.0"
 
@@ -586,12 +586,12 @@ jobs:
       # built-in GITHUB_TOKEN cannot push (branch protection / required reviews),
       # this direct commit will be REJECTED. DxMessaging's perf-numbers.yml hit
       # exactly this and switched to a GitHub App installation token
-      # (actions/create-github-app-token@v3) that opens an auto-merge PR instead.
+      # (actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1) that opens an auto-merge PR instead.
       # If that happens here, provision an App token and mirror that rationale;
       # the default below is the simplest path that works on an UNprotected
       # default branch.
       - name: Commit perf results
-        uses: stefanzweifel/git-auto-commit-action@v7.2.0
+        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
           # Broadened from perf-results/*.xml to the whole tree so the rolling
