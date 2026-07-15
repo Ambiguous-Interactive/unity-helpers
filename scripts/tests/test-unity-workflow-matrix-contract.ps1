@@ -1312,6 +1312,35 @@ if (-not $ensureEditorPrefersAtomicModuleRepair) {
     Write-Info "Checked ensure-editor prefers healthy alternate-root reuse and alternate-root atomic repair before quarantine fallback."
 }
 
+$nativeStartupFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Ensure-UnityNativeStartupHealthy'
+$nativeStartupCommands = if ($nativeStartupFunctionAst) {
+    Get-FunctionCommandNames -FunctionAst $nativeStartupFunctionAst
+} else {
+    @()
+}
+$nativeStartupRepairIndex = Get-CommandIndex `
+    -Commands $nativeStartupCommands `
+    -Name 'Repair-UnityEditorWithCiModules'
+$nativeStartupPinnedFailureIndex = Get-CommandIndex `
+    -Commands $nativeStartupCommands `
+    -Name 'Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor' `
+    -StartIndex ($nativeStartupRepairIndex + 1)
+$nativeStartupAlternateRootIndex = Get-CommandIndex `
+    -Commands $nativeStartupCommands `
+    -Name 'Install-UnityEditorWithCiModulesInAlternateRoot' `
+    -StartIndex ($nativeStartupPinnedFailureIndex + 1)
+if (
+    -not $nativeStartupFunctionAst -or
+    $nativeStartupRepairIndex -lt 0 -or
+    $nativeStartupPinnedFailureIndex -le $nativeStartupRepairIndex -or
+    $nativeStartupAlternateRootIndex -le $nativeStartupPinnedFailureIndex
+) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Native-startup repair must fall back to an alternate CI-managed install root when quarantine/reinstall is blocked by a handle on the existing editor tree."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked native-startup repair uses alternate-root fallback for an existing-editor-pinned quarantine failure."
+}
+
 $detectOnly = $true
 . $windowsRunnerMaintenancePath
 if (-not $detectOnly) {
