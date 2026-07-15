@@ -3009,8 +3009,6 @@ function Install-UnityEditorWithCiModules {
             break
         }
 
-        $installLines = @($installResult.Output)
-        $installText = ($installLines -join "`n")
         $resolvedAfterFailure = Resolve-InstalledEditor -Version $Version -Root $InstallRoot -ManagedOnly:$ManagedOnly
         if ($resolvedAfterFailure) {
             Write-CiNotice "Unity repair install for $Version failed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; verifying modules against disk."
@@ -3019,6 +3017,7 @@ function Install-UnityEditorWithCiModules {
             break
         }
 
+        $installText = (@($installResult.Output) -join "`n")
         # Collapse consecutive identical lines (the Android NDK install can spam
         # thousands of identical progress lines) only when failure diagnostics
         # need a tail; a recovered editor does not consume it.
