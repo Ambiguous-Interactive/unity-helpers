@@ -4878,6 +4878,10 @@ $editor = Ensure-UnityNativeStartupHealthy -Version $UnityVersion -EditorPath $e
 $script:ProvisioningEditorPath = $editor
 $missingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $editor -RelativePaths $RequiredEditorPayloadRelativePath)
 if ($missingPayload.Count -gt 0) {
+    if ($env:UH_UNITY_DISABLE_EDITOR_REPAIR -eq '1') {
+        throw "Unity $UnityVersion required editor payload is missing ($($missingPayload -join ', ')), and UH_UNITY_DISABLE_EDITOR_REPAIR=1 disabled required-payload auto-repair."
+    }
+
     Ensure-UnityCli | Out-Null
     Set-UnityCliInstallPath -Root $InstallRoot
     if ($CiManagedOnly) {
@@ -4885,7 +4889,21 @@ if ($missingPayload.Count -gt 0) {
     }
 
     $repairReason = "required editor payload is missing: $($missingPayload -join ', ')."
-    $editor = Repair-UnityEditorWithCiModules -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Reason $repairReason -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+    try {
+        $editor = Repair-UnityEditorWithCiModules -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Reason $repairReason -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+    } catch {
+        $repairFailure = $_.Exception.Message
+        if (-not (Test-UnityAtomicInstallFailureMayBePinnedToExistingEditor -Message $repairFailure -InstallRoot $InstallRoot -Version $UnityVersion)) {
+            throw
+        }
+
+        Write-Host "::warning::Required-payload repair for Unity $UnityVersion could not replace the existing editor tree ($repairFailure); trying an alternate CI-managed install root."
+        try {
+            $editor = Install-UnityEditorWithCiModulesInAlternateRoot -Version $UnityVersion -InstallRoot $InstallRoot -Reason "required-payload repair was pinned to the existing editor tree ($repairFailure)" -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+        } catch {
+            throw "Unity $UnityVersion required-payload repair was blocked at the existing editor tree ($repairFailure), and alternate-root repair also failed: $($_.Exception.Message)"
+        }
+    }
     $script:ProvisioningEditorPath = $editor
     $editor = Ensure-UnityNativeStartupHealthy -Version $UnityVersion -EditorPath $editor -InstallRoot $InstallRoot -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
     $script:ProvisioningEditorPath = $editor
