@@ -4239,6 +4239,7 @@ function Install-UnityEditorWithCiModulesInAlternateRoot {
         [Parameter(Mandatory = $true)][string]$InstallRoot,
         [Parameter(Mandatory = $true)][string]$Reason,
         [string]$Profile = $(Get-UnityProvisioningProfile),
+        [string[]]$RequiredEditorPayloadRelativePath = @(),
         [switch]$ManagedOnly
     )
 
@@ -4262,11 +4263,17 @@ function Install-UnityEditorWithCiModulesInAlternateRoot {
             if ($existingAlternate) {
                 $existingAlternateMissing = @(Get-MissingUnityCiModuleGroups -EditorPath $existingAlternate -Profile $Profile)
                 if ($existingAlternateMissing.Count -eq 0) {
-                    Write-CiNotice "Using already repaired alternate-root CI editor for Unity $Version with provisioning profile '$Profile': $existingAlternate"
-                    return $existingAlternate
+                    $existingAlternateMissingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $existingAlternate -RelativePaths $RequiredEditorPayloadRelativePath)
+                    if ($existingAlternateMissingPayload.Count -eq 0) {
+                        Write-CiNotice "Using already repaired alternate-root CI editor for Unity $Version with provisioning profile '$Profile' and complete required payload: $existingAlternate"
+                        return $existingAlternate
+                    }
+
+                    Write-Host "::warning::Quarantining payload-incomplete alternate-root Unity $Version editor before retrying alternate-root repair: $existingAlternate (missing payload: $($existingAlternateMissingPayload -join ', '))."
+                } else {
+                    Write-Host "::warning::Quarantining partial alternate-root Unity $Version editor before retrying alternate-root repair: $existingAlternate (missing modules: $($existingAlternateMissing -join ', '))."
                 }
 
-                Write-Host "::warning::Quarantining partial alternate-root Unity $Version editor before retrying alternate-root repair: $existingAlternate (missing: $($existingAlternateMissing -join ', '))."
                 Move-UnityVersionInstallToQuarantine -Version $Version -InstallRoot $alternateRoot
             }
 
@@ -4278,6 +4285,10 @@ function Install-UnityEditorWithCiModulesInAlternateRoot {
             $missing = @(Get-MissingUnityCiModuleGroups -EditorPath $resolved -Profile $Profile)
             if ($missing.Count -gt 0) {
                 throw "Alternate-root Unity $Version install completed at '$resolved', but required CI module groups for provisioning profile '$Profile' are still missing on disk: $($missing -join ', ')."
+            }
+            $missingPayload = @(Get-MissingRequiredEditorPayloadPaths -EditorPath $resolved -RelativePaths $RequiredEditorPayloadRelativePath)
+            if ($missingPayload.Count -gt 0) {
+                throw "Alternate-root Unity $Version install completed at '$resolved', but required editor payload is still missing on disk: $($missingPayload -join ', ')."
             }
             if ($ManagedOnly -and -not (Test-IsPathInsideDirectory -Path $resolved -Directory $InstallRoot)) {
                 throw "Alternate-root Unity $Version install resolved outside the managed install root '$InstallRoot': $resolved"
@@ -4913,7 +4924,7 @@ if ($missingPayload.Count -gt 0) {
 
         Write-Host "::warning::Required-payload repair for Unity $UnityVersion could not replace the existing editor tree ($repairFailure); trying an alternate CI-managed install root."
         try {
-            $editor = Install-UnityEditorWithCiModulesInAlternateRoot -Version $UnityVersion -InstallRoot $InstallRoot -Reason "required-payload repair was pinned to the existing editor tree ($repairFailure)" -Profile $ProvisioningProfile -ManagedOnly:$CiManagedOnly
+            $editor = Install-UnityEditorWithCiModulesInAlternateRoot -Version $UnityVersion -InstallRoot $InstallRoot -Reason "required-payload repair was pinned to the existing editor tree ($repairFailure)" -Profile $ProvisioningProfile -RequiredEditorPayloadRelativePath $RequiredEditorPayloadRelativePath -ManagedOnly:$CiManagedOnly
         } catch {
             throw "Unity $UnityVersion required-payload repair was blocked at the existing editor tree ($repairFailure), and alternate-root repair also failed: $($_.Exception.Message)"
         }
