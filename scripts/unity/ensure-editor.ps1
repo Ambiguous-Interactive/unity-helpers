@@ -3011,9 +3011,6 @@ function Install-UnityEditorWithCiModules {
 
         $installLines = @($installResult.Output)
         $installText = ($installLines -join "`n")
-        # Collapse consecutive identical lines (the Android NDK install can spam
-        # thousands of identical progress lines) so the tail is READABLE.
-        $tail = Get-CollapsedCliOutputTail -Output $installResult.Output -MaxLines 40
         $resolvedAfterFailure = Resolve-InstalledEditor -Version $Version -Root $InstallRoot -ManagedOnly:$ManagedOnly
         if ($resolvedAfterFailure) {
             Write-CiNotice "Unity repair install for $Version failed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; verifying modules against disk."
@@ -3022,6 +3019,10 @@ function Install-UnityEditorWithCiModules {
             break
         }
 
+        # Collapse consecutive identical lines (the Android NDK install can spam
+        # thousands of identical progress lines) only when failure diagnostics
+        # need a tail; a recovered editor does not consume it.
+        $tail = Get-CollapsedCliOutputTail -Output $installResult.Output -MaxLines 40
         if ($installText -match '(?i)already installed|editor already installed|is already installed') {
             if ($attempt -lt 2) {
                 Write-InstalledEditorDiagnostics -Version $Version -Root $InstallRoot -Reason "Unity repair install reported already-installed, but Unity.exe could not be resolved afterward."
