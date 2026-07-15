@@ -1751,6 +1751,7 @@ if ($ensureEditorWatchdogImported) {
             -not $ensureEditorContent.Contains('[string[]]$RequiredEditorPayloadRelativePath') -or
             -not $ensureEditorContent.Contains('required editor payload is missing') -or
             -not $ensureEditorContent.Contains('UH_UNITY_DISABLE_EDITOR_REPAIR=1 disabled required-payload auto-repair') -or
+            -not $ensureEditorContent.Contains('Using reusable alternate-root CI editor with complete required payload') -or
             -not $ensureEditorContent.Contains('Required-payload repair for Unity') -or
             -not $ensureEditorContent.Contains('Install-UnityEditorWithCiModulesInAlternateRoot')
         ) {
