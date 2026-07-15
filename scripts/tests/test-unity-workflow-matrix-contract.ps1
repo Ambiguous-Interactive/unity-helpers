@@ -144,6 +144,7 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-CliProgressTriple',
         'Get-LastCliProgressMessage',
         'Write-CiNotice',
+        'Install-UnityEditorWithCiModules',
         'Invoke-UnityCliCaptureWithTimeout',
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
@@ -1693,6 +1694,95 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $repairRecoveryFunctionNames = @(
+        'Assert-UnityProvisioningBudgetCanFit',
+        'Get-UnityCiModuleIds',
+        'Confirm-UnityCliManagedInstallRoot',
+        'Write-CiNotice',
+        'Get-UnityCliModuleInstallArguments',
+        'Invoke-UnityCliCapture',
+        'Resolve-InstalledEditor',
+        'Get-MissingUnityCiModuleGroups'
+    )
+    $repairRecoveryOriginalFunctions = @{}
+    $oldProvisioningEditorPathVariable = Get-Variable -Name ProvisioningEditorPath -Scope Script -ErrorAction SilentlyContinue
+    $oldProvisioningEditorPath = if ($oldProvisioningEditorPathVariable) { $oldProvisioningEditorPathVariable.Value } else { $null }
+    try {
+        foreach ($functionName in $repairRecoveryFunctionNames) {
+            $existingFunction = Get-Item "Function:\$functionName" -ErrorAction SilentlyContinue
+            $repairRecoveryOriginalFunctions[$functionName] = if ($existingFunction) { $existingFunction.ScriptBlock } else { $null }
+        }
+
+        function script:Assert-UnityProvisioningBudgetCanFit { param([string]$Operation, [int]$MinimumSeconds) }
+        function script:Get-UnityCiModuleIds { param([string]$Profile) return @('windows-mono') }
+        function script:Confirm-UnityCliManagedInstallRoot { param([string]$Root) return $Root }
+        function script:Write-CiNotice { param([string]$Message) $script:repairRecoveryNotices.Add($Message) | Out-Null }
+        function script:Get-UnityCliModuleInstallArguments { param([string]$Verb, [string]$Version, [string[]]$ModuleIds) return @($Verb, $Version) }
+        function script:Invoke-UnityCliCapture {
+            param([string[]]$Arguments)
+            return @{
+                Success = $false
+                ExitCode = 124
+                Output = @('Progress: 50%')
+                StallKilled = $false
+                TimedOutWallClock = $true
+            }
+        }
+        function script:Resolve-InstalledEditor { param([string]$Version, [string]$Root, [switch]$ManagedOnly) return 'D:\Unity\6000.5.2f1\Editor\Unity.exe' }
+        function script:Get-MissingUnityCiModuleGroups { param([string]$EditorPath, [string]$Profile) return @($script:repairRecoveryMissingModules) }
+
+        $script:repairRecoveryNotices = New-Object System.Collections.Generic.List[string]
+        $script:repairRecoveryMissingModules = @()
+        $resolvedRepairEditor = Install-UnityEditorWithCiModules `
+            -Version '6000.5.2f1' `
+            -InstallRoot 'D:\Unity' `
+            -Reason 'live timeout regression' `
+            -Profile 'StandaloneWindowsIl2Cpp' `
+            -ManagedOnly
+        $repairRecoveryNoticeText = @($script:repairRecoveryNotices.ToArray()) -join ' '
+        $script:repairRecoveryMissingModules = @('windows-mono')
+        $missingModuleFailure = ''
+        try {
+            Install-UnityEditorWithCiModules `
+                -Version '6000.5.2f1' `
+                -InstallRoot 'D:\Unity' `
+                -Reason 'live timeout regression' `
+                -Profile 'StandaloneWindowsIl2Cpp' `
+                -ManagedOnly | Out-Null
+        } catch {
+            $missingModuleFailure = $_.Exception.Message
+        }
+        if (
+            $resolvedRepairEditor -ne 'D:\Unity\6000.5.2f1\Editor\Unity.exe' -or
+            $repairRecoveryNoticeText -notmatch 'failed with exit code 124' -or
+            $repairRecoveryNoticeText -notmatch 'verifying modules against disk' -or
+            $missingModuleFailure -notmatch 'required CI module groups.+still missing.+windows-mono'
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::A timed-out repair install must continue to disk module verification when Unity.exe is resolvable afterward and fail closed if required modules are absent. Resolved='$resolvedRepairEditor' Notices='$repairRecoveryNoticeText' MissingModuleFailure='$missingModuleFailure'."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked repair installs recover a resolvable editor after a Unity CLI timeout and still verify modules on disk.'
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Repair-install timeout recovery regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        foreach ($functionName in $repairRecoveryFunctionNames) {
+            if ($repairRecoveryOriginalFunctions[$functionName]) {
+                Set-Item "Function:\$functionName" -Value $repairRecoveryOriginalFunctions[$functionName]
+            } else {
+                Remove-Item "Function:\$functionName" -ErrorAction SilentlyContinue
+            }
+        }
+        Remove-Variable -Name repairRecoveryNotices -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name repairRecoveryMissingModules -Scope Script -ErrorAction SilentlyContinue
+        if ($oldProvisioningEditorPathVariable) {
+            $script:ProvisioningEditorPath = $oldProvisioningEditorPath
+        } else {
+            Remove-Variable -Name ProvisioningEditorPath -Scope Script -ErrorAction SilentlyContinue
+        }
+    }
+
     $oldInstallTimeout = $env:UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS
     $oldProvisioningProfileVariable = Get-Variable -Name UnityProvisioningProfile -Scope Script -ErrorAction SilentlyContinue
     $oldProvisioningProfile = if ($oldProvisioningProfileVariable) { [string]$oldProvisioningProfileVariable.Value } else { $null }
