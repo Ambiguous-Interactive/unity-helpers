@@ -2404,7 +2404,17 @@ $classificationCases = @(
         )
         Expected = $true
     }
+    @{
+        Name = 'current Unity entitlement and ULF-unavailable markers'
+        ExitCode = 0
+        Lines = @(
+            '[Licensing::Module] Successfully returned the entitlement license'
+            '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'
+        )
+        Expected = $true
+    }
     @{ Name = 'dual exact normalized markers'; ExitCode = 1; Lines = @('  Successfully returned the entitlement license  ', "`tSerial number unavailable for ULF return"); Expected = $true }
+    @{ Name = 'ULF-unavailable marker only'; ExitCode = 0; Lines = @('[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'); Expected = $false }
     @{ Name = 'case-altered markers'; ExitCode = 0; Lines = @('Successfully Returned the entitlement license', 'Serial Number unavailable for ULF return'); Expected = $false }
     @{ Name = 'generic success'; ExitCode = 1; Lines = @('License return succeeded'); Expected = $false }
     @{ Name = 'one marker'; ExitCode = 1; Lines = @('Successfully returned the entitlement license'); Expected = $false }

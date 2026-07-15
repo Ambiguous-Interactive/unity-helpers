@@ -17,9 +17,24 @@ const positive = [
 
 const cases = [
   ["exact markers", true, positive, true],
+  [
+    "current Unity ULF-unavailable marker",
+    true,
+    positive.replace(
+      "[Licensing::Client] Successfully returned ULF license with serial number : <redacted>",
+      "[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation"
+    ),
+    true
+  ],
   ["command incomplete", false, positive, false],
   ["exit status missing", true, positive.replace("exit_return_rc=0\n", ""), false],
   ["entitlement only", true, "Successfully returned the entitlement license\n", false],
+  [
+    "ULF unavailable only",
+    true,
+    "exit_return_rc=0\n[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation\n",
+    false
+  ],
   ["case changed", true, positive.replace("Successfully", "successfully"), false],
   ["terminated", true, positive.replace("exit_return_rc=0", "exit_return_rc=143"), false],
   [
