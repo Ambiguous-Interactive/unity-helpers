@@ -1750,9 +1750,11 @@ if ($ensureEditorWatchdogImported) {
             -not $traversalRejected -or
             -not $ensureEditorContent.Contains('[string[]]$RequiredEditorPayloadRelativePath') -or
             -not $ensureEditorContent.Contains('required editor payload is missing') -or
-            -not $ensureEditorContent.Contains('Repair-UnityEditorWithCiModules')
+            -not $ensureEditorContent.Contains('UH_UNITY_DISABLE_EDITOR_REPAIR=1 disabled required-payload auto-repair') -or
+            -not $ensureEditorContent.Contains('Required-payload repair for Unity') -or
+            -not $ensureEditorContent.Contains('Install-UnityEditorWithCiModulesInAlternateRoot')
         ) {
-            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation must reject traversal, report only missing relative files, and drive managed quarantine/reinstall before licensed work. Missing='$($missingPayload -join ',')' TraversalRejected=$traversalRejected."
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Required editor payload validation must reject traversal, report only missing relative files, honor the repair-disable flag, and fall back to an alternate managed root when the damaged tree is locked. Missing='$($missingPayload -join ',')' TraversalRejected=$traversalRejected."
             $failed = $true
         } elseif ($VerboseOutput) {
             Write-Info 'Checked required editor payload validation and repair contract.'
