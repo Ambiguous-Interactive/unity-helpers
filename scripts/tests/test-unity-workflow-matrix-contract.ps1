@@ -9,6 +9,7 @@ param([switch]$VerboseOutput)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $buildLockActionCommit = '092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315'
+$buildLockActionVersion = 'v1.7.1'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
@@ -271,10 +272,11 @@ function Test-UnityLockCleanupIsGated {
     $returnUses = './.github/actions/return-unity-license'
     $requiredCleanupGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
     $requiredReleaseGate = 'if: ${{ always() && (steps.unity_lock.outcome == ''success'' || steps.unity_lock.outcome == ''failure'' || steps.unity_lock.outcome == ''cancelled'') }}'
+    $buildLockUsesLineSuffix = '[ \t]+# ' + [regex]::Escape($buildLockActionVersion) + '[ \t]*\r?$'
 
-    $acquirePattern = '(?ms)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:.*?\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + '[ \t]*\r?$'
+    $acquirePattern = '(?m)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:[^\r\n]*\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + $buildLockUsesLineSuffix
     $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($requiredCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+continue-on-error:\s+true\s*\r?\n\s+uses:\s+' + [regex]::Escape($returnUses)
-    $releasePattern = '(?ms)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + '[ \t]*\r?$'
+    $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
     $failures = @()
 
     foreach ($job in $Jobs.GetEnumerator()) {
@@ -379,7 +381,7 @@ function Test-UnityLockAppConfiguration {
             "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@$buildLockActionCommit"
         }
 
-        $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]*\r?$'
+        $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]+# ' + [regex]::Escape($buildLockActionVersion) + '[ \t]*\r?$'
         if ($stepText -notmatch $exactActionPattern) {
             $failures += "$stepKind lock step must use $expectedAction"
         }
