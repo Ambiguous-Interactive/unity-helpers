@@ -203,3 +203,5 @@ The Unity workflows expect the following repository (or organization) secrets. T
 - `BUILD_LOCK_APP_ID`, `BUILD_LOCK_APP_PRIVATE_KEY` — dedicated GitHub App credentials for the `wallstop-organization-builds` organization build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`); both are required together and should be provisioned as organization secrets with access to this repository.
 - `UNITY_ACCELERATOR_ENDPOINT` — optional; enables the Unity Accelerator cache namespace when set.
 - `RUNNER_AUDIT_PAT` — optional; upgrades the runner-preflight soft pass to a hard pass (see above).
+
+Provision the required Unity and build-lock credentials as organization secrets selected for this repository. The licensed workflows intentionally do not bind jobs to a per-repository environment, so trusted pull requests from branches in this repository validate automatically without an environment approval. Pull requests from forks remain ineligible for licensed jobs and do not receive these secrets.
