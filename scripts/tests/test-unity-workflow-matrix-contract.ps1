@@ -1408,8 +1408,12 @@ try {
         Remove-Item -LiteralPath $bootstrapEnvDiagnostics -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
-if ($bootstrapEnvExitCode -ne 2) {
-    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 must force direct bootstrap script execution into detect-only mode. Exit $bootstrapEnvExitCode. Output: $($bootstrapEnvOutput -join ' ')"
+$bootstrapEnvOutputText = $bootstrapEnvOutput -join ' '
+if (
+    $bootstrapEnvExitCode -notin @(0, 2) -or
+    $bootstrapEnvOutputText -notmatch 'UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 -> forcing DetectOnly'
+) {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 must force direct bootstrap script execution into detect-only mode. Healthy hosts return 0 and hosts missing prerequisites return 2. Exit $bootstrapEnvExitCode. Output: $bootstrapEnvOutputText"
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked direct bootstrap honors UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1."
