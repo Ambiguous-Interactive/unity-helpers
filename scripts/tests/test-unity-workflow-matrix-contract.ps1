@@ -8,7 +8,7 @@ param([switch]$VerboseOutput)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$buildLockActionCommit = 'f39ee38533b20592aa0fdf72b3e18d07c46325f3'
+$buildLockActionCommit = '092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }

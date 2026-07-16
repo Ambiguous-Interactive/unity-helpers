@@ -87,7 +87,22 @@ for (const job of [
     /github\.event_name\s*!=\s*'pull_request'\s*&&/u,
     `${job} must not reject every pull request`
   );
-  assert.match(block, /^    environment:\s*unity-license\s*$/mu, `${job} must use unity-license`);
+  assert.doesNotMatch(
+    block,
+    /^    environment:\s*unity-license\s*$/mu,
+    `${job} must use organization secrets without an approval-gated environment`
+  );
+}
+for (const workflowName of ["unity-tests.yml", "unity-benchmarks.yml", "release.yml"]) {
+  const licensedWorkflow = fs.readFileSync(
+    path.join(root, ".github/workflows", workflowName),
+    "utf8"
+  );
+  assert.doesNotMatch(
+    licensedWorkflow,
+    /^\s+environment:\s*unity-license\s*$/mu,
+    `${workflowName} must not require a per-repository Unity environment`
+  );
 }
 assert.match(
   workflow,
