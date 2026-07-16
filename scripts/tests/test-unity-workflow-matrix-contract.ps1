@@ -8,8 +8,8 @@ param([switch]$VerboseOutput)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$buildLockActionCommit = '092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315'
-$buildLockActionVersion = 'v1.7.1'
+$buildLockActionCommit = 'c9d7e9feda64700c00374ffcbcc9dd93553c7054'
+$buildLockActionVersion = 'v1.8.1'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
@@ -412,6 +412,7 @@ function Test-UnityLockAppConfiguration {
 [string[]]$lines = Get-Content -LiteralPath $workflowPath
 [string]$workflowContent = $lines -join "`n"
 [string[]]$benchmarksWorkflowLines = Get-Content -LiteralPath $benchmarksWorkflowPath
+[string]$benchmarksWorkflowContent = $benchmarksWorkflowLines -join "`n"
 [string[]]$releaseWorkflowLines = Get-Content -LiteralPath $releaseWorkflowPath
 [string[]]$runnerBootstrapLines = Get-Content -LiteralPath $runnerBootstrapPath
 [string]$runnerBootstrapContent = Get-Content -LiteralPath $runnerBootstrapPath -Raw
@@ -1035,16 +1036,15 @@ if ($VerboseOutput) {
 
 $runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight')) { $runnerBootstrapJobTexts['runner-preflight'] } else { '' }
 $bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
-$requiredLabelsPattern = '(?m)^\s+REQUIRED_LABELS:\s*"self-hosted,Windows,RAM-64GB,\$\{\{\s*inputs\.runner-label\s*\}\}"\s*$'
 $bootstrapRunsOnPattern = '(?m)^\s+runs-on:\s*\[self-hosted,\s*Windows,\s*RAM-64GB,\s*"\$\{\{\s*inputs\.runner-label\s*\}\}"\]\s*$'
-$stableRunnerLabelMatcher = 'select((($labels - ((.labels // []) | map(.name))) | length) == 0)'
-$brokenRunnerLabelMatcher = '($labels | all(. as $l | (.labels // [])'
+$runnerPreflightAction = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@$buildLockActionCommit"
+$readerAppCredentialsPattern = '(?ms)reader-app-id:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_ID\s*\}\}.*reader-app-private-key:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_PRIVATE_KEY\s*\}\}'
 $runnerBootstrapPinsRequestedMachine = (
     $runnerBootstrapJobTexts.ContainsKey('runner-preflight') -and
     $runnerBootstrapJobTexts.ContainsKey('bootstrap') -and
-    $runnerPreflightJob -match $requiredLabelsPattern -and
-    $runnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
-    -not $runnerPreflightJob.Contains($brokenRunnerLabelMatcher) -and
+    $runnerPreflightJob.Contains("uses: $runnerPreflightAction # $buildLockActionVersion") -and
+    $runnerPreflightJob -match $readerAppCredentialsPattern -and
+    $runnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB","${{ inputs.runner-label }}"]]''') -and
     $bootstrapJob -match $bootstrapRunsOnPattern -and
     $bootstrapJob.Contains('custom ''$requested'' label') -and
     $actionlintContent.Contains('- DAD-MACHINE') -and
@@ -1061,19 +1061,46 @@ if (-not $runnerBootstrapPinsRequestedMachine) {
 
 $unityTestsRunnerPreflightJob = if ($jobTexts.ContainsKey('runner-preflight')) { $jobTexts['runner-preflight'] } else { '' }
 $benchmarksRunnerPreflightJob = if ($benchmarksJobTexts.ContainsKey('runner-preflight')) { $benchmarksJobTexts['runner-preflight'] } else { '' }
-$unityWorkflowRunnerPreflightsUseStableMatcher = (
+$unityWorkflowRunnerPreflightsFailClosed = (
     $jobTexts.ContainsKey('runner-preflight') -and
     $benchmarksJobTexts.ContainsKey('runner-preflight') -and
-    $unityTestsRunnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
-    $benchmarksRunnerPreflightJob.Contains($stableRunnerLabelMatcher) -and
-    -not $unityTestsRunnerPreflightJob.Contains($brokenRunnerLabelMatcher) -and
-    -not $benchmarksRunnerPreflightJob.Contains($brokenRunnerLabelMatcher)
+    $unityTestsRunnerPreflightJob.Contains("uses: $runnerPreflightAction # $buildLockActionVersion") -and
+    $benchmarksRunnerPreflightJob.Contains("uses: $runnerPreflightAction # $buildLockActionVersion") -and
+    $unityTestsRunnerPreflightJob -match $readerAppCredentialsPattern -and
+    $benchmarksRunnerPreflightJob -match $readerAppCredentialsPattern -and
+    $unityTestsRunnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
+    $benchmarksRunnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
+    -not $workflowContent.Contains('RUNNER_AUDIT_PAT') -and
+    -not $benchmarksWorkflowContent.Contains('RUNNER_AUDIT_PAT') -and
+    -not $runnerBootstrapContent.Contains('RUNNER_AUDIT_PAT') -and
+    -not $workflowContent.Contains('Soft pass: skipping runner inventory check.') -and
+    -not $benchmarksWorkflowContent.Contains('Soft pass: skipping runner inventory check.') -and
+    -not $runnerBootstrapContent.Contains('Soft pass: skipping runner inventory check.')
 )
-if (-not $unityWorkflowRunnerPreflightsUseStableMatcher) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow runner-preflight label matching must use the set-difference matcher from runner-bootstrap.yml so visible runner inventories do not crash jq by treating label strings as runner objects. Keep .github/workflows/unity-benchmarks.yml in sync."
+if (-not $unityWorkflowRunnerPreflightsFailClosed) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Every self-hosted Unity runner preflight must use the pinned reader-App action, request the exact runs-on labels, and fail closed without PAT or soft-pass fallbacks."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity workflow runner-preflight label matchers use the stable set-difference form."
+    Write-Info "Checked Unity workflow runner preflights use the fail-closed reader-App action."
+}
+
+$unityCiSuccessJob = if ($jobTexts.ContainsKey('unity-ci-success')) { $jobTexts['unity-ci-success'] } else { '' }
+$unityCiSuccessContract = (
+    $jobTexts.ContainsKey('unity-ci-success') -and
+    $unityCiSuccessJob -match '(?m)^\s+name:\s*Unity CI Success\s*$' -and
+    $unityCiSuccessJob -match '(?m)^\s+if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$' -and
+    $unityCiSuccessJob.Contains('needs.runner-preflight.result') -and
+    $unityCiSuccessJob.Contains('needs.unity-tests.result') -and
+    $unityCiSuccessJob.Contains('needs.unity-tests-standalone.result') -and
+    $unityCiSuccessJob.Contains('needs.unity-tests-single-threaded.result') -and
+    $unityCiSuccessJob.Contains('needs.unitypackage-smoke.result') -and
+    $unityCiSuccessJob.Contains('Unexpected Unity CI job result')
+)
+if (-not $unityCiSuccessContract) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity CI must end in an always-reporting Unity CI Success job that rejects runner-preflight failures and unexpected skipped licensed jobs."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity CI has an always-reporting fail-closed aggregate job."
 }
 
 function Get-UnityWorkflowStepText {

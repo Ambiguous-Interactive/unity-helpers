@@ -37,12 +37,12 @@ gh api orgs/<org>/actions/runner-groups/<group-id>/repositories \
   -q '.repositories[] | {id, name, full_name}'
 ```
 
-If `wallstop/unity-helpers` does not appear in that list, the dispatcher has no path to the group's runners from this repository, which matches the symptom above.
+If `Ambiguous-Interactive/unity-helpers` does not appear in that list, the dispatcher has no path to the group's runners from this repository, which matches the symptom above.
 
 Cross-check by listing runners that the repository itself can see:
 
 ```bash
-gh api repos/wallstop/unity-helpers/actions/runners \
+gh api repos/Ambiguous-Interactive/unity-helpers/actions/runners \
   -q '.runners[] | {id, name, status, busy, labels: [.labels[].name]}'
 ```
 
@@ -78,21 +78,13 @@ After applying the chosen resolution, re-run the queued workflow from the Action
 
 ## Preflight diagnostic in this repository
 
-Unity workflows run a `runner-preflight` job on `ubuntu-latest` before the self-hosted matrix. That preflight queries `gh api orgs/${OWNER}/actions/runners` first and, on 403/404 (the default `secrets.GITHUB_TOKEN` cannot list org-scoped runners under most org policies), falls back to `gh api repos/${GITHUB_REPOSITORY}/actions/runners`. If both endpoints fail (typically a 403 from each because the token is unscoped for runner administration), the preflight emits a `::warning::` and exits 0 (soft pass).
+Unity workflows run a `runner-preflight` job on `ubuntu-latest` before the self-hosted matrix. The preflight uses the organization reader GitHub App and requests only organization self-hosted-runner read permission. It asks GitHub for runner groups visible to `Ambiguous-Interactive/unity-helpers`, then considers only runners inside those groups when matching the exact `runs-on` labels.
 
-**Critical contract:** the preflight must NEVER be more strict than the no-preflight baseline. Its only job is to surface a fast, clear failure when it can _prove_ the runner inventory is wrong. When it cannot prove that, it soft-passes so Unity CI is never made strictly more broken than it was without the preflight.
+The preflight fails closed. Missing reader credentials, an App authentication or API failure, no runner group visible to this repository, malformed or truncated inventory, or no accessible online runner with every required label all make the check red. It never emits a green soft pass. Busy online runners remain eligible because GitHub can queue the licensed job until one becomes idle.
 
-### Upgrading the soft pass to a hard pass
+The `Unity CI Success` aggregate job runs with `always()` and is the required branch-protection check. It rejects a failed or cancelled preflight and rejects an unexpected skipped licensed job, so a runner outage cannot produce a green Unity check merely because dependent jobs were skipped.
 
-The default `secrets.GITHUB_TOKEN` cannot list runners under a repo-level scope strict enough to reflect the runner-group ACL, so the preflight falls back to a soft pass on most installations. To upgrade the soft-pass path to a hard-pass:
-
-1. Mint a fine-grained personal access token (or a GitHub App installation token) holding the repository-level "Administration: read" permission, scoped to `wallstop/unity-helpers` only. Do NOT use a classic PAT with `admin:org`, and do NOT use the fine-grained "Organization administration: read" permission: both grant org-wide visibility, which causes `gh api orgs/<org>/actions/runners` to return the entire org runner inventory regardless of any individual repository's runner-group ACL. That would let the preflight see runners as online and silently pass even when the post-transfer ACL is broken, which is exactly the pitfall this runbook addresses.
-2. Add the token as a repository secret named `RUNNER_AUDIT_PAT`.
-3. The Unity workflows already prefer `RUNNER_AUDIT_PAT` over `GITHUB_TOKEN` when set (`GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}`) and query the repo-scoped endpoint. That endpoint enforces the runner-group ACL: if the repository does not have access to a runner via its group, the runner is invisible there, which is the live ACL state we want the preflight to detect. The preflight retains the same soft-pass behavior if the secret is absent, so this is opt-in.
-
-The rationale is deliberate: we want the upgrade token to FAIL when the ACL is misconfigured, not paper over it; that is why we use the repo-scoped "Administration: read" permission rather than any org admin scope. Without that property the hard-pass mode would be worse than the soft-pass mode it replaces.
-
-Because `administration` is not a valid `permissions:` key for the workflow-scoped `GITHUB_TOKEN`, the only way to grant the preflight read access to the runner inventory under a repo-level scope is to provision an external token (PAT or app installation token) via `RUNNER_AUDIT_PAT`. Without that, the preflight falls back to the soft-pass path, which is the design intent.
+The reader App must be installed for the organization and expose the organization secrets `BUILD_LOCK_READER_APP_ID` and `BUILD_LOCK_READER_APP_PRIVATE_KEY` to this repository. Its organization permission is Self-hosted runners: read. No PAT or repository-level environment is required.
 
 If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
@@ -201,7 +193,7 @@ The Unity workflows expect the following repository (or organization) secrets. T
 
 - `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD` — classic serial Unity activation (all three required together).
 - `BUILD_LOCK_APP_ID`, `BUILD_LOCK_APP_PRIVATE_KEY` — dedicated GitHub App credentials for the `wallstop-organization-builds` organization build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`); both are required together and should be provisioned as organization secrets with access to this repository.
+- `BUILD_LOCK_READER_APP_ID`, `BUILD_LOCK_READER_APP_PRIVATE_KEY` — read-only GitHub App credentials used by the hosted runner preflight; both are required together and should be provisioned as organization secrets with access to this repository.
 - `UNITY_ACCELERATOR_ENDPOINT` — optional; enables the Unity Accelerator cache namespace when set.
-- `RUNNER_AUDIT_PAT` — optional; upgrades the runner-preflight soft pass to a hard pass (see above).
 
 Provision the required Unity and build-lock credentials as organization secrets selected for this repository. The licensed workflows intentionally do not bind jobs to a per-repository environment, so trusted pull requests from branches in this repository validate automatically without an environment approval. Pull requests from forks remain ineligible for licensed jobs and do not receive these secrets.

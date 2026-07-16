@@ -176,17 +176,6 @@ jobs:
 
   runner-preflight:
     name: Self-hosted runner access preflight
-    # Runs on ubuntu-latest BEFORE any self-hosted matrix entry tries to
-    # queue. This converts the "stuck forever" failure mode that motivated
-    # docs/runbooks/unity-runners-after-transfer.md into a fast,
-    # clearly-explained failure. The runbook explains the post-transfer
-    # runner-group ACL pitfall and the resolution paths.
-    #
-    # CRITICAL CONTRACT: this preflight must NEVER make Unity CI more
-    # broken than the no-preflight baseline. If the token cannot list
-    # either the org-level OR repo-level runner inventory (403/404 from
-    # both), the preflight emits a ::warning:: and exits 0 (soft pass).
-    # Only when we can prove the inventory is wrong do we fail hard.
     if: >-
       ${{
         (github.event_name != 'pull_request' ||
@@ -195,95 +184,16 @@ jobs:
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    permissions:
-      actions: read
-      # NOTE: `administration: read` is NOT a valid permissions key for
-      # workflow GITHUB_TOKEN (per actionlint and the GitHub docs schema).
-      # Listing self-hosted runners requires admin:org (org-scope) OR a
-      # fine-grained PAT with repo "Administration: read" -- neither of
-      # which the default GITHUB_TOKEN can carry. The soft-pass path in
-      # the run script below is the supported coverage when the token
-      # is unscoped. See docs/runbooks/unity-runners-after-transfer.md.
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Probe self-hosted runner availability
-        env:
-          GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
-          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
-        # Repeated literal of the labels list. Keep in sync with unity-tests
-        # `runs-on:` declaration below; this preflight must run before any
-        # self-hosted matrix in this workflow.
-        # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml;
-        # see that file's comments for why `jq -s` is required.
-        run: |
-          set -euo pipefail
-          echo "::group::Runner-access preflight"
-          echo "Required labels: ${REQUIRED_LABELS}"
-          IFS=',' read -r -a required <<< "${REQUIRED_LABELS}"
-          runners_json="$(mktemp)"
-          runners_scope=""
-          # 1) Try the ORG-scoped endpoint first. Self-hosted runners live
-          # at org scope in this repo (group "Default" in Ambiguous-Interactive).
-          # The default GITHUB_TOKEN often lacks admin:org and will 403 here.
-          if gh api --paginate \
-              "orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100" \
-              2>/dev/null \
-              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
-            runners_scope="org"
-          else
-            # 2) Fall back to the REPO-scoped endpoint. Requires
-            # administration:read; less common to be granted but possible.
-            if gh api --paginate \
-                "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100" \
-                2>/dev/null \
-                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
-              runners_scope="repo"
-            fi
-          fi
-          if [ -z "${runners_scope}" ]; then
-            # 3) Soft pass: both endpoints failed (almost certainly the
-            # default GITHUB_TOKEN lacks scope). DO NOT fail the build --
-            # that would make Unity CI strictly more broken than baseline.
-            # The watchdog + manual unstick workflows still cover the
-            # actually-stuck case.
-            org_url="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners"
-            repo_url="repos/${GITHUB_REPOSITORY}/actions/runners"
-            {
-              echo "::warning::Runner inventory unavailable from both ${org_url}"
-              echo "::warning::and ${repo_url} (likely 403: GITHUB_TOKEN lacks admin:org"
-              echo "::warning::or administration:read)."
-              echo "::warning::See docs/runbooks/unity-runners-after-transfer.md"
-              echo "::warning::for how to plumb a RUNNER_AUDIT_PAT secret to upgrade"
-              echo "::warning::this soft-pass to a hard-pass."
-            }
-            echo "Soft pass: skipping runner inventory check."
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "Runner inventory scope: ${runners_scope}"
-          total="$(jq 'length' < "${runners_json}")"
-          echo "Visible runners (${runners_scope} scope): ${total}"
-          # Find at least one ONLINE runner with all required labels.
-          matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
-            [ .[]
-              | select(.status == "online")
-              | select((($labels - ((.labels // []) | map(.name))) | length) == 0)
-            ] | length
-          ' < "${runners_json}")"
-          echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
-          if [ "${matched}" -lt 1 ]; then
-            {
-              echo "::error::No online self-hosted runner satisfies the required labels (${REQUIRED_LABELS})."
-              echo "The Unity matrix would queue forever."
-              echo "See docs/runbooks/unity-runners-after-transfer.md for the post-transfer runner-group ACL fix."
-            }
-            jq '[ .[] | {name, status, busy, labels: [(.labels // [])[].name]} ]' \
-              < "${runners_json}"
-            exit 1
-          fi
-          echo "::endgroup::"
+      - name: Require an online Unity runner
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
+        with:
+          reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
+          required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
 
   # FAST tier: editmode + playmode across all versions. The expensive standalone
   # IL2CPP legs live in unity-tests-standalone, which `needs:` this job -- so a
@@ -488,7 +398,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -563,7 +473,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -830,7 +740,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -905,7 +815,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -1157,7 +1067,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1227,7 +1137,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1313,7 +1223,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
@@ -1356,7 +1266,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
@@ -1388,3 +1298,79 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           overwrite: true
+
+  unity-ci-success:
+    name: Unity CI Success
+    if: ${{ always() }}
+    needs:
+      - matrix-config
+      - runner-preflight
+      - unity-tests
+      - unity-tests-standalone
+      - unity-tests-single-threaded
+      - unitypackage-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every expected Unity CI job result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CURRENT_REPOSITORY: ${{ github.repository }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
+          RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
+          UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
+          STANDALONE_RESULT: ${{ needs.unity-tests-standalone.result }}
+          SINGLE_THREADED_RESULT: ${{ needs.unity-tests-single-threaded.result }}
+          UNITYPACKAGE_SMOKE_RESULT: ${{ needs.unitypackage-smoke.result }}
+        run: |
+          set -euo pipefail
+
+          if [ "${EVENT_NAME}" = "pull_request" ] && [ "${PR_HEAD_REPOSITORY}" != "${CURRENT_REPOSITORY}" ]; then
+            expected="skipped"
+            for result in \
+              "${MATRIX_CONFIG_RESULT}" \
+              "${RUNNER_PREFLIGHT_RESULT}" \
+              "${UNITY_TESTS_RESULT}" \
+              "${STANDALONE_RESULT}" \
+              "${SINGLE_THREADED_RESULT}" \
+              "${UNITYPACKAGE_SMOKE_RESULT}"; do
+              if [ "${result}" != "${expected}" ]; then
+                echo "::error::Unexpected Unity CI job result for an intentionally unlicensed fork PR: ${result}."
+                exit 1
+              fi
+            done
+            echo "Fork PR intentionally omitted licensed Unity jobs."
+            exit 0
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
+            echo "Unprotected push intentionally omitted licensed Unity jobs."
+            exit 0
+          fi
+
+          failed="false"
+          require_result() {
+            job="$1"
+            actual="$2"
+            allowed="$3"
+            case ",${allowed}," in
+              *,"${actual}",*) ;;
+              *)
+                echo "::error::Unexpected Unity CI job result: ${job}=${actual}; expected ${allowed}."
+                failed="true"
+                ;;
+            esac
+          }
+
+          require_result "matrix-config" "${MATRIX_CONFIG_RESULT}" "success"
+          require_result "runner-preflight" "${RUNNER_PREFLIGHT_RESULT}" "success"
+          require_result "unity-tests" "${UNITY_TESTS_RESULT}" "success"
+          require_result "unity-tests-standalone" "${STANDALONE_RESULT}" "success,skipped"
+          require_result "unity-tests-single-threaded" "${SINGLE_THREADED_RESULT}" "success"
+          require_result "unitypackage-smoke" "${UNITYPACKAGE_SMOKE_RESULT}" "success"
+
+          if [ "${failed}" = "true" ]; then
+            exit 1
+          fi

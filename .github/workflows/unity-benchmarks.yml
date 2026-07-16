@@ -83,86 +83,18 @@ jobs:
 
   runner-preflight:
     name: Self-hosted runner access preflight
-    # See docs/runbooks/unity-runners-after-transfer.md for the design
-    # contract. CRITICAL: this preflight must NEVER make Unity CI more
-    # broken than the no-preflight baseline -- if both runner-inventory
-    # endpoints return 403/404, soft-pass with a ::warning::.
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    permissions:
-      actions: read
-      # NOTE: `administration: read` is NOT a valid permissions key for
-      # workflow GITHUB_TOKEN (per actionlint and the GitHub docs schema).
-      # Listing self-hosted runners requires admin:org (org-scope) OR a
-      # fine-grained PAT with repo "Administration: read" -- neither of
-      # which the default GITHUB_TOKEN can carry. The soft-pass path in
-      # the run script below is the supported coverage when the token
-      # is unscoped. See docs/runbooks/unity-runners-after-transfer.md.
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Probe self-hosted runner availability
-        env:
-          GH_TOKEN: ${{ secrets.RUNNER_AUDIT_PAT || secrets.GITHUB_TOKEN }}
-          REQUIRED_LABELS: "self-hosted,Windows,RAM-64GB"
-        # gh api --paginate | jq -s pattern mirrors stuck-job-watchdog.yml.
-        run: |
-          set -euo pipefail
-          echo "::group::Runner-access preflight"
-          echo "Required labels: ${REQUIRED_LABELS}"
-          IFS=',' read -r -a required <<< "${REQUIRED_LABELS}"
-          runners_json="$(mktemp)"
-          runners_scope=""
-          if gh api --paginate \
-              "orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100" \
-              2>/dev/null \
-              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
-            runners_scope="org"
-          else
-            if gh api --paginate \
-                "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100" \
-                2>/dev/null \
-                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
-              runners_scope="repo"
-            fi
-          fi
-          if [ -z "${runners_scope}" ]; then
-            org_url="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners"
-            repo_url="repos/${GITHUB_REPOSITORY}/actions/runners"
-            {
-              echo "::warning::Runner inventory unavailable from both ${org_url}"
-              echo "::warning::and ${repo_url} (likely 403: GITHUB_TOKEN lacks admin:org"
-              echo "::warning::or administration:read)."
-              echo "::warning::See docs/runbooks/unity-runners-after-transfer.md"
-              echo "::warning::for how to plumb a RUNNER_AUDIT_PAT secret to upgrade"
-              echo "::warning::this soft-pass to a hard-pass."
-            }
-            echo "Soft pass: skipping runner inventory check."
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "Runner inventory scope: ${runners_scope}"
-          total="$(jq 'length' < "${runners_json}")"
-          echo "Visible runners (${runners_scope} scope): ${total}"
-          matched="$(jq --argjson labels "$(printf '%s\n' "${required[@]}" | jq -R . | jq -s .)" '
-            [ .[]
-              | select(.status == "online")
-              | select((($labels - ((.labels // []) | map(.name))) | length) == 0)
-            ] | length
-          ' < "${runners_json}")"
-          echo "Runners satisfying ${REQUIRED_LABELS}: ${matched}"
-          if [ "${matched}" -lt 1 ]; then
-            {
-              echo "::error::No online self-hosted runner satisfies the required labels (${REQUIRED_LABELS})."
-              echo "The Unity matrix would queue forever."
-              echo "See docs/runbooks/unity-runners-after-transfer.md for the post-transfer runner-group ACL fix."
-            }
-            jq '[ .[] | {name, status, busy, labels: [(.labels // [])[].name]} ]' \
-              < "${runners_json}"
-            exit 1
-          fi
-          echo "::endgroup::"
+      - name: Require an online Unity runner
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
+        with:
+          reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
+          required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
 
   benchmarks:
     name: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
@@ -325,7 +257,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -409,7 +341,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@092fb0ddfc1ff13c684ac0e3c76d9b48ec3ee315 # v1.7.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
