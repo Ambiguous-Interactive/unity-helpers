@@ -346,7 +346,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a8d43dd87a938f1b3417fd8a9310354bf38e2fd1 # v1.8.2
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
@@ -387,7 +387,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@c9d7e9feda64700c00374ffcbcc9dd93553c7054 # v1.8.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@a8d43dd87a938f1b3417fd8a9310354bf38e2fd1 # v1.8.2
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
