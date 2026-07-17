@@ -45,8 +45,10 @@ function Get-GitIgnoredPaths([string[]]$paths) {
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw 'git is not available on PATH. lint-gitignore-docs requires git check-ignore.'
   }
-  # Terminate the last path before PowerShell appends its platform newline; otherwise Windows sends a trailing CR as part of that path.
-  $input_text = ($paths -join "`n") + "`n"
+  # On Windows, terminate the last path before PowerShell appends CRLF;
+  # otherwise Git receives the trailing CR as part of that path. Unix hosts
+  # must keep the original unterminated batch to avoid an empty stdin record.
+  $input_text = ($paths -join "`n") + $(if ($IsWindows) { "`n" } else { '' })
   # git check-ignore --stdin returns ignored paths (one per line), exits 0 if any match, 1 if none
   $ignored = $input_text | & git check-ignore --stdin 2>$null
   if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1) {
