@@ -2021,16 +2021,21 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $returnTimeoutMatch = [regex]::Match($dockerRunnerContent, 'UNITY_LICENSE_RETURN_TIMEOUT="\$\{UNITY_LICENSE_RETURN_TIMEOUT:-(?<seconds>\d+)\}"')
   $terminationGraceMatch = [regex]::Match($dockerRunnerContent, 'UNITY_TERMINATION_GRACE_SECONDS="\$\{UNITY_TERMINATION_GRACE_SECONDS:-(?<seconds>\d+)\}"')
   $containerWrapperMatch = [regex]::Match($dockerRunnerContent, 'UNITY_CONTAINER_WRAPPER_SECONDS="\$\{UNITY_CONTAINER_WRAPPER_SECONDS:-(?<seconds>\d+)\}"')
+  $dockerClientTimeoutMatch = [regex]::Match($dockerRunnerContent, 'UNITY_DOCKER_CLIENT_TIMEOUT="\$\{UNITY_DOCKER_CLIENT_TIMEOUT:-(?<seconds>\d+)\}"')
+  $dockerClientGraceMatch = [regex]::Match($dockerRunnerContent, 'UNITY_DOCKER_CLIENT_KILL_GRACE="\$\{UNITY_DOCKER_CLIENT_KILL_GRACE:-(?<seconds>\d+)\}"')
 
   $unityTimeoutMinutes = if ($unityTimeoutMatch.Success) { [int][Math]::Ceiling(([int]$unityTimeoutMatch.Groups['seconds'].Value) / 60.0) } else { 0 }
   $activationTimeoutSeconds = if ($activationTimeoutMatch.Success) { [int]$activationTimeoutMatch.Groups['seconds'].Value } else { 0 }
   $returnTimeoutSeconds = if ($returnTimeoutMatch.Success) { [int]$returnTimeoutMatch.Groups['seconds'].Value } else { 0 }
   $terminationGraceSeconds = if ($terminationGraceMatch.Success) { [int]$terminationGraceMatch.Groups['seconds'].Value } else { 0 }
   $containerWrapperSeconds = if ($containerWrapperMatch.Success) { [int]$containerWrapperMatch.Groups['seconds'].Value } else { 0 }
-  $minimumContainerSeconds = (2 * $activationTimeoutSeconds) + (60 * $unityTimeoutMinutes) + $returnTimeoutSeconds + (5 * $terminationGraceSeconds) + $containerWrapperSeconds
+  $dockerClientTimeoutSeconds = if ($dockerClientTimeoutMatch.Success) { [int]$dockerClientTimeoutMatch.Groups['seconds'].Value } else { 0 }
+  $dockerClientGraceSeconds = if ($dockerClientGraceMatch.Success) { [int]$dockerClientGraceMatch.Groups['seconds'].Value } else { 0 }
+  $minimumContainerSeconds = (2 * $activationTimeoutSeconds) + (60 * $unityTimeoutMinutes) + $returnTimeoutSeconds + (4 * $terminationGraceSeconds) + $containerWrapperSeconds
   $containerStopSeconds = $terminationGraceSeconds + $returnTimeoutSeconds + $containerWrapperSeconds
+  $dockerCleanupSeconds = $containerStopSeconds + (3 * $dockerClientTimeoutSeconds) + (3 * $dockerClientGraceSeconds)
   $minimumExportWrapperMinutes = 5
-  $requiredExportStepTimeoutMinutes = [int][Math]::Ceiling(($minimumContainerSeconds + $containerStopSeconds) / 60.0) + $minimumExportWrapperMinutes
+  $requiredExportStepTimeoutMinutes = [int][Math]::Ceiling(($minimumContainerSeconds + $terminationGraceSeconds + $dockerCleanupSeconds) / 60.0) + $minimumExportWrapperMinutes
   $minimumSetupMinutes = 10
   $minimumImplicitPostMinutes = 5
   $minimumUnallocatedSlackMinutes = 10
@@ -2067,7 +2072,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
       $timeoutBudgetFailures += "$($caller.Name): job=${jobMinutes}m/${requiredJobMinutes}m required; lock=${lockMinutes}m (max 180m); export=${exportMinutes}m/${requiredExportStepTimeoutMinutes}m required; cleanup failure/success=${failureCleanupMinutes}m/${successCleanupMinutes}m"
     }
   }
-  $timeoutBudgetIsCoherent = $unityTimeoutMatch.Success -and $activationTimeoutMatch.Success -and $returnTimeoutMatch.Success -and $terminationGraceMatch.Success -and $containerWrapperMatch.Success -and $timeoutBudgetFailures.Count -eq 0
+  $timeoutBudgetIsCoherent = $unityTimeoutMatch.Success -and $activationTimeoutMatch.Success -and $returnTimeoutMatch.Success -and $terminationGraceMatch.Success -and $containerWrapperMatch.Success -and $dockerClientTimeoutMatch.Success -and $dockerClientGraceMatch.Success -and $timeoutBudgetFailures.Count -eq 0
   $teeFailureMessageIndex = $exporterContent.IndexOf('Failed to persist Unity package export log with tee exit code')
   $unityFailureMessageIndex = $exporterContent.IndexOf('Unity package export failed with exit code')
   $exporterPersistsUnityLog = (
@@ -2092,11 +2097,19 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $dockerRunnerRedactsAndReturnsSerialLicense = (
     $dockerRunnerContent.Contains('redact_unity_license_output()') -and
     $dockerRunnerContent.Contains('run_with_watchdog()') -and
+    $dockerRunnerContent.Contains('handle_container_signal()') -and
+    $dockerRunnerContent.Contains('set -m') -and
+    $dockerRunnerContent.Contains('bash -c \"\${MAIN_COMMAND_SCRIPT}\" &') -and
+    $dockerRunnerContent.Contains('kill -TERM -- "-${MAIN_PROCESS_GROUP_PID}"') -and
+    $dockerRunnerContent.Contains('kill -KILL -- "-${MAIN_PROCESS_GROUP_PID}"') -and
+    $dockerRunnerContent.Contains('return_serial_license || true') -and
+    $dockerRunnerContent.Contains('run_docker_client_with_watchdog()') -and
     $dockerRunnerContent.Contains('--signal=TERM') -and
     $dockerRunnerContent.Contains('--kill-after="${UNITY_TERMINATION_GRACE_SECONDS}"') -and
     $dockerRunnerContent.Contains('UNITY_CONTAINER_NAME="unity-helpers-$$-$(date +%s%N)"') -and
     $dockerRunnerContent.Contains("trap cleanup_unity_container EXIT") -and
     $dockerRunnerContent.Contains('docker stop --timeout "${UNITY_CONTAINER_STOP_SECONDS}" "${UNITY_CONTAINER_NAME}"') -and
+    $dockerRunnerContent.Contains("'docker rm -f'") -and
     $dockerRunnerContent.Contains('docker rm -f "${UNITY_CONTAINER_NAME}"') -and
     $dockerRunnerContent.Contains('[REDACTED-UNITY-SERIAL]') -and
     $dockerRunnerContent.Contains('[REDACTED-UNITY-EMAIL]') -and
@@ -2107,7 +2120,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $dockerRunnerContent.Contains('-password "${UNITY_PASSWORD}"') -and
     $dockerRunnerContent.Contains('Successfully returned the entitlement license') -and
     $dockerRunnerContent.Contains('Serial number unavailable for ULF return') -and
-    $dockerRunnerContent.Contains('exit "${RETURN_EXIT_CODE}"')
+    $dockerRunnerContent.Contains('return "${RETURN_EXIT_CODE}"')
   )
 
   Write-TestResult `

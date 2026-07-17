@@ -21,6 +21,8 @@ set -euo pipefail
 #   UNITY_LICENSE_RETURN_TIMEOUT - Serial return timeout in seconds (default: 300)
 #   UNITY_TERMINATION_GRACE_SECONDS - TERM-to-KILL grace period (default: 30)
 #   UNITY_CONTAINER_WRAPPER_SECONDS - Container orchestration reserve (default: 60)
+#   UNITY_DOCKER_CLIENT_TIMEOUT - Per-client API overhead bound (default: 30)
+#   UNITY_DOCKER_CLIENT_KILL_GRACE - Docker CLI TERM-to-KILL grace (default: 10)
 #
 # Usage:
 #   ./run-unity-docker.sh -batchmode -nographics -quit -projectPath /project -logFile -
@@ -35,13 +37,17 @@ UNITY_LICENSE_ACTIVATION_TIMEOUT="${UNITY_LICENSE_ACTIVATION_TIMEOUT:-300}"
 UNITY_LICENSE_RETURN_TIMEOUT="${UNITY_LICENSE_RETURN_TIMEOUT:-300}"
 UNITY_TERMINATION_GRACE_SECONDS="${UNITY_TERMINATION_GRACE_SECONDS:-30}"
 UNITY_CONTAINER_WRAPPER_SECONDS="${UNITY_CONTAINER_WRAPPER_SECONDS:-60}"
+UNITY_DOCKER_CLIENT_TIMEOUT="${UNITY_DOCKER_CLIENT_TIMEOUT:-30}"
+UNITY_DOCKER_CLIENT_KILL_GRACE="${UNITY_DOCKER_CLIENT_KILL_GRACE:-10}"
 
 for timeout_variable in \
     UNITY_TIMEOUT \
     UNITY_LICENSE_ACTIVATION_TIMEOUT \
     UNITY_LICENSE_RETURN_TIMEOUT \
     UNITY_TERMINATION_GRACE_SECONDS \
-    UNITY_CONTAINER_WRAPPER_SECONDS
+    UNITY_CONTAINER_WRAPPER_SECONDS \
+    UNITY_DOCKER_CLIENT_TIMEOUT \
+    UNITY_DOCKER_CLIENT_KILL_GRACE
 do
     timeout_value="${!timeout_variable}"
     if [[ ! "${timeout_value}" =~ ^[1-9][0-9]*$ ]]; then
@@ -51,12 +57,13 @@ do
 done
 
 # Cover two activation attempts (online plus file fallback), the main command,
-# serial return, and every TERM-to-KILL grace period, including the Docker CLI.
+# serial return, and their four in-container TERM-to-KILL grace periods. The
+# host timeout adds its own Docker CLI kill grace outside this duration.
 UNITY_CONTAINER_TIMEOUT=$((
     (2 * UNITY_LICENSE_ACTIVATION_TIMEOUT) +
     UNITY_TIMEOUT +
     UNITY_LICENSE_RETURN_TIMEOUT +
-    (5 * UNITY_TERMINATION_GRACE_SECONDS) +
+    (4 * UNITY_TERMINATION_GRACE_SECONDS) +
     UNITY_CONTAINER_WRAPPER_SECONDS
 ))
 UNITY_CONTAINER_STOP_SECONDS=$((
@@ -64,7 +71,6 @@ UNITY_CONTAINER_STOP_SECONDS=$((
     UNITY_LICENSE_RETURN_TIMEOUT +
     UNITY_CONTAINER_WRAPPER_SECONDS
 ))
-
 WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # Store cache in the persistent test-project volume by default to avoid
 # workspace ownership/commit risks. Can be overridden via UNITY_LICENSE_CACHE_DIR.
@@ -149,6 +155,11 @@ fi
 # Single-quoted heredoc sections ensure no host-side expansion of credentials.
 INNER_SCRIPT='#!/usr/bin/env bash
 set -euo pipefail
+
+if ! command -v pgrep; then
+    echo "ERROR: pgrep is required to supervise the complete Unity process tree." >&2
+    exit 2
+fi
 
 # Ensure cache directories exist and are writable inside container
 mkdir -p /root/.local/share/unity3d /root/.config/unity3d 2>/dev/null || true
@@ -362,33 +373,17 @@ else
     INNER_SCRIPT+=$'\nrequire_license_artifact\n'
 fi
 
-# ── Main Unity command ──────────────────────────────────────────────────────
-# The escaped arguments are safe to interpolate here because printf '%q' was used.
-# xvfb-run is invoked via an if/else block to avoid word-splitting issues with
-# --server-args (the space-containing argument cannot be stored safely in a variable).
-INNER_SCRIPT+="
-echo '==> Running Unity command...'
-EXIT_CODE=0
-UNITY_COMMAND_PIPE_STATUS=()
-set +e
-if [[ \"\${USE_XVFB:-0}\" == \"1\" ]]; then
-    run_with_watchdog 'Unity command' \"\${UNITY_TIMEOUT}\" \\
-        xvfb-run --auto-servernum --server-args='-screen 0 640x480x24' \\
-        unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
-else
-    run_with_watchdog 'Unity command' \"\${UNITY_TIMEOUT}\" \\
-        unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
-fi
-UNITY_COMMAND_PIPE_STATUS=(\"\${PIPESTATUS[@]}\")
-EXIT_CODE=\"\${UNITY_COMMAND_PIPE_STATUS[0]}\"
-set -e
-"
-
-# ── License return (serial only) ────────────────────────────────────────────
+# ── Idempotent license return (serial only) ─────────────────────────────────
 if [[ -n "${UNITY_SERIAL:-}" ]]; then
     INNER_SCRIPT+='
-echo "==> Returning Pro serial license..."
+SERIAL_RETURN_ATTEMPTED=0
 RETURN_EXIT_CODE=0
+return_serial_license() {
+    if [[ "${SERIAL_RETURN_ATTEMPTED}" -eq 1 ]]; then
+        return "${RETURN_EXIT_CODE}"
+    fi
+    SERIAL_RETURN_ATTEMPTED=1
+    echo "==> Returning Pro serial license..."
 RETURN_OUTPUT=$(run_with_watchdog "Unity serial license return" "${UNITY_LICENSE_RETURN_TIMEOUT}" unity-editor -batchmode -nographics -quit \
     -returnlicense \
     -username "${UNITY_EMAIL}" \
@@ -406,16 +401,125 @@ if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
 else
     echo "==> License returned."
 fi
+    return "${RETURN_EXIT_CODE}"
+}
+'
+else
+    INNER_SCRIPT+='
+SERIAL_RETURN_ATTEMPTED=0
+RETURN_EXIT_CODE=0
+return_serial_license() {
+    return 0
+}
 '
 fi
 
-# ── Exit with Unity exit code ───────────────────────────────────────────────
+# ── PID 1 signal handling and supervised Unity process group ────────────────
 INNER_SCRIPT+='
+MAIN_PROCESS_GROUP_PID=""
+terminate_main_process_group() {
+    if [[ -z "${MAIN_PROCESS_GROUP_PID}" ]] || ! kill -0 -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null; then
+        return 0
+    fi
+
+    echo "==> Stopping supervised Unity process group ${MAIN_PROCESS_GROUP_PID}..."
+    local -a supervised_pids=("${MAIN_PROCESS_GROUP_PID}")
+    local process_index=0
+    local child_pid=""
+    while [[ "${process_index}" -lt "${#supervised_pids[@]}" ]]; do
+        while IFS= read -r child_pid; do
+            [[ -n "${child_pid}" ]] && supervised_pids+=("${child_pid}")
+        done < <(pgrep -P "${supervised_pids[process_index]}" 2>/dev/null || true)
+        process_index=$((process_index + 1))
+    done
+    for child_pid in "${supervised_pids[@]}"; do
+        kill -TERM "${child_pid}" 2>/dev/null || true
+    done
+    kill -TERM -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null || true
+    local deadline=$((SECONDS + UNITY_TERMINATION_GRACE_SECONDS))
+    local process_alive=1
+    while [[ "${process_alive}" -eq 1 && "${SECONDS}" -lt "${deadline}" ]]; do
+        process_alive=0
+        for child_pid in "${supervised_pids[@]}"; do
+            if kill -0 "${child_pid}" 2>/dev/null; then
+                process_alive=1
+                break
+            fi
+        done
+        if [[ "${process_alive}" -eq 0 ]] && kill -0 -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null; then
+            process_alive=1
+        fi
+        [[ "${process_alive}" -eq 1 ]] && sleep 1
+    done
+    local needs_kill=0
+    for child_pid in "${supervised_pids[@]}"; do
+        if kill -0 "${child_pid}" 2>/dev/null; then
+            needs_kill=1
+            break
+        fi
+    done
+    if kill -0 -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null; then
+        needs_kill=1
+    fi
+    if [[ "${needs_kill}" -eq 1 ]]; then
+        echo "==> Unity process group ignored TERM; sending KILL."
+        for child_pid in "${supervised_pids[@]}"; do
+            kill -KILL "${child_pid}" 2>/dev/null || true
+        done
+        kill -KILL -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null || true
+    fi
+    wait "${MAIN_PROCESS_GROUP_PID}" 2>/dev/null || true
+    MAIN_PROCESS_GROUP_PID=""
+}
+
+handle_container_signal() {
+    local signal_exit="$1"
+    trap - INT TERM
+    terminate_main_process_group
+    return_serial_license || true
+    exit "${signal_exit}"
+}
+trap '"'"'handle_container_signal 130'"'"' INT
+trap '"'"'handle_container_signal 143'"'"' TERM
+export -f run_with_watchdog redact_unity_license_output
+'
+
+# The escaped arguments are safe to interpolate because printf %q preserved
+# their boundaries. Monitor mode gives the asynchronous child its own process
+# group so PID 1 can terminate every descendant before returning the serial seat.
+INNER_SCRIPT+="
+echo '==> Running Unity command...'
+MAIN_COMMAND_SCRIPT=\$(cat <<'UNITY_MAIN_EOF'
+set +e
+if [[ \"\${USE_XVFB:-0}\" == \"1\" ]]; then
+    run_with_watchdog 'Unity command' \"\${UNITY_TIMEOUT}\" \\
+        xvfb-run --auto-servernum --server-args='-screen 0 640x480x24' \\
+        unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
+else
+    run_with_watchdog 'Unity command' \"\${UNITY_TIMEOUT}\" \\
+        unity-editor ${ESCAPED_ARGS} 2>&1 | redact_unity_license_output
+fi
+UNITY_COMMAND_PIPE_STATUS=(\"\${PIPESTATUS[@]}\")
+exit \"\${UNITY_COMMAND_PIPE_STATUS[0]}\"
+UNITY_MAIN_EOF
+)
+set -m
+bash -c \"\${MAIN_COMMAND_SCRIPT}\" &
+MAIN_PROCESS_GROUP_PID=\$!
+set +m
+EXIT_CODE=0
+wait \"\${MAIN_PROCESS_GROUP_PID}\" || EXIT_CODE=\$?
+MAIN_PROCESS_GROUP_PID=''
+"
+
+# ── Normal completion: return once, then preserve the main result ───────────
+INNER_SCRIPT+='
+return_serial_license || true
 echo "==> Unity command finished with exit code: ${EXIT_CODE}"
-if [[ "${EXIT_CODE}" -eq 0 && "${RETURN_EXIT_CODE:-0}" -ne 0 ]]; then
+if [[ "${EXIT_CODE}" -eq 0 && "${RETURN_EXIT_CODE}" -ne 0 ]]; then
     exit "${RETURN_EXIT_CODE}"
 fi
-exit ${EXIT_CODE}
+exit "${EXIT_CODE}"
 '
 
 # Ensure test project directory exists
@@ -428,16 +532,45 @@ echo "==> [run-unity-docker] Starting Docker container..."
 # Name the container so interruption can always kill and remove it even if the
 # Docker client itself ignores TERM. Normal completion uses the same cleanup.
 UNITY_CONTAINER_NAME="unity-helpers-$$-$(date +%s%N)"
+run_docker_client_with_watchdog() {
+    local label="$1"
+    local timeout_seconds="$2"
+    shift 2
+
+    local client_exit=0
+    timeout \
+        --signal=TERM \
+        --kill-after="${UNITY_DOCKER_CLIENT_KILL_GRACE}" \
+        "${timeout_seconds}" \
+        "$@" || client_exit=$?
+    if [[ "${client_exit}" -eq 124 ]]; then
+        echo "ERROR: ${label} exceeded ${timeout_seconds}s." >&2
+    elif [[ "${client_exit}" -eq 137 ]]; then
+        echo "ERROR: ${label} exited 137 under its TERM-to-KILL watchdog; this status can also originate in the client." >&2
+    fi
+    return "${client_exit}"
+}
 cleanup_unity_container() {
     local inspect_output=""
-    if ! inspect_output="$(docker inspect --format '{{.State.Running}}' "${UNITY_CONTAINER_NAME}" 2>&1)"; then
-        return 0
+    local inspect_exit=0
+    inspect_output="$(run_docker_client_with_watchdog \
+        'docker inspect' \
+        "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
+        docker inspect --format '{{.State.Running}}' "${UNITY_CONTAINER_NAME}" 2>&1)" || inspect_exit=$?
+    if [[ "${inspect_exit}" -ne 0 ]]; then
+        echo "==> [run-unity-docker] Container state is unknown; attempting graceful stop before forced removal. ${inspect_output}" >&2
     fi
-    if [[ "${inspect_output}" == "true" ]]; then
+    if [[ "${inspect_output}" != "false" ]]; then
         echo "==> [run-unity-docker] Gracefully stopping container ${UNITY_CONTAINER_NAME} for in-container license return..."
-        docker stop --timeout "${UNITY_CONTAINER_STOP_SECONDS}" "${UNITY_CONTAINER_NAME}" || true
+        run_docker_client_with_watchdog \
+            'docker stop' \
+            "$((UNITY_CONTAINER_STOP_SECONDS + UNITY_DOCKER_CLIENT_TIMEOUT))" \
+            docker stop --timeout "${UNITY_CONTAINER_STOP_SECONDS}" "${UNITY_CONTAINER_NAME}" || true
     fi
-    docker rm -f "${UNITY_CONTAINER_NAME}" || true
+    run_docker_client_with_watchdog \
+        'docker rm -f' \
+        "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
+        docker rm -f "${UNITY_CONTAINER_NAME}" || true
 }
 handle_interrupt() {
     exit "$1"

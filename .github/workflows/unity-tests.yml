@@ -1298,7 +1298,7 @@ jobs:
 
       - name: Export Unity package smoke artifact
         id: export_unitypackage
-        timeout-minutes: 150
+        timeout-minutes: 155
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
