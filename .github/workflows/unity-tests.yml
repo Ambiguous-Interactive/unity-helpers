@@ -30,14 +30,6 @@ on:
           - editmode
           - playmode
           - standalone
-      abort-on-first-failure:
-        description: >-
-          Stop the matrix at the first failing leg (fast iteration). Default
-          false keeps the full matrix running for cross-version compatibility
-          visibility. Only honored on workflow_dispatch.
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -215,11 +207,9 @@ jobs:
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
-      # Default false keeps the full matrix running so cross-version
-      # compatibility stays visible on a red run. workflow_dispatch can flip
-      # abort-on-first-failure to stop at the first failing leg for fast
-      # iteration (with max-parallel:2 that means "stop launching further legs").
-      fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
+      # A sibling may hold a Unity license, so matrix failures must never cancel
+      # another leg before its license-return and lock-release cleanup completes.
+      fail-fast: false
       max-parallel: 2
       matrix:
         # Ordered fast-tier include from matrix-config: editmode then playmode,
@@ -577,7 +567,7 @@ jobs:
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
-      fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
+      fail-fast: false
       max-parallel: 2
       matrix:
         # Standalone-tier include from matrix-config (empty -> this job is skipped
@@ -945,9 +935,7 @@ jobs:
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
     strategy:
-      # See the unity-tests job: default false for full visibility;
-      # workflow_dispatch can opt into abort-on-first-failure.
-      fail-fast: ${{ github.event_name == 'workflow_dispatch' && inputs.abort-on-first-failure == 'true' }}
+      fail-fast: false
       max-parallel: 2
       matrix:
         # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode

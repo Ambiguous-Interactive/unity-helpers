@@ -2385,6 +2385,33 @@ foreach ($licensedJobId in $licensedJobIds) {
     }
 }
 
+$licensedWorkflowJobSets = @(
+    @{ File = '.github/workflows/unity-tests.yml'; Jobs = $jobTexts },
+    @{ File = '.github/workflows/unity-benchmarks.yml'; Jobs = $benchmarksJobTexts },
+    @{ File = '.github/workflows/release.yml'; Jobs = $releaseJobTexts }
+)
+foreach ($workflowJobSet in $licensedWorkflowJobSets) {
+    foreach ($job in $workflowJobSet.Jobs.GetEnumerator()) {
+        $jobText = [string]$job.Value
+        $isLicensedMatrix = (
+            $jobText.Contains('Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@') -and
+            $jobText -match '(?m)^    strategy:\s*$' -and
+            $jobText -match '(?m)^      matrix:\s*$'
+        )
+        if (-not $isLicensedMatrix) {
+            continue
+        }
+
+        $failFastFalseCount = [regex]::Matches($jobText, '(?m)^      fail-fast: false\s*$').Count
+        if ($failFastFalseCount -ne 1) {
+            Write-Host "::error file=$($workflowJobSet.File)::Licensed matrix job '$($job.Key)' must set exactly one literal strategy.fail-fast: false so a failing leg cannot cancel a sibling Unity license holder."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked licensed matrix job '$($job.Key)' in $($workflowJobSet.File) disables fail-fast cancellation."
+        }
+    }
+}
+
 $unityMatrixParallelismUsesRunnerSlots = (
     $jobTexts.ContainsKey('unity-tests') -and
     $jobTexts.ContainsKey('unity-tests-standalone') -and

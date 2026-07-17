@@ -12,6 +12,9 @@ Unity work after a newer commit becomes current.
 - Added exact, immutable current-head guards as the first step and immediately
   before lock acquisition in every licensed job.
 - Made the PowerShell workflow contracts data-driven across all licensed jobs.
+- Removed the manual matrix-abort option and require literal `fail-fast: false`
+  on every licensed matrix, so one failing leg cannot cancel a sibling license
+  holder before cleanup.
 
 ## Validation
 
