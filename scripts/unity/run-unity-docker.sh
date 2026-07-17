@@ -602,16 +602,44 @@ run_docker_client_with_watchdog() {
     return "${client_exit}"
 }
 cleanup_unity_container() {
+    # Settle the initiating client before querying the daemon. A canceled
+    # docker run may register its name while the client is handling TERM; an
+    # inspect performed first could miss that late registration permanently.
+    local client_was_in_flight=0
+    if [[ -n "${DOCKER_RUN_PID}" ]]; then
+        client_was_in_flight=1
+    fi
+    terminate_docker_run_client
     local inspect_output=""
     local inspect_exit=0
-    inspect_output="$(run_docker_client_with_watchdog \
-        'docker inspect' \
-        "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
-        docker inspect --format '{{.State.Running}}' "${UNITY_CONTAINER_NAME}" 2>&1)" || inspect_exit=$?
+    local inspect_timeout="${UNITY_DOCKER_CLIENT_TIMEOUT}"
+    local registration_deadline=$((SECONDS + UNITY_DOCKER_CLIENT_TIMEOUT))
+    while true; do
+        if [[ "${client_was_in_flight}" -eq 1 ]]; then
+            local registration_remaining=$((registration_deadline - SECONDS))
+            if [[ "${registration_remaining}" -le 0 ]]; then
+                break
+            fi
+            inspect_timeout="${UNITY_DOCKER_CLIENT_TIMEOUT}"
+            if [[ "${registration_remaining}" -lt "${inspect_timeout}" ]]; then
+                inspect_timeout="${registration_remaining}"
+            fi
+        fi
+
+        inspect_exit=0
+        inspect_output="$(run_docker_client_with_watchdog \
+            'docker inspect' \
+            "${inspect_timeout}" \
+            docker inspect --format '{{.State.Running}}' "${UNITY_CONTAINER_NAME}" 2>&1)" || inspect_exit=$?
+        if [[ "${inspect_exit}" -eq 0 ]] || [[ "${client_was_in_flight}" -eq 0 ]]; then
+            break
+        fi
+        sleep 1
+    done
     if [[ "${inspect_exit}" -ne 0 ]]; then
-        echo "==> [run-unity-docker] Container state is unknown; attempting graceful stop before forced removal. ${inspect_output}" >&2
+        echo "==> [run-unity-docker] Container state remained unknown after bounded registration settlement; attempting graceful stop before forced removal. ${inspect_output}" >&2
     fi
-    if [[ "${inspect_output}" != "false" ]]; then
+    if [[ "${client_was_in_flight}" -eq 1 ]] || [[ "${inspect_output}" != "false" ]]; then
         echo "==> [run-unity-docker] Gracefully stopping container ${UNITY_CONTAINER_NAME} for in-container license return..."
         run_docker_client_with_watchdog \
             'docker stop' \
@@ -622,7 +650,6 @@ cleanup_unity_container() {
         'docker rm -f' \
         "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
         docker rm -f "${UNITY_CONTAINER_NAME}" || true
-    terminate_docker_run_client
 }
 DOCKER_RUN_PID=""
 terminate_docker_run_client() {

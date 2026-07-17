@@ -2094,7 +2094,16 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $workflowContent.Contains('unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}') -and
     $workflowContent.Contains('.artifacts/unity/unitypackage-project/unitypackage-output/*.log')
   )
+  $containerCleanupIndex = $dockerRunnerContent.IndexOf('cleanup_unity_container()')
+  $clientSettlementIndex = if ($containerCleanupIndex -ge 0) { $dockerRunnerContent.IndexOf('terminate_docker_run_client', $containerCleanupIndex) } else { -1 }
+  $cleanupInspectIndex = if ($containerCleanupIndex -ge 0) { $dockerRunnerContent.IndexOf('local inspect_output=""', $containerCleanupIndex) } else { -1 }
+  $cleanupSettlesInitiatingClient = (
+    $containerCleanupIndex -ge 0 -and
+    $clientSettlementIndex -gt $containerCleanupIndex -and
+    $cleanupInspectIndex -gt $clientSettlementIndex
+  )
   $dockerRunnerRedactsAndReturnsSerialLicense = (
+    $cleanupSettlesInitiatingClient -and
     $dockerRunnerContent.Contains('redact_unity_license_output()') -and
     $dockerRunnerContent.Contains('run_with_watchdog()') -and
     $dockerRunnerContent.Contains('handle_container_signal()') -and
@@ -2109,6 +2118,8 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $dockerRunnerContent.Contains('run_docker_client_with_watchdog()') -and
     $dockerRunnerContent.Contains('start_docker_run_client()') -and
     $dockerRunnerContent.Contains('trap "defer_interrupt 143" TERM') -and
+    $dockerRunnerContent.Contains('local registration_deadline=$((SECONDS + UNITY_DOCKER_CLIENT_TIMEOUT))') -and
+    $dockerRunnerContent.Contains('local registration_remaining=$((registration_deadline - SECONDS))') -and
     $dockerRunnerContent.Contains('--signal=TERM') -and
     $dockerRunnerContent.Contains('--kill-after="${UNITY_TERMINATION_GRACE_SECONDS}"') -and
     $dockerRunnerContent.Contains('UNITY_CONTAINER_NAME="unity-helpers-$$-$(date +%s%N)"') -and

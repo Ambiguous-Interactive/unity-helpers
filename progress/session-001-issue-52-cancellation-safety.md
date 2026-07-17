@@ -33,6 +33,11 @@ Unity work after a newer commit becomes current.
 - Supervisor launches defer signals only across atomic child-PID registration,
   then replay them immediately; transient Unity output uses a mode-0600
   `mktemp` file that signal and normal paths both remove.
+- A final launch-race review found that daemon-side registration can outlive the
+  initiating Docker client. Cancellation now stops and reaps that bounded client,
+  retries inspection for one bounded client window, then gracefully stops and
+  forcibly removes any late named container. Completed runs keep the single-
+  inspect fast path.
 - The graceful-stop reserve includes separate TERM-to-KILL windows for the
   interrupted command and the subsequent bounded license return.
 - Rebalanced both hosted export jobs so the 360-minute job cap includes setup,
@@ -43,8 +48,12 @@ Unity work after a newer commit becomes current.
 
 - Red tests reproduced missing step/process/client bounds and budget equality.
 - Data-driven workflow and release-budget contracts pass for both export callers.
-- Behavioral fake-container coverage signals the production wrapper during both
-  activation and main Unity work. It proves TERM-resistant parent and descendant
-  cleanup, exactly one PID 1 serial return before removal, mutated two-grace
-  stop-reserve propagation, and unconditional removal after inspect failure.
+- Behavioral fake-container coverage signals the production wrapper before
+  registration, during activation, and during main Unity work. The registration
+  fixture lets its client exit, makes the first inspect miss, then asynchronously
+  registers and starts the named container; cleanup observes it on a bounded
+  retry. Coverage also proves TERM-resistant parent and descendant cleanup,
+  exactly one PID 1 serial return before removal, no leftover client/daemon/
+  container process, mutated two-grace reserve propagation, and unconditional
+  removal after inspect failure.
 - Full pre-push validation and the exact central consumer-policy audit pass.

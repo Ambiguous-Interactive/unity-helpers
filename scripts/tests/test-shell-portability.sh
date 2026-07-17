@@ -674,6 +674,9 @@ h1_pid_file="$h1_tempdir/unity.pid"
 h1_descendant_pid_file="$h1_tempdir/unity-descendant.pid"
 h1_container_pid_file="$h1_tempdir/container.pid"
 h1_container_name_file="$h1_tempdir/container.name"
+h1_docker_run_pid_file="$h1_tempdir/docker-run.pid"
+h1_docker_daemon_pid_file="$h1_tempdir/docker-daemon.pid"
+h1_registration_release_file="$h1_tempdir/release-registration"
 h1_events="$h1_tempdir/events.log"
 mkdir -p "$h1_bin" "$h1_project" "$h1_container_root"
 
@@ -689,6 +692,10 @@ case "${1:-}" in
             printf 'simulated inspect failure\n' >&2
             exit 9
         fi
+        if [[ ! -s "${FAKE_CONTAINER_NAME_FILE}" ]]; then
+            printf 'No such object\n' >&2
+            exit 1
+        fi
         container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
         if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null; then
             printf 'true\n'
@@ -697,14 +704,26 @@ case "${1:-}" in
         fi
         ;;
     stop)
+        stop_timeout=10
+        if [[ "${2:-}" == "--timeout" && "${3:-}" =~ ^[0-9]+$ ]]; then
+            stop_timeout="${3}"
+        fi
+        stop_deadline=$((SECONDS + stop_timeout))
+        printf 'fake stop begin seconds=%s deadline=%s epoch=%s\n' "${SECONDS}" "${stop_deadline}" "$(date +%s)" >> "${FAKE_EVENT_LOG}"
         container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
+        while [[ "${SECONDS}" -lt "${stop_deadline}" ]]; do
+            [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null && break
+            sleep 0.1
+            container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
+        done
         if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null; then
             kill -TERM "${container_pid}"
-            for _ in 1 2 3 4 5; do
+            while [[ "${SECONDS}" -lt "${stop_deadline}" ]]; do
                 kill -0 "${container_pid}" 2>/dev/null || break
                 sleep 1
             done
         fi
+        printf 'fake stop end seconds=%s deadline=%s epoch=%s\n' "${SECONDS}" "${stop_deadline}" "$(date +%s)" >> "${FAKE_EVENT_LOG}"
         ;;
     rm)
         container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
@@ -713,10 +732,12 @@ case "${1:-}" in
         fi
         ;;
     run)
+        printf '%s\n' "$$" > "${FAKE_DOCKER_RUN_PID_FILE}"
         arguments=("$@")
+        container_name=""
         for ((index = 0; index < ${#arguments[@]}; index++)); do
             if [[ "${arguments[index]}" == "--name" ]]; then
-                printf '%s\n' "${arguments[index + 1]}" > "${FAKE_CONTAINER_NAME_FILE}"
+                container_name="${arguments[index + 1]}"
                 break
             fi
         done
@@ -724,11 +745,38 @@ case "${1:-}" in
         inner_script="${inner_script//\/root/${FAKE_CONTAINER_ROOT}}"
         inner_script="${inner_script//\/project/${FAKE_PROJECT_DIR}}"
         inner_script="${inner_script//\/workspace/${FAKE_WORKSPACE_DIR}}"
-        cd "${FAKE_PROJECT_DIR}"
-        PATH="${FAKE_BIN}:$PATH" bash -c "${inner_script}" &
-        container_pid=$!
-        printf '%s\n' "${container_pid}" > "${FAKE_CONTAINER_PID_FILE}"
-        wait "${container_pid}"
+        launch_fake_container() {
+            printf '%s\n' "${container_name}" > "${FAKE_CONTAINER_NAME_FILE}"
+            printf 'docker registration complete\n' >> "${FAKE_EVENT_LOG}"
+            cd "${FAKE_PROJECT_DIR}"
+            # A real Docker daemon owns the container independently of the
+            # initiating CLI. Give the fake container its own process group so
+            # terminating the fake client cannot deliver an extra TERM that
+            # bypasses PID 1's bounded return handler.
+            set -m
+            PATH="${FAKE_BIN}:$PATH" bash -c "${inner_script}" &
+            container_pid=$!
+            set +m
+            printf '%s\n' "${container_pid}" > "${FAKE_CONTAINER_PID_FILE}"
+            wait "${container_pid}"
+        }
+        if [[ "${FAKE_SIGNAL_PHASE:-main}" == "registration" ]]; then
+            printf 'docker registration pending\n' >> "${FAKE_EVENT_LOG}"
+            trap '' TERM
+            while [[ ! -f "${FAKE_REGISTRATION_RELEASE_FILE}" ]]; do
+                sleep 0.1
+            done
+            (
+                # Model a daemon independent of the canceled CLI. Without this
+                # reset, the fake container inherits the client's ignored TERM.
+                trap - TERM
+                sleep 2
+                launch_fake_container
+            ) &
+            printf '%s\n' "$!" > "${FAKE_DOCKER_DAEMON_PID_FILE}"
+            exit 143
+        fi
+        launch_fake_container
         ;;
     *)
         printf 'unexpected fake docker command: %s\n' "$*" >&2
@@ -790,6 +838,9 @@ export FAKE_UNITY_PID_FILE="$h1_pid_file"
 export FAKE_UNITY_DESCENDANT_PID_FILE="$h1_descendant_pid_file"
 export FAKE_CONTAINER_PID_FILE="$h1_container_pid_file"
 export FAKE_CONTAINER_NAME_FILE="$h1_container_name_file"
+export FAKE_DOCKER_RUN_PID_FILE="$h1_docker_run_pid_file"
+export FAKE_DOCKER_DAEMON_PID_FILE="$h1_docker_daemon_pid_file"
+export FAKE_REGISTRATION_RELEASE_FILE="$h1_registration_release_file"
 export FAKE_EVENT_LOG="$h1_events"
 export FAKE_CONTAINER_ROOT="$h1_container_root"
 export FAKE_PROJECT_DIR="$h1_project"
@@ -828,15 +879,18 @@ elif ! grep -Eq '^rm -f unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
     h1_failure="host cleanup did not remove the named container"
 fi
 
-# Signal the production wrapper during and after acquisition. Its EXIT cleanup
-# must pass TERM through Docker, let PID 1 return the seat, then remove the
-# container. These phases share assertions so coverage cannot drift apart.
+# Signal the production wrapper before registration, during activation, and
+# during main work. EXIT cleanup must settle the initiating client before
+# inspect, pass TERM through Docker, return the seat, then remove the container.
+# These phases share assertions so coverage cannot drift apart.
 if [[ -z "$h1_failure" ]]; then
-    for h1_signal_phase in activation main; do
+    for h1_signal_phase in registration activation main; do
         : > "$h1_docker_log"
         : > "$h1_unity_log"
         : > "$h1_events"
-        rm -f "$h1_pid_file" "$h1_descendant_pid_file" "$h1_container_pid_file" "$h1_container_name_file"
+        rm -f "$h1_pid_file" "$h1_descendant_pid_file" "$h1_container_pid_file" \
+            "$h1_container_name_file" "$h1_docker_run_pid_file" \
+            "$h1_docker_daemon_pid_file" "$h1_registration_release_file"
         h1_signal_output="$h1_tempdir/signal-${h1_signal_phase}.log"
         FAKE_SIGNAL_PHASE="$h1_signal_phase" \
         PATH="$h1_bin:$PATH" \
@@ -850,15 +904,18 @@ if [[ -z "$h1_failure" ]]; then
         UNITY_LICENSE_RETURN_TIMEOUT=7 \
         UNITY_TERMINATION_GRACE_SECONDS=1 \
         UNITY_CONTAINER_WRAPPER_SECONDS=3 \
-        UNITY_DOCKER_CLIENT_TIMEOUT=1 \
+        UNITY_DOCKER_CLIENT_TIMEOUT=3 \
         UNITY_DOCKER_CLIENT_KILL_GRACE=1 \
             "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_signal_output" 2>&1 &
         h1_wrapper_pid=$!
         h1_ready=0
         for _ in 1 2 3 4 5 6 7 8 9 10; do
-            if [[ -s "$h1_container_name_file" ]] && \
-                { [[ "$h1_signal_phase" == "activation" ]] && grep -Fq 'unity activation' "$h1_events" || \
-                  [[ "$h1_signal_phase" == "main" && -s "$h1_pid_file" ]]; }; then
+            if { [[ "$h1_signal_phase" == "registration" ]] && \
+                    grep -Fq 'docker registration pending' "$h1_events" && \
+                    [[ ! -e "$h1_container_name_file" ]]; } || \
+                { [[ -s "$h1_container_name_file" ]] && \
+                    { [[ "$h1_signal_phase" == "activation" ]] && grep -Fq 'unity activation' "$h1_events" || \
+                      [[ "$h1_signal_phase" == "main" && -s "$h1_pid_file" ]]; }; }; then
                 h1_ready=1
                 break
             fi
@@ -872,14 +929,20 @@ if [[ -z "$h1_failure" ]]; then
         fi
 
         kill -TERM "$h1_wrapper_pid"
+        if [[ "$h1_signal_phase" == "registration" ]]; then
+            : > "$h1_registration_release_file"
+        fi
         ( sleep 20; kill -KILL "$h1_wrapper_pid" 2>/dev/null || true ) &
         h1_wait_guard=$!
         h1_wrapper_exit=0
         wait "$h1_wrapper_pid" || h1_wrapper_exit=$?
         kill "$h1_wait_guard" 2>/dev/null || true
         wait "$h1_wait_guard" 2>/dev/null || true
-        return_line="$(grep -nF 'unity return' "$h1_events" | tail -n 1 | cut -d: -f1)"
-        remove_line="$(grep -nE '^docker rm -f ' "$h1_events" | tail -n 1 | cut -d: -f1)"
+        return_line="$(grep -nF 'unity return' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
+        remove_line="$(grep -nE '^docker rm -f ' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
+        registration_line="$(grep -nF 'docker registration complete' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
+        first_inspect_line="$(grep -nE '^docker inspect ' "$h1_events" | head -n 1 | cut -d: -f1 || true)"
+        inspect_line="$(grep -nE '^docker inspect ' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
         if [[ "$h1_wrapper_exit" -ne 143 ]]; then
             h1_failure="${h1_signal_phase} wrapper TERM exited ${h1_wrapper_exit}, expected 143"
         elif [[ "$(grep -cF -- '-returnlicense' "$h1_unity_log")" -ne 1 ]]; then
@@ -888,6 +951,16 @@ if [[ -z "$h1_failure" ]]; then
             h1_failure="${h1_signal_phase} cancellation left the TERM-resistant Unity process alive"
         elif [[ -s "$h1_descendant_pid_file" ]] && kill -0 "$(cat "$h1_descendant_pid_file")" 2>/dev/null; then
             h1_failure="${h1_signal_phase} cancellation left a TERM-resistant descendant alive"
+        elif [[ -s "$h1_container_pid_file" ]] && kill -0 "$(cat "$h1_container_pid_file")" 2>/dev/null; then
+            h1_failure="${h1_signal_phase} cancellation left the fake container alive"
+        elif [[ -s "$h1_docker_run_pid_file" ]] && kill -0 "$(cat "$h1_docker_run_pid_file")" 2>/dev/null; then
+            h1_failure="${h1_signal_phase} cancellation left the initiating Docker client alive"
+        elif [[ -s "$h1_docker_daemon_pid_file" ]] && kill -0 "$(cat "$h1_docker_daemon_pid_file")" 2>/dev/null; then
+            h1_failure="${h1_signal_phase} cancellation left the delayed daemon registration helper alive"
+        elif [[ "$h1_signal_phase" == "registration" && \
+                ( -z "$first_inspect_line" || -z "$registration_line" || -z "$inspect_line" || \
+                  "$first_inspect_line" -ge "$registration_line" || "$registration_line" -ge "$inspect_line" ) ]]; then
+            h1_failure="cleanup did not retry inspection across delayed daemon registration"
         elif [[ -z "$return_line" || -z "$remove_line" || "$return_line" -ge "$remove_line" ]]; then
             h1_failure="${h1_signal_phase} serial return was not observed before forced container removal"
         elif ! grep -Eq '^stop --timeout 12 unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
@@ -925,7 +998,8 @@ fi
 
 unset FAKE_BIN FAKE_DOCKER_LOG FAKE_UNITY_LOG FAKE_UNITY_PID_FILE \
     FAKE_UNITY_DESCENDANT_PID_FILE FAKE_CONTAINER_PID_FILE \
-    FAKE_CONTAINER_NAME_FILE FAKE_EVENT_LOG FAKE_CONTAINER_ROOT \
+    FAKE_CONTAINER_NAME_FILE FAKE_DOCKER_RUN_PID_FILE FAKE_DOCKER_DAEMON_PID_FILE \
+    FAKE_REGISTRATION_RELEASE_FILE FAKE_EVENT_LOG FAKE_CONTAINER_ROOT \
     FAKE_PROJECT_DIR FAKE_WORKSPACE_DIR FAKE_SIGNAL_PHASE
 rm -rf "$h1_tempdir"
 
