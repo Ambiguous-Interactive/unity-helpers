@@ -341,6 +341,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
+        timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@59a2fa98224569e5a697f271a3ac4b866c53ac2c # v1.8.3
         with:
           lock-name: wallstop-organization-builds

@@ -351,17 +351,16 @@ jobs:
           lock-name: wallstop-organization-builds
           holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
           runner-id: ${{ runner.name }}
-          timeout-minutes: "210"
+          timeout-minutes: "160"
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Export Unity package
         id: export_unitypackage
-        # The exporter bounds Unity itself to 120 minutes. Five more minutes let
-        # the wrapper persist diagnostics and return the license before this step
-        # stops, while the 360-minute job retains setup and cleanup reserves.
-        timeout-minutes: 125
+        # Covers bounded activation, the 120-minute Unity command watchdog,
+        # TERM-to-KILL escalation, serial return, and host container teardown.
+        timeout-minutes: 150
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -391,6 +390,7 @@ jobs:
 
       - name: Release organization Unity lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
+        timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@59a2fa98224569e5a697f271a3ac4b866c53ac2c # v1.8.3
         with:
           lock-name: wallstop-organization-builds
@@ -405,6 +405,7 @@ jobs:
 
       - name: Dump Unity export log tail on failure or cancellation
         if: ${{ failure() || cancelled() }}
+        timeout-minutes: 2
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/unitypackage-project/unitypackage-output
@@ -412,6 +413,7 @@ jobs:
 
       - name: Upload .unitypackage export diagnostics
         if: ${{ failure() || cancelled() }}
+        timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
@@ -425,6 +427,7 @@ jobs:
           overwrite: true
 
       - name: Upload .unitypackage artifact
+        timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-unitypackage

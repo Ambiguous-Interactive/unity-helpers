@@ -280,7 +280,7 @@ function Test-UnityLockCleanupIsGated {
 
     $acquirePattern = '(?m)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:[^\r\n]*\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + $acquireUsesLineSuffix
     $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($requiredCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+continue-on-error:\s+true\s*\r?\n\s+uses:\s+' + [regex]::Escape($returnUses)
-    $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
+    $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
     $failures = @()
 
     foreach ($job in $Jobs.GetEnumerator()) {
@@ -323,7 +323,7 @@ function Test-UnityLockCleanupIsGated {
             $failures += "$($job.Key): return-unity-license must classify the licensed command's log and successful outcome"
         }
         if ($jobText -notmatch $releasePattern) {
-            $failures += "$($job.Key): release-build-lock must run after every non-skipped acquire outcome"
+            $failures += "$($job.Key): release-build-lock must be five-minute bounded and run after every non-skipped acquire outcome"
         }
         if ($declaredLicensedWorkSteps.Count -eq 0) {
             $failures += "$($job.Key): every lock-owning job must declare at least one licensed-work step"
@@ -337,8 +337,21 @@ function Test-UnityLockCleanupIsGated {
             if (-not (0 -le $acquireIndex -and $acquireIndex -lt $licensedWorkIndex -and $licensedWorkIndex -lt $returnIndex -and $returnIndex -lt $releaseIndex)) {
                 $failures += "$($job.Key): lock lifecycle order must be acquire, licensed work '$licensedWorkStepName', identified cleanup, then release"
             }
-            if (-not $licensedWorkStep.Success -or $licensedWorkStep.Value -notmatch '(?m)^\s+timeout-minutes:\s+\S.*$') {
-                $failures += "$($job.Key): licensed work '$licensedWorkStepName' must have a step timeout so a hung Unity process cannot retain the shared seat until the job timeout"
+            $timeoutMatch = [regex]::Match($licensedWorkStep.Value, '(?m)^\s+timeout-minutes:\s+(?<value>\S.*)$')
+            $timeoutValue = if ($timeoutMatch.Success) { $timeoutMatch.Groups['value'].Value.Trim() } else { '' }
+            $literalTimeout = 0
+            $conditionalTimeoutMatch = [regex]::Match(
+                $timeoutValue,
+                '^\$\{\{\s*\(matrix\.test-mode == ''standalone'' && (?<standalone>\d+)\) \|\| (?<default>\d+)\s*\}\}$'
+            )
+            $hasPositiveTimeout = (
+                ([int]::TryParse($timeoutValue, [ref]$literalTimeout) -and $literalTimeout -gt 0) -or
+                ($conditionalTimeoutMatch.Success -and
+                    [int]$conditionalTimeoutMatch.Groups['standalone'].Value -gt 0 -and
+                    [int]$conditionalTimeoutMatch.Groups['default'].Value -gt 0)
+            )
+            if (-not $licensedWorkStep.Success -or -not $hasPositiveTimeout) {
+                $failures += "$($job.Key): licensed work '$licensedWorkStepName' must have a positive literal or contract-evaluable step timeout so a hung Unity process cannot retain the shared seat until the job timeout"
             }
         }
         if (-not $acquireHolder.Success -or -not $releaseHolder.Success -or $acquireHolder.Groups['value'].Value.Trim() -ne $releaseHolder.Groups['value'].Value.Trim()) {

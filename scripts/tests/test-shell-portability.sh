@@ -654,6 +654,122 @@ else
 fi
 
 # =============================================================================
+# Section H: Unity Docker watchdog and container cleanup
+# =============================================================================
+echo ""
+echo '=== Section H: Unity Docker watchdog and container cleanup ==='
+
+echo ""
+echo '--- H1: TERM-resistant Unity is killed before serial return and teardown ---'
+
+run_test
+h1_tempdir="$(mktemp -d)"
+h1_bin="$h1_tempdir/bin"
+h1_project="$h1_tempdir/project"
+h1_container_root="$h1_tempdir/container-root"
+h1_docker_log="$h1_tempdir/docker.log"
+h1_unity_log="$h1_tempdir/unity.log"
+h1_output="$h1_tempdir/wrapper.log"
+h1_pid_file="$h1_tempdir/unity.pid"
+mkdir -p "$h1_bin" "$h1_project" "$h1_container_root"
+
+cat > "$h1_bin/docker" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+
+case "${1:-}" in
+    inspect)
+        printf 'true\n'
+        ;;
+    stop|rm)
+        ;;
+    run)
+        arguments=("$@")
+        inner_script="${arguments[${#arguments[@]} - 1]}"
+        inner_script="${inner_script//\/root/${FAKE_CONTAINER_ROOT}}"
+        inner_script="${inner_script//\/project/${FAKE_PROJECT_DIR}}"
+        inner_script="${inner_script//\/workspace/${FAKE_WORKSPACE_DIR}}"
+        cd "${FAKE_PROJECT_DIR}"
+        PATH="${FAKE_BIN}:$PATH" bash -c "${inner_script}"
+        ;;
+    *)
+        printf 'unexpected fake docker command: %s\n' "$*" >&2
+        exit 2
+        ;;
+esac
+EOF
+
+cat > "$h1_bin/unity-editor" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${FAKE_UNITY_LOG}"
+
+case " $* " in
+    *' -returnlicense '*)
+        printf 'Successfully returned the entitlement license\n'
+        ;;
+    *' -serial '*)
+        mkdir -p "${FAKE_CONTAINER_ROOT}/.local/share/unity3d/Unity"
+        printf 'fixture-license\n' > "${FAKE_CONTAINER_ROOT}/.local/share/unity3d/Unity/Unity_lic.ulf"
+        ;;
+    *)
+        printf '%s\n' "$$" > "${FAKE_UNITY_PID_FILE}"
+        trap '' TERM
+        while true; do
+            sleep 1
+        done
+        ;;
+esac
+EOF
+chmod +x "$h1_bin/docker" "$h1_bin/unity-editor"
+
+h1_exit=0
+PATH="$h1_bin:$PATH" \
+FAKE_BIN="$h1_bin" \
+FAKE_DOCKER_LOG="$h1_docker_log" \
+FAKE_UNITY_LOG="$h1_unity_log" \
+FAKE_UNITY_PID_FILE="$h1_pid_file" \
+FAKE_CONTAINER_ROOT="$h1_container_root" \
+FAKE_PROJECT_DIR="$h1_project" \
+FAKE_WORKSPACE_DIR="$REPO_ROOT" \
+UNITY_TEST_PROJECT_DIR="$h1_project" \
+UNITY_LICENSE_CACHE_DIR="$h1_tempdir/license-cache" \
+UNITY_SERIAL='FAKE-SERIAL' \
+UNITY_EMAIL='fixture@example.invalid' \
+UNITY_PASSWORD='fixture-password' \
+UNITY_TIMEOUT=1 \
+UNITY_LICENSE_ACTIVATION_TIMEOUT=2 \
+UNITY_LICENSE_RETURN_TIMEOUT=2 \
+UNITY_TERMINATION_GRACE_SECONDS=1 \
+UNITY_CONTAINER_WRAPPER_SECONDS=1 \
+    "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_output" 2>&1 || h1_exit=$?
+
+h1_failure=""
+if [[ "$h1_exit" -ne 124 && "$h1_exit" -ne 137 ]]; then
+    h1_failure="expected watchdog exit 124 or 137, got $h1_exit"
+elif ! grep -Fq 'TERM-to-KILL watchdog' "$h1_output"; then
+    h1_failure="watchdog escalation evidence was missing"
+elif ! grep -Fq -- '-returnlicense' "$h1_unity_log"; then
+    h1_failure="serial return did not run after the main Unity timeout"
+elif [[ -s "$h1_pid_file" ]] && kill -0 "$(cat "$h1_pid_file")" 2>/dev/null; then
+    h1_failure="TERM-resistant Unity process remained alive"
+elif ! grep -Eq '^run --name unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
+    h1_failure="Docker run did not use a unique container name"
+elif ! grep -Eq '^stop --timeout [0-9]+ unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
+    h1_failure="host cleanup did not reserve a graceful in-container return window"
+elif ! grep -Eq '^rm -f unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
+    h1_failure="host cleanup did not remove the named container"
+fi
+rm -rf "$h1_tempdir"
+
+if [[ -z "$h1_failure" ]]; then
+    pass "Unity watchdog forces KILL, returns the serial seat, and removes the named container"
+else
+    fail "Unity watchdog/container cleanup regression" "$h1_failure"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 echo ""
