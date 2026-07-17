@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
-# Contract test: pull_request workflows should cancel superseded PR iterations.
+# Contract test: pull_request workflows must preserve licensed lock holders while
+# ordinary workflows should cancel superseded PR iterations.
 [CmdletBinding()]
 param([switch]$VerboseOutput)
 
@@ -43,21 +44,30 @@ foreach ($file in $workflowFiles) {
   $hasUsableGroup =
     $body -match '(?m)^  group:\s*.+' -and
     ($body.Contains('github.event.pull_request.number') -or $body.Contains('github.ref'))
+  $usesOrganizationBuildLock = $content -match 'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@'
   $cancelsPullRequests =
     $body -match "(?m)^  cancel-in-progress:\s*true\s*$" -or
     $body -match "(?m)^  cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*$"
+  $preservesInProgressRuns = $body -match '(?m)^  cancel-in-progress:\s*false\s*$'
 
   if (-not $hasUsableGroup) {
     Write-Host "::error file=$relativePath::pull_request workflow concurrency must group by the PR number or Git ref."
     $failed = $true
   }
 
-  if (-not $cancelsPullRequests) {
+  if ($usesOrganizationBuildLock -and -not $preservesInProgressRuns) {
+    Write-Host "::error file=$relativePath::pull_request workflows that acquire the organization build lock must set cancel-in-progress to false so active license holders can complete cleanup."
+    $failed = $true
+  } elseif (-not $usesOrganizationBuildLock -and -not $cancelsPullRequests) {
     Write-Host "::error file=$relativePath::pull_request workflow concurrency must cancel superseded pull_request runs."
     $failed = $true
   }
 
-  if ($hasUsableGroup -and $cancelsPullRequests) {
+  if (
+    $hasUsableGroup -and
+    (($usesOrganizationBuildLock -and $preservesInProgressRuns) -or
+      (-not $usesOrganizationBuildLock -and $cancelsPullRequests))
+  ) {
     Write-Info "Checked $relativePath."
   }
 }
@@ -66,5 +76,5 @@ if ($failed) {
   exit 1
 }
 
-Write-Host "[test-pr-workflow-concurrency] OK: pull_request workflows cancel superseded PR runs." -ForegroundColor Green
+Write-Host "[test-pr-workflow-concurrency] OK: pull_request concurrency preserves licensed holders and cancels ordinary superseded runs." -ForegroundColor Green
 exit 0

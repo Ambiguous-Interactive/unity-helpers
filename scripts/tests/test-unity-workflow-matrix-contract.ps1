@@ -10,6 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $buildLockActionCommit = '59a2fa98224569e5a697f271a3ac4b866c53ac2c'
 $buildLockActionVersion = 'v1.8.3'
+$currentPrHeadGuardCommit = 'eef57b9d2dd467c3d7e0cc11d31e350dda038b26'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
@@ -2320,15 +2321,68 @@ if ($sparseRegistryExitCode -ne 0) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
-$hasPrCancelConcurrency = (
+$preservesLicensedPrRuns = (
     $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
-    $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
+    $workflowContent.Contains('cancel-in-progress: false')
 )
-if (-not $hasPrCancelConcurrency) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must cancel superseded pull_request runs so old iterations do not keep the organization Unity runner occupied."
+if (-not $preservesLicensedPrRuns) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must not cancel an in-progress licensed run because cancellation can skip license return and lock release cleanup."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity Tests pull_request concurrency cancellation contract."
+    Write-Info "Checked Unity Tests preserves in-progress licensed runs."
+}
+
+$currentPrHeadGuardUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@$currentPrHeadGuardCommit"
+$licensedJobIds = @(
+    'unity-tests',
+    'unity-tests-standalone',
+    'unity-tests-single-threaded',
+    'unitypackage-smoke'
+)
+foreach ($licensedJobId in $licensedJobIds) {
+    if (-not $jobTexts.ContainsKey($licensedJobId)) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Missing licensed job '$licensedJobId' while validating current-PR-head guards."
+        $failed = $true
+        continue
+    }
+
+    $licensedJob = [string]$jobTexts[$licensedJobId]
+    $guardSteps = @([regex]::Matches(
+            $licensedJob,
+            '(?ms)^\s+- name: Require current PR head before (?:setup|lock acquisition)\s*$.*?(?=^\s+- name:|\z)'
+        ))
+    $setupGuardIndex = $licensedJob.IndexOf('- name: Require current PR head before setup', [StringComparison]::Ordinal)
+    $lockGuardIndex = $licensedJob.IndexOf('- name: Require current PR head before lock acquisition', [StringComparison]::Ordinal)
+    $acquireIndex = $licensedJob.IndexOf('- name: Acquire organization Unity lock', [StringComparison]::Ordinal)
+    $nextStepAfterLockGuard = if ($lockGuardIndex -ge 0) {
+        $licensedJob.IndexOf('- name:', $lockGuardIndex + 1, [StringComparison]::Ordinal)
+    } else {
+        -1
+    }
+    $firstStepIndex = $licensedJob.IndexOf('- name:', [StringComparison]::Ordinal)
+    $guardInputsAreExact = (
+        $guardSteps.Count -eq 2 -and
+        @($guardSteps | Where-Object {
+                $_.Value.Contains("uses: $currentPrHeadGuardUses") -and
+                $_.Value.Contains('github-token: ${{ github.token }}') -and
+                $_.Value.Contains('pull-request-number: ${{ github.event.pull_request.number }}') -and
+                $_.Value.Contains('expected-head-sha: ${{ github.event.pull_request.head.sha }}')
+            }).Count -eq 2
+    )
+
+    if (
+        $setupGuardIndex -lt 0 -or
+        $setupGuardIndex -ne $firstStepIndex -or
+        $lockGuardIndex -lt 0 -or
+        $acquireIndex -lt 0 -or
+        $nextStepAfterLockGuard -ne $acquireIndex -or
+        -not $guardInputsAreExact
+    ) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Licensed job '$licensedJobId' must use the exact pinned current-PR-head guard as its first step and again immediately before lock acquisition."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked current-PR-head guards for licensed job '$licensedJobId'."
+    }
 }
 
 $unityMatrixParallelismUsesRunnerSlots = (

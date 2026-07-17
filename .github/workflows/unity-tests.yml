@@ -42,10 +42,11 @@ on:
 permissions:
   contents: read
   checks: write
+  pull-requests: read
 
 concurrency:
   group: unity-tests-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   matrix-config:
@@ -226,6 +227,13 @@ jobs:
         # include object. (Standalone runs in the gated unity-tests-standalone job.)
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
+      - name: Require current PR head before setup
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
       - name: Enable Git long paths
         shell: powershell
         env:
@@ -394,6 +402,14 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Require current PR head before lock acquisition
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Acquire organization Unity lock
         id: unity_lock
@@ -568,6 +584,13 @@ jobs:
         # by the if-guard above -- single-mode dispatch pins run in the fast tier).
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-standalone) }}
     steps:
+      - name: Require current PR head before setup
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
       - name: Enable Git long paths
         shell: powershell
         env:
@@ -736,6 +759,14 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Require current PR head before lock acquisition
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Acquire organization Unity lock
         id: unity_lock
@@ -925,6 +956,13 @@ jobs:
         unity-version: ["6000.3.16f1"]
         test-mode: ["editmode", "playmode"]
     steps:
+      - name: Require current PR head before setup
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
       - name: Enable Git long paths
         shell: powershell
         env:
@@ -1063,6 +1101,14 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/provisioning
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Require current PR head before lock acquisition
+        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Acquire organization Unity lock
         id: unity_lock
@@ -1203,6 +1249,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
+      - name: Require current PR head before setup
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -1220,6 +1273,13 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Require current PR head before lock acquisition
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Acquire organization Unity lock
         id: unity_lock
