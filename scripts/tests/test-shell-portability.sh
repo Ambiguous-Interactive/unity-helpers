@@ -879,6 +879,23 @@ elif ! grep -Eq '^rm -f unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
     h1_failure="host cleanup did not remove the named container"
 fi
 
+# Docker's `-e NAME` form reads only the caller's exported environment. Wrapper
+# defaults are shell-local, so every non-secret inner-script control must carry
+# its explicit validated value instead of accidentally disappearing in CI.
+if [[ -z "$h1_failure" ]]; then
+    for h1_container_control in \
+        'UNITY_TIMEOUT=1' \
+        'UNITY_LICENSE_ACTIVATION_TIMEOUT=2' \
+        'UNITY_LICENSE_RETURN_TIMEOUT=2' \
+        'UNITY_TERMINATION_GRACE_SECONDS=1'
+    do
+        if ! grep -Fq -- "-e ${h1_container_control}" "$h1_docker_log"; then
+            h1_failure="Docker run did not pass explicit ${h1_container_control} control"
+            break
+        fi
+    done
+fi
+
 # Signal the production wrapper before registration, during activation, and
 # during main work. EXIT cleanup must settle the initiating client before
 # inspect, pass TERM through Docker, return the seat, then remove the container.

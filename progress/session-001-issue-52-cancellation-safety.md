@@ -56,4 +56,9 @@ Unity work after a newer commit becomes current.
   exactly one PID 1 serial return before removal, no leftover client/daemon/
   container process, mutated two-grace reserve propagation, and unconditional
   removal after inspect failure.
+- Hosted package-export CI found that Docker's `-e NAME` form does not receive
+  wrapper defaults that were assigned as non-exported shell variables. All four
+  in-container timeout/grace controls now pass explicit validated values;
+  data-driven fake-Docker coverage rejects any recurrence across the complete
+  control set.
 - Full pre-push validation and the exact central consumer-policy audit pass.
