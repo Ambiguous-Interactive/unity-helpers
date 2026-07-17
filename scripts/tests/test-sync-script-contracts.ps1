@@ -2017,6 +2017,10 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $workflowContent,
     '(?ms)^\s*- name: Acquire organization Unity lock\s*\r?\n(?:(?!^\s*- name:).)*?^\s+with:\s*\r?\n(?:(?!^\s*- name:).)*?^\s+timeout-minutes:\s*["'']?(?<minutes>\d+)["'']?\s*$'
   )
+  $exportStepTimeoutMatch = [regex]::Match(
+    $workflowContent,
+    '(?ms)^\s*- name: Export Unity package\s*\r?\n(?:(?!^\s*- name:).)*?^\s+timeout-minutes:\s*(?<minutes>\d+)\s*$'
+  )
   $unityTimeoutMatch = [regex]::Match(
     $exporterContent,
     'UNITY_TIMEOUT="\$\{UNITY_TIMEOUT:-(?<seconds>\d+)\}"'
@@ -2024,13 +2028,19 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
 
   $jobTimeoutMinutes = if ($jobTimeoutMatch.Success) { [int]$jobTimeoutMatch.Groups['minutes'].Value } else { 0 }
   $lockTimeoutMinutes = if ($lockTimeoutMatch.Success) { [int]$lockTimeoutMatch.Groups['minutes'].Value } else { 0 }
+  $exportStepTimeoutMinutes = if ($exportStepTimeoutMatch.Success) { [int]$exportStepTimeoutMatch.Groups['minutes'].Value } else { 0 }
   $unityTimeoutMinutes = if ($unityTimeoutMatch.Success) { [int][Math]::Ceiling(([int]$unityTimeoutMatch.Groups['seconds'].Value) / 60.0) } else { 0 }
-  $minimumOverheadMinutes = 30
-  $requiredJobTimeoutMinutes = $lockTimeoutMinutes + $unityTimeoutMinutes + $minimumOverheadMinutes
+  $minimumExportWrapperMinutes = 5
+  $minimumPreAcquireMinutes = 15
+  $minimumCleanupMinutes = 10
+  $requiredExportStepTimeoutMinutes = $unityTimeoutMinutes + $minimumExportWrapperMinutes
+  $requiredJobTimeoutMinutes = $lockTimeoutMinutes + $exportStepTimeoutMinutes + $minimumPreAcquireMinutes + $minimumCleanupMinutes
   $timeoutBudgetIsCoherent = (
     $jobTimeoutMatch.Success -and
     $lockTimeoutMatch.Success -and
+    $exportStepTimeoutMatch.Success -and
     $unityTimeoutMatch.Success -and
+    $exportStepTimeoutMinutes -ge $requiredExportStepTimeoutMinutes -and
     $jobTimeoutMinutes -ge $requiredJobTimeoutMinutes
   )
   $teeFailureMessageIndex = $exporterContent.IndexOf('Failed to persist Unity package export log with tee exit code')
@@ -2069,9 +2079,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   )
 
   Write-TestResult `
-    -TestName 'release unitypackage job timeout covers lock wait and export budget' `
+    -TestName 'release Unity export step and job timeouts preserve cleanup budget' `
     -Passed $timeoutBudgetIsCoherent `
-    -Message "Expected unitypackage job timeout to be at least lock timeout + Unity export timeout + ${minimumOverheadMinutes}m overhead. Job=${jobTimeoutMinutes}m, lock=${lockTimeoutMinutes}m, Unity=${unityTimeoutMinutes}m, required=${requiredJobTimeoutMinutes}m."
+    -Message "Expected the export step to cover the Unity watchdog plus ${minimumExportWrapperMinutes}m wrapper overhead, and the job to cover lock wait, the bounded export, ${minimumPreAcquireMinutes}m setup, and ${minimumCleanupMinutes}m cleanup. Job=${jobTimeoutMinutes}m/${requiredJobTimeoutMinutes}m required; lock=${lockTimeoutMinutes}m; export=${exportStepTimeoutMinutes}m/${requiredExportStepTimeoutMinutes}m required; Unity=${unityTimeoutMinutes}m."
 
   Write-TestResult `
     -TestName 'unitypackage exporter persists Unity log and preserves exit code' `

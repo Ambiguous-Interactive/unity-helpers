@@ -358,6 +358,10 @@ jobs:
 
       - name: Export Unity package
         id: export_unitypackage
+        # The exporter bounds Unity itself to 120 minutes. Five more minutes let
+        # the wrapper persist diagnostics and return the license before this step
+        # stops, while the 360-minute job retains setup and cleanup reserves.
+        timeout-minutes: 125
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}

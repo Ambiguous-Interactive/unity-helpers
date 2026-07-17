@@ -330,8 +330,15 @@ function Test-UnityLockCleanupIsGated {
         }
         foreach ($licensedWorkStepName in $declaredLicensedWorkSteps) {
             $licensedWorkIndex = $jobText.IndexOf("- name: $licensedWorkStepName", [StringComparison]::Ordinal)
+            $licensedWorkStep = [regex]::Match(
+                $jobText,
+                '(?ms)^\s+- name: ' + [regex]::Escape($licensedWorkStepName) + '\s*$.*?(?=^\s+- name:|\z)'
+            )
             if (-not (0 -le $acquireIndex -and $acquireIndex -lt $licensedWorkIndex -and $licensedWorkIndex -lt $returnIndex -and $returnIndex -lt $releaseIndex)) {
                 $failures += "$($job.Key): lock lifecycle order must be acquire, licensed work '$licensedWorkStepName', identified cleanup, then release"
+            }
+            if (-not $licensedWorkStep.Success -or $licensedWorkStep.Value -notmatch '(?m)^\s+timeout-minutes:\s+\S.*$') {
+                $failures += "$($job.Key): licensed work '$licensedWorkStepName' must have a step timeout so a hung Unity process cannot retain the shared seat until the job timeout"
             }
         }
         if (-not $acquireHolder.Success -or -not $releaseHolder.Success -or $acquireHolder.Groups['value'].Value.Trim() -ne $releaseHolder.Groups['value'].Value.Trim()) {
