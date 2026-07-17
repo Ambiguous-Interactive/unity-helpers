@@ -67,7 +67,7 @@ UNITY_CONTAINER_TIMEOUT=$((
     UNITY_CONTAINER_WRAPPER_SECONDS
 ))
 UNITY_CONTAINER_STOP_SECONDS=$((
-    UNITY_TERMINATION_GRACE_SECONDS +
+    (2 * UNITY_TERMINATION_GRACE_SECONDS) +
     UNITY_LICENSE_RETURN_TIMEOUT +
     UNITY_CONTAINER_WRAPPER_SECONDS
 ))
@@ -217,206 +217,37 @@ run_with_watchdog() {
     return "${command_exit}"
 }
 
-# ── xvfb setup (if requested) ───────────────────────────────────────────────
-'
-
-if [[ "${UNITY_USE_XVFB}" == "1" ]]; then
-    echo "==> [run-unity-docker] xvfb mode enabled"
-    INNER_SCRIPT+='
-echo "==> Installing xvfb..."
-apt-get update -qq && apt-get install -y -qq xvfb > /dev/null 2>&1
-echo "==> xvfb installed."
-USE_XVFB=1
-'
-else
-    INNER_SCRIPT+='
-USE_XVFB=0
-'
-fi
-
-# ── License activation ──────────────────────────────────────────────────────
-if [[ -n "${UNITY_EMAIL:-}" && -n "${UNITY_PASSWORD:-}" && -z "${UNITY_SERIAL:-}" ]]; then
-    echo "==> [run-unity-docker] Using Personal license (online activation with email+password)"
-    # Unity Personal must activate online. Unity no longer supports manual
-    # activation for Personal, so .alf upload is not a valid fallback path.
-    INNER_SCRIPT+='
-echo "==> Attempting online activation with email+password..."
-ONLINE_CONFIRMED=0
-HARD_FAILURE=0
-SOFT_FAILURE=0
-MACHINE_NOT_REGISTERED=0
-ONLINE_LOG_FILE="/root/.config/unity3d/.activation-$(date +%s%N).log"
-ONLINE_OUTPUT=$(run_with_watchdog "Unity license activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit \
-    -username "${UNITY_EMAIL}" \
-    -password "${UNITY_PASSWORD}" \
-    -logFile /dev/stdout 2>&1) || true
-printf "%s\n" "${ONLINE_OUTPUT}" > "${ONLINE_LOG_FILE}"
-printf "%s\n" "${ONLINE_OUTPUT}" | redact_unity_license_output
-echo "==> Activation log saved: ${ONLINE_LOG_FILE}"
-
-if echo "${ONLINE_OUTPUT}" | grep -Eqi "No license activation found for this computer|No ULF license found"; then
-    MACHINE_NOT_REGISTERED=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "Found 0 entitlement groups|com\.unity\.editor\.headless was not found|No valid Unity Editor license found|Token not found in cache|No (valid )?(Unity Editor )?license (found|available)"; then
-    HARD_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "invalid (user )?credentials|invalid username|bad credentials|authentication failed"; then
-    HARD_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "timeout|network|connection|temporar|DNS|refused|unreachable"; then
-    SOFT_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -qiE "license activated|License updated successfully|Entitlement-based licensing initiated"; then
-    ONLINE_CONFIRMED=1
-fi
-
-if [[ "${ONLINE_CONFIRMED}" -ne 1 ]]; then
-    ACTIVATION_DONE=0
-
-    if [[ "${MACHINE_NOT_REGISTERED}" -eq 1 ]]; then
-        echo "==> Online activation failed: this machine has no Unity license registration."
-        ULF_SUCCEEDED=0
-        if [[ -n "${UNITY_LICENSE:-}" ]]; then
-            echo "==> Trying .ulf file (in case it was generated for this machine)..."
-            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
-            ULF_OUTPUT=$(run_with_watchdog "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
-            rm -f /tmp/unity.ulf
-            if check_license_artifact; then
-                echo "==> .ulf activation succeeded."
-                ULF_SUCCEEDED=1
-            fi
-        fi
-        if [[ "${ULF_SUCCEEDED}" -eq 1 ]]; then
-            ACTIVATION_DONE=1
-        else
-            echo ""
-            echo "ERROR: Unity reported that this machine is not registered for the current account."
-            echo "ERROR: Unity Personal does not support manual activation via .alf/.ulf upload."
-            echo "ERROR: Use Unity Hub on a supported interactive machine to activate Personal,"
-            echo "ERROR: or use a serial-based paid license if you need manual activation."
-            echo "ERROR: If you already have a machine-matched .ulf file, place it at"
-            echo "ERROR: .unity-secrets/license.ulf and rerun the command."
-            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for supported paths."
-            exit 1
-        fi
-    fi
-
-    if [[ "${ACTIVATION_DONE}" -eq 0 ]]; then
-        if [[ "${HARD_FAILURE}" -eq 1 ]]; then
-            echo "ERROR: Online activation failed with a hard licensing rejection."
-            echo "ERROR: Skipping .ulf fallback because this failure is not recoverable via local file activation."
-            echo "ERROR: If logs contain Found 0 entitlement groups or com.unity.editor.headless was not found,"
-            echo "ERROR: open a Unity support ticket and attach the activation log path shown above."
-            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for troubleshooting steps."
-            exit 1
-        fi
-
-        if [[ "${SOFT_FAILURE}" -eq 1 && -n "${UNITY_LICENSE:-}" ]]; then
-            echo "==> Online activation had a transient failure. Falling back to .ulf file..."
-            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
-            ULF_OUTPUT=$(run_with_watchdog "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
-            rm -f /tmp/unity.ulf
-            require_license_artifact
-        elif [[ -n "${UNITY_LICENSE:-}" ]]; then
-            echo "==> Online activation was not confirmed. Falling back to .ulf file..."
-            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
-            ULF_OUTPUT=$(run_with_watchdog "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
-            rm -f /tmp/unity.ulf
-            require_license_artifact
-        else
-            echo "ERROR: Online activation failed and no .ulf fallback available."
-            echo "ERROR: Common reasons for activation failure:"
-            echo "  - Invalid email/password credentials"
-            echo "  - Network connectivity issues"
-            echo "  - Unity returned no valid license for this machine/account"
-            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for troubleshooting steps."
-            exit 1
-        fi
-    fi
-else
-    require_license_artifact
-fi
-echo "==> License activation complete."
-'
-elif [[ -n "${UNITY_LICENSE:-}" ]]; then
-    echo "==> [run-unity-docker] Using manual .ulf license file"
-    # Manual .ulf path for machine-matched licenses. This is not a supported
-    # Unity Personal activation flow, but remains valid for serial/manual licenses.
-    INNER_SCRIPT+='
-echo "==> Activating Unity with manual .ulf license..."
-printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
-ULF_OUTPUT=$(run_with_watchdog "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout 2>&1) || true
-printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
-rm -f /tmp/unity.ulf
-require_license_artifact
-echo "==> License activation complete."
-'
-elif [[ -n "${UNITY_SERIAL:-}" ]]; then
-    if [[ -z "${UNITY_EMAIL:-}" || -z "${UNITY_PASSWORD:-}" ]]; then
-        echo "ERROR: UNITY_SERIAL requires UNITY_EMAIL and UNITY_PASSWORD to be set."
-        exit 1
-    fi
-    echo "==> [run-unity-docker] Using Pro license (serial)"
-    # Serial, email, and password are available inside the container via Docker -e flags.
-    INNER_SCRIPT+='
-echo "==> Activating Unity with Pro serial license..."
-SERIAL_OUTPUT=$(run_with_watchdog "Unity serial license activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit \
-    -serial "${UNITY_SERIAL}" \
-    -username "${UNITY_EMAIL}" \
-    -password "${UNITY_PASSWORD}" \
-    -logFile /dev/stdout 2>&1) || true
-printf "%s\n" "${SERIAL_OUTPUT}" | redact_unity_license_output
-require_license_artifact
-echo "==> License activation complete."
-'
-else
-    echo "==> No activation credentials provided. Checking for cached Unity license artifacts..."
-    INNER_SCRIPT+=$'\nrequire_license_artifact\n'
-fi
-
-# ── Idempotent license return (serial only) ─────────────────────────────────
-if [[ -n "${UNITY_SERIAL:-}" ]]; then
-    INNER_SCRIPT+='
-SERIAL_RETURN_ATTEMPTED=0
-RETURN_EXIT_CODE=0
-return_serial_license() {
-    if [[ "${SERIAL_RETURN_ATTEMPTED}" -eq 1 ]]; then
-        return "${RETURN_EXIT_CODE}"
-    fi
-    SERIAL_RETURN_ATTEMPTED=1
-    echo "==> Returning Pro serial license..."
-RETURN_OUTPUT=$(run_with_watchdog "Unity serial license return" "${UNITY_LICENSE_RETURN_TIMEOUT}" unity-editor -batchmode -nographics -quit \
-    -returnlicense \
-    -username "${UNITY_EMAIL}" \
-    -password "${UNITY_PASSWORD}" \
-    -logFile /dev/stdout 2>&1) || RETURN_EXIT_CODE=$?
-printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
-if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
-    if printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Successfully returned the entitlement license" && \
-        printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Serial number unavailable for ULF return"; then
-        echo "==> Unity returned the entitlement license, then exited with code ${RETURN_EXIT_CODE} while skipping legacy ULF return; treating the seat return as successful."
-        RETURN_EXIT_CODE=0
-    else
-        echo "ERROR: Unity license return failed with exit code ${RETURN_EXIT_CODE}." >&2
-    fi
-else
-    echo "==> License returned."
-fi
-    return "${RETURN_EXIT_CODE}"
-}
-'
-else
-    INNER_SCRIPT+='
-SERIAL_RETURN_ATTEMPTED=0
-RETURN_EXIT_CODE=0
-return_serial_license() {
-    return 0
-}
-'
-fi
-
-# ── PID 1 signal handling and supervised Unity process group ────────────────
-INNER_SCRIPT+='
 MAIN_PROCESS_GROUP_PID=""
+WATCHDOG_CAPTURE_FILE=""
+PENDING_CONTAINER_SIGNAL_EXIT=0
+CONTAINER_SIGNAL_HANDLING_DISABLED=0
+defer_container_signal() {
+    PENDING_CONTAINER_SIGNAL_EXIT="$1"
+}
+
+start_supervised_process() {
+    local defer_signals=1
+    if [[ "${CONTAINER_SIGNAL_HANDLING_DISABLED}" -eq 1 ]]; then
+        defer_signals=0
+    else
+        PENDING_CONTAINER_SIGNAL_EXIT=0
+        trap "defer_container_signal 130" INT
+        trap "defer_container_signal 143" TERM
+    fi
+
+    set -m
+    "$@" &
+    MAIN_PROCESS_GROUP_PID=$!
+    set +m
+    if [[ "${defer_signals}" -eq 1 ]]; then
+        trap "handle_container_signal 130" INT
+        trap "handle_container_signal 143" TERM
+        if [[ "${PENDING_CONTAINER_SIGNAL_EXIT}" -ne 0 ]]; then
+            handle_container_signal "${PENDING_CONTAINER_SIGNAL_EXIT}"
+        fi
+    fi
+}
+
 terminate_main_process_group() {
     if [[ -z "${MAIN_PROCESS_GROUP_PID}" ]] || ! kill -0 -- "-${MAIN_PROCESS_GROUP_PID}" 2>/dev/null; then
         return 0
@@ -472,15 +303,238 @@ terminate_main_process_group() {
     MAIN_PROCESS_GROUP_PID=""
 }
 
+run_with_watchdog_capture() {
+    local output_variable="$1"
+    local label="$2"
+    local timeout_seconds="$3"
+    shift 3
+
+    local command_exit=0
+    WATCHDOG_CAPTURE_FILE="$(mktemp /tmp/unity-watchdog.XXXXXX)"
+    start_supervised_process timeout \
+        --signal=TERM \
+        --kill-after="${UNITY_TERMINATION_GRACE_SECONDS}" \
+        "${timeout_seconds}" \
+        "$@" > "${WATCHDOG_CAPTURE_FILE}" 2>&1
+    wait "${MAIN_PROCESS_GROUP_PID}" || command_exit=$?
+    MAIN_PROCESS_GROUP_PID=""
+    printf -v "${output_variable}" "%s" "$(cat "${WATCHDOG_CAPTURE_FILE}")"
+    rm -f "${WATCHDOG_CAPTURE_FILE}"
+    WATCHDOG_CAPTURE_FILE=""
+    if [[ "${command_exit}" -eq 124 ]]; then
+        echo "ERROR: ${label} exceeded ${timeout_seconds}s under the TERM-to-KILL watchdog." >&2
+    elif [[ "${command_exit}" -eq 137 ]]; then
+        echo "ERROR: ${label} exited 137 under the TERM-to-KILL watchdog; this status can also originate in the command itself." >&2
+    fi
+    return "${command_exit}"
+}
+
+SERIAL_RETURN_ATTEMPTED=0
+RETURN_EXIT_CODE=0
+return_serial_license() {
+    if [[ -z "${UNITY_SERIAL:-}" ]] || [[ "${SERIAL_RETURN_ATTEMPTED}" -eq 1 ]]; then
+        return "${RETURN_EXIT_CODE}"
+    fi
+    SERIAL_RETURN_ATTEMPTED=1
+    echo "==> Returning Pro serial license..."
+    RETURN_OUTPUT=""
+    run_with_watchdog_capture RETURN_OUTPUT "Unity serial license return" "${UNITY_LICENSE_RETURN_TIMEOUT}" unity-editor -batchmode -nographics -quit \
+        -returnlicense \
+        -username "${UNITY_EMAIL}" \
+        -password "${UNITY_PASSWORD}" \
+        -logFile /dev/stdout || RETURN_EXIT_CODE=$?
+    printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
+    if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
+        if printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Successfully returned the entitlement license" && \
+            printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Serial number unavailable for ULF return"; then
+            echo "==> Unity returned the entitlement license, then exited with code ${RETURN_EXIT_CODE} while skipping legacy ULF return; treating the seat return as successful."
+            RETURN_EXIT_CODE=0
+        else
+            echo "ERROR: Unity license return failed with exit code ${RETURN_EXIT_CODE}." >&2
+        fi
+    else
+        echo "==> License returned."
+    fi
+    return "${RETURN_EXIT_CODE}"
+}
+
 handle_container_signal() {
     local signal_exit="$1"
     trap - INT TERM
+    CONTAINER_SIGNAL_HANDLING_DISABLED=1
     terminate_main_process_group
+    rm -f "${WATCHDOG_CAPTURE_FILE}"
+    WATCHDOG_CAPTURE_FILE=""
     return_serial_license || true
     exit "${signal_exit}"
 }
 trap '"'"'handle_container_signal 130'"'"' INT
 trap '"'"'handle_container_signal 143'"'"' TERM
+
+# ── xvfb setup (if requested) ───────────────────────────────────────────────
+'
+
+if [[ "${UNITY_USE_XVFB}" == "1" ]]; then
+    echo "==> [run-unity-docker] xvfb mode enabled"
+    INNER_SCRIPT+='
+echo "==> Installing xvfb..."
+apt-get update -qq && apt-get install -y -qq xvfb > /dev/null 2>&1
+echo "==> xvfb installed."
+USE_XVFB=1
+'
+else
+    INNER_SCRIPT+='
+USE_XVFB=0
+'
+fi
+
+# ── License activation ──────────────────────────────────────────────────────
+if [[ -n "${UNITY_EMAIL:-}" && -n "${UNITY_PASSWORD:-}" && -z "${UNITY_SERIAL:-}" ]]; then
+    echo "==> [run-unity-docker] Using Personal license (online activation with email+password)"
+    # Unity Personal must activate online. Unity no longer supports manual
+    # activation for Personal, so .alf upload is not a valid fallback path.
+    INNER_SCRIPT+='
+echo "==> Attempting online activation with email+password..."
+ONLINE_CONFIRMED=0
+HARD_FAILURE=0
+SOFT_FAILURE=0
+MACHINE_NOT_REGISTERED=0
+ONLINE_LOG_FILE="/root/.config/unity3d/.activation-$(date +%s%N).log"
+ONLINE_OUTPUT=""
+run_with_watchdog_capture ONLINE_OUTPUT "Unity license activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit \
+    -username "${UNITY_EMAIL}" \
+    -password "${UNITY_PASSWORD}" \
+    -logFile /dev/stdout || true
+printf "%s\n" "${ONLINE_OUTPUT}" > "${ONLINE_LOG_FILE}"
+printf "%s\n" "${ONLINE_OUTPUT}" | redact_unity_license_output
+echo "==> Activation log saved: ${ONLINE_LOG_FILE}"
+
+if echo "${ONLINE_OUTPUT}" | grep -Eqi "No license activation found for this computer|No ULF license found"; then
+    MACHINE_NOT_REGISTERED=1
+elif echo "${ONLINE_OUTPUT}" | grep -Eqi "Found 0 entitlement groups|com\.unity\.editor\.headless was not found|No valid Unity Editor license found|Token not found in cache|No (valid )?(Unity Editor )?license (found|available)"; then
+    HARD_FAILURE=1
+elif echo "${ONLINE_OUTPUT}" | grep -Eqi "invalid (user )?credentials|invalid username|bad credentials|authentication failed"; then
+    HARD_FAILURE=1
+elif echo "${ONLINE_OUTPUT}" | grep -Eqi "timeout|network|connection|temporar|DNS|refused|unreachable"; then
+    SOFT_FAILURE=1
+elif echo "${ONLINE_OUTPUT}" | grep -qiE "license activated|License updated successfully|Entitlement-based licensing initiated"; then
+    ONLINE_CONFIRMED=1
+fi
+
+if [[ "${ONLINE_CONFIRMED}" -ne 1 ]]; then
+    ACTIVATION_DONE=0
+
+    if [[ "${MACHINE_NOT_REGISTERED}" -eq 1 ]]; then
+        echo "==> Online activation failed: this machine has no Unity license registration."
+        ULF_SUCCEEDED=0
+        if [[ -n "${UNITY_LICENSE:-}" ]]; then
+            echo "==> Trying .ulf file (in case it was generated for this machine)..."
+            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
+            ULF_OUTPUT=""
+            run_with_watchdog_capture ULF_OUTPUT "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout || true
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
+            rm -f /tmp/unity.ulf
+            if check_license_artifact; then
+                echo "==> .ulf activation succeeded."
+                ULF_SUCCEEDED=1
+            fi
+        fi
+        if [[ "${ULF_SUCCEEDED}" -eq 1 ]]; then
+            ACTIVATION_DONE=1
+        else
+            echo ""
+            echo "ERROR: Unity reported that this machine is not registered for the current account."
+            echo "ERROR: Unity Personal does not support manual activation via .alf/.ulf upload."
+            echo "ERROR: Use Unity Hub on a supported interactive machine to activate Personal,"
+            echo "ERROR: or use a serial-based paid license if you need manual activation."
+            echo "ERROR: If you already have a machine-matched .ulf file, place it at"
+            echo "ERROR: .unity-secrets/license.ulf and rerun the command."
+            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for supported paths."
+            exit 1
+        fi
+    fi
+
+    if [[ "${ACTIVATION_DONE}" -eq 0 ]]; then
+        if [[ "${HARD_FAILURE}" -eq 1 ]]; then
+            echo "ERROR: Online activation failed with a hard licensing rejection."
+            echo "ERROR: Skipping .ulf fallback because this failure is not recoverable via local file activation."
+            echo "ERROR: If logs contain Found 0 entitlement groups or com.unity.editor.headless was not found,"
+            echo "ERROR: open a Unity support ticket and attach the activation log path shown above."
+            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for troubleshooting steps."
+            exit 1
+        fi
+
+        if [[ "${SOFT_FAILURE}" -eq 1 && -n "${UNITY_LICENSE:-}" ]]; then
+            echo "==> Online activation had a transient failure. Falling back to .ulf file..."
+            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
+            ULF_OUTPUT=""
+            run_with_watchdog_capture ULF_OUTPUT "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout || true
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
+            rm -f /tmp/unity.ulf
+            require_license_artifact
+        elif [[ -n "${UNITY_LICENSE:-}" ]]; then
+            echo "==> Online activation was not confirmed. Falling back to .ulf file..."
+            printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
+            ULF_OUTPUT=""
+            run_with_watchdog_capture ULF_OUTPUT "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout || true
+            printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
+            rm -f /tmp/unity.ulf
+            require_license_artifact
+        else
+            echo "ERROR: Online activation failed and no .ulf fallback available."
+            echo "ERROR: Common reasons for activation failure:"
+            echo "  - Invalid email/password credentials"
+            echo "  - Network connectivity issues"
+            echo "  - Unity returned no valid license for this machine/account"
+            echo "ERROR: See docs/guides/unity-devcontainer-licensing.md for troubleshooting steps."
+            exit 1
+        fi
+    fi
+else
+    require_license_artifact
+fi
+echo "==> License activation complete."
+'
+elif [[ -n "${UNITY_LICENSE:-}" ]]; then
+    echo "==> [run-unity-docker] Using manual .ulf license file"
+    # Manual .ulf path for machine-matched licenses. This is not a supported
+    # Unity Personal activation flow, but remains valid for serial/manual licenses.
+    INNER_SCRIPT+='
+echo "==> Activating Unity with manual .ulf license..."
+printf "%s\n" "${UNITY_LICENSE}" > /tmp/unity.ulf
+ULF_OUTPUT=""
+run_with_watchdog_capture ULF_OUTPUT "Unity license file activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit -manualLicenseFile /tmp/unity.ulf -logFile /dev/stdout || true
+printf "%s\n" "${ULF_OUTPUT}" | redact_unity_license_output
+rm -f /tmp/unity.ulf
+require_license_artifact
+echo "==> License activation complete."
+'
+elif [[ -n "${UNITY_SERIAL:-}" ]]; then
+    if [[ -z "${UNITY_EMAIL:-}" || -z "${UNITY_PASSWORD:-}" ]]; then
+        echo "ERROR: UNITY_SERIAL requires UNITY_EMAIL and UNITY_PASSWORD to be set."
+        exit 1
+    fi
+    echo "==> [run-unity-docker] Using Pro license (serial)"
+    # Serial, email, and password are available inside the container via Docker -e flags.
+    INNER_SCRIPT+='
+echo "==> Activating Unity with Pro serial license..."
+SERIAL_OUTPUT=""
+run_with_watchdog_capture SERIAL_OUTPUT "Unity serial license activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit \
+    -serial "${UNITY_SERIAL}" \
+    -username "${UNITY_EMAIL}" \
+    -password "${UNITY_PASSWORD}" \
+    -logFile /dev/stdout || true
+printf "%s\n" "${SERIAL_OUTPUT}" | redact_unity_license_output
+require_license_artifact
+echo "==> License activation complete."
+'
+else
+    echo "==> No activation credentials provided. Checking for cached Unity license artifacts..."
+    INNER_SCRIPT+=$'\nrequire_license_artifact\n'
+fi
+
+# ── Supervised main Unity process group ─────────────────────────────────────
+INNER_SCRIPT+='
 export -f run_with_watchdog redact_unity_license_output
 '
 
@@ -503,10 +557,7 @@ UNITY_COMMAND_PIPE_STATUS=(\"\${PIPESTATUS[@]}\")
 exit \"\${UNITY_COMMAND_PIPE_STATUS[0]}\"
 UNITY_MAIN_EOF
 )
-set -m
-bash -c \"\${MAIN_COMMAND_SCRIPT}\" &
-MAIN_PROCESS_GROUP_PID=\$!
-set +m
+start_supervised_process bash -c \"\${MAIN_COMMAND_SCRIPT}\"
 EXIT_CODE=0
 wait \"\${MAIN_PROCESS_GROUP_PID}\" || EXIT_CODE=\$?
 MAIN_PROCESS_GROUP_PID=''
@@ -571,9 +622,49 @@ cleanup_unity_container() {
         'docker rm -f' \
         "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
         docker rm -f "${UNITY_CONTAINER_NAME}" || true
+    terminate_docker_run_client
+}
+DOCKER_RUN_PID=""
+terminate_docker_run_client() {
+    if [[ -z "${DOCKER_RUN_PID}" ]]; then
+        return 0
+    fi
+    if ! kill -0 "${DOCKER_RUN_PID}" 2>/dev/null; then
+        wait "${DOCKER_RUN_PID}" 2>/dev/null || true
+        DOCKER_RUN_PID=""
+        return 0
+    fi
+
+    kill -TERM "${DOCKER_RUN_PID}" 2>/dev/null || true
+    local deadline=$((SECONDS + UNITY_TERMINATION_GRACE_SECONDS))
+    while kill -0 "${DOCKER_RUN_PID}" 2>/dev/null && [[ "${SECONDS}" -lt "${deadline}" ]]; do
+        sleep 1
+    done
+    if kill -0 "${DOCKER_RUN_PID}" 2>/dev/null; then
+        kill -KILL "${DOCKER_RUN_PID}" 2>/dev/null || true
+    fi
+    wait "${DOCKER_RUN_PID}" 2>/dev/null || true
+    DOCKER_RUN_PID=""
 }
 handle_interrupt() {
+    trap - INT TERM
     exit "$1"
+}
+PENDING_INTERRUPT_EXIT=0
+defer_interrupt() {
+    PENDING_INTERRUPT_EXIT="$1"
+}
+start_docker_run_client() {
+    PENDING_INTERRUPT_EXIT=0
+    trap "defer_interrupt 130" INT
+    trap "defer_interrupt 143" TERM
+    "$@" &
+    DOCKER_RUN_PID=$!
+    trap "handle_interrupt 130" INT
+    trap "handle_interrupt 143" TERM
+    if [[ "${PENDING_INTERRUPT_EXIT}" -ne 0 ]]; then
+        handle_interrupt "${PENDING_INTERRUPT_EXIT}"
+    fi
 }
 trap cleanup_unity_container EXIT
 trap 'handle_interrupt 130' INT
@@ -582,7 +673,7 @@ trap 'handle_interrupt 143' TERM
 # The workspace is mounted read-only (/workspace:ro) for safety.
 # The test project directory is mounted read-write (/project) for compilation artifacts.
 DOCKER_EXIT=0
-timeout \
+start_docker_run_client timeout \
     --signal=TERM \
     --kill-after="${UNITY_TERMINATION_GRACE_SECONDS}" \
     "${UNITY_CONTAINER_TIMEOUT}" \
@@ -602,7 +693,9 @@ timeout \
     -e UNITY_TERMINATION_GRACE_SECONDS \
     -w /project \
     "${UNITY_IMAGE}" \
-    bash -c "${INNER_SCRIPT}" || DOCKER_EXIT=$?
+    bash -c "${INNER_SCRIPT}"
+wait "${DOCKER_RUN_PID}" || DOCKER_EXIT=$?
+DOCKER_RUN_PID=""
 
 # ── Post-run: copy .alf to .unity-secrets/ if machine registration needed ──
 if [[ -f "${UNITY_LICENSE_CACHE_CONFIG_DIR}/manual-activation.alf" && -f "${UNITY_LICENSE_CACHE_CONFIG_DIR}/.alf-generated-this-run" ]]; then

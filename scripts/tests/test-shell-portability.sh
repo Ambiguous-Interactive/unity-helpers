@@ -748,6 +748,13 @@ case " $* " in
         printf 'Successfully returned the entitlement license\n'
         ;;
     *' -serial '*)
+        printf 'unity activation\n' >> "${FAKE_EVENT_LOG}"
+        if [[ "${FAKE_SIGNAL_PHASE:-main}" == "activation" ]]; then
+            trap '' TERM
+            while true; do
+                sleep 1
+            done
+        fi
         mkdir -p "${FAKE_CONTAINER_ROOT}/.local/share/unity3d/Unity"
         printf 'fixture-license\n' > "${FAKE_CONTAINER_ROOT}/.local/share/unity3d/Unity/Unity_lic.ulf"
         ;;
@@ -821,51 +828,75 @@ elif ! grep -Eq '^rm -f unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
     h1_failure="host cleanup did not remove the named container"
 fi
 
-# Simulate host cleanup while PID 1 is supervising a TERM-resistant workload.
+# Signal the production wrapper during and after acquisition. Its EXIT cleanup
+# must pass TERM through Docker, let PID 1 return the seat, then remove the
+# container. These phases share assertions so coverage cannot drift apart.
 if [[ -z "$h1_failure" ]]; then
-    : > "$h1_docker_log"
-    : > "$h1_unity_log"
-    : > "$h1_events"
-    rm -f "$h1_pid_file" "$h1_descendant_pid_file" "$h1_container_pid_file" "$h1_container_name_file"
-    h1_signal_output="$h1_tempdir/signal-wrapper.log"
-    PATH="$h1_bin:$PATH" \
-    UNITY_TEST_PROJECT_DIR="$h1_project" \
-    UNITY_LICENSE_CACHE_DIR="$h1_tempdir/license-cache" \
-    UNITY_SERIAL='FAKE-SERIAL' \
-    UNITY_EMAIL='fixture@example.invalid' \
-    UNITY_PASSWORD='fixture-password' \
-    UNITY_TIMEOUT=30 \
-    UNITY_LICENSE_ACTIVATION_TIMEOUT=2 \
-    UNITY_LICENSE_RETURN_TIMEOUT=7 \
-    UNITY_TERMINATION_GRACE_SECONDS=1 \
-    UNITY_CONTAINER_WRAPPER_SECONDS=3 \
-    UNITY_DOCKER_CLIENT_TIMEOUT=1 \
-    UNITY_DOCKER_CLIENT_KILL_GRACE=1 \
-        "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_signal_output" 2>&1 &
-    h1_wrapper_pid=$!
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-        [[ -s "$h1_pid_file" && -s "$h1_container_name_file" ]] && break
-        sleep 1
-    done
-    if [[ ! -s "$h1_pid_file" || ! -s "$h1_container_name_file" ]]; then
-        h1_failure="signal fixture did not reach supervised Unity work"
-    else
-        PATH="$h1_bin:$PATH" "$h1_bin/docker" stop --timeout 11 "$(cat "$h1_container_name_file")" || true
-        wait "$h1_wrapper_pid" || true
+    for h1_signal_phase in activation main; do
+        : > "$h1_docker_log"
+        : > "$h1_unity_log"
+        : > "$h1_events"
+        rm -f "$h1_pid_file" "$h1_descendant_pid_file" "$h1_container_pid_file" "$h1_container_name_file"
+        h1_signal_output="$h1_tempdir/signal-${h1_signal_phase}.log"
+        FAKE_SIGNAL_PHASE="$h1_signal_phase" \
+        PATH="$h1_bin:$PATH" \
+        UNITY_TEST_PROJECT_DIR="$h1_project" \
+        UNITY_LICENSE_CACHE_DIR="$h1_tempdir/license-cache" \
+        UNITY_SERIAL='FAKE-SERIAL' \
+        UNITY_EMAIL='fixture@example.invalid' \
+        UNITY_PASSWORD='fixture-password' \
+        UNITY_TIMEOUT=30 \
+        UNITY_LICENSE_ACTIVATION_TIMEOUT=30 \
+        UNITY_LICENSE_RETURN_TIMEOUT=7 \
+        UNITY_TERMINATION_GRACE_SECONDS=1 \
+        UNITY_CONTAINER_WRAPPER_SECONDS=3 \
+        UNITY_DOCKER_CLIENT_TIMEOUT=1 \
+        UNITY_DOCKER_CLIENT_KILL_GRACE=1 \
+            "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_signal_output" 2>&1 &
+        h1_wrapper_pid=$!
+        h1_ready=0
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            if [[ -s "$h1_container_name_file" ]] && \
+                { [[ "$h1_signal_phase" == "activation" ]] && grep -Fq 'unity activation' "$h1_events" || \
+                  [[ "$h1_signal_phase" == "main" && -s "$h1_pid_file" ]]; }; then
+                h1_ready=1
+                break
+            fi
+            sleep 1
+        done
+        if [[ "$h1_ready" -ne 1 ]]; then
+            h1_failure="${h1_signal_phase} signal fixture did not reach its licensed phase"
+            kill -KILL "$h1_wrapper_pid" 2>/dev/null || true
+            wait "$h1_wrapper_pid" 2>/dev/null || true
+            break
+        fi
+
+        kill -TERM "$h1_wrapper_pid"
+        ( sleep 20; kill -KILL "$h1_wrapper_pid" 2>/dev/null || true ) &
+        h1_wait_guard=$!
+        h1_wrapper_exit=0
+        wait "$h1_wrapper_pid" || h1_wrapper_exit=$?
+        kill "$h1_wait_guard" 2>/dev/null || true
+        wait "$h1_wait_guard" 2>/dev/null || true
         return_line="$(grep -nF 'unity return' "$h1_events" | tail -n 1 | cut -d: -f1)"
         remove_line="$(grep -nE '^docker rm -f ' "$h1_events" | tail -n 1 | cut -d: -f1)"
-        if [[ "$(grep -cF -- '-returnlicense' "$h1_unity_log")" -ne 1 ]]; then
-            h1_failure="PID 1 did not perform exactly one serial return after TERM"
+        if [[ "$h1_wrapper_exit" -ne 143 ]]; then
+            h1_failure="${h1_signal_phase} wrapper TERM exited ${h1_wrapper_exit}, expected 143"
+        elif [[ "$(grep -cF -- '-returnlicense' "$h1_unity_log")" -ne 1 ]]; then
+            h1_failure="${h1_signal_phase} cancellation did not perform exactly one serial return"
         elif [[ -s "$h1_pid_file" ]] && kill -0 "$(cat "$h1_pid_file")" 2>/dev/null; then
-            h1_failure="PID 1 left the TERM-resistant Unity process alive"
+            h1_failure="${h1_signal_phase} cancellation left the TERM-resistant Unity process alive"
         elif [[ -s "$h1_descendant_pid_file" ]] && kill -0 "$(cat "$h1_descendant_pid_file")" 2>/dev/null; then
-            h1_failure="PID 1 left a TERM-resistant descendant alive"
+            h1_failure="${h1_signal_phase} cancellation left a TERM-resistant descendant alive"
         elif [[ -z "$return_line" || -z "$remove_line" || "$return_line" -ge "$remove_line" ]]; then
-            h1_failure="serial return was not observed before forced container removal"
-        elif ! grep -Eq '^stop --timeout 11 unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
-            h1_failure="mutated 1s TERM + 7s return + 3s wrapper reserve did not produce stop timeout 11"
+            h1_failure="${h1_signal_phase} serial return was not observed before forced container removal"
+        elif ! grep -Eq '^stop --timeout 12 unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
+            h1_failure="mutated 2x1s TERM + 7s return + 3s wrapper reserve did not produce stop timeout 12"
         fi
-    fi
+        if [[ -n "$h1_failure" ]]; then
+            break
+        fi
+    done
 fi
 
 # Inspect uncertainty must never bypass the final bounded rm -f attempt.
@@ -895,7 +926,7 @@ fi
 unset FAKE_BIN FAKE_DOCKER_LOG FAKE_UNITY_LOG FAKE_UNITY_PID_FILE \
     FAKE_UNITY_DESCENDANT_PID_FILE FAKE_CONTAINER_PID_FILE \
     FAKE_CONTAINER_NAME_FILE FAKE_EVENT_LOG FAKE_CONTAINER_ROOT \
-    FAKE_PROJECT_DIR FAKE_WORKSPACE_DIR
+    FAKE_PROJECT_DIR FAKE_WORKSPACE_DIR FAKE_SIGNAL_PHASE
 rm -rf "$h1_tempdir"
 
 if [[ -z "$h1_failure" ]]; then

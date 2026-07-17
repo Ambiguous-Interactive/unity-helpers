@@ -2032,7 +2032,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $dockerClientTimeoutSeconds = if ($dockerClientTimeoutMatch.Success) { [int]$dockerClientTimeoutMatch.Groups['seconds'].Value } else { 0 }
   $dockerClientGraceSeconds = if ($dockerClientGraceMatch.Success) { [int]$dockerClientGraceMatch.Groups['seconds'].Value } else { 0 }
   $minimumContainerSeconds = (2 * $activationTimeoutSeconds) + (60 * $unityTimeoutMinutes) + $returnTimeoutSeconds + (4 * $terminationGraceSeconds) + $containerWrapperSeconds
-  $containerStopSeconds = $terminationGraceSeconds + $returnTimeoutSeconds + $containerWrapperSeconds
+  $containerStopSeconds = (2 * $terminationGraceSeconds) + $returnTimeoutSeconds + $containerWrapperSeconds
   $dockerCleanupSeconds = $containerStopSeconds + (3 * $dockerClientTimeoutSeconds) + (3 * $dockerClientGraceSeconds)
   $minimumExportWrapperMinutes = 5
   $requiredExportStepTimeoutMinutes = [int][Math]::Ceiling(($minimumContainerSeconds + $terminationGraceSeconds + $dockerCleanupSeconds) / 60.0) + $minimumExportWrapperMinutes
@@ -2098,12 +2098,17 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $dockerRunnerContent.Contains('redact_unity_license_output()') -and
     $dockerRunnerContent.Contains('run_with_watchdog()') -and
     $dockerRunnerContent.Contains('handle_container_signal()') -and
+    $dockerRunnerContent.Contains('start_supervised_process()') -and
+    $dockerRunnerContent.Contains('trap "defer_container_signal 143" TERM') -and
+    $dockerRunnerContent.Contains('WATCHDOG_CAPTURE_FILE="$(mktemp /tmp/unity-watchdog.XXXXXX)"') -and
     $dockerRunnerContent.Contains('set -m') -and
-    $dockerRunnerContent.Contains('bash -c \"\${MAIN_COMMAND_SCRIPT}\" &') -and
+    $dockerRunnerContent.Contains('start_supervised_process bash -c \"\${MAIN_COMMAND_SCRIPT}\"') -and
     $dockerRunnerContent.Contains('kill -TERM -- "-${MAIN_PROCESS_GROUP_PID}"') -and
     $dockerRunnerContent.Contains('kill -KILL -- "-${MAIN_PROCESS_GROUP_PID}"') -and
     $dockerRunnerContent.Contains('return_serial_license || true') -and
     $dockerRunnerContent.Contains('run_docker_client_with_watchdog()') -and
+    $dockerRunnerContent.Contains('start_docker_run_client()') -and
+    $dockerRunnerContent.Contains('trap "defer_interrupt 143" TERM') -and
     $dockerRunnerContent.Contains('--signal=TERM') -and
     $dockerRunnerContent.Contains('--kill-after="${UNITY_TERMINATION_GRACE_SECONDS}"') -and
     $dockerRunnerContent.Contains('UNITY_CONTAINER_NAME="unity-helpers-$$-$(date +%s%N)"') -and

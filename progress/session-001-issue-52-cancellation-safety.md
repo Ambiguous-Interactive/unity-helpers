@@ -25,6 +25,16 @@ Unity work after a newer commit becomes current.
   group, TERM/KILL every captured descendant, return a serial seat exactly once,
   and exit on INT/TERM. Host inspect, graceful stop, and forced removal calls are
   independently watchdog-bounded; inspect uncertainty still reaches `rm -f`.
+- Final adversarial review found that those PID 1 traps were installed only
+  after activation and that the host fixture bypassed the wrapper by invoking
+  `docker stop` itself. Activation and return now use the same interruptible
+  process-group supervisor, traps are live before any licensed command, and the
+  host waits asynchronously so its own INT/TERM handler can enter EXIT cleanup.
+- Supervisor launches defer signals only across atomic child-PID registration,
+  then replay them immediately; transient Unity output uses a mode-0600
+  `mktemp` file that signal and normal paths both remove.
+- The graceful-stop reserve includes separate TERM-to-KILL windows for the
+  interrupted command and the subsequent bounded license return.
 - Rebalanced both hosted export jobs so the 360-minute job cap includes setup,
   acquisition, container execution, client cleanup, explicit workflow cleanup,
   implicit post-actions, and additional unallocated slack.
@@ -33,7 +43,8 @@ Unity work after a newer commit becomes current.
 
 - Red tests reproduced missing step/process/client bounds and budget equality.
 - Data-driven workflow and release-budget contracts pass for both export callers.
-- Behavioral fake-container coverage proves TERM-resistant parent and descendant
-  cleanup, PID 1 serial return before removal, mutated stop-reserve propagation,
-  and unconditional removal after an inspect failure.
+- Behavioral fake-container coverage signals the production wrapper during both
+  activation and main Unity work. It proves TERM-resistant parent and descendant
+  cleanup, exactly one PID 1 serial return before removal, mutated two-grace
+  stop-reserve propagation, and unconditional removal after inspect failure.
 - Full pre-push validation and the exact central consumer-policy audit pass.
