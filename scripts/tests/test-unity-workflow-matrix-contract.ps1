@@ -10,6 +10,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $buildLockActionCommit = '59a2fa98224569e5a697f271a3ac4b866c53ac2c'
 $buildLockActionVersion = 'v1.8.3'
+$acquireBuildLockActionCommit = '6b2147a1d158c770f213d216f4eea0c313be370a'
+$acquireBuildLockActionComment = 'issue #52 reviewed acquire'
 $currentPrHeadGuardCommit = '8e1cf892f5ee710908fc14f09b3c8033edcb74f9'
 
 function Write-Info($msg) {
@@ -268,14 +270,15 @@ function Test-UnityLockCleanupIsGated {
         [Parameter(Mandatory = $true)][hashtable]$LicensedWorkStepNames
     )
 
-    $acquireUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@$buildLockActionCommit"
+    $acquireUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@$acquireBuildLockActionCommit"
     $releaseUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@$buildLockActionCommit"
     $returnUses = './.github/actions/return-unity-license'
     $requiredCleanupGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
     $requiredReleaseGate = 'if: ${{ always() && (steps.unity_lock.outcome == ''success'' || steps.unity_lock.outcome == ''failure'' || steps.unity_lock.outcome == ''cancelled'') }}'
+    $acquireUsesLineSuffix = '[ \t]+# ' + [regex]::Escape($acquireBuildLockActionComment) + '[ \t]*\r?$'
     $buildLockUsesLineSuffix = '[ \t]+# ' + [regex]::Escape($buildLockActionVersion) + '[ \t]*\r?$'
 
-    $acquirePattern = '(?m)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:[^\r\n]*\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + $buildLockUsesLineSuffix
+    $acquirePattern = '(?m)- name: Acquire organization Unity lock\s*\r?\n\s+id:\s+unity_lock\s*\r?\n(?:[^\r\n]*\r?\n)*?\s+uses:\s+' + [regex]::Escape($acquireUses) + $acquireUsesLineSuffix
     $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($requiredCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+continue-on-error:\s+true\s*\r?\n\s+uses:\s+' + [regex]::Escape($returnUses)
     $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
     $failures = @()
@@ -377,12 +380,13 @@ function Test-UnityLockAppConfiguration {
         $isAcquireStep = $stepText.Contains('Acquire organization Unity lock')
         $stepKind = if ($isAcquireStep) { 'Acquire' } else { 'Release' }
         $expectedAction = if ($isAcquireStep) {
-            "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@$buildLockActionCommit"
+            "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@$acquireBuildLockActionCommit"
         } else {
             "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@$buildLockActionCommit"
         }
 
-        $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]+# ' + [regex]::Escape($buildLockActionVersion) + '[ \t]*\r?$'
+        $expectedComment = if ($isAcquireStep) { $acquireBuildLockActionComment } else { $buildLockActionVersion }
+        $exactActionPattern = '(?m)^\s+uses:\s+' + [regex]::Escape($expectedAction) + '[ \t]+# ' + [regex]::Escape($expectedComment) + '[ \t]*\r?$'
         if ($stepText -notmatch $exactActionPattern) {
             $failures += "$stepKind lock step must use $expectedAction"
         }
