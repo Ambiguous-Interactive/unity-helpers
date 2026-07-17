@@ -228,7 +228,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -405,7 +405,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -585,7 +585,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-standalone) }}
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -762,7 +762,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -957,7 +957,7 @@ jobs:
         test-mode: ["editmode", "playmode"]
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1104,7 +1104,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1250,7 +1250,7 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1275,7 +1275,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Require current PR head before lock acquisition
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@eef57b9d2dd467c3d7e0cc11d31e350dda038b26
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@8e1cf892f5ee710908fc14f09b3c8033edcb74f9
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}

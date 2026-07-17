@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $buildLockActionCommit = '59a2fa98224569e5a697f271a3ac4b866c53ac2c'
 $buildLockActionVersion = 'v1.8.3'
-$currentPrHeadGuardCommit = 'eef57b9d2dd467c3d7e0cc11d31e350dda038b26'
+$currentPrHeadGuardCommit = '8e1cf892f5ee710908fc14f09b3c8033edcb74f9'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
