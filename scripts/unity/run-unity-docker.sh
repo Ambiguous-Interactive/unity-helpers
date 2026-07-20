@@ -335,7 +335,6 @@ return_serial_license() {
     if [[ -z "${UNITY_SERIAL:-}" ]] || [[ "${SERIAL_RETURN_ATTEMPTED}" -eq 1 ]]; then
         return "${RETURN_EXIT_CODE}"
     fi
-    SERIAL_RETURN_ATTEMPTED=1
     echo "==> Returning Pro serial license..."
     RETURN_OUTPUT=""
     run_with_watchdog_capture RETURN_OUTPUT "Unity serial license return" "${UNITY_LICENSE_RETURN_TIMEOUT}" unity-editor -batchmode -nographics -quit \
@@ -343,6 +342,11 @@ return_serial_license() {
         -username "${UNITY_EMAIL}" \
         -password "${UNITY_PASSWORD}" \
         -logFile /dev/stdout || RETURN_EXIT_CODE=$?
+    # A signal received while the supervised return is still running kills that
+    # process group and re-enters this function from handle_container_signal.
+    # Publish completion only after the command settles so that path retries the
+    # interrupted return instead of mistaking a started attempt for a finished one.
+    SERIAL_RETURN_ATTEMPTED=1
     printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
     if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
         if printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Successfully returned the entitlement license" && \
@@ -706,6 +710,7 @@ start_docker_run_client timeout \
     "${UNITY_CONTAINER_TIMEOUT}" \
     docker run \
     --name "${UNITY_CONTAINER_NAME}" \
+    --stop-timeout "${UNITY_CONTAINER_STOP_SECONDS}" \
     -v "${WORKSPACE_DIR}:/workspace:ro" \
     -v "${UNITY_TEST_PROJECT_DIR}:/project" \
     -v "${UNITY_LICENSE_CACHE_LOCAL_DIR}:/root/.local/share/unity3d" \
