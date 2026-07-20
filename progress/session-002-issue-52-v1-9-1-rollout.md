@@ -37,3 +37,7 @@ release commit.
   acquired at `2026-07-20T22:18:30.207Z` on `ELI-MACHINE`. The push therefore
   exercises the after-acquire boundary: the old licensed job must remain active
   and release normally even though a newer PR head exists.
+- Result: the old holder remained unchanged after the newer head was pushed,
+  completed successfully at `2026-07-20T22:23:34Z`, and then disappeared from
+  central lock state without quarantine. Supersession did not cancel or bypass
+  its licensed cleanup.
