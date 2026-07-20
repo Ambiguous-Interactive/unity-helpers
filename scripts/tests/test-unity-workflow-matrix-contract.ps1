@@ -8,14 +8,58 @@ param([switch]$VerboseOutput)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$buildLockActionCommit = '59a2fa98224569e5a697f271a3ac4b866c53ac2c'
-$buildLockActionVersion = 'v1.8.3'
-$acquireBuildLockActionCommit = '6b2147a1d158c770f213d216f4eea0c313be370a'
-$acquireBuildLockActionComment = 'issue #52 reviewed acquire'
-$currentPrHeadGuardCommit = '8e1cf892f5ee710908fc14f09b3c8033edcb74f9'
+$buildLockActionCommit = 'a00614ace745152a659c5c2654f7cefb68a5a628'
+$buildLockActionVersion = 'v1.9.1'
+$acquireBuildLockActionCommit = 'a00614ace745152a659c5c2654f7cefb68a5a628'
+$acquireBuildLockActionComment = 'v1.9.1'
+$currentPrHeadGuardCommit = 'a00614ace745152a659c5c2654f7cefb68a5a628'
 
 function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
+}
+
+function Test-PrCapableAcquireIdentityInputs {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkflowContent,
+        [Parameter(Mandatory = $true)][hashtable]$Jobs
+    )
+
+    if ($WorkflowContent -notmatch '(?m)^  pull_request:\s*$') {
+        return $true
+    }
+
+    foreach ($job in $Jobs.GetEnumerator()) {
+        [string]$jobText = $job.Value
+        $acquireActionCount = [regex]::Matches(
+            $jobText,
+            'Ambiguous-Interactive/ambiguous-organization-build-lock/\.github/actions/acquire-build-lock@'
+        ).Count
+        if ($acquireActionCount -eq 0) {
+            continue
+        }
+
+        $acquireSteps = @([regex]::Matches(
+                $jobText,
+                '(?ms)^      - name: Acquire organization Unity lock\s*$.*?(?=^      - name:|\z)'
+            ))
+        if ($acquireSteps.Count -ne $acquireActionCount) {
+            return $false
+        }
+
+        foreach ($acquireStep in $acquireSteps) {
+            foreach ($expectedInput in @(
+                    'github-token: ${{ github.token }}',
+                    'pull-request-number: ${{ github.event.pull_request.number }}',
+                    'expected-head-sha: ${{ github.event.pull_request.head.sha }}'
+                )) {
+                if ([regex]::Matches($acquireStep.Value, "(?m)^          $([regex]::Escape($expectedInput))\s*$").Count -ne 1) {
+                    return $false
+                }
+            }
+        }
+    }
+
+    return $true
 }
 
 function Test-RunnerBootstrapPassesMaintenanceForce {
@@ -2407,6 +2451,49 @@ foreach ($licensedJobId in $licensedJobIds) {
     } elseif ($VerboseOutput) {
         Write-Info "Checked current-PR-head guards for licensed job '$licensedJobId'."
     }
+}
+
+$prAcquireIdentityInputsAreExact = Test-PrCapableAcquireIdentityInputs `
+    -WorkflowContent $workflowContent `
+    -Jobs $jobTexts
+$prAcquireMutationProofsRejectDrift = $true
+foreach ($expectedInput in @(
+        'github-token: ${{ github.token }}',
+        'pull-request-number: ${{ github.event.pull_request.number }}',
+        'expected-head-sha: ${{ github.event.pull_request.head.sha }}'
+    )) {
+    $mutatedJobs = @{}
+    foreach ($job in $jobTexts.GetEnumerator()) {
+        $mutatedJobs[$job.Key] = [string]$job.Value
+    }
+
+    $mutationTarget = [string]$mutatedJobs['unity-tests']
+    $acquireStep = [regex]::Match(
+        $mutationTarget,
+        '(?ms)^      - name: Acquire organization Unity lock\s*$.*?(?=^      - name:|\z)'
+    )
+    $inputLine = "          $expectedInput"
+    $inputIndex = $acquireStep.Value.IndexOf($inputLine, [StringComparison]::Ordinal)
+    if (-not $acquireStep.Success -or $inputIndex -lt 0) {
+        $prAcquireMutationProofsRejectDrift = $false
+        continue
+    }
+
+    $mutatedAcquireStep = $acquireStep.Value.Remove($inputIndex, $inputLine.Length)
+    $mutatedJobs['unity-tests'] = $mutationTarget.Remove($acquireStep.Index, $acquireStep.Length).Insert(
+        $acquireStep.Index,
+        $mutatedAcquireStep
+    )
+    if (Test-PrCapableAcquireIdentityInputs -WorkflowContent $workflowContent -Jobs $mutatedJobs) {
+        $prAcquireMutationProofsRejectDrift = $false
+    }
+}
+
+if (-not $prAcquireIdentityInputsAreExact -or -not $prAcquireMutationProofsRejectDrift) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::Every acquire step in a pull-request-capable workflow must pass the exact PR number, expected head SHA, and GitHub token; mutation proofs must reject each missing binding.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked every PR-capable acquire step binds exact PR identity and each missing-input mutation is rejected.'
 }
 
 $licensedWorkflowJobSets = @(
