@@ -1722,19 +1722,144 @@ EditorSettings:
     return $project
 }
 
+function Get-UnityActivationRetryBudgetSeconds {
+    # Total wall-clock budget for RETRYING transient Unity serial-activation
+    # failures. This exists for issue #57: the organization build lock's release
+    # cooldown is deliberately near-zero, so when this run acquires a seat the
+    # PRIOR holder's activation may not have propagated as returned yet and Unity
+    # answers 20111 "maximum number of activations". That is transient seat
+    # contention, so activation retries (bounded) until the seat frees instead of
+    # the lock blindly holding a slot for minutes. Honors
+    # UH_ACTIVATION_RETRY_BUDGET_SECONDS. Default 360s matches the previously
+    # observed ~5-minute Unity activation handoff plus a margin. A NON-INTEGER or
+    # NEGATIVE override is ignored with a ::warning:: and the default is used. 0 is
+    # the explicit OPT-OUT: a single attempt with legacy fail-fast behavior (no
+    # retry) -- note this differs from the *-TIMEOUT_SECONDS helpers where 0 means
+    # "unbounded", because an unbounded activation retry could pin a lock slot
+    # forever on a real capacity leak. Mirrors Get-StandaloneTestPlayerTimeoutSeconds's
+    # env-parse idiom. StrictMode-safe: no collection reads.
+    param([int]$Default = 360)
+
+    if ($env:UH_ACTIVATION_RETRY_BUDGET_SECONDS) {
+        $parsed = 0
+        if (
+            [int]::TryParse($env:UH_ACTIVATION_RETRY_BUDGET_SECONDS, [ref]$parsed) -and
+            $parsed -ge 0
+        ) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_ACTIVATION_RETRY_BUDGET_SECONDS='$env:UH_ACTIVATION_RETRY_BUDGET_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
+function Get-UnityActivationRetryDelaySeconds {
+    # Deterministic (pre-jitter) exponential backoff CEILING for activation retry
+    # attempt N (1-based): min(CapSeconds, BaseSeconds * 2^(N-1)). The caller adds
+    # bounded random jitter and additionally clamps the sleep so it never overruns
+    # the retry-budget deadline. Pure + StrictMode-safe so the backoff policy is
+    # unit-tested without launching Unity.
+    param(
+        [Parameter(Mandatory = $true)][int]$Attempt,
+        [int]$BaseSeconds = 5,
+        [int]$CapSeconds = 30
+    )
+
+    if ($Attempt -lt 1) { $Attempt = 1 }
+    # Clamp the exponent so 2^(N-1) cannot overflow on a pathologically high attempt
+    # count; the min() against CapSeconds makes anything past the cap moot anyway.
+    $exponent = [Math]::Min($Attempt - 1, 30)
+    $scaled = [double]$BaseSeconds * [Math]::Pow(2, $exponent)
+    $ceiling = [Math]::Min([double]$CapSeconds, $scaled)
+    return [int][Math]::Ceiling($ceiling)
+}
+
+function Get-UnityActivationFailureClass {
+    # PURE classifier for a Unity SERIAL-activation attempt: given the editor exit
+    # code and the (possibly empty) activation log text, decide whether the run
+    # should proceed, retry, or fail fast. Returns a StrictMode-safe object with
+    #   Class  = 'success' | 'retryable' | 'hard'
+    #   Reason = a stable, credential-free tag for diagnostics
+    #
+    # Contract (see the org lock's RESOURCE_REASON_CODES + secure-two-seat-rollout):
+    #   * exit 0                                 -> success / activated
+    #   * 20111 "maximum number of activations"  -> retryable / account-limit-20111
+    #       The SEAT-CONTENTION signal. The lock caps concurrent holders, so a 20111
+    #       here is either a transient handoff (previous seat still freeing -> clears
+    #       within the budget) or a real capacity leak (persists). We retry it ONLY
+    #       within the bounded budget; a 20111 that survives the deadline is re-thrown
+    #       with the 20111 evidence still in the (OVERWRITTEN, final-attempt)
+    #       activation log, so the EXISTING return-side classifier still raises the
+    #       account-blocked incident. We never treat 20111 as success and never reset
+    #       the incident path.
+    #   * 20113 "serial expired"                 -> hard / serial-expired-20113
+    #       Calendar expiry; retrying is pointless until the serial is rotated.
+    #   * any other non-zero exit                -> retryable / unknown
+    #       Covers process kills (124/137/143), transient network/token licensing
+    #       errors (20105/20120/...), and unforeseen transients. Bounded by the
+    #       budget, so a genuine misconfiguration costs at most one budget then
+    #       surfaces the real error.
+    # The \b-style non-digit guards keep 201110 / 120111 from matching 20111.
+    # StrictMode-safe: no collection reads.
+    param(
+        [Parameter(Mandatory = $true)][int]$ExitCode,
+        [string]$LogText = ''
+    )
+
+    if ($ExitCode -eq 0) {
+        return [pscustomobject]@{ Class = 'success'; Reason = 'activated' }
+    }
+
+    $text = if ($null -eq $LogText) { '' } else { [string]$LogText }
+
+    if (
+        $text -match '(?i)maximum number of activations' -or
+        $text -match '(?<![0-9])20111(?![0-9])'
+    ) {
+        return [pscustomobject]@{ Class = 'retryable'; Reason = 'account-limit-20111' }
+    }
+
+    if (
+        $text -match '(?i)serial expired' -or
+        $text -match '(?<![0-9])20113(?![0-9])'
+    ) {
+        return [pscustomobject]@{ Class = 'hard'; Reason = 'serial-expired-20113' }
+    }
+
+    return [pscustomobject]@{ Class = 'retryable'; Reason = 'unknown' }
+}
+
 function Invoke-UnityLicenseActivate {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
         [Parameter(Mandatory = $true)][string]$Serial,
         [Parameter(Mandatory = $true)][string]$Email,
         [Parameter(Mandatory = $true)][string]$Password,
-        [Parameter(Mandatory = $true)][string]$LogPath
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [int]$RetryBudgetSeconds = -1,
+        # TESTABILITY SEAM (never passed in production): an optional invoker
+        # `{ param($activateArgs, $logPath) ... return [int]$exitCode }` that stands
+        # in for the real editor launch so the retry/deadline/backoff loop can be
+        # exercised cross-platform without Unity. When $null (the default) the real
+        # `& $EditorPath ... | Tee-Object` path runs and production behavior is
+        # byte-for-byte unchanged.
+        [scriptblock]$ActivationInvoker = $null
     )
 
-    # Classic SERIAL activation: a single editor invocation that activates the
-    # paid Unity seat and immediately quits. This MUST succeed before the test
-    # run, so unlike the return path it THROWS on a non-zero exit -- a failed
-    # activation means the test editor would launch unlicensed and fail opaquely.
+    # Classic SERIAL activation: an editor invocation that activates the paid Unity
+    # seat and immediately quits. This MUST succeed before the test run, so unlike
+    # the best-effort return path a terminal failure THROWS -- an unlicensed test
+    # editor fails opaquely.
+    #
+    # RETRY (issue #57): the organization lock's release cooldown is intentionally
+    # near-zero, so when this run acquires a seat the PRIOR holder's activation may
+    # not have propagated as returned yet and Unity answers 20111 "maximum number of
+    # activations". That is transient seat contention, not a hard error, so we retry
+    # within a bounded wall-clock budget (Get-UnityActivationRetryBudgetSeconds) with
+    # jittered exponential backoff (Get-UnityActivationRetryDelaySeconds). A 20111
+    # that SURVIVES the budget is a real capacity leak: we re-throw with the 20111
+    # evidence still in the activation log so the existing return-side classifier
+    # raises the account incident. Permanent failures (serial expiry) fail fast.
     $logDir = Split-Path -Parent $LogPath
     if ($logDir -and -not (Test-Path -LiteralPath $logDir -PathType Container)) {
         New-Item -ItemType Directory -Force -Path $logDir | Out-Null
@@ -1742,9 +1867,11 @@ function Invoke-UnityLicenseActivate {
 
     # SECURITY: the serial/email/password ride in the argument array, so this site
     # must NEVER echo the args (no "...$activateArgs..." Write-Host). The caller
-    # passes a $LogPath that lives under a NON-uploaded temp dir (RUNNER_TEMP /
-    # system temp), never under $ArtifactsPath, so the credentials cannot leak into
-    # an uploaded artifact.
+    # passes a $LogPath under a NON-uploaded temp dir (RUNNER_TEMP / system temp),
+    # never under $ArtifactsPath. Tee-Object OVERWRITES $LogPath each attempt, so the
+    # log reflects only the FINAL attempt: a success after a transient 20111 leaves a
+    # clean log (no stale 20111 for the return classifier to mis-read as an incident),
+    # while a persistent 20111 leaves the 20111 intact for the incident path.
     $activateArgs = @(
         '-quit',
         '-batchmode',
@@ -1755,22 +1882,67 @@ function Invoke-UnityLicenseActivate {
         '-logFile', '-'
     )
 
-    Write-Host "::group::Activate Unity license (serial)"
-    # Unity.exe is a Windows GUI-subsystem binary: PowerShell's `&` does NOT wait
-    # for it or set $LASTEXITCODE unless its stdout is consumed via the pipeline.
-    # `-logFile -` puts the Unity log on stdout and `| Tee-Object` forces the wait,
-    # sets $LASTEXITCODE, and persists the (non-uploaded) temp log. (Proven idiom;
-    # see Invoke-UnityEditor.)
-    & $EditorPath @activateArgs 2>&1 | Tee-Object -FilePath $LogPath
-    $exitCode = $LASTEXITCODE
-    Write-Host "::endgroup::"
-    if ($exitCode -ne 0) {
-        # The message names the failure and the (non-uploaded) log path ONLY -- it
-        # must never embed the serial/email/password values.
-        throw "Unity license activation failed with exit code $exitCode. See the activation log at $LogPath (not uploaded as an artifact)."
+    if ($RetryBudgetSeconds -lt 0) {
+        $RetryBudgetSeconds = Get-UnityActivationRetryBudgetSeconds
     }
+    $deadline = (Get-Date).AddSeconds($RetryBudgetSeconds)
+    $attempt = 0
 
-    Write-CiNotice 'Activated the Unity license (serial).'
+    while ($true) {
+        $attempt++
+
+        if ($ActivationInvoker) {
+            $exitCode = [int](& $ActivationInvoker $activateArgs $LogPath)
+        } else {
+            Write-Host "::group::Activate Unity license (serial) attempt $attempt"
+            # Unity.exe is a Windows GUI-subsystem binary: `&` does NOT wait for it or
+            # set $LASTEXITCODE unless its stdout is consumed. `-logFile -` + Tee-Object
+            # forces the wait, sets $LASTEXITCODE, and (over)writes the non-uploaded log.
+            & $EditorPath @activateArgs 2>&1 | Tee-Object -FilePath $LogPath
+            $exitCode = $LASTEXITCODE
+            Write-Host "::endgroup::"
+        }
+
+        $logText = ''
+        try {
+            if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+                $rawLog = Get-Content -LiteralPath $LogPath -Raw -ErrorAction Stop
+                if ($null -ne $rawLog) { $logText = $rawLog }
+            }
+        } catch {
+            $logText = ''
+        }
+
+        $decision = Get-UnityActivationFailureClass -ExitCode $exitCode -LogText $logText
+
+        if ($decision.Class -eq 'success') {
+            if ($attempt -gt 1) {
+                Write-CiNotice "Activated the Unity license (serial) on attempt $attempt."
+            } else {
+                Write-CiNotice 'Activated the Unity license (serial).'
+            }
+            return
+        }
+
+        # Every throw names the failure class + reason + attempt count + the
+        # (non-uploaded) log path ONLY -- never the serial/email/password values.
+        if ($decision.Class -eq 'hard') {
+            throw "Unity license activation failed with exit code $exitCode (reason=$($decision.Reason)) after $attempt attempt(s); not retryable. See the activation log at $LogPath (not uploaded as an artifact)."
+        }
+
+        $remainingSeconds = ($deadline - (Get-Date)).TotalSeconds
+        if ($RetryBudgetSeconds -le 0 -or $remainingSeconds -le 0) {
+            throw "Unity license activation failed with exit code $exitCode (reason=$($decision.Reason)) after $attempt attempt(s) within a $RetryBudgetSeconds s retry budget. See the activation log at $LogPath (not uploaded as an artifact)."
+        }
+
+        $delaySeconds = Get-UnityActivationRetryDelaySeconds -Attempt $attempt
+        # Full jitter in [1, delay], then clamp so we never sleep past the deadline
+        # (min 1s so a tiny remaining budget still makes one more attempt).
+        $jittered = Get-Random -Minimum 1 -Maximum ($delaySeconds + 1)
+        $sleepSeconds = [int][Math]::Max(1, [Math]::Min([double]$jittered, $remainingSeconds))
+        Write-Host "::warning::Unity license activation attempt $attempt failed (exit code $exitCode, reason=$($decision.Reason)); retrying in ${sleepSeconds}s (~$([int]$remainingSeconds)s of retry budget left). Expected transient seat contention under the organization lock's near-zero release cooldown."
+        Start-Sleep -Seconds $sleepSeconds
+    }
 }
 
 function Test-UnityLicenseReturnLogShowsEntitlementReturned {
