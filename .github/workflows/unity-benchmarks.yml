@@ -35,7 +35,7 @@ jobs:
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Resolve dispatch overrides
@@ -125,7 +125,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -133,7 +133,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.18.0"
 
@@ -430,7 +430,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # Persist credentials so git-auto-commit-action can push.
           persist-credentials: true
@@ -464,7 +464,7 @@ jobs:
       # Node 22 (matches the benchmarks job's setup-node) to run the pure-Node,
       # zero-dependency perf-delta tooling under scripts/unity/lib/.
       - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.18.0"
 

@@ -26,13 +26,13 @@ jobs:
       release-url: ${{ steps.release_drafter.outputs.html_url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 1 # Only need current commit for package.json and CHANGELOG.md
 
       - name: Draft release
         id: release_drafter
-        uses: release-drafter/release-drafter@4d75298e00d9e34c483e5ff8c68d0ea1c1940c1e
+        uses: release-drafter/release-drafter@eada3c96a64734dd381cfbda23511034e328ddb0
         with:
           config-name: release-drafter.yml
         env:
