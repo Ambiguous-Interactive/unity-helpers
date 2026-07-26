@@ -570,8 +570,8 @@ MAIN_PROCESS_GROUP_PID=''
 
 # ── Normal completion: return once, then preserve the main result ───────────
 INNER_SCRIPT+='
-return_serial_license || true
 echo "==> Unity command finished with exit code: ${EXIT_CODE}"
+return_serial_license || true
 if [[ "${EXIT_CODE}" -eq 0 && "${RETURN_EXIT_CODE}" -ne 0 ]]; then
     exit "${RETURN_EXIT_CODE}"
 fi

@@ -1460,20 +1460,6 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
-      - name: Delete private Unity cleanup evidence
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        shell: pwsh
-        env:
-          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
-          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
-        run: |
-          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
-          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
-            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-              Remove-Item -LiteralPath $evidencePath -Force
-            }
-          }
-
       - name: Dump Unity export log tail on failure or cancellation
         if: ${{ failure() || cancelled() }}
         timeout-minutes: 2
@@ -1496,6 +1482,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           overwrite: true
+
+      - name: Delete private Unity cleanup evidence
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        shell: pwsh
+        env:
+          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
+          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
+        run: |
+          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
+          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
+            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+              Remove-Item -LiteralPath $evidencePath -Force
+            }
+          }
 
   unity-ci-success:
     name: Unity CI Success

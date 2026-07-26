@@ -102,6 +102,7 @@ $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windo
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 $runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
+$runUnityDockerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
@@ -493,6 +494,7 @@ function Test-UnityLockAppConfiguration {
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 [string]$runCiTestsContent = Get-Content -LiteralPath $runCiTestsPath -Raw
+[string]$runUnityDockerContent = Get-Content -LiteralPath $runUnityDockerPath -Raw
 $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
 $integrationPackagesConfig = Get-Content -LiteralPath $integrationPackagesPath -Raw | ConvertFrom-Json
 [string[]]$unityVersions = @(
@@ -2602,6 +2604,26 @@ if (-not $returnActionResourceProofContract) {
     Write-Info 'Checked return action delegates bounded private evidence to central policy.'
 }
 
+$dockerCompletionIndex = $runUnityDockerContent.IndexOf(
+    'echo "==> Unity command finished with exit code: ${EXIT_CODE}"',
+    [StringComparison]::Ordinal
+)
+$dockerReturnIndex = if ($dockerCompletionIndex -ge 0) {
+    $runUnityDockerContent.IndexOf(
+        'return_serial_license || true',
+        $dockerCompletionIndex,
+        [StringComparison]::Ordinal
+    )
+} else {
+    -1
+}
+if ($dockerCompletionIndex -lt 0 -or $dockerReturnIndex -le $dockerCompletionIndex) {
+    Write-Host '::error file=scripts/unity/run-unity-docker.sh::Docker completion status must be emitted before serial return so exit_return_rc remains the final non-empty evidence line.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked Docker return evidence ends with the exit_return_rc attestation.'
+}
+
 $centralGateUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@$centralCleanupPolicyCommit"
 $centralLifecycleFailures = @()
 $licensedLifecycleCount = 0
@@ -2644,6 +2666,39 @@ if ($licensedLifecycleCount -ne 6 -or $centralLifecycleFailures.Count -gt 0) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked six licensed jobs use the central cleanup policy and fail-closed final gate.'
+}
+
+$sharedDiagnosticEvidenceFailures = @()
+foreach ($sharedDiagnosticJob in @(
+        @{
+            File = '.github/workflows/release.yml'
+            Text = [string]$releaseJobTexts['unitypackage']
+            Upload = 'Upload .unitypackage export diagnostics'
+        },
+        @{
+            File = '.github/workflows/unity-tests.yml'
+            Text = [string]$jobTexts['unitypackage-smoke']
+            Upload = 'Upload Unity package export smoke diagnostics'
+        }
+    )) {
+    $gateIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Require confirmed Unity cleanup', [StringComparison]::Ordinal)
+    $dumpIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Dump Unity export log tail on failure or cancellation', [StringComparison]::Ordinal)
+    $uploadIndex = $sharedDiagnosticJob.Text.IndexOf("- name: $($sharedDiagnosticJob.Upload)", [StringComparison]::Ordinal)
+    $deleteIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Delete private Unity cleanup evidence', [StringComparison]::Ordinal)
+    if (
+        $gateIndex -lt 0 -or
+        $dumpIndex -le $gateIndex -or
+        $uploadIndex -le $dumpIndex -or
+        $deleteIndex -le $uploadIndex
+    ) {
+        $sharedDiagnosticEvidenceFailures += $sharedDiagnosticJob.File
+    }
+}
+if ($sharedDiagnosticEvidenceFailures.Count -gt 0) {
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Shared Unity export logs must remain available for failure diagnostics until after the final gate, dump, and upload steps. Failures=$($sharedDiagnosticEvidenceFailures -join ', ')."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked shared Unity export evidence is deleted only after failure diagnostics.'
 }
 
 $unityLockUsesAppCredentials = (
