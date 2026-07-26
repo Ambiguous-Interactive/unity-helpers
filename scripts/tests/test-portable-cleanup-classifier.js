@@ -24,6 +24,42 @@ const cases = [
       "[Licensing::Client] Successfully returned ULF license with serial number : <redacted>",
       "[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation"
     ),
+    false
+  ],
+  [
+    "ULF group returned before bare skip marker",
+    true,
+    `${positive}Serial number unavailable for ULF return\n`,
+    false
+  ],
+  [
+    "bare skip marker before ULF group returned",
+    true,
+    positive.replace(
+      "[Licensing::Module] Successfully returned the entitlement license\n",
+      "[Licensing::Module] Successfully returned the entitlement license\nSerial number unavailable for ULF return\n"
+    ),
+    false
+  ],
+  [
+    "one ULF group returned and another skipped",
+    true,
+    `${positive}[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation\n`,
+    false
+  ],
+  [
+    "one ULF group skipped before another returned",
+    true,
+    positive.replace(
+      "[Licensing::Module] Successfully returned the entitlement license\n",
+      "[Licensing::Module] Successfully returned the entitlement license\n[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation\n"
+    ),
+    false
+  ],
+  [
+    "incidental skipped-marker mention",
+    true,
+    `${positive}Checking for Serial number unavailable for ULF return in the log\n`,
     true
   ],
   ["command incomplete", false, positive, false],

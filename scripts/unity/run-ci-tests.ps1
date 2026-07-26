@@ -1945,32 +1945,6 @@ function Invoke-UnityLicenseActivate {
     }
 }
 
-function Test-UnityLicenseReturnLogShowsEntitlementReturned {
-    param(
-        [Parameter(Mandatory = $true)][string]$LogPath
-    )
-
-    try {
-        if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
-            return $false
-        }
-
-        $returnedEntitlement = Select-String `
-            -LiteralPath $LogPath `
-            -Pattern 'Successfully returned the entitlement license' `
-            -SimpleMatch `
-            -Quiet
-        $legacyFileUnavailable = Select-String `
-            -LiteralPath $LogPath `
-            -Pattern 'Serial number unavailable for ULF return' `
-            -SimpleMatch `
-            -Quiet
-        return $returnedEntitlement -and $legacyFileUnavailable
-    } catch {
-        return $false
-    }
-}
-
 function Invoke-UnityLicenseReturn {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -2014,12 +1988,15 @@ function Invoke-UnityLicenseReturn {
         $exitCode = $LASTEXITCODE
         Write-Host "::endgroup::"
 
-        if ($exitCode -ne 0) {
-            if (Test-UnityLicenseReturnLogShowsEntitlementReturned -LogPath $LogPath) {
-                Write-CiNotice "Unity returned the entitlement license, then exited with code $exitCode while skipping legacy ULF return; treating the seat return as successful."
-            } else {
-                Write-Host "::warning::Unity license return exited with code $exitCode; the workflow if:always() return step and the next run's return-at-start are the backstops for the leaked seat."
-            }
+        $ulfReturnSkipped = Select-String `
+            -LiteralPath $LogPath `
+            -Pattern '^\s*(?:Serial number unavailable for ULF return|\[Licensing::Module\] Error: Serial number unavailable for ULF return; skipping operation)\s*$' `
+            -CaseSensitive `
+            -Quiet
+        if ($ulfReturnSkipped) {
+            Write-Host "::warning::Unity skipped ULF return; exact cleanup evidence was not confirmed (exit code $exitCode). The workflow if:always() return step and the next run's return-at-start are the backstops for the leaked seat."
+        } elseif ($exitCode -ne 0) {
+            Write-Host "::warning::Unity license return exited with code $exitCode; exact ULF cleanup evidence was not confirmed. The workflow if:always() return step and the next run's return-at-start are the backstops for the leaked seat."
         } else {
             Write-CiNotice 'Returned the Unity license (serial).'
         }

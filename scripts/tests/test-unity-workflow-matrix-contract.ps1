@@ -2636,15 +2636,64 @@ $classificationCases = @(
             '[Licensing::Module] Successfully returned the entitlement license'
             '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'
         )
+        Expected = $false
+    }
+    @{
+        Name = 'ULF group returned before bare skip marker'
+        ExitCode = 1
+        Lines = @(
+            '  Successfully returned the entitlement license  '
+            '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'
+            "`tSerial number unavailable for ULF return"
+        )
+        Expected = $false
+    }
+    @{
+        Name = 'bare skip marker before ULF group returned'
+        ExitCode = 1
+        Lines = @(
+            'Successfully returned the entitlement license'
+            'Serial number unavailable for ULF return'
+            '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'
+        )
+        Expected = $false
+    }
+    @{
+        Name = 'one ULF group returned and another skipped'
+        ExitCode = 0
+        Lines = @(
+            '[Licensing::Module] Successfully returned the entitlement license'
+            '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'
+            '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'
+        )
+        Expected = $false
+    }
+    @{
+        Name = 'one ULF group skipped before another returned'
+        ExitCode = 0
+        Lines = @(
+            '[Licensing::Module] Successfully returned the entitlement license'
+            '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'
+            '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'
+        )
+        Expected = $false
+    }
+    @{
+        Name = 'incidental skipped-marker mention'
+        ExitCode = 0
+        Lines = @(
+            '[Licensing::Module] Successfully returned the entitlement license'
+            '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'
+            'Checking for Serial number unavailable for ULF return in the log'
+        )
         Expected = $true
     }
-    @{ Name = 'dual exact normalized markers'; ExitCode = 1; Lines = @('  Successfully returned the entitlement license  ', "`tSerial number unavailable for ULF return"); Expected = $true }
     @{ Name = 'ULF-unavailable marker only'; ExitCode = 0; Lines = @('[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'); Expected = $false }
     @{ Name = 'case-altered markers'; ExitCode = 0; Lines = @('Successfully Returned the entitlement license', 'Serial Number unavailable for ULF return'); Expected = $false }
     @{ Name = 'generic success'; ExitCode = 1; Lines = @('License return succeeded'); Expected = $false }
     @{ Name = 'one marker'; ExitCode = 1; Lines = @('Successfully returned the entitlement license'); Expected = $false }
     @{ Name = 'negated marker substrings'; ExitCode = 1; Lines = @('Not Successfully returned the entitlement license', 'Not Serial number unavailable for ULF return'); Expected = $false }
-    @{ Name = 'terminated despite exact markers'; ExitCode = 137; Lines = @('Successfully returned the entitlement license', 'Serial number unavailable for ULF return'); Expected = $false }
+    @{ Name = 'terminated despite exact positive markers'; ExitCode = 137; Lines = @('Successfully returned the entitlement license', '[Licensing::Client] Successfully returned ULF license with serial number : <redacted>'); Expected = $false }
     @{ Name = 'missing log'; ExitCode = 1; Lines = $null; Expected = $false }
 )
 $classificationFailures = @()

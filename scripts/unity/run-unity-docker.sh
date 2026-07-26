@@ -348,14 +348,14 @@ return_serial_license() {
     # interrupted return instead of mistaking a started attempt for a finished one.
     SERIAL_RETURN_ATTEMPTED=1
     printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
-    if [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
-        if printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Successfully returned the entitlement license" && \
-            printf "%s\n" "${RETURN_OUTPUT}" | grep -Fq "Serial number unavailable for ULF return"; then
-            echo "==> Unity returned the entitlement license, then exited with code ${RETURN_EXIT_CODE} while skipping legacy ULF return; treating the seat return as successful."
-            RETURN_EXIT_CODE=0
-        else
-            echo "ERROR: Unity license return failed with exit code ${RETURN_EXIT_CODE}." >&2
+    if printf "%s\n" "${RETURN_OUTPUT}" | grep -Eq \
+        "^[[:space:]]*(Serial number unavailable for ULF return|\[Licensing::Module\] Error: Serial number unavailable for ULF return; skipping operation)[[:space:]]*$"; then
+        echo "ERROR: Unity skipped ULF return; exact cleanup evidence was not confirmed (exit code ${RETURN_EXIT_CODE})." >&2
+        if [[ "${RETURN_EXIT_CODE}" -eq 0 ]]; then
+            RETURN_EXIT_CODE=1
         fi
+    elif [[ "${RETURN_EXIT_CODE}" -ne 0 ]]; then
+        echo "ERROR: Unity license return failed with exit code ${RETURN_EXIT_CODE}." >&2
     else
         echo "==> License returned."
     fi

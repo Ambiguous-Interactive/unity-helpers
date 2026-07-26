@@ -23,6 +23,7 @@ function classifyCleanupEvidence({ commandCompleted, logText }) {
 
   let entitlementReturned = false;
   let ulfReturned = false;
+  let ulfReturnSkipped = false;
   let recordedExitCode = null;
   for (const rawLine of logText.split(/\r?\n/u)) {
     const line = rawLine.trim();
@@ -33,7 +34,10 @@ function classifyCleanupEvidence({ commandCompleted, logText }) {
     if (ENTITLEMENT_MARKERS.has(line)) {
       entitlementReturned = true;
     }
-    if (ULF_UNAVAILABLE_MARKERS.has(line) || ULF_RETURN.test(line)) {
+    if (ULF_UNAVAILABLE_MARKERS.has(line)) {
+      ulfReturnSkipped = true;
+    }
+    if (ULF_RETURN.test(line)) {
       ulfReturned = true;
     }
   }
@@ -42,7 +46,8 @@ function classifyCleanupEvidence({ commandCompleted, logText }) {
     recordedExitCode !== null &&
     !TERMINATION_EXIT_CODES.has(recordedExitCode) &&
     entitlementReturned &&
-    ulfReturned
+    ulfReturned &&
+    !ulfReturnSkipped
   );
 }
 

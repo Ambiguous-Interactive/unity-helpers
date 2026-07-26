@@ -412,11 +412,23 @@ function Run-UnityCiScriptContractTests {
       Sort-Object -Unique
   )
   $missingDefinitions = @($ciCommandNames | Where-Object { $_ -notin $definedFunctionNames })
+  $runnerContent = Get-Content -LiteralPath $runnerPath -Raw
+  $skippedUlfIsNotDeclaredSuccessful = (
+    -not $runnerContent.Contains('treating the seat return as successful') -and
+    -not $runnerContent.Contains('function Test-UnityLicenseReturnLogShowsEntitlementReturned') -and
+    $runnerContent.Contains('$ulfReturnSkipped = Select-String') -and
+    $runnerContent.Contains('if ($ulfReturnSkipped)')
+  )
 
   Write-TestResult `
     -TestName 'run-ci-tests.ps1 defines every Write-Ci* helper it calls' `
     -Passed ($missingDefinitions.Count -eq 0) `
     -Message "Missing helper definitions: $($missingDefinitions -join ', ')"
+
+  Write-TestResult `
+    -TestName 'run-ci-tests does not treat a skipped ULF return as successful' `
+    -Passed $skippedUlfIsNotDeclaredSuccessful `
+    -Message 'Expected skipped ULF return evidence to remain unknown instead of being described as successful.'
 }
 
 function Run-TestFixtureTempFolderContractTests {
@@ -2102,6 +2114,15 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $clientSettlementIndex -gt $containerCleanupIndex -and
     $cleanupInspectIndex -gt $clientSettlementIndex
   )
+  $returnExitCodeZeroAssignments = [regex]::Matches(
+    $dockerRunnerContent,
+    '(?m)^\s*RETURN_EXIT_CODE=0\s*$'
+  ).Count
+  $skippedUlfForcesDockerReturnFailure = (
+    $dockerRunnerContent.Contains('Unity skipped ULF return; exact cleanup evidence was not confirmed') -and
+    $dockerRunnerContent.Contains('if [[ "${RETURN_EXIT_CODE}" -eq 0 ]]') -and
+    $dockerRunnerContent.Contains('RETURN_EXIT_CODE=1')
+  )
   $dockerRunnerRedactsAndReturnsSerialLicense = (
     $cleanupSettlesInitiatingClient -and
     $dockerRunnerContent.Contains('redact_unity_license_output()') -and
@@ -2134,8 +2155,10 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $dockerRunnerContent.Contains('printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output') -and
     $dockerRunnerContent.Contains('-username "${UNITY_EMAIL}"') -and
     $dockerRunnerContent.Contains('-password "${UNITY_PASSWORD}"') -and
-    $dockerRunnerContent.Contains('Successfully returned the entitlement license') -and
     $dockerRunnerContent.Contains('Serial number unavailable for ULF return') -and
+    -not $dockerRunnerContent.Contains('treating the seat return as successful') -and
+    $returnExitCodeZeroAssignments -eq 1 -and
+    $skippedUlfForcesDockerReturnFailure -and
     $dockerRunnerContent.Contains('return "${RETURN_EXIT_CODE}"')
   )
 
