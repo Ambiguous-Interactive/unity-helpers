@@ -2617,11 +2617,18 @@ $dockerReturnIndex = if ($dockerCompletionIndex -ge 0) {
 } else {
     -1
 }
-if ($dockerCompletionIndex -lt 0 -or $dockerReturnIndex -le $dockerCompletionIndex) {
+if (
+    $dockerCompletionIndex -lt 0 -or
+    $dockerReturnIndex -le $dockerCompletionIndex -or
+    -not $runUnityDockerContent.Contains(
+        'docker rm -f "${UNITY_CONTAINER_NAME}" >/dev/null || true',
+        [StringComparison]::Ordinal
+    )
+) {
     Write-Host '::error file=scripts/unity/run-unity-docker.sh::Docker completion status must be emitted before serial return so exit_return_rc remains the final non-empty evidence line.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked Docker return evidence ends with the exit_return_rc attestation.'
+    Write-Info 'Checked Docker return evidence ends with the exit_return_rc attestation, including silent EXIT-trap removal.'
 }
 
 $centralGateUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@$centralCleanupPolicyCommit"

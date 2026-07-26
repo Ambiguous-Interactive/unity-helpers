@@ -654,7 +654,7 @@ cleanup_unity_container() {
     run_docker_client_with_watchdog \
         'docker rm -f' \
         "${UNITY_DOCKER_CLIENT_TIMEOUT}" \
-        docker rm -f "${UNITY_CONTAINER_NAME}" || true
+        docker rm -f "${UNITY_CONTAINER_NAME}" >/dev/null || true
 }
 DOCKER_RUN_PID=""
 terminate_docker_run_client() {
