@@ -389,6 +389,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Release organization Unity lock
+        id: release_unity_lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
@@ -402,6 +403,38 @@ jobs:
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
+
+      - name: Require confirmed Unity cleanup
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
+        with:
+          acquired: ${{ steps.unity_lock.outputs.acquired }}
+          classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
+          cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
+          cleanup-health: ${{ steps.return_unity_license.outputs.resource-health }}
+          cleanup-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          release-outcome: ${{ steps.release_unity_lock.outcome }}
+          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
+          released: ${{ steps.release_unity_lock.outputs.released }}
+          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
+          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
+          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
+          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
+          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
+
+      - name: Delete private Unity cleanup evidence
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        shell: pwsh
+        env:
+          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
+          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
+        run: |
+          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
+          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
+            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+              Remove-Item -LiteralPath $evidencePath -Force
+            }
+          }
 
       - name: Dump Unity export log tail on failure or cancellation
         if: ${{ failure() || cancelled() }}

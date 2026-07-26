@@ -1,16 +1,14 @@
 name: Return Unity license
 description: >-
   Defense-in-depth: explicitly return the per-run Unity license seat via
-  `Unity.exe -returnlicense` (classic serial activation). Runs as an if:always()
-  backstop for a killed/crashed/timed-out editor that could not return its own
-  seat. NEVER fails the build (a missing editor path or credentials, or any error, is
-  non-fatal -- the next run's return-at-start is a further backstop).
+  `Unity.exe -returnlicense` (classic serial activation), capture private evidence,
+  and delegate cleanup classification to the central organization policy.
 inputs:
   unity-editor-path:
-    description: "Path to the resolved Unity editor exe (exported to GITHUB_ENV by run-ci-tests.ps1). When empty there is nothing to return."
+    description: "Path to the resolved Unity editor executable. When empty, only prior return evidence can prove cleanup."
     required: false
   prior-return-log-path:
-    description: "Path to a Unity return log from licensed work that may already contain exact cleanup evidence; it must not expose unredacted credentials."
+    description: "Path to a dedicated Unity return log from licensed work; it must remain private."
     required: false
   prior-command-succeeded:
     description: "Set true only when the command that produced prior-return-log-path completed successfully."
@@ -18,147 +16,154 @@ inputs:
     default: "false"
 outputs:
   resource-safe:
-    description: "Whether Unity confirmed that this runner no longer holds the license activation."
-    value: ${{ steps.return_license.outputs.resource-safe }}
+    description: "Whether the central policy confirmed that this runner no longer holds the license activation."
+    value: ${{ steps.classify_return.outputs.resource-safe || steps.classify_prior.outputs.resource-safe }}
   resource-cleanup-status:
-    description: "confirmed only when exact positive Unity return evidence was observed; otherwise unknown."
-    value: ${{ steps.return_license.outputs.resource-cleanup-status }}
+    description: "confirmed only when central policy observed exact positive Unity return evidence; otherwise unknown."
+    value: ${{ steps.classify_return.outputs.resource-cleanup-status || steps.classify_prior.outputs.resource-cleanup-status }}
   resource-health:
-    description: "Return cleanup does not classify account health, so this remains healthy."
-    value: ${{ steps.return_license.outputs.resource-health }}
+    description: "Central account-health classification."
+    value: ${{ steps.classify_return.outputs.resource-health || steps.classify_prior.outputs.resource-health }}
   resource-reason:
-    description: "Stable cleanup evidence reason code."
-    value: ${{ steps.return_license.outputs.resource-reason }}
+    description: "Stable central cleanup evidence reason code."
+    value: ${{ steps.classify_return.outputs.resource-reason || steps.classify_prior.outputs.resource-reason }}
+  classification-complete:
+    description: "Whether bounded central classification completed deterministically."
+    value: ${{ steps.classify_return.outputs.classification-complete || steps.classify_prior.outputs.classification-complete }}
+  evidence-digest:
+    description: "SHA-256 digest of bounded evidence identity and bytes."
+    value: ${{ steps.classify_return.outputs.evidence-digest || steps.classify_prior.outputs.evidence-digest }}
+  return-log-path:
+    description: "Private return log selected for classification and later deletion."
+    value: ${{ steps.capture_return.outputs.return-log-path || steps.prior_metadata.outputs.return-log-path }}
+  supplemental-evidence-paths:
+    description: "Private supplemental evidence selected for classification and later deletion."
+    value: ${{ steps.prior_metadata.outputs.supplemental-evidence-paths }}
 runs:
   using: composite
   steps:
-    - name: Return Unity license
-      id: return_license
+    - name: Resolve prior return metadata
+      id: prior_metadata
       shell: pwsh
       env:
         PRIOR_RETURN_LOG_PATH: ${{ inputs.prior-return-log-path }}
         PRIOR_COMMAND_SUCCEEDED: ${{ inputs.prior-command-succeeded }}
       run: |
         Set-StrictMode -Version Latest
-        . (Join-Path '${{ github.action_path }}' 'Classify-UnityLicenseReturn.ps1')
-        # Pin $PSNativeCommandUseErrorActionPreference = $false (mirrors the
-        # rationale in scripts/unity/run-ci-tests.ps1). PowerShell 7.4+
-        # can ENABLE the native-error behavior so that `& <native>` THROWS on a
-        # non-zero exit. If that fired here, `& $editorPath @returnArgs` would
-        # throw BEFORE `$exitCode = $LASTEXITCODE` runs, jumping straight to the
-        # catch and making the best-effort return's exit-code-classified warning
-        # unreliable across hosts. Pinning it $false keeps the LASTEXITCODE-based
-        # classification authoritative and identical on every runner. (Pre-7.4
-        # builds lack the variable; assigning it is harmless and StrictMode-safe.)
-        $PSNativeCommandUseErrorActionPreference = $false
-
-        function Set-ConfirmedCleanupOutput {
-          "resource-safe=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "resource-cleanup-status=confirmed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "resource-reason=cleanup-confirmed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        }
-
-        function Test-PriorReturnEvidence {
-          if ($env:PRIOR_COMMAND_SUCCEEDED -ne 'true' -or [string]::IsNullOrWhiteSpace($env:PRIOR_RETURN_LOG_PATH)) {
-            return $false
-          }
-          return Test-UnityLicenseReturnResourceSafe -ExitCode 0 -LogPath $env:PRIOR_RETURN_LOG_PATH
-        }
-
-        # Best-effort, never-fails seat return. Top-level try/catch + a final
-        # `exit 0` keep cleanup errors from masking the build result. Missing
-        # positive evidence remains unknown so the lock can quarantine this
-        # runner until an explicit, evidence-backed recovery.
+        $ErrorActionPreference = 'Stop'
+        $ready = $false
+        $exitCode = ''
+        $returnLogPath = ''
+        $supplementalPaths = ''
         try {
-          "resource-safe=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "resource-cleanup-status=unknown" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "resource-health=healthy" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "resource-reason=return-missing-positive-evidence" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          $editorPath = '${{ inputs.unity-editor-path }}'
-          if ([string]::IsNullOrWhiteSpace($editorPath)) {
-            $editorPath = $env:UNITY_EDITOR_PATH
+          $candidate = [string]$env:PRIOR_RETURN_LOG_PATH
+          if ($candidate -match "[`r`n]") {
+            throw 'Prior return evidence path contains an unsupported newline.'
           }
-
-          # Nothing to return when the editor path was never resolved (the Unity
-          # run never reached the point of exporting UNITY_EDITOR_PATH).
-          if ([string]::IsNullOrWhiteSpace($editorPath)) {
-            if (Test-PriorReturnEvidence) {
-              Set-ConfirmedCleanupOutput
-              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
-            } else {
-              Write-Host "::notice::No Unity editor path or exact prior return evidence resolved; cleanup remains unknown."
+          if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            $file = Get-Item -LiteralPath $candidate -Force
+            if ($file.Length -gt 25MB -or $file.Extension -notin @('.log', '.txt')) {
+              throw 'Prior return evidence is outside the supported bounds.'
             }
-            exit 0
-          }
-          if (-not (Test-Path -LiteralPath $editorPath -PathType Leaf)) {
-            if (Test-PriorReturnEvidence) {
-              Set-ConfirmedCleanupOutput
-              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
-            } else {
-              Write-Host "::notice::Resolved Unity editor path does not exist and no exact prior return evidence was found; cleanup remains unknown."
+            $supplementalPaths = $file.FullName
+            if ($env:PRIOR_COMMAND_SUCCEEDED -eq 'true') {
+              $lastLine = @(
+                Get-Content -LiteralPath $file.FullName -Tail 4 -ErrorAction Stop |
+                  Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+              ) | Select-Object -Last 1
+              if ([string]$lastLine -match '^exit_return_rc=(-?[0-9]+)$') {
+                $parsedExitCode = 0L
+                if ([long]::TryParse($Matches[1], [ref]$parsedExitCode)) {
+                  $ready = $true
+                  $exitCode = [string]$parsedExitCode
+                  $returnLogPath = $file.FullName
+                }
+              }
             }
-            exit 0
-          }
-
-          # Serial activation returns by account, so both credentials are required
-          # unless the licensed command already proved cleanup. Never echo them.
-          if ([string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -or [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)) {
-            if (Test-PriorReturnEvidence) {
-              Set-ConfirmedCleanupOutput
-              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence."
-            } else {
-              Write-Host "::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set and no exact prior return evidence was found; cleanup remains unknown."
-            }
-            exit 0
-          }
-
-          # SECURITY: email/password ride in the argument array, and Unity may echo
-          # account fragments into its log, so write the return log to a NON-uploaded
-          # temp dir (RUNNER_TEMP, fallback the system temp path), NOT under the
-          # uploaded artifacts. Never echo the args/secrets.
-          $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
-          $returnLog = Join-Path $licenseLogDir 'unity-return-license.log'
-
-          # SECURITY: do NOT echo this array (it carries the credentials).
-          $returnArgs = @(
-            '-quit',
-            '-batchmode',
-            '-nographics',
-            '-returnlicense',
-            '-username', $env:UNITY_EMAIL,
-            '-password', $env:UNITY_PASSWORD,
-            '-logFile', '-'
-          )
-
-          Write-Host "::group::Return Unity license"
-          # Unity.exe is a Windows GUI-subsystem binary: PowerShell's `&` does NOT
-          # wait for it or set $LASTEXITCODE unless its stdout is consumed via the
-          # pipeline. `-logFile -` puts the log on stdout and `| Tee-Object` forces
-          # the wait and sets $LASTEXITCODE. Tee-Object DOES persist the log to
-          # $returnLog, but that target lives under the NON-uploaded temp dir
-          # ($licenseLogDir above), so it stays out of any UPLOADED ARTIFACT and the
-          # account fragments Unity may print cannot leak into uploads. Same proven
-          # idiom as run-ci-tests.ps1.
-          & $editorPath @returnArgs 2>&1 | Tee-Object -FilePath $returnLog
-          $exitCode = $LASTEXITCODE
-          Write-Host "::endgroup::"
-
-          $currentReturnConfirmed = Test-UnityLicenseReturnResourceSafe -ExitCode $exitCode -LogPath $returnLog
-          $priorReturnConfirmed = -not $currentReturnConfirmed -and (Test-PriorReturnEvidence)
-          if ($currentReturnConfirmed -or $priorReturnConfirmed) {
-            Set-ConfirmedCleanupOutput
-            if ($priorReturnConfirmed) {
-              Write-Host "::notice::Licensed work already produced exact positive Unity return evidence; the redundant helper added no stronger proof."
-            } elseif ($exitCode -ne 0) {
-              Write-Host "::notice::Unity emitted exact entitlement and ULF return evidence before exiting with code $exitCode; treating cleanup as confirmed."
-            } else {
-              Write-Host "::notice::Returned the Unity license seat with exact positive evidence."
-            }
-          } else {
-            Write-Host "::warning::Unity license return exited with code $exitCode without exact positive evidence; cleanup remains unknown."
           }
         } catch {
-          Write-Host "::warning::Unity license return step hit an unexpected error: $($_.Exception.Message). Cleanup remains unknown and lock release will quarantine this runner."
+          Write-Host '::warning::Prior Unity return metadata could not be attested; the redundant return remains authoritative.'
         }
-        # Defense-in-depth: this step must never fail the build.
-        exit 0
+        "prior-ready=$($ready.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-log-path=$returnLogPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "supplemental-evidence-paths=$supplementalPaths" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Classify prior exact return evidence
+      id: classify_prior
+      if: ${{ steps.prior_metadata.outputs.prior-ready == 'true' }}
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      with:
+        return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
+        return-command-completed: "true"
+        return-exit-code: ${{ steps.prior_metadata.outputs.return-exit-code }}
+        evidence-capture-complete: "true"
+
+    - name: Capture redundant Unity return evidence
+      id: capture_return
+      if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
+      shell: pwsh
+      env:
+        UNITY_EDITOR_INPUT: ${{ inputs.unity-editor-path }}
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $false
+        $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+        $returnLog = Join-Path $licenseLogDir 'unity-return-license.log'
+        $commandCompleted = $false
+        $exitCode = ''
+        $captureComplete = $false
+        try {
+          Set-Content -LiteralPath $returnLog -Value '' -NoNewline
+          $captureComplete = $true
+          $editorPath = [string]$env:UNITY_EDITOR_INPUT
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            $editorPath = [string]$env:UNITY_EDITOR_PATH
+          }
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            Write-Host '::notice::No Unity editor path resolved; cleanup remains unknown.'
+          } elseif (-not (Test-Path -LiteralPath $editorPath -PathType Leaf)) {
+            Write-Host '::notice::Resolved Unity editor path does not exist; cleanup remains unknown.'
+          } elseif ([string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -or [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)) {
+            Write-Host '::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set; cleanup remains unknown.'
+          } else {
+            $returnArgs = @(
+              '-quit',
+              '-batchmode',
+              '-nographics',
+              '-returnlicense',
+              '-username', $env:UNITY_EMAIL,
+              '-password', $env:UNITY_PASSWORD,
+              '-logFile', '-'
+            )
+            Write-Host '::group::Return Unity license'
+            try {
+              & $editorPath @returnArgs 2>&1 | Out-File -FilePath $returnLog -Encoding utf8
+              $exitCode = [string]$LASTEXITCODE
+              $commandCompleted = $true
+              Add-Content -LiteralPath $returnLog -Value "exit_return_rc=$exitCode" -Encoding utf8
+              Write-Host "::notice::Unity return command completed with exit code $exitCode; raw evidence remains private."
+            } finally {
+              Write-Host '::endgroup::'
+            }
+          }
+        } catch {
+          $captureComplete = $false
+          Write-Host '::warning::Unity return evidence capture failed; cleanup remains unknown and central release will fail closed.'
+        }
+        "return-log-path=$returnLog" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-command-completed=$($commandCompleted.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "evidence-capture-complete=$($captureComplete.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Classify redundant return evidence
+      id: classify_return
+      if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      with:
+        return-log-path: ${{ steps.capture_return.outputs.return-log-path }}
+        return-command-completed: ${{ steps.capture_return.outputs.return-command-completed }}
+        return-exit-code: ${{ steps.capture_return.outputs.return-exit-code }}
+        evidence-capture-complete: ${{ steps.capture_return.outputs.evidence-capture-complete }}
+        supplemental-evidence-paths: ${{ steps.prior_metadata.outputs.supplemental-evidence-paths }}

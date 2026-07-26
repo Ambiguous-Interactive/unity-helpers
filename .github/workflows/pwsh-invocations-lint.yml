@@ -11,6 +11,7 @@ on:
       - ".github/actions/**"
       - "**/*.sh"
       - "scripts/**.ps1"
+      - "scripts/tests/test-portable-cleanup-classifier.js"
       - "package.json"
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - ".github/actions/**"
       - "**/*.sh"
       - "scripts/**.ps1"
+      - "scripts/tests/test-portable-cleanup-classifier.js"
       - "package.json"
   workflow_dispatch:
 
@@ -37,23 +39,45 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          path: unity-helpers
+          persist-credentials: false
+
+      - name: Checkout immutable central cleanup policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: Ambiguous-Interactive/ambiguous-organization-build-lock
+          ref: 673eb65e7d863a1a8a8a70882bd980e189d41754
+          path: build-lock-policy
+          persist-credentials: false
 
       - name: Test PowerShell invocations linter
+        working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/tests/test-lint-pwsh-invocations.ps1 -VerboseOutput
 
       - name: Lint PowerShell invocations
+        working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/lint-pwsh-invocations.ps1 -VerboseOutput
 
       - name: Test workflow run-expression-length linter
+        working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/tests/test-lint-workflow-run-expression-length.ps1 -VerboseOutput
 
       - name: Lint workflow run-expression length
+        working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/lint-workflow-run-expression-length.ps1 -VerboseOutput
 
       - name: Test Unity workflow matrix contract
+        working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/tests/test-unity-workflow-matrix-contract.ps1 -VerboseOutput
+
+      - name: Test central Unity cleanup policy parity
+        working-directory: unity-helpers
+        env:
+          BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
+        run: node scripts/tests/test-portable-cleanup-classifier.js

@@ -719,9 +719,13 @@ case "${1:-}" in
             sleep 0.1
             container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
         done
-        if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null && \
-            [[ ! -f "${FAKE_CONTAINER_STOPPING_FILE}" ]]; then
-            kill -TERM "${container_pid}"
+        if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null; then
+            if [[ ! -f "${FAKE_CONTAINER_STOPPING_FILE}" ]]; then
+                kill -TERM "${container_pid}"
+            fi
+            # Real `docker stop` waits for an already-stopping container too.
+            # Model that bounded wait so forced removal cannot race PID 1's
+            # signal handler merely because the initiating client sent TERM.
             while [[ "${SECONDS}" -lt "${stop_deadline}" ]]; do
                 kill -0 "${container_pid}" 2>/dev/null || break
                 sleep 1

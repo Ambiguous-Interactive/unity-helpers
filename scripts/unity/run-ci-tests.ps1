@@ -1978,14 +1978,13 @@ function Invoke-UnityLicenseReturn {
         )
 
         Write-Host "::group::Return Unity license (serial)"
-        # Same Tee-Object wait + $LASTEXITCODE idiom as Invoke-UnityLicenseActivate
-        # / Invoke-UnityEditor (a bare `&` would not wait for the GUI-subsystem
-        # binary). `-logFile -` puts the log on stdout; Tee-Object DOES persist it
-        # to $LogPath, but the caller keeps $LogPath under the NON-uploaded temp dir
-        # (RUNNER_TEMP / system temp), so it stays out of any UPLOADED ARTIFACT and
-        # the account fragments Unity may print cannot leak into uploads.
-        & $EditorPath @returnArgs 2>&1 | Tee-Object -FilePath $LogPath
+        # Consume the GUI-subsystem process through a pipeline so PowerShell waits
+        # and records LASTEXITCODE, but write directly to the private log. Unity
+        # return output can contain account or serial fragments and must not reach
+        # the workflow log.
+        & $EditorPath @returnArgs 2>&1 | Out-File -FilePath $LogPath -Encoding utf8
         $exitCode = $LASTEXITCODE
+        Add-Content -LiteralPath $LogPath -Value "exit_return_rc=$exitCode" -Encoding utf8
         Write-Host "::endgroup::"
 
         $ulfReturnSkipped = Select-String `

@@ -359,6 +359,7 @@ return_serial_license() {
     else
         echo "==> License returned."
     fi
+    echo "exit_return_rc=${RETURN_EXIT_CODE}"
     return "${RETURN_EXIT_CODE}"
 }
 
