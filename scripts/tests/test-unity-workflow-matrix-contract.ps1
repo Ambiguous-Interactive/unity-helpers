@@ -68,6 +68,12 @@ function Test-EnrollmentContract {
 
     $preflight = Get-JobText -Workflow $Workflow -JobName 'runner-preflight'
     if ($preflight -notmatch [regex]::Escape($trustedClause)) { return $false }
+    if ($preflight -notmatch '(?m)^    name: Self-hosted runner registration preflight\s*$') {
+        return $false
+    }
+    if ($preflight -notmatch '(?m)^      - name: Require a registered Windows Unity runner\s*$') {
+        return $false
+    }
     if ($preflight -notmatch [regex]::Escape(
             "$actionPrefix/check-unity-runner-availability@$lifecycleCommit"
         )) { return $false }

@@ -93,18 +93,18 @@ permissions:
 
 jobs:
   # Preflight convention: every job whose runs-on declares `self-hosted`
-  # must `needs:` a runner-access preflight (see
+  # must `needs:` a runner-registration preflight (see
   # docs/runbooks/unity-runners-after-transfer.md). This mirrors the
   # unity-tests.yml runner-preflight pattern exactly.
   runner-preflight:
-    name: Self-hosted runner access preflight
+    name: Self-hosted runner registration preflight
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Require the selected Unity runner online
+      - name: Require the selected Unity runner to be registered
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}

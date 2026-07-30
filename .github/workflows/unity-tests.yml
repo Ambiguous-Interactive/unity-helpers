@@ -39,7 +39,7 @@ jobs:
           head-sha: ${{ github.event.pull_request.head.sha }}
 
   runner-preflight:
-    name: Self-hosted runner access preflight
+    name: Self-hosted runner registration preflight
     if: >-
       ${{
         github.event.pull_request.user.login != 'dependabot[bot]' &&
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Require an online Windows Unity runner
+      - name: Require a registered Windows Unity runner
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@08fc83e83fa4cae89c0177005b388585ffdb1d9a
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
@@ -483,7 +483,12 @@ jobs:
         with:
           classifier-result: ${{ needs.change-classifier.result }}
           unity-required: ${{ needs.change-classifier.outputs.unity-required }}
-          trusted-revision: ${{ github.event.pull_request.user.login != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          trusted-revision: >-
+            ${{
+              github.event.pull_request.user.login != 'dependabot[bot]' &&
+              (github.event_name != 'pull_request' ||
+                github.event.pull_request.head.repo.full_name == github.repository)
+            }}
           preflight-result: ${{ needs.runner-preflight.result }}
           unity-result: ${{ needs.unity-validation.result }}
           fallback-result: ${{ needs.unity-lock-cleanup.result }}

@@ -20,5 +20,7 @@ jobs:
     steps:
       - name: Report the fail-closed benchmark state
         run: |
-          echo "::notice::Paid benchmark matrices are retired while canonical Unity validation is consolidated under the organization lifecycle. Restore them only with their own audited return, fallback, and aggregate contract."
+          notice="Paid benchmark matrices are retired while canonical Unity validation is consolidated under the organization lifecycle."
+          notice+=" Restore them only with their own audited return, fallback, and aggregate contract."
+          echo "::notice::${notice}"
           exit 1

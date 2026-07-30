@@ -78,19 +78,19 @@ Change the group's visibility to all repositories:
 
 The second resolution avoids future per-transfer maintenance but exposes the runners to every repository in the organization. Use it only when that exposure is acceptable for the runner group's security posture.
 
-After applying the chosen resolution, re-run the queued workflow from the Actions tab. The `runner-preflight` job validates runner access from `ubuntu-latest` before the one enrolled Unity `6000.5.2f1` validation job attempts to dispatch onto self-hosted; a green preflight confirms the fix.
+After applying the chosen resolution, re-run the queued workflow from the Actions tab. The `runner-preflight` job validates runner registration and repository visibility from `ubuntu-latest` before the one enrolled Unity `6000.5.2f1` validation job attempts to dispatch onto self-hosted; a green preflight confirms that GitHub has a matching registered target.
 
 ## Preflight diagnostic in this repository
 
 The enrolled Unity workflow runs a `runner-preflight` job on `ubuntu-latest` before its self-hosted validation job. The preflight uses the organization reader GitHub App and requests only organization self-hosted-runner read permission. It asks GitHub for runner groups visible to `Ambiguous-Interactive/unity-helpers`, then considers only runners inside those groups when matching the exact `runs-on` labels. Older-version, single-threaded, and benchmark matrices remain intentionally absent until issue #323 restores each with a complete audited lifecycle.
 
-The preflight fails closed. Missing reader credentials, an App authentication or API failure, no runner group visible to this repository, malformed or truncated inventory, or no accessible online runner with every required label all make the check red. It never emits a green soft pass. Busy online runners remain eligible because GitHub can queue the licensed job until one becomes idle.
+The preflight fails closed. Missing reader credentials, an App authentication or API failure, no runner group visible to this repository, malformed or truncated inventory, or no registered runner with every required label all make the check red. It never emits a green soft pass. Connection and busy state are deliberately ignored: a registered offline or busy runner passes, and GitHub keeps the licensed job queued until it can accept work.
 
 The `Unity CI Success` aggregate job runs with `always()` and is the required branch-protection check. It rejects a failed or cancelled preflight and rejects an unexpected skipped licensed job, so a runner outage cannot produce a green Unity check merely because dependent jobs were skipped.
 
 The reader App must be installed for the organization and expose the organization secrets `BUILD_LOCK_READER_APP_ID` and `BUILD_LOCK_READER_APP_PRIVATE_KEY` to this repository. Its organization permission is Self-hosted runners: read. No PAT or repository-level environment is required.
 
-If the preflight passes but the validation job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
+If the preflight passes but the validation job stays queued, first verify whether the registered runner is intentionally offline or busy. If it is online and idle, investigate the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)). Use `.github/workflows/unstick-run.yml` for manual recovery of a single run and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
 ## Machine-name labels for runner bootstrap
 

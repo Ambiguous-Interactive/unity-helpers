@@ -327,7 +327,9 @@ jobs:
     steps:
       - name: Block release until container-owned cleanup is trusted
         run: |
-          echo "::error::Release publishing is retired fail closed until central build-lock issue #153 provides trusted return evidence for the container-owned Unity activation used by .unitypackage export."
+          message="Release publishing is retired fail closed until central build-lock issue #153 provides trusted return evidence"
+          message+=" for the container-owned Unity activation used by .unitypackage export."
+          echo "::error::${message}"
           exit 1
 
   prepare-tag:
