@@ -166,6 +166,14 @@ jobs:
             throw 'A required Unity validation suite resolved to an empty assembly list.'
           }
 
+      - name: Validate Unity credentials
+        timeout-minutes: 2
+        uses: ./.github/actions/validate-unity-license
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
       - name: Provision the CI-managed Unity editor
         timeout-minutes: 180
         shell: pwsh
@@ -186,14 +194,6 @@ jobs:
             throw 'Unity editor provisioning did not return an editor path.'
           }
           "UNITY_EDITOR_PATH=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-      - name: Validate Unity credentials
-        timeout-minutes: 2
-        uses: ./.github/actions/validate-unity-license
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Require current PR head before lock acquisition
         timeout-minutes: 2

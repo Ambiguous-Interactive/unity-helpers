@@ -96,6 +96,17 @@ function Test-EnrollmentContract {
     foreach ($mode in @('editmode', 'playmode', 'standalone')) {
         if ($unity -notmatch [regex]::Escape("-TestMode $mode")) { return $false }
     }
+    $credentialPosition = $unity.IndexOf(
+        '      - name: Validate Unity credentials',
+        [StringComparison]::Ordinal
+    )
+    $provisionPosition = $unity.IndexOf(
+        '      - name: Provision the CI-managed Unity editor',
+        [StringComparison]::Ordinal
+    )
+    if ($credentialPosition -lt 0 -or $credentialPosition -ge $provisionPosition) {
+        return $false
+    }
     foreach ($required in @(
             'require-resource-lifecycle: "true"',
             'minimum-release-cooldown-seconds: "1"',
