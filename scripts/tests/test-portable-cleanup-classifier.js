@@ -7,7 +7,9 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
 const buildLockRoot = path.resolve(process.env.BUILD_LOCK_POLICY_ROOT || "");
-const policyCommit = "673eb65e7d863a1a8a8a70882bd980e189d41754";
+const legacyCompositePolicyCommit = "673eb65e7d863a1a8a8a70882bd980e189d41754";
+const enrolledPolicyCommit = "0ce3dce6cbe29af210432087e3b6d81509258063";
+const enrolledLifecycleCommit = "08fc83e83fa4cae89c0177005b388585ffdb1d9a";
 const classifierPath = path.join(buildLockRoot, ".github/dist/classify-unity-cleanup-evidence.js");
 const gatePath = path.join(buildLockRoot, ".github/dist/require-confirmed-unity-cleanup.js");
 
@@ -24,8 +26,8 @@ assert.equal(
       encoding: "utf8"
     })
     .trim(),
-  policyCommit,
-  "central policy checkout must be the exact immutable commit pinned by the consumer"
+  enrolledPolicyCommit,
+  "central policy checkout must be the exact immutable return commit consumed by enrolled CI"
 );
 
 const { classifyEvidence } = require(classifierPath);
@@ -240,7 +242,7 @@ for (const [name, overrides, expected] of gateCases) {
 
 const returnActionPath = path.join(root, ".github/actions/return-unity-license/action.yml");
 const returnAction = fs.readFileSync(returnActionPath, "utf8");
-const centralClassifierUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@${policyCommit}`;
+const centralClassifierUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@${legacyCompositePolicyCommit}`;
 assert.match(returnAction, new RegExp(`uses: ${centralClassifierUse}`, "u"));
 assert.match(
   returnAction,
@@ -271,26 +273,15 @@ const workflowFiles = [
 const workflow = workflowFiles
   .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
   .join("\n");
-const centralGateUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@${policyCommit}`;
-assert.equal(workflow.split(`uses: ${centralGateUse}`).length - 1, 6);
-assert.equal(workflow.split("id: release_unity_lock").length - 1, 6);
-assert.equal(
-  workflow.split(
-    "resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}"
-  ).length - 1,
-  6
-);
-assert.equal(
-  workflow.split(
-    "classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}"
-  ).length - 1,
-  6
-);
-assert.equal(
-  workflow.split("release-outcome: ${{ steps.release_unity_lock.outcome }}").length - 1,
-  6
-);
-assert.equal(workflow.split("- name: Delete private Unity cleanup evidence").length - 1, 6);
+const enrolledClassifierUse =
+  `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/` +
+  `classify-unity-cleanup-evidence@${enrolledLifecycleCommit}`;
+const enrolledGateUse =
+  `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/` +
+  `require-confirmed-unity-cleanup@${enrolledLifecycleCommit}`;
+assert.equal(workflow.split(`uses: ${enrolledClassifierUse}`).length - 1, 1);
+assert.equal(workflow.split(`uses: ${enrolledGateUse}`).length - 1, 1);
+assert.doesNotMatch(workflow, new RegExp(`@${legacyCompositePolicyCommit}`, "u"));
 
 process.stdout.write(
   `Central Unity cleanup policy parity passed (${classificationCases.length} classifier cases, ${gateCases.length} gate cases).\n`

@@ -37,6 +37,11 @@
 
 Unity Helpers provides production-ready utilities designed to improve development speed. Key performance highlights: 10-15x faster random generation than Unity.Random (see benchmarks), O(log n) spatial queries, and declarative inspector attributes to reduce custom editor code.
 
+The package compatibility target remains Unity 2021.3+, but enrolled licensed CI
+temporarily validates only Unity 6000.5.2f1. Older-version, single-threaded, and
+benchmark coverage is not currently CI-certified; restoration is tracked in
+[issue #323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323).
+
 ---
 
 ## 📦 Quick Install

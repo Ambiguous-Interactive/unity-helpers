@@ -226,9 +226,9 @@ jobs:
             echo
             echo "## After Merge"
             echo
-            echo "Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`."
-            echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
-            echo "Release Publish validates, packs npm, exports the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."
+            echo "Publication is intentionally blocked fail closed."
+            echo "Release Publish stops before \`.unitypackage\` export, tag creation, npm publication, or GitHub Release publication until central build-lock issue #153 provides trusted container-owned cleanup."
+            echo "Track restoration in unity-helpers issue #323; do not bypass the blocking gate."
           } > "${pr_body_file}"
 
           GH_TOKEN="${GH_PUSH_TOKEN}" gh pr create \

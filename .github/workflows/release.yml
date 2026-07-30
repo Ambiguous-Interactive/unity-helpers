@@ -170,7 +170,7 @@ jobs:
               printf '%s\n' "${tag_lookup_output}"
               exit "${tag_lookup_exit}"
             fi
-            echo "::notice::Tag ${tag} does not exist and will be created after package validation and .unitypackage export succeed."
+            echo "::notice::Tag ${tag} does not exist. Publication remains blocked before tag preparation while container-owned Unity cleanup awaits central issue #153."
             tag_action="create"
           fi
 
@@ -318,155 +318,17 @@ jobs:
           overwrite: true
 
   unitypackage:
-    name: Export .unitypackage
+    name: Export .unitypackage (retired)
     needs:
       - release-ready
       - validate-package
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 5
     steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.release-ready.outputs.source-sha }}
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: "22.18.0"
-
-      - name: Validate Unity license secrets
-        uses: ./.github/actions/validate-unity-license
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-
-      - name: Acquire organization Unity lock
-        id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
-          runner-id: ${{ runner.name }}
-          timeout-minutes: "160"
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Export Unity package
-        id: export_unitypackage
-        # Covers bounded activation, the 120-minute Unity command watchdog,
-        # TERM-to-KILL escalation, serial return, and host container teardown.
-        timeout-minutes: 155
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_VERSION: ${{ vars.RELEASE_UNITY_VERSION }}
+      - name: Block release until container-owned cleanup is trusted
         run: |
-          set -euo pipefail
-          if [ -z "${UNITY_VERSION:-}" ]; then
-            UNITY_VERSION="$(jq -r '.release' .github/unity-versions.json)"
-            export UNITY_VERSION
-          fi
-          output=".artifacts/unitypackage/${{ needs.release-ready.outputs.package-name }}-${{ needs.release-ready.outputs.package-version }}.unitypackage"
-          bash scripts/unity/export-unitypackage.sh --output "${output}"
-
-      - name: Return Unity license
-        id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
-        timeout-minutes: 5
-        continue-on-error: true
-        uses: ./.github/actions/return-unity-license
-        with:
-          prior-return-log-path: .artifacts/unity/unitypackage-project/unitypackage-output/unity.log
-          prior-command-succeeded: ${{ steps.export_unitypackage.outcome == 'success' }}
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-
-      - name: Release organization Unity lock
-        id: release_unity_lock
-        if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
-        timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
-          runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          resource-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Require confirmed Unity cleanup
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
-        with:
-          acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
-          cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          cleanup-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
-          release-outcome: ${{ steps.release_unity_lock.outcome }}
-          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
-          released: ${{ steps.release_unity_lock.outputs.released }}
-          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
-          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
-          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
-          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
-          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
-
-      - name: Dump Unity export log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
-        timeout-minutes: 2
-        uses: ./.github/actions/dump-unity-log-tail
-        with:
-          results-dir: .artifacts/unity/unitypackage-project/unitypackage-output
-          label: Unity package export
-
-      - name: Upload .unitypackage export diagnostics
-        if: ${{ failure() || cancelled() }}
-        timeout-minutes: 5
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            .artifacts/unity/unitypackage-project/Assets/Editor/UnityHelpersPackageExporter.cs
-            .artifacts/unity/unitypackage-project/Packages/manifest.json
-            .artifacts/unity/unitypackage-project/ProjectSettings/
-            .artifacts/unity/unitypackage-project/unitypackage-output/*.log
-          if-no-files-found: warn
-          retention-days: 14
-          overwrite: true
-
-      - name: Delete private Unity cleanup evidence
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        shell: pwsh
-        env:
-          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
-          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
-        run: |
-          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
-          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
-            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-              Remove-Item -LiteralPath $evidencePath -Force
-            }
-          }
-
-      - name: Upload .unitypackage artifact
-        timeout-minutes: 5
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-unitypackage
-          path: .artifacts/unitypackage/
-          if-no-files-found: error
-          overwrite: true
+          echo "::error::Release publishing is retired fail closed until central build-lock issue #153 provides trusted return evidence for the container-owned Unity activation used by .unitypackage export."
+          exit 1
 
   prepare-tag:
     name: Prepare release tag

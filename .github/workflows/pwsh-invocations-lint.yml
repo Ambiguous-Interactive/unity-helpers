@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: Ambiguous-Interactive/ambiguous-organization-build-lock
-          ref: 673eb65e7d863a1a8a8a70882bd980e189d41754
+          ref: 0ce3dce6cbe29af210432087e3b6d81509258063
           path: build-lock-policy
           persist-credentials: false
 

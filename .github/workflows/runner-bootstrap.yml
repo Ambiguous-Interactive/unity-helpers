@@ -298,7 +298,7 @@ jobs:
           if ($code -ne 0) { exit $code }
 
       # F1: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a -- matches the repo-wide pinned
-      # version used by unity-tests.yml/unity-benchmarks.yml.
+      # version used by the enrolled Unity validation and hosted retirement workflows.
       # F19: if-no-files-found is `error` (not `warn`) so a missing transcript
       # is a HARD failure rather than a silent empty artifact upload.
       - name: Upload bootstrap transcript

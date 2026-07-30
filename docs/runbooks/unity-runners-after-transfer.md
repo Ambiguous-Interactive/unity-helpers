@@ -4,11 +4,15 @@
 
 This runbook explains how to restore self-hosted Unity runner access after a repository is transferred between GitHub organizations (or when a freshly provisioned runner does not pick up queued Unity jobs). Keep execution notes local. Do not paste secrets, screenshots of organization settings, or other private account metadata into this file or any tracked follow-up.
 
-It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`, `.github/workflows/unity-benchmarks.yml`, and `.github/workflows/runner-bootstrap.yml`, and by `scripts/unity/ensure-editor.ps1` and `.github/actions/print-self-hosted-runner-diagnostics`.
+It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`
+and `.github/workflows/runner-bootstrap.yml`, and by
+`scripts/unity/ensure-editor.ps1` and
+`.github/actions/print-self-hosted-runner-diagnostics`. The credentialed benchmark
+matrix is retired until it has its own audited lifecycle.
 
 ## Symptom
 
-- A queued Unity workflow run (for example **Unity Tests** or **Unity Benchmarks**) stays queued indefinitely.
+- A queued **Unity Tests** workflow run stays queued indefinitely.
 - The GitHub Actions UI shows the job waiting for a runner. There is no error, no warning, and the run never starts.
 - The organization's self-hosted runners report Online and Idle in the GitHub UI, with labels that exactly match the workflow's `runs-on` request (`self-hosted`, `Windows`, `RAM-64GB`).
 - The watchdog defined in `.github/workflows/stuck-job-watchdog.yml` does not recover the run because no idle runner is visible to the repository, so the watchdog's label-matching rule never fires.
@@ -74,11 +78,11 @@ Change the group's visibility to all repositories:
 
 The second resolution avoids future per-transfer maintenance but exposes the runners to every repository in the organization. Use it only when that exposure is acceptable for the runner group's security posture.
 
-After applying the chosen resolution, re-run the queued workflow from the Actions tab. The `runner-preflight` job added to each Unity workflow validates runner access from `ubuntu-latest` before any matrix entry attempts to dispatch onto self-hosted; a green preflight confirms the fix.
+After applying the chosen resolution, re-run the queued workflow from the Actions tab. The `runner-preflight` job validates runner access from `ubuntu-latest` before the one enrolled Unity `6000.5.2f1` validation job attempts to dispatch onto self-hosted; a green preflight confirms the fix.
 
 ## Preflight diagnostic in this repository
 
-Unity workflows run a `runner-preflight` job on `ubuntu-latest` before the self-hosted matrix. The preflight uses the organization reader GitHub App and requests only organization self-hosted-runner read permission. It asks GitHub for runner groups visible to `Ambiguous-Interactive/unity-helpers`, then considers only runners inside those groups when matching the exact `runs-on` labels.
+The enrolled Unity workflow runs a `runner-preflight` job on `ubuntu-latest` before its self-hosted validation job. The preflight uses the organization reader GitHub App and requests only organization self-hosted-runner read permission. It asks GitHub for runner groups visible to `Ambiguous-Interactive/unity-helpers`, then considers only runners inside those groups when matching the exact `runs-on` labels. Older-version, single-threaded, and benchmark matrices remain intentionally absent until issue #323 restores each with a complete audited lifecycle.
 
 The preflight fails closed. Missing reader credentials, an App authentication or API failure, no runner group visible to this repository, malformed or truncated inventory, or no accessible online runner with every required label all make the check red. It never emits a green soft pass. Busy online runners remain eligible because GitHub can queue the licensed job until one becomes idle.
 
@@ -86,7 +90,7 @@ The `Unity CI Success` aggregate job runs with `always()` and is the required br
 
 The reader App must be installed for the organization and expose the organization secrets `BUILD_LOCK_READER_APP_ID` and `BUILD_LOCK_READER_APP_PRIVATE_KEY` to this repository. Its organization permission is Self-hosted runners: read. No PAT or repository-level environment is required.
 
-If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
+If the preflight passes but the validation job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
 ## Machine-name labels for runner bootstrap
 

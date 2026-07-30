@@ -1802,7 +1802,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
-    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.release-ready.outputs.source-sha }}')).Count -ge 2) -and
+    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.release-ready.outputs.source-sha }}')).Count -ge 1) -and
     $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}') -and
     $workflowContent.Contains('source-sha: ${{ needs.verify-tag.outputs.source-sha }}') -and
     $workflowContent.Contains('tag-action: ${{ needs.verify-tag.outputs.tag-action }}')
@@ -1817,8 +1817,8 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('Re-run with allow_tag_recovery=true only after confirming npm and GitHub Release are unpublished.')
   )
 
-  $missingTagCreationIsNormalPath = (
-    $workflowContent.Contains('Tag ${tag} does not exist and will be created after package validation and .unitypackage export succeed.') -and
+  $missingTagRemainsDeferred = (
+    $workflowContent.Contains('Tag ${tag} does not exist. Publication remains blocked before tag preparation while container-owned Unity cleanup awaits central issue #153.') -and
     $workflowContent.Contains('tag_action="create"') -and
     -not $workflowContent.Contains('Tag ${tag} does not exist. Use Release Tag')
   )
@@ -1953,9 +1953,9 @@ function Run-ReleasePublishTagPreparationContractTests {
     -Message 'Expected release.yml to compare existing tag targets with the selected source SHA before continuing.'
 
   Write-TestResult `
-    -TestName 'release publish creates missing tags as the normal manual path' `
-    -Passed $missingTagCreationIsNormalPath `
-    -Message 'Expected missing release tags to be created by Release Publish without the retired Release Tag workflow.'
+    -TestName 'release publish defers missing tags behind fail-closed export' `
+    -Passed $missingTagRemainsDeferred `
+    -Message 'Expected missing release tags to remain deferred until the retired Unity export is safely restored.'
 
   Write-TestResult `
     -TestName 'release publish missing tag lookup accepts GitHub JSON 404s' `
@@ -2024,6 +2024,13 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $dockerRunnerContent = Get-Content -Path $dockerRunnerPath -Raw
 
   $releaseJob = [regex]::Match($workflowContent, '(?ms)^  unitypackage:\s*$.*?(?=^  [A-Za-z0-9_-]+:\s*$|\z)').Value
+  $releaseExportRetired = (
+    $releaseJob.Contains('name: Export .unitypackage (retired)') -and
+    $releaseJob.Contains('Block release until container-owned cleanup is trusted') -and
+    $releaseJob.Contains('central build-lock issue #153') -and
+    $releaseJob.Contains('exit 1') -and
+    $releaseJob -notmatch 'UNITY_SERIAL|UNITY_EMAIL|UNITY_PASSWORD|acquire-build-lock|return-unity-license'
+  )
   $smokeJob = [regex]::Match($unityTestsWorkflowContent, '(?ms)^  unitypackage-smoke:\s*$.*?(?=^  [A-Za-z0-9_-]+:\s*$|\z)').Value
   $unityTimeoutMatch = [regex]::Match(
     $exporterContent,
@@ -2084,7 +2091,16 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
       $timeoutBudgetFailures += "$($caller.Name): job=${jobMinutes}m/${requiredJobMinutes}m required; lock=${lockMinutes}m (max 180m); export=${exportMinutes}m/${requiredExportStepTimeoutMinutes}m required; cleanup failure/success=${failureCleanupMinutes}m/${successCleanupMinutes}m"
     }
   }
-  $timeoutBudgetIsCoherent = $unityTimeoutMatch.Success -and $activationTimeoutMatch.Success -and $returnTimeoutMatch.Success -and $terminationGraceMatch.Success -and $containerWrapperMatch.Success -and $dockerClientTimeoutMatch.Success -and $dockerClientGraceMatch.Success -and $timeoutBudgetFailures.Count -eq 0
+  $timeoutBudgetIsCoherent = $releaseExportRetired -or (
+    $unityTimeoutMatch.Success -and
+    $activationTimeoutMatch.Success -and
+    $returnTimeoutMatch.Success -and
+    $terminationGraceMatch.Success -and
+    $containerWrapperMatch.Success -and
+    $dockerClientTimeoutMatch.Success -and
+    $dockerClientGraceMatch.Success -and
+    $timeoutBudgetFailures.Count -eq 0
+  )
   $teeFailureMessageIndex = $exporterContent.IndexOf('Failed to persist Unity package export log with tee exit code')
   $unityFailureMessageIndex = $exporterContent.IndexOf('Unity package export failed with exit code')
   $exporterPersistsUnityLog = (
@@ -2099,7 +2115,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $unityFailureMessageIndex -ge 0 -and
     $teeFailureMessageIndex -lt $unityFailureMessageIndex
   )
-  $releaseUploadsExportDiagnostics = (
+  $releaseUploadsExportDiagnostics = $releaseExportRetired -or (
     $workflowContent.Contains('Dump Unity export log tail on failure or cancellation') -and
     $workflowContent.Contains('results-dir: .artifacts/unity/unitypackage-project/unitypackage-output') -and
     $workflowContent.Contains('Upload .unitypackage export diagnostics') -and
@@ -2163,9 +2179,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   )
 
   Write-TestResult `
-    -TestName 'release Unity export step and job timeouts preserve cleanup budget' `
+    -TestName 'release Unity export is enrolled or retired fail closed' `
     -Passed $timeoutBudgetIsCoherent `
-    -Message "Expected both exporter callers to cover bounded activation, Unity, TERM/KILL, return, and container teardown plus ${minimumExportWrapperMinutes}m step overhead; each job must preserve setup, cleanup, implicit-post, and ${minimumUnallocatedSlackMinutes}m unallocated slack. $($timeoutBudgetFailures -join '; ')"
+    -Message "Expected the release exporter to remain credential-free and fail closed pending central #153, or every active exporter caller to preserve its full cleanup budget. $($timeoutBudgetFailures -join '; ')"
 
   Write-TestResult `
     -TestName 'unitypackage exporter persists Unity log and preserves exit code' `
@@ -2173,9 +2189,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log, preserve the original Unity command exit code, and fail when tee cannot persist the log.'
 
   Write-TestResult `
-    -TestName 'release unitypackage job uploads export diagnostics on failure' `
+    -TestName 'release unitypackage job is retired or uploads failure diagnostics' `
     -Passed $releaseUploadsExportDiagnostics `
-    -Message 'Expected release.yml to dump and upload the persisted Unity package export log on failure or cancellation.'
+    -Message 'Expected a credential-free fail-closed retirement or persisted Unity package export diagnostics on failure.'
 
   Write-TestResult `
     -TestName 'Docker Unity runner redacts and returns serial licenses' `
@@ -2223,9 +2239,11 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not $workflowContent.Contains('$arguments = @(') -and
     -not $workflowContent.Contains('@arguments')
   )
-  $prBodyUsesManualPublishWorkflow = (
-    $workflowContent.Contains('Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`.') -and
-    $workflowContent.Contains('creates the release tag if needed') -and
+  $prBodyReportsPublicationRetirement = (
+    $workflowContent.Contains('Publication is intentionally blocked fail closed.') -and
+    $workflowContent.Contains('central build-lock issue #153') -and
+    $workflowContent.Contains('Track restoration in unity-helpers issue #323') -and
+    -not $workflowContent.Contains('Run the Release Publish workflow on') -and
     -not $workflowContent.Contains('The Release Tag workflow pushes tag')
   )
 
@@ -2250,9 +2268,9 @@ function Run-ReleasePrepareWorkflowContractTests {
     -Message 'Expected release-prepare.yml to avoid positional array splatting that can bind "-Bump" as the Bump value.'
 
   Write-TestResult `
-    -TestName 'release prepare points operators at the manual Release Publish button' `
-    -Passed $prBodyUsesManualPublishWorkflow `
-    -Message 'Expected release PR body to tell operators to run Release Publish after merge, without referencing the retired Release Tag workflow.'
+    -TestName 'release prepare reports fail-closed publication retirement' `
+    -Passed $prBodyReportsPublicationRetirement `
+    -Message 'Expected release PR body to block publication and identify the central and repository restoration issues.'
 }
 
 function Run-ReleaseTagWorkflowRetirementContractTests {
@@ -2275,7 +2293,7 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
     $publishWorkflowContent.Contains('gh_api_or_error "Creating annotated tag object ${TAG}" --method POST "repos/${GITHUB_REPOSITORY}/git/tags"')
   )
   $releasePrepareNoLongerMentionsReleaseTag = (
-    $prepareWorkflowContent.Contains('Run the Release Publish workflow') -and
+    $prepareWorkflowContent.Contains('Publication is intentionally blocked fail closed.') -and
     -not $prepareWorkflowContent.Contains('Release Tag workflow')
   )
 
@@ -2290,9 +2308,9 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
     -Message 'Expected release.yml prepare-tag job to create annotated release tags when the manual release tag is missing.'
 
   Write-TestResult `
-    -TestName 'release prepare instructions no longer mention Release Tag workflow' `
+    -TestName 'release prepare instructions remain retired without Release Tag workflow' `
     -Passed $releasePrepareNoLongerMentionsReleaseTag `
-    -Message 'Expected release-prepare.yml PR body to instruct operators to run Release Publish, not Release Tag.'
+    -Message 'Expected release-prepare.yml PR body to report retirement without reviving the Release Tag workflow.'
 }
 
 function Run-ReleasePackageContentContractTests {
