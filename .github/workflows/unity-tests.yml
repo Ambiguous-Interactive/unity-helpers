@@ -317,9 +317,12 @@ jobs:
         with:
           matrix-note: "default (organization lock wraps the Unity section)"
 
+      # restore + save are split so only protected-branch runs pay the save.
+      # See the paired "Save Unity Library and package caches" step for why.
       - name: Cache Unity Library and package caches
+        id: unity-library-cache
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         env:
           PACKAGE_HASH: >-
             ${{ hashFiles(
@@ -574,6 +577,27 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           if-no-files-found: warn
           retention-days: 14
+
+      # Only protected-branch runs refresh the shared baseline. A pull-request
+      # leg's save buys nothing back: GitHub scopes the entry it writes to the
+      # PR ref, so no other branch can ever read it, while it still consumes the
+      # repository's 10 GB cache budget and can evict the main-branch baseline
+      # that every leg restores from. Measured on run 30227874347, saving cost
+      # 167s per standalone leg and 36s per editmode/playmode leg -- ~18 min of
+      # runner time per run -- for entries whose own restore came from the
+      # restore-keys prefix rather than an exact key hit.
+      - name: Save Unity Library and package caches
+        if: >-
+          ${{ !cancelled() &&
+            steps.compute.outputs.is-empty != 'true' &&
+            github.ref_protected &&
+            steps.unity-library-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
 
   # GATED STANDALONE tier: the expensive IL2CPP player legs. `needs: unity-tests`
   # means any failure in the fast tier (a compile error in an editmode leg, a mass
@@ -711,9 +735,12 @@ jobs:
         with:
           matrix-note: "gated standalone (organization lock wraps the Unity section)"
 
+      # restore + save are split so only protected-branch runs pay the save.
+      # See the paired "Save Unity Library and package caches" step for why.
       - name: Cache Unity Library and package caches
+        id: unity-library-cache
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         env:
           PACKAGE_HASH: >-
             ${{ hashFiles(
@@ -969,6 +996,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Protected-branch runs only -- see the default matrix job's save step for
+      # why a pull-request leg's cache entry cannot be reused by anything.
+      - name: Save Unity Library and package caches
+        if: >-
+          ${{ !cancelled() &&
+            steps.compute.outputs.is-empty != 'true' &&
+            github.ref_protected &&
+            steps.unity-library-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
+
   # SINGLE_THREADED leg. The default matrix never exercises the SINGLE_THREADED
   # code paths (Runtime/Core/DataStructure/Cache.cs et al. gate thread-safe vs
   # single-threaded behavior on `#if SINGLE_THREADED`, OFF by default). This job
@@ -1102,9 +1144,12 @@ jobs:
         with:
           matrix-note: "single-threaded (organization lock wraps the Unity section)"
 
+      # restore + save are split so only protected-branch runs pay the save.
+      # See the paired "Save Unity Library and package caches" step for why.
       - name: Cache Unity Library and package caches
+        id: unity-library-cache
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         env:
           PACKAGE_HASH: >-
             ${{ hashFiles(
@@ -1322,6 +1367,21 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
           if-no-files-found: warn
           retention-days: 14
+
+      # Protected-branch runs only -- see the default matrix job's save step for
+      # why a pull-request leg's cache entry cannot be reused by anything.
+      - name: Save Unity Library and package caches
+        if: >-
+          ${{ !cancelled() &&
+            steps.compute.outputs.is-empty != 'true' &&
+            github.ref_protected &&
+            steps.unity-library-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/Library
+            .artifacts/unity/cache/${{ matrix.unity-version }}
+          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
 
   unitypackage-smoke:
     name: Unity package export smoke
