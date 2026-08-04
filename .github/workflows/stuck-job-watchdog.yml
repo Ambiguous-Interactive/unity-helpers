@@ -135,7 +135,13 @@ jobs:
           git_auth() {
             git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" "$@"
           }
-          git_auth clone --depth 1 "https://github.com/${REPO}.git" repo
+          # --no-checkout: this clone exists only to move the watchdog-state
+          # orphan branch, so the default branch's worktree is never wanted.
+          # Materializing it would make every cycle depend on the default
+          # branch checking out clean -- an unnormalized blob anywhere in the
+          # repository would leave a modified file behind and abort the
+          # checkout below, silently disabling recovery.
+          git_auth clone --depth 1 --no-checkout "https://github.com/${REPO}.git" repo
           cd repo
           GIT_AUTHOR_ID=(-c "user.email=actions@github.com" -c "user.name=stuck-job-watchdog")
 
