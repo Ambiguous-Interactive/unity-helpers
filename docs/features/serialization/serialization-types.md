@@ -266,6 +266,38 @@ public SerializableSortedDictionary<int, string> sortedDict;
 
 ---
 
+### Collection Values
+
+Unity does not serialize a nested collection. `SerializableDictionary<string, List<float>>` makes
+the serialized values array a `List<float>[]`, which Unity drops entirely — while the parallel keys
+array survives, because it is a plain `string[]`. The asset then records keys and no values, and
+every runtime lookup comes back empty.
+
+Route the collection through a cache box instead, which makes the list a direct field of a
+serializable class rather than the element type of an array:
+
+```csharp
+[Serializable]
+public sealed class FloatListCache : SerializableDictionary.Cache<List<float>> { }
+
+[Serializable]
+public sealed class DamageCurves
+    : SerializableDictionary<string, List<float>, FloatListCache> { }
+
+public sealed class WeaponConfig : MonoBehaviour
+{
+    [SerializeField]
+    private DamageCurves _curves = new();
+}
+```
+
+The Inspector reports the unsupported shape as an error rather than drawing a value column that
+persists nothing, so this is visible while authoring instead of at runtime. The same applies to
+`SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>`: wrap the element type in a
+`[Serializable]` class.
+
+---
+
 ### Serialization Support
 
 - **Unity:** Synchronized `_keys` and `_values` arrays

@@ -573,6 +573,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     }
 
     [CustomPropertyDrawer(typeof(SerializableDictionary<,>), true)]
+    // The three-argument cache form derives from SerializableDictionaryBase, not from
+    // SerializableDictionary<TKey, TValue>, so useForChildren above never reaches it. Without this
+    // registration the documented escape hatch for non-serializable value types costs the Inspector.
+    [CustomPropertyDrawer(typeof(SerializableDictionary<,,>), true)]
     [CustomPropertyDrawer(typeof(SerializableSortedDictionary<,>), true)]
     [CustomPropertyDrawer(typeof(SerializableSortedDictionary<,,>), true)]
     public sealed class SerializableDictionaryPropertyDrawer : PropertyDrawer
@@ -937,6 +941,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 CachedPropertyPair propertyPair = GetOrCreateCachedPropertyPair(cacheKey, property);
                 SerializedProperty keysProperty = propertyPair.keysProperty;
                 SerializedProperty valuesProperty = propertyPair.valuesProperty;
+
+                // Refusing to draw the rows is deliberate. Letting someone keep authoring entries
+                // into a value column that persists nothing is the actual harm, and the error is
+                // reported before the foldout so collapsing the dictionary cannot hide it.
+                if (HasDroppedValuesArray(propertyPair))
+                {
+                    EditorGUI.HelpBox(
+                        position,
+                        SerializableCollectionSerializationDiagnostics.BuildDroppedDictionaryValuesMessage(
+                            property.displayName
+                        ),
+                        MessageType.Error
+                    );
+                    return;
+                }
+
                 EnsureParallelArraySizes(keysProperty, valuesProperty);
 
                 bool resolvedTypes = TryResolveKeyValueTypes(
@@ -1421,6 +1441,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float baseHeight = EditorGUIUtility.singleLineHeight;
+
+            // Measured before type resolution and before the foldout so the error box below is
+            // reserved space even when the dictionary is collapsed.
+            CachedPropertyPair serializationPair = GetOrCreateCachedPropertyPair(
+                GetListKey(property),
+                property
+            );
+            if (HasDroppedValuesArray(serializationPair))
+            {
+                return GetDroppedBackingArrayHeight(
+                    SerializableCollectionSerializationDiagnostics.BuildDroppedDictionaryValuesMessage(
+                        property.displayName
+                    )
+                );
+            }
 
             // Resolve types early to determine if sorted dictionary (affects animation settings)
             bool resolvedTypes = TryResolveKeyValueTypes(
@@ -2653,6 +2688,44 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static float GetWarningBarHeight()
         {
             return EditorGUIUtility.singleLineHeight * 1.6f;
+        }
+
+        // Keys resolved and values did not: Unity serialized the TKey[] and refused the values
+        // array. Requiring both signals keeps an unresolvable property, where neither half exists,
+        // from being reported as a serialization failure it is not.
+        private static bool HasDroppedValuesArray(CachedPropertyPair propertyPair)
+        {
+            return propertyPair.keysProperty != null && propertyPair.valuesProperty == null;
+        }
+
+        internal static bool HasDroppedValuesArrayForTests(SerializedProperty dictionaryProperty)
+        {
+            return HasDroppedValuesArray(
+                new CachedPropertyPair
+                {
+                    keysProperty = dictionaryProperty.FindPropertyRelative(
+                        SerializableDictionarySerializedPropertyNames.Keys
+                    ),
+                    valuesProperty = dictionaryProperty.FindPropertyRelative(
+                        SerializableDictionarySerializedPropertyNames.Values
+                    ),
+                }
+            );
+        }
+
+        // GetPropertyHeight has no rect, so the wrap width comes from the Inspector view. The
+        // GUIContent allocation is confined to fields Unity already refuses to serialize, which are
+        // broken and rare, and a readable multi-line error is worth more there than the allocation.
+        private static float GetDroppedBackingArrayHeight(string message)
+        {
+            float wrapWidth = Mathf.Max(
+                EditorGUIUtility.currentViewWidth - (EditorGUIUtility.singleLineHeight * 2f),
+                120f
+            );
+            return Mathf.Max(
+                EditorStyles.helpBox.CalcHeight(new GUIContent(message), wrapWidth),
+                EditorGUIUtility.singleLineHeight * 2f
+            );
         }
 
         private static bool TypeSupportsNullReferences(Type type)

@@ -791,6 +791,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 CachedItemsProperty cachedItems = GetOrCreateCachedItemsProperty(listKey, property);
                 SerializedProperty itemsProperty = cachedItems.itemsProperty;
 
+                // Refusing to draw the rows is deliberate. Letting someone keep authoring entries
+                // into a set that persists nothing is the actual harm, and the error is reported
+                // before the foldout so collapsing the set cannot hide it.
+                if (HasDroppedItemsArray(hasInspector, itemsProperty))
+                {
+                    EditorGUI.HelpBox(
+                        position,
+                        SerializableCollectionSerializationDiagnostics.BuildDroppedSetItemsMessage(
+                            property.displayName
+                        ),
+                        MessageType.Error
+                    );
+                    return;
+                }
+
                 bool hasItemsArray = itemsProperty is { isArray: true };
                 int totalCount = hasItemsArray ? itemsProperty.arraySize : 0;
 
@@ -1323,6 +1338,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             Type elementType = inspector?.ElementType;
 
+            // Measured before the foldout so the error box below is reserved space even when the
+            // set is collapsed.
+            if (HasDroppedItemsArray(hasInspector, itemsProperty))
+            {
+                return GetDroppedBackingArrayHeight(
+                    SerializableCollectionSerializationDiagnostics.BuildDroppedSetItemsMessage(
+                        property.displayName
+                    )
+                );
+            }
+
             bool isSortedSet = IsSortedSetCached(property);
 
             // Get main foldout animation progress
@@ -1718,6 +1744,40 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal string GetListKey(SerializedProperty property)
         {
             return GetPropertyCacheKey(property);
+        }
+
+        // The set resolved as a set but its items array did not: Unity refused the element type.
+        // Requiring both signals keeps a property that is not a set at all, where the inspector
+        // never resolves either, from being reported as a serialization failure it is not.
+        private static bool HasDroppedItemsArray(
+            bool hasInspector,
+            SerializedProperty itemsProperty
+        )
+        {
+            return hasInspector && itemsProperty == null;
+        }
+
+        internal static bool HasDroppedItemsArrayForTests(
+            bool hasInspector,
+            SerializedProperty itemsProperty
+        )
+        {
+            return HasDroppedItemsArray(hasInspector, itemsProperty);
+        }
+
+        // GetPropertyHeight has no rect, so the wrap width comes from the Inspector view. The
+        // GUIContent allocation is confined to fields Unity already refuses to serialize, which are
+        // broken and rare, and a readable multi-line error is worth more there than the allocation.
+        private static float GetDroppedBackingArrayHeight(string message)
+        {
+            float wrapWidth = Mathf.Max(
+                EditorGUIUtility.currentViewWidth - (EditorGUIUtility.singleLineHeight * 2f),
+                120f
+            );
+            return Mathf.Max(
+                EditorStyles.helpBox.CalcHeight(new GUIContent(message), wrapWidth),
+                EditorGUIUtility.singleLineHeight * 2f
+            );
         }
 
         private CachedItemsProperty GetOrCreateCachedItemsProperty(

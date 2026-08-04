@@ -13,6 +13,7 @@
     "package-lock.json",
     ".git/**",
     "progress/**",
+    "GOAL.md",
     "*.svg",
     "*.png",
     "*.gif",

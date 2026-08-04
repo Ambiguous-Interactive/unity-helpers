@@ -9,6 +9,8 @@ artifacts/
 progress/
 PLAN.md
 PLAN.md.meta
+GOAL.md
+GOAL.md.meta
 
 # MkDocs Material files with tabbed content syntax (===) that markdownlint doesn't support
 docs/index.md
