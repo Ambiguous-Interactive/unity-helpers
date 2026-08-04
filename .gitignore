@@ -419,3 +419,10 @@ pr-description.md*
 test-results*
 .artifacts/
 .artifacts.meta
+
+design-system/
+design-system.meta
+progress/
+progress.meta
+GOAL.md
+GOAL.md.meta
