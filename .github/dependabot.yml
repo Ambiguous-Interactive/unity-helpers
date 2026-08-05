@@ -1,8 +1,15 @@
 version: 2
 updates:
-  # GitHub Actions workflow updates
+  # GitHub Actions workflow updates.
+  # `/` covers .github/workflows/**. Composite actions under .github/actions/*
+  # pin third-party actions too, and a bare `/` does not reach them -- that left
+  # .github/actions/return-unity-license/action.yml on an older central cleanup
+  # classifier than the workflows, which fails the Unity lock contract because
+  # the return action must delegate to the exact classifier the workflows use.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
     groups:
