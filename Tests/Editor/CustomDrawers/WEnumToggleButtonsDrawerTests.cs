@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     ToggleTestAsset.SignedByteExampleEnum.Zero,
                     ToggleTestAsset.SignedByteExampleEnum.One,
                 },
-                (Func<ToggleTestAsset, object>)(asset => asset.signedByteMode)
+                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedByteMode)
             ).SetName("SignedByteMembersBelowZero");
 
             yield return new TestCaseData(
@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     ToggleTestAsset.SignedShortExampleEnum.Zero,
                     ToggleTestAsset.SignedShortExampleEnum.Maximum,
                 },
-                (Func<ToggleTestAsset, object>)(asset => asset.signedShortMode)
+                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedShortMode)
             ).SetName("SignedShortMembersSpanningTheFullRange");
         }
 
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void EnumOptionsRoundTripSignedMembers(
             string fieldName,
             object[] members,
-            Func<ToggleTestAsset, object> readMember
+            Func<ScriptableObject, object> readMember
         )
         {
             ToggleTestAsset asset = CreateScriptableObject<ToggleTestAsset>();
