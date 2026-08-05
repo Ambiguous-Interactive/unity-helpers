@@ -197,26 +197,6 @@ jobs:
         with:
           matrix-note: "default (organization lock wraps the Unity section)"
 
-      - name: Cache Unity Library and package caches
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        env:
-          PACKAGE_HASH: >-
-            ${{ hashFiles(
-              'package.json',
-              'Runtime/**',
-              'Editor/**',
-              'Tests/**',
-              'scripts/unity/run-ci-tests.ps1',
-              'scripts/unity/lib/asmdef-discovery.js',
-              '.github/actions/compute-unity-assemblies/action.yml'
-            ) }}
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          key: Library-bench-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-${{ env.PACKAGE_HASH }}
-
       - name: Validate Unity license secrets
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
@@ -285,11 +265,17 @@ jobs:
           # Release (not Debug) code optimization for the editmode/playmode perf
           # legs, mirroring the repo-wide Unity Release-mode contract so the
           # weekly coverage run measures the same optimized hot path the docs do.
+          # Same persistent project root as unity-tests.yml, and deliberately the
+          # same per-leg directory: this workflow compiles the project identically
+          # and differs only in the test-category filter, so it reuses that warm
+          # Library instead of importing a second copy. See unity-tests.yml for why
+          # the project cannot live under .artifacts/.
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
@@ -321,7 +307,8 @@ jobs:
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'editmode' `
             -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.Runtime.Random' `
-            -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}'
+            -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace')
 
       - name: Return Unity license
         id: return_unity_license

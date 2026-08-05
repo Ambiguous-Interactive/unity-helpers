@@ -378,38 +378,6 @@ jobs:
         with:
           matrix-note: "default (organization lock wraps the Unity section)"
 
-      # restore + save are split so only protected-branch runs pay the save.
-      # See the paired "Save Unity Library and package caches" step for why.
-      - name: Cache Unity Library and package caches
-        id: unity-library-cache
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        env:
-          PACKAGE_HASH: >-
-            ${{ hashFiles(
-              'package.json',
-              'Runtime/**',
-              'Editor/**',
-              'Tests/**',
-              'scripts/unity/run-ci-tests.ps1',
-              'scripts/unity/lib/asmdef-discovery.js',
-              '.github/actions/compute-unity-assemblies/action.yml',
-              '.github/integration-packages.json'
-            ) }}
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          # The `-default-` scope token keeps this prefix DISJOINT from the
-          # single-threaded job's `-single-threaded-` key so the restore-keys
-          # fallback can never cross-restore a SINGLE_THREADED-compiled Library
-          # into a default leg. restore-keys lets a test-only PR (different
-          # PACKAGE_HASH) warm-restore the prior run's imported Library instead of
-          # importing cold.
-          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-${{ env.PACKAGE_HASH }}
-          restore-keys: |
-            Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-
-
       - name: Validate Unity license secrets
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
@@ -484,16 +452,17 @@ jobs:
       - name: Run Unity Test Runner
         id: run_tests
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        # Per-mode timeout. 150: ONLY the standalone leg needs it -- it builds a
-        # NON-development IL2CPP player with the Release C++ configuration, and a
-        # run-ci-tests.ps1 change rotates the Library cache key, so first runs
-        # build cold. editmode/playmode are in-editor runs whose healthy worst case
-        # is the ~40-min SINGLE_THREADED EditMode baseline, so 90 gives >2x headroom
-        # yet fails a hang ~60 min sooner than the old blanket 150 (a dead Unity
-        # Accelerator once stalled EditMode for the full 150 and produced no
-        # results.xml). All values stay under the job timeout (1200) so the step
-        # clock fires first and releases the shared Unity seat.
-        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 150) || 90 }}
+        # Per-mode timeout, sized from measurement rather than fear. Across the 60
+        # most recent Unity Tests runs (~430 leg instances) the slowest this step
+        # has EVER been is 9.1 min (editmode), with standalone topping out at
+        # 8.7 min. 40/60 keeps >4x headroom over that worst case -- enough for a
+        # cold import on a fresh runner -- while cutting what a HANG costs: every
+        # leg serializes on the one organization Unity seat, and a lock wait of
+        # 91 min has been measured behind a stuck leg, so an oversized step clock
+        # turns one hang into org-wide starvation. Standalone keeps the larger
+        # budget because it also builds an IL2CPP player. Both stay under the job
+        # timeout (1200) so the step clock fires first and releases the seat.
+        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
         shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -507,11 +476,20 @@ jobs:
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
         run: |
+          # -ProjectRoot puts the generated project and its Library OUTSIDE
+          # $GITHUB_WORKSPACE. actions/checkout runs `git clean -ffdx` at the top of
+          # every job and `-x` means gitignored, so while the project lived under
+          # .artifacts/ every job deleted the Library the previous job had just built
+          # on that same disk -- and the repo paid an actions/cache round trip to put
+          # it back (measured across the 60 most recent runs: 109 min of restore,
+          # 119 min of save, all on the single serialized organization Unity seat).
+          # RUNNER_WORKSPACE is the checkout's parent, which git clean cannot reach.
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
@@ -638,27 +616,6 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           if-no-files-found: warn
           retention-days: 14
-
-      # Only protected-branch runs refresh the shared baseline. A pull-request
-      # leg's save buys nothing back: GitHub scopes the entry it writes to the
-      # PR ref, so no other branch can ever read it, while it still consumes the
-      # repository's 10 GB cache budget and can evict the main-branch baseline
-      # that every leg restores from. Measured on run 30227874347, saving cost
-      # 167s per standalone leg and 36s per editmode/playmode leg -- ~18 min of
-      # runner time per run -- for entries whose own restore came from the
-      # restore-keys prefix rather than an exact key hit.
-      - name: Save Unity Library and package caches
-        if: >-
-          ${{ !cancelled() &&
-            steps.compute.outputs.is-empty != 'true' &&
-            github.ref_protected &&
-            steps.unity-library-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
 
   # GATED STANDALONE tier: the expensive IL2CPP player legs. `needs: unity-tests`
   # means any failure in the fast tier (a compile error in an editmode leg, a mass
@@ -797,38 +754,6 @@ jobs:
         with:
           matrix-note: "gated standalone (organization lock wraps the Unity section)"
 
-      # restore + save are split so only protected-branch runs pay the save.
-      # See the paired "Save Unity Library and package caches" step for why.
-      - name: Cache Unity Library and package caches
-        id: unity-library-cache
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        env:
-          PACKAGE_HASH: >-
-            ${{ hashFiles(
-              'package.json',
-              'Runtime/**',
-              'Editor/**',
-              'Tests/**',
-              'scripts/unity/run-ci-tests.ps1',
-              'scripts/unity/lib/asmdef-discovery.js',
-              '.github/actions/compute-unity-assemblies/action.yml',
-              '.github/integration-packages.json'
-            ) }}
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          # The `-default-` scope token keeps this prefix DISJOINT from the
-          # single-threaded job's `-single-threaded-` key so the restore-keys
-          # fallback can never cross-restore a SINGLE_THREADED-compiled Library
-          # into a default leg. restore-keys lets a test-only PR (different
-          # PACKAGE_HASH) warm-restore the prior run's imported Library instead of
-          # importing cold.
-          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-${{ env.PACKAGE_HASH }}
-          restore-keys: |
-            Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-default-
-
       - name: Validate Unity license secrets
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
@@ -903,16 +828,17 @@ jobs:
       - name: Run Unity Test Runner
         id: run_tests
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        # Per-mode timeout. 150: ONLY the standalone leg needs it -- it builds a
-        # NON-development IL2CPP player with the Release C++ configuration, and a
-        # run-ci-tests.ps1 change rotates the Library cache key, so first runs
-        # build cold. editmode/playmode are in-editor runs whose healthy worst case
-        # is the ~40-min SINGLE_THREADED EditMode baseline, so 90 gives >2x headroom
-        # yet fails a hang ~60 min sooner than the old blanket 150 (a dead Unity
-        # Accelerator once stalled EditMode for the full 150 and produced no
-        # results.xml). All values stay under the job timeout (1200) so the step
-        # clock fires first and releases the shared Unity seat.
-        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 150) || 90 }}
+        # Per-mode timeout, sized from measurement rather than fear. Across the 60
+        # most recent Unity Tests runs (~430 leg instances) the slowest this step
+        # has EVER been is 9.1 min (editmode), with standalone topping out at
+        # 8.7 min. 40/60 keeps >4x headroom over that worst case -- enough for a
+        # cold import on a fresh runner -- while cutting what a HANG costs: every
+        # leg serializes on the one organization Unity seat, and a lock wait of
+        # 91 min has been measured behind a stuck leg, so an oversized step clock
+        # turns one hang into org-wide starvation. Standalone keeps the larger
+        # budget because it also builds an IL2CPP player. Both stay under the job
+        # timeout (1200) so the step clock fires first and releases the seat.
+        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
         shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -931,6 +857,7 @@ jobs:
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
@@ -1057,21 +984,6 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           if-no-files-found: warn
           retention-days: 14
-
-      # Protected-branch runs only -- see the default matrix job's save step for
-      # why a pull-request leg's cache entry cannot be reused by anything.
-      - name: Save Unity Library and package caches
-        if: >-
-          ${{ !cancelled() &&
-            steps.compute.outputs.is-empty != 'true' &&
-            github.ref_protected &&
-            steps.unity-library-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
 
   # SINGLE_THREADED leg. The default matrix never exercises the SINGLE_THREADED
   # code paths (Runtime/Core/DataStructure/Cache.cs et al. gate thread-safe vs
@@ -1207,37 +1119,6 @@ jobs:
         with:
           matrix-note: "single-threaded (organization lock wraps the Unity section)"
 
-      # restore + save are split so only protected-branch runs pay the save.
-      # See the paired "Save Unity Library and package caches" step for why.
-      - name: Cache Unity Library and package caches
-        id: unity-library-cache
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        env:
-          PACKAGE_HASH: >-
-            ${{ hashFiles(
-              'package.json',
-              'Runtime/**',
-              'Editor/**',
-              'Tests/**',
-              'scripts/unity/run-ci-tests.ps1',
-              'scripts/unity/lib/asmdef-discovery.js',
-              '.github/actions/compute-unity-assemblies/action.yml',
-              '.github/integration-packages.json'
-            ) }}
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          # `single-threaded` in BOTH the project path above and this key keeps this
-          # leg's Library (compiled WITH SINGLE_THREADED) separate from the default
-          # matrix's `6000.3.16f1-{mode}` Library (compiled WITHOUT it). The
-          # restore-keys prefix carries the same `-single-threaded-` token so it can
-          # only ever fall back to other SINGLE_THREADED Libraries.
-          key: Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-${{ env.PACKAGE_HASH }}
-          restore-keys: |
-            Library-${{ runner.os }}-${{ runner.arch }}-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded-
-
       - name: Validate Unity license secrets
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
@@ -1299,12 +1180,13 @@ jobs:
       - name: Run Unity Test Runner
         id: run_tests
         if: ${{ steps.compute.outputs.is-empty != 'true' }}
-        # This job is editmode + playmode ONLY (no standalone IL2CPP build), so 90
-        # min -- >2x the ~40-min healthy SINGLE_THREADED EditMode baseline -- is the
-        # fail-fast cap. The old 150 let a dead-Accelerator EditMode stall burn the
-        # full window and emit no results.xml; 90 surfaces that ~60 min sooner and
-        # releases the shared Unity seat. Stays under the job timeout (1200).
-        timeout-minutes: 90
+        # editmode + playmode ONLY (no standalone IL2CPP build). Measured worst case
+        # for this leg across the 60 most recent runs is 7.8 min, so 40 keeps >5x
+        # headroom while failing a hang 50 min sooner than the old 90 -- the
+        # organization Unity seat is a single serialized resource, and a stuck leg
+        # holds it for exactly this long. See the default matrix job for the full
+        # measurement note. Stays under the job timeout (1200).
+        timeout-minutes: 40
         shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -1323,7 +1205,8 @@ jobs:
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded' `
-            -ProjectPath '.artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'single-threaded' `
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
@@ -1430,21 +1313,6 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
           if-no-files-found: warn
           retention-days: 14
-
-      # Protected-branch runs only -- see the default matrix job's save step for
-      # why a pull-request leg's cache entry cannot be reused by anything.
-      - name: Save Unity Library and package caches
-        if: >-
-          ${{ !cancelled() &&
-            steps.compute.outputs.is-empty != 'true' &&
-            github.ref_protected &&
-            steps.unity-library-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: |
-            .artifacts/unity/projects/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/Library
-            .artifacts/unity/cache/${{ matrix.unity-version }}
-          key: ${{ steps.unity-library-cache.outputs.cache-primary-key }}
 
   unitypackage-smoke:
     name: Unity package export smoke

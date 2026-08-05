@@ -1226,7 +1226,6 @@ function Test-UnityJobMaintainsSelectedRunner {
     $provisionIndex = $JobText.IndexOf('- name: Provision Unity Editor')
     $firstPwshShellIndex = $JobText.IndexOf('shell: pwsh')
     $runnerDiagnosticsIndex = $JobText.IndexOf('- name: Print runner diagnostics')
-    $cacheIndex = $JobText.IndexOf('- name: Cache Unity Library and package caches')
     $setupNodeIndex = $JobText.IndexOf('- name: Setup Node.js')
     $computeIndex = $JobText.IndexOf('- name: Compute')
     $licenseValidationIndex = $JobText.IndexOf('- name: Validate Unity license secrets')
@@ -1255,7 +1254,6 @@ function Test-UnityJobMaintainsSelectedRunner {
     $unityExpensiveStepsSkipEmptyAssemblyLegs = (
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Maintain Unity editor on selected runner') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Print runner diagnostics') -and
-        (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Cache Unity Library and package caches') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Validate Unity license secrets') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Provision Unity Editor') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Acquire organization Unity lock') -and
@@ -1264,7 +1262,6 @@ function Test-UnityJobMaintainsSelectedRunner {
     $jobTimeoutCoversMaintenanceBudget = $JobText -match '(?m)^\s+timeout-minutes:\s*1200\s*$'
     $maintenanceStepEndCandidates = @(
         $runnerDiagnosticsIndex,
-        $cacheIndex,
         $licenseValidationIndex,
         $provisionIndex
     ) | Where-Object { $_ -gt $maintenanceIndex } | Sort-Object
@@ -1297,7 +1294,6 @@ function Test-UnityJobMaintainsSelectedRunner {
         $unityExpensiveStepsSkipEmptyAssemblyLegs -and
         ($firstPwshShellIndex -lt 0 -or $maintenanceIndex -lt $firstPwshShellIndex) -and
         ($runnerDiagnosticsIndex -lt 0 -or $maintenanceIndex -lt $runnerDiagnosticsIndex) -and
-        ($cacheIndex -lt 0 -or $maintenanceIndex -lt $cacheIndex) -and
         ($licenseValidationIndex -lt 0 -or $maintenanceIndex -lt $licenseValidationIndex) -and
         $maintenanceUsesWindowsPowerShell -and
         $maintenancePublishesPowerShell7Path -and
@@ -1326,7 +1322,7 @@ $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
     (Test-UnityJobMaintainsSelectedRunner -JobText $benchmarksMatrixJob)
 )
 if (-not $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must compute the test assembly list before runner maintenance; skip maintenance, diagnostics, cache, license validation, provisioning, lock acquisition, and Unity test execution when the selected leg is empty; and still run scripts/unity/maintain-windows-runner.ps1 inside each non-empty self-hosted Unity job before Provision Unity Editor. Maintenance must use Windows PowerShell, publish the discovered PowerShell 7 directory through GITHUB_PATH, and remain the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must compute the test assembly list before runner maintenance; skip maintenance, diagnostics, license validation, provisioning, lock acquisition, and Unity test execution when the selected leg is empty; and still run scripts/unity/maintain-windows-runner.ps1 inside each non-empty self-hosted Unity job before Provision Unity Editor. Maintenance must use Windows PowerShell, publish the discovered PowerShell 7 directory through GITHUB_PATH, and remain the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity workflows skip empty legs before runner maintenance and maintain editors before provisioning."
@@ -2409,6 +2405,102 @@ $licensedJobIds = @(
     'unity-tests-single-threaded',
     'unitypackage-smoke'
 )
+
+# ---------------------------------------------------------------------------
+# The generated Unity project must survive actions/checkout.
+#
+# actions/checkout runs `git clean -ffdx` at the top of every job, and `-x`
+# means gitignored. While the project lived under .artifacts/, every job deleted
+# the Library the previous job had just built on that same disk, and the repo
+# paid an actions/cache round trip to put it back: measured across the 60 most
+# recent Unity Tests runs, 109 min of restore and 119 min of save, all of it on
+# the single serialized organization Unity seat.
+#
+# Two halves, both easy to undo by accident, so both are pinned:
+#   1. Every leg that runs run-ci-tests.ps1 passes -ProjectRoot under
+#      RUNNER_WORKSPACE -- the checkout's PARENT, which `git clean` cannot reach.
+#   2. No Unity workflow caches a workspace-relative Library again.
+# ---------------------------------------------------------------------------
+$unityWorkflowFilesWithProjects = @(
+    '.github/workflows/unity-tests.yml',
+    '.github/workflows/unity-benchmarks.yml'
+)
+$persistentProjectRootArgument = "-ProjectRoot (Join-Path `$env:RUNNER_WORKSPACE 'unity-workspace')"
+foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
+    $unityWorkflowPath = Join-Path $repoRoot $unityWorkflowFile
+    if (-not (Test-Path -LiteralPath $unityWorkflowPath -PathType Leaf)) {
+        Write-Host "::error file=$unityWorkflowFile::Missing Unity workflow while validating persistent project roots."
+        $failed = $true
+        continue
+    }
+
+    $unityWorkflowText = Get-Content -LiteralPath $unityWorkflowPath -Raw
+    $runCiTestsInvocations = @([regex]::Matches($unityWorkflowText, [regex]::Escape('./scripts/unity/run-ci-tests.ps1'))).Count
+    $persistentRootDeclarations = @([regex]::Matches(
+            $unityWorkflowText,
+            [regex]::Escape($persistentProjectRootArgument)
+        )).Count
+
+    if ($runCiTestsInvocations -eq 0) {
+        Write-Host "::error file=$unityWorkflowFile::Expected at least one run-ci-tests.ps1 invocation while validating persistent project roots."
+        $failed = $true
+    } elseif ($persistentRootDeclarations -ne $runCiTestsInvocations) {
+        Write-Host "::error file=$unityWorkflowFile::Every run-ci-tests.ps1 step must pass ``$persistentProjectRootArgument`` (found $persistentRootDeclarations for $runCiTestsInvocations invocations). Without it the generated project falls back under .artifacts/, where actions/checkout's ``git clean -ffdx`` deletes the Library before every job."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked $unityWorkflowFile pins the persistent Unity project root on all $runCiTestsInvocations run steps."
+    }
+
+    if ($unityWorkflowText -match '(?m)^\s*\.artifacts/unity/projects/.*?/Library\s*$') {
+        Write-Host "::error file=$unityWorkflowFile::A workspace-relative '.artifacts/unity/projects/**/Library' path reappeared in an actions/cache step. The project now lives outside the workspace; caching the old path uploads an empty directory and re-adds the restore/save cost the persistent root removed."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked $unityWorkflowFile no longer caches a workspace-relative Library."
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Step timeouts stay inside the measured budget.
+#
+# Across the 60 most recent Unity Tests runs (~430 leg instances) the slowest
+# 'Run Unity Test Runner' has been 9.1 min, standalone topping out at 8.7 min.
+# The caps below keep >4x headroom over that. The reason they must not drift
+# back up: every leg serializes on ONE organization Unity seat, and a 91-minute
+# lock wait has been measured behind a stuck leg -- an oversized step clock
+# converts a single hang into org-wide starvation.
+# ---------------------------------------------------------------------------
+$unityRunTimeoutContracts = @(
+    @{
+        Name = 'default matrix + standalone run timeout'
+        Pattern = 'timeout-minutes:\s*\$\{\{\s*\(matrix\.test-mode\s*==\s*''standalone''\s*&&\s*60\)\s*\|\|\s*40\s*\}\}'
+        Message = "The default and standalone 'Run Unity Test Runner' steps must cap at 60 min (standalone) / 40 min (editmode, playmode). Measured worst case is 8.7-9.1 min; a larger cap only lengthens how long a hang holds the single organization Unity seat."
+    },
+    @{
+        Name = 'single-threaded run timeout'
+        Pattern = '(?ms)- name: Run Unity Test Runner.*?-ProjectScope ''single-threaded'''
+        Message = "The SINGLE_THREADED 'Run Unity Test Runner' step must pass -ProjectScope 'single-threaded' so its differently-compiled Library never shares a directory with the default matrix's."
+    }
+)
+foreach ($contract in $unityRunTimeoutContracts) {
+    if ($workflowContent -notmatch $contract.Pattern) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked Unity run-step contract '$($contract.Name)'."
+    }
+}
+
+$oversizedRunTimeouts = @([regex]::Matches(
+        $workflowContent,
+        '(?ms)- name: Run Unity Test Runner.*?timeout-minutes:\s*(\d+)\s*$'
+    ))
+foreach ($match in $oversizedRunTimeouts) {
+    $declaredTimeout = [int]$match.Groups[1].Value
+    if ($declaredTimeout -gt 60) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::A 'Run Unity Test Runner' step declares timeout-minutes: $declaredTimeout. The measured worst case is 9.1 min; anything above 60 hands a hung leg more than an hour of the single organization Unity seat."
+        $failed = $true
+    }
+}
 foreach ($licensedJobId in $licensedJobIds) {
     if (-not $jobTexts.ContainsKey($licensedJobId)) {
         Write-Host "::error file=.github/workflows/unity-tests.yml::Missing licensed job '$licensedJobId' while validating current-PR-head guards."

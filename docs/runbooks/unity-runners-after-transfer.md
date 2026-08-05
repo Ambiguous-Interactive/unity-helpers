@@ -154,9 +154,42 @@ Get-Command pwsh
 
 After installing PowerShell 7, restart the self-hosted runner service/agent (or refresh the machine's PATH and restart the runner) so the agent process sees `pwsh` on its PATH. The runner agent inherits its environment at start time; until it is restarted it keeps reporting `pwsh: command not found` even though a fresh interactive shell can find `pwsh`. Re-run the queued Unity workflow once the agent is back online.
 
+## The persistent Unity project root
+
+Each Unity leg generates a throwaway Unity project whose `Library` holds the import
+database and the compiled assemblies. That project lives **outside the checkout**, at:
+
+```text
+<RUNNER_WORKSPACE>\unity-workspace\projects\<unity-version>-<mode>[-<scope>]
+<RUNNER_WORKSPACE>\unity-workspace\cache\<unity-version>
+```
+
+It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
+means gitignored, so anything under the repository's `.artifacts/` tree is deleted
+before the job starts — including the `Library` the previous leg had just built on
+that same disk. Keeping the project one directory up puts it out of `git clean`'s
+reach, so a leg reuses its own local copy instead of downloading one.
+
+Operator notes:
+
+- **Confirm reuse.** Every run logs `Library: warm (reused)` or
+  `Library: cold (first run on this runner)` in the `Ephemeral Unity project` group.
+  A leg that reports `cold` on every run means the root is not surviving between
+  jobs — check whether something is wiping `RUNNER_WORKSPACE`.
+- **Disk is the trade.** This buys back cache transfer time by keeping the projects
+  on local disk. `run-ci-tests.ps1` prunes least-recently-used sibling projects when
+  free space drops below its floor (`-ProjectRootMinimumFreeGb`, default 60 GB) and
+  never prunes the leg that is about to run. The runner diagnostics block prints
+  `Workspace volume: <drive> N GB free of M GB` every run.
+- **Force a cold rebuild** for one leg by deleting its directory under
+  `unity-workspace\projects`; the next run regenerates it.
+- A leg that moves between the two runners is handled automatically:
+  `Clear-StaleUnityCompilationCache` notices the repo-root marker changed and clears
+  `Library\Bee`, `ScriptAssemblies`, `PlayerScriptAssemblies`, and `Il2cppBuildCache`.
+
 ## Git compression tools for Actions cache
 
-Self-hosted Windows Unity runners also need Git for Windows' Unix tools available to GitHub Actions cache steps. `actions/cache` restores and saves archives through `tar` and `gzip`; when the runner PATH exposes Git Bash but omits `C:\Program Files\Git\usr\bin`, cache post steps can warn with `gzip: command not found` and fail to save the Unity Library cache.
+Self-hosted Windows Unity runners also need Git for Windows' Unix tools available to GitHub Actions cache steps. `actions/cache` restores and saves archives through `tar` and `gzip`; when the runner PATH exposes Git Bash but omits `C:\Program Files\Git\usr\bin`, cache post steps can warn with `gzip: command not found` and fail to save a cache entry. The Unity `Library` is no longer among them — see the section above — but the prepend stays because it is cheap and any future cache step on these runners needs it.
 
 The `print-self-hosted-runner-diagnostics` composite action prepends Git's `usr\bin` directory to `$GITHUB_PATH` when it finds both `gzip.exe` and `tar.exe`, and emits a warning when that directory is absent. To verify locally on the runner:
 

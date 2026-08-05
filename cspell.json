@@ -839,7 +839,9 @@
         "cwd",
         "gantt",
         "mcp",
-        "icall"
+        "icall",
+        "ffdx",
+        "redistributables"
       ]
     }
   ],
@@ -1101,7 +1103,8 @@
     "tzf",
     "nogit",
     "Dups",
-    "WFL"
+    "WFL",
+    "UCRT"
   ],
   "flagWords": [],
   "minWordLength": 3,

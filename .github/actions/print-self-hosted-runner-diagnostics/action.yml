@@ -82,6 +82,24 @@ runs:
         $refProtected = Default-Value $env:GITHUB_REF_PROTECTED
         Write-Output ("GitHub ref:            " + $githubRef + " (protected=" + $refProtected + ")")
         Write-Output ("GitHub event:          " + (Default-Value $env:GITHUB_EVENT_NAME))
+        # The generated Unity project and its Library persist under
+        # RUNNER_WORKSPACE across jobs (see unity-tests.yml: the project cannot
+        # live inside the checkout, where actions/checkout's `git clean -ffdx`
+        # deletes it every job). That trades network cache time for local disk,
+        # so free space is now a load-bearing runner property: run-ci-tests.ps1
+        # prunes least-recently-used projects below its floor, and this line is
+        # how an operator sees that coming. Best-effort; never fails the step.
+        try {
+            $workspaceRoot = Default-Value $env:RUNNER_WORKSPACE ''
+            if (-not [string]::IsNullOrEmpty($workspaceRoot)) {
+                $driveRoot = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($workspaceRoot))
+                $driveInfo = New-Object System.IO.DriveInfo($driveRoot)
+                Write-Output ("Workspace volume:      " + $driveRoot + " " +
+                    ("{0:N1} GB free of {1:N1} GB" -f ($driveInfo.AvailableFreeSpace / 1GB), ($driveInfo.TotalSize / 1GB)))
+            }
+        } catch {
+            Write-Output ("Workspace volume:      <unreadable: " + $_.Exception.Message + ">")
+        }
         Write-Output ""
         Write-Output ("PowerShell version:    " + $PSVersionTable.PSVersion.ToString())
         # PATH-walk that mirrors actions/runner WhichUtil. The runner agent
