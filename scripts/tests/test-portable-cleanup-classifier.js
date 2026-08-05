@@ -6,7 +6,30 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-const buildLockRoot = path.resolve(process.env.BUILD_LOCK_POLICY_ROOT || "");
+const configuredPolicyRoot = process.env.BUILD_LOCK_POLICY_ROOT || "";
+
+// This test runs against a separate checkout of the central build-lock policy, which only CI
+// provides (see the "Test central Unity cleanup policy parity" step). Hard-failing without it
+// made `npm run validate:prepush` -- the documented pre-push gate -- impossible to pass on a
+// developer machine. Skip when the checkout is absent, but never when running in Actions: there
+// its absence means the CI wiring broke, and silently skipping would drop the contract.
+if (!configuredPolicyRoot) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.error(
+      "BUILD_LOCK_POLICY_ROOT is unset under GitHub Actions. The central policy checkout step " +
+        "must run before this test; skipping here would drop the parity contract silently."
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    "[test-portable-cleanup-classifier] SKIPPED: set BUILD_LOCK_POLICY_ROOT to a checkout of " +
+      "ambiguous-organization-build-lock to run the central cleanup policy parity contract."
+  );
+  process.exit(0);
+}
+
+const buildLockRoot = path.resolve(configuredPolicyRoot);
 const policyCommit = "673eb65e7d863a1a8a8a70882bd980e189d41754";
 const classifierPath = path.join(buildLockRoot, ".github/dist/classify-unity-cleanup-evidence.js");
 const gatePath = path.join(buildLockRoot, ".github/dist/require-confirmed-unity-cleanup.js");
