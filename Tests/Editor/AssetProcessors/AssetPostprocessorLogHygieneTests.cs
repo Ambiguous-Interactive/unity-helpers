@@ -26,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     {
         private const string TestRoot = "Assets/__AssetPostprocessorHygieneTests__";
 
+        private AssetChangeDetectionEnabledScope _watcherScope;
+
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
@@ -63,6 +65,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // in DetectAssetChangeProcessorTests.BaseSetUp.
             AssetPostprocessorTestHandlers.FlushAndClearAll();
             DetectAssetChangeProcessor.ResetForTesting();
+            // Unlike the fixtures that call ProcessChangesForTesting, the prefab test
+            // below drives Unity's real OnPostprocessAllAssets callback. That path
+            // declines to initialize the watcher in batch mode, which is where CI runs
+            // EditMode, so without forcing it on the test would find nothing to warn
+            // about and pass while covering nothing.
+            _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             // Declare this fixture's folder as the only path the processor may react
             // to. Prevents cross-fixture pollution: assets created under this fixture's
@@ -76,6 +84,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
             DetectAssetChangeProcessor.ResetForTesting();
+            _watcherScope?.Dispose();
+            _watcherScope = null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
             // Flush AFTER every asset-mutating operation (Refresh above, plus any

@@ -21,12 +21,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [TestFixture]
     public sealed class AssetChangeDetectionEnablementTests : BatchedEditorTestBase
     {
-        private bool? _originalOverride;
+        // The scope captures the enablement on construction and restores it on dispose, so these
+        // tests can reassign it freely without any of them owning the restore.
+        private AssetChangeDetectionEnabledScope _watcherScope;
 
         [SetUp]
         public override void BaseSetUp()
         {
-            _originalOverride = DetectAssetChangeProcessor.EnabledOverride;
+            _watcherScope = AssetChangeDetectionUtility.EnabledScope(
+                AssetChangeDetectionUtility.Enabled
+            );
             base.BaseSetUp();
         }
 
@@ -35,7 +39,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             // These tests drive initialization directly, so hand the next fixture a clean slate.
             DetectAssetChangeProcessor.ResetForTesting();
-            DetectAssetChangeProcessor.EnabledOverride = _originalOverride;
+            _watcherScope?.Dispose();
+            _watcherScope = null;
             base.TearDown();
         }
 

@@ -141,6 +141,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private static void ResetProcessorWithPrefabSceneFixtureAllowlist()
         {
             DetectAssetChangeProcessor.ResetForTesting();
+            // ResetForTesting clears the enablement override too, and the watcher declines
+            // to initialize in batch mode, which is where CI runs EditMode. Re-force it.
+            DetectAssetChangeProcessor.EnabledOverride = true;
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
         }
@@ -150,6 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             DetectAssetChangeProcessor.IncludeTestAssets = false;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
+            DetectAssetChangeProcessor.EnabledOverride = null;
 
             // Clean up tracked scene objects directly - no FindObjectsByType!
             foreach (GameObject go in _instantiatedSceneObjects)

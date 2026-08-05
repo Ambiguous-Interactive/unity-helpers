@@ -475,6 +475,17 @@ internal static class AssetWatcherPolicy
 Turning the watcher off after it has already initialized stops further initialization but leaves
 already-discovered subscriptions in place.
 
+For a temporary change, use the scope instead of assigning and restoring by hand — it captures the
+current state on construction and puts it back on dispose, so an early return or an exception cannot
+leak the override:
+
+```csharp
+using (AssetChangeDetectionUtility.EnabledScope(false))
+{
+    ImportEverything();
+}
+```
+
 ---
 
 ## Troubleshooting

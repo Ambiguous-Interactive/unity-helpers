@@ -29,6 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private DetectAssetChangeProcessor.AssetWatcherSettings _settings;
         private float _originalLoopWindowSeconds;
+        private AssetChangeDetectionEnabledScope _watcherScope;
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
@@ -79,6 +80,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // subscriber under test.
             AssetPostprocessorTestHandlers.FlushAndClearAll();
             DetectAssetChangeProcessor.ResetForTesting();
+            // The watcher declines to initialize in batch mode, which is where CI runs
+            // EditMode. This fixture exists to exercise the watcher, so force it on.
+            _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             // Constrain the processor to this fixture's folder so assets created by any
             // other fixture are structurally ignored even when IncludeTestAssets is true.
@@ -93,6 +97,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
             DetectAssetChangeProcessor.ResetForTesting(_settings);
+            _watcherScope?.Dispose();
+            _watcherScope = null;
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             if (

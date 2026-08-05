@@ -55,6 +55,25 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         }
 
         /// <summary>
+        /// Forces <see cref="Enabled"/> for the life of the returned scope, then restores whatever
+        /// it was before.
+        /// </summary>
+        /// <param name="enabled">Whether the watcher may initialize inside the scope.</param>
+        /// <returns>A scope that restores the captured state when disposed.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// using (AssetChangeDetectionUtility.EnabledScope(false))
+        /// {
+        ///     ImportEverything();
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static AssetChangeDetectionEnabledScope EnabledScope(bool enabled)
+        {
+            return new AssetChangeDetectionEnabledScope(enabled);
+        }
+
+        /// <summary>
         /// Clears the asset-change watcher's loop-protection state and pending change queue.
         /// </summary>
         /// <remarks>
