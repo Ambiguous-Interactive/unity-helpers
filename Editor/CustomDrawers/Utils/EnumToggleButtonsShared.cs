@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
     using System.Runtime.CompilerServices;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
