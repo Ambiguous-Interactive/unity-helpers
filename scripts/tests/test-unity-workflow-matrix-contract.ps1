@@ -2455,6 +2455,75 @@ foreach ($licensedJobId in $licensedJobIds) {
     }
 }
 
+# The per-leg guards above fire only after a leg has been dispatched, which means
+# waiting in line for the single self-hosted Unity seat. Because this workflow's
+# concurrency group cannot cancel in progress, a superseded iteration that still
+# dispatches its legs holds the group -- and therefore the successor run -- for as
+# long as that queue takes. The hosted matrix-config job must resolve it once and
+# skip the licensed tiers outright.
+$matrixConfigJob = if ($jobTexts.ContainsKey('matrix-config')) { [string]$jobTexts['matrix-config'] } else { '' }
+$supersededStep = [regex]::Match(
+    $matrixConfigJob,
+    '(?ms)^      - name: Detect superseded pull request head\s*$.*?(?=^      - name:|\z)'
+)
+$supersededGateContracts = @(
+    @{
+        Name = 'matrix-config exposes the superseded output'
+        Ok = $matrixConfigJob -match '(?m)^      superseded:\s*\$\{\{\s*steps\.superseded\.outputs\.superseded\s*\}\}\s*$'
+        Message = 'matrix-config must expose a `superseded` output wired to the detection step so every licensed tier can gate on it.'
+    },
+    @{
+        Name = 'matrix-config detects a superseded head on a hosted runner'
+        Ok = $supersededStep.Success -and $supersededStep.Value -match '(?m)^        id: superseded\s*$'
+        Message = 'matrix-config must carry a "Detect superseded pull request head" step with id `superseded`.'
+    },
+    @{
+        Name = 'superseded detection compares the queued head against the live head'
+        Ok = (
+            $supersededStep.Success -and
+            $supersededStep.Value.Contains('PR_NUMBER: ${{ github.event.pull_request.number }}') -and
+            $supersededStep.Value.Contains('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}') -and
+            $supersededStep.Value.Contains('.head.sha')
+        )
+        Message = 'The superseded detection step must compare the run''s queued head SHA against the pull request''s live head SHA.'
+    },
+    @{
+        Name = 'superseded detection fails open'
+        Ok = (
+            $supersededStep.Success -and
+            ([regex]::Matches($supersededStep.Value, 'superseded=false')).Count -ge 3 -and
+            ([regex]::Matches($supersededStep.Value, 'superseded=true')).Count -eq 1
+        )
+        Message = 'The superseded detection step must fail OPEN: a non-pull-request run and any failure to resolve the live head must report superseded=false so validation is never skipped by an API hiccup.'
+    },
+    @{
+        Name = 'Unity CI Success treats a superseded run as a clean no-op'
+        Ok = (
+            $workflowContent.Contains('MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}') -and
+            $workflowContent -match '(?m)^          if \[ "\$\{MATRIX_CONFIG_SUPERSEDED\}" = "true" \]; then\s*$'
+        )
+        Message = 'unity-ci-success must exit 0 for a superseded run: it never ran the licensed tiers and its check belongs to the head SHA it was queued for, so it can neither gate nor authorize the current head.'
+    }
+)
+foreach ($licensedJobId in $licensedJobIds) {
+    $supersededGateContracts += @{
+        Name = "licensed job '$licensedJobId' skips when superseded"
+        Ok = (
+            $jobTexts.ContainsKey($licensedJobId) -and
+            [string]$jobTexts[$licensedJobId] -match "needs\.matrix-config\.outputs\.superseded\s*!=\s*'true'"
+        )
+        Message = "Licensed job '$licensedJobId' must skip when matrix-config reports the pull request head has moved on, so a superseded run never queues for the self-hosted Unity seat."
+    }
+}
+foreach ($contract in $supersededGateContracts) {
+    if (-not $contract.Ok) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Superseded-run gate contract failed ($($contract.Name)): $($contract.Message)"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked superseded-run gate contract '$($contract.Name)'."
+    }
+}
+
 $prAcquireIdentityInputsAreExact = Test-PrCapableAcquireIdentityInputs `
     -WorkflowContent $workflowContent `
     -Jobs $jobTexts

@@ -59,11 +59,67 @@ jobs:
       matrix-include: ${{ steps.resolve.outputs.matrix-include }}
       matrix-include-standalone: ${{ steps.resolve.outputs.matrix-include-standalone }}
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
+      superseded: ${{ steps.superseded.outputs.superseded }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
+
+      # Resolve "has this PR moved on?" ONCE, here, on a hosted runner.
+      #
+      # Every licensed leg re-checks the head immediately before setup and again
+      # before lock acquisition, but those guards fire only after the leg has
+      # already been dispatched -- and a dispatch means waiting in line for the
+      # single self-hosted Unity seat. A stale iteration therefore burned eight
+      # queue slots to do nothing, and because this workflow's concurrency group
+      # cannot cancel in progress (a leg may be holding the org Unity license),
+      # the successor run stayed `pending` behind it for as long as that took.
+      # Observed on run 30963202461: two legs still queued 45 minutes after the
+      # head moved, with the successor run never started.
+      #
+      # Skipping the licensed tiers instead lets a superseded run complete in
+      # seconds and hand the concurrency group to the run that matters. The
+      # per-leg guards stay as defense in depth for a push that lands after this
+      # step has already answered.
+      #
+      # Fails OPEN: any API trouble resolving the head leaves superseded=false,
+      # so an unreachable API costs a redundant run, never a skipped validation.
+      - name: Detect superseded pull request head
+        id: superseded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_NUMBER:-}" ] || [ -z "${EXPECTED_HEAD_SHA:-}" ]; then
+            echo "Not a pull request run; nothing can supersede it."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          current=""
+          if ! current="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"; then
+            current=""
+          fi
+          if [ -z "${current}" ]; then
+            echo "::warning::Could not resolve the current head of pull request #${PR_NUMBER}; proceeding as current."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if [ "${current}" = "${EXPECTED_HEAD_SHA}" ]; then
+            echo "Pull request #${PR_NUMBER} is still at ${EXPECTED_HEAD_SHA}."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "superseded=true" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Superseded run for ${EXPECTED_HEAD_SHA}; pull request #${PR_NUMBER} now points to ${current}. Skipping the licensed Unity tiers."
+          {
+            echo "## Superseded Unity run"
+            echo ""
+            echo "This run was queued for \`${EXPECTED_HEAD_SHA}\`; pull request #${PR_NUMBER} now points to \`${current}\`."
+            echo "The licensed Unity tiers were skipped so the run for the current head can start immediately."
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       # Fail FAST on a bad test-project module manifest before any (expensive,
       # self-hosted) Unity leg starts. A non-existent UPM id here -- e.g. the
@@ -202,7 +258,8 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.matrix-config.outputs.has-required-secrets == 'true'
+        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
@@ -623,7 +680,8 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.outputs.has-required-secrets == 'true' &&
-        needs.matrix-config.outputs.matrix-include-standalone != '[]'
+        needs.matrix-config.outputs.matrix-include-standalone != '[]' &&
+        needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
@@ -1046,7 +1104,8 @@ jobs:
         needs.unity-tests.result == 'success' &&
         (needs.unity-tests-standalone.result == 'success' ||
           needs.unity-tests-standalone.result == 'skipped') &&
-        needs.matrix-config.outputs.has-required-secrets == 'true'
+        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
@@ -1403,7 +1462,8 @@ jobs:
         (needs.unity-tests-standalone.result == 'success' ||
           needs.unity-tests-standalone.result == 'skipped') &&
         needs.unity-tests-single-threaded.result == 'success' &&
-        needs.matrix-config.outputs.has-required-secrets == 'true'
+        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1577,6 +1637,7 @@ jobs:
           CURRENT_REPOSITORY: ${{ github.repository }}
           REF_PROTECTED: ${{ github.ref_protected }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
+          MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
           STANDALONE_RESULT: ${{ needs.unity-tests-standalone.result }}
@@ -1605,6 +1666,17 @@ jobs:
 
           if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
             echo "Unprotected push intentionally omitted licensed Unity jobs."
+            exit 0
+          fi
+
+          # A superseded iteration must not report failure: it never ran the
+          # licensed tiers, and its check attaches to the head SHA it was queued
+          # for, not to the one the pull request now points at -- so it can
+          # neither gate nor authorize a merge of the current head. Reporting
+          # anything else here would either mark "you pushed again" as a defect
+          # or leave the run permanently pending.
+          if [ "${MATRIX_CONFIG_SUPERSEDED}" = "true" ]; then
+            echo "Superseded run; the licensed Unity tiers were skipped for the current head's run."
             exit 0
           fi
 
