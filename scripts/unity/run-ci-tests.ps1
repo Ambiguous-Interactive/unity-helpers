@@ -20,9 +20,12 @@ param(
     [string]$ProjectPath,
 
     # Distinguishes generated projects that share a <version>-<mode> pair but are
-    # compiled DIFFERENTLY -- today only the SINGLE_THREADED leg. Two differently
-    # compiled Libraries must never share a directory, or each leg invalidates the
-    # other's compiled assemblies on every run.
+    # compiled DIFFERENTLY -- today the SINGLE_THREADED and benchmark legs. Two
+    # differently compiled Libraries must never share a directory, or each leg
+    # invalidates the other's compiled assemblies on every run. Constrained to a
+    # bare directory-name shape: this becomes a path segment, and a separator in it
+    # would place the project outside the root the disk guard prunes.
+    [ValidatePattern('^[A-Za-z0-9._-]*$')]
     [string]$ProjectScope,
 
     # Root for the generated project and the UPM caches, OUTSIDE the repository.
@@ -3407,10 +3410,10 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 # proves the Library survived since the previous leg instead of being imported
 # cold. A persistent leg that reports "cold" every run means the project root is
 # not actually surviving between jobs, which is the whole point of this path.
-$LibraryPath = Join-Path $ProjectPath 'Library'
-$LibraryWarmth = if (Test-Path -LiteralPath $LibraryPath -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
+$LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
 $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+$LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
 Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
 
