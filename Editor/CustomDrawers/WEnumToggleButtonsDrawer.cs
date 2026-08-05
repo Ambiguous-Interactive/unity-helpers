@@ -1087,10 +1087,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
+            // Convert.ToInt64 throws on a ulong-backed member above long.MaxValue; the serialized
+            // property stores the same 64-bit pattern either way.
             if (option.Value is Enum enumValue)
             {
-                long numeric = Convert.ToInt64(enumValue, CultureInfo.InvariantCulture);
-                property.longValue = numeric;
+                if (enumValue.TryConvertToInt64(out long numeric))
+                {
+                    property.longValue = numeric;
+                }
+
                 return;
             }
 
@@ -1290,9 +1295,29 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             property.longValue = unchecked((long)value);
         }
 
+        // Convert.ToUInt64 throws OverflowException on a negative enum member, and this runs inside
+        // BuildEnumOptions' loop with no handler, so a single negative member took the whole
+        // inspector down rather than drawing one button wrong.
         private static ulong ConvertToUInt64(object value)
         {
-            return Convert.ToUInt64(value, CultureInfo.InvariantCulture);
+            if (value is Enum enumValue)
+            {
+                return enumValue.TryConvertToUInt64(out ulong converted) ? converted : 0UL;
+            }
+
+            if (value == null)
+            {
+                return 0UL;
+            }
+
+            try
+            {
+                return Convert.ToUInt64(value, CultureInfo.InvariantCulture);
+            }
+            catch (Exception)
+            {
+                return 0UL;
+            }
         }
 
         private static bool IsPowerOfTwo(ulong value)

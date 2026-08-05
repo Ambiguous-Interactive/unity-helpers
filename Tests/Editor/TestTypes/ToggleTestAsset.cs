@@ -40,6 +40,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [StringInList("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta")]
         public string noPaginationState = "Alpha";
 
+        [WEnumToggleButtons]
+        public SignedByteExampleEnum signedByteMode = SignedByteExampleEnum.MinusOne;
+
+        [WEnumToggleButtons]
+        public SignedShortExampleEnum signedShortMode = SignedShortExampleEnum.Minimum;
+
         [Flags]
         public enum ExampleFlags
         {
@@ -54,6 +60,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             First,
             Second,
             Third,
+        }
+
+        // Convert.ToUInt64 throws OverflowException on every member below zero, which took the
+        // whole inspector down while drawing either of these fields.
+        public enum SignedByteExampleEnum : sbyte
+        {
+            MinusTwo = -2,
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        public enum SignedShortExampleEnum : short
+        {
+            Minimum = short.MinValue,
+            MinusOne = -1,
+            Zero = 0,
+            Maximum = short.MaxValue,
         }
 
         private static class DropdownProvider

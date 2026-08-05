@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Reflection;
     using System.Runtime.CompilerServices;
@@ -462,6 +463,99 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             where T : unmanaged, Enum
         {
             return enumerable.Select(value => value.ToCachedName());
+        }
+
+        /// <summary>
+        /// Converts a boxed enum value to the 64-bit two's-complement pattern of its underlying type.
+        /// </summary>
+        /// <param name="value">The enum value to convert.</param>
+        /// <param name="result">The converted bit pattern, or 0 when conversion fails.</param>
+        /// <returns>True when <paramref name="value"/> was converted; otherwise, false.</returns>
+        /// <remarks>
+        /// Null handling: A null value returns false.
+        /// Thread-safe: Yes.
+        /// Performance: O(1).
+        /// Allocations: None beyond the caller's existing box.
+        /// Edge cases: Signed underlying types are sign-extended, so a negative member converts to
+        /// its full 64-bit pattern rather than overflowing; <see cref="ulong"/>-backed members above
+        /// <see cref="long.MaxValue"/> convert without overflowing. This is the boxed counterpart of
+        /// the generic path used by <see cref="ToCachedName{T}"/> and
+        /// <see cref="HasFlagNoAlloc{T}"/>, and exists because editor tooling only ever holds enum
+        /// values as <see cref="object"/>.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (Direction.Left.TryConvertToUInt64(out ulong pattern))
+        /// {
+        ///     Debug.Log(pattern);
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool TryConvertToUInt64(this Enum value, out ulong result)
+        {
+            if (value == null)
+            {
+                result = 0UL;
+                return false;
+            }
+
+            // Convert.ToUInt64 throws OverflowException on every negative member, and
+            // Convert.ToInt64 throws on ulong members above long.MaxValue. Dispatching on the
+            // underlying type is the only conversion that is total over all nine enum shapes.
+            IConvertible convertible = value;
+            switch (Type.GetTypeCode(value.GetType()))
+            {
+                case TypeCode.SByte:
+                case TypeCode.Int16:
+                case TypeCode.Int32:
+                case TypeCode.Int64:
+                    result = unchecked((ulong)convertible.ToInt64(CultureInfo.InvariantCulture));
+                    return true;
+                case TypeCode.Byte:
+                case TypeCode.UInt16:
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
+                    result = convertible.ToUInt64(CultureInfo.InvariantCulture);
+                    return true;
+                default:
+                    result = 0UL;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Converts a boxed enum value to the signed 64-bit pattern Unity's serialized properties store.
+        /// </summary>
+        /// <param name="value">The enum value to convert.</param>
+        /// <param name="result">The converted value, or 0 when conversion fails.</param>
+        /// <returns>True when <paramref name="value"/> was converted; otherwise, false.</returns>
+        /// <remarks>
+        /// Null handling: A null value returns false.
+        /// Thread-safe: Yes.
+        /// Performance: O(1).
+        /// Allocations: None beyond the caller's existing box.
+        /// Edge cases: Total over every underlying type, including negative members and
+        /// <see cref="ulong"/>-backed members above <see cref="long.MaxValue"/>, which round-trip
+        /// through Unity's serialized properties as the same bit pattern.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (Direction.Left.TryConvertToInt64(out long serialized))
+        /// {
+        ///     property.longValue = serialized;
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool TryConvertToInt64(this Enum value, out long result)
+        {
+            if (!value.TryConvertToUInt64(out ulong unsigned))
+            {
+                result = 0L;
+                return false;
+            }
+
+            result = unchecked((long)unsigned);
+            return true;
         }
     }
 

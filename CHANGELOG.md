@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AssetChangeDetectionUtility.Enabled`**: turn the `[DetectAssetChanged]` watcher on or off, with `ResetEnabledToDefault()` and `EnabledScope(bool)` ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
 - **`AssetChangeDetectionEnabledScope`**: an `IDisposable` that restores the watcher's previous enablement on dispose.
 - **`SingleThreadedThreadPool.DrainAsync()`**: closes the pool and waits for already-queued work to finish, for queues you cannot afford to drop. Disposal still cancels. `IsAcceptingWork` reports whether `Enqueue` still does anything ([#318](https://github.com/Ambiguous-Interactive/unity-helpers/issues/318)).
+- **`Enum.TryConvertToUInt64()` / `TryConvertToInt64()`**: convert any enum value to its 64-bit bit pattern without overflowing on negative or very large members.
 
 ### Fixed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dictionary and set values silently lost**: `SerializableDictionary<TKey, List<TValue>>` saved its keys and none of its values. The Inspector now reports this instead of drawing a column that persists nothing. Use a `[Serializable]` wrapper type or `SerializableDictionary<TKey, TValue, TValueCache>` ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).
 - **`SerializableDictionary<TKey, TValue, TValueCache>` had no Inspector**: it now has a property drawer ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).
 - **Enums with negative values were slow to name**: `ToCachedName()` and `ToDisplayName()` fell back to a dictionary for any signed enum with a negative member, and small `sbyte` enums allocated a 256-entry cache. Both now use the compact array lookup ([#339](https://github.com/Ambiguous-Interactive/unity-helpers/issues/339)).
+- **`[WEnumToggleButtons]` threw on enums with negative values**: drawing a field whose enum had a member below zero threw `OverflowException` and took the whole Inspector down; the Odin drawer instead rendered such members as "None" and wrote that back. Both now draw and round-trip every member ([#339](https://github.com/Ambiguous-Interactive/unity-helpers/issues/339)).
 - **`NativePcgRandom` produced worse randomness than every other generator**: `NextFloat()` could return exactly 1, `NextLong()` could return a negative, `NextUint(0)` threw `DivideByZeroException`, and most seeds built a shortened-period stream. It now matches `PcgRandom` and gains `NextDouble()`. Sequences for a given seed have changed ([#282](https://github.com/Ambiguous-Interactive/unity-helpers/issues/282)).
 
 ## [3.5.1] - 2026-07-12

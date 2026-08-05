@@ -341,12 +341,23 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="value">The value to convert (typically an enum value).</param>
         /// <returns>The UInt64 representation, or 0 if conversion fails.</returns>
+        /// <remarks>
+        /// Enum values route through <see cref="EnumExtensions.TryConvertToUInt64"/>, which
+        /// sign-extends signed underlying types. <see cref="Convert.ToUInt64(object, IFormatProvider)"/>
+        /// throws <see cref="OverflowException"/> on every negative member, and the catch below used
+        /// to turn that into mask 0 -- rendering and round-tripping such a member as "None".
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong ConvertToUInt64(object value)
         {
             if (value == null)
             {
                 return 0UL;
+            }
+
+            if (value is Enum enumValue)
+            {
+                return enumValue.TryConvertToUInt64(out ulong converted) ? converted : 0UL;
             }
 
             try

@@ -4,11 +4,13 @@
 namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 {
     using System;
+    using System.Collections.Generic;
     using System.Reflection;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -174,6 +176,91 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, thirdOption, true);
             serializedObject.ApplyModifiedProperties();
             Assert.AreEqual(ToggleTestAsset.ExampleEnum.Third, asset.mode);
+        }
+
+        // Issue #339. Building the options for either of these enums threw OverflowException
+        // before the drawer stopped converting boxed members with Convert.ToUInt64, which fails on
+        // every member below zero -- and it threw from inside a plain loop with no handler, so one
+        // negative member took the whole inspector down. One assertion body per shape, so covering
+        // another underlying type costs one source line.
+        private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
+        {
+            yield return new TestCaseData(
+                nameof(ToggleTestAsset.signedByteMode),
+                new object[]
+                {
+                    ToggleTestAsset.SignedByteExampleEnum.MinusTwo,
+                    ToggleTestAsset.SignedByteExampleEnum.MinusOne,
+                    ToggleTestAsset.SignedByteExampleEnum.Zero,
+                    ToggleTestAsset.SignedByteExampleEnum.One,
+                },
+                (Func<ToggleTestAsset, object>)(asset => asset.signedByteMode)
+            ).SetName("SignedByteMembersBelowZero");
+
+            yield return new TestCaseData(
+                nameof(ToggleTestAsset.signedShortMode),
+                new object[]
+                {
+                    ToggleTestAsset.SignedShortExampleEnum.Minimum,
+                    ToggleTestAsset.SignedShortExampleEnum.MinusOne,
+                    ToggleTestAsset.SignedShortExampleEnum.Zero,
+                    ToggleTestAsset.SignedShortExampleEnum.Maximum,
+                },
+                (Func<ToggleTestAsset, object>)(asset => asset.signedShortMode)
+            ).SetName("SignedShortMembersSpanningTheFullRange");
+        }
+
+        [TestCaseSource(nameof(SignedUnderlyingTypeCases))]
+        public void EnumOptionsRoundTripSignedMembers(
+            string fieldName,
+            object[] members,
+            Func<ToggleTestAsset, object> readMember
+        )
+        {
+            ToggleTestAsset asset = CreateScriptableObject<ToggleTestAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+
+            SerializedProperty property = serializedObject.FindProperty(fieldName);
+            Assert.NotNull(property);
+
+            ToggleSet toggleSet = WEnumToggleButtonsUtility.CreateToggleSet(
+                property,
+                GetFieldInfo(fieldName)
+            );
+
+            Assert.False(toggleSet.SupportsMultipleSelection);
+            Assert.AreEqual(
+                members.Length,
+                toggleSet.Options.Count,
+                $"{fieldName} lost options while building its toggle set."
+            );
+
+            foreach (object member in members)
+            {
+                ToggleOption option = GetOptionByValue(toggleSet, member);
+
+                Assert.IsTrue(((Enum)member).TryConvertToUInt64(out ulong expectedPattern));
+                Assert.AreEqual(
+                    expectedPattern,
+                    option.FlagValue,
+                    $"{member} did not carry its own bit pattern into the toggle option."
+                );
+
+                WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, option, true);
+                serializedObject.ApplyModifiedProperties();
+                Assert.AreEqual(
+                    member,
+                    readMember(asset),
+                    $"{member} did not survive the round trip through the serialized property."
+                );
+
+                serializedObject.Update();
+                Assert.IsTrue(
+                    WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option),
+                    $"{member} was written but did not read back as the active option."
+                );
+            }
         }
 
         [Test]
@@ -516,6 +603,21 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             Assert.Fail("Expected enum option was not located.");
+            return default;
+        }
+
+        private static ToggleOption GetOptionByValue(ToggleSet toggleSet, object value)
+        {
+            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            {
+                ToggleOption option = toggleSet.Options[index];
+                if (Equals(option.Value, value))
+                {
+                    return option;
+                }
+            }
+
+            Assert.Fail($"Expected option for {value} was not located.");
             return default;
         }
 
