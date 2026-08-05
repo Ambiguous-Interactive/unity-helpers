@@ -2732,6 +2732,35 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
             Ok = $watchdogContent -match '(?ms)could not read the runner inventory.*?flush_summary_and_exit 1'
             Message = 'The watchdog must exit non-zero when it cannot read the runner inventory. Exiting 0 is what let it report success on every cycle while evaluating nothing -- a blind watchdog must be red, because a green check is exactly what stopped anyone from noticing.'
             File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'watchdog recognizes a cancelled run whose every step succeeded'
+            Ok = (
+                $watchdogContent -match '(?ms)select\(\.conclusion == "cancelled"\).*?select\(\(\(\.steps // \[\]\) \| length\) > 0\).*?select\(all\(\(\.steps // \[\]\)\[\]; \.conclusion == "success"\)\)' -and
+                $watchdogContent.Contains('actions/runs/${run_id}/rerun')
+            )
+            Message = 'The watchdog must detect issue #342 by its signature -- a job with conclusion "cancelled" whose step list is non-empty and every step succeeded -- and recover it with POST actions/runs/{id}/rerun. Requiring a non-empty step list is what keeps a deliberate cancel, whose in-flight step is itself cancelled, from being re-run automatically.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'watchdog checks for green-step cancels before the clean-queue early exit'
+            Ok = (
+                $watchdogContent.IndexOf('1b. Recover runs GitHub reported `cancelled`') -ge 0 -and
+                $watchdogContent.IndexOf('1b. Recover runs GitHub reported `cancelled`') -lt $watchdogContent.IndexOf('Queue is clean. No action.')
+            )
+            Message = 'The green-step recovery must run before the queued-run scan. That scan exits the whole step as soon as the queue is clean, which is the normal state, so recovery placed after it would almost never execute.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'watchdog bounds automatic re-runs'
+            Ok = (
+                $watchdogContent -match 'MAX_RERUNS_PER_DAY:\s*"\d+"' -and
+                $watchdogContent -match 'MAX_RERUN_ATTEMPT:\s*"\d+"' -and
+                $watchdogContent.Contains('(.run_attempt // 1) <= $maxAttempt') -and
+                $watchdogContent.Contains('rerun-${run_id}.json')
+            )
+            Message = 'Automatic re-runs must be bounded twice: by run_attempt (a re-run that lands in the same cancelled state escalates to a human instead of looping every five minutes) and by a per-run daily cap in its own state file. The cap file must be distinct from the cancel state file, whose reader falls back to a .reruns key and would otherwise consume the cancel budget.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
         }
     )
 }

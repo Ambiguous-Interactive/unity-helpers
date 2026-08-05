@@ -88,6 +88,16 @@ The reader App must be installed for the organization and expose the organizatio
 
 If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
+### The watchdog's second recovery mode
+
+The same watchdog also recovers a different symptom: a completed run reported `cancelled` whose jobs all succeeded step by step. GitHub occasionally marks a job `cancelled` even though every one of its steps, `Complete job` included, reported success; dependent jobs then skip on the unmet `needs:` and `Unity CI Success` reports red with no diff to explain it. A plain re-run of the same run id goes green.
+
+The watchdog detects that signature — a job with `conclusion: cancelled` whose step list is non-empty and whose every step succeeded — and re-runs the run through `POST /repos/{owner}/{repo}/actions/runs/{id}/rerun`. A deliberate cancel never matches, because its in-flight step is itself cancelled rather than successful.
+
+Two bounds keep it from looping. The run's `run_attempt` must be at most `MAX_RERUN_ATTEMPT`, so a re-run that lands in the same state escalates to a human, and re-runs are capped at `MAX_RERUNS_PER_DAY` per run id in a state file on the `watchdog-state` branch. Both appear in the workflow's `env:` block.
+
+This re-run uses the workflow's own `GITHUB_TOKEN`, whose job-level `actions: write` grant already covers it. It does **not** use the build-lock reader App, which is read-only by design — do not widen that App to enable this.
+
 ## Machine-name labels for runner bootstrap
 
 The manual `.github/workflows/runner-bootstrap.yml` workflow performs host maintenance on one specific Windows runner. Each runner must therefore have a custom label that exactly matches its runner name:

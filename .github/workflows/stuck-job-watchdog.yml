@@ -25,10 +25,12 @@ name: Stuck Job Watchdog
 #     `WATCHDOG_EXCLUDED_WORKFLOWS` repo variable, whitespace-separated).
 #   * The run id is NOT the watchdog's own run id.
 #
-# Recovery action (per cli/cli#9221 and the gh-run-rerun manual,
-# `gh run rerun --failed` cannot be used on a `status: queued` run because
-# the run never reached `failed`; the documented workaround is cancel +
-# redispatch / cancel + operator-managed re-run):
+# Recovery action for the dispatcher-stuck mode (per cli/cli#9221 and the
+# gh-run-rerun manual, `gh run rerun --failed` cannot be used on a
+# `status: queued` run because the run never reached `failed`; the documented
+# workaround is cancel + redispatch / cancel + operator-managed re-run. That
+# rationale is scoped to QUEUED runs and does not apply to the completed-run
+# mode below, which re-runs through the REST API):
 #   * `gh run cancel <id>` kills the stuck dispatch.
 #   * If the run was triggered by push/schedule/workflow_dispatch on a
 #     branch (not a tag) AND the workflow file declares `workflow_dispatch:`,
@@ -39,7 +41,27 @@ name: Stuck Job Watchdog
 #     "Re-run all jobs" in the GitHub UI. Do NOT push a commit, comment on
 #     the PR, or escalate any other automatic action.
 #
-# Cancel attempts are capped at 2 per run-id per 24h via a small state file
+# A SECOND, independent failure mode (issue #342): GitHub occasionally reports
+# a job as `conclusion: cancelled` when every one of its steps succeeded,
+# `Complete job` included. Downstream jobs then skip on the unmet `needs:` and
+# the run's success gate reports red, with no diff to explain it -- a plain
+# re-run of the same run id goes green. Detection is the signature itself and
+# needs no runner inventory:
+#   * The run is completed with `conclusion: cancelled`, and finished within
+#     MAX_RERUN_AGE_SECONDS.
+#   * Its `run_attempt` is at most MAX_RERUN_ATTEMPT, so a re-run that lands in
+#     the same state is escalated to a human instead of looping every 5 min.
+#   * At least one of its jobs has `conclusion: cancelled` with a non-empty
+#     step list whose every step is `conclusion: success`. A deliberate cancel
+#     never matches: its in-flight step is itself cancelled, not successful.
+#   * The workflow file is not in the exclusion list, and it is not the
+#     watchdog's own run.
+# Recovery is `POST repos/{owner}/{repo}/actions/runs/{id}/rerun` -- the same
+# button an operator clicks -- using GITHUB_TOKEN's `actions: write`. The
+# read-only build-lock App cannot do it and must not be widened for it.
+#
+# Cancel attempts are capped at 2 per run-id per 24h, and re-runs at
+# MAX_RERUNS_PER_DAY per run-id per 24h, via small state files
 # on the `watchdog-state` orphan branch. State is pushed immediately after each
 # successful cancel, with a single rebase+retry on push failure.
 #
@@ -97,6 +119,9 @@ jobs:
           STATE_BRANCH: watchdog-state
           STATE_DIR: .watchdog-state
           MAX_CANCELS_PER_DAY: "2"
+          MAX_RERUNS_PER_DAY: "1"
+          MAX_RERUN_AGE_SECONDS: "3600"
+          MAX_RERUN_ATTEMPT: "1"
           MIN_QUEUE_AGE_SECONDS: "300"
           DEFAULT_EXCLUDED_WORKFLOWS: "release.yml"
           EXTRA_EXCLUDED_WORKFLOWS: ${{ vars.WATCHDOG_EXCLUDED_WORKFLOWS }}
@@ -125,6 +150,8 @@ jobs:
           : > "${stuck_runs_file}"
           excluded_runs_file="$(mktemp)"
           : > "${excluded_runs_file}"
+          rerun_runs_file="$(mktemp)"
+          : > "${rerun_runs_file}"
 
           log_summary "## Stuck-job watchdog audit ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
           log_summary "Repo: ${REPO}"
@@ -246,10 +273,139 @@ jobs:
             [[ "${1:-}" =~ ^[0-9]+$ ]]
           }
 
+          now_epoch="$(date -u +%s)"
+
+          # ------------------------------------------------------------------
+          # 1b. Recover runs GitHub reported `cancelled` with every step green
+          #     (issue #342). Placed before the queued-run scan on purpose: that
+          #     scan exits early on a clean queue, which is the normal state, so
+          #     anything after it would almost never run.
+          # ------------------------------------------------------------------
+          cancelled_runs_json="$(mktemp)"
+          echo '[]' > "${cancelled_runs_json}"
+          # One page, newest first. This is a recent-window scan, not an archive
+          # sweep, and MAX_RERUN_AGE_SECONDS bounds it again below.
+          if ! gh api "repos/${REPO}/actions/runs?status=cancelled&per_page=100" \
+              | jq '[(.workflow_runs // [])[]]' > "${cancelled_runs_json}"; then
+            log_summary "WARN: failed to list cancelled runs; skipping green-step recovery this cycle."
+            echo '[]' > "${cancelled_runs_json}"
+          fi
+
+          mapfile -t cancelled_ids < <(jq -r \
+            --argjson now "${now_epoch}" \
+            --argjson maxAge "${MAX_RERUN_AGE_SECONDS}" \
+            --argjson maxAttempt "${MAX_RERUN_ATTEMPT}" '
+            .[]
+            | select(.updated_at != null)
+            | select((.run_attempt // 1) <= $maxAttempt)
+            | (.updated_at | fromdateiso8601) as $updated
+            | select(($now - $updated) <= $maxAge)
+            | .id
+          ' < "${cancelled_runs_json}" | sort -u)
+
+          log_summary "Cancelled runs inside the ${MAX_RERUN_AGE_SECONDS}s recovery window: ${#cancelled_ids[@]}"
+
+          for run_id in "${cancelled_ids[@]}"; do
+            [[ -z "${run_id}" ]] && continue
+            if [[ "${run_id}" == "${SELF_RUN_ID}" ]]; then
+              continue
+            fi
+
+            rerun_meta="$(
+              jq -c --argjson id "${run_id}" '
+                .[]
+                | select(.id == $id)
+                | {
+                    path: (.path // ""),
+                    event: (.event // ""),
+                    attempt: (.run_attempt // 1),
+                    html_url: (.html_url // "")
+                  }
+              ' < "${cancelled_runs_json}" | head -n 1
+            )"
+            if [[ -z "${rerun_meta}" ]]; then
+              continue
+            fi
+            rerun_path_base="$(jq -r '.path' <<< "${rerun_meta}")"
+            rerun_path_base="${rerun_path_base##*/}"
+            rerun_event="$(jq -r '.event' <<< "${rerun_meta}")"
+            rerun_attempt="$(jq -r '.attempt' <<< "${rerun_meta}")"
+            rerun_html_url="$(jq -r '.html_url' <<< "${rerun_meta}")"
+
+            if [[ -n "${EXCLUDED_BY_FILE[${rerun_path_base}]+x}" ]]; then
+              continue
+            fi
+
+            rerun_jobs_json="$(mktemp)"
+            if ! gh api --paginate "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" \
+                | jq -s '[.[] | (.jobs // [])[]]' > "${rerun_jobs_json}" 2>/dev/null; then
+              log_summary "run ${run_id}: failed to list jobs for green-step check; skipping."
+              continue
+            fi
+
+            # The signature: a cancelled job that ran steps and every one of
+            # them succeeded. An empty step list is NOT a match -- a job
+            # cancelled before it started anything is an ordinary cancel.
+            ghost_jobs="$(jq '[
+              .[]
+              | select(.conclusion == "cancelled")
+              | select(((.steps // []) | length) > 0)
+              | select(all((.steps // [])[]; .conclusion == "success"))
+            ] | length' < "${rerun_jobs_json}")"
+
+            if ! is_nonnegative_integer "${ghost_jobs}" || (( ghost_jobs == 0 )); then
+              continue
+            fi
+
+            rerun_state_file="${STATE_DIR}/rerun-${run_id}.json"
+            reruns=0
+            last_rerun=0
+            if [[ -f "${rerun_state_file}" ]]; then
+              rerun_state_ok=1
+              rerun_state_content="$(cat "${rerun_state_file}" 2>/dev/null)" || rerun_state_ok=0
+              if [[ ${rerun_state_ok} -eq 1 ]]; then
+                parsed_reruns="$(jq -r '.reruns // 0' <<< "${rerun_state_content}" 2>/dev/null)" || rerun_state_ok=0
+                parsed_last_rerun="$(jq -r '.last_rerun // 0' <<< "${rerun_state_content}" 2>/dev/null)" || rerun_state_ok=0
+              fi
+              if [[ ${rerun_state_ok} -eq 1 ]] \
+                  && is_nonnegative_integer "${parsed_reruns}" \
+                  && is_nonnegative_integer "${parsed_last_rerun}"; then
+                reruns="${parsed_reruns}"
+                last_rerun="${parsed_last_rerun}"
+              else
+                log_summary "run ${run_id}: rerun state file corrupt; resetting."
+              fi
+            fi
+            if (( now_epoch - last_rerun > 86400 )); then
+              reruns=0
+            fi
+
+            if (( reruns >= MAX_RERUNS_PER_DAY )); then
+              log_summary "run ${run_id} (${rerun_path_base}, event=${rerun_event}): cancelled with ${ghost_jobs} all-green job(s), but the rerun cap (${MAX_RERUNS_PER_DAY}/24h) is reached."
+              log_summary "Operator action: ${rerun_html_url}"
+              printf '* run %s (%s, event=%s) -- cap reached, operator action: %s\n' "${run_id}" "${rerun_path_base}" "${rerun_event}" "${rerun_html_url}" >> "${rerun_runs_file}"
+              continue
+            fi
+
+            log_summary "run ${run_id} (${rerun_path_base}, event=${rerun_event}, attempt=${rerun_attempt}): cancelled with ${ghost_jobs} job(s) whose every step succeeded; re-running."
+            if ! gh api -X POST "repos/${REPO}/actions/runs/${run_id}/rerun" > /dev/null 2>&1; then
+              log_summary "run ${run_id}: rerun request failed; will try again next cycle."
+              continue
+            fi
+
+            reruns=$((reruns + 1))
+            printf '{"reruns": %d, "last_rerun": %d}\n' "${reruns}" "${now_epoch}" > "${rerun_state_file}"
+            git add "${rerun_state_file}"
+            state_dirty=1
+            persist_state_changes "record rerun for run ${run_id}" || true
+            printf '* run %s (%s, event=%s) -- re-run (%d/%d in 24h): %s\n' \
+              "${run_id}" "${rerun_path_base}" "${rerun_event}" \
+              "${reruns}" "${MAX_RERUNS_PER_DAY}" "${rerun_html_url}" >> "${rerun_runs_file}"
+          done
+
           # ------------------------------------------------------------------
           # 2. Enumerate queued runs older than MIN_QUEUE_AGE_SECONDS.
           # ------------------------------------------------------------------
-          now_epoch="$(date -u +%s)"
           queued_runs_json="$(mktemp)"
           # `gh api --paginate` over the runs endpoint returns one JSON object
           # per page; `jq -s '[.[] | .workflow_runs[]?]'` flattens all pages
@@ -329,7 +485,9 @@ jobs:
           # ------------------------------------------------------------------
           # 4. For each queued run, decide stuck vs healthy vs excluded.
           # ------------------------------------------------------------------
-          state_dirty=0
+          # NOTE: do not reset state_dirty here. Phase 1b can leave a staged
+          # rerun record behind when its immediate push failed, and clearing
+          # the flag would make the final sync skip it.
           for run_id in "${queued_ids[@]}"; do
             # Skip the watchdog's own run id (defense in depth - the watchdog
             # workflow file is excluded by name above, but if someone renames
@@ -550,6 +708,13 @@ jobs:
             echo "### Stuck (auto-cancelled)"
             if [[ -s "${stuck_runs_file}" ]]; then
               cat "${stuck_runs_file}"
+            else
+              echo "_(none)_"
+            fi
+            echo ""
+            echo "### Cancelled with every step green (re-run)"
+            if [[ -s "${rerun_runs_file}" ]]; then
+              cat "${rerun_runs_file}"
             else
               echo "_(none)_"
             fi
