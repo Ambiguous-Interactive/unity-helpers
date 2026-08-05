@@ -51,12 +51,16 @@ logs_extracted*
 !.claude/.gitkeep
 .codex/*
 
-# Machine-local Unity MCP client configuration. The bridge endpoint (host:port)
-# is per-developer, written by scripts/mcp/configure-unity-mcp-endpoint.sh — never
+# Machine-local Unity MCP client configuration. The bridge endpoint (host:port) and
+# its bearer token are per-developer, written by `npm run unity:mcp:configure` — never
 # commit these. See docs/guides/mcp-local-setup.md. (.vscode/** and .codex/* above
 # already cover the VS Code and Codex client configs.)
 .mcp.json
 .cursor/mcp.json
+# The SOURCE of those endpoint values is per-developer too. Ignoring only the
+# generated configs while tracking their input leaves the host address one
+# `git add` away from being committed.
+.env.local
 
 _llm_*
 _llm_*.meta

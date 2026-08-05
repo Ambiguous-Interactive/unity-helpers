@@ -841,7 +841,8 @@
         "mcp",
         "icall",
         "ffdx",
-        "redistributables"
+        "redistributables",
+        "smol"
       ]
     }
   ],
@@ -1104,7 +1105,10 @@
     "nogit",
     "Dups",
     "WFL",
-    "UCRT"
+    "UCRT",
+    "IshoBoy",
+    "DoxReloaded",
+    "qora"
   ],
   "flagWords": [],
   "minWordLength": 3,

@@ -1,72 +1,104 @@
 # MCP Local Setup
 
-This page covers machine-local MCP configuration for a Linux devcontainer with a
-Windows host relay.
+Unity runs on a Windows host; agents run in a Linux devcontainer. Unity's relay speaks stdio, which
+cannot cross into the container, so a small Node bridge serves it over authenticated HTTP and the
+container's agents point at that endpoint.
 
-## Why this is local-only
-
-These files contain machine-specific host and port values and are gitignored:
-
-- `.vscode/mcp.json`
-- `.mcp.json`
-- `.cursor/mcp.json`
-- `.codex/config.toml`
-
-Do not commit these files.
-
-## 1. Define local endpoint values
-
-Create `.env.local` in repo root:
-
-```bash
-export UNITY_MCP_BRIDGE_HOST=YOUR_WINDOWS_HOST_IP
-export UNITY_MCP_BRIDGE_PORT=9003
-export UNITY_MCP_BRIDGE_PATH=/mcp
+```text
+Unity (Windows) → relay (stdio) → unity-mcp bridge (HTTP + bearer) → agent clients (container)
 ```
 
-Optional defaults used by scripts:
+One command does each side.
 
-- `UNITY_MCP_DEFAULT_HOST`
-- `UNITY_MCP_DEFAULT_PORT`
-- `UNITY_MCP_DEFAULT_PATH`
-
-## 2. Generate all local client configs
-
-Run from the devcontainer:
-
-```bash
-bash scripts/mcp/configure-unity-mcp-endpoint.sh
-```
-
-This updates local MCP config files for VS Code, Claude Code, Cursor, and Codex.
-
-## 3. Start bridge on Windows host
-
-See the [official Unity Docs](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.9/manual/integration/unity-mcp-get-started.html) for more details.
+## Host: start the bridge
 
 ```powershell
-$env:UNITY_MCP_RELAY_COMMAND = '<relay command from Unity MCP docs>'
-pwsh -File scripts/mcp/start-unity-mcp-bridge.ps1 -Port 9003
+npm run unity:mcp:bridge
 ```
 
-## 4. Probe from the devcontainer
+It finds Unity's relay under `~/.unity/relay`, generates a bearer token into `.env.local` if there
+is not one already, and pins the relay to **this repository's** Unity project by passing
+`--project-path`. That pin is what stops the relay attaching to whichever editor it discovers first
+when several are open. Pass `--project <path>` only to override it deliberately.
+
+See the [Unity MCP documentation](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.9/manual/integration/unity-mcp-get-started.html)
+for installing the relay.
+
+## Container: configure the clients
 
 ```bash
-bash scripts/mcp/probe-unity-mcp-endpoint.sh YOUR_WINDOWS_HOST_IP 9003
+npm run unity:mcp:configure
 ```
 
-## Notes
+This discovers the endpoint and writes all four machine-local client configs — `.mcp.json`
+(Claude Code), `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml` — under the server name
+`unity-mcp-remote`, each carrying the bearer token. Writes are transactional: a failure part-way
+rolls every already-written file back.
 
-- `9003` is the default fallback port in MCP helper scripts.
-- If your host uses a different port, set it in `.env.local` or pass it as a
-  script argument.
-- See the [MCP helper scripts](../../scripts/mcp/) for script-level details.
+Then check it:
+
+```bash
+npm run unity:mcp:probe
+```
+
+## The endpoint is a port; the editor behind it is not
+
+This is the failure that [#333](https://github.com/Ambiguous-Interactive/unity-helpers/issues/333)
+was filed for, and it is worth understanding rather than just avoiding.
+
+A bridge is bound to **one** Unity editor, but a client config names a **host and port**. Whichever
+editor claimed that port answers. Nothing about "the connection succeeded" tells you the editor on
+the other end has _this_ project open — and because a consumer project contains
+`Packages/com.wallstop-studios.unity-helpers` too, even checking that the package is present does
+not distinguish them.
+
+So `probe` and `configure` ask. After the MCP handshake they call
+`Unity_ManageEditor GetProjectRoot`, which answers in one request with no code compilation, and:
+
+- **`probe` always prints the project** it is talking to.
+- **`configure` pins that project** into `.env.local` as `UNITY_MCP_PROJECT_ROOT` the first time it
+  succeeds. Every later run verifies against it instead of trusting the port.
+- **A mismatch is a hard failure** that names both projects, and nothing is written.
+
+```text
+A Unity MCP bridge answered at http://192.168.1.33:9003/mcp but has a different project open
+(serves D:/Code/IshoBoy, expected D:/Code/Packages).
+```
+
+Pass `--any-project` to accept whatever answers, when that is genuinely what you want.
+
+Two habits keep this from arising at all: every studio project owns a **distinct port** — this one
+uses **9007**, DxMessaging 9003, IshoBoy 9004, DoxReloaded 9010, qora-redux 9020 — and every bridge
+has its **own bearer token**, so a config aimed at a neighbor's port gets a `401` rather than a
+quietly wrong editor.
+
+## Optional configuration
+
+Everything has a default. To override, create `.env.local` in the repo root (gitignored):
+
+```bash
+UNITY_MCP_BRIDGE_HOST=host.docker.internal
+UNITY_MCP_BRIDGE_PORT=9007
+UNITY_MCP_BRIDGE_PATH=/mcp
+UNITY_MCP_BEARER_TOKEN=<64 hex characters>
+UNITY_MCP_PROJECT_ROOT=D:/Code/YourUnityProject
+UNITY_PROJECT_PATH=D:\Path\To\HostUnityProject
+```
+
+`UNITY_MCP_BEARER_TOKEN` and `UNITY_MCP_PROJECT_ROOT` are written for you on first success; the rest
+are only needed when a default is wrong. Command-line flags beat the environment, which beats
+`.env.local`, which beats the built-in defaults. Run `node scripts/mcp/unity-mcp.mjs --help` for the
+full flag list.
+
+## Never commit these
+
+`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, and `.env.local` hold a
+per-developer endpoint and a bearer token. All five are gitignored, and
+`npm run validate:mcp-config` fails if that ever stops being true.
 
 ## Binding the server to your agent
 
-Generating the config files does not retroactively connect an agent that was
-already running. After step 2, **reload the agent** so it picks up the new
-server — restart the editor/CLI, or in Claude Code re-approve the project MCP
-server — then the `Unity_*` tools attach. The MCP server can be running and
-reachable (step 4 returns HTTP 200) while a stale agent session still shows no
-Unity tools; reloading is what binds them.
+Generating the config does not retroactively connect an agent that is already running. After
+`configure`, **reload the agent** — restart the editor/CLI, or in Claude Code re-approve the project
+MCP server — and the `Unity_*` tools attach. A reachable endpoint and a stale agent session look
+identical from the outside; reloading is what binds them.

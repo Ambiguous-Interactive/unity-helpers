@@ -18,12 +18,16 @@ Param(
     2. UNH-MCP-INVALID  - any config that IS present is structurally valid (JSON
        configs are parsed; the Codex TOML block is regex-checked) and its
        `unity-mcp-remote` server URL ends with `/mcp` (case-sensitive).
-    3. UNH-MCP-MISSINGREF - every `scripts/mcp/*.sh|*.ps1` path referenced by the
+    3. UNH-MCP-MISSINGREF - every `scripts/mcp/*.sh|*.ps1|*.mjs` path referenced by the
        MCP docs actually exists on disk (catches the dangling-reference class of
        bug, e.g. a documented helper script that was never copied over).
 
-    Keep the config list in sync with scripts/mcp/configure-unity-mcp-endpoint.sh
-    and docs/guides/mcp-local-setup.md.
+    4. UNH-MCP-PORT     - the bridge default port is this repository's own (9007) and no
+       sibling studio project's port appears in it. A shared port is how a client config
+       ends up aimed at another project's editor (issue #333).
+
+    Keep the config list in sync with scripts/mcp/unity-mcp.mjs and
+    docs/guides/mcp-local-setup.md.
 
 .PARAMETER VerboseOutput
     Show detailed per-check output.
@@ -52,11 +56,12 @@ Push-Location $repoRoot
 try {
   $errors = New-Object System.Collections.Generic.List[string]
 
-  # Machine-local MCP client config files written by
-  # scripts/mcp/configure-unity-mcp-endpoint.sh. host:port is per-developer, so
-  # all four MUST be gitignored. .vscode/** and .codex/* already cover two of
-  # them; .mcp.json and .cursor/mcp.json need explicit entries.
-  $localConfigs = @('.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.codex/config.toml')
+  # Machine-local MCP client config files written by `npm run unity:mcp:configure`.
+  # host:port and the bearer token are per-developer, so all of these MUST be
+  # gitignored. .vscode/** and .codex/* already cover two of them; .mcp.json,
+  # .cursor/mcp.json and .env.local need explicit entries. .env.local is the SOURCE
+  # of the others and holds the token, so leaving it tracked defeats the rest.
+  $localConfigs = @('.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.codex/config.toml', '.env.local')
 
   # ---- Check 1: every machine-local config path is gitignored ----
   Write-Info 'Check 1: machine-local MCP configs are gitignored...'
@@ -130,7 +135,7 @@ try {
   # ---- Check 3: every scripts/mcp/* path referenced by the docs exists ----
   Write-Info 'Check 3: MCP doc script references resolve...'
   $docFiles = @('scripts/mcp/README.md', 'docs/guides/mcp-local-setup.md')
-  $refRegex = [regex]'(?<![\w/])scripts/mcp/[A-Za-z0-9._/-]+\.(?:sh|ps1)\b'
+  $refRegex = [regex]'(?<![\w/])scripts/mcp/[A-Za-z0-9._/-]+\.(?:sh|ps1|mjs)\b'
   foreach ($doc in $docFiles) {
     if (-not (Test-Path -LiteralPath $doc)) { continue }
     $text = Get-Content -Raw -LiteralPath $doc
@@ -143,6 +148,37 @@ try {
       }
       else {
         $errors.Add("::error file=$doc::UNH-MCP-MISSINGREF: references '$ref' which does not exist. Add the script or remove the reference.")
+      }
+    }
+  }
+
+  # ---- Check 4: the bridge owns this repository's port, not a sibling's ----
+  # Every studio project runs its own bridge, and a bridge is bound to one editor.
+  # Sharing a port with a sibling is how a client config ends up aimed at another
+  # project's Unity while every reachability check reports success (issue #333).
+  Write-Info "Check 4: the bridge default port is this repository's own..."
+  $bridge = 'scripts/mcp/unity-mcp.mjs'
+  $siblingPorts = [ordered]@{
+    '9003' = 'DxMessaging'
+    '9004' = 'IshoBoy'
+    '9010' = 'DoxReloaded'
+    '9020' = 'qora-redux'
+  }
+  if (-not (Test-Path -LiteralPath $bridge)) {
+    $errors.Add("::error file=$bridge::UNH-MCP-MISSINGREF: the Unity MCP bridge is missing.")
+  }
+  else {
+    $bridgeText = Get-Content -Raw -LiteralPath $bridge
+    if ($bridgeText -notmatch '(?m)^\s*port:\s*9007,') {
+      $errors.Add("::error file=$bridge::UNH-MCP-PORT: the bridge default port must be 9007.")
+    }
+    if ($bridgeText -notmatch '(?m)FALLBACK_PORTS\s*=\s*Object\.freeze\(\[9007\]\)') {
+      $errors.Add("::error file=$bridge::UNH-MCP-PORT: discovery must fall back to 9007 only; probing a sibling's port is how a config lands on another project's editor.")
+    }
+    foreach ($siblingPort in $siblingPorts.Keys) {
+      # Named in a comment is fine and useful; used as a value is not.
+      if ($bridgeText -match "(?m)^\s*port:\s*$siblingPort," -or $bridgeText -match "FALLBACK_PORTS\s*=\s*Object\.freeze\(\[[^\]]*$siblingPort") {
+        $errors.Add("::error file=$bridge::UNH-MCP-PORT: port $siblingPort belongs to $($siblingPorts[$siblingPort]); this repository uses 9007.")
       }
     }
   }

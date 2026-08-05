@@ -90,6 +90,7 @@ $cleanGitIgnore = @"
 .cursor/mcp.json
 .vscode/**
 .codex/*
+.env.local
 "@
 
 $validMcpJson = '{ "mcpServers": { "unity-mcp-remote": { "type": "http", "url": "http://192.168.1.33:9003/mcp" } } }'
@@ -97,7 +98,8 @@ $validMcpJson = '{ "mcpServers": { "unity-mcp-remote": { "type": "http", "url": 
 # Check 3 doc-reference rule (the real-repo smoke test covers Check 3's happy path).
 $readmeOk = "See the local MCP setup guide for configuration steps."
 $readmeMissing = "Run ``scripts/mcp/install-claude-desktop-config.sh`` to set up."
-$configureScript = "#!/usr/bin/env bash`necho configure"
+# Minimal stand-in for the bridge: Check 4 reads only the port declarations out of it.
+$bridgeScript = "export const DEFAULTS = Object.freeze({`n  port: 9007,`n});`nexport const FALLBACK_PORTS = Object.freeze([9007]);"
 
 Write-Host 'Testing validate-mcp-config.ps1...' -ForegroundColor White
 
@@ -110,7 +112,7 @@ if (-not (Test-Path -LiteralPath $validator)) {
 $f1 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
   '.mcp.json'                                = $validMcpJson
   'scripts/mcp/README.md'                    = $readmeOk
-  'scripts/mcp/configure-unity-mcp-endpoint.sh' = $configureScript
+  'scripts/mcp/unity-mcp.mjs'                = $bridgeScript
 }
 try {
   $r1 = Invoke-Validator -FixtureRoot $f1
@@ -123,6 +125,7 @@ finally { Remove-Item -Recurse -Force -LiteralPath $f1 -ErrorAction SilentlyCont
 $f2 = New-McpFixture -GitIgnore ".cursor/mcp.json`n.vscode/**`n.codex/*" -Files @{
   '.mcp.json'             = $validMcpJson
   'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
 }
 try {
   $r2 = Invoke-Validator -FixtureRoot $f2
@@ -134,6 +137,7 @@ finally { Remove-Item -Recurse -Force -LiteralPath $f2 -ErrorAction SilentlyCont
 $f3 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
   '.mcp.json'             = '{ "mcpServers": { "unity-mcp-remote": { "type": "http", "url": "http://192.168.1.33:9003/wrong" } } }'
   'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
 }
 try {
   $r3 = Invoke-Validator -FixtureRoot $f3
@@ -158,6 +162,7 @@ $f5 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
   '.mcp.json'             = $validMcpJson
   '.codex/config.toml'    = $validToml
   'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
 }
 try {
   $r5 = Invoke-Validator -FixtureRoot $f5
@@ -171,6 +176,7 @@ $f6 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
   '.mcp.json'             = $validMcpJson
   '.codex/config.toml'    = $badToml
   'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
 }
 try {
   $r6 = Invoke-Validator -FixtureRoot $f6

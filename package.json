@@ -46,52 +46,52 @@
   "licensesUrl": "https://ambiguous-interactive.github.io/unity-helpers/project/license/",
   "samples": [
     {
-      "displayName": "DI – VContainer",
+      "displayName": "DI \u2013 VContainer",
       "description": "LifetimeScope registration, scene-wide assignment, and runtime BuildUpWithRelations.",
       "path": "Samples~/DI - VContainer"
     },
     {
-      "displayName": "DI – Zenject",
+      "displayName": "DI \u2013 Zenject",
       "description": "SceneContext installer, scene-wide assignment, and prefab instantiation with relations.",
       "path": "Samples~/DI - Zenject"
     },
     {
-      "displayName": "DI – Reflex",
+      "displayName": "DI \u2013 Reflex",
       "description": "SceneScope installer, scene scan, and runtime Container helpers.",
       "path": "Samples~/DI - Reflex"
     },
     {
-      "displayName": "Relational Components – Basic",
+      "displayName": "Relational Components \u2013 Basic",
       "description": "Attribute-based auto-wiring without DI; parent/sibling/child examples.",
       "path": "Samples~/Relational Components - Basic"
     },
     {
-      "displayName": "Serialization – JSON",
+      "displayName": "Serialization \u2013 JSON",
       "description": "System.Text.Json with Unity converters; pretty and fast options.",
       "path": "Samples~/Serialization - JSON"
     },
     {
-      "displayName": "Random – PRNG",
+      "displayName": "Random \u2013 PRNG",
       "description": "PCG seeds, floats, Gaussian, and list sampling.",
       "path": "Samples~/Random - PRNG"
     },
     {
-      "displayName": "Logging – Tag Formatter",
+      "displayName": "Logging \u2013 Tag Formatter",
       "description": "UnityLogTagFormatter decorators, runtime toggles, and logging extension demos.",
       "path": "Samples~/Logging - Tag Formatter"
     },
     {
-      "displayName": "Spatial Structures – 2D and 3D",
+      "displayName": "Spatial Structures \u2013 2D and 3D",
       "description": "QuadTree2D, KdTree2D nearest neighbors, SpatialHash2D queries.",
       "path": "Samples~/Spatial Structures - 2D and 3D"
     },
     {
-      "displayName": "UI Toolkit – MultiFile Selector (Editor)",
+      "displayName": "UI Toolkit \u2013 MultiFile Selector (Editor)",
       "description": "EditorWindow using MultiFileSelectorElement for multi-file picking.",
       "path": "Samples~/UI Toolkit - MultiFile Selector (Editor)"
     },
     {
-      "displayName": "UGUI – EnhancedImage",
+      "displayName": "UGUI \u2013 EnhancedImage",
       "description": "Programmatic Canvas setup and HDR-tinted EnhancedImage.",
       "path": "Samples~/UGUI - EnhancedImage"
     }
@@ -163,6 +163,9 @@
     "lint:workflow-run-expression-length": "pwsh -NoProfile -File scripts/lint-workflow-run-expression-length.ps1 -VerboseOutput",
     "validate:lint-error-codes": "pwsh -NoProfile -File scripts/validate-lint-error-codes.ps1 -VerboseOutput",
     "validate:mcp-config": "pwsh -NoProfile -File scripts/validate-mcp-config.ps1 -VerboseOutput",
+    "unity:mcp:probe": "node scripts/mcp/unity-mcp.mjs probe",
+    "unity:mcp:configure": "node scripts/mcp/unity-mcp.mjs configure",
+    "unity:mcp:bridge": "node scripts/mcp/unity-mcp.mjs bridge",
     "validate:git-push-config": "pwsh -NoProfile -File scripts/validate-git-push-config.ps1",
     "test:add-cspell-word": "node scripts/tests/test-add-cspell-word.js",
     "test:configure-git-defaults": "bash scripts/tests/test-configure-git-defaults.sh",
@@ -186,7 +189,7 @@
     "test:license-cache": "bash scripts/tests/test-license-cache.sh",
     "lint:markdown": "node ./scripts/run-node-bin.js markdownlint --config .markdownlint.json --ignore-path .markdownlintignore -- \"**/*.md\" \"**/*.markdown\"",
     "validate:content": "npm run lint:docs && npm run test:deprecated-external-links && npm run lint:markdown && npm run lint:changelog && npm run lint:yaml && npm run format:check && npm run lint:llm && npm run lint:doc-counts && npm run lint:dependabot && npm run lint:pwsh-invocations && npm run lint:workflow-run-expression-length && npm run validate:lint-error-codes && npm run validate:mcp-config",
-    "validate:tests": "npm run lint:tests && npm run test:check-eol && npm run test:gitignore-docs && npm run test:validate-mcp-config && npm run test:sync-script-contracts && npm run test:agent-preflight && npm run test:git-path-helpers && npm run test:accelerator && npm run test:project-workspace && npm run test:postinstall-hooks && npm run test:github-pages-sortable && npm run test:portable-cleanup-classifier && npm run test:add-cspell-word && npm run test:configure-git-defaults && npm run test:validate-git-push-config && npm run test:git-staging-helpers && npm run test:lint-dependabot && npm run test:lint-duplicate-usings && npm run test:lint-pwsh-invocations && npm run test:lint-workflow-run-expression-length && npm run test:pr-workflow-concurrency && npm run test:unity-workflow-matrix-contract && npm run test:validate-lint-error-codes && npm run test:precommit-integration && npm run test:pre-push-changed-files && npm run test:license-cache && npm run test:wiki-generation && npm run test:npm-package-signature && npm run test:npm-package-changelog && npm run test:release-tools",
+    "validate:tests": "npm run lint:tests && npm run test:check-eol && npm run test:gitignore-docs && npm run test:validate-mcp-config && npm run test:unity-mcp && npm run test:sync-script-contracts && npm run test:agent-preflight && npm run test:git-path-helpers && npm run test:accelerator && npm run test:project-workspace && npm run test:postinstall-hooks && npm run test:github-pages-sortable && npm run test:portable-cleanup-classifier && npm run test:add-cspell-word && npm run test:configure-git-defaults && npm run test:validate-git-push-config && npm run test:git-staging-helpers && npm run test:lint-dependabot && npm run test:lint-duplicate-usings && npm run test:lint-pwsh-invocations && npm run test:lint-workflow-run-expression-length && npm run test:pr-workflow-concurrency && npm run test:unity-workflow-matrix-contract && npm run test:validate-lint-error-codes && npm run test:precommit-integration && npm run test:pre-push-changed-files && npm run test:license-cache && npm run test:wiki-generation && npm run test:npm-package-signature && npm run test:npm-package-changelog && npm run test:release-tools",
     "validate:prepush": "npm run validate:git-push-config && npm run validate:content && npm run lint:spelling && npm run eol:check && npm run validate:tests && npm run lint:csharp-naming && npm run lint:duplicate-usings && npm run lint:spelling:config && npm run validate:devcontainer && npm run validate:hook-sync && npm run validate:hook-perms && npm run validate:hook-spell-parity && npm run validate:cspell-files-parity && npm run test:shell-portability",
     "validate:devcontainer": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput && npm run test:validate-devcontainer-urls && npm run test:post-create",
     "validate:hook-sync": "pwsh -NoProfile -File scripts/validate-hook-sync-calls.ps1 -VerboseOutput",
@@ -203,6 +206,7 @@
     "test:check-eol": "pwsh -NoProfile -File scripts/tests/test-check-eol.ps1",
     "test:gitignore-docs": "pwsh -NoProfile -File scripts/tests/test-gitignore-docs.ps1",
     "test:validate-mcp-config": "pwsh -NoProfile -File scripts/tests/test-validate-mcp-config.ps1",
+    "test:unity-mcp": "node --test scripts/tests/test-unity-mcp.mjs",
     "test:sync-script-contracts": "pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1",
     "test:agent-preflight": "pwsh -NoProfile -File scripts/tests/test-agent-preflight.ps1",
     "test:git-staging-helpers": "bash scripts/tests/test-git-staging-helpers.sh",
@@ -231,8 +235,10 @@
     "unity:retry-license": "bash scripts/unity/retry-license.sh"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "cspell": "10.0.1",
     "markdownlint-cli": "0.49.1",
-    "prettier": "3.9.6"
+    "prettier": "3.9.6",
+    "smol-toml": "1.7.1"
   }
 }
