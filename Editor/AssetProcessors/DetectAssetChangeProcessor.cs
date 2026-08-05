@@ -67,6 +67,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             internal Func<double> TimeProvider { get; set; } = DefaultTimeProvider;
             internal double? LoopWindowSecondsOverride { get; set; }
             internal bool DiagnosticsEnabled { get; set; }
+            internal bool? EnabledOverride { get; set; }
         }
 
         internal sealed class AssetWatcher
@@ -135,6 +136,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static Func<double> _timeProvider = DefaultTimeProvider;
         private static double? _loopWindowSecondsOverride;
         private static bool _diagnosticsEnabled;
+        private static bool? _enabledOverride;
 
         // Declared after other static fields so its delegate target (ProcessPendingAssetChangesCore)
         // is fully visible to the compiler at field initialization order — avoids any surprise
@@ -183,6 +185,33 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             set => _diagnosticsEnabled = value;
         }
 
+        /// <summary>
+        /// Forces the watcher on or off, or restores the default policy when
+        /// <see langword="null"/>.
+        /// </summary>
+        internal static bool? EnabledOverride
+        {
+            get => _enabledOverride;
+            set => _enabledOverride = value;
+        }
+
+        /// <summary>
+        /// Whether the watcher may initialize. Defaults to off in batch mode.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="BuildWatchers"/> is an all-types / all-methods reflection scan. Running it
+        /// inside Unity's import phase destabilizes the asset pipeline: a native mono crash
+        /// (STATUS_ACCESS_VIOLATION inside GetMethodsByName_native) on some Unity versions,
+        /// multi-minute importer stalls on others. The play-mode guard in
+        /// <see cref="OnPostprocessAllAssets"/> covers one door into that scan; a headless
+        /// `-batchmode` run is not play mode and went through the other one. The watcher is an
+        /// editor-authoring convenience, and a headless run has no author to act on a callback, so
+        /// the scan there is unobservable work at best and a crash at worst. A headless asset
+        /// pipeline that does want the watcher can opt back in through
+        /// <see cref="AssetChangeDetectionUtility.Enabled"/>.
+        /// </remarks>
+        internal static bool IsEnabled => _enabledOverride ?? !Application.isBatchMode;
+
         static DetectAssetChangeProcessor()
         {
             EditorApplication.delayCall += EnsureInitialized;
@@ -195,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             string[] movedFrom
         )
         {
-            EnsureInitialized();
+            EnsureInitialized(force: true);
             EnqueueAssetChanges(
                 imported ?? Array.Empty<string>(),
                 deleted ?? Array.Empty<string>(),
@@ -224,6 +253,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 TimeProvider = _timeProvider,
                 LoopWindowSecondsOverride = _loopWindowSecondsOverride,
                 DiagnosticsEnabled = _diagnosticsEnabled,
+                EnabledOverride = _enabledOverride,
             };
         }
 
@@ -258,6 +288,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             TimeProvider = settings?.TimeProvider ?? DefaultTimeProvider;
             LoopWindowSecondsOverride = settings?.LoopWindowSecondsOverride;
             DiagnosticsEnabled = settings?.DiagnosticsEnabled ?? false;
+            _enabledOverride = settings?.EnabledOverride;
+        }
+
+        internal static void EnsureInitializedForTesting()
+        {
+            EnsureInitialized();
         }
 
         internal static void ResetLoopProtection()
@@ -1111,7 +1147,22 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static void EnsureInitialized()
         {
+            EnsureInitialized(force: false);
+        }
+
+        // Gating here rather than at the callback covers every door into BuildWatchers: the
+        // delayCall registered by the static constructor, the postprocess callback, and the
+        // explicit test entry point. Guarding only the callback still let the delayCall run the
+        // scan in a headless editor. force is for the test entry point, whose caller is asking for
+        // the watcher outright -- the package's own EditMode suite runs under -batchmode.
+        private static void EnsureInitialized(bool force)
+        {
             if (_initialized)
+            {
+                return;
+            }
+
+            if (!force && !IsEnabled)
             {
                 return;
             }

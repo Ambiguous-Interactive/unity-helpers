@@ -436,6 +436,45 @@ The `DetectAssetChangeProcessor` (Editor assembly) automatically:
 
 **Timing:** Methods are called after Unity completes asset import/deletion
 
+### When the Watcher Runs
+
+Step 1 above is an all-types / all-methods reflection scan. Running it inside Unity's import phase
+destabilizes the asset pipeline — a native crash on some Unity versions, multi-minute importer stalls
+on others — so the watcher declines to initialize where it has nothing to do:
+
+| Context                                 | Watcher initializes | Why                                                             |
+| --------------------------------------- | ------------------- | --------------------------------------------------------------- |
+| Interactive editor                      | Yes                 | This is the authoring workflow the feature exists for           |
+| Play mode                               | No                  | Authoring concern; a play-mode import would recurse into a scan |
+| Batch mode (`-batchmode`, CI, headless) | No                  | No author is present to act on a callback                       |
+
+Override the default from an `[InitializeOnLoad]` static constructor, so it applies before the
+watcher's own deferred initialization:
+
+```csharp
+using UnityEditor;
+using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
+
+[InitializeOnLoad]
+internal static class AssetWatcherPolicy
+{
+    static AssetWatcherPolicy()
+    {
+        // Opt a headless asset pipeline back in...
+        AssetChangeDetectionUtility.Enabled = true;
+
+        // ...or keep the watcher off in an interactive editor.
+        AssetChangeDetectionUtility.Enabled = false;
+
+        // Drop the override and restore the defaults in the table above.
+        AssetChangeDetectionUtility.ResetEnabledToDefault();
+    }
+}
+```
+
+Turning the watcher off after it has already initialized stops further initialization but leaves
+already-discovered subscriptions in place.
+
 ---
 
 ## Troubleshooting
