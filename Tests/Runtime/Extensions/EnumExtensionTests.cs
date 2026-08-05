@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Extensions
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
@@ -67,6 +68,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Zero = 0,
             PositiveValue = 1,
             MaxValue = 127,
+        }
+
+        // Signed enums whose members straddle zero. Every one of these lost the
+        // array-indexed name lookup before the underlying-type-aware conversion,
+        // because zero-extending a negative member made a four-value enum measure
+        // billions of slots wide.
+        private enum SignedByteFlagsEnum : sbyte
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            All = -1,
+        }
+
+        private enum SignedShortNearEnum : short
+        {
+            MinusTwo = -2,
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedIntNearEnum
+        {
+            MinusTwo = -2,
+
+            [EnumDisplayName("Minus One")]
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedLongNearEnum : long
+        {
+            MinusTwo = -2,
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedIntWideEnum
+        {
+            Minimum = int.MinValue,
+            MinusOne = -1,
+            Zero = 0,
+            Maximum = int.MaxValue,
+        }
+
+        private enum SignedLongAllNegativeEnum : long
+        {
+            Lowest = -3,
+            Middle = -2,
+            Highest = -1,
         }
 
         private enum UnsignedShortEnum : ushort
@@ -810,6 +865,222 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             string[] cachedNames = values.ToCachedNames().ToArray();
             Assert.AreEqual(3000, cachedNames.Length);
+        }
+
+        // One assertion body, run against every underlying type and sign. Adding an
+        // enum shape to the source below is the whole cost of covering it.
+        private static IEnumerable<TestCaseData> EnumContractCases()
+        {
+            yield return Contract<TestEnum>(nameof(TestEnum));
+            yield return Contract<TinyTestEnum>(nameof(TinyTestEnum));
+            yield return Contract<SmallTestEnum>(nameof(SmallTestEnum));
+            yield return Contract<BigTestEnum>(nameof(BigTestEnum));
+            yield return Contract<SignedByteEnum>(nameof(SignedByteEnum));
+            yield return Contract<SignedByteFlagsEnum>(nameof(SignedByteFlagsEnum));
+            yield return Contract<SignedShortNearEnum>(nameof(SignedShortNearEnum));
+            yield return Contract<SignedIntNearEnum>(nameof(SignedIntNearEnum));
+            yield return Contract<SignedLongNearEnum>(nameof(SignedLongNearEnum));
+            yield return Contract<SignedIntWideEnum>(nameof(SignedIntWideEnum));
+            yield return Contract<SignedLongAllNegativeEnum>(nameof(SignedLongAllNegativeEnum));
+            yield return Contract<UnsignedShortEnum>(nameof(UnsignedShortEnum));
+            yield return Contract<UnsignedIntEnum>(nameof(UnsignedIntEnum));
+            yield return Contract<UnsignedLongEnum>(nameof(UnsignedLongEnum));
+            yield return Contract<SingleValueEnum>(nameof(SingleValueEnum));
+            yield return Contract<NonFlagsEnum>(nameof(NonFlagsEnum));
+        }
+
+        private static TestCaseData Contract<T>(string name)
+            where T : unmanaged, Enum
+        {
+            return new TestCaseData((Action)AssertEnumContract<T>).SetName(name);
+        }
+
+        private static void AssertEnumContract<T>()
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            string[] names = Enum.GetNames(typeof(T));
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                Assert.AreEqual(
+                    names[i],
+                    values[i].ToCachedName(),
+                    $"{typeof(T).Name}.{names[i]} did not round-trip through the name cache."
+                );
+                Assert.IsNotEmpty(
+                    values[i].ToDisplayName(),
+                    $"{typeof(T).Name}.{names[i]} produced an empty display name."
+                );
+            }
+
+            foreach (T value in values)
+            {
+                foreach (T flag in values)
+                {
+                    Assert.AreEqual(
+                        value.HasFlag(flag),
+                        value.HasFlagNoAlloc(flag),
+                        $"{typeof(T).Name}: HasFlagNoAlloc({value}, {flag}) disagreed with Enum.HasFlag."
+                    );
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EnumContractCases))]
+        public void EnumContractHoldsForEveryUnderlyingType(Action assertion)
+        {
+            assertion();
+        }
+
+        // The regression #339 reported. These windows are what the name caches allocate;
+        // before the fix every one of the signed cases below fell through to the
+        // dictionary (or, for sbyte, smeared four members across 256 slots), because the
+        // range was measured on zero-extended keys where -1 sorts above every positive
+        // member.
+        [Test]
+        public void ArrayWindowSpansSignedEnumsByTheirOwnOrdering()
+        {
+            AssertArrayWindow<SignedIntNearEnum>(expectedLength: 4, SignedIntNearEnum.MinusTwo);
+            AssertArrayWindow<SignedShortNearEnum>(expectedLength: 4, SignedShortNearEnum.MinusTwo);
+            AssertArrayWindow<SignedLongNearEnum>(expectedLength: 4, SignedLongNearEnum.MinusTwo);
+            AssertArrayWindow<SignedByteFlagsEnum>(expectedLength: 6, SignedByteFlagsEnum.All);
+            AssertArrayWindow<SignedLongAllNegativeEnum>(
+                expectedLength: 3,
+                SignedLongAllNegativeEnum.Lowest
+            );
+            AssertArrayWindow<NonFlagsEnum>(expectedLength: 4, NonFlagsEnum.Red);
+            AssertArrayWindow<SingleValueEnum>(expectedLength: 1, SingleValueEnum.OnlyValue);
+
+            // -1..127 is 129 slots. Zero-extending smeared the same four members across
+            // the full 256, anchored at 0, so half the array could never be indexed.
+            AssertArrayWindow<SignedByteEnum>(expectedLength: 129, SignedByteEnum.NegativeValue);
+        }
+
+        // The complement: an enum genuinely wider than the cap must still choose the
+        // dictionary, or the fix would trade a demotion for a 4-billion-slot allocation.
+        [Test]
+        public void ArrayWindowRejectsEnumsWiderThanTheCap()
+        {
+            AssertNoArrayWindow<SignedIntWideEnum>();
+            AssertNoArrayWindow<UnsignedIntEnum>();
+            AssertNoArrayWindow<UnsignedLongEnum>();
+            AssertNoArrayWindow<BigTestEnum>();
+        }
+
+        private static void AssertArrayWindow<T>(int expectedLength, T expectedMinimum)
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
+                values,
+                out ulong minValue,
+                out int arrayLength
+            );
+
+            Assert.IsTrue(useArray, $"{typeof(T).Name} should use the array lookup strategy.");
+            Assert.AreEqual(
+                expectedLength,
+                arrayLength,
+                $"{typeof(T).Name} allocated the wrong number of array slots."
+            );
+            Assert.IsTrue(
+                EnumNumericHelper<T>.TryConvertToUInt64(expectedMinimum, out ulong expectedKey),
+                $"{typeof(T).Name}.{expectedMinimum} could not be converted."
+            );
+            Assert.AreEqual(
+                expectedKey,
+                minValue,
+                $"{typeof(T).Name} anchored its array window at the wrong member."
+            );
+
+            // Every declared member must land inside the window; an off-by-one here is
+            // silent at runtime because the lookup falls back to ToString.
+            foreach (T value in values)
+            {
+                Assert.IsTrue(EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key));
+                Assert.Less(
+                    unchecked(key - minValue),
+                    (ulong)arrayLength,
+                    $"{typeof(T).Name}.{value} fell outside its own array window."
+                );
+            }
+        }
+
+        private static void AssertNoArrayWindow<T>()
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(values, out _, out _);
+            Assert.IsFalse(
+                useArray,
+                $"{typeof(T).Name} spans more than {EnumLookupStrategy<T>.MaximumArrayLength} values and must not allocate an array."
+            );
+        }
+
+        [Test]
+        public void SignednessMatchesTheUnderlyingType()
+        {
+            Assert.IsTrue(EnumNumericHelper<SignedByteEnum>.IsSigned);
+            Assert.IsTrue(EnumNumericHelper<SignedShortNearEnum>.IsSigned);
+            Assert.IsTrue(EnumNumericHelper<SignedIntNearEnum>.IsSigned);
+            Assert.IsTrue(EnumNumericHelper<SignedLongNearEnum>.IsSigned);
+            Assert.IsFalse(EnumNumericHelper<TinyTestEnum>.IsSigned);
+            Assert.IsFalse(EnumNumericHelper<UnsignedShortEnum>.IsSigned);
+            Assert.IsFalse(EnumNumericHelper<UnsignedIntEnum>.IsSigned);
+            Assert.IsFalse(EnumNumericHelper<UnsignedLongEnum>.IsSigned);
+        }
+
+        // Sign extension is what makes `key - minValue` land on a small index for a
+        // negative member; zero extension produced a key only as wide as the underlying
+        // type, which 64-bit modular arithmetic cannot wrap back.
+        [Test]
+        public void NegativeMembersConvertToTheirSignExtendedPattern()
+        {
+            Assert.IsTrue(
+                EnumNumericHelper<SignedByteFlagsEnum>.TryConvertToUInt64(
+                    SignedByteFlagsEnum.All,
+                    out ulong sbyteKey
+                )
+            );
+            Assert.AreEqual(unchecked((ulong)-1L), sbyteKey);
+
+            Assert.IsTrue(
+                EnumNumericHelper<SignedShortNearEnum>.TryConvertToUInt64(
+                    SignedShortNearEnum.MinusOne,
+                    out ulong shortKey
+                )
+            );
+            Assert.AreEqual(unchecked((ulong)-1L), shortKey);
+
+            Assert.IsTrue(
+                EnumNumericHelper<SignedIntNearEnum>.TryConvertToUInt64(
+                    SignedIntNearEnum.MinusOne,
+                    out ulong intKey
+                )
+            );
+            Assert.AreEqual(unchecked((ulong)-1L), intKey);
+
+            // Unsigned members must NOT be sign-extended: a byte enum's 255 is 255.
+            Assert.IsTrue(
+                EnumNumericHelper<TinyTestEnum>.TryConvertToUInt64(
+                    TinyTestEnum.All,
+                    out ulong byteKey
+                )
+            );
+            Assert.AreEqual(255UL, byteKey);
+        }
+
+        [Test]
+        public void DisplayNameHonorsAttributesOnNegativeMembers()
+        {
+            Assert.AreEqual("Minus One", SignedIntNearEnum.MinusOne.ToDisplayName());
+            Assert.AreEqual(
+                nameof(SignedIntNearEnum.MinusTwo),
+                SignedIntNearEnum.MinusTwo.ToDisplayName()
+            );
+            Assert.AreEqual(nameof(SignedIntNearEnum.Zero), SignedIntNearEnum.Zero.ToDisplayName());
+            Assert.AreEqual(nameof(SignedIntNearEnum.One), SignedIntNearEnum.One.ToDisplayName());
         }
     }
 }

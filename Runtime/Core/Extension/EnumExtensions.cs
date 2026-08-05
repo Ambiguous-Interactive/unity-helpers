@@ -62,33 +62,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             T[] values = Unsafe.As<Array, T[]>(ref rawValues);
             string[] names = Enum.GetNames(typeof(T));
 
-            // Try to determine if we can use array-based lookup
-            ulong minVal = ulong.MaxValue;
-            ulong maxVal = 0;
-            bool hasValidRange = true;
-
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (!EnumNumericHelper<T>.TryConvertToUInt64(values[i], out ulong val))
-                {
-                    hasValidRange = false;
-                    break;
-                }
-
-                if (val < minVal)
-                {
-                    minVal = val;
-                }
-
-                if (val > maxVal)
-                {
-                    maxVal = val;
-                }
-            }
-
-            // Use array if the range is reasonable (< 256 elements)
-            ulong range = hasValidRange && maxVal >= minVal ? maxVal - minVal + 1 : 0;
-            bool useArray = hasValidRange && range is <= 256 and > 0;
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
+                values,
+                out ulong windowMinValue,
+                out int windowLength
+            );
 
             string[] namesArray;
             ConcurrentDictionary<ulong, string> namesDict;
@@ -97,8 +75,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (useArray)
             {
-                minValue = minVal;
-                arrayLength = (int)range;
+                minValue = windowMinValue;
+                arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
                 for (int i = 0; i < values.Length; i++)
@@ -106,8 +84,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     T value = values[i];
                     if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                     {
-                        int index = (int)(key - minValue);
-                        if (index >= 0 && index < arrayLength)
+                        // Unsigned subtraction, matching ToCachedName's lookup exactly, so a
+                        // window that straddles zero indexes the same slot on both sides.
+                        ulong index = unchecked(key - minValue);
+                        if (index < (ulong)arrayLength)
                         {
                             string name = names[i];
                             if (namesArray[index] == null)
@@ -235,35 +215,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             Type type = typeof(T);
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Static);
-
-            // First pass: determine range
-            ulong minVal = ulong.MaxValue;
-            ulong maxVal = 0;
-            bool hasValidRange = true;
-
+            T[] fieldValues = new T[fields.Length];
             for (int i = 0; i < fields.Length; i++)
             {
-                T value = (T)fields[i].GetValue(null);
-                if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong val))
-                {
-                    hasValidRange = false;
-                    break;
-                }
-
-                if (val < minVal)
-                {
-                    minVal = val;
-                }
-
-                if (val > maxVal)
-                {
-                    maxVal = val;
-                }
+                fieldValues[i] = (T)fields[i].GetValue(null);
             }
 
-            // Use array if the range is reasonable (< 256 elements)
-            ulong range = hasValidRange && maxVal >= minVal ? maxVal - minVal + 1 : 0;
-            bool useArray = hasValidRange && range is <= 256 and > 0;
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
+                fieldValues,
+                out ulong windowMinValue,
+                out int windowLength
+            );
 
             string[] namesArray;
             ConcurrentDictionary<ulong, string> namesDict;
@@ -272,8 +234,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (useArray)
             {
-                minValue = minVal;
-                arrayLength = (int)range;
+                minValue = windowMinValue;
+                arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
                 for (int i = 0; i < fields.Length; i++)
@@ -285,12 +247,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     )
                         ? displayName.DisplayName
                         : field.Name;
-                    T value = (T)field.GetValue(null);
 
-                    if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
+                    if (EnumNumericHelper<T>.TryConvertToUInt64(fieldValues[i], out ulong key))
                     {
-                        int index = (int)(key - minValue);
-                        if (index >= 0 && index < arrayLength)
+                        // Unsigned subtraction, matching ToDisplayName's lookup exactly, so a
+                        // window that straddles zero indexes the same slot on both sides.
+                        ulong index = unchecked(key - minValue);
+                        if (index < (ulong)arrayLength)
                         {
                             namesArray[index] = name;
                         }
@@ -318,9 +281,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     )
                         ? displayName.DisplayName
                         : field.Name;
-                    T value = (T)field.GetValue(null);
 
-                    if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
+                    if (!EnumNumericHelper<T>.TryConvertToUInt64(fieldValues[i], out ulong key))
                     {
                         continue;
                     }
@@ -510,8 +472,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     internal static class EnumNumericHelper<T>
         where T : unmanaged, Enum
     {
+        /// <summary>
+        /// True when the enum's underlying type is signed and can therefore hold negative members.
+        /// </summary>
+        public static readonly bool IsSigned = ResolveIsSigned();
+
         private static readonly int Size = Unsafe.SizeOf<T>();
 
+        // Signed underlying types are SIGN-extended to the full 64-bit two's-complement
+        // pattern, not zero-extended. Zero-extending a negative sbyte/short/int yields a
+        // key that is numerically large but only 8/16/32 bits wide, while every consumer
+        // does `key - minValue` in 64-bit modular arithmetic -- so the wrap that should
+        // land a negative member on a small array index instead lands astronomically far
+        // from it. Sign extension makes every width behave like the 8-byte case, where
+        // that arithmetic has always been correct.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryConvertToUInt64(T value, out ulong result)
         {
@@ -520,13 +494,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             switch (Size)
             {
                 case 1:
-                    result = Unsafe.As<T, byte>(ref valueRef);
+                    result = IsSigned
+                        ? unchecked((ulong)(long)Unsafe.As<T, sbyte>(ref valueRef))
+                        : Unsafe.As<T, byte>(ref valueRef);
                     return true;
                 case 2:
-                    result = Unsafe.As<T, ushort>(ref valueRef);
+                    result = IsSigned
+                        ? unchecked((ulong)(long)Unsafe.As<T, short>(ref valueRef))
+                        : Unsafe.As<T, ushort>(ref valueRef);
                     return true;
                 case 4:
-                    result = Unsafe.As<T, uint>(ref valueRef);
+                    result = IsSigned
+                        ? unchecked((ulong)(long)Unsafe.As<T, int>(ref valueRef))
+                        : Unsafe.As<T, uint>(ref valueRef);
                     return true;
                 case 8:
                     result = Unsafe.As<T, ulong>(ref valueRef);
@@ -535,6 +515,125 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     result = default;
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Orders two converted keys the way the enum's own members order, so a signed
+        /// enum's negative members sort below its positive ones instead of above them.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsLessThan(ulong left, ulong right)
+        {
+            if (IsSigned)
+            {
+                return unchecked((long)left) < unchecked((long)right);
+            }
+
+            return left < right;
+        }
+
+        private static bool ResolveIsSigned()
+        {
+            switch (Type.GetTypeCode(Enum.GetUnderlyingType(typeof(T))))
+            {
+                case TypeCode.SByte:
+                case TypeCode.Int16:
+                case TypeCode.Int32:
+                case TypeCode.Int64:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Internal helper that decides whether an enum's values are dense enough for the
+    /// array-indexed lookup strategy the name caches prefer.
+    /// </summary>
+    /// <typeparam name="T">The unmanaged enum type.</typeparam>
+    internal static class EnumLookupStrategy<T>
+        where T : unmanaged, Enum
+    {
+        /// <summary>
+        /// Largest number of array slots a name cache will allocate for an enum.
+        /// </summary>
+        public const int MaximumArrayLength = 256;
+
+        /// <summary>
+        /// Computes the array-lookup window for a set of enum values.
+        /// </summary>
+        /// <param name="values">The enum's declared values.</param>
+        /// <param name="minValue">The converted key that maps to array index 0.</param>
+        /// <param name="arrayLength">The number of array slots the window spans.</param>
+        /// <returns>True when an array lookup is worthwhile, false to use a dictionary.</returns>
+        /// <remarks>
+        /// Range is measured in the enum's OWN ordering (see <see cref="EnumNumericHelper{T}.IsLessThan"/>),
+        /// which is what keeps a small signed enum such as `{ -2, -1, 0, 1 }` on the array
+        /// path. Measuring it on unsigned keys made every signed enum with a negative
+        /// member look billions of slots wide and silently demoted it to the dictionary.
+        /// </remarks>
+        public static bool TryComputeArrayWindow(
+            T[] values,
+            out ulong minValue,
+            out int arrayLength
+        )
+        {
+            minValue = 0;
+            arrayLength = 0;
+
+            if (values == null || values.Length == 0)
+            {
+                return false;
+            }
+
+            ulong minKey = 0;
+            ulong maxKey = 0;
+            bool hasAny = false;
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!EnumNumericHelper<T>.TryConvertToUInt64(values[i], out ulong key))
+                {
+                    return false;
+                }
+
+                if (!hasAny)
+                {
+                    minKey = key;
+                    maxKey = key;
+                    hasAny = true;
+                    continue;
+                }
+
+                if (EnumNumericHelper<T>.IsLessThan(key, minKey))
+                {
+                    minKey = key;
+                }
+
+                if (EnumNumericHelper<T>.IsLessThan(maxKey, key))
+                {
+                    maxKey = key;
+                }
+            }
+
+            if (!hasAny)
+            {
+                return false;
+            }
+
+            // Modular subtraction, so a window that straddles zero (or wraps the unsigned
+            // domain) still measures its true width. Both operands come from the same
+            // 64-bit key space, so the difference is exact whenever it fits the cap below.
+            ulong span = unchecked(maxKey - minKey);
+            if (span >= (ulong)MaximumArrayLength)
+            {
+                return false;
+            }
+
+            minValue = minKey;
+            arrayLength = (int)span + 1;
+            return true;
         }
     }
 }

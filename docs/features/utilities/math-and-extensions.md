@@ -830,6 +830,11 @@ string cached = state.ToCachedName();
 
 Performance: ToCachedName uses cached lookups to avoid repeated allocations and string conversions after the first call.
 
+The cache picks its strategy from how far apart the enum's members are, not how many
+there are: members within 256 of each other get a direct array index, anything wider
+gets a dictionary. Negative members count normally toward that span, so
+`enum Direction { Left = -1, None = 0, Right = 1 }` is three slots wide, not billions.
+
 ### Display Names for UI
 
 **The problem:** Enum values often need different names in UI than in code.

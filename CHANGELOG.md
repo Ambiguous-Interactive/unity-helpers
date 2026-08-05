@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Asset-change watcher crashing headless editors**: `[DetectAssetChanged]` no longer initializes in batch mode ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
 - **Dictionary and set values silently lost**: `SerializableDictionary<TKey, List<TValue>>` saved its keys and none of its values. The Inspector now reports this instead of drawing a column that persists nothing. Use a `[Serializable]` wrapper type or `SerializableDictionary<TKey, TValue, TValueCache>` ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).
 - **`SerializableDictionary<TKey, TValue, TValueCache>` had no Inspector**: it now has a property drawer ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).
+- **Enums with negative values were slow to name**: `ToCachedName()` and `ToDisplayName()` fell back to a dictionary for any signed enum with a negative member, and small `sbyte` enums allocated a 256-entry cache. Both now use the compact array lookup ([#339](https://github.com/Ambiguous-Interactive/unity-helpers/issues/339)).
 
 ## [3.5.1] - 2026-07-12
 
