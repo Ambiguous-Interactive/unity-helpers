@@ -1502,6 +1502,52 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      # matrix-config answers "has this PR moved on?" ONCE, before any leg is
+      # dispatched, which only covers a push that lands before it runs. A push
+      # that lands AFTER it -- while legs are queued for the single Unity seat --
+      # leaves its output at `false`, so every dispatched leg then fails on its own
+      # require-current-pr-head guard and this gate reports the run red. Measured
+      # on run 31020762387: six legs failed, all six on
+      # "Stale pull request run for <old sha>", zero on a test.
+      #
+      # Re-resolving here closes that window. This job runs last and on a hosted
+      # runner, so it sees the head as of the moment the verdict is written.
+      #
+      # Fails OPEN, exactly like matrix-config's copy: any trouble resolving the
+      # head leaves superseded=false, so an API hiccup costs a redundant red,
+      # never a waived validation.
+      - name: Re-detect superseded pull request head
+        id: late_superseded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_NUMBER:-}" ] || [ -z "${EXPECTED_HEAD_SHA:-}" ]; then
+            echo "Not a pull request run; nothing can supersede it."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          current=""
+          if ! current="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"; then
+            current=""
+          fi
+          # Shape, not emptiness: `--jq '.head.sha'` prints the literal string
+          # "null" and exits 0 when the field is absent.
+          if ! printf '%s' "${current}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::warning::Could not resolve the current head of pull request #${PR_NUMBER} (got '${current}'); reporting this run's real result."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if [ "${current}" = "${EXPECTED_HEAD_SHA}" ]; then
+            echo "Pull request #${PR_NUMBER} is still at ${EXPECTED_HEAD_SHA}."
+            echo "superseded=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "superseded=true" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Superseded run for ${EXPECTED_HEAD_SHA}; pull request #${PR_NUMBER} now points to ${current}."
+
       - name: Require every expected Unity CI job result
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -1510,6 +1556,7 @@ jobs:
           REF_PROTECTED: ${{ github.ref_protected }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
           MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
+          LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
           STANDALONE_RESULT: ${{ needs.unity-tests-standalone.result }}
@@ -1556,12 +1603,28 @@ jobs:
           # the output alone would report green for a bogus UPM module id or an
           # offline runner fleet, which is the exact fail-fast signal those jobs
           # exist to raise.
-          if [ "${MATRIX_CONFIG_SUPERSEDED}" = "true" ]; then
+          #
+          # Two ways to be superseded, waived identically. MATRIX_CONFIG_SUPERSEDED
+          # means the push beat dispatch, so the licensed tiers never started.
+          # LATE_SUPERSEDED means it landed afterwards, so they started and then
+          # exited on their own head guards. The reasoning above does not
+          # distinguish them: either way the check attaches to a head the pull
+          # request has moved past.
+          if [ "${MATRIX_CONFIG_SUPERSEDED}" = "true" ] || [ "${LATE_SUPERSEDED}" = "true" ]; then
             if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
               echo "::error::Superseded run, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
               exit 1
             fi
-            echo "Superseded run; the licensed Unity tiers were skipped for the current head's run."
+            if [ "${MATRIX_CONFIG_SUPERSEDED}" = "true" ]; then
+              echo "Superseded before dispatch; the licensed Unity tiers were skipped for the current head's run."
+            else
+              echo "Superseded after dispatch; the licensed Unity tiers exited on their head guards. The current head has its own run."
+            fi
+            {
+              echo "## Superseded Unity run"
+              echo ""
+              echo "This run was queued for a head the pull request has since moved past, so its result cannot gate or authorize the current head. Reported as a no-op."
+            } >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
 

@@ -2457,6 +2457,30 @@ foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
     } elseif ($VerboseOutput) {
         Write-Info "Checked $unityWorkflowFile no longer caches a workspace-relative Library."
     }
+
+    # Two legs may share a persistent project directory ONLY if they generate the
+    # same project. -IncludeIntegrations changes the ephemeral manifest (three DI
+    # packages) and therefore the compiled assembly set, so a leg that passes it and
+    # a leg that does not must never land on the same directory -- they would rewrite
+    # the manifest over each other and re-resolve packages on every alternation. The
+    # rule is expressed per file because the split runs along workflow lines:
+    # unity-tests.yml always integrates, unity-benchmarks.yml never does.
+    # Anchored to a run-line, not the bare word: the workflows discuss
+    # -IncludeIntegrations in comments, and a comment is not a flag.
+    $integrationInvocations = @([regex]::Matches($unityWorkflowText, '(?m)^\s+-IncludeIntegrations\b')).Count
+    $benchmarkScopes = @([regex]::Matches($unityWorkflowText, "-ProjectScope 'benchmarks'")).Count
+    if ($unityWorkflowFile -eq '.github/workflows/unity-benchmarks.yml') {
+        if ($integrationInvocations -ne 0) {
+            Write-Host "::error file=$unityWorkflowFile::This workflow now passes -IncludeIntegrations. Either drop it or give these legs a project scope that cannot collide with unity-tests.yml's, which also integrates."
+            $failed = $true
+        }
+        if ($benchmarkScopes -ne $runCiTestsInvocations) {
+            Write-Host "::error file=$unityWorkflowFile::Every run-ci-tests.ps1 step must pass ``-ProjectScope 'benchmarks'`` (found $benchmarkScopes for $runCiTestsInvocations invocations). Without it these legs share a persistent project directory with unity-tests.yml, whose legs pass -IncludeIntegrations and therefore generate a different manifest and assembly set."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked $unityWorkflowFile keeps its own project scope."
+        }
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -2487,6 +2511,55 @@ foreach ($contract in $unityRunTimeoutContracts) {
         $failed = $true
     } elseif ($VerboseOutput) {
         Write-Info "Checked Unity run-step contract '$($contract.Name)'."
+    }
+}
+
+# ---------------------------------------------------------------------------
+# A superseded run must be a no-op, whichever side of dispatch the push landed.
+#
+# matrix-config resolves supersession before any leg is dispatched, so it cannot
+# see a push that lands while legs are queued for the single Unity seat. Those
+# legs then fail on their own require-current-pr-head guards and the gate reports
+# the run red -- measured on run 31020762387: six legs failed, all six on
+# "Stale pull request run", zero on a test. Unity CI Success therefore re-resolves
+# the head itself, and the waiver covers both signals.
+# ---------------------------------------------------------------------------
+$lateSupersessionContracts = @(
+    @{
+        Name = 'Unity CI Success re-detects a late supersession'
+        Pattern = '(?ms)- name: Re-detect superseded pull request head\s*\r?\n\s+id:\s+late_superseded\b'
+        Message = 'Unity CI Success must re-resolve the pull request head itself. matrix-config answers before dispatch, so a push that lands while legs are queued leaves every leg failing its own head guard and the run red.'
+    },
+    @{
+        Name = 'the late-supersession probe fails open'
+        # Anchored two ways, because both are easy to get wrong. The wording
+        # "reporting this run's real result" is unique to the LATE probe --
+        # matrix-config's probe emits a near-identical warning, and a pattern that
+        # matches either passes no matter what the late one does. And the
+        # superseded=false must be the very next line, or the pattern also matches
+        # the later "still at the expected sha" branch and passes when the
+        # unresolvable case has been flipped to superseded=true -- which would waive
+        # validation on every API hiccup, the one thing this must not do.
+        Pattern = "reporting this run's real result[^\r\n]*\r?\n\s*echo `"superseded=false`""
+        Message = 'The late-supersession probe must report superseded=false on the line right after it fails to resolve the head, so an API hiccup costs a redundant red rather than a waived validation.'
+    },
+    @{
+        Name = 'the waiver honors both supersession signals'
+        Pattern = '\[ "\$\{MATRIX_CONFIG_SUPERSEDED\}" = "true" \] \|\| \[ "\$\{LATE_SUPERSEDED\}" = "true" \]'
+        Message = 'The supersession waiver must accept the late signal as well as matrix-config''s, or a push that lands after dispatch still reports the run red.'
+    },
+    @{
+        Name = 'supersession still requires the hosted gates'
+        Pattern = '(?ms)LATE_SUPERSEDED.*?Superseded run, but a hosted gate did not pass'
+        Message = 'Supersession must waive only the four licensed results; matrix-config and runner-preflight run to completion regardless and must still pass.'
+    }
+)
+foreach ($contract in $lateSupersessionContracts) {
+    if ($workflowContent -notmatch $contract.Pattern) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked superseded-gate contract '$($contract.Name)'."
     }
 }
 
@@ -2617,7 +2690,7 @@ $supersededGateContracts = @(
         Name = 'Unity CI Success treats a superseded run as a clean no-op'
         Ok = (
             $workflowContent.Contains('MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}') -and
-            $workflowContent -match '(?m)^          if \[ "\$\{MATRIX_CONFIG_SUPERSEDED\}" = "true" \]; then\s*$'
+            $workflowContent -match '(?m)^          if \[ "\$\{MATRIX_CONFIG_SUPERSEDED\}" = "true" \] \|\| \[ "\$\{LATE_SUPERSEDED\}" = "true" \]; then\s*$'
         )
         Message = 'unity-ci-success must exit 0 for a superseded run: it never ran the licensed tiers and its check belongs to the head SHA it was queued for, so it can neither gate nor authorize the current head.'
     }

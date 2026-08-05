@@ -265,17 +265,21 @@ jobs:
           # Release (not Debug) code optimization for the editmode/playmode perf
           # legs, mirroring the repo-wide Unity Release-mode contract so the
           # weekly coverage run measures the same optimized hot path the docs do.
-          # Same persistent project root as unity-tests.yml, and deliberately the
-          # same per-leg directory: this workflow compiles the project identically
-          # and differs only in the test-category filter, so it reuses that warm
-          # Library instead of importing a second copy. See unity-tests.yml for why
-          # the project cannot live under .artifacts/.
+          # Same persistent project root as unity-tests.yml but a SEPARATE per-leg
+          # directory. These legs deliberately omit -IncludeIntegrations, so their
+          # ephemeral manifest and compiled assembly set differ from the test legs'.
+          # Sharing a directory would make the two workflows rewrite the manifest
+          # over each other, re-resolving packages and recompiling on every
+          # alternation -- and this is the lane that MEASURES performance, so that
+          # churn would land directly in the numbers. See unity-tests.yml for why
+          # the project cannot live under .artifacts/ at all.
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode '${{ matrix.test-mode }}' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'benchmarks' `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
@@ -308,7 +312,8 @@ jobs:
             -TestMode 'editmode' `
             -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.Runtime.Random' `
             -ArtifactsPath '.artifacts/unity/benchmarks-random/${{ matrix.unity-version }}' `
-            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace')
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'benchmarks'
 
       - name: Return Unity license
         id: return_unity_license
