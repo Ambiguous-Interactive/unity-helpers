@@ -29,10 +29,25 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         : SerializableDictionary<string, List<float>, FloatListCache> { }
 
     /// <summary>
+    /// The same dictionary with its value type wrapped in <see cref="SerializableList{T}"/>, which
+    /// is the supported form that needs no per-value-type cache subclass.
+    /// </summary>
+    [Serializable]
+    public sealed class StringFloatSerializableListDictionary
+        : SerializableDictionary<string, SerializableList<float>> { }
+
+    /// <summary>
     /// Set whose element type is itself a collection, which Unity refuses to serialize.
     /// </summary>
     [Serializable]
     public sealed class FloatListHashSet : SerializableHashSet<List<float>> { }
+
+    /// <summary>
+    /// The same set with its element type wrapped in <see cref="SerializableList{T}"/>.
+    /// </summary>
+    [Serializable]
+    public sealed class FloatSerializableListHashSet
+        : SerializableHashSet<SerializableList<float>> { }
 
     /// <summary>
     /// Set with an element type Unity does serialize, used as the control for

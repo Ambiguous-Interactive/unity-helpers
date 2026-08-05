@@ -28,7 +28,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             return $"'{displayName}' cannot round-trip through Unity serialization: Unity refuses "
                 + "this value type -- most often a nested collection such as List<T> -- so the "
-                + "values array is never written and every lookup returns nothing. Wrap the value "
+                + "values array is never written and every lookup returns nothing. For a list "
+                + "value, change the value type to SerializableList<T>. Otherwise wrap the value "
                 + "type in a [Serializable] class, or declare the dictionary as "
                 + "SerializableDictionary<TKey, TValue, TValueCache> with a "
                 + "SerializableDictionary.Cache<TValue> subclass as TValueCache.";
@@ -43,7 +44,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             return $"'{displayName}' cannot round-trip through Unity serialization: Unity refuses "
                 + "this element type -- most often a nested collection such as List<T> -- so the "
-                + "items array is never written and the set is always empty at runtime. Wrap the "
+                + "items array is never written and the set is always empty at runtime. For a list "
+                + "element, change the element type to SerializableList<T>. Otherwise wrap the "
                 + "element type in a [Serializable] class.";
         }
     }

@@ -273,8 +273,40 @@ the serialized values array a `List<float>[]`, which Unity drops entirely — wh
 array survives, because it is a plain `string[]`. The asset then records keys and no values, and
 every runtime lookup comes back empty.
 
-Route the collection through a cache box instead, which makes the list a direct field of a
-serializable class rather than the element type of an array:
+The fix is to add the one layer of indirection Unity wants: make the list a field of a serializable
+class rather than the element type of an array. `SerializableList<T>` is that class, so the change is
+a type change and nothing else:
+
+```csharp
+public sealed class WeaponConfig : MonoBehaviour
+{
+    // Serializes. SerializableDictionary<string, List<float>> would not.
+    [SerializeField]
+    private SerializableDictionary<string, SerializableList<float>> _curves = new();
+
+    public void AddPoint(string weapon, float damage)
+    {
+        if (!_curves.TryGetValue(weapon, out SerializableList<float> curve))
+        {
+            curve = new SerializableList<float>();
+            _curves[weapon] = curve;
+        }
+
+        curve.Add(damage);
+    }
+}
+```
+
+`SerializableList<T>` implements `IList<T>`, converts implicitly to and from `List<T>`, and exposes
+`AsList()` for the `List<T>` members it does not surface (`Sort`, `BinarySearch`). It draws in the
+Inspector as the list it wraps, with no extra foldout, and serializes to a plain JSON array. It has
+reference equality, matching `List<T>`, so it is a poor set element unless the set is keyed on
+identity.
+
+The same applies to `SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>`:
+`SerializableHashSet<SerializableList<T>>` serializes.
+
+For a value type that is not a list, route it through a cache box:
 
 ```csharp
 [Serializable]
@@ -283,18 +315,10 @@ public sealed class FloatListCache : SerializableDictionary.Cache<List<float>> {
 [Serializable]
 public sealed class DamageCurves
     : SerializableDictionary<string, List<float>, FloatListCache> { }
-
-public sealed class WeaponConfig : MonoBehaviour
-{
-    [SerializeField]
-    private DamageCurves _curves = new();
-}
 ```
 
-The Inspector reports the unsupported shape as an error rather than drawing a value column that
-persists nothing, so this is visible while authoring instead of at runtime. The same applies to
-`SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>`: wrap the element type in a
-`[Serializable]` class.
+Either way, the Inspector reports an unsupported shape as an error rather than drawing a value column
+that persists nothing, so this is visible while authoring instead of at runtime.
 
 ---
 

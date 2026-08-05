@@ -86,6 +86,46 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        // The whole point of shipping SerializableList<T>: the fix for a collection-valued
+        // dictionary is a type change, with no cache subclass per value type.
+        [Test]
+        public void UnitySerializesValuesWrappedInASerializableList()
+        {
+            SerializedProperty values = FindArray(
+                nameof(NestedCollectionSerializationHost.wrappedValues),
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            Assert.That(
+                values,
+                Is.Not.Null,
+                "SerializableList<T> exists so that a list-valued dictionary serializes; if this "
+                    + "is null the wrapper does not add the indirection Unity needs."
+            );
+        }
+
+        [Test]
+        public void UnitySerializesItemsWrappedInASerializableList()
+        {
+            SerializedProperty items = FindArray(
+                nameof(NestedCollectionSerializationHost.wrappedItems),
+                SerializableHashSetSerializedPropertyNames.Items
+            );
+
+            Assert.That(items, Is.Not.Null);
+        }
+
+        [Test]
+        public void DictionaryDrawerAcceptsTheListWrapper()
+        {
+            Assert.That(
+                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                    FindCollection(nameof(NestedCollectionSerializationHost.wrappedValues))
+                ),
+                Is.False
+            );
+        }
+
         [Test]
         public void DictionaryDrawerReportsADroppedValuesArray()
         {
@@ -189,6 +229,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
             Assert.That(message, Does.Contain("Dropped Values"));
+            Assert.That(message, Does.Contain("SerializableList<T>"));
             Assert.That(message, Does.Contain("SerializableDictionary.Cache"));
         }
 
@@ -201,6 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
             Assert.That(message, Does.Contain("Dropped Items"));
+            Assert.That(message, Does.Contain("SerializableList<T>"));
         }
 
         private SerializedProperty FindCollection(string fieldName)
