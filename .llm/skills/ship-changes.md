@@ -73,7 +73,10 @@ If changes include user-facing modifications:
 1. Add entry under `## [Unreleased]` section
 2. Use correct subsection: `### Added`, `### Fixed`, `### Changed`, `### Removed`
 3. Reference issue numbers where applicable: `[#NNN](https://github.com/wallstop/unity-helpers/issues/NNN)` <!-- cspell:ignore NNN -->
-4. Keep entries concise — one line per change
+4. **Keep entries SHORT — one or two sentences, plain language, user-visible effect first.** No
+   root-cause narration, no mechanism, no run IDs. Put the long version in the commit body and, if
+   users need it, a `docs/` guide you link to. See
+   [update-documentation](./update-documentation.md#writing-good-changelog-entries).
 
 ### Step 5: Documentation Check
 
