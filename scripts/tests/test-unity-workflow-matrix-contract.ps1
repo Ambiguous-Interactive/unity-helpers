@@ -2540,12 +2540,44 @@ foreach ($licensedJobId in $licensedJobIds) {
         Message = "Licensed job '$licensedJobId' must skip when matrix-config reports the pull request head has moved on, so a superseded run never queues for the self-hosted Unity seat."
     }
 }
+# The stuck-job watchdog reported success on every cycle from #315 through #328
+# while never evaluating a single queued run: `orgs/{owner}/actions/runners`
+# needs admin:org, GITHUB_TOKEN 403s, the repo-scoped fallback does not list
+# org-level runners, and the handler exited 0. A permanently green workflow that
+# is structurally blind is the same silent-failure class #328 was opened for.
+$watchdogPath = Join-Path $repoRoot '.github/workflows/stuck-job-watchdog.yml'
+if (-not (Test-Path -LiteralPath $watchdogPath)) {
+    Write-Host "::error::Stuck job watchdog workflow not found: $watchdogPath"
+    $failed = $true
+} else {
+    $watchdogContent = Get-Content -LiteralPath $watchdogPath -Raw
+    $supersededGateContracts += @(
+        @{
+            Name = 'watchdog reads the runner inventory with the build-lock reader App'
+            Ok = (
+                $watchdogContent.Contains('RUNNER_INVENTORY_TOKEN: ${{ steps.reader-token.outputs.token }}') -and
+                $watchdogContent.Contains('app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}') -and
+                $watchdogContent -match 'RUNNER_INVENTORY_TOKEN[^\n]*\n[^\n]*orgs/\$\{OWNER\}/actions/runners'
+            )
+            Message = 'The watchdog must query orgs/{owner}/actions/runners with the build-lock reader App token. GITHUB_TOKEN lacks admin:org and 403s, and the repo-scoped fallback does not list org-level runners, so without it the audit can never see a runner.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'watchdog fails closed on an unreadable runner inventory'
+            Ok = $watchdogContent -match '(?ms)could not read the runner inventory.*?flush_summary_and_exit 1'
+            Message = 'The watchdog must exit non-zero when it cannot read the runner inventory. Exiting 0 is what let it report success on every cycle while evaluating nothing -- a blind watchdog must be red, because a green check is exactly what stopped anyone from noticing.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        }
+    )
+}
+
 foreach ($contract in $supersededGateContracts) {
+    $contractFile = if ($contract.ContainsKey('File')) { $contract.File } else { '.github/workflows/unity-tests.yml' }
     if (-not $contract.Ok) {
-        Write-Host "::error file=.github/workflows/unity-tests.yml::Superseded-run gate contract failed ($($contract.Name)): $($contract.Message)"
+        Write-Host "::error file=$contractFile::Workflow recovery contract failed ($($contract.Name)): $($contract.Message)"
         $failed = $true
     } elseif ($VerboseOutput) {
-        Write-Info "Checked superseded-run gate contract '$($contract.Name)'."
+        Write-Info "Checked workflow recovery contract '$($contract.Name)'."
     }
 }
 

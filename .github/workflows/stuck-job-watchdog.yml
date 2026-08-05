@@ -66,10 +66,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # The runner inventory is the watchdog's whole basis for action, and
+      # GITHUB_TOKEN cannot read it: `orgs/{owner}/actions/runners` needs
+      # admin:org and 403s, and the repo-scoped fallback does not list
+      # org-level runners either. Without this the audit exits at step 3 on
+      # every cycle -- a permanently green workflow that has never evaluated a
+      # single run. The build-lock reader App is the same identity
+      # check-unity-runner-availability already uses to decide whether a Unity
+      # runner is online, so it is exactly the grant this needs.
+      - name: Mint an org-scoped runner-inventory token
+        id: reader-token
+        # Never fail the audit on a missing/expired App credential -- the token
+        # is an upgrade to the inventory lookup, and the unreadable-inventory
+        # guard below is what decides whether the run can proceed.
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Audit + cancel-and-redispatch
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_INVENTORY_TOKEN: ${{ steps.reader-token.outputs.token }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           SELF_RUN_ID: ${{ github.run_id }}
@@ -264,17 +285,34 @@ jobs:
           #    org grows past 100 runners - see cli/cli#1268).
           # ------------------------------------------------------------------
           runners_json="$(mktemp)"
-          runners_scope="org"
-          if ! gh api --paginate "orgs/${OWNER}/actions/runners?per_page=100" \
+          runners_scope=""
+          # The org endpoint needs admin:org, which GITHUB_TOKEN does not have.
+          # Try the reader App's org-scoped token first; it is the identity that
+          # can actually see the self-hosted fleet.
+          if [ -n "${RUNNER_INVENTORY_TOKEN:-}" ] \
+            && GH_TOKEN="${RUNNER_INVENTORY_TOKEN}" gh api --paginate "orgs/${OWNER}/actions/runners?per_page=100" \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="org (reader App)"
+          elif gh api --paginate "orgs/${OWNER}/actions/runners?per_page=100" \
+              | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
+            runners_scope="org (workflow token)"
+          elif gh api --paginate "repos/${REPO}/actions/runners?per_page=100" \
               | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}" 2>/dev/null; then
             runners_scope="repo"
-            log_summary "WARN: org-level runner list unavailable (likely 403). Falling back to repo runners."
-            if ! gh api --paginate "repos/${REPO}/actions/runners?per_page=100" \
-                | jq -s '[.[] | (.runners // [])[]]' > "${runners_json}"; then
-              log_summary "ERROR: repo-level runner list also failed; cannot evaluate idle runners. No action issued."
-              popd > /dev/null
-              flush_summary_and_exit 0
-            fi
+            log_summary "WARN: org-level runner list unavailable; fell back to repo runners, which do not include org-level runners."
+          fi
+
+          # Fail CLOSED on an unreadable inventory. Exiting 0 here is what let
+          # this workflow report success on every cycle from #315 through #328
+          # while never evaluating a single queued run: a watchdog that cannot
+          # see runners is not healthy, it is blind, and a green check said
+          # otherwise. Red is the only signal that gets this fixed.
+          if [ -z "${runners_scope}" ]; then
+            log_summary "ERROR: could not read the runner inventory from the org (reader App or workflow token) or the repo."
+            log_summary "The watchdog cannot tell a dispatcher-stuck run from a run waiting on a busy fleet without it."
+            log_summary "Check that BUILD_LOCK_READER_APP_ID / BUILD_LOCK_READER_APP_PRIVATE_KEY are set, and that the App is granted read access to organization self-hosted runners."
+            popd > /dev/null
+            flush_summary_and_exit 1
           fi
           log_summary "Runner inventory scope: ${runners_scope}"
 
