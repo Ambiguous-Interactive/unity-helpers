@@ -74,10 +74,12 @@ const OPTION_NAMES = new Set([
   "protocol-version",
   "log-level",
   "token",
-  "no-discover"
+  "project-root",
+  "no-discover",
+  "any-project"
 ]);
 
-const FLAG_NAMES = new Set(["no-discover"]);
+const FLAG_NAMES = new Set(["no-discover", "any-project"]);
 
 const ENV_KEYS = Object.freeze({
   bindHost: "UNITY_MCP_BIND_HOST",
@@ -511,6 +513,41 @@ export function normalizeProjectRoot(value) {
 }
 
 /**
+ * Complete the MCP lifecycle handshake. Best-effort: a server that does not want the notification
+ * should not cost us the identity query, so a failure here is not fatal on its own.
+ */
+export async function notifyInitialized(
+  url,
+  options,
+  sessionId,
+  protocolVersion,
+  fetchImpl = fetch
+) {
+  const headers = {
+    Accept: "application/json, text/event-stream",
+    "Content-Type": "application/json",
+    "MCP-Protocol-Version": protocolVersion
+  };
+  if (options.bearerToken) {
+    headers.Authorization = `Bearer ${options.bearerToken}`;
+  }
+  if (sessionId) {
+    headers["Mcp-Session-Id"] = sessionId;
+  }
+
+  try {
+    await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      signal: AbortSignal.timeout(options.timeout)
+    });
+  } catch {
+    /* The identity query below reports the real outcome. */
+  }
+}
+
+/**
  * Ask an endpoint which Unity project it has open.
  *
  * This is the question the old bash/PowerShell tooling never asked, and not asking it is the whole
@@ -635,6 +672,12 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
 
   const sessionId = response.headers.get("mcp-session-id");
   const negotiated = message.result.protocolVersion;
+
+  // The spec requires `notifications/initialized` before any other request. Unity's own server is
+  // lenient, but a conforming relay may refuse the tool call -- and a refused identity query reads
+  // as "would not identify itself", which fails the endpoint. Skipping it would defeat the check on
+  // exactly the servers that follow the protocol most carefully.
+  await notifyInitialized(url, options, sessionId, negotiated, fetchImpl);
 
   // Ask WHICH Unity this is before treating the endpoint as usable (issue #333).
   const projectRoot = await queryProjectRoot(url, options, sessionId, negotiated, fetchImpl);
@@ -911,7 +954,7 @@ function tomlString(value) {
 
 /**
  * Decide whether a TOML header line opens the table this tool owns. Parsing the single line with a
- * sentinel key is how a `[mcp_servers.unity-mcp-remote]` header is told apart from any other header without
+ * sentinel key is how a `[mcp_servers.unity_mcp_remote]` header is told apart from any other header without
  * hand-writing a TOML grammar.
  */
 function classifyTomlHeader(line) {
@@ -921,7 +964,7 @@ function classifyTomlHeader(line) {
   const marker = "__dxm_mcp_table_marker_7d0f__";
   try {
     const parsed = parseToml(`${line}\n${marker} = true\n`);
-    const owned = parsed.mcp_servers?.["unity-mcp-remote"]?.[marker] === true;
+    const owned = parsed.mcp_servers?.["unity_mcp_remote"]?.[marker] === true;
     const hasMarker = JSON.stringify(parsed).includes(`"${marker}":true`);
     return hasMarker ? { owned } : undefined;
   } catch {
@@ -931,7 +974,7 @@ function classifyTomlHeader(line) {
 
 const CODEX_AMBIGUOUS_MESSAGE = (reason) =>
   `${reason} in .codex/config.toml, so this tool cannot tell which lines it owns. ` +
-  "Delete the [mcp_servers.unity-mcp-remote] table from .codex/config.toml (or move it to the end of the " +
+  "Delete the [mcp_servers.unity_mcp_remote] table from .codex/config.toml (or move it to the end of the " +
   "file, after every multi-line value) and re-run configure.";
 
 export function mergeCodexToml(raw, url, bearerToken) {
@@ -942,7 +985,7 @@ export function mergeCodexToml(raw, url, bearerToken) {
     fail(`Invalid TOML in Codex config: ${error.message}`);
   }
   const block = [
-    "[mcp_servers.unity-mcp-remote]",
+    "[mcp_servers.unity_mcp_remote]",
     `url = ${tomlString(url)}`,
     `http_headers = { Authorization = ${tomlString(`Bearer ${bearerToken}`)} }`,
     "startup_timeout_sec = 20",
@@ -963,14 +1006,14 @@ export function mergeCodexToml(raw, url, bearerToken) {
     fail(CODEX_AMBIGUOUS_MESSAGE("Duplicate unity-mcp table"));
   }
   if (owned.length === 0) {
-    if (parsed.mcp_servers?.["unity-mcp-remote"] !== undefined) {
+    if (parsed.mcp_servers?.["unity_mcp_remote"] !== undefined) {
       fail("Unsupported inline or dotted unity-mcp definition in Codex config");
     }
     return `${normalized.trimEnd()}${normalized.trim() ? "\n\n" : ""}${block}`;
   }
 
   const start = owned[0];
-  // A `[mcp_servers.unity-mcp-remote]` line inside a multi-line string is not a table header. Everything
+  // A `[mcp_servers.unity_mcp_remote]` line inside a multi-line string is not a table header. Everything
   // before a real header is itself complete TOML, so a prefix that will not parse proves the line
   // scanner is about to splice through a string literal.
   try {

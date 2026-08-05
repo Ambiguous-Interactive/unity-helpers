@@ -10,7 +10,9 @@ import http from "node:http";
 import test from "node:test";
 
 import {
+  mergeCodexToml,
   normalizeProjectRoot,
+  parseArgs,
   pinProjectRoot,
   probeEndpoint,
   sameProjectRoot
@@ -20,6 +22,7 @@ const PROTOCOL_VERSION = "2025-11-25";
 
 /** A stand-in bridge: MCP initialize, plus GetProjectRoot answering with the supplied root. */
 function startFakeBridge({ projectRoot, omitProjectRoot = false }) {
+  const methods = [];
   const server = http.createServer((request, response) => {
     let body = "";
     request.on("data", (chunk) => {
@@ -32,6 +35,7 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false }) {
       }
 
       const message = JSON.parse(body);
+      methods.push(message.method);
       if (message.method === "initialize") {
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(
@@ -61,7 +65,7 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false }) {
 
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => {
-      resolve({ server, port: server.address().port });
+      resolve({ server, port: server.address().port, methods });
     });
   });
 }
@@ -175,4 +179,42 @@ test("pinProjectRoot never overwrites a pin the developer already stated", () =>
 test("pinProjectRoot writes nothing when the endpoint never identified itself", () => {
   const result = pinProjectRoot({ repoRoot: "/tmp" }, { projectRoot: undefined });
   assert.equal(result.wrote, false);
+});
+
+// The MCP lifecycle requires notifications/initialized before any other request. Unity's own server
+// tolerates its absence; a conforming relay need not, and a refused identity query reads as "would
+// not identify itself" -- so skipping it would disable the check on the strictest servers.
+test("the probe completes the lifecycle before asking for identity", async () => {
+  const { server, port, methods } = await startFakeBridge({ projectRoot: "D:/Code/Packages" });
+  try {
+    await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor("D:/Code/Packages")
+    );
+    assert.deepEqual(methods, ["initialize", "notifications/initialized", "tools/call"]);
+  } finally {
+    server.close();
+  }
+});
+
+test("the documented identity flags are actually parseable", () => {
+  const args = parseArgs(["--project-root", "D:/Code/Packages", "--any-project"]);
+  assert.equal(args["project-root"], "D:/Code/Packages");
+  assert.equal(args["any-project"], true);
+});
+
+// The Codex table is snake_case here, matching validate-mcp-config and every config already on
+// disk. A hyphenated name would leave the old table enabled beside the new one.
+test("the Codex merge replaces the existing table rather than adding a second", () => {
+  const existing = [
+    "[mcp_servers.unity_mcp_remote]",
+    'url = "http://192.168.1.33:9003/mcp"',
+    "enabled = true",
+    ""
+  ].join("\n");
+  const merged = mergeCodexToml(existing, "http://host.docker.internal:9007/mcp", "tok");
+  assert.equal((merged.match(/^\[mcp_servers\./gm) ?? []).length, 1);
+  assert.match(merged, /\[mcp_servers\.unity_mcp_remote\]/);
+  assert.match(merged, /9007/);
+  assert.doesNotMatch(merged, /9003/);
 });
