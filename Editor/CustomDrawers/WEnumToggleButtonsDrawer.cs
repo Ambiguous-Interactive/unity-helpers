@@ -895,6 +895,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static ToggleOption[] BuildEnumOptions(Type enumType, bool isFlags)
         {
             Array values = Enum.GetValues(enumType);
+            ulong underlyingMask = EnumShared.GetUnderlyingTypeMask(enumType);
             using PooledResource<List<ToggleOption>> optionsLease = Buffers<ToggleOption>.GetList(
                 values.Length,
                 out List<ToggleOption> options
@@ -915,7 +916,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 ulong numericValue = ConvertToUInt64(value);
-                if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue))
+                // Truncate to the underlying width before the power-of-two test: a signed enum's
+                // top-bit flag sign-extends to 0xFF..80, which is the value mask arithmetic needs
+                // but is not a power of two, and testing the extended pattern discards the flag.
+                if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue & underlyingMask))
                 {
                     Debug.LogWarning(
                         $"[{nameof(WEnumToggleButtonsUtility)}] Skipping composite flag value {name} "

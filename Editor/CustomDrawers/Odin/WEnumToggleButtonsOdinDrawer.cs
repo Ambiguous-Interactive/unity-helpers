@@ -664,6 +664,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static EnumShared.ToggleOption[] BuildEnumOptions(Type enumType, bool isFlags)
         {
             Array values = Enum.GetValues(enumType);
+            ulong underlyingMask = EnumShared.GetUnderlyingTypeMask(enumType);
             using PooledResource<List<EnumShared.ToggleOption>> optionsLease =
                 Buffers<EnumShared.ToggleOption>.GetList(
                     values.Length,
@@ -685,7 +686,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 ulong numericValue = EnumShared.ConvertToUInt64(value);
-                if (isFlags && numericValue != 0UL && !EnumShared.IsPowerOfTwo(numericValue))
+                // See EnumToggleButtonsShared.GetUnderlyingTypeMask: a signed enum's top-bit flag
+                // sign-extends, and testing the extended pattern would discard it as composite.
+                if (
+                    isFlags
+                    && numericValue != 0UL
+                    && !EnumShared.IsPowerOfTwo(numericValue & underlyingMask)
+                )
                 {
                     Debug.LogWarning(
                         $"[{nameof(WEnumToggleButtonsOdinDrawer)}] Skipping composite flag value {name} "

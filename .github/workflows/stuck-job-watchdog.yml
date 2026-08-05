@@ -9,7 +9,9 @@ name: Stuck Job Watchdog
 # nonetheless waits indefinitely until manually re-run.
 #
 # Detection requires ALL of the following to be true:
-#   * The workflow run is `status: queued` AND older than MIN_QUEUE_AGE_SECONDS
+#   * The workflow run is `status: queued` AND its CURRENT ATTEMPT (`run_started_at`,
+#     which resets on re-run, falling back to `created_at`) is older than
+#     MIN_QUEUE_AGE_SECONDS
 #     (default 300s / 5 min; round-2 false-positive guards below -- zero
 #     in-progress jobs, self-run exclusion, excluded-workflow list -- make
 #     the previous conservative 600s buffer unnecessary).
@@ -418,11 +420,16 @@ jobs:
             flush_summary_and_exit 0
           fi
 
+          # Age the CURRENT ATTEMPT, not the run. `created_at` is not reset by a re-run, so a
+          # freshly re-run job -- including one this workflow just re-ran in phase 1b -- would
+          # otherwise read as hours old on its first cycle and be cancelled before it could ever
+          # be dispatched. `run_started_at` is documented to reset on re-run; fall back to
+          # `created_at` only when it is absent.
           mapfile -t queued_ids < <(jq -r --argjson now "${now_epoch}" --argjson min "${MIN_QUEUE_AGE_SECONDS}" '
             .[]
-            | select(.created_at != null)
-            | (.created_at | fromdateiso8601) as $created
-            | select(($now - $created) >= $min)
+            | select((.run_started_at // .created_at) != null)
+            | ((.run_started_at // .created_at) | fromdateiso8601) as $started
+            | select(($now - $started) >= $min)
             | .id
           ' < "${queued_runs_json}" | sort -u)
 

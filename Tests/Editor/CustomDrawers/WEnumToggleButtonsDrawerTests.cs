@@ -263,6 +263,63 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
+        // A signed flags enum's top-bit member is a single-bit flag that reads as a negative
+        // number. Sign-extending it -- which the serialized property round-trip requires -- makes
+        // it 0xFF..80, so a power-of-two check against the extended pattern silently drops the
+        // button and leaves the flag with no way to author it.
+        [Test]
+        public void SignedTopBitFlagKeepsItsButtonAndRoundTrips()
+        {
+            ToggleTestAsset asset = CreateScriptableObject<ToggleTestAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(ToggleTestAsset.signedFlags)
+            );
+            Assert.NotNull(property);
+
+            ToggleSet toggleSet = WEnumToggleButtonsUtility.CreateToggleSet(
+                property,
+                GetFieldInfo(nameof(ToggleTestAsset.signedFlags))
+            );
+
+            Assert.True(toggleSet.SupportsMultipleSelection);
+            Assert.AreEqual(
+                4,
+                toggleSet.Options.Count,
+                "Every single-bit member must keep its button, including the top bit."
+            );
+
+            ToggleOption high = GetOptionByValue(
+                toggleSet,
+                ToggleTestAsset.SignedFlagsExampleEnum.High
+            );
+            Assert.AreEqual(unchecked((ulong)-128L), high.FlagValue);
+
+            WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, high, true);
+            serializedObject.ApplyModifiedProperties();
+            Assert.AreEqual(ToggleTestAsset.SignedFlagsExampleEnum.High, asset.signedFlags);
+
+            ToggleOption low = GetOptionByValue(
+                toggleSet,
+                ToggleTestAsset.SignedFlagsExampleEnum.Low
+            );
+            serializedObject.Update();
+            WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, low, true);
+            serializedObject.ApplyModifiedProperties();
+            Assert.AreEqual(
+                ToggleTestAsset.SignedFlagsExampleEnum.High
+                    | ToggleTestAsset.SignedFlagsExampleEnum.Low,
+                asset.signedFlags,
+                "The top bit must survive combining with another flag."
+            );
+
+            serializedObject.Update();
+            Assert.True(WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, high));
+            Assert.True(WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, low));
+        }
+
         [Test]
         public void IntDropDownOptionsRespectSelection()
         {

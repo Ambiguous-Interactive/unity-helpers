@@ -542,6 +542,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
+        /// Identifies <see cref="SerializableList{T}"/>, which shares the collections' zero-byte
+        /// empty encoding but none of their wrapper machinery.
+        /// </summary>
+        /// <remarks>
+        /// Its single <c>[ProtoMember]</c> is a repeated field with no scalar beside it, so an
+        /// empty instance encodes to zero bytes -- exactly the case the empty-payload guard below
+        /// exists to reject for ordinary messages. Unlike the set and dictionary types it needs no
+        /// wrapper: its backing list is a direct member rather than an array synchronized through
+        /// <c>OnAfterDeserialize</c>, so a default instance already is the correct empty list.
+        /// </remarks>
+        private static bool IsSerializableListType(Type type)
+        {
+            return type != null
+                && type.IsGenericType
+                && type.GetGenericTypeDefinition() == typeof(SerializableList<>);
+        }
+
+        /// <summary>
         /// Cached reflection accessors for protobuf collection wrapper serialization.
         /// Uses ReflectionHelpers for cached delegate generation and nameof() for compile-time safety.
         /// </summary>
@@ -1730,6 +1748,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     );
                     return default;
                 }
+            }
+
+            // An empty SerializableList<T> also encodes to zero bytes, for the same reason the
+            // collections above do. It needs no wrapper, only permission to be empty.
+            if (data.Length == 0 && IsSerializableListType(declared))
+            {
+                return Activator.CreateInstance<T>();
             }
 
             // Empty-payload guard for all OTHER (non-collection) types: an empty protobuf payload

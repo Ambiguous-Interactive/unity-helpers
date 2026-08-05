@@ -168,5 +168,25 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             CollectionAssert.AreEqual(original.ToArray(), deserialized.ToArray());
         }
+
+        // The wrapper's only ProtoMember is a repeated field, so an empty instance encodes to zero
+        // bytes -- which is exactly what the deserializer's empty-payload guard rejects for an
+        // ordinary message. An authored-but-empty list is valid data and must survive.
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void ProtoRoundTripsAnEmptyList()
+        {
+            SerializableList<int> original = new();
+
+            byte[] bytes = Serializer.ProtoSerialize(original);
+            Assert.AreEqual(0, bytes.Length, "An empty list is expected to encode to zero bytes.");
+
+            SerializableList<int> deserialized = Serializer.ProtoDeserialize<SerializableList<int>>(
+                bytes
+            );
+
+            Assert.IsTrue(deserialized != null);
+            Assert.AreEqual(0, deserialized.Count);
+        }
     }
 }

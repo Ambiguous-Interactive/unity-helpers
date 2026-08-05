@@ -338,6 +338,41 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         }
 
         /// <summary>
+        /// Gets the bit mask covering the width of an enum's underlying type.
+        /// </summary>
+        /// <param name="enumType">The enum type to measure.</param>
+        /// <returns>The mask, or <see cref="ulong.MaxValue"/> for a non-enum or 64-bit type.</returns>
+        /// <remarks>
+        /// <see cref="ConvertToUInt64"/> sign-extends, so a legitimate top-bit flag such as
+        /// <c>sbyte -128</c> becomes <c>0xFFFFFFFFFFFFFF80</c>. That is the right value for mask
+        /// arithmetic -- it matches what the serialized property reads back -- but it is not a
+        /// power of two, so a power-of-two check must run against the truncated width or the flag
+        /// is discarded as composite.
+        /// </remarks>
+        public static ulong GetUnderlyingTypeMask(Type enumType)
+        {
+            if (enumType == null || !enumType.IsEnum)
+            {
+                return ulong.MaxValue;
+            }
+
+            switch (Type.GetTypeCode(Enum.GetUnderlyingType(enumType)))
+            {
+                case TypeCode.SByte:
+                case TypeCode.Byte:
+                    return byte.MaxValue;
+                case TypeCode.Int16:
+                case TypeCode.UInt16:
+                    return ushort.MaxValue;
+                case TypeCode.Int32:
+                case TypeCode.UInt32:
+                    return uint.MaxValue;
+                default:
+                    return ulong.MaxValue;
+            }
+        }
+
+        /// <summary>
         /// Converts an object value to a UInt64 representation.
         /// </summary>
         /// <param name="value">The value to convert (typically an enum value).</param>
