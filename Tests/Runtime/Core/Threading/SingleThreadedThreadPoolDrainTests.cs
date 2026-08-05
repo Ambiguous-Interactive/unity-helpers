@@ -27,6 +27,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
         private const int QueuedItems = 25;
         private const int DrainTimeoutMilliseconds = 30_000;
 
+        // Bounds how long a gated work item can pin the worker if an assertion fails before the
+        // gate is released, so a failure reports promptly instead of stalling teardown.
+        private const int GateTimeoutMilliseconds = 5_000;
+
         [UnityTest]
         public IEnumerator DrainRunsEveryQueuedItemBeforeDisposal()
         {
@@ -49,6 +53,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
 
             threadPool.Dispose();
             Assert.AreEqual(QueuedItems, Volatile.Read(ref completed));
+        }
+
+        // The worker claims busy off a non-empty queue rather than off a successful dequeue,
+        // so an item that has left the queue but has not finished still holds the drain. Gating
+        // the item makes that deterministic instead of depending on the dequeue race.
+        [UnityTest]
+        public IEnumerator DrainWaitsForAnItemAlreadyExecuting()
+        {
+            using ManualResetEventSlim release = new(false);
+            using CancellationTokenSource timeout = new(DrainTimeoutMilliseconds);
+            using SingleThreadedThreadPool threadPool = new();
+
+            int completed = 0;
+            threadPool.Enqueue(() =>
+            {
+                release.Wait(GateTimeoutMilliseconds);
+                Interlocked.Increment(ref completed);
+            });
+
+            Task<bool> drain = threadPool.DrainAsync(timeout.Token).AsTask();
+            for (int i = 0; i < 10; ++i)
+            {
+                Assert.IsFalse(
+                    drain.IsCompleted,
+                    "Drain returned while an item was still running."
+                );
+                yield return null;
+            }
+
+            release.Set();
+            while (!drain.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(drain.Result);
+            Assert.AreEqual(1, Volatile.Read(ref completed));
         }
 
         [UnityTest]

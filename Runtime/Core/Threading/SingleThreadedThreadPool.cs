@@ -282,12 +282,20 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 try
                 {
-                    if (_work.TryDequeue(out WorkItem workItem))
+                    // Claim busy off a non-empty queue rather than off a successful dequeue.
+                    // Marking after TryDequeue leaves a window where the item has left the queue
+                    // and is not yet in flight, and DrainAsync -- which waits for an empty queue
+                    // and an idle worker -- would report a drain that had not happened. Ordering
+                    // it this way means one of the two conditions always holds for a live item.
+                    if (!_work.IsEmpty)
                     {
                         _isWorking = true;
                         try
                         {
-                            await workItem.ExecuteAsync().ConfigureAwait(false);
+                            if (_work.TryDequeue(out WorkItem workItem))
+                            {
+                                await workItem.ExecuteAsync().ConfigureAwait(false);
+                            }
                         }
                         catch (Exception e)
                         {
