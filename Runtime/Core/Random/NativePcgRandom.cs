@@ -21,9 +21,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </list>
     /// <para>Cons:</para>
     /// <list type="bullet">
-    /// <item><description>Value-type semantics—accidental copying can lead to diverging sequences.</description></item>
+    /// <item><description>Value-type semantics—accidental copying can lead to diverging sequences. The buffered
+    /// coin-flip bits are part of that state, so a copy taken mid-buffer replays those flips.</description></item>
     /// <item><description>Not cryptographically secure; limited convenience API.</description></item>
     /// </list>
+    /// <para>
+    /// Numeric behavior matches <see cref="PcgRandom"/> and <see cref="AbstractRandom"/>: <c>NextFloat</c> and
+    /// <c>NextDouble</c> return <c>[0, 1)</c>, <c>NextLong</c> is non-negative, and <c>NextUint(max)</c> is
+    /// unbiased. Sequences are not comparable to <see cref="PcgRandom"/>'s for the same seed—this type keeps its
+    /// own draw order.
+    /// </para>
     /// <para>When to use:</para>
     /// <list type="bullet">
     /// <item><description>Performance-critical contexts (Burst/Jobs) where you control by-ref semantics.</description></item>
@@ -39,31 +46,60 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// uint u = rng.NextUint();
     /// bool b = rng.NextBool();
     /// float t = rng.NextFloat();
+    /// double d = rng.NextDouble();
     /// </code>
     /// </example>
     public struct NativePcgRandom
     {
-        private const uint HalfwayUint = uint.MaxValue / 2;
-        private const double MagicDouble = 4.6566128752458E-10;
-        private const float MagicFloat = 5.960465E-008F;
+        private const int MaxRejectionAttempts32 = 1 << 16;
 
-        private readonly ulong _increment;
+        // internal, matching PcgRandom, so the parity contract below is assertable
+        // without reflecting on our own code.
+        internal readonly ulong _increment;
         private ulong _state;
+        private uint _bitBuffer;
+        private int _bitCount;
 
+        /// <summary>
+        /// Initializes the generator from a <see cref="Guid"/>.
+        /// </summary>
+        /// <param name="seed">Seed material; both halves are used.</param>
         public NativePcgRandom(Guid seed)
         {
             (ulong a, ulong b) = RandomUtilities.GuidToUInt64Pair(seed);
             _state = a;
-            _increment = b;
+            _increment = NormalizeIncrement(b);
+            _bitBuffer = 0;
+            _bitCount = 0;
         }
 
+        /// <summary>
+        /// Initializes the generator from an integer seed.
+        /// </summary>
+        /// <param name="seed">Seed value; every value produces a distinct stream.</param>
         public NativePcgRandom(int seed)
         {
-            _increment = 6554638469UL;
+            // Start with a nice prime, matching PcgRandom's integer-seeded constructor.
+            _increment = NormalizeIncrement(6554638469UL);
             _state = unchecked((ulong)seed);
-            _increment = NextUlong();
+            _bitBuffer = 0;
+            _bitCount = 0;
+            _increment = NormalizeIncrement(NextUlong());
         }
 
+        // PCG's LCG step is only full-period when the increment is odd; an even one
+        // collapses the sequence. PcgRandom normalizes at every construction site and
+        // this type did not, so 75% of integer seeds and half of Guid seeds produced a
+        // degenerate stream.
+        private static ulong NormalizeIncrement(ulong increment)
+        {
+            return (increment & 1UL) == 0 ? increment | 1UL : increment;
+        }
+
+        /// <summary>
+        /// Produces the next 32-bit sample.
+        /// </summary>
+        /// <returns>A uniformly distributed <see cref="uint"/>.</returns>
         public uint NextUint()
         {
             unchecked
@@ -76,6 +112,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        /// <summary>
+        /// Produces a non-negative <see cref="int"/> below <paramref name="max"/>.
+        /// </summary>
+        /// <param name="max">Exclusive upper bound; must be positive.</param>
+        /// <returns>A value in <c>[0, max)</c>.</returns>
         public int Next(int max)
         {
             if (max <= 0)
@@ -86,57 +127,111 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return unchecked((int)NextUint(unchecked((uint)max)));
         }
 
+        /// <summary>
+        /// Produces a <see cref="uint"/> below <paramref name="max"/> without modulo bias.
+        /// </summary>
+        /// <param name="max">Exclusive upper bound; must be non-zero.</param>
+        /// <returns>A value in <c>[0, max)</c>.</returns>
         public uint NextUint(uint max)
         {
-            /*
-                https://github.com/libevent/libevent/blob/3807a30b03ab42f2f503f2db62b1ef5876e2be80/arc4random.c#L531
-
-                https://cs.stackexchange.com/questions/570/generating-uniformly-distributed-random-numbers-using-a-coin
-                Generates a uniform random number within the bound, avoiding modulo bias
-            */
-            uint threshold = unchecked((uint)((0x100000000UL - max) % max));
-            int attempts = 0;
-            while (true)
+            if (max == 0)
             {
-                uint randomValue = NextUint();
-                if (threshold <= randomValue)
+                throw new ArgumentException("Max cannot be zero");
+            }
+
+            // Power-of-two fast path
+            if ((max & (max - 1)) == 0)
+            {
+                return NextUint() & (max - 1);
+            }
+
+            // Lemire's method (32-bit): take high 32 bits of r*max
+            uint r = NextUint();
+            ulong m = (ulong)r * max;
+            uint lo = (uint)m;
+            if (lo < max)
+            {
+                uint t = unchecked((0u - max) % max);
+                int attempts = 0;
+                while (lo < t)
                 {
-                    return randomValue % max;
+                    if (++attempts > MaxRejectionAttempts32)
+                    {
+                        // Prevent infinite loop: fall back to modulo (small bias) rather than hang
+                        return r % max;
+                    }
+                    r = NextUint();
+                    m = (ulong)r * max;
+                    lo = (uint)m;
                 }
-                if (++attempts > 1 << 16)
-                {
-                    // Prevent infinite loop: return modulo (introduces tiny bias) rather than hang
-                    return randomValue % max;
-                }
+            }
+            return (uint)(m >> 32);
+        }
+
+        /// <summary>
+        /// Produces a non-negative <see cref="long"/>.
+        /// </summary>
+        /// <returns>A value in <c>[0, long.MaxValue]</c>.</returns>
+        public long NextLong()
+        {
+            unchecked
+            {
+                return (long)(NextUlong() & 0x7FFFFFFFFFFFFFFF);
             }
         }
 
-        public long NextLong()
+        /// <summary>
+        /// Produces the next 64-bit sample.
+        /// </summary>
+        /// <returns>A uniformly distributed <see cref="ulong"/>.</returns>
+        public ulong NextUlong()
         {
             uint upper = NextUint();
             uint lower = NextUint();
-            // Mix things up a little
-            if (NextBool())
-            {
-                return unchecked((long)((ulong)upper << 32) | lower);
-            }
-            return unchecked((long)((ulong)lower << 32) | upper);
+            return ((ulong)upper << 32) | lower;
         }
 
-        public ulong NextUlong()
-        {
-            return unchecked((ulong)NextLong());
-        }
-
+        /// <summary>
+        /// Produces a fair coin flip.
+        /// </summary>
+        /// <returns>True or false with equal probability.</returns>
+        /// <remarks>
+        /// Consumes one bit of a buffered 32-bit sample, so 32 flips cost one PCG step
+        /// rather than 32.
+        /// </remarks>
         public bool NextBool()
         {
-            return NextUint() < HalfwayUint;
+            if (_bitCount == 0)
+            {
+                _bitBuffer = NextUint();
+                _bitCount = 32;
+            }
+            bool bit = (_bitBuffer & 1u) == 0;
+            _bitBuffer >>= 1;
+            _bitCount--;
+            return bit;
         }
 
+        /// <summary>
+        /// Produces a <see cref="float"/> in <c>[0, 1)</c>.
+        /// </summary>
+        /// <returns>A value that is never 1.</returns>
         public float NextFloat()
         {
-            uint floatAsInt = NextUint();
-            return (floatAsInt >> 8) * MagicFloat;
+            // Use 24 random bits for float mantissa
+            return (NextUint() >> 8) * (1f / (1 << 24));
+        }
+
+        /// <summary>
+        /// Produces a <see cref="double"/> in <c>[0, 1)</c>.
+        /// </summary>
+        /// <returns>A value that is never 1.</returns>
+        public double NextDouble()
+        {
+            // 53 random bits from a 64-bit sample
+            const double scale = 1.0 / 9007199254740992.0; // 2^53
+            ulong combined = NextUlong() >> 11;
+            return combined * scale;
         }
     }
 }
