@@ -28,6 +28,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public override void BaseSetUp()
         {
+            // Canonical cross-fixture pollution tripwire. See
+            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
+            // the rationale (why this runs FIRST, before any processor
+            // configuration in this SetUp). Placed BEFORE base.BaseSetUp() to
+            // match the placement convention enforced by
+            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(
                 AssetChangeDetectionUtility.Enabled
             );
