@@ -1648,7 +1648,7 @@ function Initialize-EphemeralProject {
         [Parameter(Mandatory = $true)][string]$Root,
         [Parameter(Mandatory = $true)][string]$Version,
         [Parameter(Mandatory = $true)][string]$Mode,
-        [string]$Path,
+        [Parameter(Mandatory = $true)][string]$Path,
         [switch]$IncludeComparisons,
         [switch]$IncludeIntegrations,
         [string]$Backend = 'IL2CPP',
@@ -1665,11 +1665,10 @@ function Initialize-EphemeralProject {
         $RepoRoot = $Root
     }
 
-    $project = if ($Path) {
-        Resolve-FullPath -Path $Path
-    } else {
-        (Resolve-UnityProjectWorkspace -RepoRoot $Root -Version $Version -Mode $Mode).ProjectPath
-    }
+    # Resolve-UnityProjectWorkspace is the single authority on WHERE the project
+    # lives; this function only builds one. A second, divergent computation here is
+    # how the persistent root and the repo-local default would silently drift apart.
+    $project = Resolve-FullPath -Path $Path
 
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Packages') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'ProjectSettings') | Out-Null
