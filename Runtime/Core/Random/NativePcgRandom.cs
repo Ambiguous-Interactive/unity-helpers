@@ -53,6 +53,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     {
         private const int MaxRejectionAttempts32 = 1 << 16;
 
+        // internal so the exhaustive scale test can assert against the value
+        // NextFloat actually uses. A test that re-derives 1f/(1<<24) for itself
+        // proves a property of C# arithmetic, not of this type -- the shipped
+        // 5.960465E-008F would sail straight through it.
+        internal const float FloatScale = 1f / (1 << 24);
+
         // internal, matching PcgRandom, so the parity contract below is assertable
         // without reflecting on our own code.
         internal readonly ulong _increment;
@@ -219,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public float NextFloat()
         {
             // Use 24 random bits for float mantissa
-            return (NextUint() >> 8) * (1f / (1 << 24));
+            return (NextUint() >> 8) * FloatScale;
         }
 
         /// <summary>

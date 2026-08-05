@@ -103,14 +103,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         // Exhaustive rather than sampled: 2^24 is every value the 24-bit mantissa can
-        // take, so this cannot miss the two that used to round to 1.
+        // take, so this cannot miss the two that used to round to 1 -- a sampled test
+        // has roughly a 1-in-40 chance of drawing either. It multiplies by the
+        // production constant, not a re-derived one, or it would only be asserting
+        // that C# can evaluate 1f/(1<<24).
         [Test]
         public void NextFloatScaleIsExactForEveryMantissa()
         {
             const int MantissaCount = 1 << 24;
             for (int mantissa = 0; mantissa < MantissaCount; mantissa++)
             {
-                float value = mantissa * (1f / (1 << 24));
+                float value = mantissa * NativePcgRandom.FloatScale;
                 if (value >= 1f)
                 {
                     Assert.Fail($"Mantissa {mantissa} scales to {value:R}, which is not below 1.");
