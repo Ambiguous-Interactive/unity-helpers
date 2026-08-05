@@ -2466,6 +2466,12 @@ $supersededStep = [regex]::Match(
     $matrixConfigJob,
     '(?ms)^      - name: Detect superseded pull request head\s*$.*?(?=^      - name:|\z)'
 )
+$supersededDecisions = @(
+    [regex]::Matches(
+        $(if ($supersededStep.Success) { $supersededStep.Value } else { '' }),
+        'superseded=(?<value>true|false)'
+    ) | ForEach-Object { $_.Groups['value'].Value }
+)
 $supersededGateContracts = @(
     @{
         Name = 'matrix-config exposes the superseded output'
@@ -2488,13 +2494,32 @@ $supersededGateContracts = @(
         Message = 'The superseded detection step must compare the run''s queued head SHA against the pull request''s live head SHA.'
     },
     @{
+        # Counting the two values is not enough -- swapping which BRANCH writes
+        # which value keeps the counts identical while inverting the whole
+        # guarantee. Bind them to position instead: every early exit writes
+        # false, and only the step's final, unconditional write says true. Any
+        # branch that reports superseded before the comparison has run then
+        # lands a `true` ahead of the last write and fails here.
         Name = 'superseded detection fails open'
+        Ok = $supersededDecisions.Count -ge 4 -and
+        $supersededDecisions[-1] -eq 'true' -and
+        @($supersededDecisions[0..($supersededDecisions.Count - 2)] | Where-Object { $_ -ne 'false' }).Count -eq 0
+        Message = 'The superseded detection step must fail OPEN: every early exit (not a pull request, unresolvable head, head unchanged) must write superseded=false, and only the final unconditional write may say true, so validation is never skipped by an API hiccup.'
+    },
+    @{
+        # `gh api --jq '.head.sha'` prints the literal "null" and exits 0 when
+        # the field is absent, and "null" compares unequal to any real SHA. An
+        # emptiness check alone would turn that anomaly into a skipped run.
+        Name = 'superseded detection validates the resolved head shape'
+        Ok = $supersededStep.Success -and $supersededStep.Value -match '\[0-9a-f\]'
+        Message = 'The superseded detection step must validate that the resolved head looks like a SHA, not merely that it is non-empty, so an API response without the field cannot skip the licensed tiers.'
+    },
+    @{
+        Name = 'Unity CI Success still requires the hosted gates when superseded'
         Ok = (
-            $supersededStep.Success -and
-            ([regex]::Matches($supersededStep.Value, 'superseded=false')).Count -ge 3 -and
-            ([regex]::Matches($supersededStep.Value, 'superseded=true')).Count -eq 1
+            $workflowContent -match '(?m)^            if \[ "\$\{MATRIX_CONFIG_RESULT\}" != "success" \] \|\| \[ "\$\{RUNNER_PREFLIGHT_RESULT\}" != "success" \]; then\s*$'
         )
-        Message = 'The superseded detection step must fail OPEN: a non-pull-request run and any failure to resolve the live head must report superseded=false so validation is never skipped by an API hiccup.'
+        Message = 'The superseded short-circuit must still require matrix-config and runner-preflight to have succeeded. Both jobs run to completion regardless of supersession -- matrix-config goes on to lint the test-project module manifest -- and a failed job still publishes its outputs, so waiving them would report green for a bogus UPM module id or an offline runner fleet.'
     },
     @{
         Name = 'Unity CI Success treats a superseded run as a clean no-op'

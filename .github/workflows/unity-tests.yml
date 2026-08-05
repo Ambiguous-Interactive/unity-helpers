@@ -102,8 +102,12 @@ jobs:
           if ! current="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"; then
             current=""
           fi
-          if [ -z "${current}" ]; then
-            echo "::warning::Could not resolve the current head of pull request #${PR_NUMBER}; proceeding as current."
+          # Shape, not emptiness: `--jq '.head.sha'` prints the literal string
+          # "null" and exits 0 when the field is absent, and "null" compares
+          # unequal to any real SHA -- an API anomaly would otherwise skip every
+          # licensed tier, the one thing this step must never do.
+          if ! printf '%s' "${current}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::warning::Could not resolve the current head of pull request #${PR_NUMBER} (got '${current}'); proceeding as current."
             echo "superseded=false" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
@@ -1675,7 +1679,20 @@ jobs:
           # neither gate nor authorize a merge of the current head. Reporting
           # anything else here would either mark "you pushed again" as a defect
           # or leave the run permanently pending.
+          #
+          # Supersession waives ONLY the four licensed results. The two hosted
+          # gates still have to pass, because they run to completion regardless:
+          # matrix-config resolves supersession in its second step and then goes
+          # on to lint the test-project module manifest and resolve the matrix,
+          # and a failed job still publishes its outputs. Short-circuiting on
+          # the output alone would report green for a bogus UPM module id or an
+          # offline runner fleet, which is the exact fail-fast signal those jobs
+          # exist to raise.
           if [ "${MATRIX_CONFIG_SUPERSEDED}" = "true" ]; then
+            if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
+              echo "::error::Superseded run, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
+              exit 1
+            fi
             echo "Superseded run; the licensed Unity tiers were skipped for the current head's run."
             exit 0
           fi
