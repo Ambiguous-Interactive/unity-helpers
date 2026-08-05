@@ -12,7 +12,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [GameObject & Component Helpers](#gameobject--component-helpers) — Component discovery, hierarchy manipulation
 - [Transform Helpers](#transform-helpers) — Hierarchy traversal
 - [Coroutine Wait Pools](#coroutine-wait-pools) — Configure `Buffers.GetWaitForSeconds*` caching
-- [Threading](#threading) — Main thread dispatcher
+- [Threading](#threading) — Main thread dispatcher, single-threaded pool teardown
 - [Path & File Helpers](#path--file-helpers) — Path resolution, file operations
 - [Scene Helpers](#scene-helpers) — Scene queries and loading
 - [Advanced Utilities](#advanced-utilities) — Null checks, hashing, formatting
@@ -550,6 +550,50 @@ async Task<string> GetTextFromMainThread()
     return text;
 }
 ```
+
+### SingleThreadedThreadPool
+
+**Run background work one item at a time, in enqueue order:**
+
+**Disposal discards queued work.** `Dispose()` and `DisposeAsync()` cancel the worker rather than
+draining it, so anything enqueued but not yet started is dropped — the `await` inside
+`DisposeAsync()` waits only for the item already in flight. That is what you want for work that can
+simply be redone, such as a generation pass, and not what you want for durable work such as a
+persistence write.
+
+The window is narrow enough to hide in testing: work enqueued a millisecond or more before disposal
+almost always completes, work enqueued immediately before it almost never does.
+
+Call `DrainAsync()` when queued items must run. It closes the pool to new work permanently, then
+returns once the queue is empty and nothing is executing:
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Threading;
+
+// Work that can be redone: drop whatever is still queued.
+_generationPool.Dispose();
+
+// Durable work: let the queue run down first.
+if (!await _persistencePool.DrainAsync())
+{
+    this.Log()?.Warn("Pool did not drain; writing final state on this thread.");
+}
+
+await _persistencePool.DisposeAsync();
+```
+
+`DrainAsync()` returns `false` when the wait was abandoned via its `CancellationToken`, the pool was
+already disposed, or the worker had already stopped with items still queued — so a caller can fall
+back to writing the final state itself. `IsAcceptingWork` reports whether `Enqueue` still does
+anything.
+
+The guarantee covers every item the calling thread enqueued before the call. A producer racing the
+drain from another thread is not covered, so stop those producers first.
+
+**One caveat on the synchronous `Dispose()`:** it blocks the calling thread until the in-flight item
+finishes. The pool posts nothing back to Unity's main thread, so this is safe for ordinary work
+items. A work item whose own continuations capture the main thread's synchronization context would
+deadlock, because `OnDestroy` runs on that thread — prefer `DisposeAsync()` there.
 
 ---
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`SingleThreadedThreadPool.DrainAsync()`**: closes the pool to new work and waits for everything already queued to finish, for consumers whose queued items are durable (persistence writes) rather than redoable. Disposal still cancels instead of draining, which is the right behavior for work that can simply be redone, so both teardown shapes are now expressible. `DrainAsync` reports whether it ran the queue down so a caller can fall back to writing final state itself, and never throws. `IsAcceptingWork` reports whether `Enqueue` still does anything ([#318](https://github.com/Ambiguous-Interactive/unity-helpers/issues/318)).
+
 ### Fixed
 
 - **Collection-valued serializable dictionaries and sets silently dropping their contents**: Unity does not serialize a nested collection, so `SerializableDictionary<TKey, List<TValue>>` wrote its keys array and no values array at all, leaving assets that looked authored while every runtime lookup returned nothing. The dictionary and set drawers now report the unsupported shape as an Inspector error instead of drawing a column that persists nothing, and the error cannot be hidden by collapsing the field. Wrap the value or element type in a `[Serializable]` class, or declare the dictionary as `SerializableDictionary<TKey, TValue, TValueCache>` ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).

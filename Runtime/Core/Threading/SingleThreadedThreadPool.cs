@@ -9,12 +9,58 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     using System.Threading;
     using System.Threading.Tasks;
 
+    /// <summary>
+    /// Runs enqueued work one item at a time on a single background worker, in enqueue order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Disposal discards queued work.</b> <see cref="Dispose"/> and <see cref="DisposeAsync"/>
+    /// cancel the worker rather than draining it, so anything enqueued but not yet started is
+    /// dropped. The <c>await</c> inside <see cref="DisposeAsync"/> waits only for the item already
+    /// in flight. That is the right behavior for work that can simply be redone, such as
+    /// generation passes, and the wrong behavior for durable work such as persistence writes:
+    /// call <see cref="DrainAsync"/> first when queued items must run.
+    /// </para>
+    /// <para>
+    /// The window is narrow enough to hide in testing. Work enqueued a millisecond or more before
+    /// disposal almost always completes; work enqueued immediately before it almost never does.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code><![CDATA[
+    /// // Work that can be redone: drop whatever is still queued.
+    /// pool.Dispose();
+    ///
+    /// // Durable work: let the queue run down first.
+    /// await pool.DrainAsync();
+    /// await pool.DisposeAsync();
+    /// ]]></code>
+    /// </example>
     public sealed class SingleThreadedThreadPool : IDisposable
     {
+        // Teardown-only poll interval. Draining waits on the worker finishing items rather than on
+        // a signal, which keeps the enqueue path free of extra synchronization for a path that
+        // runs once per pool.
+        private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
+
+        /// <summary>
+        /// Exceptions thrown by work items, in the order they were caught.
+        /// </summary>
         public ConcurrentQueue<Exception> Exceptions => _exceptions;
+
+        /// <summary>
+        /// Number of work items queued, plus the one currently executing.
+        /// </summary>
         public int Count => _work.Count + (_isWorking ? 1 : 0);
 
+        /// <summary>
+        /// Whether the pool still accepts work. Turns off permanently on the first
+        /// <see cref="DrainAsync"/> or disposal.
+        /// </summary>
+        public bool IsAcceptingWork => _acceptingWork && !_disposed;
+
         private volatile bool _active = true;
+        private volatile bool _acceptingWork = true;
         private volatile bool _isWorking;
         private volatile bool _disposed;
 
@@ -25,6 +71,17 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         private readonly TimeSpan _noWorkWaitTime;
         private readonly CancellationTokenSource _cancellationTokenSource;
 
+        /// <summary>
+        /// Starts the worker immediately.
+        /// </summary>
+        /// <param name="runInBackground">
+        /// When <see langword="true"/> the worker runs on a thread pool thread; otherwise it gets
+        /// its own long-running thread.
+        /// </param>
+        /// <param name="noWorkWaitTime">
+        /// How long the idle worker waits for a signal before re-checking the queue. Defaults to
+        /// one second.
+        /// </param>
         public SingleThreadedThreadPool(
             bool runInBackground = true,
             TimeSpan? noWorkWaitTime = null
@@ -41,9 +98,13 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 : Task.Factory.StartNew(DoWorkAsync, TaskCreationOptions.LongRunning).Unwrap();
         }
 
+        /// <summary>
+        /// Queues an action to run on the worker. Ignored once the pool stops accepting work.
+        /// </summary>
+        /// <param name="work">The action to run.</param>
         public void Enqueue(Action work)
         {
-            if (_disposed || !_active)
+            if (_disposed || !_acceptingWork)
             {
                 return;
             }
@@ -52,9 +113,14 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             Signal();
         }
 
+        /// <summary>
+        /// Queues an asynchronous action to run on the worker, which awaits it before starting the
+        /// next item. Ignored once the pool stops accepting work.
+        /// </summary>
+        /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<Task> work)
         {
-            if (_disposed || !_active)
+            if (_disposed || !_acceptingWork)
             {
                 return;
             }
@@ -63,9 +129,14 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             Signal();
         }
 
+        /// <summary>
+        /// Queues an asynchronous action to run on the worker, which awaits it before starting the
+        /// next item. Ignored once the pool stops accepting work.
+        /// </summary>
+        /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<ValueTask> work)
         {
-            if (_disposed || !_active)
+            if (_disposed || !_acceptingWork)
             {
                 return;
             }
@@ -86,6 +157,75 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
         }
 
+        /// <summary>
+        /// Stops accepting new work and waits for everything already queued to finish running.
+        /// </summary>
+        /// <param name="cancellationToken">Abandons the wait; queued work is left in the queue.</param>
+        /// <returns>
+        /// <see langword="true"/> when the queue ran down and the worker went idle;
+        /// <see langword="false"/> when the wait was abandoned, the pool was already disposed, or
+        /// the worker had already stopped with items still queued.
+        /// </returns>
+        /// <remarks>
+        /// Closes the pool to new work permanently, then returns once the queue is empty and no
+        /// item is executing. The guarantee is that every item the calling thread enqueued before
+        /// this call has run; a concurrent producer racing this call is not covered, so stop those
+        /// producers first. Disposal is still required afterwards -- draining does not stop the
+        /// worker or release its handles.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (!await pool.DrainAsync())
+        /// {
+        ///     Debug.LogWarning("Pool did not drain; writing final state on this thread.");
+        /// }
+        ///
+        /// await pool.DisposeAsync();
+        /// ]]></code>
+        /// </example>
+        public async ValueTask<bool> DrainAsync(CancellationToken cancellationToken = default)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            _acceptingWork = false;
+            Signal();
+
+            while (!_work.IsEmpty || _isWorking)
+            {
+                if (cancellationToken.IsCancellationRequested || _disposed)
+                {
+                    return false;
+                }
+
+                // A stopped worker will never drain what is left, so waiting for it would hang.
+                if (_workerTask.IsCompleted && !_isWorking)
+                {
+                    return _work.IsEmpty;
+                }
+
+                try
+                {
+                    await Task.Delay(DrainPollInterval, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Cancels the worker and releases its handles, discarding any work still queued.
+        /// </summary>
+        /// <remarks>
+        /// Waits only for the item already in flight. Call <see cref="DrainAsync"/> first when
+        /// queued items must run.
+        /// </remarks>
         public async ValueTask DisposeAsync()
         {
             if (_disposed)
@@ -93,6 +233,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 return;
             }
 
+            _acceptingWork = false;
             _active = false;
             _disposed = true;
 
@@ -117,6 +258,17 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Cancels the worker and releases its handles, discarding any work still queued.
+        /// </summary>
+        /// <remarks>
+        /// Blocks the calling thread until the in-flight item finishes. This is safe for work
+        /// items that do not resume on a captured synchronization context; the pool itself uses
+        /// <c>ConfigureAwait(false)</c> throughout, so it posts nothing back to Unity's main
+        /// thread. A work item whose own continuations capture the main thread's context would
+        /// deadlock here, because <c>OnDestroy</c> runs on that thread. Prefer
+        /// <see cref="DisposeAsync"/> when the work items await anything context-bound.
+        /// </remarks>
         public void Dispose()
         {
             DisposeAsync().AsTask().GetAwaiter().GetResult();
