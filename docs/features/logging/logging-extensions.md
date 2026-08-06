@@ -44,7 +44,17 @@ public sealed class EnemyHUD : MonoBehaviour
 
 ### Enabling logging in builds
 
-`ENABLE_UBERLOGGING` is defined automatically for `DEBUG`, `DEVELOPMENT_BUILD`, and `UNITY_EDITOR`. Define it manually (or `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) in Player Settings if you need the extensions in release builds.
+Logging is on wherever Unity defines `UNITY_EDITOR`, `DEVELOPMENT_BUILD`, or `DEBUG`, so the editor and development builds need no configuration. To keep it in a release build, define `ENABLE_UBERLOGGING` (or the per-severity `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) in **Player Settings → Scripting Define Symbols**.
+
+The define has to be project-wide. Each entry point is a [`[Conditional]`](https://learn.microsoft.com/dotnet/api/system.diagnostics.conditionalattribute) method, and the compiler decides whether to keep a call by looking at the symbols of the assembly that **calls** it — not the ones this package was compiled with. That is what makes a disabled call genuinely free:
+
+```csharp
+// Logging off: this whole line is removed, so Instance is never read and no
+// FormattableString is built. The singleton is not created.
+CoroutineHandler.Instance.Log($"Finished unloading {scene.name}.");
+```
+
+The same applies to `Helpers.LogNotAssigned` and `ValidateAssignments`, whose only observable effect is a log — with logging off, `ValidateAssignments` no longer performs its reflection walk. Use `AreAnyAssignmentsInvalid` when you need the answer in every build configuration.
 
 ---
 
@@ -105,14 +115,14 @@ Use negative priorities for “outer” wrappers (run earlier) and higher number
 
 ## Extension Method Cheat Sheet
 
-| API                                                                                                      | Description                                                                                      |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `component.Log(FormattableString, Exception e = null, bool pretty = true)`                               | Sends an info log through the formatter. Guarded by `ENABLE_UBERLOGGING`/`DEBUG_LOGGING`.        |
-| `component.LogWarn(...)`, `component.LogError(...)`, `component.LogDebug(...)`                           | Severity-specific variants with the same signature.                                              |
-| `component.GenericToString()`                                                                            | Serializes all public fields/properties into JSON (used by the formatter when you pass `:json`). |
-| `component.EnableLogging()` / `component.DisableLogging()`                                               | Per-object toggle. Disabled components are skipped without allocations.                          |
-| `component.GlobalEnableLogging()` / `component.GlobalDisableLogging()` / `SetGlobalLoggingEnabled(bool)` | Global kill switch suitable for in-game consoles or dev toggles.                                 |
-| `WallstopStudiosLogger.IsGlobalLoggingEnabled()`                                                         | Query current state (useful for tooling UIs).                                                    |
+| API                                                                                                      | Description                                                                                       |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `component.Log(FormattableString, Exception e = null, bool pretty = true)`                               | Sends an info log through the formatter. `[Conditional]` on `ENABLE_UBERLOGGING`/`DEBUG_LOGGING`. |
+| `component.LogWarn(...)`, `component.LogError(...)`, `component.LogDebug(...)`                           | Severity-specific variants with the same signature.                                               |
+| `component.GenericToString()`                                                                            | Serializes all public fields/properties into JSON (used by the formatter when you pass `:json`).  |
+| `component.EnableLogging()` / `component.DisableLogging()`                                               | Per-object toggle. Disabled components are skipped without allocations.                           |
+| `component.GlobalEnableLogging()` / `component.GlobalDisableLogging()` / `SetGlobalLoggingEnabled(bool)` | Global kill switch suitable for in-game consoles or dev toggles.                                  |
+| `WallstopStudiosLogger.IsGlobalLoggingEnabled()`                                                         | Query current state (useful for tooling UIs).                                                     |
 
 Additional behavior:
 
@@ -127,7 +137,7 @@ Additional behavior:
 1. **Register tags once** — Use static constructors or `[RuntimeInitializeOnLoadMethod]` to register project-wide tags. Avoid allocating per-frame delegates.
 2. **Prefer interpolation** — `$"{health:json}"` keeps minimal formatting allocations compared to `string.Format`.
 3. **Use `pretty: false` for exporters** — When writing to files or parsing logs, disable prefixes to simplify downstream tooling.
-4. **Gate release builds** — If you plan to leave logging enabled in production, explicitly define `ENABLE_UBERLOGGING` (or `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) and make sure log volume is acceptable (or wrap noisy calls in your own `#define`s).
+4. **Gate release builds** — If you plan to leave logging enabled in production, define `ENABLE_UBERLOGGING` (or `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) project-wide and make sure log volume is acceptable (or wrap noisy calls in your own `#define`s). Leaving them undefined costs nothing at all — the calls are not compiled.
 5. **Leverage tests** — `Tests/Runtime/Extensions/LoggingExtensionTests.cs` covers every default tag and stacking scenario. Copy those patterns when adding new decorations to ensure behavior stays deterministic.
 
 ---

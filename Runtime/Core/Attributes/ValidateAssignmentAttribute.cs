@@ -156,12 +156,32 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             );
         }
 
+        /// <summary>
+        /// Logs a warning for every <see cref="ValidateAssignmentAttribute"/> field on
+        /// <paramref name="o"/> that is null, empty, or has no elements.
+        /// </summary>
+        /// <param name="o">The Unity Object to validate. A null object is a no-op.</param>
+        /// <remarks>
+        /// Thread-safe: Yes.
+        /// Performance: O(n) in the attributed field count; the field set is cached per type.
+        /// Allocations: None when logging is disabled -- this method is
+        /// <see cref="System.Diagnostics.ConditionalAttribute"/> on the same symbol set as
+        /// <see cref="WallstopStudiosLogger.LogWarn"/>, its only observable effect. The compiler
+        /// removes the entire call site, so the reflection walk and its
+        /// <see cref="FieldInfo.GetValue(object)"/> boxing never happen in a release build.
+        /// Use <see cref="AreAnyAssignmentsInvalid"/> when the answer is needed regardless of
+        /// build configuration.
+        /// </remarks>
+        // NOT gated on UNITY_EDITOR alone: the symbol set below includes DEVELOPMENT_BUILD, which
+        // keeps this alive for IL2CPP standalone test players, where the warning test expects the
+        // log. The body is reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
+        [System.Diagnostics.Conditional(WallstopStudiosLogger.EnableUberLoggingSymbol)]
+        [System.Diagnostics.Conditional(WallstopStudiosLogger.DevelopmentBuildSymbol)]
+        [System.Diagnostics.Conditional(WallstopStudiosLogger.DebugSymbol)]
+        [System.Diagnostics.Conditional(WallstopStudiosLogger.UnityEditorSymbol)]
+        [System.Diagnostics.Conditional(WallstopStudiosLogger.WarnLoggingSymbol)]
         public static void ValidateAssignments(this Object o)
         {
-            // Intentionally NOT gated on UNITY_EDITOR: the sibling AreAnyAssignmentsInvalid already
-            // runs in player builds, so gating only the logging variant left this a silent no-op in
-            // builds (and on IL2CPP standalone, where the warning test expects the log). The body is
-            // reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
             if (o == null)
             {
                 return;

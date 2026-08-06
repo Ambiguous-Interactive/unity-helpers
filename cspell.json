@@ -358,7 +358,8 @@
         "contravariant",
         "vtable",
         "blittable",
-        "IVT"
+        "IVT",
+        "undefining"
       ]
     },
     {
