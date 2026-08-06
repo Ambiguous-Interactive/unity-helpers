@@ -932,8 +932,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             // either alone fails this loop somewhere.
             foreach (T value in values)
             {
+                // The PUBLIC generic overload, not the internal helper: this is the one overload
+                // resolution picks for a statically-typed enum, and it must agree with the boxed
+                // path the editor tooling is forced onto.
                 Assert.IsTrue(
-                    EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong generic),
+                    value.TryConvertToUInt64(out ulong generic),
                     $"{typeof(T).Name}.{value} failed the generic conversion."
                 );
                 Assert.IsTrue(
@@ -949,6 +952,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Assert.IsTrue(
                     ((Enum)value).TryConvertToInt64(out long signed),
                     $"{typeof(T).Name}.{value} failed the signed boxed conversion."
+                );
+                Assert.IsTrue(
+                    value.TryConvertToInt64(out long genericSigned),
+                    $"{typeof(T).Name}.{value} failed the generic signed conversion."
+                );
+                Assert.AreEqual(
+                    signed,
+                    genericSigned,
+                    $"{typeof(T).Name}.{value}: the generic signed conversion disagreed with the boxed one."
                 );
                 Assert.AreEqual(
                     unchecked((long)boxed),

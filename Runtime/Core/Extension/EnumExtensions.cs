@@ -466,6 +466,74 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
+        /// Converts an enum value to the 64-bit two's-complement pattern of its underlying type,
+        /// without boxing.
+        /// </summary>
+        /// <typeparam name="T">The unmanaged enum type.</typeparam>
+        /// <param name="value">The enum value to convert.</param>
+        /// <param name="result">The converted bit pattern, or 0 when conversion fails.</param>
+        /// <returns>True when <paramref name="value"/> was converted; otherwise, false.</returns>
+        /// <remarks>
+        /// Null handling: Not applicable; <typeparamref name="T"/> is a value type.
+        /// Thread-safe: Yes.
+        /// Performance: O(1).
+        /// Allocations: None. Prefer this overload wherever the enum type is known at compile time;
+        /// the <see cref="Enum"/> overload exists for editor tooling, which only ever holds enum
+        /// values as <see cref="object"/> and so cannot supply a type argument.
+        /// Edge cases: Signed underlying types are sign-extended, matching the boxed overload
+        /// exactly, so the two agree for every member of every shape.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (Direction.Left.TryConvertToUInt64(out ulong pattern))
+        /// {
+        ///     Debug.Log(pattern);
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool TryConvertToUInt64<T>(this T value, out ulong result)
+            where T : unmanaged, Enum
+        {
+            return EnumNumericHelper<T>.TryConvertToUInt64(value, out result);
+        }
+
+        /// <summary>
+        /// Converts an enum value to the signed 64-bit pattern Unity's serialized properties store,
+        /// without boxing.
+        /// </summary>
+        /// <typeparam name="T">The unmanaged enum type.</typeparam>
+        /// <param name="value">The enum value to convert.</param>
+        /// <param name="result">The converted value, or 0 when conversion fails.</param>
+        /// <returns>True when <paramref name="value"/> was converted; otherwise, false.</returns>
+        /// <remarks>
+        /// Null handling: Not applicable; <typeparamref name="T"/> is a value type.
+        /// Thread-safe: Yes.
+        /// Performance: O(1).
+        /// Allocations: None.
+        /// Edge cases: Identical bit pattern to the <see cref="Enum"/> overload.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (Direction.Left.TryConvertToInt64(out long serialized))
+        /// {
+        ///     property.longValue = serialized;
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool TryConvertToInt64<T>(this T value, out long result)
+            where T : unmanaged, Enum
+        {
+            if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong unsigned))
+            {
+                result = 0L;
+                return false;
+            }
+
+            result = unchecked((long)unsigned);
+            return true;
+        }
+
+        /// <summary>
         /// Converts a boxed enum value to the 64-bit two's-complement pattern of its underlying type.
         /// </summary>
         /// <param name="value">The enum value to convert.</param>
@@ -485,7 +553,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         /// <example>
         /// <code><![CDATA[
-        /// if (Direction.Left.TryConvertToUInt64(out ulong pattern))
+        /// // Editor tooling holds enum members as object, so the type is not known statically.
+        /// object member = System.Enum.GetValues(enumType).GetValue(0);
+        /// if (member is Enum boxed && boxed.TryConvertToUInt64(out ulong pattern))
         /// {
         ///     Debug.Log(pattern);
         /// }
@@ -540,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         /// <example>
         /// <code><![CDATA[
-        /// if (Direction.Left.TryConvertToInt64(out long serialized))
+        /// if (option.Value is Enum boxed && boxed.TryConvertToInt64(out long serialized))
         /// {
         ///     property.longValue = serialized;
         /// }
