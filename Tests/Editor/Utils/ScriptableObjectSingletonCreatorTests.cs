@@ -1391,6 +1391,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string testPath = TestRoot + "/OrphanCleanupTest.asset";
             string absolutePath = GetAbsolutePath(testPath);
 
+            // TestRoot lives under Assets/Resources, which is exactly where the singleton creator
+            // scans, and the file written below is not valid asset YAML. Any AssetDatabase refresh
+            // that lands while it exists logs "Unknown error occurred while loading" -- including
+            // the deferred one EnsureSingletonAssets queues on EditorApplication.delayCall, which
+            // fires on a later frame and so is attributed to whichever test is then running.
+            // Suppression has to stay open across every yield below, so it cannot be a try/finally
+            // (this is a coroutine); it is cleared once the corrupt file is gone and refreshed.
+            LogAssert.ignoreFailingMessages = true;
+
             // Create a fake asset file on disk (simulating partial creation)
             File.WriteAllText(absolutePath, "fake asset content");
             Assert.IsTrue(File.Exists(absolutePath), "Setup: fake file should exist on disk");
@@ -1416,6 +1425,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ImportAssetOptions.ForceSynchronousImport
             );
             yield return null;
+            LogAssert.ignoreFailingMessages = false;
 
             Assert.IsFalse(File.Exists(absolutePath), "Orphaned asset file should be cleaned up");
             Assert.IsFalse(File.Exists(metaPath), "Orphaned meta file should be cleaned up");
@@ -1453,6 +1463,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Create a ScriptableObject and write a partial file to simulate failed creation
             ScriptableObject instance = ScriptableObject.CreateInstance<CaseMismatch>(); // UNH-SUPPRESS: UNH002 - Testing cleanup logic
 
+            // Same coupling as TryCleanupPartiallyCreatedAssetRemovesOrphanedFiles: this writes
+            // invalid asset YAML into Assets/Resources and then lets frames pass, so a deferred
+            // refresh can log a load error against it. Observed on the Unity 6000.5 EditMode leg
+            // while the other seven legs passed on identical code.
+            LogAssert.ignoreFailingMessages = true;
+
             // Write partial content to disk (simulating Unity writing but failing to import)
             File.WriteAllText(absolutePath, "partial yaml content");
             yield return null;
@@ -1479,6 +1495,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ImportAssetOptions.ForceSynchronousImport
             );
             yield return null;
+            LogAssert.ignoreFailingMessages = false;
 
             Assert.IsFalse(File.Exists(absolutePath), "Partial file should be cleaned up");
         }

@@ -252,6 +252,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [TearDown]
         public virtual void TearDown()
         {
+            // Safety cleanup: a test that suppresses failing log messages and then fails inside the
+            // suppression window leaks the setting into every test that follows, where it silently
+            // swallows real errors. Unity does not reset it between tests, and a leaked suppression
+            // is far worse than the flake the suppression was hiding, so clear it unconditionally.
+            LogAssert.ignoreFailingMessages = false;
+
 #if UNITY_EDITOR
             // Safety cleanup: ensure AssetDatabase is not stuck in batch mode
             // This handles tests that throw exceptions before properly disposing batch scopes
