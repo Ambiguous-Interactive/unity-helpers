@@ -305,7 +305,7 @@ export function resolveOptions(args, environment = process.env, localValues, rep
     port: integer(explicitPort ?? DEFAULTS.port, "Port", 1, 65_535),
     explicitPort: explicitPort === undefined ? undefined : integer(explicitPort, "Port", 1, 65_535),
     endpointPath: validateEndpointPath(get("path", "endpointPath", DEFAULTS.endpointPath)),
-    projectPath: path.resolve(projectPath ?? repoRoot),
+    projectPath: projectPath === undefined ? undefined : path.resolve(projectPath),
     relayPath: first(args.relay, environment[ENV_KEYS.relayPath], local[ENV_KEYS.relayPath]),
     requestTimeout: integer(
       get("request-timeout", "requestTimeout", DEFAULTS.requestTimeout),
@@ -361,12 +361,52 @@ export function resolveOptions(args, environment = process.env, localValues, rep
   return options;
 }
 
-export function requireProjectPath(options) {
-  if (!options.projectPath) {
-    fail(`Unity project path is required. Pass --project or set ${ENV_KEYS.projectPath}.`);
+/** A Unity project root is the directory holding both Assets and ProjectSettings. */
+export function isUnityProjectRoot(directory, exists = fs.existsSync) {
+  return (
+    exists(path.join(directory, "Assets")) && exists(path.join(directory, "ProjectSettings"))
+  );
+}
+
+/**
+ * Walk up from a starting directory to the Unity project that contains it.
+ *
+ * The sibling studio repos this script came from ARE Unity projects, so they default the relay's
+ * --project-path to their own repo root. This repository is a PACKAGE: it lives at
+ * <project>/Packages/com.wallstop-studios.unity-helpers and has no Assets/ProjectSettings of its
+ * own. Inheriting that default hands the relay a directory that is not a project at all, and the
+ * editor it then attaches to is anyone's guess -- the #333 failure one level down.
+ *
+ * Requiring BOTH marker directories is what makes this correct here: the repo root happens to
+ * carry a stray Assets/, and matching on that alone would stop at the package.
+ */
+export function findUnityProjectRoot(start, exists = fs.existsSync) {
+  let current = path.resolve(start);
+  for (;;) {
+    if (isUnityProjectRoot(current, exists)) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return undefined;
+    }
+    current = parent;
   }
-  // Resolved from this script's own repository by default, so the relay is pinned to the project
-  // the script lives in no matter which directory the bridge was started from.
+}
+
+export function requireProjectPath(options, runtime = {}) {
+  const exists = runtime.exists ?? fs.existsSync;
+  if (!options.projectPath) {
+    const discovered = findUnityProjectRoot(options.repoRoot, exists);
+    if (!discovered) {
+      fail(
+        `Could not find a Unity project above ${options.repoRoot}. This repository is a package, ` +
+          `not a project, so the bridge walks up looking for a directory with both Assets and ` +
+          `ProjectSettings. Pass --project <unity project root> or set ${ENV_KEYS.projectPath}.`
+      );
+    }
+    options = { ...options, projectPath: discovered };
+  }
   if (!fs.existsSync(options.projectPath) || !fs.statSync(options.projectPath).isDirectory()) {
     fail(`Unity project directory does not exist: ${options.projectPath}`);
   }
@@ -1215,8 +1255,11 @@ function sendJson(response, statusCode, payload, closeConnection = false) {
 }
 
 export async function startBridge(inputOptions, runtime = {}) {
-  const options = ensureBearerToken(inputOptions);
-  const projectPath = requireProjectPath(options);
+  let options = ensureBearerToken(inputOptions);
+  const projectPath = requireProjectPath(options, runtime.projectRuntime);
+  // Fold the discovered project back in so the startup banner and the returned options report the
+  // directory the relay was actually pointed at, not the undefined the caller supplied.
+  options = { ...options, projectPath };
   const relayPath = findRelay(options.relayPath, runtime.relayRuntime);
   await assertPortAvailable(options.port, options.bindHost);
 

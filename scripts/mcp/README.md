@@ -29,10 +29,16 @@ sanity check did not help, because a consumer project contains
 
 Three layers keep it pinned, and none of them is sufficient alone:
 
-1. **The relay is told the project.** `bridge` passes `--project-path <repo root>`, resolved from
-   this script's own location rather than the current directory, so it pins this repository no
-   matter where the bridge was started. `--project` overrides deliberately. Without that flag the
-   relay attaches to whichever editor it discovers first.
+1. **The relay is told the project.** `bridge` passes `--project-path`, so the relay opens a named
+   project instead of whichever editor it discovers first. `--project` overrides deliberately.
+
+   **This repository is a package, not a Unity project**, which is where the sibling studio repos
+   differ: they _are_ projects, so they can pass their own repo root. Here the repo lives at
+   `<project>/Packages/com.wallstop-studios.unity-helpers` and has no `Assets`/`ProjectSettings` of
+   its own, so `bridge` walks **up** from the script's location to the first directory containing
+   **both** markers. Both are required because the repo root carries a stray, untracked `Assets/`;
+   matching on that alone would stop at the package and hand the relay a non-project.
+
 2. **Each project owns a port.** This repository uses **9007**; DxMessaging 9003, IshoBoy 9004,
    DoxReloaded 9010, qora-redux 9020. Discovery probes 9007 only — probing a neighbor's port is
    exactly how a config ends up aimed at another project's editor.

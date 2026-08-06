@@ -17,9 +17,15 @@ npm run unity:mcp:bridge
 ```
 
 It finds Unity's relay under `~/.unity/relay`, generates a bearer token into `.env.local` if there
-is not one already, and pins the relay to **this repository's** Unity project by passing
-`--project-path`. That pin is what stops the relay attaching to whichever editor it discovers first
-when several are open. Pass `--project <path>` only to override it deliberately.
+is not one already, and pins the relay to a named Unity project by passing `--project-path`. That
+pin is what stops the relay attaching to whichever editor it discovers first when several are open.
+
+This repository is a **package**, not a Unity project, so there is nothing to pin at the repo root.
+`bridge` walks up from the script's location to the first directory holding both `Assets` and
+`ProjectSettings` — normally `<project>/` two levels above
+`<project>/Packages/com.wallstop-studios.unity-helpers`. If your layout differs, or the walk finds
+nothing, pass `--project <unity project root>` (or set `UNITY_PROJECT_PATH`); it fails with that
+instruction rather than guessing.
 
 See the [Unity MCP documentation](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.9/manual/integration/unity-mcp-get-started.html)
 for installing the relay.

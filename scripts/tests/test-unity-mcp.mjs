@@ -7,9 +7,12 @@
 
 import assert from "node:assert/strict";
 import http from "node:http";
+import path from "node:path";
 import test from "node:test";
 
 import {
+  findUnityProjectRoot,
+  isUnityProjectRoot,
   mergeCodexToml,
   normalizeProjectRoot,
   parseArgs,
@@ -217,4 +220,39 @@ test("the Codex merge replaces the existing table rather than adding a second", 
   assert.match(merged, /\[mcp_servers\.unity_mcp_remote\]/);
   assert.match(merged, /9007/);
   assert.doesNotMatch(merged, /9003/);
+});
+
+// This repository is a PACKAGE at <project>/Packages/com.wallstop-studios.unity-helpers, not a
+// Unity project. The sibling repos the bridge was ported from ARE projects, so their default of
+// "relay --project-path <repo root>" is wrong here and would point the relay at a non-project.
+test("project discovery walks up to the Unity project containing the package", () => {
+  const project = path.resolve("/Code/Packages");
+  const pkg = path.join(project, "Packages", "com.wallstop-studios.unity-helpers");
+  const present = new Set([
+    path.join(project, "Assets"),
+    path.join(project, "ProjectSettings")
+  ]);
+  const exists = (candidate) => present.has(candidate);
+
+  assert.equal(findUnityProjectRoot(pkg, exists), project);
+});
+
+// The repo root carries a stray, untracked Assets/ directory. Matching on Assets alone would stop
+// there and hand the relay the package instead of the project.
+test("a stray Assets directory without ProjectSettings is not a project root", () => {
+  const project = path.resolve("/Code/Packages");
+  const pkg = path.join(project, "Packages", "com.wallstop-studios.unity-helpers");
+  const present = new Set([
+    path.join(pkg, "Assets"),
+    path.join(project, "Assets"),
+    path.join(project, "ProjectSettings")
+  ]);
+  const exists = (candidate) => present.has(candidate);
+
+  assert.equal(isUnityProjectRoot(pkg, exists), false);
+  assert.equal(findUnityProjectRoot(pkg, exists), project);
+});
+
+test("discovery reports nothing when no Unity project encloses the package", () => {
+  assert.equal(findUnityProjectRoot(path.resolve("/tmp/standalone"), () => false), undefined);
 });
