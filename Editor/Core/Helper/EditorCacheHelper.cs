@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
     using System.Runtime.CompilerServices;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -140,6 +141,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             new ColorComparer()
         );
         private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
+
+        // Display name keyed by the member's own bit pattern. GetEnumDisplayName used to locate a
+        // value with Array.IndexOf(Enum.GetValues(type), value), which allocates a fresh N-element
+        // array on EVERY call and then boxes each element it compares. The names beside it were
+        // already cached; the values were not.
+        private static readonly Dictionary<
+            Type,
+            Dictionary<ulong, string>
+        > EnumDisplayNameByValueCache = new();
         private static readonly Dictionary<string, GUIStyle> GUIStyleCache = new();
 
         /// <summary>
@@ -242,25 +252,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 return string.Empty;
             }
 
-            Type enumType = value.GetType();
-
-            string[] displayNames = GetEnumDisplayNames(enumType);
-
-            try
+            if (
+                value.TryConvertToUInt64(out ulong key)
+                && GetEnumDisplayNamesByValue(value.GetType())
+                    .TryGetValue(key, out string displayName)
+            )
             {
-                int index = Array.IndexOf(Enum.GetValues(enumType), value);
-
-                if (index >= 0 && index < displayNames.Length)
-                {
-                    return displayNames[index];
-                }
-            }
-            catch
-            {
-                // Fall through to default
+                return displayName;
             }
 
             return value.ToString();
+        }
+
+        /// <summary>
+        /// Builds, once per enum type, a map from each member's 64-bit pattern to its display name.
+        /// </summary>
+        /// <param name="enumType">The enum type to map.</param>
+        /// <returns>The cached map, or an empty map when <paramref name="enumType"/> is not an enum.</returns>
+        /// <remarks>
+        /// Aliases (two members sharing a value) keep the FIRST declared name, matching what
+        /// <c>Array.IndexOf</c> returned before this was cached, so display output is unchanged.
+        /// </remarks>
+        private static Dictionary<ulong, string> GetEnumDisplayNamesByValue(Type enumType)
+        {
+            if (
+                EnumDisplayNameByValueCache.TryGetValue(
+                    enumType,
+                    out Dictionary<ulong, string> cached
+                )
+            )
+            {
+                return cached;
+            }
+
+            string[] names = GetEnumDisplayNames(enumType);
+            Dictionary<ulong, string> map = new(names.Length);
+
+            if (names.Length > 0)
+            {
+                Array values = Enum.GetValues(enumType);
+                int count = Math.Min(values.Length, names.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    if (
+                        values.GetValue(i) is Enum member
+                        && member.TryConvertToUInt64(out ulong key)
+                        && !map.ContainsKey(key)
+                    )
+                    {
+                        map[key] = names[i];
+                    }
+                }
+            }
+
+            EnumDisplayNameByValueCache[enumType] = map;
+            return map;
         }
 
         /// <summary>
@@ -509,6 +555,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             _intToStringCache?.Clear();
             _paginationLabelCache?.Clear();
             EnumDisplayNameCache.Clear();
+            EnumDisplayNameByValueCache.Clear();
             GUIStyleCache.Clear();
             foreach (Texture2D texture in SolidTextureCache.Values)
             {
