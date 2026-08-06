@@ -62,10 +62,11 @@ Use `--any-project` to skip layer 3 when connecting to something else is the poi
 | `unauthorized`     | A bridge is running but rejected the bearer token                      |
 | `http-error`       | Something answered that is not a streamable-HTTP MCP endpoint          |
 | `malformed`        | Answered, but produced no valid JSON-RPC `initialize` result           |
+| `no-editor`        | Bridge is up and authenticating, but no Unity editor is attached       |
 | `unidentified`     | Handshook, but would not say which project it has open                 |
 | `project-mismatch` | Healthy bridge, wrong editor — it names the project it actually serves |
 
-`configure` refuses to write on `unauthorized` or `project-mismatch`. Both mean a real bridge is
+`configure` refuses to write on `unauthorized`, `no-editor`, or `project-mismatch`. Both mean a real bridge is
 there and only the pairing is wrong, so overwriting the config would bake in the wrong answer.
 
 ## Machine-local files
@@ -101,6 +102,7 @@ per the
    agent. Restart the editor/CLI, or in Claude Code re-approve the project MCP server. A reachable
    endpoint and a stale agent session look identical from the outside.
 
-An endpoint that handshakes but exposes no `Unity_*` tools means the bridge is up and no editor is
-attached to the relay — Unity registers those tools, so an empty tool list means the editor is
-closed or open on a different project.
+`probe` diagnoses this directly: an endpoint that handshakes but exposes no `Unity_*` tools reports
+`no-editor` rather than "reachable". Unity registers those tools from inside the editor, so an empty
+`tools/list` means the editor is closed, still importing, or has not had the connection approved in
+its Unity MCP Server settings.

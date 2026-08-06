@@ -588,6 +588,52 @@ export async function notifyInitialized(
 }
 
 /**
+ * Count the tools an endpoint exposes.
+ *
+ * Unity registers the `Unity_*` tools from inside the editor, so a bridge with no editor attached
+ * completes the handshake perfectly and exposes nothing. That state is indistinguishable from a
+ * working setup unless you ask -- observed live: a healthy, authenticating bridge on 9007 with
+ * `tools/list` returning zero, while `probe` happily reported "reachable".
+ *
+ * Returns `undefined` when the endpoint will not answer at all, which is NOT treated as empty:
+ * only a definitive zero is worth failing on.
+ */
+export async function countTools(url, options, sessionId, protocolVersion, fetchImpl = fetch) {
+  const headers = {
+    Accept: "application/json, text/event-stream",
+    "Content-Type": "application/json",
+    "MCP-Protocol-Version": protocolVersion
+  };
+  if (options.bearerToken) {
+    headers.Authorization = `Bearer ${options.bearerToken}`;
+  }
+  if (sessionId) {
+    headers["Mcp-Session-Id"] = sessionId;
+  }
+
+  try {
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
+      signal: AbortSignal.timeout(options.timeout)
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const message = parseProbePayload(
+      response.headers.get("content-type") ?? "",
+      await response.text(),
+      3
+    );
+    const tools = message?.result?.tools;
+    return Array.isArray(tools) ? tools.length : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Ask an endpoint which Unity project it has open.
  *
  * This is the question the old bash/PowerShell tooling never asked, and not asking it is the whole
@@ -719,6 +765,11 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
   // exactly the servers that follow the protocol most carefully.
   await notifyInitialized(url, options, sessionId, negotiated, fetchImpl);
 
+  // A bridge with no editor attached handshakes perfectly and exposes nothing, so establish that
+  // an editor is actually there before asking which project it has open -- otherwise the useful
+  // diagnosis ("no editor") is reported as the vaguer "would not identify itself".
+  const toolCount = await countTools(url, options, sessionId, negotiated, fetchImpl);
+
   // Ask WHICH Unity this is before treating the endpoint as usable (issue #333).
   const projectRoot = await queryProjectRoot(url, options, sessionId, negotiated, fetchImpl);
 
@@ -736,7 +787,25 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
     }).catch(() => {});
   }
 
-  const identified = { url, sessionId, protocolVersion: negotiated, projectRoot, ...candidate };
+  const identified = {
+    url,
+    sessionId,
+    protocolVersion: negotiated,
+    projectRoot,
+    toolCount,
+    ...candidate
+  };
+
+  // Zero tools is unambiguous and worth failing on regardless of whether a project is pinned:
+  // the endpoint cannot do anything an agent wants.
+  if (toolCount === 0) {
+    return {
+      ...identified,
+      ok: false,
+      status: "no-editor",
+      detail: "bridge is up but no Unity editor is attached (tools/list returned 0 tools)"
+    };
+  }
 
   if (options.expectedProjectRoot && !options.anyProject) {
     if (projectRoot === undefined) {
@@ -1589,6 +1658,15 @@ export async function runProbe(options, runtime = {}) {
   if (!found) {
     // "Nothing responded" is the wrong diagnosis when a healthy bridge answered and was rejected
     // for serving another project. Naming that distinction is most of the value of the check.
+    const noEditor = attempts.find((attempt) => attempt.status === "no-editor");
+    if (noEditor) {
+      fail(
+        `A Unity MCP bridge is running at ${noEditor.url}, but no Unity editor is attached to it, ` +
+          `so it exposes no Unity_* tools. Open the editor on this repository's Unity project and ` +
+          `approve the connection in its Unity MCP Server settings, then re-run.\n` +
+          `Attempts:\n${describeAttempts(attempts)}`
+      );
+    }
     const mismatch = attempts.find((attempt) => attempt.status === "project-mismatch");
     if (mismatch) {
       fail(
@@ -1623,6 +1701,14 @@ export async function runConfigure(options, runtime = {}) {
   // A live bridge serving a DIFFERENT Unity project is the failure this tooling exists to stop
   // (issue #333). Writing its endpoint would point every agent at the wrong editor while every
   // check reported success, which is exactly how the old scripts behaved.
+  const noEditor = found ? undefined : attempts.find((a) => a.status === "no-editor");
+  if (noEditor) {
+    fail(
+      `A Unity MCP bridge is running at ${noEditor.url} with no Unity editor attached, so it ` +
+        `exposes no Unity_* tools and cannot be verified. Nothing was written. Open the editor on ` +
+        `this repository's Unity project, approve the connection, then re-run configure.`
+    );
+  }
   const mismatch = found ? undefined : attempts.find((a) => a.status === "project-mismatch");
   if (mismatch) {
     fail(

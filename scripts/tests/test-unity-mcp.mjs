@@ -24,7 +24,7 @@ import {
 const PROTOCOL_VERSION = "2025-11-25";
 
 /** A stand-in bridge: MCP initialize, plus GetProjectRoot answering with the supplied root. */
-function startFakeBridge({ projectRoot, omitProjectRoot = false }) {
+function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }) {
   const methods = [];
   const server = http.createServer((request, response) => {
     let body = "";
@@ -48,6 +48,16 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false }) {
             result: { protocolVersion: PROTOCOL_VERSION, capabilities: {} }
           })
         );
+        return;
+      }
+
+      if (message.method === "tools/list") {
+        // Unity registers Unity_* tools from inside the editor; none exist when it is detached.
+        const tools = Array.from({ length: toolCount }, (unused, index) => ({
+          name: `Unity_Tool${index}`
+        }));
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ jsonrpc: "2.0", id: 3, result: { tools } }));
         return;
       }
 
@@ -194,7 +204,12 @@ test("the probe completes the lifecycle before asking for identity", async () =>
       { host: "127.0.0.1", port, endpointPath: "/mcp" },
       optionsFor("D:/Code/Packages")
     );
-    assert.deepEqual(methods, ["initialize", "notifications/initialized", "tools/call"]);
+    assert.deepEqual(methods, [
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "tools/call"
+    ]);
   } finally {
     server.close();
   }
@@ -255,4 +270,40 @@ test("a stray Assets directory without ProjectSettings is not a project root", (
 
 test("discovery reports nothing when no Unity project encloses the package", () => {
   assert.equal(findUnityProjectRoot(path.resolve("/tmp/standalone"), () => false), undefined);
+});
+
+// A bridge with no editor attached handshakes perfectly and exposes nothing. Reporting that as
+// "reachable" is the #333 confusion one layer up, and it was observed live before this check.
+test("a bridge with no editor attached is reported as such, not as reachable", async () => {
+  const { server, port } = await startFakeBridge({
+    projectRoot: "D:/Code/Packages",
+    toolCount: 0
+  });
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor(undefined)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "no-editor");
+    assert.equal(result.toolCount, 0);
+    assert.match(result.detail, /no Unity editor is attached/);
+  } finally {
+    server.close();
+  }
+});
+
+// Zero tools is unambiguous, so it fails even with no project pinned -- unlike the identity check,
+// which cannot demand an expectation that was never configured.
+test("no-editor fails even when no project root is pinned", async () => {
+  const { server, port } = await startFakeBridge({ projectRoot: "D:/x", toolCount: 0 });
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor(undefined)
+    );
+    assert.equal(result.ok, false);
+  } finally {
+    server.close();
+  }
 });
