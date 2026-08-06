@@ -52,9 +52,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// Out-of-range handling is deliberately split. Every member that can express "did nothing"
     /// does: <see cref="RemoveAt"/> and <see cref="CopyTo"/> no-op, <see cref="Insert"/> clamps,
     /// and a null sequence is ignored. The indexer is the one member with no way to signal failure
-    /// -- it must produce a <typeparamref name="T"/> -- so it throws exactly as
-    /// <see cref="List{T}"/> does, because returning <c>default</c> for a bad index would hand the
-    /// caller a value that looks authored.
+    /// -- it must produce a <typeparamref name="T"/> -- so it defers to the bounds check
+    /// <see cref="List{T}"/> already performs rather than duplicating it, because returning
+    /// <c>default</c> for a bad index would hand the caller a value that looks authored.
     /// </para>
     /// </remarks>
     [Serializable]
@@ -112,32 +112,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public T this[int index]
         {
-            get
-            {
-                List<T> items = _items;
-                if (items == null || index < 0 || items.Count <= index)
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(index),
-                        $"{index} is outside of bounds [0, {Count})"
-                    );
-                }
-
-                return items[index];
-            }
-            set
-            {
-                List<T> items = _items;
-                if (items == null || index < 0 || items.Count <= index)
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(index),
-                        $"{index} is outside of bounds [0, {Count})"
-                    );
-                }
-
-                items[index] = value;
-            }
+            get => EnsureItems()[index];
+            set => EnsureItems()[index] = value;
         }
 
         /// <summary>
