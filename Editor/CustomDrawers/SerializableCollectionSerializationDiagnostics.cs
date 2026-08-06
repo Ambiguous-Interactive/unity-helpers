@@ -31,8 +31,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 + "values array is never written and every lookup returns nothing. For a list "
                 + "value, change the value type to SerializableList<T>. Otherwise wrap the value "
                 + "type in a [Serializable] class, or declare the dictionary as "
-                + "SerializableDictionary<TKey, TValue, TValueCache> with a "
-                + "SerializableDictionary.Cache<TValue> subclass as TValueCache.";
+                + "SerializableDictionary<TKey, TValue, SerializableDictionary.Cache<TValue>> -- "
+                + "the open generic works, no per-value-type subclass required.";
         }
 
         /// <summary>

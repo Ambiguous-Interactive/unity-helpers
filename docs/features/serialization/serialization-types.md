@@ -306,7 +306,17 @@ identity.
 The same applies to `SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>`:
 `SerializableHashSet<SerializableList<T>>` serializes.
 
-For a value type that is not a list, route it through a cache box:
+For a value type that is not a list, route it through a cache box. The open generic is enough — a
+per-value-type subclass is **not** required:
+
+```csharp
+[Serializable]
+public sealed class DamageCurves
+    : SerializableDictionary<string, List<float>, SerializableDictionary.Cache<List<float>>> { }
+```
+
+Declaring a named subclass is still worthwhile when you want a short type name to reuse, but it buys
+readability rather than capability:
 
 ```csharp
 [Serializable]
