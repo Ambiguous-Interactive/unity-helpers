@@ -30,7 +30,10 @@ if (!configuredPolicyRoot) {
 }
 
 const buildLockRoot = path.resolve(configuredPolicyRoot);
-const policyCommit = "673eb65e7d863a1a8a8a70882bd980e189d41754";
+// Derived, never restated: a hand-copied SHA here would keep matching the previous policy after a
+// Dependabot bump, so this parity contract would pass while validating a version we no longer use.
+const { resolveBuildLockPin } = require("../resolve-build-lock-pin");
+const policyCommit = resolveBuildLockPin("require-confirmed-unity-cleanup", root);
 const classifierPath = path.join(buildLockRoot, ".github/dist/classify-unity-cleanup-evidence.js");
 const gatePath = path.join(buildLockRoot, ".github/dist/require-confirmed-unity-cleanup.js");
 

@@ -43,11 +43,22 @@ jobs:
           path: unity-helpers
           persist-credentials: false
 
+      # Read the pin out of the workflows instead of restating it here. Dependabot bumps a
+      # `uses:` SHA but never a `ref:` input, so a hand-copied commit silently checks out the
+      # previous policy and the parity test below then passes against the wrong version.
+      - name: Resolve pinned central cleanup policy commit
+        id: policy_pin
+        working-directory: unity-helpers
+        shell: bash
+        run: |
+          sha="$(node scripts/resolve-build-lock-pin.js require-confirmed-unity-cleanup)"
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
       - name: Checkout immutable central cleanup policy
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: Ambiguous-Interactive/ambiguous-organization-build-lock
-          ref: 673eb65e7d863a1a8a8a70882bd980e189d41754
+          ref: ${{ steps.policy_pin.outputs.sha }}
           path: build-lock-policy
           persist-credentials: false
 
