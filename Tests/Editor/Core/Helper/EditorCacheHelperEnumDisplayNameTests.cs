@@ -71,7 +71,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             string alias = EditorCacheHelper.GetEnumDisplayName(AliasSample.Alias);
 
             Assert.AreEqual(original, alias);
-            Assert.That(original, Is.AnyOf("Original", "Alias"));
+            // Is.AnyOf is NUnit 3.13+; Unity bundles an older NUnit, so use the Or constraint.
+            Assert.That(original, Is.EqualTo("Original").Or.EqualTo("Alias"));
         }
 
         // The lookup key is the member's 64-bit pattern, and a signed member sign-extends. Getting
