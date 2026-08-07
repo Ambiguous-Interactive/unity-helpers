@@ -86,8 +86,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 string temporaryPath = path + TemporarySuffix;
                 FileStream stream;
+                byte[] bytes;
                 try
                 {
+                    // Encoded before the handle is opened, so nothing it can throw can strand an
+                    // open FileStream that the catch below is not in a position to dispose.
+                    bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     EnsureDirectory(path);
                     stream = OpenStagingStream(temporaryPath, useAsync: false);
                 }
@@ -100,7 +104,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
-                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     using (stream)
                     {
                         stream.Write(bytes, 0, bytes.Length);
@@ -156,19 +159,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 string temporaryPath = path + TemporarySuffix;
                 FileStream stream;
+                byte[] bytes;
                 try
                 {
+                    // Encoded before the handle is opened, so nothing it can throw can strand an
+                    // open FileStream that the catch below is not in a position to dispose.
+                    bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     EnsureDirectory(path);
                     stream = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
                 {
+                    // The staged file was never opened here, so it is not this call's to delete.
                     return e;
                 }
 
                 try
                 {
-                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     // Synchronous `using` (not `await using`) keeps this off System.IAsyncDisposable,
                     // which is unavailable under the .NET Standard 2.0 profile of older Unity LTS.
                     using (stream)
@@ -321,10 +328,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 string temporaryPath = destinationPath + TemporarySuffix;
+                bool staged = false;
                 try
                 {
                     EnsureDirectory(destinationPath);
                     File.Copy(sourcePath, temporaryPath, overwrite: true);
+                    staged = true;
                     FlushToDisk(temporaryPath);
                     Swap(temporaryPath, destinationPath);
                     error = null;
@@ -333,7 +342,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 catch (Exception e)
                 {
                     error = e;
-                    DiscardStagedFile(temporaryPath);
+                    if (staged)
+                    {
+                        DiscardStagedFile(temporaryPath);
+                    }
+
                     return false;
                 }
             }
@@ -374,9 +387,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string temporaryPath = destinationPath + TemporarySuffix;
+            // FileHelper.CopyFileAsync opens the destination with FileMode.Create before it copies a
+            // byte, so a false return still means a staged file exists here to clean up. Only a
+            // failure before that call leaves nothing of ours behind.
+            bool staged = false;
             try
             {
                 EnsureDirectory(destinationPath);
+                staged = true;
                 bool copied = await FileHelper
                     .CopyFileAsync(sourcePath, temporaryPath, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
@@ -396,7 +414,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception e)
             {
-                DiscardStagedFile(temporaryPath);
+                if (staged)
+                {
+                    DiscardStagedFile(temporaryPath);
+                }
+
                 return e;
             }
             finally
