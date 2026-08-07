@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+    using WallstopStudios.UnityHelpers.Core.Threading;
 
     /// <summary>
     /// File writes that never leave a torn document behind, for player-owned data such as saves,
@@ -138,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentException("A destination path is required.", nameof(path));
             }
 
-            GateScope gate;
+            SemaphoreLease gate;
             try
             {
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
@@ -260,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            GateScope gate;
+            SemaphoreLease gate;
             try
             {
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
@@ -374,7 +375,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return invalid;
             }
 
-            GateScope gate;
+            SemaphoreLease gate;
             try
             {
                 gate = await EnterGateAsync(destinationPath, cancellationToken)
@@ -493,21 +494,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return gates;
         }
 
-        private static GateScope EnterGate(string path)
+        private static SemaphoreLease EnterGate(string path)
         {
-            SemaphoreSlim gate = GateFor(path);
-            gate.Wait();
-            return new GateScope(gate);
+            return GateFor(path).Acquire();
         }
 
-        private static async ValueTask<GateScope> EnterGateAsync(
+        private static ValueTask<SemaphoreLease> EnterGateAsync(
             string path,
             CancellationToken cancellationToken
         )
         {
-            SemaphoreSlim gate = GateFor(path);
-            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            return new GateScope(gate);
+            return GateFor(path).AcquireAsync(cancellationToken);
         }
 
         private static SemaphoreSlim GateFor(string path)
@@ -628,24 +625,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 // complete and flushed, but the destination is briefly absent.
                 File.Delete(path);
                 File.Move(temporaryPath, path);
-            }
-        }
-
-        /// <summary>
-        /// Holds a path's gate until disposed. A struct so <c>using</c> costs no allocation.
-        /// </summary>
-        private readonly struct GateScope : IDisposable
-        {
-            private readonly SemaphoreSlim _gate;
-
-            internal GateScope(SemaphoreSlim gate)
-            {
-                _gate = gate;
-            }
-
-            public void Dispose()
-            {
-                _gate.Release();
             }
         }
     }

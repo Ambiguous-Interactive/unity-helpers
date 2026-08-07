@@ -595,6 +595,60 @@ finishes. The pool posts nothing back to Unity's main thread, so this is safe fo
 items. A work item whose own continuations capture the main thread's synchronization context would
 deadlock, because `OnDestroy` runs on that thread — prefer `DisposeAsync()` there.
 
+### Semaphore Leases
+
+`SemaphoreSlim` makes you pair every wait with a `finally`. `Acquire()` returns a `SemaphoreLease`
+instead, so the critical section is a `using` block:
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Threading;
+
+private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
+
+public void Append(string line)
+{
+    using (_gate.Acquire())
+    {
+        _lines.Add(line);
+    }
+}
+
+public async Task AppendAsync(string line, CancellationToken cancellationToken)
+{
+    using (await _gate.AcquireAsync(cancellationToken))
+    {
+        _lines.Add(line);
+    }
+}
+```
+
+When you would rather not block, `TryAcquire` reports failure instead:
+
+```csharp
+if (_gate.TryAcquire(TimeSpan.FromMilliseconds(50), out SemaphoreLease lease))
+{
+    using (lease)
+    {
+        // Took a permit within the timeout.
+    }
+}
+```
+
+`SemaphoreLease` is a struct, so an uncontended acquire allocates nothing.
+
+**Disposal is tracked and idempotent.** Disposing a lease twice returns one permit, not two. That
+matters more than it sounds: an extra `Release()` raises the permit count above the semaphore's
+maximum and quietly lets two callers into a section built for one. `IsHeld` reports whether a lease
+still owns a permit, and a lease from a failed `TryAcquire` is not held, so disposing it is a no-op.
+
+**Do not copy a lease.** Assigning it to another variable or passing it by value produces a second
+lease pointing at the same permit, and disposing both releases twice. Acquire it directly into a
+`using` and let it die there.
+
+`Acquire()` and `AcquireAsync()` throw `ArgumentNullException` on a null semaphore rather than
+handing back a lease that is not held — a silently unlocked critical section surfaces far from its
+cause. `TryAcquire` reports `false` instead.
+
 ---
 
 ## Logging
