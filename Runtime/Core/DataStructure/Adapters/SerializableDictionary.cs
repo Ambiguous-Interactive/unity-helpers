@@ -210,10 +210,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <c>SerializableDictionary&lt;TKey, List&lt;T&gt;&gt;</c> declares a <c>List&lt;T&gt;[]</c>
         /// that never reaches the asset. Boxing each value in a one-field serializable class makes
         /// the collection a field of a class rather than an array element, which Unity accepts.
-        /// This field is written only for the value types that need it, so every other dictionary
-        /// keeps byte-identical YAML and stays readable by older package versions. ProtoBuf and
-        /// JSON ignore it because both serialize <see cref="_values"/> directly and neither has the
-        /// nesting restriction.
+        /// This field is <em>populated</em> only for the value types that need it, so every other
+        /// dictionary keeps storing its values in <see cref="_values"/> and stays readable by older
+        /// package versions. Unity still <em>declares</em> it on every dictionary -- a serialized
+        /// field cannot be conditional -- so the format cost is one empty array per dictionary and
+        /// nothing else. ProtoBuf and JSON ignore it because both serialize <see cref="_values"/>
+        /// directly and neither has the nesting restriction.
         /// </remarks>
         [SerializeField]
         [ProtoIgnore]
