@@ -268,27 +268,20 @@ public SerializableSortedDictionary<int, string> sortedDict;
 
 ### Collection Values
 
-Unity does not serialize a nested collection. `SerializableDictionary<string, List<float>>` makes
-the serialized values array a `List<float>[]`, which Unity drops entirely — while the parallel keys
-array survives, because it is a plain `string[]`. The asset then records keys and no values, and
-every runtime lookup comes back empty.
-
-The fix is to add the one layer of indirection Unity wants: make the list a field of a serializable
-class rather than the element type of an array. `SerializableList<T>` is that class, so the change is
-a type change and nothing else:
+A dictionary whose value type is itself a collection just works. No wrapper type, no cache subclass,
+no consumer change:
 
 ```csharp
 public sealed class WeaponConfig : MonoBehaviour
 {
-    // Serializes. SerializableDictionary<string, List<float>> would not.
     [SerializeField]
-    private SerializableDictionary<string, SerializableList<float>> _curves = new();
+    private SerializableDictionary<string, List<float>> _curves = new();
 
     public void AddPoint(string weapon, float damage)
     {
-        if (!_curves.TryGetValue(weapon, out SerializableList<float> curve))
+        if (!_curves.TryGetValue(weapon, out List<float> curve))
         {
-            curve = new SerializableList<float>();
+            curve = new List<float>();
             _curves[weapon] = curve;
         }
 
@@ -297,26 +290,45 @@ public sealed class WeaponConfig : MonoBehaviour
 }
 ```
 
-`SerializableList<T>` implements `IList<T>`, converts implicitly to and from `List<T>`, and exposes
-`AsList()` for the `List<T>` members it does not surface (`Sort`, `BinarySearch`). It draws in the
-Inspector as the list it wraps, with no extra foldout, and serializes to a plain JSON array. It has
-reference equality, matching `List<T>`, so it is a poor set element unless the set is keyed on
-identity.
+This holds for `List<T>` and `T[]` values, on both `SerializableDictionary` and
+`SerializableSortedDictionary`.
 
-The same applies to `SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>`:
-`SerializableHashSet<SerializableList<T>>` serializes.
+#### How it works, and why your existing assets are unaffected
 
-For a value type that is not a list, route it through a cache box. The open generic is enough — a
-per-value-type subclass is **not** required:
+Unity does not serialize a nested collection: the serialized values array would be a `List<float>[]`,
+which Unity drops entirely, while the parallel keys array survives because it is a plain `string[]`.
+Rather than asking you to change the value type, the dictionary writes those values to a second
+serialized array whose elements are one-field boxes — the indirection Unity wants — and unpacks them
+on load.
 
-```csharp
-[Serializable]
-public sealed class DamageCurves
-    : SerializableDictionary<string, List<float>, SerializableDictionary.Cache<List<float>>> { }
-```
+That second array is **populated** only for value types Unity would otherwise drop. Every other
+dictionary keeps storing its values exactly where it always did, so no existing data is rewritten
+and assets written by this version stay readable by older package versions. Because a serialized
+field cannot be declared conditionally, dictionaries do gain one empty array in their serialized
+form; the first save after upgrading adds that line to affected assets and nothing else.
 
-Declaring a named subclass is still worthwhile when you want a short type name to reuse, but it buys
-readability rather than capability:
+#### Sets are different
+
+`SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>` still report the shape as
+unsupported. That is deliberate rather than pending: `List<T>` has reference equality, so a set of
+lists treats two lists with identical contents as two distinct elements, and deserializing one never
+reproduces the set you saved. Use `SerializableHashSet<SerializableList<T>>` only if you genuinely
+want identity semantics; otherwise the element type is the thing to reconsider.
+
+`SerializableList<T>` remains available and is still the right choice when you want a list that draws
+and serializes on its own, outside a dictionary. It implements `IList<T>`, converts implicitly to and
+from `List<T>`, and exposes `AsList()` for the `List<T>` members it does not surface (`Sort`,
+`BinarySearch`). It draws in the Inspector as the list it wraps, with no extra foldout, and
+serializes to a plain JSON array.
+
+#### Value types that are still unsupported
+
+Interfaces, abstract types, `Dictionary<,>`, and classes without `[Serializable]` cannot be
+serialized by Unity in any container, so no wrapper repairs them. The Inspector reports those as an
+error rather than drawing a value column that persists nothing, so it is visible while authoring
+instead of at runtime.
+
+The three-argument cache form is still supported for a value type you want to route explicitly:
 
 ```csharp
 [Serializable]
@@ -326,9 +338,6 @@ public sealed class FloatListCache : SerializableDictionary.Cache<List<float>> {
 public sealed class DamageCurves
     : SerializableDictionary<string, List<float>, FloatListCache> { }
 ```
-
-Either way, the Inspector reports an unsupported shape as an error rather than drawing a value column
-that persists nothing, so this is visible while authoring instead of at runtime.
 
 ---
 

@@ -87,6 +87,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonInclude]
         protected internal TValueCache[] _values;
 
+        /// <summary>
+        /// Parallel backing array used only when Unity refuses to serialize <see cref="_values"/>.
+        /// See <see cref="SerializableDictionaryBase{TKey, TValue, TValueCache}"/> for why boxing is
+        /// what repairs a collection-typed value, and why every other value type keeps using
+        /// <see cref="_values"/> and its existing YAML.
+        /// </summary>
+        [SerializeField]
+        [ProtoIgnore]
+        [JsonIgnore]
+        protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
+
+        private static readonly bool RequiresBoxedValues =
+            typeof(TValueCache).IsArray
+            || (
+                typeof(TValueCache).IsGenericType
+                && typeof(TValueCache).GetGenericTypeDefinition() == typeof(List<>)
+            );
+
         [ProtoIgnore]
         [JsonIgnore]
         protected internal SortedDictionary<TKey, TValue> _dictionary;
@@ -336,6 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             // Clear cached arrays since we're replacing all content
             _keys = null;
             _values = null;
+            _boxedValues = null;
             MarkSerializationCacheDirty();
         }
 
@@ -670,6 +689,62 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public void OnBeforeSerialize()
         {
+            OnBeforeSerializeCore();
+            MirrorValuesToBoxedCache();
+        }
+
+        private void RehydrateValuesFromBoxedCache()
+        {
+            if (!RequiresBoxedValues || _boxedValues == null)
+            {
+                return;
+            }
+
+            int length = _boxedValues.Length;
+            TValueCache[] rehydrated = new TValueCache[length];
+            for (int index = 0; index < length; index++)
+            {
+                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
+                rehydrated[index] = box == null ? default : box.Data;
+            }
+
+            _values = rehydrated;
+        }
+
+        private void MirrorValuesToBoxedCache()
+        {
+            if (!RequiresBoxedValues)
+            {
+                return;
+            }
+
+            if (_values == null)
+            {
+                _boxedValues = null;
+                return;
+            }
+
+            int length = _values.Length;
+            if (_boxedValues == null || _boxedValues.Length != length)
+            {
+                _boxedValues = new SerializableDictionary.Cache<TValueCache>[length];
+            }
+
+            for (int index = 0; index < length; index++)
+            {
+                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
+                if (box == null)
+                {
+                    box = new SerializableDictionary.Cache<TValueCache>();
+                    _boxedValues[index] = box;
+                }
+
+                box.Data = _values[index];
+            }
+        }
+
+        private void OnBeforeSerializeCore()
+        {
             bool arraysIntact = _keys != null && _values != null && _keys.Length == _values.Length;
 
             // If we have valid arrays with duplicates/nulls and should preserve them,
@@ -819,6 +894,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public void OnAfterDeserialize()
         {
+            RehydrateValuesFromBoxedCache();
+
             bool keysAndValuesPresent =
                 _keys != null && _values != null && _keys.Length == _values.Length;
 
@@ -826,6 +903,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 _keys = null;
                 _values = null;
+                _boxedValues = null;
                 _preserveSerializedEntries = false;
                 _arraysDirty = true;
                 return;
@@ -920,6 +998,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             _keys = null;
             _values = null;
+            _boxedValues = null;
         }
 
         [ProtoAfterDeserialization]

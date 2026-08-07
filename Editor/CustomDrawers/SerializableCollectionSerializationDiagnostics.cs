@@ -27,12 +27,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static string BuildDroppedDictionaryValuesMessage(string displayName)
         {
             return $"'{displayName}' cannot round-trip through Unity serialization: Unity refuses "
-                + "this value type -- most often a nested collection such as List<T> -- so the "
-                + "values array is never written and every lookup returns nothing. For a list "
-                + "value, change the value type to SerializableList<T>. Otherwise wrap the value "
-                + "type in a [Serializable] class, or declare the dictionary as "
-                + "SerializableDictionary<TKey, TValue, SerializableDictionary.Cache<TValue>> -- "
-                + "the open generic works, no per-value-type subclass required.";
+                + "this value type, so the values array is never written and every lookup returns "
+                + "nothing. List<T> and T[] values are handled automatically and are not this "
+                + "error. Interfaces, abstract types, dictionaries, and classes without "
+                + "[Serializable] are not serializable in any container, so wrapping them does not "
+                + "help -- give the value a concrete [Serializable] class type instead.";
         }
 
         /// <summary>

@@ -55,4 +55,21 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     /// </summary>
     [Serializable]
     public sealed class NestedCollectionControlHashSet : SerializableHashSet<string> { }
+
+    /// <summary>
+    /// The form the documentation offers as the no-subclass escape hatch: a concrete subclass
+    /// closing the three-argument dictionary over the OPEN generic cache box. The documentation
+    /// asserts this works; nothing tested it until now.
+    /// </summary>
+    [Serializable]
+    public sealed class StringFloatListOpenGenericCacheDictionary
+        : SerializableDictionary<string, List<float>, SerializableDictionary.Cache<List<float>>> { }
+
+    /// <summary>
+    /// The sorted counterpart of <see cref="StringFloatListDictionary"/>. The sorted base declares
+    /// the same collection-typed values array, so it has the same defect and needs the same repair.
+    /// </summary>
+    [Serializable]
+    public sealed class StringFloatListSortedDictionary
+        : SerializableSortedDictionary<string, List<float>> { }
 }

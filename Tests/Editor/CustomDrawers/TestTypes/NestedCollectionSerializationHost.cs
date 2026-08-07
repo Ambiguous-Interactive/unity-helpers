@@ -24,5 +24,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         public FloatListHashSet droppedItems = new();
 
         public FloatSerializableListHashSet wrappedItems = new();
+
+        public StringFloatListOpenGenericCacheDictionary openGenericCachedValues = new();
+
+        public StringFloatListSortedDictionary sortedDroppedValues = new();
     }
 }
