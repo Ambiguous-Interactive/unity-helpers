@@ -307,6 +307,38 @@ and assets written by this version stay readable by older package versions. Beca
 field cannot be declared conditionally, dictionaries do gain one empty array in their serialized
 form; the first save after upgrading adds that line to affected assets and nothing else.
 
+#### Nesting these inside each other
+
+A serializable collection whose value or element is **another serializable collection type** has never
+needed any of this, and still does not:
+
+```csharp
+// All fine, no wrapper and no box involved.
+SerializableDictionary<string, SerializableDictionary<int, float>> byRegion;
+SerializableHashSet<SerializableDictionary<int, float>> variants;
+```
+
+The reason is the same one the boxing exploits: `SerializableDictionary<int, float>` is a `[Serializable]`
+**class**, and Unity has always accepted a class as an array element. Only a *raw* `List<T>` or `T[]`
+in that position is refused, and that is exactly the case the boxing now covers — so the two mechanisms
+compose:
+
+```csharp
+// Boxed because the value is a raw List<>, and its elements nest normally inside the box.
+SerializableDictionary<string, List<SerializableDictionary<int, float>>> curvesByRegion;
+```
+
+**The depth limit is Unity's, not this package's.** Unity stops descending after a fixed number of
+nesting levels and warns rather than saving the remainder, and each dictionary in a chain costs
+roughly two of those levels. Three dictionaries deep is covered by tests; arbitrarily deep recursion
+is not something a wrapper can rescue, so if you find yourself approaching it, flatten the data —
+a composite key is usually the answer:
+
+```csharp
+// Instead of Dictionary<A, Dictionary<B, Dictionary<C, V>>>
+SerializableDictionary<RegionTierKey, float> byRegionAndTier;
+```
+
 #### Sets are different
 
 `SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>` still report the shape as

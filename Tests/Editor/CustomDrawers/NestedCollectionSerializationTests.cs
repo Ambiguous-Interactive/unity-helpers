@@ -145,6 +145,89 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        // Recursive nesting composes with the boxing rather than competing with it: a dictionary
+        // VALUE that is another serializable dictionary is a class, which is the shape Unity has
+        // always accepted, so it must keep using the plain array and gain no box.
+        [Test]
+        public void ADictionaryValuedDictionaryNeedsNoBoxingAndRoundTrips()
+        {
+            IntFloatDictionary inner = new();
+            inner[7] = 1.25f;
+            _host.nestedDictionaryValues["inner"] = inner;
+
+            NestedCollectionSerializationHost restored = RoundTrip();
+
+            Assert.That(
+                FindArray(
+                    nameof(NestedCollectionSerializationHost.nestedDictionaryValues),
+                    SerializableDictionarySerializedPropertyNames.Values
+                ),
+                Is.Not.Null,
+                "A dictionary-valued dictionary is a class-valued dictionary; Unity serializes it."
+            );
+            Assert.That(restored.nestedDictionaryValues.Count, Is.EqualTo(1));
+            Assert.That(restored.nestedDictionaryValues["inner"][7], Is.EqualTo(1.25f));
+        }
+
+        // Both mechanisms at once: the value is a raw collection (so it is boxed) whose element is
+        // itself a serializable dictionary (so it relies on ordinary class nesting inside the box).
+        [Test]
+        public void AListOfDictionariesValueRoundTrips()
+        {
+            IntFloatDictionary inner = new();
+            inner[3] = 9.5f;
+            _host.listOfDictionaryValues["curves"] = new List<IntFloatDictionary> { inner };
+
+            NestedCollectionSerializationHost restored = RoundTrip();
+
+            Assert.That(restored.listOfDictionaryValues.Count, Is.EqualTo(1));
+            Assert.That(restored.listOfDictionaryValues["curves"].Count, Is.EqualTo(1));
+            Assert.That(restored.listOfDictionaryValues["curves"][0][3], Is.EqualTo(9.5f));
+        }
+
+        // How deep the recursion actually goes. Each dictionary costs Unity roughly two nesting
+        // levels (the class, then its arrays), and Unity stops at a fixed depth of its own -- so the
+        // limit is Unity's, not this package's, and no amount of boxing lifts it. Three dictionaries
+        // deep is asserted as supported; if Unity ever tightens the limit, this is where it shows up
+        // rather than in a consumer's save file.
+        [Test]
+        public void ThreeDictionariesDeepRoundTrips()
+        {
+            IntFloatDictionary innermost = new();
+            innermost[5] = 0.5f;
+            NestedDictionaryDictionary middle = new();
+            middle["mid"] = innermost;
+            _host.deeplyNestedValues["outer"] = middle;
+
+            NestedCollectionSerializationHost restored = RoundTrip();
+
+            Assert.That(restored.deeplyNestedValues.Count, Is.EqualTo(1));
+            Assert.That(restored.deeplyNestedValues["outer"].Count, Is.EqualTo(1));
+            Assert.That(restored.deeplyNestedValues["outer"]["mid"][5], Is.EqualTo(0.5f));
+        }
+
+        // A set of dictionaries is the set shape that does work, because the element is a class
+        // rather than a raw collection. Pinned so the set diagnostic is not mistaken for "sets
+        // cannot nest at all".
+        [Test]
+        public void ADictionaryElementedSetRoundTrips()
+        {
+            IntFloatDictionary inner = new();
+            inner[1] = 2f;
+            _host.dictionaryItems.Add(inner);
+
+            NestedCollectionSerializationHost restored = RoundTrip();
+
+            Assert.That(
+                FindArray(
+                    nameof(NestedCollectionSerializationHost.dictionaryItems),
+                    SerializableHashSetSerializedPropertyNames.Items
+                ),
+                Is.Not.Null
+            );
+            Assert.That(restored.dictionaryItems.Count, Is.EqualTo(1));
+        }
+
         // An ordinary value type must keep storing its values in the plain array. Unity declares
         // the boxed field on every dictionary -- a serialized field cannot be conditional -- so the
         // guarantee that matters is that it stays EMPTY: the values still live where older package

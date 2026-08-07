@@ -72,4 +72,41 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     public sealed class StringFloatListSortedDictionary
         : SerializableSortedDictionary<string, List<float>> { }
+
+    /// <summary>
+    /// Innermost link of the recursive-nesting chain.
+    /// </summary>
+    [Serializable]
+    public sealed class IntFloatDictionary : SerializableDictionary<int, float> { }
+
+    /// <summary>
+    /// A dictionary whose value is another serializable dictionary. This needs no boxing: the value
+    /// is a class, not a raw collection, which is the shape Unity has always accepted.
+    /// </summary>
+    [Serializable]
+    public sealed class NestedDictionaryDictionary
+        : SerializableDictionary<string, IntFloatDictionary> { }
+
+    /// <summary>
+    /// The composition of both mechanisms: a raw collection value (needs boxing) whose element is
+    /// itself a serializable dictionary (needs Unity's ordinary class nesting).
+    /// </summary>
+    [Serializable]
+    public sealed class ListOfDictionaryDictionary
+        : SerializableDictionary<string, List<IntFloatDictionary>> { }
+
+    /// <summary>
+    /// A deeper chain, used to find where Unity's own serialization depth limit stops the recursion
+    /// rather than to assert a supported shape.
+    /// </summary>
+    [Serializable]
+    public sealed class DeeplyNestedDictionary
+        : SerializableDictionary<string, NestedDictionaryDictionary> { }
+
+    /// <summary>
+    /// A set whose element is a serializable dictionary. Sets refuse raw collections, but a
+    /// dictionary element is a class, so this is the set shape that does work.
+    /// </summary>
+    [Serializable]
+    public sealed class DictionaryHashSet : SerializableHashSet<IntFloatDictionary> { }
 }

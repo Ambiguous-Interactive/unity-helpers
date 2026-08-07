@@ -28,5 +28,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         public StringFloatListOpenGenericCacheDictionary openGenericCachedValues = new();
 
         public StringFloatListSortedDictionary sortedDroppedValues = new();
+
+        public NestedDictionaryDictionary nestedDictionaryValues = new();
+
+        public ListOfDictionaryDictionary listOfDictionaryValues = new();
+
+        public DeeplyNestedDictionary deeplyNestedValues = new();
+
+        public DictionaryHashSet dictionaryItems = new();
     }
 }
