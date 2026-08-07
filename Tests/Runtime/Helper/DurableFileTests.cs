@@ -291,6 +291,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CopyFromAMissingSourceCreatesNothing()
+        {
+            // Creating the destination's directory tree before discovering the source is missing
+            // leaves a mutation behind from an operation that did nothing else.
+            string source = Path.Combine(_testDirectory, "missing.json");
+            string destination = Path.Combine(_testDirectory, "a", "b", "c", "destination.json");
+
+            Assert.IsFalse(DurableFile.TryCopy(source, destination, out Exception error));
+
+            Assert.IsTrue(error != null);
+            Assert.IsFalse(Directory.Exists(Path.Combine(_testDirectory, "a")));
+        }
+
+        [Test]
         public void DeleteReportsSuccessWhenNothingIsThere()
         {
             Assert.IsTrue(DurableFile.TryDelete(Path.Combine(_testDirectory, "absent.json")));

@@ -87,18 +87,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         }
 
         [Test]
-        public void DisposingACopiedLeaseCannotCorruptThePermitCount()
+        public void DisposingACopiedLeaseIsSwallowedWhenTheMaximumIsExplicit()
         {
             using SemaphoreSlim semaphore = new(1, 1);
             SemaphoreLease lease = semaphore.Acquire();
-            // Copying is documented as forbidden. Pinned here so that doing it anyway degrades to a
-            // no-op rather than raising the count above the semaphore's maximum.
+            // Copying is documented as forbidden. With an explicit maximum, doing it anyway degrades
+            // to a no-op: the extra release throws SemaphoreFullException and Dispose swallows it.
             SemaphoreLease copy = lease;
 
             lease.Dispose();
 
             Assert.DoesNotThrow(() => copy.Dispose());
             Assert.AreEqual(1, semaphore.CurrentCount);
+        }
+
+        [Test]
+        public void DisposingACopiedLeaseInflatesACountWithNoExplicitMaximum()
+        {
+            // The unhappy half of the pair, pinned because the docs used to claim a guarantee that
+            // only ever held for the bounded case. new SemaphoreSlim(1) has a maximum of
+            // int.MaxValue, so the copy's release SUCCEEDS -- nothing throws, nothing is swallowed,
+            // and a second caller is now admitted to a section built for one. Per-lease disposal
+            // tracking cannot prevent this: the copy carries its own flags.
+            using SemaphoreSlim semaphore = new(1);
+            SemaphoreLease lease = semaphore.Acquire();
+            SemaphoreLease copy = lease;
+
+            lease.Dispose();
+            copy.Dispose();
+
+            Assert.AreEqual(2, semaphore.CurrentCount);
         }
 
         [Test]

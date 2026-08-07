@@ -25,10 +25,27 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </para>
     /// <para>
     /// <b>Do not copy a lease.</b> Assigning one to another variable, capturing it, or passing it by
-    /// value produces a second lease pointing at the same permit. Disposing both is harmless — the
-    /// second release is swallowed rather than allowed to corrupt the count — but the section is
-    /// unguarded from the first disposal onward. Acquire it directly into a <c>using</c> and let it
-    /// die there.
+    /// value produces a second lease pointing at the same permit, and disposing both releases twice.
+    /// This is not made safe by the disposal tracking, which is per-lease: the copy carries its own
+    /// flags and cannot see that the original already released.
+    /// </para>
+    /// <para>
+    /// What that second release does depends on how the semaphore was constructed, and the
+    /// difference is worth knowing:
+    /// <list type="bullet">
+    /// <item><description>
+    /// <c>new SemaphoreSlim(1, 1)</c> — the extra release throws <c>SemaphoreFullException</c>,
+    /// which <see cref="Dispose"/> swallows. The count survives.
+    /// </description></item>
+    /// <item><description>
+    /// <c>new SemaphoreSlim(1)</c> — the maximum defaults to <see cref="int.MaxValue"/>, so the
+    /// extra release <b>succeeds</b>. The count silently rises to 2 and a second caller is admitted
+    /// to a section built for one.
+    /// </description></item>
+    /// </list>
+    /// <b>Always pass an explicit maximum.</b> It does not make copying safe, but it turns silent
+    /// corruption into a swallowed no-op. Better still, acquire directly into a <c>using</c> and let
+    /// the lease die there.
     /// </para>
     /// <para>
     /// <b><see cref="Dispose"/> never throws</b>, including when the semaphore itself has already

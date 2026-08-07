@@ -642,8 +642,19 @@ maximum and quietly lets two callers into a section built for one. `IsHeld` repo
 still owns a permit, and a lease from a failed `TryAcquire` is not held, so disposing it is a no-op.
 
 **Do not copy a lease.** Assigning it to another variable or passing it by value produces a second
-lease pointing at the same permit, and disposing both releases twice. Acquire it directly into a
-`using` and let it die there.
+lease pointing at the same permit, and disposing both releases twice. The disposal tracking is
+per-lease and cannot help here — the copy carries its own flags and cannot see that the original
+already released.
+
+**Construct semaphores with an explicit maximum.** It does not make copying safe, but it decides
+whether the mistake is loud-free or silent:
+
+| Constructor               | A copied lease disposed twice                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `new SemaphoreSlim(1, 1)` | The extra release throws and `Dispose` swallows it. Count survives.                                                                           |
+| `new SemaphoreSlim(1)`    | Maximum defaults to `int.MaxValue`, so the extra release **succeeds** — the count silently rises to 2 and a second caller enters the section. |
+
+Acquire directly into a `using` and let the lease die there, and neither case can arise.
 
 `Acquire()` and `AcquireAsync()` throw `ArgumentNullException` on a null semaphore rather than
 handing back a lease that is not held — a silently unlocked critical section surfaces far from its

@@ -313,8 +313,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileStream staging;
                 try
                 {
-                    EnsureDirectory(destinationPath);
+                    // Source first: a copy that cannot read its source must leave the destination
+                    // side of the filesystem exactly as it found it, and EnsureDirectory is a
+                    // mutation.
                     source = OpenSourceStream(sourcePath, useAsync: false);
+                    EnsureDirectory(destinationPath);
                 }
                 catch (Exception e)
                 {
@@ -393,8 +396,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileStream staging;
                 try
                 {
-                    EnsureDirectory(destinationPath);
+                    // Source first, for the reason recorded in TryCopy.
                     source = OpenSourceStream(sourcePath, useAsync: true);
+                    EnsureDirectory(destinationPath);
                 }
                 catch (Exception e)
                 {
