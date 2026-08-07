@@ -2487,15 +2487,21 @@ if ($sparseRegistryExitCode -ne 0) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
+# Two properties, and they pull against each other. `cancel-in-progress: false` is mandatory --
+# cancelling a licensed job can skip license return and lock release. But that alone makes every new
+# run queue behind its predecessor, and a superseded predecessor holds the group for as long as its
+# legs sit in the runner queue, where they cannot reach the head guard that would end them. On PR
+# #351 the head carried no Unity check at all for two hours while every other check was green.
+# Scoping the group to the head is what keeps the second property from costing the first.
 $preservesLicensedPrRuns = (
-    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
+    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}') -and
     $workflowContent.Contains('cancel-in-progress: false')
 )
 if (-not $preservesLicensedPrRuns) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must not cancel an in-progress licensed run because cancellation can skip license return and lock release cleanup."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must not cancel an in-progress licensed run (cancellation can skip license return and lock release), and its concurrency group must be scoped to the head SHA so a superseded run cannot block the current head from being validated at all."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity Tests preserves in-progress licensed runs."
+    Write-Info "Checked Unity Tests preserves in-progress licensed runs and scopes concurrency per head."
 }
 
 $currentPrHeadGuardUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@$currentPrHeadGuardCommit"
@@ -2721,11 +2727,11 @@ foreach ($licensedJobId in $licensedJobIds) {
 }
 
 # The per-leg guards above fire only after a leg has been dispatched, which means
-# waiting in line for the single self-hosted Unity seat. Because this workflow's
-# concurrency group cannot cancel in progress, a superseded iteration that still
-# dispatches its legs holds the group -- and therefore the successor run -- for as
-# long as that queue takes. The hosted matrix-config job must resolve it once and
-# skip the licensed tiers outright.
+# waiting in line for the single self-hosted Unity seat. The concurrency group is
+# scoped per head so that queue can no longer block the successor run outright,
+# but a superseded iteration that dispatches its legs anyway still burns runner
+# slots to fail eight guards. The hosted matrix-config job must resolve
+# supersession once and skip the licensed tiers outright.
 $matrixConfigJob = if ($jobTexts.ContainsKey('matrix-config')) { [string]$jobTexts['matrix-config'] } else { '' }
 $supersededStep = [regex]::Match(
     $matrixConfigJob,

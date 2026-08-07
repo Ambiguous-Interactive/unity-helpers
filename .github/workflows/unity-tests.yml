@@ -36,8 +36,19 @@ permissions:
   checks: write
   pull-requests: read
 
+# Scoped to the HEAD, not just the pull request. `cancel-in-progress: false` is required -- a
+# cancelled licensed job can skip license return and lock release -- but a per-PR group then makes
+# every new run queue behind its predecessor. A superseded predecessor holds that group for as long
+# as its legs sit in the runner queue, and a queued leg cannot reach the require-current-pr-head
+# guard that would end it in two seconds. Measured on PR #351: the head had NO Unity check at all
+# for two hours, while every other check was green and `main` has no branch protection to catch it.
+#
+# Per-head groups let the current head start immediately. Superseded legs stay harmless: the pinned
+# head guard is each licensed job's first step AND runs again immediately before lock acquisition,
+# so a stale leg exits without ever taking the Unity seat, and matrix-config now resolves
+# supersession promptly instead of after a queue drain.
 concurrency:
-  group: unity-tests-${{ github.event.pull_request.number || github.ref }}
+  group: unity-tests-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
