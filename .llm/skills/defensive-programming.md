@@ -298,6 +298,8 @@ Four rules, with worked examples in
 - Failure cleanup deletes only files this call created. Make ownership decidable with one exclusive
   open (`FileMode.Create` + `FileShare.None`).
 - Restore state with a `readonly struct` `IDisposable` scope and `using`, not `try`/`finally`.
+- `Dispose()` never throws. It runs from a `finally`, so a throw replaces the caller's real
+  exception with one about teardown.
 - Map negative-capable hashes and indices with `WallMath.PositiveMod`, never `Math.Abs` or
   `& int.MaxValue`.
 
@@ -444,6 +446,7 @@ Before submitting production code, verify:
 - [ ] No `File.Exists`/`Directory.Exists` probe is the only guard on the action that follows it
 - [ ] Failure cleanup deletes only files this call created
 - [ ] State restoration uses a `readonly struct` `IDisposable` scope, not `try`/`finally`
+- [ ] No `Dispose()` can throw
 - [ ] Negative-capable hashes and indices go through `WallMath.PositiveMod`
 
 For Editor-specific defensive patterns, see [defensive-editor-programming](./defensive-editor-programming.md).

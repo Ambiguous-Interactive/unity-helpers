@@ -25,8 +25,15 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </para>
     /// <para>
     /// <b>Do not copy a lease.</b> Assigning one to another variable, capturing it, or passing it by
-    /// value produces a second lease pointing at the same permit, and disposing both releases twice.
-    /// Acquire it directly into a <c>using</c> and let it die there.
+    /// value produces a second lease pointing at the same permit. Disposing both is harmless — the
+    /// second release is swallowed rather than allowed to corrupt the count — but the section is
+    /// unguarded from the first disposal onward. Acquire it directly into a <c>using</c> and let it
+    /// die there.
+    /// </para>
+    /// <para>
+    /// <b><see cref="Dispose"/> never throws</b>, including when the semaphore itself has already
+    /// been disposed. Disposal runs from a <c>finally</c>, so a throw there would replace the
+    /// exception the caller was already unwinding with.
     /// </para>
     /// </remarks>
     /// <example>
@@ -67,7 +74,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         public bool IsHeld => _semaphore != null;
 
         /// <summary>
-        /// Returns the permit. Safe to call more than once; only the first call releases.
+        /// Returns the permit. Safe to call more than once; only the first call releases. Never
+        /// throws, including when the semaphore has already been disposed.
         /// </summary>
         public void Dispose()
         {
@@ -78,7 +86,19 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
 
             _semaphore = null;
-            semaphore.Release();
+            try
+            {
+                semaphore.Release();
+            }
+            catch
+            {
+                // Dispose runs from a `finally`, so throwing here would REPLACE whatever exception
+                // the using block was already unwinding with -- the caller loses the failure they
+                // care about and gets a confusing one about a semaphore instead. Neither reachable
+                // exception is actionable: ObjectDisposedException means the semaphore is already
+                // gone, so the permit is moot, and SemaphoreFullException means the count is
+                // already back at its maximum. Both leave the permit accounted for.
+            }
         }
     }
 

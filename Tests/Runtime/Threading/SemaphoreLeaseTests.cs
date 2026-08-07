@@ -57,6 +57,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         }
 
         [Test]
+        public void DisposingALeaseWhoseSemaphoreIsGoneDoesNotThrow()
+        {
+            SemaphoreSlim semaphore = new(1, 1);
+            SemaphoreLease lease = semaphore.Acquire();
+            semaphore.Dispose();
+
+            Assert.DoesNotThrow(() => lease.Dispose());
+            Assert.IsFalse(lease.IsHeld);
+        }
+
+        [Test]
+        public void ADisposedSemaphoreDoesNotMaskTheCallersException()
+        {
+            SemaphoreSlim semaphore = new(1, 1);
+
+            // The whole point of never throwing from Dispose: this runs from the `finally` of the
+            // using, so a throw there would replace the caller's real failure with a confusing one.
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+            {
+                using (semaphore.Acquire())
+                {
+                    semaphore.Dispose();
+                    throw new InvalidOperationException("the real failure");
+                }
+            });
+
+            Assert.AreEqual("the real failure", thrown.Message);
+        }
+
+        [Test]
+        public void DisposingACopiedLeaseCannotCorruptThePermitCount()
+        {
+            using SemaphoreSlim semaphore = new(1, 1);
+            SemaphoreLease lease = semaphore.Acquire();
+            // Copying is documented as forbidden. Pinned here so that doing it anyway degrades to a
+            // no-op rather than raising the count above the semaphore's maximum.
+            SemaphoreLease copy = lease;
+
+            lease.Dispose();
+
+            Assert.DoesNotThrow(() => copy.Dispose());
+            Assert.AreEqual(1, semaphore.CurrentCount);
+        }
+
+        [Test]
         public void TryAcquireTakesAFreePermit()
         {
             using SemaphoreSlim semaphore = new(1, 1);
