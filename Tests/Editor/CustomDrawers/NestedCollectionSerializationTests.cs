@@ -122,6 +122,29 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.sortedDroppedValues["b"], Is.EqualTo(new List<float> { 2f }));
         }
 
+        // The Inspector path writes the managed values array from its SerializedProperties and then
+        // asks for the runtime dictionary to be rebuilt. Rehydrating from the boxed array there
+        // would overwrite that fresh write with a copy that is stale until the next serialize, which
+        // is how an edit silently reverts. Pinned because nothing else would notice.
+        [Test]
+        public void EditorAfterDeserializeDoesNotOverwriteAFreshlyWrittenValuesArray()
+        {
+            _host.droppedValues["dash"] = new List<float> { 1f };
+            _host.droppedValues.OnBeforeSerialize();
+
+            // Stand in for the drawer: the managed arrays now hold the edit, the boxed array does not.
+            _host.droppedValues._keys = new[] { "dash" };
+            _host.droppedValues._values = new[] { new List<float> { 42f } };
+
+            _host.droppedValues.EditorAfterDeserialize();
+
+            Assert.That(
+                _host.droppedValues["dash"],
+                Is.EqualTo(new List<float> { 42f }),
+                "EditorAfterDeserialize must read the managed values array the caller just wrote."
+            );
+        }
+
         // An ordinary value type must keep storing its values in the plain array. Unity declares
         // the boxed field on every dictionary -- a serialized field cannot be conditional -- so the
         // guarantee that matters is that it stays EMPTY: the values still live where older package

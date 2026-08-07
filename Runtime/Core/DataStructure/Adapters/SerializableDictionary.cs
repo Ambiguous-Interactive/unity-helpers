@@ -304,12 +304,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public void OnAfterDeserialize()
         {
-            OnAfterDeserializeInternal(suppressWarnings: false);
+            OnAfterDeserializeInternal(suppressWarnings: false, rehydrateBoxedValues: true);
         }
 
         internal override void EditorAfterDeserialize()
         {
-            OnAfterDeserializeInternal(suppressWarnings: true);
+            // The editor callers have just written the managed values array from the Inspector's
+            // SerializedProperties and are asking for the runtime dictionary to be rebuilt from it.
+            // Rehydrating here would overwrite that fresh array with the boxed copy, which is stale
+            // until the next OnBeforeSerialize -- the same class of bug the ScriptableSingleton
+            // branch in SerializableDictionaryPropertyDrawer already guards against.
+            OnAfterDeserializeInternal(suppressWarnings: true, rehydrateBoxedValues: false);
         }
 
         internal override void EditorSyncSerializedArrays()
@@ -319,9 +324,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             OnBeforeSerialize();
         }
 
-        private void OnAfterDeserializeInternal(bool suppressWarnings)
+        private void OnAfterDeserializeInternal(bool suppressWarnings, bool rehydrateBoxedValues)
         {
-            RehydrateValuesFromBoxedCache();
+            if (rehydrateBoxedValues)
+            {
+                RehydrateValuesFromBoxedCache();
+            }
 
             bool keysAndValuesPresent =
                 _keys != null && _values != null && _keys.Length == _values.Length;
@@ -688,7 +696,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoAfterDeserialization]
         protected internal void OnProtoAfterDeserialization()
         {
-            OnAfterDeserializeInternal(suppressWarnings: false);
+            OnAfterDeserializeInternal(suppressWarnings: false, rehydrateBoxedValues: false);
         }
 
         protected abstract void SetValue(TValueCache[] cache, int index, TValue value);
