@@ -80,12 +80,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            SemaphoreSlim gate = GateFor(path);
-            gate.Wait();
-            try
+            using (EnterGate(path))
             {
                 string temporaryPath = path + TemporarySuffix;
-                FileStream stream;
+                FileStream staging;
                 byte[] bytes;
                 try
                 {
@@ -93,21 +91,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     // open FileStream that the catch below is not in a position to dispose.
                     bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     EnsureDirectory(path);
-                    stream = OpenStagingStream(temporaryPath, useAsync: false);
+                    staging = OpenStagingStream(temporaryPath, useAsync: false);
                 }
                 catch (Exception e)
                 {
-                    // The staged file was never opened here, so it is not this call's to delete.
                     error = e;
                     return false;
                 }
 
                 try
                 {
-                    using (stream)
+                    using (staging)
                     {
-                        stream.Write(bytes, 0, bytes.Length);
-                        stream.Flush(flushToDisk: true);
+                        staging.Write(bytes, 0, bytes.Length);
+                        staging.Flush(flushToDisk: true);
                     }
 
                     Swap(temporaryPath, path);
@@ -120,10 +117,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     DiscardStagedFile(temporaryPath);
                     return false;
                 }
-            }
-            finally
-            {
-                gate.Release();
             }
         }
 
@@ -145,32 +138,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentException("A destination path is required.", nameof(path));
             }
 
-            SemaphoreSlim gate = GateFor(path);
+            GateScope gate;
             try
             {
-                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
             {
                 return e;
             }
 
-            try
+            using (gate)
             {
                 string temporaryPath = path + TemporarySuffix;
-                FileStream stream;
+                FileStream staging;
                 byte[] bytes;
                 try
                 {
-                    // Encoded before the handle is opened, so nothing it can throw can strand an
-                    // open FileStream that the catch below is not in a position to dispose.
                     bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     EnsureDirectory(path);
-                    stream = OpenStagingStream(temporaryPath, useAsync: true);
+                    staging = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
                 {
-                    // The staged file was never opened here, so it is not this call's to delete.
                     return e;
                 }
 
@@ -178,12 +168,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     // Synchronous `using` (not `await using`) keeps this off System.IAsyncDisposable,
                     // which is unavailable under the .NET Standard 2.0 profile of older Unity LTS.
-                    using (stream)
+                    using (staging)
                     {
-                        await stream
+                        await staging
                             .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
                             .ConfigureAwait(false);
-                        stream.Flush(flushToDisk: true);
+                        staging.Flush(flushToDisk: true);
                     }
 
                     Swap(temporaryPath, path);
@@ -194,10 +184,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     DiscardStagedFile(temporaryPath);
                     return e;
                 }
-            }
-            finally
-            {
-                gate.Release();
             }
         }
 
@@ -228,26 +214,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return true;
             }
 
-            SemaphoreSlim gate = GateFor(path);
-            gate.Wait();
-            try
+            using (EnterGate(path))
             {
-                EnsureDirectory(path);
-                byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
-                using FileStream stream = OpenAppendStream(path, useAsync: false);
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Flush(flushToDisk: true);
-                error = null;
-                return true;
-            }
-            catch (Exception e)
-            {
-                error = e;
-                return false;
-            }
-            finally
-            {
-                gate.Release();
+                try
+                {
+                    EnsureDirectory(path);
+                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
+                    using FileStream stream = OpenAppendStream(path, useAsync: false);
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(flushToDisk: true);
+                    error = null;
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    error = e;
+                    return false;
+                }
             }
         }
 
@@ -277,34 +260,33 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            SemaphoreSlim gate = GateFor(path);
+            GateScope gate;
             try
             {
-                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
             {
                 return e;
             }
 
-            try
+            using (gate)
             {
-                EnsureDirectory(path);
-                byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
-                using FileStream stream = OpenAppendStream(path, useAsync: true);
-                await stream
-                    .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
-                    .ConfigureAwait(false);
-                stream.Flush(flushToDisk: true);
-                return null;
-            }
-            catch (Exception e)
-            {
-                return e;
-            }
-            finally
-            {
-                gate.Release();
+                try
+                {
+                    EnsureDirectory(path);
+                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
+                    using FileStream stream = OpenAppendStream(path, useAsync: true);
+                    await stream
+                        .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
+                        .ConfigureAwait(false);
+                    stream.Flush(flushToDisk: true);
+                    return null;
+                }
+                catch (Exception e)
+                {
+                    return e;
+                }
             }
         }
 
@@ -323,18 +305,42 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            SemaphoreSlim gate = GateFor(destinationPath);
-            gate.Wait();
-            try
+            using (EnterGate(destinationPath))
             {
                 string temporaryPath = destinationPath + TemporarySuffix;
-                bool staged = false;
+                FileStream source;
+                FileStream staging;
                 try
                 {
                     EnsureDirectory(destinationPath);
-                    File.Copy(sourcePath, temporaryPath, overwrite: true);
-                    staged = true;
-                    FlushToDisk(temporaryPath);
+                    source = OpenSourceStream(sourcePath, useAsync: false);
+                }
+                catch (Exception e)
+                {
+                    error = e;
+                    return false;
+                }
+
+                try
+                {
+                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                }
+                catch (Exception e)
+                {
+                    source.Dispose();
+                    error = e;
+                    return false;
+                }
+
+                try
+                {
+                    using (source)
+                    using (staging)
+                    {
+                        source.CopyTo(staging, DefaultBufferSize);
+                        staging.Flush(flushToDisk: true);
+                    }
+
                     Swap(temporaryPath, destinationPath);
                     error = null;
                     return true;
@@ -342,17 +348,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 catch (Exception e)
                 {
                     error = e;
-                    if (staged)
-                    {
-                        DiscardStagedFile(temporaryPath);
-                    }
-
+                    DiscardStagedFile(temporaryPath);
                     return false;
                 }
-            }
-            finally
-            {
-                gate.Release();
             }
         }
 
@@ -376,54 +374,63 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return invalid;
             }
 
-            SemaphoreSlim gate = GateFor(destinationPath);
+            GateScope gate;
             try
             {
-                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                return e;
-            }
-
-            string temporaryPath = destinationPath + TemporarySuffix;
-            // FileHelper.CopyFileAsync opens the destination with FileMode.Create before it copies a
-            // byte, so a false return still means a staged file exists here to clean up. Only a
-            // failure before that call leaves nothing of ours behind.
-            bool staged = false;
-            try
-            {
-                EnsureDirectory(destinationPath);
-                staged = true;
-                bool copied = await FileHelper
-                    .CopyFileAsync(sourcePath, temporaryPath, cancellationToken: cancellationToken)
+                gate = await EnterGateAsync(destinationPath, cancellationToken)
                     .ConfigureAwait(false);
-                if (!copied)
-                {
-                    DiscardStagedFile(temporaryPath);
-                    return new IOException(
-                        $"Failed to copy '{sourcePath}' to '{destinationPath}'."
-                    );
-                }
-
-                // The flush and the swap stay synchronous: splitting them across an await buys
-                // nothing, and both are metadata-scale operations.
-                FlushToDisk(temporaryPath);
-                Swap(temporaryPath, destinationPath);
-                return null;
             }
             catch (Exception e)
             {
-                if (staged)
-                {
-                    DiscardStagedFile(temporaryPath);
-                }
-
                 return e;
             }
-            finally
+
+            using (gate)
             {
-                gate.Release();
+                string temporaryPath = destinationPath + TemporarySuffix;
+                FileStream source;
+                FileStream staging;
+                try
+                {
+                    EnsureDirectory(destinationPath);
+                    source = OpenSourceStream(sourcePath, useAsync: true);
+                }
+                catch (Exception e)
+                {
+                    return e;
+                }
+
+                try
+                {
+                    staging = OpenStagingStream(temporaryPath, useAsync: true);
+                }
+                catch (Exception e)
+                {
+                    source.Dispose();
+                    return e;
+                }
+
+                try
+                {
+                    using (source)
+                    using (staging)
+                    {
+                        await source
+                            .CopyToAsync(staging, DefaultBufferSize, cancellationToken)
+                            .ConfigureAwait(false);
+                        // The flush stays synchronous: it is a metadata-scale operation and
+                        // splitting it across an await buys nothing.
+                        staging.Flush(flushToDisk: true);
+                    }
+
+                    Swap(temporaryPath, destinationPath);
+                    return null;
+                }
+                catch (Exception e)
+                {
+                    DiscardStagedFile(temporaryPath);
+                    return e;
+                }
             }
         }
 
@@ -441,6 +448,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
+                // File.Delete is already a no-op on a missing file, so the probe is a fast path
+                // rather than a correctness guard, and losing the race with another deleter is
+                // harmless: the postcondition this reports is "no file remains", not "we removed it".
                 if (File.Exists(path))
                 {
                     File.Delete(path);
@@ -469,16 +479,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            // Probed up front so a missing source never reaches the staging step, where its failure
-            // would be indistinguishable from a staged file another writer owns.
-            if (!File.Exists(sourcePath))
-            {
-                return new FileNotFoundException(
-                    $"Source file not found: '{sourcePath}'.",
-                    sourcePath
-                );
-            }
-
             return null;
         }
 
@@ -491,6 +491,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return gates;
+        }
+
+        private static GateScope EnterGate(string path)
+        {
+            SemaphoreSlim gate = GateFor(path);
+            gate.Wait();
+            return new GateScope(gate);
+        }
+
+        private static async ValueTask<GateScope> EnterGateAsync(
+            string path,
+            CancellationToken cancellationToken
+        )
+        {
+            SemaphoreSlim gate = GateFor(path);
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return new GateScope(gate);
         }
 
         private static SemaphoreSlim GateFor(string path)
@@ -507,9 +524,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(key);
-            return Gates[(hash & int.MaxValue) % GateCount];
+            return Gates[hash.PositiveMod(GateCount)];
         }
 
+        private static FileStream OpenSourceStream(string sourcePath, bool useAsync)
+        {
+            return new FileStream(
+                sourcePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                DefaultBufferSize,
+                useAsync
+            );
+        }
+
+        // FileMode.Create + FileShare.None is what makes ownership decidable: if this open returns,
+        // the staged file is exclusively this call's and every later failure must discard it; if it
+        // throws, nothing here created anything and a staged file that exists belongs to somebody
+        // else. Copy stages through this same open rather than File.Copy, because File.Copy folds
+        // "could not take the staging path" and "failed halfway through writing it" into one
+        // exception and the cleanup decision differs between them.
         private static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
         {
             return new FileStream(
@@ -545,14 +580,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        // File.Copy does not flush, so the staged copy is reopened purely to force it out of the
-        // page cache before the swap makes it the live file.
-        private static void FlushToDisk(string path)
-        {
-            using FileStream stream = new(path, FileMode.Open, FileAccess.Write, FileShare.None);
-            stream.Flush(flushToDisk: true);
-        }
-
         // A leftover staged file reads as a half-finished write to the next attempt, and would keep
         // failing identically if the cause was a full disk.
         private static void DiscardStagedFile(string temporaryPath)
@@ -560,6 +587,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             TryDelete(temporaryPath);
         }
 
+        // Whether the destination exists decides which API can swap, and another process can change
+        // that answer between the probe and the call — so neither branch trusts it. Each falls
+        // through to the other on the exception that means "the file was there / was not there
+        // after all".
         private static void Swap(string temporaryPath, string path)
         {
             if (File.Exists(path))
@@ -574,7 +605,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (IOException) when (File.Exists(path))
             {
-                // Another process created the destination between the probe and the move.
                 Replace(temporaryPath, path);
             }
         }
@@ -585,6 +615,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 File.Replace(temporaryPath, path, destinationBackupFileName: null);
             }
+            catch (FileNotFoundException)
+            {
+                // The destination was removed after the probe. Moving into the gap is the same
+                // outcome File.Replace would have produced.
+                File.Move(temporaryPath, path);
+            }
             catch (NotSupportedException)
             {
                 // File.Replace is the atomic swap but is not implemented on every platform. Where
@@ -592,6 +628,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 // complete and flushed, but the destination is briefly absent.
                 File.Delete(path);
                 File.Move(temporaryPath, path);
+            }
+        }
+
+        /// <summary>
+        /// Holds a path's gate until disposed. A struct so <c>using</c> costs no allocation.
+        /// </summary>
+        private readonly struct GateScope : IDisposable
+        {
+            private readonly SemaphoreSlim _gate;
+
+            internal GateScope(SemaphoreSlim gate)
+            {
+                _gate = gate;
+            }
+
+            public void Dispose()
+            {
+                _gate.Release();
             }
         }
     }

@@ -232,6 +232,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void AFailureBeforeStagingLeavesAnExistingStagedFileAlone()
+        {
+            // A copy that fails before it ever opens the staging path -- here because the source is
+            // missing -- must not touch a staged file, because that file belongs to whoever did
+            // open it.
+            string source = Path.Combine(_testDirectory, "missing.json");
+            string destination = WriteDirectly("destination.json", "the previous document");
+            string staged = destination + DurableFile.TemporarySuffix;
+            File.WriteAllText(staged, "another writer's staged document");
+
+            Assert.IsFalse(DurableFile.TryCopy(source, destination, out Exception error));
+
+            Assert.IsTrue(error != null);
+            Assert.AreEqual("another writer's staged document", File.ReadAllText(staged));
+            Assert.AreEqual("the previous document", File.ReadAllText(destination));
+        }
+
+        [Test]
+        public void AFailureAfterStagingRemovesTheStagedFile()
+        {
+            string source = WriteDirectly("source.json", "source contents");
+            // A directory where the destination belongs fails the swap, which is the only step that
+            // runs after this call has taken exclusive ownership of the staged file.
+            string destination = Path.Combine(_testDirectory, "destination.json");
+            Directory.CreateDirectory(destination);
+
+            Assert.IsFalse(DurableFile.TryCopy(source, destination, out Exception error));
+
+            Assert.IsTrue(error != null);
+            Assert.IsFalse(File.Exists(destination + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
+        public void AFailedWriteAfterStagingRemovesTheStagedFile()
+        {
+            string path = Path.Combine(_testDirectory, "save.json");
+            Directory.CreateDirectory(path);
+
+            Assert.IsFalse(
+                DurableFile.TryWriteAllText(path, "the new document", out Exception error)
+            );
+
+            Assert.IsTrue(error != null);
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
         public void CopyFromAMissingSourceLeavesTheDestinationIntact()
         {
             string source = Path.Combine(_testDirectory, "missing.json");

@@ -349,6 +349,85 @@ When passing file arguments to CLI tools, a `--` (end-of-options) separator MUST
 
 ---
 
+## Filesystem, Scope, and Index Patterns
+
+| Forbidden                                                   | Use Instead                                                                              | Reason                                                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `File.Exists` as the sole guard on the call that follows it | Probe to pick the likely branch, then catch the exception the race produces              | Another process can change the answer between the probe and the next line.             |
+| Deleting a derived temporary path on any failure            | Delete only when this call's exclusive open returned                                     | A concurrent writer may own the file sitting at that path.                             |
+| `File.Copy` into a staging path you must clean up           | Open the staging stream yourself (`FileMode.Create` + `FileShare.None`) and copy into it | `File.Copy` folds "could not take the path" and "failed mid-write" into one exception. |
+| `try`/`finally` to restore state a block changed            | A `readonly struct` implementing `IDisposable`, used with `using`                        | One line instead of five, cannot be nested wrongly, and allocates nothing.             |
+| `Math.Abs(hash) % n`                                        | `hash.PositiveMod(n)`                                                                    | `Math.Abs(int.MinValue)` throws `OverflowException`.                                   |
+| `(hash & int.MaxValue) % n`                                 | `hash.PositiveMod(n)`                                                                    | Discarding the sign bit folds two distinct hashes onto one bucket.                     |
+
+### Filesystem Races
+
+A probe used purely as a fast path is fine — say so in a comment. `File.Delete` is already a no-op on
+a missing file, so `File.Exists` around it avoids exception cost rather than preventing a bug. What is
+forbidden is letting the probe decide which API is _legal_:
+
+```csharp
+if (File.Exists(destination))
+{
+    Replace(staged, destination); // File.Replace, itself falling back on FileNotFoundException
+    return;
+}
+
+try
+{
+    File.Move(staged, destination);
+}
+catch (IOException) when (File.Exists(destination))
+{
+    Replace(staged, destination);
+}
+```
+
+### Staged-File Ownership
+
+Branch cleanup on whether the exclusive open returned, not on whether the operation failed. If it
+threw, nothing here is yours to delete; if it returned, a later failure leaves a partial file that is:
+
+```csharp
+FileStream staging;
+try
+{
+    staging = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None);
+}
+catch (Exception e)
+{
+    return e; // not ours -- leave it alone
+}
+
+try { /* write, flush, swap */ }
+catch (Exception e)
+{
+    TryDelete(temporary); // ours, and a partial file left behind is a leak
+    return e;
+}
+```
+
+### Disposable Scopes
+
+```csharp
+private readonly struct GateScope : IDisposable
+{
+    private readonly SemaphoreSlim _gate;
+
+    internal GateScope(SemaphoreSlim gate) => _gate = gate;
+
+    public void Dispose() => _gate.Release();
+}
+
+using (EnterGate(path)) { /* ... */ }
+```
+
+Existing examples: `DurableFile.GateScope`, `AssetDatabaseBatchScope`,
+`GroupGUIWidthUtility.PushContentPadding`, `LabelWidthScope`. For `async`, acquire _before_ the
+`using` so a cancelled wait is reported instead of releasing a gate that was never taken.
+
+---
+
 ## Related Documentation
 
 - [high-performance-csharp](../skills/high-performance-csharp.md) - Core performance patterns
