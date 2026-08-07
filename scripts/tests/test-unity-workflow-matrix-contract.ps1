@@ -2995,21 +2995,35 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
     }
 }
 
-$unityMatrixParallelismUsesRunnerSlots = (
-    $jobTexts.ContainsKey('unity-tests') -and
-    $jobTexts.ContainsKey('unity-tests-standalone') -and
-    $jobTexts.ContainsKey('unity-tests-single-threaded') -and
-    $benchmarksJobTexts.ContainsKey('benchmarks') -and
-    $jobTexts['unity-tests'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
-    $jobTexts['unity-tests-standalone'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
-    $jobTexts['unity-tests-single-threaded'] -match '(?m)^\s+max-parallel:\s*2\s*$' -and
-    $benchmarksJobTexts['benchmarks'] -match '(?m)^\s+max-parallel:\s*2\s*$'
-)
-if (-not $unityMatrixParallelismUsesRunnerSlots) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity self-hosted matrix jobs must use max-parallel: 2 so CI actually uses the two available Unity runner queue slots. Keep .github/workflows/unity-benchmarks.yml in sync."
+# `max-parallel: 2` used to be pinned here on the theory that it matched the two
+# Unity runners. It does not gate execution -- a self-hosted runner already takes
+# one job at a time -- it gates *eligibility*, so every completion became a fresh
+# dispatch transition, and dispatch to a self-hosted runner is the slow part.
+# Measured on run 31130259492 (main, green): 16 legs, 70.9 min of work on 2
+# runners against an 88 min wall clock, with a runner idle for 13.4 min while four
+# legs sat queued. Sibling repos were not on the runners in that window and the
+# organization Unity lock acquired in 2-4 s on every leg, so the cap is the only
+# remaining explanation. The contract is now the inverse: no cap.
+$unityMatrixJobsWithParallelismCap = @()
+foreach ($capJob in @('unity-tests', 'unity-tests-standalone', 'unity-tests-single-threaded')) {
+    if (-not $jobTexts.ContainsKey($capJob)) {
+        $unityMatrixJobsWithParallelismCap += "$capJob (missing)"
+    }
+    elseif ([string]$jobTexts[$capJob] -match '(?m)^\s+max-parallel:') {
+        $unityMatrixJobsWithParallelismCap += $capJob
+    }
+}
+if (-not $benchmarksJobTexts.ContainsKey('benchmarks')) {
+    $unityMatrixJobsWithParallelismCap += 'benchmarks (missing)'
+}
+elseif ([string]$benchmarksJobTexts['benchmarks'] -match '(?m)^\s+max-parallel:') {
+    $unityMatrixJobsWithParallelismCap += 'benchmarks'
+}
+if ($unityMatrixJobsWithParallelismCap.Count -gt 0) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity self-hosted matrix jobs must not cap max-parallel: it limits matrix eligibility rather than execution, so each completion becomes a slow self-hosted dispatch transition and both runners idle with legs queued. Concurrency is already bounded by the runner pool and the organization Unity lock. Offending: $($unityMatrixJobsWithParallelismCap -join ', '). Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity matrix jobs use the two available self-hosted runner slots."
+    Write-Info "Checked Unity matrix jobs leave every leg immediately eligible for the self-hosted runners."
 }
 
 $unityLockCleanupIsGated = (

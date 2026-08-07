@@ -309,7 +309,22 @@ jobs:
       # A sibling may hold a Unity license, so matrix failures must never cancel
       # another leg before its license-return and lock-release cleanup completes.
       fail-fast: false
-      max-parallel: 2
+      # No max-parallel. It used to be 2 -- one slot per Unity runner -- which
+      # sounds like it matches capacity and is in fact the thing that wastes it:
+      # `max-parallel` makes only N matrix jobs *eligible*, so every completion is
+      # a fresh dispatch transition, and dispatch to a self-hosted runner is what
+      # is slow here. Measured on run 31130259492 (main, green): 16 legs, 70.9 min
+      # of work, 2 runners -- a 35.5 min packing floor against an 88 min wall
+      # clock. ELI-MACHINE finished a leg at +9.4 min and sat idle until +22.8 with
+      # four legs queued; no sibling repo touched the runners in that window
+      # (checked DxMessaging, DoxReloaded, IshoBoy, qora-redux), and the
+      # organization Unity lock acquired in 2-4 s on all 15 licensed legs, so
+      # neither contention explains it.
+      #
+      # Concurrency is still bounded by the runner pool: a self-hosted runner takes
+      # one job at a time, and the organization lock guards the Unity seat. The
+      # trade-off accepted here is politeness -- a sibling repo's Unity job can now
+      # queue behind more of ours at once.
       matrix:
         # Ordered fast-tier include from matrix-config: editmode then playmode,
         # version-minor. matrix.unity-version / matrix.test-mode come from each
@@ -686,7 +701,11 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # No max-parallel, for the reason recorded on the fast tier above: capping
+      # eligibility turns every completion into a slow self-hosted dispatch
+      # transition. This tier is where it cost the most -- the four standalone legs
+      # were created at +32.0 min and the first started at +42.1, both runners idle
+      # throughout.
       matrix:
         # Standalone-tier include from matrix-config (empty -> this job is skipped
         # by the if-guard above -- single-mode dispatch pins run in the fast tier).
@@ -1065,7 +1084,7 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # No max-parallel, for the reason recorded on the fast tier above.
       matrix:
         # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode
         # only -- both are fast in-editor runs; the SINGLE_THREADED path does not need

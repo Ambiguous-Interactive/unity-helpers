@@ -111,7 +111,10 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # No max-parallel, kept in sync with .github/workflows/unity-tests.yml, where
+      # the measurement behind it is recorded: capping eligibility to the runner
+      # count makes every completion a fresh self-hosted dispatch transition, and
+      # that transition is what leaves both runners idle with legs queued.
       matrix:
         unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
         test-mode:
