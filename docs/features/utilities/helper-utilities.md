@@ -738,6 +738,55 @@ await FileHelper.CopyFileAsync(
 - Cancellable copy operations
 - Streaming file operations
 
+### Durable Writes for Player Data
+
+`File.WriteAllText` empties the destination before it writes a single byte. If the game is killed, the
+device loses power, or the disk fills in between, the player's save is gone and a truncated one is in its
+place. `DurableFile` writes the new contents to a sibling file, forces them to disk, and only then swaps
+them over the destination.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+if (!DurableFile.TryWriteAllText(savePath, json, out Exception error))
+{
+    Debug.LogError($"Could not save: {error}");
+    // The previous save is still on disk and still readable.
+}
+```
+
+Every method reports failure instead of throwing, and the async ones return the exception (null on
+success):
+
+```csharp
+Exception error = await DurableFile.WriteAllTextAsync(savePath, json, cancellationToken);
+
+// Append is stronger still: it never rewrites bytes that are already on disk.
+DurableFile.TryAppendAllText(ledgerPath, $"{score}\n", out Exception appendError);
+
+// Replace one file with another under the same staging discipline.
+DurableFile.TryCopy(savePath, backupPath, out Exception copyError);
+```
+
+`Serializer.WriteToJsonFile` and `WriteToJsonFileAsync` already write through this, so JSON saves get the
+guarantee without changing any code.
+
+**What it promises:**
+
+- A reader sees either the complete previous contents or the complete new ones, never a partial file.
+- The data is forced out of the page cache before the swap makes it live.
+- Concurrent writes to the same path from your game are serialized.
+
+**What it does not promise:**
+
+- It is **not** full crash safety. .NET cannot flush a directory, so a filesystem may still reorder the
+  rename behind the data write.
+- It does not coordinate with other processes. A second process writing the same file at the same time is
+  reported as a failure rather than allowed to corrupt the document.
+
+A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
+safe to ignore or delete.
+
 ---
 
 <a id="scene-helpers"></a>

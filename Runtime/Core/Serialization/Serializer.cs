@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.IO;
     using System.Reflection;
     using System.Runtime.CompilerServices;
+    using System.Runtime.ExceptionServices;
     using System.Runtime.Serialization.Formatters.Binary;
     using System.Text;
     using System.Text.Json;
@@ -3242,10 +3243,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <param name="input">The instance to serialize.</param>
         /// <param name="path">Destination file path.</param>
         /// <param name="pretty">Write indented output when true.</param>
+        /// <remarks>
+        /// The write is staged and swapped by <see cref="DurableFile"/>, so an interrupted write
+        /// leaves the previous document intact instead of truncating it.
+        /// </remarks>
         public static void WriteToJsonFile<T>(T input, string path, bool pretty = true)
         {
             string jsonAsText = JsonStringify(input, pretty);
-            File.WriteAllText(path, jsonAsText);
+            WriteTextDurably(path, jsonAsText);
         }
 
         /// <summary>
@@ -3258,7 +3263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static async Task WriteToJsonFileAsync<T>(T input, string path, bool pretty = true)
         {
             string jsonAsText = JsonStringify(input, pretty);
-            await File.WriteAllTextAsync(path, jsonAsText);
+            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
         }
 
         /// <summary>
@@ -3272,16 +3277,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         )
         {
             string jsonAsText = JsonStringify(input, pretty);
-            byte[] bytes = SerializerEncoding.Encoding.GetBytes(jsonAsText);
-            using FileStream fs = new(
-                path,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                4096,
-                useAsync: true
-            );
-            await fs.WriteAsync(bytes, 0, bytes.Length, cancellationToken);
+            await WriteTextDurablyAsync(path, jsonAsText, cancellationToken);
         }
 
         /// <summary>
@@ -3294,7 +3290,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static void WriteToJsonFile<T>(T input, string path, JsonSerializerOptions options)
         {
             string jsonAsText = JsonStringify(input, options);
-            File.WriteAllText(path, jsonAsText);
+            WriteTextDurably(path, jsonAsText);
         }
 
         /// <summary>
@@ -3311,7 +3307,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         )
         {
             string jsonAsText = JsonStringify(input, options);
-            await File.WriteAllTextAsync(path, jsonAsText);
+            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
         }
 
         /// <summary>
@@ -3350,6 +3346,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch
             {
                 return false;
+            }
+        }
+
+        // These wrappers keep the throwing contract these public methods have always had, while the
+        // write itself becomes non-destructive. ExceptionDispatchInfo preserves the original I/O
+        // stack, which a bare `throw error` would overwrite.
+        private static void WriteTextDurably(string path, string contents)
+        {
+            if (!DurableFile.TryWriteAllText(path, contents, out Exception error))
+            {
+                ExceptionDispatchInfo.Capture(error).Throw();
+            }
+        }
+
+        private static async Task WriteTextDurablyAsync(
+            string path,
+            string contents,
+            System.Threading.CancellationToken cancellationToken
+        )
+        {
+            Exception error = await DurableFile.WriteAllTextAsync(
+                path,
+                contents,
+                cancellationToken
+            );
+            if (error != null)
+            {
+                ExceptionDispatchInfo.Capture(error).Throw();
             }
         }
     }

@@ -156,6 +156,14 @@ SaveData loaded = Serializer.Deserialize<SaveData>(bytes, SerializationType.Json
 
 Unity Helpers provides several advanced APIs for high-performance and robust file operations.
 
+### Writes Do Not Destroy the Previous File
+
+Every `WriteToJsonFile` / `WriteToJsonFileAsync` overload writes through
+[`DurableFile`](../utilities/helper-utilities.md#durable-writes-for-player-data): the document is staged in
+a sibling file, flushed to disk, and swapped over the destination. A write interrupted by a crash, a power
+loss, or a full disk therefore leaves the previous save readable instead of truncating it. Missing
+directories are created for you. Failures still throw, exactly as before.
+
 ### Async File Operations
 
 For non-blocking file I/O (useful in loading screens or background saves):
