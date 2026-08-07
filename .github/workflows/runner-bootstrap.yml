@@ -105,7 +105,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Require the selected Unity runner online
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@e6fa595a336e95d800c1139bdebf6d749ee6f186 # v1.11.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
@@ -137,7 +137,7 @@ jobs:
       - name: Checkout
         # Shallow checkout: bootstrap only needs scripts/unity/* and a
         # composite action; no history depth required.
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
@@ -234,7 +234,7 @@ jobs:
           Write-Host "Resolved detect-only: $detectOnly (raw='$rawDetect')"
 
           # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
-          # reliably the repo root post-checkout (actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 above).
+          # reliably the repo root post-checkout (actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 above).
           #
           # The maintenance script audits/remediates host prerequisites first
           # (VC++ redists, UCRT, long paths, pwsh, Defender exclusions), then
