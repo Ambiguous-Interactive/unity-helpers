@@ -252,7 +252,34 @@ jobs:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      # This job is the only one in the workflow that reached for organization
+      # secrets without first asking whether this run has any. Dependabot runs use
+      # a separate secret store, so `reader-app-id` arrived empty and the action
+      # failed closed with "Missing required input" -- on every dependency PR,
+      # forever, while `matrix-config` had already (correctly) skipped the licensed
+      # tiers those credentials exist to serve. Preflighting a runner fleet nothing
+      # is going to dispatch to is not a gate, it is a guaranteed red.
+      #
+      # The check is done here rather than in the job's `if:` on purpose: the
+      # `secrets` context is unavailable in a job-level condition, and reading it
+      # through `needs.matrix-config` would put this job behind a barrier it does
+      # not otherwise need.
+      - name: Detect build-lock reader credentials
+        id: credentials
+        env:
+          READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          READER_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${READER_APP_ID:-}" ] && [ -n "${READER_APP_PRIVATE_KEY:-}" ]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "present=false" >> "${GITHUB_OUTPUT}"
+          echo "::notice::No build-lock reader credentials on this run, so the licensed Unity tiers are skipped and there is no runner fleet to preflight."
+
       - name: Require an online Unity runner
+        if: ${{ steps.credentials.outputs.present == 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
@@ -1567,6 +1594,7 @@ jobs:
           REF_PROTECTED: ${{ github.ref_protected }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
           MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
+          HAS_REQUIRED_SECRETS: ${{ needs.matrix-config.outputs.has-required-secrets }}
           LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
@@ -1596,6 +1624,43 @@ jobs:
 
           if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
             echo "Unprotected push intentionally omitted licensed Unity jobs."
+            exit 0
+          fi
+
+          # A run with no organization secrets -- Dependabot's separate secret
+          # store is the case that reaches this -- cannot dispatch a licensed leg,
+          # so every one of them is skipped by design. That is the same situation
+          # as a fork PR above and is reported the same way: green, because nothing
+          # failed, with the summary saying plainly that no Unity validation ran.
+          #
+          # It is still an assertion, not a waiver. Both hosted gates must have
+          # passed and every licensed job must be `skipped`; anything else means a
+          # leg ran that could not have, or a gate broke, and that is a real red.
+          if [ "${HAS_REQUIRED_SECRETS}" != "true" ]; then
+            if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
+              echo "::error::Run without Unity credentials, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
+              exit 1
+            fi
+            for pair in \
+              "unity-tests=${UNITY_TESTS_RESULT}" \
+              "unity-tests-standalone=${STANDALONE_RESULT}" \
+              "unity-tests-single-threaded=${SINGLE_THREADED_RESULT}" \
+              "unitypackage-smoke=${UNITYPACKAGE_SMOKE_RESULT}"; do
+              if [ "${pair#*=}" != "skipped" ]; then
+                echo "::error::Run without Unity credentials, but a licensed job did not skip: ${pair}."
+                exit 1
+              fi
+            done
+            echo "No Unity credentials on this run; the licensed Unity tiers were skipped."
+            {
+              echo "## Unity validation did not run"
+              echo ""
+              echo "This run had no Unity credentials, so every licensed tier was skipped and **no Unity test executed**."
+              echo ""
+              echo "The hosted gates passed and every licensed job skipped as designed, so this is reported as a pass rather than a failure."
+              echo ""
+              echo "Unity coverage for these changes comes from the protected-branch push after merge."
+            } >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
 

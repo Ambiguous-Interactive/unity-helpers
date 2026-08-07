@@ -2808,6 +2808,41 @@ $supersededGateContracts = @(
             $workflowContent -match '(?m)^          if \[ "\$\{MATRIX_CONFIG_SUPERSEDED\}" = "true" \] \|\| \[ "\$\{LATE_SUPERSEDED\}" = "true" \]; then\s*$'
         )
         Message = 'unity-ci-success must exit 0 for a superseded run: it never ran the licensed tiers and its check belongs to the head SHA it was queued for, so it can neither gate nor authorize the current head.'
+    },
+    @{
+        # Dependabot runs draw from a separate secret store, so
+        # BUILD_LOCK_READER_APP_ID arrived empty and the availability action failed
+        # closed with "Missing required input" -- permanently red on every
+        # dependency PR, while matrix-config had already skipped the licensed tiers
+        # those credentials exist to serve. The `secrets` context is unavailable in
+        # a job-level `if:`, so the guard has to be a step.
+        Name = 'runner-preflight skips the fleet probe when the reader credentials are absent'
+        Ok = (
+            $unityTestsRunnerPreflightJob -match '(?m)^\s+id:\s*credentials\s*$' -and
+            $unityTestsRunnerPreflightJob.Contains('READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}') -and
+            $unityTestsRunnerPreflightJob -match "(?m)^\s+if:\s*\`$\{\{\s*steps\.credentials\.outputs\.present\s*==\s*'true'\s*\}\}\s*$"
+        )
+        Message = 'runner-preflight must detect whether this run carries build-lock reader credentials and skip the fleet probe when it does not. Probing a runner fleet no licensed leg is going to be dispatched to is not a gate, it is a guaranteed red on every Dependabot pull request.'
+    },
+    @{
+        Name = 'Unity CI Success reports a run without Unity credentials instead of failing it'
+        Ok = (
+            $workflowContent.Contains('HAS_REQUIRED_SECRETS: ${{ needs.matrix-config.outputs.has-required-secrets }}') -and
+            $workflowContent -match '(?m)^          if \[ "\$\{HAS_REQUIRED_SECRETS\}" != "true" \]; then\s*$' -and
+            $workflowContent.Contains('## Unity validation did not run')
+        )
+        Message = 'unity-ci-success must have an explicit branch for a run with no Unity credentials, and its step summary must say plainly that no Unity test executed. Without it the verdict demands success from licensed jobs that were skipped by design.'
+    },
+    @{
+        # The branch above is a waiver only if it asserts nothing; these two errors
+        # are what keep it an assertion. A licensed job that reported anything but
+        # `skipped` on a credential-less run means a leg ran that could not have.
+        Name = 'the no-credentials branch still asserts the hosted gates and the skips'
+        Ok = (
+            $workflowContent.Contains('Run without Unity credentials, but a hosted gate did not pass') -and
+            $workflowContent.Contains('Run without Unity credentials, but a licensed job did not skip')
+        )
+        Message = 'The no-credentials branch of unity-ci-success must require both hosted gates to have passed and every licensed job to have skipped. Exiting 0 without those checks would report green for a broken gate.'
     }
 )
 foreach ($licensedJobId in $licensedJobIds) {
