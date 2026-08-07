@@ -84,3 +84,17 @@ own copies win there and nothing competes for the name.
 Below `6000.5` — including every `6000.0` through `6000.4` release — Unity ships none of them and
 this package's copies are required. `System.IO.Pipelines` is never provided by Unity and ships
 unconditionally.
+
+## What this package deliberately does not ship
+
+`System.Runtime.CompilerServices.Unsafe` is used across the runtime (`EnumExtensions`,
+`ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`) and is **not** bundled. Every
+editor in the support matrix provides it, which the CI matrix demonstrates on every run: 2021.3,
+2022.3, 6000.3, and 6000.5 all compile the package. Adding a copy would put a fourth source in play
+for a contested name, and competing sources are the mechanism behind every failure on this page.
+
+Both decisions — which assemblies are constrained and which are deliberately absent — are enforced
+by `scripts/lint-bundled-assemblies.ps1`. That matters because the fix here is invisible: a NuGet
+refresh that regenerates an importer without its constraint, or drops in a new DLL, would silently
+restore the conflict. The linter fails on an unclassified DLL, so a refresh cannot proceed without a
+conscious decision recorded here.

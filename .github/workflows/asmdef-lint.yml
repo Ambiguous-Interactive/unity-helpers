@@ -12,6 +12,8 @@ on:
       # introduce (or fix) a finding without touching an asmdef.
       - "**.cs"
       - "scripts/lint-asmdef.ps1"
+      - "Runtime/Binaries/**"
+      - "scripts/lint-bundled-assemblies.ps1"
       - ".github/workflows/asmdef-lint.yml"
   pull_request:
     paths:
@@ -19,6 +21,8 @@ on:
       - "**.asmref"
       - "**.cs"
       - "scripts/lint-asmdef.ps1"
+      - "Runtime/Binaries/**"
+      - "scripts/lint-bundled-assemblies.ps1"
       - ".github/workflows/asmdef-lint.yml"
 
 permissions:
@@ -38,3 +42,7 @@ jobs:
       - name: Validate Assembly Definition files
         shell: pwsh
         run: ./scripts/lint-asmdef.ps1 -VerboseOutput
+
+      - name: Validate bundled assembly importers
+        shell: pwsh
+        run: ./scripts/lint-bundled-assemblies.ps1 -VerboseOutput
