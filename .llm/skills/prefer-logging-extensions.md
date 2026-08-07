@@ -346,15 +346,13 @@ The logging extensions are **thread-safe**. When called from a background thread
 
 ## Build Configuration
 
-Logging is enabled by the `ENABLE_UBERLOGGING` define, which is automatically set for:
+Every entry point is a [`[Conditional]`](https://learn.microsoft.com/dotnet/api/system.diagnostics.conditionalattribute) method carrying the whole enabling set — `ENABLE_UBERLOGGING`, `DEVELOPMENT_BUILD`, `DEBUG`, `UNITY_EDITOR`, plus its own severity symbol. Unity defines the middle three itself, so the editor and development builds need no configuration.
 
-- `DEVELOPMENT_BUILD`
-- `DEBUG`
-- `UNITY_EDITOR`
+In release builds the compiler removes **the entire call site**, receiver and arguments included, so a disabled call costs nothing at all — no `FormattableString`, and no evaluation of an expression like `MySingleton.Instance` that would otherwise have side effects.
 
-In release builds, logging calls are compiled out for zero runtime overhead.
+That decision is made in the assembly that **calls** the method, not in this package, so a symbol has to be defined project-wide (Player Settings → Scripting Define Symbols) to take effect. There is no longer a file-scoped `#define` inside the package; a define that reached only this assembly would change nothing for your code.
 
-**Granular logging defines**: For finer control, individual log levels can be toggled with `DEBUG_LOGGING`, `WARN_LOGGING`, and `ERROR_LOGGING` defines. These allow selective compilation of specific log levels while keeping others disabled.
+**Granular logging defines**: individual levels can be enabled with `DEBUG_LOGGING`, `WARN_LOGGING`, and `ERROR_LOGGING` while the others stay compiled out.
 
 ---
 

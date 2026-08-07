@@ -190,16 +190,22 @@ public void Initialize() { }
 **`#define` directives** MUST be placed at the **top of the file** before any tokens. This is a C# language requirement (error CS1032):
 
 ```csharp
-// ✅ CORRECT - #define at file top (C# requirement)
-#if !ENABLE_UBERLOGGING && (DEVELOPMENT_BUILD || DEBUG || UNITY_EDITOR)
+// ✅ CORRECT - #define / #undef at file top (C# requirement)
 #define ENABLE_UBERLOGGING
-#endif
 
-namespace WallstopStudios.UnityHelpers.Core.Extension
+namespace WallstopStudios.UnityHelpers.Tests.Extensions
 {
     // ...
 }
 ```
+
+`#undef` obeys the same rule, and it undefines a compiler-supplied symbol for that file only —
+which is how `ConditionalLoggingStrippedTests` reproduces a release build inside an editor test run
+(a `[Conditional]` call is resolved against the symbols in effect at the **call site's file
+position**).
+
+Note the package itself no longer carries a file-scoped `#define ENABLE_UBERLOGGING`: the logging
+gate moved onto the methods as `[Conditional]`, so the decision belongs to the calling assembly.
 
 **`#if` conditional blocks** (without `#define`) should be placed **inside** the namespace for consistency:
 

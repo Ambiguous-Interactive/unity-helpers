@@ -1040,10 +1040,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         // The sampled offset is exact in double, but `center + offset` rounds to float, and the
         // offset a caller recovers as `point - center` can be longer than the one sampled. Near the
         // origin that is a few ULPs; at world coordinate 1e6 with radius 0.05 the float grid around
-        // the center is coarser than the radius and a quarter of all samples land outside. Rather
-        // than return a point outside the shape these methods promise, resample -- and at
-        // magnitudes where no offset survives the rounding, fall back to the center, which is the
-        // only representable point that satisfies the contract.
+        // the center is coarser than the radius and just over HALF of all samples land outside,
+        // overshooting by up to 77% of the radius. Rather than return a point outside the shape
+        // these methods promise, resample -- and at magnitudes where no offset survives the
+        // rounding, fall back to the center, which is then the only representable point that
+        // satisfies the contract.
         private const int RandomPointInShapeAttempts = 8;
 
         /// <summary>
@@ -1066,7 +1067,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             random ??= PRNG.Instance;
             double radiusAbs = Math.Abs(radius);
-            if (radiusAbs <= 0f)
+            // NaN fails the loop's predicate every time, so without this it would burn all eight
+            // attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
+            // and previously produced an infinite point. `center` is the honest answer to both.
+            if (!float.IsFinite(radius) || radiusAbs <= 0f)
             {
                 return center;
             }
@@ -1111,7 +1115,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             random ??= PRNG.Instance;
             double radiusAbs = Math.Abs(radius);
-            if (radiusAbs <= 0f)
+            // NaN fails the loop's predicate every time, so without this it would burn all eight
+            // attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
+            // and previously produced an infinite point. `center` is the honest answer to both.
+            if (!float.IsFinite(radius) || radiusAbs <= 0f)
             {
                 return center;
             }

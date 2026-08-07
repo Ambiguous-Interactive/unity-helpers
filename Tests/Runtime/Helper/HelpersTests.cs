@@ -792,8 +792,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         // Far from the origin the float grid around the center gets coarser than the radius, so
         // `center + offset` rounds a sampled point clean outside the shape. Measured before the
-        // fix: at (1e6, 1e6) with radius 0.05, 25.8% of returned points failed the very test a
-        // range query applies -- overshooting by up to half the radius, not by an ULP.
+        // fix at (1e6, 1e6) with radius 0.05: 50.75% of returned points failed the very test a
+        // range query applies, overshooting by up to 77% of the radius -- not by an ULP. (The
+        // closed form is 1 - (1.25r)^2/(pi*r^2) = 50.3%; the per-axis rate is 26%, which is the
+        // number to avoid quoting.) The first three cases and the last cannot fail even pre-fix --
+        // they are regression cover for the near-origin and fully-degenerate ends.
         [TestCase(0f, 18f)]
         [TestCase(100f, 18f)]
         [TestCase(1_000f, 1f)]

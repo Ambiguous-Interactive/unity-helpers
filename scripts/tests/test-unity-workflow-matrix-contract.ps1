@@ -87,7 +87,10 @@ function Get-BuildLockActionPins {
         [Parameter(Mandatory = $true)][string[]]$RequiredActionNames
     )
 
-    $pattern = 'Ambiguous-Interactive/ambiguous-organization-build-lock/\.github/actions/(?<name>[A-Za-z0-9._-]+)@(?<ref>[^\s#]+)(?:[ \t]+#[ \t]*(?<comment>\S+))?'
+    # Anchored to a live `uses:` line. Matching the action path anywhere would let a commented-out
+    # reference satisfy the required-action check and then supply the SHA every downstream
+    # assertion compares against -- the exact vacuous pass this function exists to prevent.
+    $pattern = '(?m)^\s*(?:-\s*)?uses:\s*Ambiguous-Interactive/ambiguous-organization-build-lock/\.github/actions/(?<name>[A-Za-z0-9._-]+)@(?<ref>[^\s#]+)(?:[ \t]+#[ \t]*(?<comment>\S+))?'
     $observed = @{}
 
     $files = @(
@@ -122,7 +125,7 @@ function Get-BuildLockActionPins {
     foreach ($name in ($observed.Keys | Sort-Object)) {
         $usages = @($observed[$name])
 
-        $unpinned = @($usages | Where-Object { $_.Reference -notmatch '^[0-9a-f]{40}$' })
+        $unpinned = @($usages | Where-Object { $_.Reference -cnotmatch '^[0-9a-f]{40}$' })
         if ($unpinned.Count -gt 0) {
             $detail = ($unpinned | ForEach-Object { "$($_.File) -> @$($_.Reference)" }) -join ', '
             Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Build-lock action '$name' must be pinned to a full 40-character commit SHA, never a tag or branch. Offending: $detail."
@@ -130,7 +133,10 @@ function Get-BuildLockActionPins {
             continue
         }
 
-        $distinctReferences = @($usages | Select-Object -ExpandProperty Reference -Unique)
+        $distinctReferences = @(
+            [string[]]@($usages | Select-Object -ExpandProperty Reference) |
+                Sort-Object -CaseSensitive -Unique
+        )
         if ($distinctReferences.Count -ne 1) {
             $detail = ($usages | ForEach-Object { "$($_.File) -> @$($_.Reference)" }) -join ', '
             Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Build-lock action '$name' is pinned to $($distinctReferences.Count) different commits. A partial bump leaves two versions live against one Unity seat. Usages: $detail."
@@ -138,7 +144,10 @@ function Get-BuildLockActionPins {
             continue
         }
 
-        $distinctComments = @($usages | Select-Object -ExpandProperty Comment -Unique)
+        $distinctComments = @(
+            [string[]]@($usages | Select-Object -ExpandProperty Comment) |
+                Sort-Object -CaseSensitive -Unique
+        )
         if ($distinctComments.Count -ne 1) {
             $detail = ($usages | ForEach-Object { "$($_.File) -> '# $($_.Comment)'" }) -join ', '
             Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Build-lock action '$name' carries $($distinctComments.Count) different version comments for one commit. Usages: $detail."

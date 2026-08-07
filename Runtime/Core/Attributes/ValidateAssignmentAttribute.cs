@@ -172,9 +172,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Use <see cref="AreAnyAssignmentsInvalid"/> when the answer is needed regardless of
         /// build configuration.
         /// </remarks>
-        // NOT gated on UNITY_EDITOR alone: the symbol set below includes DEVELOPMENT_BUILD, which
-        // keeps this alive for IL2CPP standalone test players, where the warning test expects the
-        // log. The body is reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
+        // The symbol set is the warn-level one because a warning is this method's entire observable
+        // effect. It deliberately includes DEVELOPMENT_BUILD and DEBUG rather than UNITY_EDITOR
+        // alone, so a development player still validates. Note that CI's standalone tier is a
+        // genuine Release player (run-ci-tests.ps1 clears BuildOptions.Development), so this is
+        // compiled out there -- which is why ValidateAssignmentsLogsWarningsForMissingFields uses
+        // ExpectWallstopLog, whose expectations no-op when the logger is not compiled in.
+        // The body is reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]

@@ -37,9 +37,11 @@ function resolveBuildLockPin(actionName, root = repoRoot) {
     throw new Error(`No .github directory under ${root}`);
   }
 
+  // Anchored to a live `uses:` line: matching the action path anywhere would let a commented-out
+  // reference select the commit this resolver hands to `ref:`, checking out the wrong policy.
   const pattern = new RegExp(
-    `${actionPathPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${actionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}@(\\S+)`,
-    "g"
+    `^[ \\t]*(?:-[ \\t]*)?uses:[ \\t]*${actionPathPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${actionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}@(\\S+)`,
+    "gm"
   );
 
   const usages = [];

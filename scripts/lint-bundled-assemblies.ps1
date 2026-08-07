@@ -58,6 +58,18 @@ function Get-DefineConstraints {
         if ($line -match '^\s*defineConstraints:\s*\[\s*\]\s*$') {
             return @()
         }
+        # Flow style: defineConstraints: ['!UNITY_6000_5_OR_NEWER', 'OTHER']. Unity writes block
+        # style, but reading a populated flow sequence as "unconstrained" would be a silent pass
+        # in the permissive direction -- exactly the failure this linter exists to prevent.
+        if ($line -match '^\s*defineConstraints:\s*\[(?<items>.+)\]\s*$') {
+            foreach ($item in $Matches['items'].Split(',')) {
+                $trimmed = $item.Trim().Trim("'", '"')
+                if ($trimmed.Length -gt 0) {
+                    $constraints += $trimmed
+                }
+            }
+            return $constraints
+        }
         if ($line -match '^\s*defineConstraints:\s*$') {
             $inBlock = $true
             continue
@@ -120,6 +132,17 @@ foreach ($dll in $dlls) {
     }
 
     Write-Info "$assemblyName importer constraints match ($(if ($actual.Count -eq 0) { 'unconstrained' } else { $actual -join ', ' }))."
+}
+
+# A refresh that DROPS an assembly is as breaking as one that adds a conflicting copy: without
+# System.Text.Json below 6000.5 the package does not compile at all. Iterating the DLLs on disk
+# alone cannot see that, so every classified name must still be present.
+$presentAssemblies = @($dlls | ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) })
+foreach ($assemblyName in ($expectedConstraints.Keys | Sort-Object)) {
+    if ($presentAssemblies -notcontains $assemblyName) {
+        Write-Host "::error file=$guidePath::$assemblyName is classified as shipped but no longer exists under Runtime/Binaries. Dropping it breaks consumers on editors that do not provide it; if the removal is deliberate, remove its classification in the same commit."
+        $failed = $true
+    }
 }
 
 foreach ($assemblyName in $deliberatelyNotShipped) {

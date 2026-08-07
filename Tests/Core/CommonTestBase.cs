@@ -829,12 +829,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <summary>
         /// True when the package logger (<see cref="WallstopStudiosLogger"/>) actually emits at
         /// runtime in THIS build. Its <c>Log/LogDebug/LogWarn/LogError</c> bodies are compiled out
-        /// unless <c>ENABLE_UBERLOGGING</c> (auto-defined for editor/dev/debug builds) or one of the
-        /// granular <c>*_LOGGING</c> symbols is set -- so a NON-development IL2CPP player produces NO
-        /// such logs. A test that asserts a log routed through the package logger must skip that
-        /// assertion when this is false, otherwise it fails with "expected log did not appear" for a
-        /// log the build intentionally omits. Mirrors the exact gate in
-        /// <see cref="WallstopStudiosLogger"/>; kept as a <c>static readonly</c> (not <c>const</c>)
+        /// unless one of <c>ENABLE_UBERLOGGING</c> / <c>DEVELOPMENT_BUILD</c> / <c>DEBUG</c> /
+        /// <c>UNITY_EDITOR</c> or a granular <c>*_LOGGING</c> symbol is set -- so a NON-development
+        /// IL2CPP player, which is what the standalone CI tier builds, produces NO such logs. A test
+        /// that asserts a log routed through the package logger must skip that assertion when this is
+        /// false, otherwise it fails with "expected log did not appear" for a log the build
+        /// intentionally omits.
+        /// <para>This evaluates the same symbol set the logger's <c>[Conditional]</c> attributes
+        /// carry, but it is resolved HERE, in Tests.Core. That is the right answer for every fixture
+        /// that does not manipulate the symbols itself; a fixture that does (see
+        /// <c>ConditionalLoggingStrippedTests</c>) must reason from its own file, because
+        /// <c>[Conditional]</c> is decided at the call site's file position.</para>
+        /// Kept as a <c>static readonly</c> (not <c>const</c>)
         /// so <c>if (WallstopLoggingCompiledIn)</c> guards do not trip the unreachable-code warning
         /// that the assembly's warnings-as-errors setting would otherwise promote to a build break.
         /// </summary>

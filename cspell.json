@@ -360,7 +360,8 @@
         "vtable",
         "blittable",
         "IVT",
-        "undefining"
+        "undefining",
+        "undefines"
       ]
     },
     {
