@@ -236,7 +236,8 @@
         "ulf",
         "alf",
         "unityci",
-        "uielements"
+        "uielements",
+        "sqr"
       ]
     },
     {
@@ -843,7 +844,8 @@
         "icall",
         "ffdx",
         "redistributables",
-        "smol"
+        "smol",
+        "ULP"
       ]
     }
   ],

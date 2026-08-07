@@ -1037,12 +1037,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return new Rect(bounds.x, bounds.y, bounds.size.x, bounds.size.y);
         }
 
+        // The sampled offset is exact in double, but `center + offset` rounds to float, and the
+        // offset a caller recovers as `point - center` can be longer than the one sampled. Near the
+        // origin that is a few ULPs; at world coordinate 1e6 with radius 0.05 the float grid around
+        // the center is coarser than the radius and a quarter of all samples land outside. Rather
+        // than return a point outside the shape these methods promise, resample -- and at
+        // magnitudes where no offset survives the rounding, fall back to the center, which is the
+        // only representable point that satisfies the contract.
+        private const int RandomPointInShapeAttempts = 8;
+
         /// <summary>
         /// Returns a uniformly random point inside a circle.
         /// </summary>
         /// <param name="center">Circle center.</param>
         /// <param name="radius">Circle radius.</param>
         /// <param name="random">Optional RNG; defaults to PRNG.Instance.</param>
+        /// <returns>
+        /// A point guaranteed to satisfy <c>(point - center).sqrMagnitude &lt;= radius * radius</c>,
+        /// the same test a range query over <paramref name="center"/> and <paramref name="radius"/>
+        /// applies. Degrades to <paramref name="center"/> where float precision around
+        /// <paramref name="center"/> admits no other point within <paramref name="radius"/>.
+        /// </returns>
         public static Vector2 GetRandomPointInCircle(
             Vector2 center,
             float radius,
@@ -1056,14 +1071,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return center;
             }
 
-            double radiusSample = ClampUnitInterval(random.NextDouble());
-            double angleSample = ClampUnitInterval(random.NextDouble());
-            double r = radiusAbs * Math.Sqrt(radiusSample);
-            double theta = angleSample * 2 * Math.PI;
-            return new Vector2(
-                center.x + (float)(r * Math.Cos(theta)),
-                center.y + (float)(r * Math.Sin(theta))
-            );
+            float radiusSquared = radius * radius;
+            for (int attempt = 0; attempt < RandomPointInShapeAttempts; ++attempt)
+            {
+                double radiusSample = ClampUnitInterval(random.NextDouble());
+                double angleSample = ClampUnitInterval(random.NextDouble());
+                double r = radiusAbs * Math.Sqrt(radiusSample);
+                double theta = angleSample * 2 * Math.PI;
+                Vector2 point = new(
+                    center.x + (float)(r * Math.Cos(theta)),
+                    center.y + (float)(r * Math.Sin(theta))
+                );
+                if ((point - center).sqrMagnitude <= radiusSquared)
+                {
+                    return point;
+                }
+            }
+
+            return center;
         }
 
         /// <summary>
@@ -1072,6 +1097,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="center">Sphere center.</param>
         /// <param name="radius">Sphere radius.</param>
         /// <param name="random">Optional RNG; defaults to PRNG.Instance.</param>
+        /// <returns>
+        /// A point guaranteed to satisfy the same distance test a range query over
+        /// <paramref name="center"/> and <paramref name="radius"/> applies. Degrades to
+        /// <paramref name="center"/> where float precision around <paramref name="center"/> admits
+        /// no other point within <paramref name="radius"/>.
+        /// </returns>
         public static Vector3 GetRandomPointInSphere(
             Vector3 center,
             float radius,
@@ -1085,27 +1116,37 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return center;
             }
 
-            double thetaSample = ClampUnitInterval(random.NextDouble());
-            double phiSample = ClampUnitInterval(random.NextDouble());
-            double radiusSample = ClampUnitInterval(random.NextDouble());
-            double theta = 2 * Math.PI * thetaSample;
-            double phiArgument = 2 * phiSample - 1;
-            if (phiArgument < -1)
+            float radiusSquared = radius * radius;
+            for (int attempt = 0; attempt < RandomPointInShapeAttempts; ++attempt)
             {
-                phiArgument = -1;
+                double thetaSample = ClampUnitInterval(random.NextDouble());
+                double phiSample = ClampUnitInterval(random.NextDouble());
+                double radiusSample = ClampUnitInterval(random.NextDouble());
+                double theta = 2 * Math.PI * thetaSample;
+                double phiArgument = 2 * phiSample - 1;
+                if (phiArgument < -1)
+                {
+                    phiArgument = -1;
+                }
+                else if (phiArgument > 1)
+                {
+                    phiArgument = 1;
+                }
+                double phi = Math.Acos(phiArgument);
+                double r = radiusAbs * Math.Pow(radiusSample, 1.0 / 3.0);
+                double sinPhi = Math.Sin(phi);
+                Vector3 point = new(
+                    center.x + (float)(r * sinPhi * Math.Cos(theta)),
+                    center.y + (float)(r * sinPhi * Math.Sin(theta)),
+                    center.z + (float)(r * Math.Cos(phi))
+                );
+                if ((point - center).sqrMagnitude <= radiusSquared)
+                {
+                    return point;
+                }
             }
-            else if (phiArgument > 1)
-            {
-                phiArgument = 1;
-            }
-            double phi = Math.Acos(phiArgument);
-            double r = radiusAbs * Math.Pow(radiusSample, 1.0 / 3.0);
-            double sinPhi = Math.Sin(phi);
-            return new Vector3(
-                center.x + (float)(r * sinPhi * Math.Cos(theta)),
-                center.y + (float)(r * sinPhi * Math.Sin(theta)),
-                center.z + (float)(r * Math.Cos(phi))
-            );
+
+            return center;
         }
 
         /// <summary>

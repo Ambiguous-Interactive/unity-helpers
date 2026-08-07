@@ -312,18 +312,35 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         private Vector3 GetRandomPointInSphere(Vector3 center, float radius)
         {
-            Vector3 point;
+            float radiusSquared = radius * radius;
 
-            do
+            while (true)
             {
-                point = new Vector3(
+                Vector3 offset = new(
                     Random.NextFloat(-radius, radius),
                     Random.NextFloat(-radius, radius),
                     Random.NextFloat(-radius, radius)
                 );
-            } while (point.sqrMagnitude > radius * radius);
 
-            return center + point;
+                if (offset.sqrMagnitude > radiusSquared)
+                {
+                    continue;
+                }
+
+                Vector3 point = center + offset;
+
+                // Validating the offset is not the same as validating the point: `center + offset`
+                // rounds, so the offset a tree recovers as `point - center` can be a couple of ULPs
+                // longer than the one accepted above -- enough to put the point outside the query
+                // sphere, which every tree is then right to exclude. Re-test with the trees' own
+                // predicate so the expected set only contains points that are genuinely in range.
+                if ((point - center).sqrMagnitude > radiusSquared)
+                {
+                    continue;
+                }
+
+                return point;
+            }
         }
 
         [Test]

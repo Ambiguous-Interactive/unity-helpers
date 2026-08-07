@@ -747,7 +747,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             for (int i = 0; i < 100; ++i)
             {
                 Vector2 point = Helpers.GetRandomPointInCircle(center, radius, random);
-                Assert.LessOrEqual(Vector2.Distance(center, point), radius + 1e-5f);
+                AssertWithinRadius(center, point, radius);
             }
         }
 
@@ -761,7 +761,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             for (int i = 0; i < 100; ++i)
             {
                 Vector3 point = Helpers.GetRandomPointInSphere(center, radius, random);
-                Assert.LessOrEqual(Vector3.Distance(center, point), radius + 1e-5f);
+                AssertWithinRadius(center, point, radius);
             }
         }
 
@@ -774,7 +774,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 point = Helpers.GetRandomPointInCircle(center, radius, random);
             Assert.IsTrue(float.IsFinite(point.x));
             Assert.IsTrue(float.IsFinite(point.y));
-            Assert.LessOrEqual(Vector2.Distance(center, point), radius + 1e-4f);
+            AssertWithinRadius(center, point, radius);
         }
 
         [TestCaseSource(nameof(RandomSphereSampleData))]
@@ -787,7 +787,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(float.IsFinite(point.x));
             Assert.IsTrue(float.IsFinite(point.y));
             Assert.IsTrue(float.IsFinite(point.z));
-            Assert.LessOrEqual(Vector3.Distance(center, point), radius + 1e-4f);
+            AssertWithinRadius(center, point, radius);
+        }
+
+        // Far from the origin the float grid around the center gets coarser than the radius, so
+        // `center + offset` rounds a sampled point clean outside the shape. Measured before the
+        // fix: at (1e6, 1e6) with radius 0.05, 25.8% of returned points failed the very test a
+        // range query applies -- overshooting by up to half the radius, not by an ULP.
+        [TestCase(0f, 18f)]
+        [TestCase(100f, 18f)]
+        [TestCase(1_000f, 1f)]
+        [TestCase(10_000f, 0.5f)]
+        [TestCase(100_000f, 0.1f)]
+        [TestCase(1_000_000f, 0.05f)]
+        [TestCase(10_000_000f, 0.01f)]
+        public void RandomPointsAreWithinRadiusAtLargeCoordinates(float coordinate, float radius)
+        {
+            IRandom random = new PcgRandom(increment: 20260807UL, state: 987654321UL);
+            Vector2 circleCenter = new(coordinate, coordinate);
+            Vector3 sphereCenter = new(coordinate, coordinate, coordinate);
+
+            for (int i = 0; i < 2_000; ++i)
+            {
+                AssertWithinRadius(
+                    circleCenter,
+                    Helpers.GetRandomPointInCircle(circleCenter, radius, random),
+                    radius
+                );
+                AssertWithinRadius(
+                    sphereCenter,
+                    Helpers.GetRandomPointInSphere(sphereCenter, radius, random),
+                    radius
+                );
+            }
+        }
+
+        // No epsilon: this is exactly the test a spatial-tree range query applies, and an epsilon
+        // here is what let these helpers return points the trees then correctly refused to find.
+        private static void AssertWithinRadius(Vector2 center, Vector2 point, float radius)
+        {
+            Assert.That(
+                (point - center).sqrMagnitude,
+                Is.LessThanOrEqualTo(radius * radius),
+                $"{point} is outside the circle of radius {radius} around {center}."
+            );
+        }
+
+        private static void AssertWithinRadius(Vector3 center, Vector3 point, float radius)
+        {
+            Assert.That(
+                (point - center).sqrMagnitude,
+                Is.LessThanOrEqualTo(radius * radius),
+                $"{point} is outside the sphere of radius {radius} around {center}."
+            );
         }
 
         [UnityTest]
