@@ -55,8 +55,23 @@ function Write-TestResult {
   }
 }
 
-function Get-RepoRoot {
-  return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+function Test-AppearsBefore {
+  # Ordering assertions written as `IndexOf(a) -lt IndexOf(b)` pass VACUOUSLY when `a` is absent,
+  # because IndexOf returns -1 and -1 is less than every real index. Every such contract therefore
+  # stopped checking the thing it was written for the moment the step it names was renamed or
+  # deleted -- which is exactly the change it exists to catch. Require both to be present.
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Haystack,
+    [Parameter(Mandatory = $true)][string]$First,
+    [Parameter(Mandatory = $true)][string]$Second
+  )
+
+  $firstIndex = $Haystack.IndexOf($First)
+  $secondIndex = $Haystack.IndexOf($Second)
+  return ($firstIndex -ge 0) -and ($secondIndex -ge 0) -and ($firstIndex -lt $secondIndex)
+}
+
+function Get-RepoRoot {  return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
 function Get-PowerShellSingleQuotedArrayEntries {
@@ -1730,7 +1745,7 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
     $publishJobBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"') -and
     $publishJobBlock.Value.Contains('git/tags/${tag_object_sha}') -and
     $publishJobBlock.Value.Contains('Tag ${TAG} points at ${tag_target}, not selected source ${SOURCE_SHA}.') -and
-    $publishJobBlock.Value.IndexOf('Verify release tag target before publish') -lt $publishJobBlock.Value.IndexOf('Publish npm package')
+    (Test-AppearsBefore -Haystack $publishJobBlock.Value -First 'Verify release tag target before publish' -Second 'Publish npm package')
   )
 
   Write-TestResult `
@@ -1798,7 +1813,7 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('Release version is required.') -and
     $workflowContent.Contains('Release version must be a single line.') -and
     $workflowContent.Contains('echo "tag=${tag}"') -and
-    $workflowContent.IndexOf('Release version must be a single line.') -lt $workflowContent.IndexOf('echo "tag=${tag}"')
+    (Test-AppearsBefore -Haystack $workflowContent -First 'Release version must be a single line.' -Second 'echo "tag=${tag}"')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
@@ -1875,15 +1890,31 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Value.Contains('if: ${{ needs.release-ready.outputs.tag-action != ''none'' }}')
   )
 
+  # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a
+  # pin -- it is a second copy that every Dependabot bump desynchronizes, and this contract failed
+  # for exactly that reason when actions/setup-node moved. What needs protecting is that BOTH tag
+  # jobs set up a SHA-pinned Node, on the SAME pin the rest of the workflow uses, before the npm
+  # publication check runs.
+  $setupNodeMatches = [regex]::Matches($workflowContent, 'uses:\s*actions/setup-node@([0-9a-f]{40})')
+  $setupNodePins = @($setupNodeMatches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+  $setupNodePinnedConsistently = ($setupNodePins.Count -eq 1)
+  $setupNodeReference = if ($setupNodePinnedConsistently) {
+    "uses: actions/setup-node@$($setupNodePins[0])"
+  }
+  else {
+    '<setup-node pin missing or inconsistent>'
+  }
+
   $tagPreparationSetsUpNodeForNpmChecks = (
     $verifyTagBlock.Success -and
     $prepareTagBlock.Success -and
-    $verifyTagBlock.Value.Contains('uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38') -and
+    $setupNodePinnedConsistently -and
+    $verifyTagBlock.Value.Contains($setupNodeReference) -and
     $verifyTagBlock.Value.Contains('node-version: "22.18.0"') -and
-    $verifyTagBlock.Value.IndexOf('Setup Node.js') -lt $verifyTagBlock.Value.IndexOf('Verify tag matches package metadata') -and
-    $prepareTagBlock.Value.Contains('uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38') -and
+    (Test-AppearsBefore -Haystack $verifyTagBlock.Value -First 'Setup Node.js' -Second 'Verify tag matches package metadata') -and
+    $prepareTagBlock.Value.Contains($setupNodeReference) -and
     $prepareTagBlock.Value.Contains('node-version: "22.18.0"') -and
-    $prepareTagBlock.Value.IndexOf('Setup Node.js') -lt $prepareTagBlock.Value.IndexOf('Recheck release artifacts before tag mutation')
+    (Test-AppearsBefore -Haystack $prepareTagBlock.Value -First 'Setup Node.js' -Second 'Recheck release artifacts before tag mutation')
   )
 
   $tagPreparationRechecksPublishedArtifactsBeforeMutation = (
@@ -1894,7 +1925,7 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"') -and
     $prepareTagBlock.Value.Contains('Failed to verify GitHub Release state for ${TAG}.') -and
     $prepareTagBlock.Value.Contains('Published artifacts already exist; refusing to create or retarget tag ${TAG}.') -and
-    $prepareTagBlock.Value.IndexOf('Recheck release artifacts before tag mutation') -lt $prepareTagBlock.Value.IndexOf('Create or retarget release tag')
+    (Test-AppearsBefore -Haystack $prepareTagBlock.Value -First 'Recheck release artifacts before tag mutation' -Second 'Create or retarget release tag')
   )
 
   $tagPreparationCreatesAnnotatedTags = (
@@ -1980,7 +2011,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   Write-TestResult `
     -TestName 'release publish tag preparation sets up Node before npm publication checks' `
     -Passed $tagPreparationSetsUpNodeForNpmChecks `
-    -Message 'Expected verify-tag and prepare-tag to set up pinned Node before running npm view publication checks.'
+    -Message 'Expected verify-tag and prepare-tag to set up SHA-pinned Node -- on the same pin actions/setup-node uses elsewhere in release.yml -- before running npm view publication checks.'
 
   Write-TestResult `
     -TestName 'release publish tag preparation rechecks publication state before mutation' `

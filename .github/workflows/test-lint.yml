@@ -74,6 +74,14 @@ jobs:
         shell: pwsh
         run: ./scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput
 
+      # Ran only from the local pre-push hook until now, so a pull request could be green in CI
+      # while breaking a release-workflow contract. A Dependabot bump of actions/setup-node did
+      # exactly that: PR #334 reported 42 green checks with this contract failing, because nothing
+      # in CI executed it.
+      - name: Test sync script contracts
+        shell: pwsh
+        run: ./scripts/tests/test-sync-script-contracts.ps1
+
       - name: Lint tests
         shell: pwsh
         run: ./scripts/lint-tests.ps1 -VerboseOutput
