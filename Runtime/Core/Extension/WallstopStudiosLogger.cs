@@ -47,21 +47,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static Thread UnityMainThread;
         private const int LogsPerCacheClean = 5;
 
-        // Preprocessor symbols that enable logging, as [Conditional] arguments. These reproduce
-        // exactly what the old file-scoped "#define ENABLE_UBERLOGGING" plus the per-method #if
-        // used to compute -- UNITY_EDITOR, DEVELOPMENT_BUILD and DEBUG are defined by Unity in
-        // every assembly, so the default behaviour needs no project configuration. They are
-        // internal so that other package APIs whose only observable effect is a log can carry
-        // the same set without re-typing the literals. The names carry a Symbol suffix because
-        // a member named Debug would shadow UnityEngine.Debug.
-        internal const string EnableUberLoggingSymbol = "ENABLE_UBERLOGGING";
-        internal const string DevelopmentBuildSymbol = "DEVELOPMENT_BUILD";
-        internal const string DebugSymbol = "DEBUG";
-        internal const string UnityEditorSymbol = "UNITY_EDITOR";
-        internal const string DebugLoggingSymbol = "DEBUG_LOGGING";
-        internal const string WarnLoggingSymbol = "WARN_LOGGING";
-        internal const string ErrorLoggingSymbol = "ERROR_LOGGING";
-
         private static bool LoggingEnabled = true;
         private static long _cacheAccessCount;
 
@@ -196,11 +181,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        [System.Diagnostics.Conditional(EnableUberLoggingSymbol)]
-        [System.Diagnostics.Conditional(DevelopmentBuildSymbol)]
-        [System.Diagnostics.Conditional(DebugSymbol)]
-        [System.Diagnostics.Conditional(UnityEditorSymbol)]
-        [System.Diagnostics.Conditional(DebugLoggingSymbol)]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
         public static void Log(
             this Object component,
             FormattableString message,
@@ -212,11 +197,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        [System.Diagnostics.Conditional(EnableUberLoggingSymbol)]
-        [System.Diagnostics.Conditional(DevelopmentBuildSymbol)]
-        [System.Diagnostics.Conditional(DebugSymbol)]
-        [System.Diagnostics.Conditional(UnityEditorSymbol)]
-        [System.Diagnostics.Conditional(DebugLoggingSymbol)]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
         public static void LogDebug(
             this Object component,
             FormattableString message,
@@ -228,11 +213,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        [System.Diagnostics.Conditional(EnableUberLoggingSymbol)]
-        [System.Diagnostics.Conditional(DevelopmentBuildSymbol)]
-        [System.Diagnostics.Conditional(DebugSymbol)]
-        [System.Diagnostics.Conditional(UnityEditorSymbol)]
-        [System.Diagnostics.Conditional(WarnLoggingSymbol)]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
         public static void LogWarn(
             this Object component,
             FormattableString message,
@@ -244,11 +229,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        [System.Diagnostics.Conditional(EnableUberLoggingSymbol)]
-        [System.Diagnostics.Conditional(DevelopmentBuildSymbol)]
-        [System.Diagnostics.Conditional(DebugSymbol)]
-        [System.Diagnostics.Conditional(UnityEditorSymbol)]
-        [System.Diagnostics.Conditional(ErrorLoggingSymbol)]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.ErrorLogging)]
         public static void LogError(
             this Object component,
             FormattableString message,
@@ -266,8 +251,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         // package-internal call to a [Conditional] method would be stripped whenever this
         // package itself is compiled without them, emptying the public methods even for a
         // consumer that did define ENABLE_UBERLOGGING.
+        //
+        // They are internal for the same reason: any other package API that is itself
+        // [Conditional] must reach the log through here, never through a [Conditional] entry
+        // point, or it inherits exactly the emptying this indirection exists to prevent.
         [HideInCallstack]
-        private static void LogDebugCore(
+        internal static void LogDebugCore(
             Object component,
             FormattableString message,
             Exception e,
@@ -301,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        private static void LogWarnCore(
+        internal static void LogWarnCore(
             Object component,
             FormattableString message,
             Exception e,
@@ -335,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         [HideInCallstack]
-        private static void LogErrorCore(
+        internal static void LogErrorCore(
             Object component,
             FormattableString message,
             Exception e,

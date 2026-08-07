@@ -12,6 +12,9 @@ on:
       - "**/*.sh"
       - "scripts/**.ps1"
       - "scripts/tests/test-portable-cleanup-classifier.js"
+      - "scripts/resolve-build-lock-pin.js"
+      - "Runtime/**.cs"
+      - "Editor/**.cs"
       - "package.json"
   pull_request:
     paths:
@@ -22,6 +25,9 @@ on:
       - "**/*.sh"
       - "scripts/**.ps1"
       - "scripts/tests/test-portable-cleanup-classifier.js"
+      - "scripts/resolve-build-lock-pin.js"
+      - "Runtime/**.cs"
+      - "Editor/**.cs"
       - "package.json"
   workflow_dispatch:
 
@@ -81,6 +87,11 @@ jobs:
         working-directory: unity-helpers
         shell: pwsh
         run: ./scripts/lint-workflow-run-expression-length.ps1 -VerboseOutput
+
+      - name: Lint [Conditional] call chains
+        working-directory: unity-helpers
+        shell: pwsh
+        run: ./scripts/lint-conditional-call-chains.ps1 -VerboseOutput
 
       - name: Test Unity workflow matrix contract
         working-directory: unity-helpers

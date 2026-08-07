@@ -175,11 +175,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         // NOT gated on UNITY_EDITOR alone: the symbol set below includes DEVELOPMENT_BUILD, which
         // keeps this alive for IL2CPP standalone test players, where the warning test expects the
         // log. The body is reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
-        [System.Diagnostics.Conditional(WallstopStudiosLogger.EnableUberLoggingSymbol)]
-        [System.Diagnostics.Conditional(WallstopStudiosLogger.DevelopmentBuildSymbol)]
-        [System.Diagnostics.Conditional(WallstopStudiosLogger.DebugSymbol)]
-        [System.Diagnostics.Conditional(WallstopStudiosLogger.UnityEditorSymbol)]
-        [System.Diagnostics.Conditional(WallstopStudiosLogger.WarnLoggingSymbol)]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
         public static void ValidateAssignments(this Object o)
         {
             if (o == null)
@@ -196,7 +196,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 if (logNotAssigned)
                 {
-                    o.LogNotAssigned(field.Name);
+                    // The unconditional core, not the [Conditional] LogNotAssigned: this method is
+                    // itself [Conditional], and a [Conditional] call inside it would be stripped
+                    // whenever the package compiles without the symbols -- leaving the reflection
+                    // walk running and logging nothing.
+                    Helpers.LogNotAssignedCore(o, field.Name);
                 }
             }
         }
