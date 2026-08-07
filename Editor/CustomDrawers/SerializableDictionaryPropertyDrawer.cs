@@ -2746,23 +2746,34 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return true;
             }
 
-            // Boxing repairs a collection-typed value, but only when the collection's own element
-            // type is serializable: Cache<List<ISomething>> serializes as an array of boxes whose
-            // Data field Unity still refuses. Inspecting a real element is the only way to tell,
-            // so an empty array is reported as fine -- nothing is lost yet, and the first entry the
-            // user adds surfaces the error.
+            // The plain array resolved, so the values have somewhere to live.
             if (
                 !string.Equals(
                     valuesProperty.name,
                     SerializableDictionarySerializedPropertyNames.BoxedValues,
                     StringComparison.Ordinal
                 )
-                || valuesProperty.arraySize == 0
             )
             {
                 return false;
             }
 
+            // Only the boxed array resolved, and it is empty. Unity DECLARES that field on every
+            // dictionary, so its presence proves nothing -- this is equally "supported shape, no
+            // entries yet" and "value type boxing cannot repair, so nothing is ever stored". They
+            // are indistinguishable from the SerializedProperties alone: the keys array is not the
+            // tell either, because OnAfterDeserialize nulls it whenever keys and values disagree,
+            // so the second case has no keys left after one round trip. Reporting nothing keeps a
+            // merely-empty dictionary from showing a false error; #357 tracks telling them apart by
+            // asking the runtime, which is the side that actually knows.
+            if (valuesProperty.arraySize == 0)
+            {
+                return false;
+            }
+
+            // Boxes exist, so boxing is active -- but it only helps when the boxed field is itself
+            // serializable. Cache<List<ISomething>> serializes as boxes whose Data Unity still
+            // refuses, and inspecting a real element is the only way to see that.
             SerializedProperty firstBox = valuesProperty.GetArrayElementAtIndex(0);
             return firstBox == null
                 || firstBox.FindPropertyRelative(
@@ -10192,8 +10203,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             keysField.SetValue(baseDictionary, keysArray);
             valuesField.SetValue(baseDictionary, valuesArray);
 
-            // Now call EditorAfterDeserialize which will read from the updated managed fields
-            baseDictionary.EditorAfterDeserialize();
+            // The managed arrays above are the fresh copy, so ask for the rebuild that trusts them.
+            // The plain EditorAfterDeserialize would refill the values array from the boxed one --
+            // correct for every OTHER caller here, which reaches it without writing anything, and
+            // wrong for this one, which would lose the write it just made.
+            baseDictionary.EditorAfterDeserializeFromManagedArrays();
         }
 
         private static FieldInfo FindFieldInHierarchy(Type type, string fieldName)

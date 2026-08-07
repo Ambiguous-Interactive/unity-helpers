@@ -127,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         // would overwrite that fresh write with a copy that is stale until the next serialize, which
         // is how an edit silently reverts. Pinned because nothing else would notice.
         [Test]
-        public void EditorAfterDeserializeDoesNotOverwriteAFreshlyWrittenValuesArray()
+        public void EditorAfterDeserializeFromManagedArraysDoesNotOverwriteAFreshWrite()
         {
             _host.droppedValues["dash"] = new List<float> { 1f };
             _host.droppedValues.OnBeforeSerialize();
@@ -136,12 +136,36 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             _host.droppedValues._keys = new[] { "dash" };
             _host.droppedValues._values = new[] { new List<float> { 42f } };
 
-            _host.droppedValues.EditorAfterDeserialize();
+            _host.droppedValues.EditorAfterDeserializeFromManagedArrays();
 
             Assert.That(
                 _host.droppedValues["dash"],
                 Is.EqualTo(new List<float> { 42f }),
-                "EditorAfterDeserialize must read the managed values array the caller just wrote."
+                "EditorAfterDeserializeFromManagedArrays must read the array the caller just wrote."
+            );
+        }
+
+        // The mirror image, and the reason the two entry points had to be split. Most editor callers
+        // reach EditorAfterDeserialize WITHOUT having written the values array -- for a collection
+        // value Unity only restored the boxed one -- so this path must refill it, or the runtime map
+        // rebuilds from a stale array and the next serialize writes that staleness back over the
+        // good boxed data.
+        [Test]
+        public void EditorAfterDeserializeRefillsTheValuesArrayFromTheBoxedOne()
+        {
+            _host.droppedValues["dash"] = new List<float> { 7f };
+            _host.droppedValues.OnBeforeSerialize();
+
+            // Stand in for a domain reload: Unity restored the boxed array and nothing else.
+            _host.droppedValues._values = null;
+
+            _host.droppedValues.EditorAfterDeserialize();
+
+            Assert.That(
+                _host.droppedValues["dash"],
+                Is.EqualTo(new List<float> { 7f }),
+                "EditorAfterDeserialize must refill the values array from the boxed one; without "
+                    + "that the dictionary rebuilds empty and the next save writes the emptiness back."
             );
         }
 
@@ -226,6 +250,44 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Is.Not.Null
             );
             Assert.That(restored.dictionaryItems.Count, Is.EqualTo(1));
+        }
+
+        // Boxing repairs exactly one level of nesting. List<List<T>> is refused as a class field too,
+        // so the box's own Data field is dropped and boxing would buy nothing -- worse, it would
+        // resolve an array that stores nothing and silence the Inspector error. The predicate
+        // therefore excludes it, and the drawer keeps reporting the shape as unsupported.
+        [Test]
+        public void AMultiLevelCollectionValueIsNotBoxedAndStillReportsTheFailure()
+        {
+            // Authored data is what makes the loss observable, and it has to be authored the way
+            // the Inspector authors it -- through the SerializedProperty -- so the serialized state
+            // the drawer inspects really does have keys with nothing parallel holding the values.
+            SerializedProperty keys = FindArray(
+                nameof(NestedCollectionSerializationHost.nestedListValues),
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            keys.arraySize = 1;
+            keys.GetArrayElementAtIndex(0).stringValue = "curves";
+            _serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            _serializedObject.Update();
+
+            SerializedProperty values = FindArray(
+                nameof(NestedCollectionSerializationHost.nestedListValues),
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            SerializedProperty boxed = FindArray(
+                nameof(NestedCollectionSerializationHost.nestedListValues),
+                SerializableDictionarySerializedPropertyNames.BoxedValues
+            );
+
+            Assert.That(values, Is.Null, "Unity refuses List<List<float>>[] as it always has.");
+            Assert.That(
+                boxed == null || boxed.arraySize == 0,
+                Is.True,
+                "Boxing a List<List<float>> produces a box whose Data field Unity also refuses, so "
+                    + "the predicate must decline to box it rather than fill an array that stores "
+                    + "nothing. The Inspector's own reporting for this shape is tracked in #357."
+            );
         }
 
         // An ordinary value type must keep storing its values in the plain array. Unity declares

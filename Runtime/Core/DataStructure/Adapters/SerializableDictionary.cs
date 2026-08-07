@@ -131,6 +131,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         internal abstract void EditorAfterDeserialize();
 
         /// <summary>
+        /// Rebuilds the runtime dictionary from the managed key/value arrays the CALLER has just
+        /// written, rather than from whatever Unity last serialized.
+        /// </summary>
+        /// <remarks>
+        /// The two differ only for a value type whose values live in the boxed array: there,
+        /// <see cref="EditorAfterDeserialize"/> must refill the values array from the boxed one,
+        /// while a caller that has just populated the values array itself needs that refill
+        /// skipped or its write is overwritten by a copy that is stale until the next serialize.
+        /// </remarks>
+        internal abstract void EditorAfterDeserializeFromManagedArrays();
+
+        /// <summary>
         /// Syncs the runtime dictionary state to the serialized arrays (_keys and _values).
         /// This is the inverse of EditorAfterDeserialize - it writes runtime state to serialized state.
         /// Used by editor code when directly modifying the dictionary and needing to persist changes.
@@ -233,11 +245,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// the Inspector error rather than silently switching to a field that stores nothing.
         /// </remarks>
         private static readonly bool RequiresBoxedValues =
-            typeof(TValueCache).IsArray
-            || (
-                typeof(TValueCache).IsGenericType
-                && typeof(TValueCache).GetGenericTypeDefinition() == typeof(List<>)
-            );
+            IsCollectionUnityRefusesToNest(typeof(TValueCache))
+            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
+
+        private static bool IsCollectionUnityRefusesToNest(Type type)
+        {
+            return type != null
+                && (
+                    type.IsArray
+                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                );
+        }
+
+        private static Type NestedElementType(Type collectionType)
+        {
+            if (collectionType.IsArray)
+            {
+                return collectionType.GetElementType();
+            }
+
+            Type[] arguments = collectionType.IsGenericType
+                ? collectionType.GetGenericArguments()
+                : Array.Empty<Type>();
+            return arguments.Length == 1 ? arguments[0] : null;
+        }
 
         [NonSerialized]
         protected internal bool _preserveSerializedEntries;
@@ -311,11 +342,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         internal override void EditorAfterDeserialize()
         {
-            // The editor callers have just written the managed values array from the Inspector's
-            // SerializedProperties and are asking for the runtime dictionary to be rebuilt from it.
-            // Rehydrating here would overwrite that fresh array with the boxed copy, which is stale
-            // until the next OnBeforeSerialize -- the same class of bug the ScriptableSingleton
-            // branch in SerializableDictionaryPropertyDrawer already guards against.
+            // Rehydrates, because most editor callers reach here WITHOUT having written the values
+            // array -- for a collection-valued dictionary Unity only restored the boxed array, so
+            // skipping the refill would rebuild the map from a stale values array.
+            OnAfterDeserializeInternal(suppressWarnings: true, rehydrateBoxedValues: true);
+        }
+
+        internal override void EditorAfterDeserializeFromManagedArrays()
+        {
+            // The one caller that has just filled the values array from the Inspector's
+            // SerializedProperties. Rehydrating would overwrite that write with the boxed copy,
+            // which is stale until the next OnBeforeSerialize -- the same class of bug the
+            // ScriptableSingleton branch in SerializableDictionaryPropertyDrawer guards against.
             OnAfterDeserializeInternal(suppressWarnings: true, rehydrateBoxedValues: false);
         }
 

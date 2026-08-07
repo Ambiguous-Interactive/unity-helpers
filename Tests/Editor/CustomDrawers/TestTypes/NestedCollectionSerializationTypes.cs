@@ -109,4 +109,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     /// </summary>
     [Serializable]
     public sealed class DictionaryHashSet : SerializableHashSet<IntFloatDictionary> { }
+
+    /// <summary>
+    /// A value type boxing cannot repair: Unity refuses <c>List&lt;List&lt;T&gt;&gt;</c> as a class
+    /// field just as firmly as it refuses it as an array element, so the box's own field is dropped
+    /// too. Must keep reporting the failure rather than resolving a boxed array that stores nothing.
+    /// </summary>
+    [Serializable]
+    public sealed class StringNestedListDictionary
+        : SerializableDictionary<string, List<List<float>>> { }
 }

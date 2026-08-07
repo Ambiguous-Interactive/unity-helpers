@@ -99,11 +99,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
 
         private static readonly bool RequiresBoxedValues =
-            typeof(TValueCache).IsArray
-            || (
-                typeof(TValueCache).IsGenericType
-                && typeof(TValueCache).GetGenericTypeDefinition() == typeof(List<>)
-            );
+            IsCollectionUnityRefusesToNest(typeof(TValueCache))
+            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
+
+        private static bool IsCollectionUnityRefusesToNest(Type type)
+        {
+            return type != null
+                && (
+                    type.IsArray
+                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                );
+        }
+
+        private static Type NestedElementType(Type collectionType)
+        {
+            if (collectionType.IsArray)
+            {
+                return collectionType.GetElementType();
+            }
+
+            Type[] arguments = collectionType.IsGenericType
+                ? collectionType.GetGenericArguments()
+                : Array.Empty<Type>();
+            return arguments.Length == 1 ? arguments[0] : null;
+        }
 
         [ProtoIgnore]
         [JsonIgnore]
