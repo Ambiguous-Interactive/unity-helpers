@@ -319,7 +319,7 @@ SerializableHashSet<SerializableDictionary<int, float>> variants;
 ```
 
 The reason is the same one the boxing exploits: `SerializableDictionary<int, float>` is a `[Serializable]`
-**class**, and Unity has always accepted a class as an array element. Only a *raw* `List<T>` or `T[]`
+**class**, and Unity has always accepted a class as an array element. Only a _raw_ `List<T>` or `T[]`
 in that position is refused, and that is exactly the case the boxing now covers — so the two mechanisms
 compose:
 
