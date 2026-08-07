@@ -12,6 +12,7 @@ on:
       # introduce (or fix) a finding without touching an asmdef.
       - "**.cs"
       - "scripts/lint-asmdef.ps1"
+      - "scripts/lint-conditional-call-chains.ps1"
       - "Runtime/Binaries/**"
       - "scripts/lint-bundled-assemblies.ps1"
       - ".github/workflows/asmdef-lint.yml"
@@ -21,6 +22,7 @@ on:
       - "**.asmref"
       - "**.cs"
       - "scripts/lint-asmdef.ps1"
+      - "scripts/lint-conditional-call-chains.ps1"
       - "Runtime/Binaries/**"
       - "scripts/lint-bundled-assemblies.ps1"
       - ".github/workflows/asmdef-lint.yml"
@@ -42,6 +44,10 @@ jobs:
       - name: Validate Assembly Definition files
         shell: pwsh
         run: ./scripts/lint-asmdef.ps1 -VerboseOutput
+
+      - name: Lint [Conditional] call chains
+        shell: pwsh
+        run: ./scripts/lint-conditional-call-chains.ps1 -VerboseOutput
 
       - name: Validate bundled assembly importers
         shell: pwsh
