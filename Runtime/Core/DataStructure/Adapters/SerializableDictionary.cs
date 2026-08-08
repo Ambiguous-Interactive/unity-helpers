@@ -20,6 +20,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
 
     /// <summary>
+    /// Lets the Inspector ask a dictionary whether its values live in the boxed array, which is the
+    /// only way to tell "the boxed array is empty because this shape does not use it" from "the boxed
+    /// array is empty because nothing has been added yet".
+    /// </summary>
+    /// <remarks>
+    /// Unity declares the boxed array on EVERY dictionary -- a <c>[SerializeField]</c> cannot be
+    /// conditional -- so the drawer sees a resolvable, empty property for both cases and cannot
+    /// distinguish them from <see cref="UnityEditor.SerializedProperty"/> alone. Implemented by both
+    /// the unsorted and the sorted base, which do not share a class hierarchy.
+    /// </remarks>
+    internal interface ISerializableDictionaryBoxedValues
+    {
+        bool UsesBoxedValues { get; }
+    }
+
+    /// <summary>
     /// Provides the shared infrastructure for Unity-friendly serializable dictionary implementations.
     /// Manages the synchronized key and value arrays that Unity, ProtoBuf, and JSON rely on,
     /// while exposing a runtime dictionary for fast lookups and mutations.
@@ -52,22 +68,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// }
     /// ]]></code>
     /// </example>
-    /// <summary>
-    /// Lets the Inspector ask a dictionary whether its values live in the boxed array, which is the
-    /// only way to tell "the boxed array is empty because this shape does not use it" from "the boxed
-    /// array is empty because nothing has been added yet".
-    /// </summary>
-    /// <remarks>
-    /// Unity declares the boxed array on EVERY dictionary -- a <c>[SerializeField]</c> cannot be
-    /// conditional -- so the drawer sees a resolvable, empty property for both cases and cannot
-    /// distinguish them from <see cref="UnityEditor.SerializedProperty"/> alone. Implemented by both
-    /// the unsorted and the sorted base, which do not share a class hierarchy.
-    /// </remarks>
-    internal interface ISerializableDictionaryBoxedValues
-    {
-        bool UsesBoxedValues { get; }
-    }
-
     [Serializable]
     public abstract class SerializableDictionaryBase
     {
