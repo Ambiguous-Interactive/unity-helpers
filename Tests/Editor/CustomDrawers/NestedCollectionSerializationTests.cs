@@ -252,41 +252,41 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.dictionaryItems.Count, Is.EqualTo(1));
         }
 
-        // Boxing repairs exactly one level of nesting. List<List<T>> is refused as a class field too,
-        // so the box's own Data field is dropped and boxing would buy nothing -- worse, it would
-        // resolve an array that stores nothing and silence the Inspector error. The predicate
-        // therefore excludes it, and the drawer keeps reporting the shape as unsupported.
+        // Boxing repairs exactly one level of nesting. Unity refuses List<List<T>> as a class field
+        // just as firmly as as an array element, so the box's own Data field is dropped and boxing
+        // would store nothing. The predicate must decline to box it.
+        //
+        // Asserted on the MANAGED arrays after a real OnBeforeSerialize, because that is the call
+        // that would fill the boxed array if the predicate regressed -- checking a SerializedProperty
+        // on a dictionary nobody populated would pass whether the predicate is right or wrong.
         [Test]
-        public void AMultiLevelCollectionValueIsNotBoxedAndStillReportsTheFailure()
+        public void AMultiLevelCollectionValueIsNotBoxed()
         {
-            // Authored data is what makes the loss observable, and it has to be authored the way
-            // the Inspector authors it -- through the SerializedProperty -- so the serialized state
-            // the drawer inspects really does have keys with nothing parallel holding the values.
-            SerializedProperty keys = FindArray(
-                nameof(NestedCollectionSerializationHost.nestedListValues),
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            keys.arraySize = 1;
-            keys.GetArrayElementAtIndex(0).stringValue = "curves";
-            _serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            _serializedObject.Update();
+            _host.nestedListValues["curves"] = new List<List<float>> { new() { 1f } };
 
-            SerializedProperty values = FindArray(
-                nameof(NestedCollectionSerializationHost.nestedListValues),
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            SerializedProperty boxed = FindArray(
-                nameof(NestedCollectionSerializationHost.nestedListValues),
-                SerializableDictionarySerializedPropertyNames.BoxedValues
-            );
+            _host.nestedListValues.OnBeforeSerialize();
 
-            Assert.That(values, Is.Null, "Unity refuses List<List<float>>[] as it always has.");
             Assert.That(
-                boxed == null || boxed.arraySize == 0,
-                Is.True,
+                _host.nestedListValues._values,
+                Is.Not.Null.And.Length.EqualTo(1),
+                "The mirror source must exist, or this asserts nothing about the mirror."
+            );
+            Assert.That(
+                _host.nestedListValues._boxedValues,
+                Is.Null,
                 "Boxing a List<List<float>> produces a box whose Data field Unity also refuses, so "
                     + "the predicate must decline to box it rather than fill an array that stores "
-                    + "nothing. The Inspector's own reporting for this shape is tracked in #357."
+                    + "nothing."
+            );
+            Assert.That(
+                FindArray(
+                    nameof(NestedCollectionSerializationHost.nestedListValues),
+                    SerializableDictionarySerializedPropertyNames.Values
+                ),
+                Is.Null,
+                "Unity refuses List<List<float>>[] as it always has -- which is why nothing this "
+                    + "package does makes the shape work. The Inspector's own reporting for it is "
+                    + "tracked in #357."
             );
         }
 
