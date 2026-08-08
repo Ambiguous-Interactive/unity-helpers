@@ -21,6 +21,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// }
     /// ]]></code>
     /// </example>
+    /// <remarks>
+    /// The <see cref="IComparable{T}"/> constraint is load-bearing and must not be relaxed to match
+    /// <see cref="SerializableHashSet{T}"/>. It is what turns a set of collections
+    /// (<c>SerializableSortedSet&lt;List&lt;float&gt;&gt;</c>) into a compile error at the field
+    /// declaration rather than a set that cannot order its own elements: <c>List&lt;T&gt;</c> is not
+    /// <c>IComparable&lt;List&lt;T&gt;&gt;</c>, and without the constraint the failure would surface
+    /// at runtime, far from the declaration that caused it.
+    /// </remarks>
     [Serializable]
     public class SerializableSortedSet<T> : SerializableSetBase<T, SortedSet<T>>
         where T : IComparable<T>

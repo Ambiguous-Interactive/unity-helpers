@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     Nested scopes are supported. The actual AssetDatabase calls are only made at the outermost scope.
     ///     </para>
     /// </remarks>
-    public readonly struct AssetDatabaseBatchScope : IDisposable
+    public struct AssetDatabaseBatchScope : IDisposable
     {
         /// <summary>
         ///     Whether to call <see cref="AssetDatabase.Refresh"/> when this scope is disposed
@@ -69,12 +69,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         private readonly bool _isOutermostScope;
 
+        // One scope is one depth increment, so it must produce exactly one decrement. Without this
+        // a second Dispose -- the usual cause being a `using` over a scope something already
+        // disposed by hand -- drives the batch depth below the number of live scopes, which ends
+        // asset editing while an outer scope still expects it, or leaves the counter negative so a
+        // later legitimate scope never restores auto-refresh at all.
+        private bool _disposed;
+
         /// <summary>
         ///     Creates a new batch scope. Use <see cref="AssetDatabaseBatchHelper.BeginBatch"/> instead of calling this directly.
         /// </summary>
         /// <param name="refreshOnDispose">Whether to call <see cref="AssetDatabase.Refresh"/> when disposing.</param>
         internal AssetDatabaseBatchScope(bool refreshOnDispose)
         {
+            _disposed = false;
             _shouldRefreshOnDispose = refreshOnDispose;
             _isOutermostScope = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
 
@@ -102,6 +110,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
             bool wasOutermost = AssetDatabaseBatchHelper.DecrementBatchDepthWithUnityCleanup();
 
             if (wasOutermost != _isOutermostScope)
