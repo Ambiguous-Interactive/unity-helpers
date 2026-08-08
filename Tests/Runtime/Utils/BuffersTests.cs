@@ -215,7 +215,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         buffer[0] = 1;
                     }
                 )
-            ).SetName(nameof(WallstopArrayPool<int>));
+            ).SetName(
+                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopArrayPool<int>)})"
+            );
 
             yield return new TestCaseData(
                 (Action)(
@@ -228,7 +230,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         buffer[0] = 1;
                     }
                 )
-            ).SetName(nameof(WallstopFastArrayPool<int>));
+            ).SetName(
+                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopFastArrayPool<int>)})"
+            );
         }
 
         // A pool that allocates per rent is not a pool. Both of these stored their idle arrays in a
