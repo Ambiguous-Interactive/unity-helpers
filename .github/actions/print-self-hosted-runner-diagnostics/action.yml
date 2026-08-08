@@ -100,6 +100,41 @@ runs:
         } catch {
             Write-Output ("Workspace volume:      <unreadable: " + $_.Exception.Message + ">")
         }
+        # Free MEMORY and leftover Unity processes, for the same reason free disk
+        # is here: a runner killed by the OS uploads no logs at all, leaves every
+        # remaining step `pending`, and annotates only "Out of memory." -- so the
+        # last chance to see it coming is the line printed before the build
+        # starts. Two OOM kills on one host (PR #355, standalone IL2CPP legs)
+        # could only be attributed by inference because nothing recorded memory.
+        # A stray UnityEditor/Unity process from a previous job on the same host
+        # is the specific suspect: jobs are dispatched 1-2 s apart, so anything
+        # that outlives its job is still resident when the next one starts.
+        try {
+            $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+            $freeGb = $osInfo.FreePhysicalMemory / 1MB
+            $totalGb = $osInfo.TotalVisibleMemorySize / 1MB
+            $commitFreeGb = $osInfo.FreeVirtualMemory / 1MB
+            Write-Output ("Physical memory:       {0:N1} GB free of {1:N1} GB" -f $freeGb, $totalGb)
+            Write-Output ("Commit charge free:    {0:N1} GB" -f $commitFreeGb)
+        } catch {
+            Write-Output ("Physical memory:       <unreadable: " + $_.Exception.Message + ">")
+        }
+        try {
+            $strays = @(Get-Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.ProcessName -match '^(Unity|UnityShaderCompiler|UnityPackageManager|il2cpp)' })
+            if ($strays.Count -eq 0) {
+                Write-Output ("Unity processes:       none resident before this job")
+            }
+            else {
+                $summary = ($strays | ForEach-Object {
+                    "{0}(pid {1}, {2:N1} GB)" -f $_.ProcessName, $_.Id, ($_.WorkingSet64 / 1GB)
+                }) -join ', '
+                Write-Output ("::warning::Unity processes were already resident before this job started: " + $summary)
+                Write-Output ("Unity processes:       " + $summary)
+            }
+        } catch {
+            Write-Output ("Unity processes:       <unreadable: " + $_.Exception.Message + ">")
+        }
         Write-Output ""
         Write-Output ("PowerShell version:    " + $PSVersionTable.PSVersion.ToString())
         # PATH-walk that mirrors actions/runner WhichUtil. The runner agent
