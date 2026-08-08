@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     ///     A disposable scope that batches AssetDatabase operations for improved performance.
@@ -32,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     Nested scopes are supported. The actual AssetDatabase calls are only made at the outermost scope.
     ///     </para>
     /// </remarks>
-    public struct AssetDatabaseBatchScope : IDisposable
+    public readonly struct AssetDatabaseBatchScope : IDisposable
     {
         /// <summary>
         ///     Whether to call <see cref="AssetDatabase.Refresh"/> when this scope is disposed
@@ -69,12 +70,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         private readonly bool _isOutermostScope;
 
-        // One scope is one depth increment, so it must produce exactly one decrement. Without this
-        // a second Dispose -- the usual cause being a `using` over a scope something already
-        // disposed by hand -- drives the batch depth below the number of live scopes, which ends
-        // asset editing while an outer scope still expects it, or leaves the counter negative so a
-        // later legitimate scope never restores auto-refresh at all.
-        private bool _disposed;
+        // One scope is one depth increment, so it must produce exactly one decrement. The lease is
+        // what makes that true for a COPY of the scope as well: a bool field would be copied along
+        // with the struct, and each copy would decrement. Without it, disposing one scope twice
+        // takes two scopes off the count, and the batch belonging to some other, still-live scope is
+        // closed early -- Unity leaves batching mode mid-operation and the rest of that scope's
+        // asset writes are unbatched.
+        private readonly DisposalLease _lease;
 
         /// <summary>
         ///     Creates a new batch scope. Use <see cref="AssetDatabaseBatchHelper.BeginBatch"/> instead of calling this directly.
@@ -82,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <param name="refreshOnDispose">Whether to call <see cref="AssetDatabase.Refresh"/> when disposing.</param>
         internal AssetDatabaseBatchScope(bool refreshOnDispose)
         {
-            _disposed = false;
+            _lease = DisposalLeases.Acquire();
             _shouldRefreshOnDispose = refreshOnDispose;
             _isOutermostScope = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
 
@@ -110,12 +112,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
+            if (!_lease.TryClaim())
             {
                 return;
             }
-
-            _disposed = true;
 
             bool wasOutermost = AssetDatabaseBatchHelper.DecrementBatchDepthWithUnityCleanup();
 
@@ -211,10 +211,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     this struct does nothing on disposal.
     ///     </para>
     /// </remarks>
-    public struct AssetDatabasePauseScope : IDisposable
+    public readonly struct AssetDatabasePauseScope : IDisposable
     {
         private readonly bool _wasBatching;
-        private bool _disposed;
+        private readonly DisposalLease _lease;
 
         /// <summary>
         ///     Creates a new pause scope. Use <see cref="AssetDatabaseBatchHelper.PauseBatch"/> instead of calling this directly.
@@ -223,7 +223,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         internal AssetDatabasePauseScope(bool wasBatching)
         {
             _wasBatching = wasBatching;
-            _disposed = false;
+            // Only a scope that actually paused something has anything to undo, so an inert scope
+            // takes no slot.
+            _lease = wasBatching ? DisposalLeases.Acquire() : default;
         }
 
         /// <summary>
@@ -235,20 +237,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     This method is exception-safe: any exceptions during batch resumption are logged but not rethrown.
         ///     </para>
         ///     <para>
-        ///     This method is idempotent: calling it multiple times has no effect after the first call.
+        ///     This method is idempotent: calling it multiple times has no effect after the first
+        ///     call, and that holds across copies of the scope as well.
         ///     </para>
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-
             if (_wasBatching)
             {
+                if (!_lease.TryClaim())
+                {
+                    return;
+                }
+
                 try
                 {
                     AssetDatabaseBatchHelper.ResumeBatch();

@@ -3,8 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Threading;
@@ -191,6 +193,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
 
             Assert.That(pool.CurrentPooledCount, Is.EqualTo(1));
+        }
+
+        // The guarantee has to be free, or it would be paid for on every buffer rent in the
+        // package. The lease is a (slot, generation) handle held outside the struct, so acquiring
+        // and claiming one allocates nothing; a heap object per lease would show up here.
+        // The window is wide on purpose. A pool reaches steady state only after its internal lists
+        // and usage tracker have grown once, and GCAssert's default ten iterations still sit inside
+        // that one-off cost -- measured at 280 bytes for the first ten cycles and 0.00 bytes per
+        // cycle over 100,000, identically before and after the lease existed.
+        [Test]
+        public void RentAndReturnAllocatesNothing()
+        {
+            using WallstopGenericPool<List<int>> pool = NewPool();
+
+            GCAssert.DoesNotAllocate(
+                () =>
+                {
+                    using PooledResource<List<int>> lease = pool.Get(out List<int> _);
+                },
+                warmupIterations: 10_000,
+                measuredIterations: 10_000
+            );
+        }
+
+        // The publicly constructed lease is the path a consumer writes by hand, and it must not be
+        // the one that allocates either.
+        [Test]
+        public void APubliclyConstructedLeaseAllocatesNothing()
+        {
+            Action<string> onDispose = _ => { };
+
+            GCAssert.DoesNotAllocate(() =>
+            {
+                using PooledResource<string> lease = new("value", onDispose);
+            });
+        }
+
+        // Deliberately not asserted for the array pools: they already allocate 32 bytes per rent on
+        // their own, because ConcurrentStack allocates a node per push, and that is true with or
+        // without the lease (measured identically on both). Asserting zero there would fail for a
+        // reason this change did not cause. Tracked separately; the lease's own cost is pinned by
+        // DisposalLeaseTests.AcquiringAndClaimingAllocatesNothing.
+
+        // PooledArray has the same defect and the same remedy. WallstopArrayPool clears on return,
+        // so a second return does not merely alias the array -- it wipes what the current holder
+        // put there.
+        [Test]
+        public void ACopiedArrayLeaseDoesNotReturnTheArrayTwice()
+        {
+            PooledArray<int> lease = WallstopArrayPool<int>.Get(8, out int[] first);
+            PooledArray<int> copy = lease;
+            lease.Dispose();
+            copy.Dispose();
+
+            using PooledArray<int> a = WallstopArrayPool<int>.Get(8, out int[] arrayA);
+            using PooledArray<int> b = WallstopArrayPool<int>.Get(8, out int[] arrayB);
+
+            Assert.That(
+                ReferenceEquals(arrayA, arrayB),
+                Is.False,
+                "Two live array rentals resolved to the same array."
+            );
+            Assert.That(first, Is.Not.Null);
+        }
+
+        // Zero-length rents share one Array.Empty<T>() instance across every pool, so they must not
+        // take a slot at all -- otherwise all of them would contend over one generation.
+        [Test]
+        public void ZeroLengthArrayLeasesAreInert()
+        {
+            using PooledArray<int> first = WallstopArrayPool<int>.Get(0, out int[] a);
+            PooledArray<int> second = WallstopArrayPool<int>.Get(0, out int[] b);
+
+            second.Dispose();
+            second.Dispose();
+
+            Assert.That(a, Is.SameAs(b));
+            Assert.That(a, Is.Empty);
         }
 
 #if !SINGLE_THREADED

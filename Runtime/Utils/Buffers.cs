@@ -1115,6 +1115,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
+        private struct PooledEntry
+        {
+            public T Value;
+            public float ReturnTime;
+        }
+
         /// <summary>
         /// Gets the current number of instances in the pool.
         /// </summary>
@@ -1207,10 +1213,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly Action<T> _onRelease;
         private readonly Action<T> _onDispose;
         private readonly Func<float> _timeProvider;
-        private readonly Action<T, PoolLease<T>> _returnAction;
+        private readonly Action<T> _returnAction;
         private readonly PoolUsageTracker _usageTracker;
 
-        private readonly List<PooledEntry<T>> _pool = new();
+        private readonly List<PooledEntry> _pool = new();
 
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
@@ -1302,14 +1308,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 T value = _producer();
                 _onGet?.Invoke(value);
                 _onRelease?.Invoke(value);
-                _pool.Add(
-                    new PooledEntry<T>
-                    {
-                        Value = value,
-                        ReturnTime = warmTime,
-                        Lease = new PoolLease<T>(value, _returnAction),
-                    }
-                );
+                _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
             }
             int warmCount = _pool.Count;
             if (warmCount > _peakSize)
@@ -1354,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 value = _producer();
                 _onGet?.Invoke(value);
-                return NewLease(value);
+                return new PooledResource<T>(value, _returnAction);
             }
 
             float currentTime = _timeProvider();
@@ -1373,19 +1372,15 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastAccessTime = currentTime;
             _usageTracker.RecordRent(currentTime);
 
-            PoolLease<T> lease;
             if (_pool.Count > 0)
             {
                 int lastIndex = _pool.Count - 1;
-                PooledEntry<T> entry = _pool[lastIndex];
-                value = entry.Value;
-                lease = entry.Lease;
+                value = _pool[lastIndex].Value;
                 _pool.RemoveAt(lastIndex);
             }
             else
             {
                 value = _producer();
-                lease = new PoolLease<T>(value, _returnAction);
                 // Update peak size when creating a new item (tracks total items in circulation)
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
                 if (totalInCirculation > _peakSize)
@@ -1395,16 +1390,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _onGet?.Invoke(value);
-            return new PooledResource<T>(value, lease);
+            return new PooledResource<T>(value, _returnAction);
         }
 
-        // A freshly produced instance has no lease yet, and nothing else can hold one for it.
-        private PooledResource<T> NewLease(T value)
-        {
-            return new PooledResource<T>(value, new PoolLease<T>(value, _returnAction));
-        }
-
-        private void ReturnToPool(T value, PoolLease<T> lease)
+        private void ReturnToPool(T value)
         {
             if (_disposed)
             {
@@ -1415,14 +1404,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onRelease?.Invoke(value);
 
             float currentTime = _timeProvider();
-            _pool.Add(
-                new PooledEntry<T>
-                {
-                    Value = value,
-                    ReturnTime = currentTime,
-                    Lease = lease,
-                }
-            );
+            _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
             _returnCount++;
             _usageTracker.RecordReturn(currentTime);
 
@@ -1514,7 +1496,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
             {
-                PooledEntry<T> entry = _pool[i];
+                PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
                 purged++;
                 _purgeCount++;
@@ -1588,7 +1570,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
             {
-                PooledEntry<T> entry = _pool[i];
+                PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
                 purged++;
                 _purgeCount++;
@@ -1621,7 +1603,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             for (int i = _pool.Count - 1; i >= 0 && purged < count && _pool.Count > minRetain; i--)
             {
-                PooledEntry<T> entry = _pool[i];
+                PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
                 purged++;
                 _purgeCount++;
@@ -1807,7 +1789,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         break;
                     }
 
-                    PooledEntry<T> entry = _pool[i];
+                    PooledEntry entry = _pool[i];
                     PurgeReason reason = PurgeReason.Explicit;
                     bool shouldPurge = false;
 
@@ -1880,7 +1862,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             for (int i = _pool.Count - 1; i >= 0 && _pool.Count > minRetain; i--)
             {
-                PooledEntry<T> entry = _pool[i];
+                PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
                 purged++;
                 _purgeCount++;
@@ -2030,6 +2012,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
+        private struct PooledEntry
+        {
+            public T Value;
+            public float ReturnTime;
+        }
+
         /// <summary>
         /// Gets the current number of instances in the pool.
         /// </summary>
@@ -2173,12 +2161,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly Action<T> _onRelease;
         private readonly Action<T> _onDispose;
         private readonly Func<float> _timeProvider;
-        private readonly Action<T, PoolLease<T>> _returnAction;
+        private readonly Action<T> _returnAction;
         private readonly object _lock = new();
         private readonly PoolUsageTracker _usageTracker;
         private Action<T, PurgeReason> _onPurge;
 
-        private readonly List<PooledEntry<T>> _pool = new();
+        private readonly List<PooledEntry> _pool = new();
 
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
@@ -2277,14 +2265,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 T value = _producer();
                 _onGet?.Invoke(value);
                 _onRelease?.Invoke(value);
-                _pool.Add(
-                    new PooledEntry<T>
-                    {
-                        Value = value,
-                        ReturnTime = warmTime,
-                        Lease = new PoolLease<T>(value, _returnAction),
-                    }
-                );
+                _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
             }
             int warmCount = _pool.Count;
             if (warmCount > _peakSize)
@@ -2331,7 +2312,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 value = _producer();
                 _onGet?.Invoke(value);
-                return NewLease(value);
+                return new PooledResource<T>(value, _returnAction);
             }
 
             float currentTime = _timeProvider();
@@ -2356,14 +2337,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (_pool.Count > 0)
                 {
                     int lastIndex = _pool.Count - 1;
-                    PooledEntry<T> entry = _pool[lastIndex];
-                    value = entry.Value;
+                    value = _pool[lastIndex].Value;
                     _pool.RemoveAt(lastIndex);
                     _onGet?.Invoke(value);
-                    // Inside the lock: the rent that advances the generation must be the same one
-                    // that took the instance out of the free list, or a concurrent renter could
-                    // hand out the same generation twice.
-                    return new PooledResource<T>(value, entry.Lease);
+                    return new PooledResource<T>(value, _returnAction);
                 }
             }
 
@@ -2381,16 +2358,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 peak = original;
             }
             _onGet?.Invoke(value);
-            return NewLease(value);
+            return new PooledResource<T>(value, _returnAction);
         }
 
-        // A freshly produced instance has no lease yet, and nothing else can hold one for it.
-        private PooledResource<T> NewLease(T value)
-        {
-            return new PooledResource<T>(value, new PoolLease<T>(value, _returnAction));
-        }
-
-        private void ReturnToPool(T value, PoolLease<T> lease)
+        private void ReturnToPool(T value)
         {
             if (Volatile.Read(ref _disposed) != 0)
             {
@@ -2405,14 +2376,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                _pool.Add(
-                    new PooledEntry<T>
-                    {
-                        Value = value,
-                        ReturnTime = currentTime,
-                        Lease = lease,
-                    }
-                );
+                _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
                 Interlocked.Increment(ref _returnCount);
 
                 int currentCount = _pool.Count;
@@ -2527,8 +2491,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
             // When Get() is called with PurgeTrigger.OnRent, it calls PurgeInternal(),
-            // which would call Get() again on Buffers<PooledEntry<T>>.List, causing a stack overflow.
-            List<PooledEntry<T>> toPurge = new();
+            // which would call Get() again on Buffers<PooledEntry>.List, causing a stack overflow.
+            List<PooledEntry> toPurge = new();
 
             lock (_lock)
             {
@@ -2609,7 +2573,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int effectiveMinRetain = MinRetainCount;
 
             // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
-            List<PooledEntry<T>> toPurge = new();
+            List<PooledEntry> toPurge = new();
 
             lock (_lock)
             {
@@ -2650,7 +2614,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int minRetain = MinRetainCount;
 
             // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
-            List<PooledEntry<T>> toPurge = new();
+            List<PooledEntry> toPurge = new();
 
             lock (_lock)
             {
@@ -2784,8 +2748,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
             // When Get() is called with PurgeTrigger.OnRent, it calls PurgeInternal(),
-            // which would call Get() again on Buffers<PooledEntry<T>>.List, causing a stack overflow.
-            List<PooledEntry<T>> entriesToPurge = null;
+            // which would call Get() again on Buffers<PooledEntry>.List, causing a stack overflow.
+            List<PooledEntry> entriesToPurge = null;
             List<PurgeReason> purgeReasons = null;
             int purgeCount = 0;
             bool hitPurgeLimit = false;
@@ -2811,10 +2775,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                             break;
                         }
 
-                        PooledEntry<T> entry = _pool[i];
+                        PooledEntry entry = _pool[i];
                         if ((currentTime - entry.ReturnTime) >= effectiveIdleTimeout)
                         {
-                            entriesToPurge ??= new List<PooledEntry<T>>();
+                            entriesToPurge ??= new List<PooledEntry>();
                             purgeReasons ??= new List<PurgeReason>();
                             entriesToPurge.Add(entry);
                             purgeReasons.Add(PurgeReason.IdleTimeout);
@@ -2851,7 +2815,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             break;
                         }
 
-                        PooledEntry<T> entry = _pool[i];
+                        PooledEntry entry = _pool[i];
                         PurgeReason reason = PurgeReason.Explicit;
                         bool shouldPurge = false;
 
@@ -2877,7 +2841,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                         if (shouldPurge)
                         {
-                            entriesToPurge ??= new List<PooledEntry<T>>();
+                            entriesToPurge ??= new List<PooledEntry>();
                             purgeReasons ??= new List<PurgeReason>();
                             entriesToPurge.Add(entry);
                             purgeReasons.Add(reason);
@@ -2950,7 +2914,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             int minRetain = MinRetainCount;
 
-            List<PooledEntry<T>> toPurge = new();
+            List<PooledEntry> toPurge = new();
 
             lock (_lock)
             {
@@ -3061,10 +3025,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             GlobalPoolRegistry.Unregister(this);
 
-            List<PooledEntry<T>> toDispose;
+            List<PooledEntry> toDispose;
             lock (_lock)
             {
-                toDispose = new List<PooledEntry<T>>(_pool);
+                toDispose = new List<PooledEntry>(_pool);
                 _pool.Clear();
             }
 
@@ -3238,20 +3202,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <strong>Warning:</strong> Do NOT use <c>foreach</c> on pooled arrays since
     /// <see cref="array"/>.Length may exceed <see cref="length"/>. Use indexed iteration instead.
     /// </para>
-    /// <para>
-    /// <strong>Warning: do not copy this lease.</strong> Disposal is tracked in a field, so a copy
-    /// — passing it to a method by value, assigning it, capturing it — carries its own copy of that
-    /// flag and cannot see that the original already returned. Disposing both returns the array
-    /// twice, and a pool holding one array twice hands it to two live callers. Dispose exactly one
-    /// lease per <c>Get</c>, ideally by letting a <c>using</c> own it.
-    /// </para>
-    /// <para>
-    /// <see cref="PooledResource{T}"/> does not have this problem: its pools own their instances and
-    /// can carry a per-instance <see cref="PoolLease{T}"/>. The array pools cannot do the same yet —
-    /// <see cref="SystemArrayPool{T}"/> hands out arrays owned by
-    /// <see cref="System.Buffers.ArrayPool{T}"/>, and every pool shares one
-    /// <see cref="Array.Empty{T}"/> instance for zero-length requests. Tracked in issue 364.
-    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -3287,7 +3237,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         public readonly int length;
 
         private readonly Action<T[]> _onDispose;
-        private bool _disposed;
+        private readonly DisposalLease _lease;
 
         /// <summary>
         /// Creates a new <see cref="PooledArray{T}"/> wrapping the specified array with the given logical length.
@@ -3311,7 +3261,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             this.array = array;
             this.length = length;
             _onDispose = onDispose;
-            _disposed = false;
+            // A zero-length rent has nothing to give back -- every pool hands out the same
+            // Array.Empty<T>() instance for it -- so it takes no slot and disposes to nothing.
+            _lease = array == null || array.Length == 0 ? default : DisposalLeases.Acquire();
         }
 
         /// <summary>
@@ -3330,13 +3282,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-            _disposed = true;
-
-            if (array == null || array.Length == 0)
+            if (!_lease.TryClaim())
             {
                 return;
             }
@@ -3934,8 +3880,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// The pooled resource instance. Access this to use the resource.
         /// </summary>
         public readonly T resource;
-        private readonly PoolLease<T> _lease;
-        private readonly long _generation;
+        private readonly Action<T> _onDispose;
+        private readonly DisposalLease _lease;
 
         /// <summary>
         /// Creates a new PooledResource wrapping the specified resource with a disposal action.
@@ -3943,13 +3889,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="resource">The resource to wrap.</param>
         /// <param name="onDispose">The action to invoke when disposing, typically returning the resource to a pool.</param>
         public PooledResource(T resource, Action<T> onDispose)
-            : this(resource, new PoolLease<T>(resource, onDispose)) { }
-
-        internal PooledResource(T resource, PoolLease<T> lease)
         {
             this.resource = resource;
-            _lease = lease;
-            _generation = lease.Rent();
+            _onDispose = onDispose;
+            _lease = DisposalLeases.Acquire();
         }
 
         /// <summary>
@@ -3957,19 +3900,18 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// This method is automatically called at the end of a 'using' block.
         /// </summary>
         /// <remarks>
-        /// The resource is released at most once per rent, no matter how many copies of this struct
-        /// exist or when each is disposed. See <see cref="PoolLease{T}"/> for why a copy is the
-        /// ordinary way a resource used to be returned twice.
+        /// The resource is released at most once per <c>Get</c>, however many copies of this struct
+        /// exist and whenever each is disposed. See <see cref="DisposalLease"/> for why a copy is
+        /// the ordinary way a resource used to be returned twice.
         /// </remarks>
         public void Dispose()
         {
-            PoolLease<T> lease = _lease;
-            if (lease == null || !lease.TryRelease(_generation))
+            if (!_lease.TryClaim())
             {
                 return;
             }
 
-            lease.Release();
+            _onDispose?.Invoke(resource);
         }
     }
 }

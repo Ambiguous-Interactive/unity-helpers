@@ -1224,13 +1224,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 0 after first dispose"
             );
 
-            // Second dispose will trigger a scope mismatch warning because the scope was
-            // created as outermost but the counter is already at 0
-            LogAssert.Expect(
-                LogType.Warning,
-                new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
-            );
-
+            // One scope is one increment, so it produces exactly one decrement. The second disposal
+            // no longer reaches the counter at all, which is why it also no longer warns about a
+            // state mismatch -- there is no mismatch left to report.
             scope.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1256,15 +1252,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             for (int i = 0; i < disposeCount; i++)
             {
-                // After the first dispose, all subsequent disposes will trigger a mismatch warning
-                if (i > 0)
-                {
-                    LogAssert.Expect(
-                        LogType.Warning,
-                        new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
-                    );
-                }
-
+                // Only the first disposal reaches the counter; the rest are no-ops and warn about
+                // nothing, because there is no longer a mismatch to report.
                 scope.Dispose();
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1296,31 +1285,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             inner.Dispose();
 
-            // Second inner dispose: inner was created as non-outermost but this dispose
-            // returns depth to 0 (outermost behavior), triggering a mismatch
-            LogAssert.Expect(
-                LogType.Warning,
-                new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
-            );
+            // The second inner disposal must not reach the counter. If it did, the depth would fall
+            // to 0 while `outer` is still live, and the outermost cleanup -- StopAssetEditing and
+            // AllowAutoRefresh -- would run in the middle of the outer scope, leaving the rest of
+            // its asset writes unbatched.
             inner.Dispose();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
-                Is.EqualTo(0),
-                "Depth should be 0 after double inner dispose (protection against negative)"
+                Is.EqualTo(1),
+                "A second disposal of the inner scope closed the outer scope's batch"
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.IsCurrentlyBatching,
+                Is.True,
+                "Batching stopped while the outer scope was still live"
             );
 
-            // outer.Dispose: outer was created as outermost but the counter is already at 0
-            LogAssert.Expect(
-                LogType.Warning,
-                new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
-            );
             outer.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
-                "Depth should remain 0 after outer dispose"
+                "Depth should be 0 after outer dispose"
             );
+            Assert.That(
+                AssetDatabaseBatchHelper.IsCurrentlyBatching,
+                Is.False,
+                "Batching should have stopped once every live scope was disposed"
+            );
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // A copy is the shape a bool guard cannot catch, and the one the depth counter cannot see:
+        // both copies look like separate scopes to it.
+        [Test]
+        public void DisposingACopyAndTheOriginalDecrementsOnce()
+        {
+            AssetDatabaseBatchScope outer = AssetDatabaseBatchHelper.BeginBatch();
+            AssetDatabaseBatchScope inner = AssetDatabaseBatchHelper.BeginBatch();
+            AssetDatabaseBatchScope copyOfInner = inner;
+
+            copyOfInner.Dispose();
+            inner.Dispose();
+
+            Assert.That(
+                AssetDatabaseBatchHelper.CurrentBatchDepth,
+                Is.EqualTo(1),
+                "Disposing a copy and its original took two scopes off the count"
+            );
+            Assert.That(AssetDatabaseBatchHelper.IsCurrentlyBatching, Is.True);
+
+            outer.Dispose();
+
+            Assert.That(AssetDatabaseBatchHelper.CurrentBatchDepth, Is.EqualTo(0));
+            Assert.That(AssetDatabaseBatchHelper.IsCurrentlyBatching, Is.False);
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -1926,30 +1945,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             scope2.Dispose();
             scope2.Dispose();
 
+            // Three scopes were opened and one has ended, so two are still live. The extra
+            // disposal must not take a second one off the count -- doing so would end scope3's
+            // batch while scope3 still expects it.
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
-                Is.EqualTo(1),
-                "Depth should be 1 after double-disposing scope2"
+                Is.EqualTo(2),
+                "A second disposal of scope2 took another live scope off the count"
             );
 
             scope1.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
-                Is.EqualTo(0),
-                "Depth should be 0 after disposing scope1"
+                Is.EqualTo(1),
+                "Depth should be 1 after disposing scope1, with scope3 still live"
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.IsCurrentlyBatching,
+                Is.True,
+                "Batching stopped while scope3 was still live"
             );
 
             scope3.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
-                "Depth should remain 0 after disposing scope3 (already below zero protection)"
+                "Depth should be 0 once every live scope has been disposed"
             );
+            Assert.That(AssetDatabaseBatchHelper.IsCurrentlyBatching, Is.False);
 
-            // This particular disposal pattern does NOT trigger warnings because:
-            // - scope2 was created as non-outermost and disposes as non-outermost (both times)
-            // - scope1 was created as outermost and disposes as outermost
-            // - scope3 was created as non-outermost and disposes as non-outermost (clamped case)
+            // No warnings: every scope now decrements exactly once, in an order the counter agrees
+            // with, so there is no state mismatch left to report.
             LogAssert.NoUnexpectedReceived();
         }
 

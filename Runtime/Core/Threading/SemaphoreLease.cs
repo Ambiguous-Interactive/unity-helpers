@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     using System;
     using System.Threading;
     using System.Threading.Tasks;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// A held <see cref="SemaphoreSlim"/> permit that is returned when the lease is disposed, so a
@@ -24,28 +25,30 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// <see cref="IsHeld"/> reports whether this lease still owns a permit.
     /// </para>
     /// <para>
-    /// <b>Do not copy a lease.</b> Assigning one to another variable, capturing it, or passing it by
-    /// value produces a second lease pointing at the same permit, and disposing both releases twice.
-    /// This is not made safe by the disposal tracking, which is per-lease: the copy carries its own
-    /// flags and cannot see that the original already released.
+    /// <b>Copying a lease is safe.</b> Assigning one to another variable, capturing it, or passing
+    /// it by value produces copies that all point at the same permit, and exactly one of them
+    /// releases it — whichever is disposed first. The tracking is a
+    /// <see cref="WallstopStudios.UnityHelpers.Utils.DisposalLease"/>, held outside the struct where
+    /// every copy reads the same state, rather than a field each copy would carry its own version
+    /// of. <see cref="IsHeld"/> reports false on every copy once any of them has released.
     /// </para>
     /// <para>
-    /// What that second release does depends on how the semaphore was constructed, and the
-    /// difference is worth knowing:
+    /// This matters because of what a second release would do, which depends on how the semaphore
+    /// was constructed:
     /// <list type="bullet">
     /// <item><description>
-    /// <c>new SemaphoreSlim(1, 1)</c> — the extra release throws <c>SemaphoreFullException</c>,
+    /// <c>new SemaphoreSlim(1, 1)</c> — an extra release throws <c>SemaphoreFullException</c>,
     /// which <see cref="Dispose"/> swallows. The count survives.
     /// </description></item>
     /// <item><description>
-    /// <c>new SemaphoreSlim(1)</c> — the maximum defaults to <see cref="int.MaxValue"/>, so the
+    /// <c>new SemaphoreSlim(1)</c> — the maximum defaults to <see cref="int.MaxValue"/>, so an
     /// extra release <b>succeeds</b>. The count silently rises to 2 and a second caller is admitted
     /// to a section built for one.
     /// </description></item>
     /// </list>
-    /// <b>Always pass an explicit maximum.</b> It does not make copying safe, but it turns silent
-    /// corruption into a swallowed no-op. Better still, acquire directly into a <c>using</c> and let
-    /// the lease die there.
+    /// <b>Still pass an explicit maximum.</b> It costs nothing and turns any other source of an
+    /// unbalanced release — a stray <c>Release()</c> elsewhere in the codebase — from silent
+    /// corruption into a loud exception.
     /// </para>
     /// <para>
     /// <b><see cref="Dispose"/> never throws</b>, including when the semaphore itself has already
@@ -74,35 +77,37 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// }
     /// ]]></code>
     /// </example>
-    public struct SemaphoreLease : IDisposable
+    public readonly struct SemaphoreLease : IDisposable
     {
-        private SemaphoreSlim _semaphore;
+        private readonly SemaphoreSlim _semaphore;
+        private readonly DisposalLease _lease;
 
         internal SemaphoreLease(SemaphoreSlim semaphore)
         {
             _semaphore = semaphore;
+            _lease = semaphore == null ? default : DisposalLeases.Acquire();
         }
 
         /// <summary>
         /// True while this lease still owns a permit. False for a default lease, for a failed
         /// <see cref="SemaphoreSlimExtensions.TryAcquire(SemaphoreSlim, TimeSpan, out SemaphoreLease)"/>,
-        /// and after <see cref="Dispose"/>.
+        /// after <see cref="Dispose"/>, and on every copy once any copy has released.
         /// </summary>
-        public bool IsHeld => _semaphore != null;
+        public bool IsHeld => _lease.IsHeld;
 
         /// <summary>
-        /// Returns the permit. Safe to call more than once; only the first call releases. Never
-        /// throws, including when the semaphore has already been disposed.
+        /// Returns the permit. Safe to call more than once, and safe to call on more than one copy
+        /// of the same lease; only the first call releases. Never throws, including when the
+        /// semaphore has already been disposed.
         /// </summary>
         public void Dispose()
         {
-            SemaphoreSlim semaphore = _semaphore;
-            if (semaphore == null)
+            if (!_lease.TryClaim())
             {
                 return;
             }
 
-            _semaphore = null;
+            SemaphoreSlim semaphore = _semaphore;
             try
             {
                 semaphore.Release();
