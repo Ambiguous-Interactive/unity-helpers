@@ -499,7 +499,8 @@
         "Sirenix",
         "asmdef",
         "asmref",
-        "stcf"
+        "stcf",
+        "WProto"
       ]
     },
     {
@@ -849,7 +850,10 @@
         "ULP",
         "uncontended",
         "OOM",
-        "Cim"
+        "Cim",
+        "varint",
+        "varints",
+        "zigzag"
       ]
     }
   ],

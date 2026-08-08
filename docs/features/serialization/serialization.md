@@ -817,3 +817,98 @@ System.Text.Json can require extra care under AOT (e.g., IL2CPP):
 - For hot POCO models, consider adding a source-generated context (JsonSerializerContext) in your game assembly and pass it to `JsonSerializer` calls.
 - If you rely on many custom converters, ensure they are referenced by code so the linker doesn't strip them. The UnityHelpers converters are referenced via options by default.
 - Avoid deserializing `System.Type` from untrusted input (see `TypeConverter`); this is intended for trusted configs/tools.
+
+## WallstopProto: the reflection-free wire layer (preview)
+
+`WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree
+protobuf implementation that does no runtime reflection, so it AOT-compiles cleanly under IL2CPP where
+protobuf-net's model builder cannot. It is **not yet wired into `Serializer`** — the facade still uses
+protobuf-net — but the wire layer is public and usable today, and it is public **for your code, not just
+this package's**: a game annotates its own types and gets the same treatment.
+
+The reader and writer are `ref struct`s over spans that allocate nothing and never throw. Every
+operation reports success, and a failure latches so a truncated write cannot look complete and a corrupt
+payload cannot decode as data:
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+
+byte[] buffer = new byte[64];
+WProtoWriter writer = new(buffer);
+writer.TryWriteTag(1, WProtoWireType.Varint);
+writer.TryWriteInt32(health);
+writer.TryWriteTag(2, WProtoWireType.LengthDelimited);
+writer.TryWriteString(playerName);
+
+if (writer.Overflowed)
+{
+    // The buffer was too small; nothing partial was emitted.
+}
+
+WProtoReader reader = new(writer.Written);
+while (reader.TryReadTag(out int fieldNumber, out int wireType))
+{
+    switch (fieldNumber)
+    {
+        case 1:
+            reader.TryReadInt32(out health);
+            break;
+        case 2:
+            reader.TryReadString(out playerName);
+            break;
+        default:
+            // Fields a newer build wrote are stepped over exactly, not guessed at.
+            reader.TrySkipField(wireType);
+            break;
+    }
+}
+```
+
+Sub-messages are length-prefixed, so their size has to be known before the payload is written.
+`WProtoSizes` measures without allocating a scratch buffer:
+
+```csharp
+int payloadSize =
+    WProtoSizes.TagSize(1) + WProtoSizes.Int32Size(health) + WProtoSizes.StringSize(playerName);
+```
+
+### Annotating your own contracts
+
+The attributes describe a contract for the (not yet shipped) generator. Field numbers are the wire
+contract; `Name` is not written to the wire at all, and exists so a schema, a diagnostic, or a payload
+dump does not change meaning when you rename a C# member:
+
+```csharp
+[WProtoContract(Name = "player_state")]
+public sealed partial class PlayerState
+{
+    [WProtoMember(1, Name = "health")]
+    private int _health;
+
+    [WProtoMember(2, Name = "display_name")]
+    private string _displayName;
+
+    [WProtoIgnore]
+    private Dictionary<string, int> _index;
+
+    [WProtoAfterDeserialization]
+    private void RebuildIndex() { /* restore what was not serialized */ }
+}
+```
+
+Four lifecycle hooks are supported — `[WProtoBeforeSerialization]`, `[WProtoAfterSerialization]`,
+`[WProtoBeforeDeserialization]` and `[WProtoAfterDeserialization]`. They may be private: generated
+formatters are emitted as a nested type of the contract, which is why the contract must be `partial`.
+`[WProtoAfterDeserialization]` runs only after a **successful** read, so a corrupt payload reports
+failure instead of handing back an object whose derived state was rebuilt from half-written members.
+
+### Wire compatibility
+
+The writer is byte-for-byte identical to protobuf-net 3.2.56 across 90 differential cases covering
+varints, ZigZag, fixed32/64, strings, byte arrays, nested messages, unpacked repeated fields, and the
+maximum field number. Two protobuf-net behaviors are worth knowing because they are easy to trip over:
+
+- An **empty but non-null** `string` or `byte[]` is written as tag plus a zero length. Only `null` is
+  omitted.
+- **Negative zero is not preserved.** Default-value omission tests `value == 0`, and `-0.0 == 0.0`, so a
+  `-0f` member is omitted and reads back as `+0f`.
