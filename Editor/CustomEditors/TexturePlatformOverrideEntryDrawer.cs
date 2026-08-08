@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using PlatformPropertyNames = WallstopStudios.UnityHelpers.Editor.Sprites.TextureSettingsApplierWindow.PlatformOverrideEntry.SerializedPropertyNames;
 
     [CustomPropertyDrawer(typeof(TextureSettingsApplierWindow.PlatformOverrideEntry))]
