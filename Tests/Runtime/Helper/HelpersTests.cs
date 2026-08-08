@@ -598,6 +598,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
+        public IEnumerator StartFunctionAsCoroutineKeepsRunningAfterTheActionThrows()
+        {
+            // An unguarded action stops the coroutine permanently the first time it throws, which
+            // silently kills a subsystem whose whole contract is "this keeps happening" (#359).
+            CoroutineHost host = CreateHost();
+            ExpectError(LogType.Error, "A repeating job threw");
+
+            int invocations = 0;
+            Coroutine coroutine = host.StartFunctionAsCoroutine(
+                () =>
+                {
+                    ++invocations;
+                    throw new InvalidOperationException("Periodic job failure.");
+                },
+                0.01f
+            );
+
+            float timeout = Time.time + 2f;
+            while (invocations < 3 && Time.time < timeout)
+            {
+                yield return null;
+            }
+
+            host.StopCoroutine(coroutine);
+            Assert.GreaterOrEqual(
+                invocations,
+                3,
+                $"A throwing repeating job must keep running, got {invocations} invocations."
+            );
+        }
+
+        [UnityTest]
+        public IEnumerator ExecuteOverTimeKeepsRunningAfterTheActionThrows()
+        {
+            CoroutineHost host = CreateHost();
+            ExpectError(LogType.Error, "A repeating job threw");
+
+            int invocations = 0;
+            IEnumerator routine = Helpers.ExecuteOverTime(
+                () =>
+                {
+                    ++invocations;
+                    throw new InvalidOperationException("Spread job failure.");
+                },
+                3,
+                0.05f,
+                delay: false
+            );
+            host.StartCoroutine(routine);
+
+            float timeout = Time.time + 2f;
+            while (invocations < 3 && Time.time < timeout)
+            {
+                yield return null;
+            }
+
+            Assert.AreEqual(
+                3,
+                invocations,
+                "A throwing action must not cancel the remaining scheduled invocations."
+            );
+        }
+
+        [UnityTest]
         public IEnumerator ExecuteOverTimeDoesNothingWhenCountIsZero()
         {
             CoroutineHost host = CreateHost();
