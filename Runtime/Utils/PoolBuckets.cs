@@ -109,17 +109,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return _buckets.GetOrAdd(size, new PoolBucket<T>());
 #endif
         }
-
-        /// <summary>
-        /// Drops every idle instance in every bucket, keeping the buckets themselves.
-        /// </summary>
-        internal void ClearAll()
-        {
-            foreach (KeyValuePair<int, PoolBucket<T>> entry in _buckets)
-            {
-                entry.Value.Clear();
-            }
-        }
     }
 
     /// <summary>

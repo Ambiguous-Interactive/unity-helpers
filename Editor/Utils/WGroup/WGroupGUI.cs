@@ -329,16 +329,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 headerHasFoldout
             );
 
-            int originalIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
-            expanded = EditorGUI.Foldout(
-                foldoutRect,
-                expanded,
-                definition.DisplayName,
-                true,
-                foldoutStyle
-            );
-            EditorGUI.indentLevel = originalIndent;
+            using (IndentLevelScope.AtLevel(0))
+            {
+                expanded = EditorGUI.Foldout(
+                    foldoutRect,
+                    expanded,
+                    definition.DisplayName,
+                    true,
+                    foldoutStyle
+                );
+            }
 
             if (foldoutStates != null)
             {
@@ -388,7 +388,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             {
                 EditorGUILayout.Space(2f);
             }
-            EditorGUI.indentLevel++;
+
+            // A group draws arbitrary property drawers, and one of those throwing must not leave
+            // the rest of the Inspector indented -- every property after this group, grouped or
+            // not, would render one level deep for the rest of the pass.
+            using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
             float horizontalPadding = GroupGUIWidthUtility.CalculateHorizontalPadding(
                 EditorStyles.helpBox,
@@ -516,7 +520,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             }
 
             WGroupIndentDiagnostics.LogAfterPop(definition?.Name);
-            EditorGUI.indentLevel--;
         }
 
         private static bool HeaderHasFoldout(WGroupDefinition definition)

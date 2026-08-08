@@ -223,9 +223,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (apply.boolValue)
             {
                 r.y += r.height + EditorGUIUtility.standardVerticalSpacing;
-                EditorGUI.indentLevel++;
-                EditorGUI.PropertyField(r, val, GUIContent.none);
-                EditorGUI.indentLevel--;
+                using (IndentLevelScope.Indent())
+                {
+                    EditorGUI.PropertyField(r, val, GUIContent.none);
+                }
             }
         }
 

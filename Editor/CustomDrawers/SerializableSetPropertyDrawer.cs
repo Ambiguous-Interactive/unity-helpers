@@ -764,17 +764,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             EditorGUI.BeginProperty(originalPosition, label, property);
-            int previousIndentScope = EditorGUI.indentLevel;
+            // In SettingsProvider context, we handle our own indentation via WGroup padding.
+            // Reset indent level to avoid double-indentation from EditorGUI methods.
+            using IndentLevelScope indentScope = targetsSettings
+                ? IndentLevelScope.AtLevel(0)
+                : IndentLevelScope.Indent(0);
 
             try
             {
-                // In SettingsProvider context, we handle our own indentation via WGroup padding
-                // Reset indent level to avoid double-indentation from EditorGUI methods
-                if (targetsSettings)
-                {
-                    EditorGUI.indentLevel = 0;
-                }
-
                 position = contentPosition;
 
                 SerializedObject serializedObject = property.serializedObject;
@@ -1076,7 +1073,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             finally
             {
-                EditorGUI.indentLevel = previousIndentScope;
                 EditorGUI.EndProperty();
             }
         }
@@ -2462,9 +2458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            int previousIndentLevel = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
-            try
+            using (IndentLevelScope.AtLevel(0))
             {
                 float rowHeight = EditorGUIUtility.singleLineHeight;
                 float spacing = EditorGUIUtility.standardVerticalSpacing;
@@ -2839,10 +2833,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 GUI.color = previousColor;
                 y = backgroundRect.yMax;
-            }
-            finally
-            {
-                EditorGUI.indentLevel = previousIndentLevel;
             }
         }
 
@@ -6253,8 +6243,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SerializedProperty endProperty = iterator.GetEndProperty();
                 bool enterChildren = true;
                 int baseDepth = valueProperty.depth;
-                int previousIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel++;
+                using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
                 while (
                     iterator.NextVisible(enterChildren)
@@ -6272,8 +6261,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     EditorGUI.PropertyField(childRect, iterator, true);
                     childY = childRect.yMax + EditorGUIUtility.standardVerticalSpacing;
                 }
-
-                EditorGUI.indentLevel = previousIndent;
             }
 
             renderedHeight = Mathf.Max(

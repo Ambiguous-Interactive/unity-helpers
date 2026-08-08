@@ -190,8 +190,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             EditorGUI.BeginProperty(position, label, property);
-            int previousIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
+            using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
             float lineHeight = EditorGUIUtility.singleLineHeight;
             float spacing = EditorGUIUtility.standardVerticalSpacing;
@@ -233,7 +232,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EditorGUI.HelpBox(helpRect, state.warningMessage, MessageType.Warning);
             }
 
-            EditorGUI.indentLevel = previousIndent;
             EditorGUI.EndProperty();
         }
 

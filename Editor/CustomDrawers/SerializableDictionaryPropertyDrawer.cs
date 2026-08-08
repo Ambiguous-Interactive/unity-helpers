@@ -922,17 +922,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             HasLastListRect = false;
 
             EditorGUI.BeginProperty(originalPosition, label, property);
-            int previousIndentLevel = EditorGUI.indentLevel;
+            // In SettingsProvider context, we handle our own indentation via WGroup padding.
+            // Reset indent level to avoid double-indentation from EditorGUI methods.
+            using IndentLevelScope indentScope = targetsSettings
+                ? IndentLevelScope.AtLevel(0)
+                : IndentLevelScope.Indent(0);
 
             try
             {
-                // In SettingsProvider context, we handle our own indentation via WGroup padding
-                // Reset indent level to avoid double-indentation from EditorGUI methods
-                if (targetsSettings)
-                {
-                    EditorGUI.indentLevel = 0;
-                }
-
                 position = contentPosition;
 
                 SerializedObject serializedObject = property.serializedObject;
@@ -1183,11 +1180,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             previousIndent,
                             0
                         );
-                        EditorGUI.indentLevel = 0;
-
-                        list.DoList(listRect);
-
-                        EditorGUI.indentLevel = previousIndent;
+                        using (IndentLevelScope.AtLevel(0))
+                        {
+                            list.DoList(listRect);
+                        }
                     }
                     finally
                     {
@@ -1210,7 +1206,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             finally
             {
-                EditorGUI.indentLevel = previousIndentLevel;
                 EditorGUI.EndProperty();
             }
         }
@@ -4185,9 +4180,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             string propertyPath = dictionaryProperty?.propertyPath ?? "(null)";
+
+            // The rows draw at indent zero, but their horizontal offset is still measured from the
+            // level this method was entered at.
             int previousIndentLevel = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
-            try
+            using (IndentLevelScope.AtLevel(0))
             {
                 AnimBool foldoutAnim = EnsurePendingFoldoutAnim(pending, propertyPath);
                 float foldoutProgress;
@@ -4696,10 +4693,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 GUI.EndGroup();
 
                 y = containerRect.yMax;
-            }
-            finally
-            {
-                EditorGUI.indentLevel = previousIndentLevel;
             }
         }
 
@@ -5598,8 +5591,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedProperty endProperty = iterator.GetEndProperty();
             bool enterChildren = true;
             int baseDepth = valueProperty.depth;
-            int previousIndent = EditorGUI.indentLevel;
-            int baseIndent = Mathf.Max(0, previousIndent - 1);
+            using IndentLevelScope indentScope = IndentLevelScope.Indent(0);
+            int baseIndent = Mathf.Max(0, EditorGUI.indentLevel - 1);
 
             while (
                 iterator.NextVisible(enterChildren)
@@ -5643,7 +5636,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 headerHeight,
                 (childY - EditorGUIUtility.standardVerticalSpacing) - valueRect.y
             );
-            EditorGUI.indentLevel = previousIndent;
             return changed;
         }
 
@@ -7697,9 +7689,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            int previousIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = Mathf.Max(0, previousIndent - 1);
-            try
+            using (IndentLevelScope.Indent(-1))
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUI.PropertyField(rect, context.Property, content, includeChildren: true);
@@ -7711,10 +7701,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     current = CloneComplexValue(updated, type);
                     MarkPendingWrapperDirty(pending, isValueField);
                 }
-            }
-            finally
-            {
-                EditorGUI.indentLevel = previousIndent;
             }
 
             return true;

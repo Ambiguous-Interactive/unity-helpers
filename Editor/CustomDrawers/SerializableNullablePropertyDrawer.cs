@@ -78,8 +78,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 GUIUtility.GetControlID(FocusType.Passive),
                 label
             );
-            int previousIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
+            using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
             float toggleWidth = EditorGUIUtility.singleLineHeight;
             float toggleHeight = EditorGUIUtility.singleLineHeight;
@@ -107,8 +106,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 );
                 EditorGUI.PropertyField(valueRect, valueProperty, GUIContent.none, true);
             }
-
-            EditorGUI.indentLevel = previousIndent;
 
             EditorGUI.EndProperty();
         }

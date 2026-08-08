@@ -269,7 +269,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             int currentLength = value?.Length ?? 0;
 
             EditorGUILayout.LabelField(label, WButtonStyles.ArrayHeaderStyle);
-            EditorGUI.indentLevel++;
+
+            // Element fields open object pickers, and Unity unwinds those with GUIUtility.ExitGUI().
+            using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
             int updatedLength = EditorGUILayout.IntField(
                 SizeContent,
@@ -333,7 +335,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            EditorGUI.indentLevel--;
             return primaryState.CurrentValue;
         }
 

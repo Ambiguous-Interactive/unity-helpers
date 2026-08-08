@@ -3761,7 +3761,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            EditorGUI.indentLevel++;
+            using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
             for (int index = 0; index < patternsProperty.arraySize; index++)
             {
@@ -3852,7 +3852,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 GUILayout.FlexibleSpace();
             }
 
-            EditorGUI.indentLevel--;
             return EditorGUI.EndChangeCheck() || mutated;
         }
 

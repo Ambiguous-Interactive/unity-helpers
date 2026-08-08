@@ -3402,14 +3402,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             Array.Clear(resource, 0, length);
             Pool.Bucket(length).Return(resource);
         }
-
-        /// <summary>
-        /// Clears all pooled arrays for testing purposes. Internal visibility for test assemblies.
-        /// </summary>
-        internal static void ClearForTesting()
-        {
-            Pool.ClearAll();
-        }
     }
 
     /// <summary>

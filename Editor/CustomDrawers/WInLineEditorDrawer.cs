@@ -359,8 +359,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             Rect indentedRect = EditorGUI.IndentedRect(rect);
-            int previousIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
+            using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
             float labelWidth = Mathf.Min(EditorGUIUtility.labelWidth, indentedRect.width);
             Rect labelRect = new Rect(
@@ -454,7 +453,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            EditorGUI.indentLevel = previousIndent;
             return foldoutState;
         }
 
@@ -470,8 +468,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Compact mode: draw label on left, small object picker on right
             // This allows object selection while hiding the full object field
             Rect indentedRect = EditorGUI.IndentedRect(rect);
-            int previousIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
+            using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
             // Reserve space for a small object picker on the right
             const float pickerWidth = 20f;
@@ -527,7 +524,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Draw a minimal object picker field (just the circle button)
             EditorGUI.ObjectField(pickerRect, property, GUIContent.none);
 
-            EditorGUI.indentLevel = previousIndent;
             return foldoutState;
         }
 
@@ -667,13 +663,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool useScrollView =
                 inlineAttribute.EnableScrolling && (needsHorizontalScroll || needsVerticalScroll);
 
-            // Save editor state - will be restored after drawing
-            int previousIndentLevel = EditorGUI.indentLevel;
-
             // Reset indent level to 0 since we're starting fresh in the inline area
-            EditorGUI.indentLevel = 0;
-
-            try
+            using (IndentLevelScope.AtLevel(0))
             {
                 if (useScrollView)
                 {
@@ -706,10 +697,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Rect drawRect = new Rect(0f, 0f, contentRect.width, inspectorHeight.ContentHeight);
                 DrawInspectorContents(editor, useSerializedInspector, drawRect);
                 GUI.EndGroup();
-            }
-            finally
-            {
-                EditorGUI.indentLevel = previousIndentLevel;
             }
         }
 

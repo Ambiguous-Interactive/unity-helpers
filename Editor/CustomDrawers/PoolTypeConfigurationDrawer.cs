@@ -233,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            EditorGUI.indentLevel++;
+            using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
             // Type Name field
             Rect typeNameRect = new(position.x, currentY, position.width, lineHeight);
@@ -319,7 +319,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EditorGUI.PropertyField(spikeRect, spikeThresholdProp, SpikeThresholdLabel);
             }
 
-            EditorGUI.indentLevel--;
             EditorGUI.EndProperty();
         }
 
@@ -345,19 +344,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             // Temporarily reset indent for right column
-            int prevIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
-            Rect adjustedRightRect = new(
-                rightRect.x + indent,
-                rightRect.y,
-                rightRect.width - indent,
-                rightRect.height
-            );
-            if (rightProp != null)
+            using (IndentLevelScope.AtLevel(0))
             {
-                EditorGUI.PropertyField(adjustedRightRect, rightProp, rightLabel);
+                Rect adjustedRightRect = new(
+                    rightRect.x + indent,
+                    rightRect.y,
+                    rightRect.width - indent,
+                    rightRect.height
+                );
+                if (rightProp != null)
+                {
+                    EditorGUI.PropertyField(adjustedRightRect, rightProp, rightLabel);
+                }
             }
-            EditorGUI.indentLevel = prevIndent;
 
             currentY += lineHeight + spacing;
         }

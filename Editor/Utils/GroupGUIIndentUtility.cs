@@ -17,15 +17,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            int originalIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = Mathf.Max(0, originalIndent - 1);
-            try
+            using (IndentLevelScope.Indent(-1))
             {
                 drawAction();
-            }
-            finally
-            {
-                EditorGUI.indentLevel = originalIndent;
             }
         }
     }

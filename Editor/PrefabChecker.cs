@@ -274,24 +274,12 @@ namespace WallstopStudios.UnityHelpers.Editor
             return (label, value, overrideToggleX, isNested) =>
             {
                 Rect lineRect;
-                if (isNested)
-                {
-                    EditorGUI.indentLevel++;
-                }
-
-                try
+                using (IndentLevelScope.Indent(isNested ? 1 : 0))
                 {
                     lineRect = EditorGUILayout.GetControlRect(
                         true,
                         EditorGUIUtility.singleLineHeight
                     );
-                }
-                finally
-                {
-                    if (isNested)
-                    {
-                        EditorGUI.indentLevel--;
-                    }
                 }
 
                 float defaultToggleX = lineRect.x + lineRect.width - ToggleWidth;

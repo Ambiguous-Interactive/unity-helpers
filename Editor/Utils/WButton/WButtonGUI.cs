@@ -890,15 +890,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 );
                 headerRect.xMin += WButtonStyles.FoldoutIconOffset;
 
-                EditorGUI.indentLevel++;
-                bool newExpanded = EditorGUI.Foldout(
-                    headerRect,
-                    expanded,
-                    header,
-                    true,
-                    WButtonStyles.FoldoutHeaderStyle
-                );
-                EditorGUI.indentLevel--;
+                bool newExpanded;
+                using (IndentLevelScope.Indent())
+                {
+                    newExpanded = EditorGUI.Foldout(
+                        headerRect,
+                        expanded,
+                        header,
+                        true,
+                        WButtonStyles.FoldoutHeaderStyle
+                    );
+                }
 
                 if (foldoutStates != null)
                 {
@@ -1367,9 +1369,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             WButtonMethodState[] states = context.States;
             if (states.Length > 0 && states[0].Parameters.Length > 0)
             {
-                EditorGUI.indentLevel++;
-                WButtonParameterDrawer.DrawParameters(states);
-                EditorGUI.indentLevel--;
+                using (IndentLevelScope.Indent())
+                {
+                    WButtonParameterDrawer.DrawParameters(states);
+                }
+
                 EditorGUILayout.Space(3f);
             }
 
