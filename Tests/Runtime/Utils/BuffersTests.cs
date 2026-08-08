@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
@@ -199,6 +200,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     Assert.AreEqual(0, buffer[j]);
                 }
             }
+        }
+
+        private static IEnumerable<TestCaseData> SteadyStateArrayPoolCases()
+        {
+            yield return new TestCaseData(
+                (Action)(
+                    () =>
+                    {
+                        using PooledArray<int> lease = WallstopArrayPool<int>.Get(
+                            16,
+                            out int[] buffer
+                        );
+                        buffer[0] = 1;
+                    }
+                )
+            ).SetName(nameof(WallstopArrayPool<int>));
+
+            yield return new TestCaseData(
+                (Action)(
+                    () =>
+                    {
+                        using PooledArray<int> lease = WallstopFastArrayPool<int>.Get(
+                            16,
+                            out int[] buffer
+                        );
+                        buffer[0] = 1;
+                    }
+                )
+            ).SetName(nameof(WallstopFastArrayPool<int>));
+        }
+
+        // A pool that allocates per rent is not a pool. Both of these stored their idle arrays in a
+        // ConcurrentStack, which holds every item in a freshly allocated node, so a rent-and-return
+        // cycle cost 32 bytes forever (#367). The window is wide because the pool's own lazily
+        // created structures have not settled after ten iterations.
+        [TestCaseSource(nameof(SteadyStateArrayPoolCases))]
+        public void ArrayPoolSteadyStateRentAndReturnDoesNotAllocate(Action rentAndReturn)
+        {
+            GCAssert.DoesNotAllocate(
+                rentAndReturn,
+                warmupIterations: 10_000,
+                measuredIterations: 100_000
+            );
         }
 
         [Test]

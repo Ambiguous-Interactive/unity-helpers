@@ -3298,11 +3298,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
     }
 
-#if SINGLE_THREADED
     /// <summary>
     /// A static array pool that provides pooled arrays of specific sizes.
     /// Arrays are cleared (set to default values) when returned to the pool.
-    /// This single-threaded implementation uses Dictionary and List for storage.
     /// </summary>
     /// <typeparam name="T">The element type for the arrays.</typeparam>
     /// <remarks>
@@ -3312,6 +3310,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </para>
     /// <para>
     /// Arrays are automatically cleared when returned to the pool to prevent data leakage.
+    /// </para>
+    /// <para>
+    /// <strong>Thread Safety:</strong> every operation is thread-safe, and renting or returning an
+    /// array allocates nothing once a size has been seen. When <c>SINGLE_THREADED</c> is defined the
+    /// synchronization is compiled out.
     /// </para>
     /// <para>
     /// <strong>⚠️ MEMORY LEAK WARNING:</strong> This pool creates a separate pool bucket for EVERY unique
@@ -3343,244 +3346,29 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public static class WallstopArrayPool<T>
     {
-        private static readonly Dictionary<int, List<T[]>> Pool = new();
-        private static readonly Action<T[]> OnDispose = Release;
-
-        /// <summary>
-        /// Gets a pooled array of the specified size. When disposed, the array is cleared and returned to the pool.
-        /// </summary>
-        /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
-        /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        public static PooledArray<T> Get(int size)
-        {
-            return Get(size, out _);
-        }
-
-        /// <summary>
-        /// Gets a pooled array of the specified size and outputs the value. When disposed, the array is cleared and returned to the pool.
-        /// </summary>
-        /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
-        /// <param name="array">The retrieved array. Will be exactly <paramref name="size"/> elements.</param>
-        /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        public static PooledArray<T> Get(int size, out T[] array)
-        {
-            switch (size)
-            {
-                case < 0:
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(size),
-                        size,
-                        "Must be non-negative."
-                    );
-                }
-                case 0:
-                {
-                    array = Array.Empty<T>();
-                    return new PooledArray<T>(array, 0, null);
-                }
-            }
-
-            List<T[]> pool = Pool.GetOrAdd(size);
-
-            if (pool.Count == 0)
-            {
-                array = new T[size];
-                return new PooledArray<T>(array, size, OnDispose);
-            }
-
-            int lastIndex = pool.Count - 1;
-            array = pool[lastIndex];
-            pool.RemoveAt(lastIndex);
-            return new PooledArray<T>(array, size, OnDispose);
-        }
-
-        private static void Release(T[] resource)
-        {
-            int length = resource.Length;
-            Array.Clear(resource, 0, length);
-            List<T[]> pool = Pool.GetOrAdd(length);
-            pool.Add(resource);
-        }
-    }
-#else
-    /// <summary>
-    /// A thread-safe static array pool that provides pooled arrays of specific sizes.
-    /// Arrays are cleared (set to default values) when returned to the pool.
-    /// This multi-threaded implementation uses ConcurrentDictionary and ConcurrentStack for thread-safe storage.
-    /// </summary>
-    /// <typeparam name="T">The element type for the arrays.</typeparam>
-    /// <remarks>
-    /// <para>
-    /// Unlike <see cref="SystemArrayPool{T}"/>, this pool returns arrays of the <em>exact</em> requested size,
-    /// making it ideal for fixed-size or predictable-size scenarios where memory efficiency is important.
-    /// </para>
-    /// <para>
-    /// Arrays are automatically cleared when returned to the pool to prevent data leakage.
-    /// </para>
-    /// <para>
-    /// <strong>⚠️ MEMORY LEAK WARNING:</strong> This pool creates a separate pool bucket for EVERY unique
-    /// size requested. If you pass variable sizes (user input, collection.Count, dynamic values), each unique
-    /// size creates a new bucket that persists forever, causing unbounded memory growth.
-    /// </para>
-    /// <para>
-    /// <strong>SAFE uses:</strong>
-    /// <list type="bullet">
-    ///   <item><description>Compile-time constants: <c>Get(16)</c>, <c>Get(64)</c>, <c>Get(256)</c></description></item>
-    ///   <item><description>Algorithm-bounded sizes with small fixed upper limits</description></item>
-    ///   <item><description>PRNG internal state buffers (fixed sizes like 16, 32, 64 bytes)</description></item>
-    ///   <item><description>Sizes from a small, known set of values</description></item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>UNSAFE uses (will leak memory):</strong>
-    /// <list type="bullet">
-    ///   <item><description><c>Get(userInput)</c> — Every unique user value creates a permanent bucket</description></item>
-    ///   <item><description><c>Get(collection.Count)</c> — Every unique collection size leaks memory</description></item>
-    ///   <item><description><c>Get(random.Next(1, 1000))</c> — Creates up to 1000 permanent buckets</description></item>
-    ///   <item><description><c>Get(dynamicCalculation)</c> — Unbounded sizes = unbounded memory</description></item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Rule of thumb:</strong> If you cannot enumerate ALL possible sizes at compile time,
-    /// use <see cref="SystemArrayPool{T}"/> instead.
-    /// </para>
-    /// </remarks>
-    public static class WallstopArrayPool<T>
-    {
-        private static readonly ConcurrentDictionary<int, ConcurrentStack<T[]>> _pool = new();
-        private static readonly Action<T[]> _onRelease = Release;
-
-        /// <summary>
-        /// Gets a pooled array of the specified size. When disposed, the array is cleared and returned to the pool.
-        /// This method is thread-safe.
-        /// </summary>
-        /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
-        /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        public static PooledArray<T> Get(int size)
-        {
-            return Get(size, out _);
-        }
-
-        /// <summary>
-        /// Gets a pooled array of the specified size and outputs the value. When disposed, the array is cleared and returned to the pool.
-        /// This method is thread-safe.
-        /// </summary>
-        /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
-        /// <param name="array">The retrieved array. Will be exactly <paramref name="size"/> elements.</param>
-        /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        public static PooledArray<T> Get(int size, out T[] array)
-        {
-            switch (size)
-            {
-                case < 0:
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(size),
-                        size,
-                        "Must be non-negative."
-                    );
-                }
-                case 0:
-                {
-                    array = Array.Empty<T>();
-                    return new PooledArray<T>(array, 0, null);
-                }
-            }
-
-            ConcurrentStack<T[]> result = _pool.GetOrAdd(size, _ => new ConcurrentStack<T[]>());
-            if (!result.TryPop(out array))
-            {
-                array = new T[size];
-            }
-
-            return new PooledArray<T>(array, size, _onRelease);
-        }
-
-        private static void Release(T[] resource)
-        {
-            int length = resource.Length;
-            Array.Clear(resource, 0, length);
-            ConcurrentStack<T[]> result = _pool.GetOrAdd(length, _ => new ConcurrentStack<T[]>());
-            result.Push(resource);
-        }
-    }
-#endif
-
-#if SINGLE_THREADED
-    /// <summary>
-    /// A fast static array pool optimized for index-based lookup with minimal overhead.
-    /// Unlike WallstopArrayPool, arrays are NOT cleared when returned to the pool, providing better performance.
-    /// This single-threaded implementation uses a List of Stacks indexed by array size for O(1) lookups.
-    /// </summary>
-    /// <typeparam name="T">The element type for the arrays. Must be an unmanaged type.</typeparam>
-    /// <remarks>
-    /// <para>
-    /// <strong>Warning:</strong> This pool does NOT clear arrays on release. Arrays may contain
-    /// data from previous uses. Only use this pool when you will overwrite all array contents
-    /// before reading, or when stale data is acceptable.
-    /// </para>
-    /// <para>
-    /// Unlike <see cref="SystemArrayPool{T}"/>, this pool returns arrays of the <em>exact</em> requested size.
-    /// </para>
-    /// <para>
-    /// <strong>⚠️ MEMORY LEAK WARNING:</strong> This pool creates a separate pool bucket for EVERY unique
-    /// size requested. If you pass variable sizes (user input, collection.Count, dynamic values), each unique
-    /// size creates a new bucket that persists forever, causing unbounded memory growth.
-    /// </para>
-    /// <para>
-    /// <strong>SAFE uses:</strong>
-    /// <list type="bullet">
-    ///   <item><description>Compile-time constants: <c>Get(16)</c>, <c>Get(64)</c>, <c>Get(256)</c></description></item>
-    ///   <item><description>Algorithm-bounded sizes with small fixed upper limits</description></item>
-    ///   <item><description>PRNG internal state buffers (fixed sizes like 16, 32, 64 bytes)</description></item>
-    ///   <item><description>Sizes from a small, known set of values</description></item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>UNSAFE uses (will leak memory):</strong>
-    /// <list type="bullet">
-    ///   <item><description><c>Get(userInput)</c> — Every unique user value creates a permanent bucket</description></item>
-    ///   <item><description><c>Get(collection.Count)</c> — Every unique collection size leaks memory</description></item>
-    ///   <item><description><c>Get(random.Next(1, 1000))</c> — Creates up to 1000 permanent buckets</description></item>
-    ///   <item><description><c>Get(dynamicCalculation)</c> — Unbounded sizes = unbounded memory</description></item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Rule of thumb:</strong> If you cannot enumerate ALL possible sizes at compile time,
-    /// use <see cref="SystemArrayPool{T}"/> instead.
-    /// </para>
-    /// </remarks>
-    public static class WallstopFastArrayPool<T>
-        where T : unmanaged
-    {
-        private static readonly List<Stack<T[]>> Pool = new();
+        private static readonly PoolBucketMap<T[]> Pool = new();
         private static readonly Action<T[]> OnRelease = Release;
 
         /// <summary>
-        /// Gets a pooled array of the specified size. When disposed, the array is returned to the pool WITHOUT being cleared.
+        /// Gets a pooled array of the specified size. When disposed, the array is cleared and returned to the pool.
+        /// This method is thread-safe.
         /// </summary>
         /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
         /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        /// <remarks>Arrays are NOT cleared on return. The caller is responsible for clearing if needed.</remarks>
         public static PooledArray<T> Get(int size)
         {
             return Get(size, out _);
         }
 
         /// <summary>
-        /// Gets a pooled array of the specified size and outputs the value. When disposed, the array is returned to the pool WITHOUT being cleared.
+        /// Gets a pooled array of the specified size and outputs the value. When disposed, the array is cleared and returned to the pool.
+        /// This method is thread-safe.
         /// </summary>
         /// <param name="size">The size of the array to retrieve. Must be non-negative.</param>
         /// <param name="array">The retrieved array. Will be exactly <paramref name="size"/> elements.</param>
         /// <returns>A <see cref="PooledArray{T}"/> wrapping an array of the exact specified size.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when size is negative.</exception>
-        /// <remarks>Arrays are NOT cleared on return. The caller is responsible for clearing if needed.</remarks>
         public static PooledArray<T> Get(int size, out T[] array)
         {
             switch (size)
@@ -3600,19 +3388,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            while (Pool.Count <= size)
-            {
-                Pool.Add(null);
-            }
-
-            Stack<T[]> pool = Pool[size];
-            if (pool == null)
-            {
-                pool = new Stack<T[]>();
-                Pool[size] = pool;
-            }
-
-            if (!pool.TryPop(out array))
+            if (!Pool.Bucket(size).TryRent(out array))
             {
                 array = new T[size];
             }
@@ -3622,7 +3398,9 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static void Release(T[] resource)
         {
-            Pool[resource.Length].Push(resource);
+            int length = resource.Length;
+            Array.Clear(resource, 0, length);
+            Pool.Bucket(length).Return(resource);
         }
 
         /// <summary>
@@ -3630,17 +3408,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static void ClearForTesting()
         {
-            for (int i = 0; i < Pool.Count; i++)
-            {
-                Pool[i]?.Clear();
-            }
+            Pool.ClearAll();
         }
     }
-#else
+
     /// <summary>
-    /// A thread-safe fast static array pool optimized for index-based lookup with minimal overhead.
+    /// A fast static array pool optimized for index-based lookup with minimal overhead.
     /// Unlike WallstopArrayPool, arrays are NOT cleared when returned to the pool, providing better performance.
-    /// This multi-threaded implementation uses a List of ConcurrentStacks with ReaderWriterLockSlim for thread-safe index access.
     /// </summary>
     /// <typeparam name="T">The element type for the arrays. Must be an unmanaged type.</typeparam>
     /// <remarks>
@@ -3651,6 +3425,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </para>
     /// <para>
     /// Unlike <see cref="SystemArrayPool{T}"/>, this pool returns arrays of the <em>exact</em> requested size.
+    /// </para>
+    /// <para>
+    /// <strong>Thread Safety:</strong> every operation is thread-safe, and renting or returning an
+    /// array allocates nothing once a size has been seen. When <c>SINGLE_THREADED</c> is defined the
+    /// synchronization is compiled out.
     /// </para>
     /// <para>
     /// <strong>⚠️ MEMORY LEAK WARNING:</strong> This pool creates a separate pool bucket for EVERY unique
@@ -3683,9 +3462,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     public static class WallstopFastArrayPool<T>
         where T : unmanaged
     {
-        private static readonly ReaderWriterLockSlim _lock = new();
-        private static readonly List<ConcurrentStack<T[]>> _pool = new();
-        private static readonly Action<T[]> _onRelease = Release;
+        private static readonly PoolBucketTable<T[]> Pool = new();
+        private static readonly Action<T[]> OnRelease = Release;
 
         /// <summary>
         /// Gets a pooled array of the specified size. When disposed, the array is returned to the pool WITHOUT being cleared.
@@ -3728,119 +3506,17 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            bool withinRange;
-            ConcurrentStack<T[]> pool = null;
-            _lock.EnterReadLock();
-            try
-            {
-                withinRange = size < _pool.Count;
-                if (withinRange)
-                {
-                    pool = _pool[size];
-                }
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
-
-            if (withinRange)
-            {
-                if (pool == null)
-                {
-                    _lock.EnterUpgradeableReadLock();
-                    try
-                    {
-                        pool = _pool[size];
-                        if (pool == null)
-                        {
-                            _lock.EnterWriteLock();
-                            try
-                            {
-                                pool = _pool[size];
-                                if (pool == null)
-                                {
-                                    pool = new ConcurrentStack<T[]>();
-                                    _pool[size] = pool;
-                                }
-                            }
-                            finally
-                            {
-                                _lock.ExitWriteLock();
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        _lock.ExitUpgradeableReadLock();
-                    }
-                }
-            }
-            else
-            {
-                _lock.EnterUpgradeableReadLock();
-                try
-                {
-                    if (size < _pool.Count)
-                    {
-                        pool = _pool[size];
-                        if (pool == null)
-                        {
-                            _lock.EnterWriteLock();
-                            try
-                            {
-                                pool = _pool[size];
-                                if (pool == null)
-                                {
-                                    pool = new ConcurrentStack<T[]>();
-                                    _pool[size] = pool;
-                                }
-                            }
-                            finally
-                            {
-                                _lock.ExitWriteLock();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        _lock.EnterWriteLock();
-                        try
-                        {
-                            while (_pool.Count <= size)
-                            {
-                                _pool.Add(null);
-                            }
-                            pool = _pool[size];
-                            if (pool == null)
-                            {
-                                pool = new ConcurrentStack<T[]>();
-                                _pool[size] = pool;
-                            }
-                        }
-                        finally
-                        {
-                            _lock.ExitWriteLock();
-                        }
-                    }
-                }
-                finally
-                {
-                    _lock.ExitUpgradeableReadLock();
-                }
-            }
-
-            if (!pool.TryPop(out array))
+            if (!Pool.Bucket(size).TryRent(out array))
             {
                 array = new T[size];
             }
 
-            return new PooledArray<T>(array, size, _onRelease);
+            return new PooledArray<T>(array, size, OnRelease);
         }
 
         private static void Release(T[] resource)
         {
-            _pool[resource.Length].Push(resource);
+            Pool.Bucket(resource.Length).Return(resource);
         }
 
         /// <summary>
@@ -3849,21 +3525,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static void ClearForTesting()
         {
-            _lock.EnterWriteLock();
-            try
-            {
-                for (int i = 0; i < _pool.Count; i++)
-                {
-                    _pool[i]?.Clear();
-                }
-            }
-            finally
-            {
-                _lock.ExitWriteLock();
-            }
+            Pool.ClearAll();
         }
     }
-#endif
 
     /// <summary>
     /// A readonly struct that wraps a pooled resource and automatically returns it to the pool when disposed.
