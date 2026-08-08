@@ -792,7 +792,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    ReportRepeatingJobFailure(e, context, ref reportedFailure);
+                    if (!reportedFailure)
+                    {
+                        ReportRepeatingJobFailure(e, context);
+                        reportedFailure = true;
+                    }
                 }
 
                 if (interval <= 0f)
@@ -808,21 +812,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         // A repeating job's whole contract is "this keeps happening". Unity stops a coroutine
         // permanently the first time its body throws, so an unguarded invocation converts one bad
         // tick into a subsystem that is silently dead for the rest of the session, with a single
-        // console exception that reads like one failed operation. Report the first failure against
-        // the owner and keep the loop alive; later failures are dropped so a job that throws every
-        // tick cannot flood the console (the first report says so explicitly).
-        private static void ReportRepeatingJobFailure(
-            Exception e,
-            Object context,
-            ref bool alreadyReported
-        )
+        // console exception that reads like one failed operation. Callers report the first failure
+        // against the owner and keep the loop alive; later failures are dropped so a job that throws
+        // every tick cannot flood the console (the first report says so explicitly).
+        private static void ReportRepeatingJobFailure(Exception e, Object context)
         {
-            if (alreadyReported)
-            {
-                return;
-            }
-
-            alreadyReported = true;
             Debug.LogError(
                 "A repeating job threw; it will keep running, and further failures of this job "
                     + $"will not be reported. {e}",
@@ -944,7 +938,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                     catch (Exception e)
                     {
-                        ReportRepeatingJobFailure(e, null, ref reportedFailure);
+                        if (!reportedFailure)
+                        {
+                            ReportRepeatingJobFailure(e, null);
+                            reportedFailure = true;
+                        }
                     }
 
                     ++totalExecuted;
@@ -961,7 +959,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    ReportRepeatingJobFailure(e, null, ref reportedFailure);
+                    if (!reportedFailure)
+                    {
+                        ReportRepeatingJobFailure(e, null);
+                        reportedFailure = true;
+                    }
                 }
 
                 ++totalExecuted;
