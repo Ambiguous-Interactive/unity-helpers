@@ -12,11 +12,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every write reports success rather than throwing, and a write that does not fit leaves the
-    /// buffer and <see cref="Position"/> untouched while latching <see cref="Overflowed"/>. The
-    /// latch means a formatter can emit a whole message without branching on each call and check
-    /// once at the end; once latched, later writes are refused so a truncated message can never
-    /// look complete.
+    /// Every write reports success rather than throwing, and a refused write leaves the buffer and
+    /// <see cref="Position"/> untouched while latching <see cref="Faulted"/>. The latch means a
+    /// formatter can emit a whole message without branching on each call and check once at the end;
+    /// once latched, later writes are refused so a truncated message can never look complete.
+    /// </para>
+    /// <para>
+    /// <b>Every</b> refusal latches, including a rejected field number or wire type -- not only
+    /// running out of room. A skipped tag is the more dangerous of the two: it costs zero bytes, so
+    /// <see cref="WProtoSizes"/> and the writer still agree, an enclosing length prefix is still
+    /// correct, and the payload decodes cleanly as a different message. Nothing but the latch
+    /// reports it.
     /// </para>
     /// <para>
     /// Sizing comes from <see cref="WProtoSizes"/>. Measuring a sub-message before writing it is
@@ -27,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     {
         private readonly Span<byte> _buffer;
         private int _position;
-        private bool _overflowed;
+        private bool _faulted;
 
         /// <summary>
         /// Initializes a writer over <paramref name="buffer"/>.
@@ -37,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             _buffer = buffer;
             _position = 0;
-            _overflowed = false;
+            _faulted = false;
         }
 
         /// <summary>Bytes written so far.</summary>
@@ -49,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Indicates whether any write has been refused for lack of space. Once set, it stays set.
         /// </summary>
-        public bool Overflowed => _overflowed;
+        public bool Faulted => _faulted;
 
         /// <summary>The bytes written so far.</summary>
         public ReadOnlySpan<byte> Written => _buffer.Slice(0, _position);
@@ -68,6 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 || !WProtoWireType.IsDefined(wireType)
             )
             {
+                _faulted = true;
                 return false;
             }
 
@@ -224,12 +231,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Writes a length-delimited header for a payload of <paramref name="payloadLength"/> bytes.
         /// </summary>
-        /// <param name="payloadLength">The payload length; must not be negative.</param>
+        /// <param name="payloadLength">The payload length; a negative length is refused.</param>
         /// <returns><c>true</c> when the header was written.</returns>
         public bool TryWriteLengthPrefix(int payloadLength)
         {
             if (payloadLength < 0)
             {
+                _faulted = true;
                 return false;
             }
 
@@ -248,9 +256,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public bool TryWriteBytes(ReadOnlySpan<byte> value)
         {
             int prefixSize = WProtoSizes.Varint32Size((uint)value.Length);
-            if (Remaining < prefixSize + value.Length)
+
+            // Subtract rather than add: `prefixSize + value.Length` overflows int for a span near
+            // int.MaxValue, and a wrapped comparison would let the prefix through and then refuse
+            // the payload -- the orphaned prefix this method exists to prevent.
+            if (_faulted || value.Length > Remaining - prefixSize)
             {
-                _overflowed = true;
+                _faulted = true;
                 return false;
             }
 
@@ -271,9 +283,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             int byteCount = WProtoSizes.Utf8ByteCount(value);
             int prefixSize = WProtoSizes.Varint32Size((uint)byteCount);
-            if (Remaining < prefixSize + byteCount)
+            if (_faulted || byteCount > Remaining - prefixSize)
             {
-                _overflowed = true;
+                _faulted = true;
                 return false;
             }
 
@@ -292,13 +304,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            int written = Encoding.UTF8.GetBytes(value.AsSpan(), _buffer.Slice(start, byteCount));
+            int written;
+            try
+            {
+                written = Encoding.UTF8.GetBytes(value.AsSpan(), _buffer.Slice(start, byteCount));
+            }
+            catch (ArgumentException)
+            {
+                // GetBytes wanting more room than GetByteCount promised is the one way this class
+                // can throw. It is not reachable for any string tested, but a Try API that throws
+                // is worse than one that reports failure, and the prefix is already committed.
+                _faulted = true;
+                return false;
+            }
 
-            // GetByteCount and GetBytes disagreeing would mean a torn write, so surface it as
-            // overflow rather than emitting a field whose prefix lies about its payload.
             if (written != byteCount)
             {
-                _overflowed = true;
+                _faulted = true;
                 return false;
             }
 
@@ -314,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (value.Length == 0)
             {
-                return !_overflowed;
+                return !_faulted;
             }
 
             if (!TryReserve(value.Length, out int start))
@@ -330,9 +352,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private bool TryReserve(int count, out int start)
         {
             start = _position;
-            if (_overflowed || count > _buffer.Length - _position)
+            if (_faulted || count > _buffer.Length - _position)
             {
-                _overflowed = true;
+                _faulted = true;
                 return false;
             }
 

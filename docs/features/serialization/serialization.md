@@ -840,9 +840,10 @@ writer.TryWriteInt32(health);
 writer.TryWriteTag(2, WProtoWireType.LengthDelimited);
 writer.TryWriteString(playerName);
 
-if (writer.Overflowed)
+if (writer.Faulted)
 {
-    // The buffer was too small; nothing partial was emitted.
+    // A write was refused -- out of room, or a bad field number. Nothing partial was
+    // emitted, and every later write is refused too.
 }
 
 WProtoReader reader = new(writer.Written);
@@ -858,7 +859,7 @@ while (reader.TryReadTag(out int fieldNumber, out int wireType))
             break;
         default:
             // Fields a newer build wrote are stepped over exactly, not guessed at.
-            reader.TrySkipField(wireType);
+            reader.TrySkipField(fieldNumber, wireType);
             break;
     }
 }

@@ -117,14 +117,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Returns the encoded size of a length-delimited payload, prefix included.
         /// </summary>
-        /// <param name="payloadLength">The payload length in bytes; negative values count as zero.</param>
-        /// <returns>The prefix size plus the payload size.</returns>
+        /// <param name="payloadLength">The payload length in bytes.</param>
+        /// <returns>
+        /// The prefix size plus the payload size, or 0 for a negative length -- which
+        /// <see cref="WProtoWriter.TryWriteLengthPrefix"/> refuses outright. The two have to agree
+        /// on the byte count for every input, invalid ones included, or a measured-then-written
+        /// message carries a length prefix that does not describe its payload.
+        /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int LengthDelimitedSize(int payloadLength)
         {
             if (payloadLength < 0)
             {
-                payloadLength = 0;
+                return 0;
             }
 
             return Varint32Size((uint)payloadLength) + payloadLength;

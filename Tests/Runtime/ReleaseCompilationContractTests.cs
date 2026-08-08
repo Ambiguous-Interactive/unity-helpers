@@ -30,11 +30,16 @@ namespace WallstopStudios.UnityHelpers.Tests
     {
         private const string PackageAssemblyPrefix = "WallstopStudios.UnityHelpers";
 
+        // The runtime assembly specifically, not merely "something matching the prefix". The prefix
+        // also matches this fixture's own assembly, so a count-based guard can never fail.
+        private const string RuntimeAssemblyName = "WallstopStudios.UnityHelpers";
+
         [Test]
         public void PackageAssembliesAreCompiledWithOptimizationsEnabled()
         {
             List<string> optimized = new();
             List<string> unoptimized = new();
+            List<string> unreadable = new();
 
             foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -56,7 +61,11 @@ namespace WallstopStudios.UnityHelpers.Tests
                     continue;
                 }
 
-                if (IsOptimizerDisabled(assembly))
+                if (!TryReadOptimizerDisabled(assembly, out bool optimizerDisabled))
+                {
+                    unreadable.Add(name);
+                }
+                else if (optimizerDisabled)
                 {
                     unoptimized.Add(name);
                 }
@@ -68,13 +77,28 @@ namespace WallstopStudios.UnityHelpers.Tests
 
             optimized.Sort(StringComparer.Ordinal);
             unoptimized.Sort(StringComparer.Ordinal);
+            unreadable.Sort(StringComparer.Ordinal);
 
-            // A probe that inspected nothing is not a passing contract.
+            // Named, not counted. The prefix also matches this fixture's own assembly, so a count
+            // of "assemblies inspected" is always at least one and can never catch the failure it
+            // was written for -- the runtime assembly being absent from the probe entirely.
+            Assert.IsTrue(
+                optimized.Contains(RuntimeAssemblyName)
+                    || unoptimized.Contains(RuntimeAssemblyName)
+                    || unreadable.Contains(RuntimeAssemblyName),
+                $"'{RuntimeAssemblyName}' was not among the loaded assemblies, so this contract "
+                    + "never inspected the runtime package at all."
+            );
+
+            // An assembly with no DebuggableAttribute is compiled for an optimizing JIT by default,
+            // so it is not a violation. It is also not evidence: if EVERY assembly came back
+            // unreadable the probe proved nothing, which is the shape a stripped-metadata player
+            // would take.
             Assert.Greater(
                 optimized.Count + unoptimized.Count,
                 0,
-                $"No loaded assembly is named '{PackageAssemblyPrefix}*', so this contract "
-                    + "inspected nothing."
+                "No package assembly carried a DebuggableAttribute, so nothing here was actually "
+                    + $"verified. Unreadable: {string.Join(", ", unreadable)}."
             );
 
             if (!Helpers.IsRunningInContinuousIntegration)
@@ -85,8 +109,9 @@ namespace WallstopStudios.UnityHelpers.Tests
             Assert.IsEmpty(unoptimized, Describe(optimized, unoptimized, enforced: true));
         }
 
-        private static bool IsOptimizerDisabled(Assembly assembly)
+        private static bool TryReadOptimizerDisabled(Assembly assembly, out bool optimizerDisabled)
         {
+            optimizerDisabled = false;
             object[] attributes;
             try
             {
@@ -97,15 +122,11 @@ namespace WallstopStudios.UnityHelpers.Tests
                 return false;
             }
 
-            // An absent attribute is the JIT's optimized default, so only an attribute that
-            // explicitly disables the optimizer counts against the contract.
             foreach (object attribute in attributes)
             {
-                if (
-                    attribute is DebuggableAttribute debuggable
-                    && debuggable.IsJITOptimizerDisabled
-                )
+                if (attribute is DebuggableAttribute debuggable)
                 {
+                    optimizerDisabled = debuggable.IsJITOptimizerDisabled;
                     return true;
                 }
             }

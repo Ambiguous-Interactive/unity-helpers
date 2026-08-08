@@ -853,7 +853,8 @@
         "Cim",
         "varint",
         "varints",
-        "zigzag"
+        "zigzag",
+        "MSVC"
       ]
     }
   ],

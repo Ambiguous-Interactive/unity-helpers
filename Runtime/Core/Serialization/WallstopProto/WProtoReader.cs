@@ -12,15 +12,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every read reports success rather than throwing, and a read that cannot be satisfied leaves
-    /// <see cref="Position"/> untouched while latching <see cref="Malformed"/>. Once latched every
-    /// later read is refused, so a caller that checks only at the end cannot mistake garbage
-    /// recovered mid-message for data.
+    /// Every read reports success rather than throwing, and a read that cannot be satisfied latches
+    /// <see cref="Malformed"/>. Once latched every later read is refused, so a caller that checks
+    /// only at the end cannot mistake garbage recovered mid-message for data.
+    /// <see cref="Position"/> is <b>not</b> rewound on failure -- a rejected length or field key may
+    /// already have consumed its varint -- so once <see cref="Malformed"/> is set, treat the
+    /// position as meaningless rather than as a resume point.
     /// </para>
     /// <para>
     /// Payloads arrive from disk and from the network, so the reader treats every length, tag and
-    /// varint as hostile: overlong varints, zero field numbers, undefined wire types, negative or
-    /// out-of-range lengths and unbalanced groups are all rejected rather than clamped.
+    /// varint as hostile: overlong varints, varints wider than the 32 bits a key or length can
+    /// mean, zero field numbers, undefined wire types, out-of-range lengths, and groups that are
+    /// unterminated or closed by a terminator naming a different field are all rejected rather than
+    /// clamped.
     /// </para>
     /// </remarks>
     public ref struct WProtoReader
@@ -75,7 +79,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (!TryReadVarint32(out uint key))
+            // Strict: a key that needed more than 32 bits is not a large field number, it is a
+            // second encoding of a small one. Accepting it would let two different byte sequences
+            // decode to the same message, which breaks byte comparison for anything that hashes or
+            // signs a payload. Google's implementations cap a key at five bytes for the same reason.
+            if (!TryReadVarint32Strict(out uint key))
             {
                 return false;
             }
@@ -107,6 +115,35 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (!TryReadVarint64(out ulong wide))
             {
                 value = 0;
+                return false;
+            }
+
+            value = (uint)wide;
+            return true;
+        }
+
+        /// <summary>
+        /// Reads an unsigned varint that must fit in 32 bits.
+        /// </summary>
+        /// <param name="value">Receives the value, or 0 on failure.</param>
+        /// <returns><c>true</c> when a value that fits 32 bits was read.</returns>
+        /// <remarks>
+        /// This is the form for structural numbers -- field keys and lengths -- where a wider
+        /// encoding carries no extra meaning and only creates a second spelling of the same value.
+        /// Field <i>values</i> use <see cref="TryReadVarint32"/>, which truncates, because a
+        /// negative <c>int32</c> is legitimately written sign-extended across ten bytes.
+        /// </remarks>
+        public bool TryReadVarint32Strict(out uint value)
+        {
+            value = 0;
+            if (!TryReadVarint64(out ulong wide))
+            {
+                return false;
+            }
+
+            if (wide > uint.MaxValue)
+            {
+                _malformed = true;
                 return false;
             }
 
@@ -364,7 +401,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public bool TryReadLength(out int length)
         {
             length = 0;
-            if (!TryReadVarint32(out uint raw))
+
+            // Strict for the same reason as a field key: a length encoded in more than 32 bits is a
+            // second spelling of a smaller one, and truncating it would silently accept it.
+            if (!TryReadVarint32Strict(out uint raw))
             {
                 return false;
             }
@@ -392,12 +432,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// guessed at. Groups are skipped by matching their terminator, bounded so a stream of
         /// openers cannot recurse without end.
         /// </remarks>
-        public bool TrySkipField(int wireType)
+        public bool TrySkipField(int fieldNumber, int wireType)
         {
-            return TrySkipField(wireType, 0);
+            return TrySkipField(fieldNumber, wireType, 0);
         }
 
-        private bool TrySkipField(int wireType, int depth)
+        private bool TrySkipField(int fieldNumber, int wireType, int depth)
         {
             if (_malformed)
             {
@@ -429,7 +469,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
                 case WProtoWireType.StartGroup:
                 {
-                    return TrySkipGroup(depth);
+                    return TrySkipGroup(fieldNumber, depth);
                 }
                 default:
                 {
@@ -440,7 +480,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
         }
 
-        private bool TrySkipGroup(int depth)
+        private bool TrySkipGroup(int groupFieldNumber, int depth)
         {
             if (depth >= MaxGroupDepth)
             {
@@ -450,7 +490,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             while (true)
             {
-                if (!TryReadTag(out _, out int innerWireType))
+                if (!TryReadTag(out int innerFieldNumber, out int innerWireType))
                 {
                     // End of input inside a group is an unterminated group, not a clean finish.
                     _malformed = true;
@@ -459,10 +499,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (innerWireType == WProtoWireType.EndGroup)
                 {
+                    // The terminator must name the group it closes. Accepting any END_GROUP lets
+                    // `1<  2<  /1>  /2>` -- crossed, not nested -- read as well-formed, and lets a
+                    // group be closed by a terminator that belongs to an enclosing one.
+                    if (innerFieldNumber != groupFieldNumber)
+                    {
+                        _malformed = true;
+                        return false;
+                    }
+
                     return true;
                 }
 
-                if (!TrySkipField(innerWireType, depth + 1))
+                if (!TrySkipField(innerFieldNumber, innerWireType, depth + 1))
                 {
                     return false;
                 }

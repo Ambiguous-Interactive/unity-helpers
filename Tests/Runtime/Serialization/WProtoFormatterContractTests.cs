@@ -84,15 +84,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             HookedMessage.Formatter formatter = new();
 
             Assert.IsFalse(formatter.TryRead(ref reader, out HookedMessage value));
-            Assert.IsTrue(value == null, "A failed read must not hand back a partially populated object.");
+            Assert.IsTrue(
+                value == null,
+                "A failed read must not hand back a partially populated object."
+            );
             Assert.IsTrue(reader.Malformed);
+
+            // Asserting only that the result is null is not enough: a formatter that runs the hook
+            // and THEN returns null passes that. The abandoned instance is the only witness.
+            Assert.IsTrue(formatter.LastAttempted != null);
+            CollectionAssert.AreEqual(
+                new[] { "before-deserialization" },
+                formatter.LastAttempted.HookLog,
+                "After-deserialization must not run on a failed read -- rebuilding derived state "
+                    + "from half-written members yields a plausible wrong object."
+            );
+            Assert.IsTrue(formatter.LastAttempted.DerivedLabel == null);
+        }
+
+        [Test]
+        public void AFieldSentWithTheWrongWireTypeIsNotDecodedAsTheDeclaredType()
+        {
+            // Field 1 is declared int32 (varint); this sends it as a Fixed32.
+            byte[] payload = { 0x0D, 0x05, 0x08, 0x07, 0x00 };
+            WProtoReader reader = new(payload);
+            HookedMessage.Formatter formatter = new();
+
+            Assert.IsTrue(formatter.TryRead(ref reader, out HookedMessage value));
+            Assert.AreEqual(
+                0,
+                value.Health,
+                "A mismatched wire type must be skipped like any unknown field, never read as the "
+                    + "declared type -- otherwise a wrong-typed payload decodes to a plausible value."
+            );
         }
 
         [Test]
         public void ExplicitMemberNamesAreCarriedOnTheContractRatherThanTheWire()
         {
             FieldInfo field = typeof(HookedMessage).GetField(
-                "_health",
+                HookedMessage.HealthFieldName,
                 BindingFlags.Instance | BindingFlags.NonPublic
             );
             Assert.IsTrue(field != null);
@@ -122,6 +153,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoContract(Name = "player_state")]
         internal sealed class HookedMessage
         {
+            /// <summary>The private member's name, so the test below carries no magic string.</summary>
+            internal const string HealthFieldName = nameof(_health);
+
             [WProtoMember(1, Name = "health")]
             private int _health;
 
@@ -180,6 +214,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             /// </summary>
             internal sealed class Formatter : IWProtoFormatter<HookedMessage>
             {
+                /// <summary>
+                /// The instance the last <see cref="TryRead"/> built, kept so a test can inspect an
+                /// abandoned read. Generated formatters have no reason to expose this.
+                /// </summary>
+                internal HookedMessage LastAttempted { get; private set; }
+
                 public int Measure(in HookedMessage value)
                 {
                     if (value == null)
@@ -219,13 +259,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 public bool TryRead(ref WProtoReader reader, out HookedMessage value)
                 {
                     HookedMessage result = new();
+                    LastAttempted = result;
                     result.OnBeforeDeserialization();
 
                     while (reader.TryReadTag(out int fieldNumber, out int wireType))
                     {
+                        // A field's wire type is checked before its number is trusted. Without this
+                        // a payload that sends an int32 as a Fixed32 decodes to a plausible value
+                        // instead of being stepped over like any other field this build cannot read.
                         switch (fieldNumber)
                         {
-                            case 1:
+                            case 1 when wireType == WProtoWireType.Varint:
                             {
                                 if (!reader.TryReadInt32(out result._health))
                                 {
@@ -235,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                                 break;
                             }
-                            case 2:
+                            case 2 when wireType == WProtoWireType.LengthDelimited:
                             {
                                 if (!reader.TryReadString(out result._label))
                                 {
@@ -247,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                             }
                             default:
                             {
-                                if (!reader.TrySkipField(wireType))
+                                if (!reader.TrySkipField(fieldNumber, wireType))
                                 {
                                     value = null;
                                     return false;

@@ -207,6 +207,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void AnUnpairedSurrogateMeasuresAndWritesTheSameNumberOfBytes()
+        {
+            // The one input where GetByteCount and GetBytes can disagree, and a disagreement there
+            // corrupts the length prefix of every enclosing message. Built at runtime on purpose:
+            // a lone surrogate cannot survive a [TestCase] argument, because attribute values are
+            // stored as UTF-8 in metadata and the compiler substitutes replacement characters, so
+            // the string reaching the test would not be the one written here.
+            string loneSurrogate = new(new[] { '\ud800' });
+
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.IsTrue(writer.TryWriteTag(1, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteString(loneSurrogate));
+            Assert.AreEqual(
+                writer.Position - 1,
+                WProtoSizes.StringSize(loneSurrogate),
+                "WProtoSizes and WProtoWriter must agree byte for byte on an unpaired surrogate."
+            );
+
+            // Measured against protobuf-net 3.2.56: it encodes the surrogate as U+FFFD too.
+            Assert.AreEqual("0A03EFBFBD", ToHex(writer.Written));
+
+            WProtoReader reader = new(writer.Written);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadString(out string roundTripped));
+            Assert.AreEqual("\ufffd", roundTripped);
+        }
+
+        [Test]
         public void NullStringWritesAnEmptyFieldRatherThanFailing()
         {
             byte[] scratch = new byte[ScratchSize];
@@ -390,7 +419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
 
                 Assert.IsTrue(
-                    reader.TrySkipField(wireType),
+                    reader.TrySkipField(fieldNumber, wireType),
                     $"Field {fieldNumber} of wire type {wireType} could not be skipped."
                 );
             }
@@ -405,14 +434,95 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] payload = { 0x0B, 0x10, 0x2A, 0x0C, 0x18, 0x07 };
             WProtoReader reader = new(payload);
-            Assert.IsTrue(reader.TryReadTag(out _, out int wireType));
+            Assert.IsTrue(reader.TryReadTag(out int groupField, out int wireType));
             Assert.AreEqual(WProtoWireType.StartGroup, wireType);
-            Assert.IsTrue(reader.TrySkipField(wireType));
+            Assert.IsTrue(reader.TrySkipField(groupField, wireType));
             Assert.IsTrue(reader.TryReadTag(out int fieldNumber, out _));
             Assert.AreEqual(3, fieldNumber);
             Assert.IsTrue(reader.TryReadInt32(out int value));
             Assert.AreEqual(7, value);
             Assert.IsFalse(reader.Malformed);
+        }
+
+        // 0B = field 1 START_GROUP, 10 2A = field 2 varint 42, then a terminator naming a DIFFERENT
+        // field, then field 3 varint 7. protobuf-net rejects both of these; accepting them lets a
+        // group be closed by a terminator belonging to an enclosing one, and lets crossed groups
+        // (1< 2< /1> /2>) read as well formed.
+        [TestCase("0B102A4C1807", TestName = "MismatchedGroupTerminatorsAreRejected(wrong field)")]
+        [TestCase("0B130C14", TestName = "MismatchedGroupTerminatorsAreRejected(crossed groups)")]
+        public void MismatchedGroupTerminatorsAreRejected(string hex)
+        {
+            byte[] payload = FromHex(hex);
+            WProtoReader reader = new(payload);
+            Assert.IsTrue(reader.TryReadTag(out int groupField, out int wireType));
+            Assert.AreEqual(WProtoWireType.StartGroup, wireType);
+            Assert.IsFalse(reader.TrySkipField(groupField, wireType));
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        // A key or a length carries no meaning above 32 bits, so a wider encoding is a second
+        // spelling of a smaller number. Truncating it would let two different byte sequences decode
+        // to the same message.
+        [TestCase(
+            "888080808001",
+            TestName = "OverWideStructuralVarintsAreRejected(field key above 32 bits)"
+        )]
+        [TestCase(
+            "0A8380808010",
+            TestName = "OverWideStructuralVarintsAreRejected(length above 32 bits)"
+        )]
+        public void OverWideStructuralVarintsAreRejected(string hex)
+        {
+            byte[] payload = FromHex(hex);
+            WProtoReader reader = new(payload);
+            if (reader.TryReadTag(out _, out int wireType))
+            {
+                Assert.AreEqual(
+                    WProtoWireType.LengthDelimited,
+                    wireType,
+                    "The key case must be rejected outright; only the length case gets this far."
+                );
+                Assert.IsFalse(reader.TryReadLength(out _));
+            }
+
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void ANegativeLengthPrefixIsRefusedAndMeasuresAsZeroBytes()
+        {
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.IsFalse(writer.TryWriteLengthPrefix(-1));
+            Assert.IsTrue(writer.Faulted);
+            Assert.AreEqual(0, writer.Position);
+            Assert.AreEqual(
+                writer.Position,
+                WProtoSizes.LengthDelimitedSize(-1),
+                "Measure and Write must agree on the byte count even for an invalid length, or a "
+                    + "measured-then-written message carries a prefix that does not fit its payload."
+            );
+        }
+
+        [Test]
+        public void RawAndFixedWritesRoundTrip()
+        {
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.IsTrue(writer.TryWriteFixed32(0xDEADBEEF));
+            Assert.IsTrue(writer.TryWriteFixed64(0x0123456789ABCDEFul));
+            Assert.IsTrue(writer.TryWriteRaw(new byte[] { 0xAA, 0xBB }));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(2));
+            Assert.IsTrue(writer.TryWriteRaw(new byte[] { 0x01, 0x02 }));
+            Assert.IsFalse(writer.Faulted);
+            Assert.AreEqual("EFBEADDEEFCDAB8967452301AABB020102", ToHex(writer.Written));
+            Assert.AreEqual(ScratchSize - writer.Position, writer.Remaining);
+
+            WProtoReader reader = new(writer.Written);
+            Assert.IsTrue(reader.TryReadFixed32(out uint fixed32));
+            Assert.AreEqual(0xDEADBEEF, fixed32);
+            Assert.IsTrue(reader.TryReadFixed64(out ulong fixed64));
+            Assert.AreEqual(0x0123456789ABCDEFul, fixed64);
         }
 
         [TestCase("0880", TestName = "MalformedInputIsRejected(truncated varint)")]
@@ -433,9 +543,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] payload = FromHex(hex);
             WProtoReader reader = new(payload);
-            while (reader.TryReadTag(out _, out int wireType))
+            while (reader.TryReadTag(out int fieldNumber, out int wireType))
             {
-                if (!reader.TrySkipField(wireType))
+                if (!reader.TrySkipField(fieldNumber, wireType))
                 {
                     break;
                 }
@@ -482,7 +592,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(reader.Malformed);
             Assert.IsFalse(reader.TryReadTag(out _, out _));
             Assert.IsFalse(reader.TryReadBool(out _));
-            Assert.IsFalse(reader.TrySkipField(WProtoWireType.Varint));
+            Assert.IsFalse(reader.TrySkipField(1, WProtoWireType.Varint));
         }
 
         [Test]
@@ -492,7 +602,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoWriter writer = new(scratch);
             Assert.IsTrue(writer.TryWriteTag(1, WProtoWireType.LengthDelimited));
             Assert.IsFalse(writer.TryWriteString("too long for three bytes"));
-            Assert.IsTrue(writer.Overflowed);
+            Assert.IsTrue(writer.Faulted);
             Assert.AreEqual(
                 1,
                 writer.Position,
@@ -507,22 +617,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        [Test]
-        public void InvalidTagsAreRefusedByTheWriter()
+        [TestCase(
+            0,
+            WProtoWireType.Varint,
+            TestName = "ARefusedTagFaultsTheWriter(field number 0)"
+        )]
+        [TestCase(
+            -1,
+            WProtoWireType.Varint,
+            TestName = "ARefusedTagFaultsTheWriter(negative field)"
+        )]
+        [TestCase(
+            WProtoWireType.MaxFieldNumber + 1,
+            WProtoWireType.Varint,
+            TestName = "ARefusedTagFaultsTheWriter(field number too large)"
+        )]
+        [TestCase(1, 6, TestName = "ARefusedTagFaultsTheWriter(undefined wire type)")]
+        public void ARefusedTagFaultsTheWriter(int fieldNumber, int wireType)
         {
             byte[] scratch = new byte[ScratchSize];
             WProtoWriter writer = new(scratch);
-            Assert.IsFalse(writer.TryWriteTag(0, WProtoWireType.Varint));
-            Assert.IsFalse(writer.TryWriteTag(-1, WProtoWireType.Varint));
-            Assert.IsFalse(
-                writer.TryWriteTag(WProtoWireType.MaxFieldNumber + 1, WProtoWireType.Varint)
-            );
-            Assert.IsFalse(writer.TryWriteTag(1, 6));
+            Assert.IsFalse(writer.TryWriteTag(fieldNumber, wireType));
             Assert.AreEqual(0, writer.Position);
+
+            // A skipped tag costs zero bytes, so WProtoSizes still agrees with the writer and an
+            // enclosing length prefix is still correct -- the payload just decodes as a different
+            // message. Nothing but the latch can report it, which is why a caller error has to latch
+            // exactly like running out of room.
+            Assert.IsTrue(writer.Faulted);
             Assert.IsFalse(
-                writer.Overflowed,
-                "A rejected tag is a caller error, not an out-of-space condition."
+                writer.TryWriteFixed64(0x0108010801080108ul),
+                "A faulted writer must refuse later writes; otherwise the value that lost its tag is "
+                    + "emitted anyway and reads back as a well-formed, wrong message."
             );
+            Assert.AreEqual(0, writer.Position);
         }
 
         [Test]
