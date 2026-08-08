@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using System.Collections.Generic;
     using System.Threading;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
 #endif
@@ -23,9 +24,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     internal sealed class PoolBucket<T>
     {
         private readonly Stack<T> _idle = new();
-#if !SINGLE_THREADED
-        private readonly object _gate = new();
-#endif
 
         /// <summary>
         /// Takes an idle instance if this bucket has one.
@@ -35,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal bool TryRent(out T instance)
         {
 #if !SINGLE_THREADED
-            lock (_gate)
+            lock (_idle)
             {
 #endif
             return _idle.TryPop(out instance);
@@ -51,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal void Return(T instance)
         {
 #if !SINGLE_THREADED
-            lock (_gate)
+            lock (_idle)
             {
 #endif
             _idle.Push(instance);
@@ -66,7 +64,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal void Clear()
         {
 #if !SINGLE_THREADED
-            lock (_gate)
+            lock (_idle)
             {
 #endif
             _idle.Clear();
@@ -101,13 +99,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return existing;
             }
 
-#if SINGLE_THREADED
-            PoolBucket<T> created = new();
-            _buckets[size] = created;
-            return created;
-#else
-            return _buckets.GetOrAdd(size, new PoolBucket<T>());
-#endif
+            // GetOrAdd(key) constructs only on the miss this lookup just proved; the overload taking
+            // a value would allocate a bucket on the way in whether or not one is needed.
+            return _buckets.GetOrAdd(size);
         }
     }
 
