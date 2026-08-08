@@ -76,12 +76,15 @@ param(
 
     [switch]$ReleasePlayerBuild,
 
-    # IL2CPP C++ compiler configuration for the standalone player build. 'Release'
-    # (the default, what shipped players run) drives the MSVC optimizer hard, which on
-    # a very large generated translation unit can hit an MSVC `C1001` optimizer ICE
-    # (pass 2 / p2). 'Debug' disables that optimization, so the standalone TEST leg --
-    # a correctness/IL2CPP-compat check, not a native-perf benchmark -- can pass it to
-    # build robustly. Inert for editmode/playmode and Mono (no IL2CPP player is built).
+    # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
+    # both the default and what CI passes: it is what a shipped player runs, so it is
+    # what the IL2CPP-compat leg should validate, and the unoptimized alternative is
+    # expensive -- the standalone legs execute the same suite roughly 2x slower than
+    # the editor's Mono JIT does. 'Debug' skips the MSVC optimizer (pass 2), which has
+    # historically hit a `C1001` ICE on the very large generated test translation unit;
+    # keep it as the documented escape hatch if that ICE returns (a failed C++ compile
+    # is caught by the GameAssembly.dll freshness check, not silently green-lit).
+    # Inert for editmode/playmode and Mono (no IL2CPP player is built).
     [ValidateSet('Release', 'Debug')]
     [string]$Il2CppCompilerConfiguration = 'Release',
 
@@ -1254,9 +1257,8 @@ public static class UhCiTestConfigurator
         // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
         // An ephemeral CI project has no committed default, so the pin removes the
         // variable instead of trusting any implicit default. Release matches a shipped
-        // player (and any future IL2CPP native benchmark); the standalone TEST leg pins
-        // Debug to skip the MSVC optimizer (pass 2), which can hit a `C1001` ICE on the
-        // very large generated test translation unit. Harmless under Mono.
+        // player, so the standalone leg validates the native configuration consumers
+        // actually run. Harmless under Mono.
         PlayerSettings.SetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone, Il2CppCompilerConfiguration.$CompilerConfiguration);
 
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
