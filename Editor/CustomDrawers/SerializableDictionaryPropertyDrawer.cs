@@ -945,7 +945,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 // Refusing to draw the rows is deliberate. Letting someone keep authoring entries
                 // into a value column that persists nothing is the actual harm, and the error is
                 // reported before the foldout so collapsing the dictionary cannot hide it.
-                if (HasDroppedValuesArray(propertyPair))
+                if (HasDroppedValuesArray(propertyPair, property))
                 {
                     EditorGUI.HelpBox(
                         position,
@@ -1448,7 +1448,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 GetListKey(property),
                 property
             );
-            if (HasDroppedValuesArray(serializationPair))
+            if (HasDroppedValuesArray(serializationPair, property))
             {
                 return GetDroppedBackingArrayHeight(
                     SerializableCollectionSerializationDiagnostics.BuildDroppedDictionaryValuesMessage(
@@ -2733,7 +2733,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         // where neither half exists, from being reported as a serialization failure it is not.
         // Resolving the boxed array is what makes a collection-valued dictionary stop reporting an
         // error, because that shape now round-trips.
-        private static bool HasDroppedValuesArray(CachedPropertyPair propertyPair)
+        private static bool HasDroppedValuesArray(
+            CachedPropertyPair propertyPair,
+            SerializedProperty dictionaryProperty
+        )
         {
             if (propertyPair.keysProperty == null)
             {
@@ -2763,12 +2766,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // entries yet" and "value type boxing cannot repair, so nothing is ever stored". They
             // are indistinguishable from the SerializedProperties alone: the keys array is not the
             // tell either, because OnAfterDeserialize nulls it whenever keys and values disagree,
-            // so the second case has no keys left after one round trip. Reporting nothing keeps a
-            // merely-empty dictionary from showing a false error; #357 tracks telling them apart by
-            // asking the runtime, which is the side that actually knows.
+            // so the second case has no keys left after one round trip. Ask the runtime instead --
+            // it computes the answer per closed generic and is the only side that knows (#357).
             if (valuesProperty.arraySize == 0)
             {
-                return false;
+                // Unresolvable instance (a disposed SerializedObject, a target the path cannot walk)
+                // means "unknown", and an unknown must not become an error on a dictionary that is
+                // merely empty -- that false report is exactly what #348 removed.
+                return GetDictionaryInstance(dictionaryProperty)
+                        is ISerializableDictionaryBoxedValues boxing
+                    && !boxing.UsesBoxedValues;
             }
 
             // Boxes exist, so boxing is active -- but it only helps when the boxed field is itself
@@ -2790,7 +2797,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         SerializableDictionarySerializedPropertyNames.Keys
                     ),
                     valuesProperty = ResolveValuesArray(dictionaryProperty),
-                }
+                },
+                dictionaryProperty
             );
         }
 

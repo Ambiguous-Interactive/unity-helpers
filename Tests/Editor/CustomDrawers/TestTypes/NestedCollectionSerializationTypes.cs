@@ -118,4 +118,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     public sealed class StringNestedListDictionary
         : SerializableDictionary<string, List<List<float>>> { }
+
+    /// <summary>
+    /// The sorted counterpart of <see cref="StringNestedListDictionary"/>. The sorted base has its
+    /// own boxing predicate and does not share a class hierarchy with the unsorted one, so the
+    /// Inspector's report for an unrepairable shape has to be proven on both.
+    /// </summary>
+    [Serializable]
+    public sealed class StringNestedListSortedDictionary
+        : SerializableSortedDictionary<string, List<List<float>>> { }
 }

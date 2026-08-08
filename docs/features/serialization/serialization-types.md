@@ -341,11 +341,16 @@ SerializableDictionary<RegionTierKey, float> byRegionAndTier;
 
 #### Sets are different
 
-`SerializableHashSet<List<T>>` and `SerializableSortedSet<List<T>>` still report the shape as
-unsupported. That is deliberate rather than pending: `List<T>` has reference equality, so a set of
-lists treats two lists with identical contents as two distinct elements, and deserializing one never
-reproduces the set you saved. Use `SerializableHashSet<SerializableList<T>>` only if you genuinely
-want identity semantics; otherwise the element type is the thing to reconsider.
+`SerializableHashSet<List<T>>` still reports the shape as unsupported. That is deliberate rather than
+pending: `List<T>` has reference equality, so a set of lists treats two lists with identical contents
+as two distinct elements, and deserializing one never reproduces the set you saved. Use
+`SerializableHashSet<SerializableList<T>>` only if you genuinely want identity semantics — the
+wrapper serializes, but it declares no value equality either, so `Contains` on a restored set is
+still false for an equal-content list. Otherwise the element type is the thing to reconsider.
+
+`SerializableSortedSet<List<T>>` does not arise at all: `SerializableSortedSet<T>` constrains
+`T : IComparable<T>`, and `List<T>` does not implement it, so the declaration is a compile error
+rather than something the Inspector has to report.
 
 `SerializableList<T>` remains available and is still the right choice when you want a list that draws
 and serializes on its own, outside a dictionary. It implements `IList<T>`, converts implicitly to and

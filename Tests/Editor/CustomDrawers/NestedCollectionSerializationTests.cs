@@ -285,8 +285,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 ),
                 Is.Null,
                 "Unity refuses List<List<float>>[] as it always has -- which is why nothing this "
-                    + "package does makes the shape work. The Inspector's own reporting for it is "
-                    + "tracked in #357."
+                    + "package does makes the shape work. The Inspector reports it; see "
+                    + "DictionaryDrawerReportsAValueTypeBoxingCannotRepair."
             );
         }
 
@@ -451,6 +451,51 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        // #357. The boxed array is DECLARED on every dictionary, so for a shape boxing cannot repair
+        // the drawer resolves a values property that is merely empty and used to report nothing --
+        // losing the only explanation a consumer gets for a column that persists no data. The
+        // runtime computes the answer per closed generic, so the drawer asks it.
+        [Test]
+        public void DictionaryDrawerReportsAValueTypeBoxingCannotRepair()
+        {
+            Assert.That(
+                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                    FindCollection(nameof(NestedCollectionSerializationHost.nestedListValues))
+                ),
+                Is.True,
+                "A List<List<float>> value serializes nowhere -- not in the plain array, not in a "
+                    + "box -- so the Inspector must say so instead of drawing an empty column."
+            );
+        }
+
+        [Test]
+        public void SortedDictionaryDrawerReportsAValueTypeBoxingCannotRepair()
+        {
+            Assert.That(
+                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                    FindCollection(nameof(NestedCollectionSerializationHost.sortedNestedListValues))
+                ),
+                Is.True,
+                "The sorted base has its own boxing predicate and no shared hierarchy with the "
+                    + "unsorted one, so it needs its own proof that the report reaches it."
+            );
+        }
+
+        // The other half of the #357 predicate, and the one #348 was filed about: an EMPTY
+        // dictionary of a supported collection value must stay silent. Both cases present the
+        // drawer with an empty boxed array, which is why the runtime has to be asked at all.
+        [Test]
+        public void DictionaryDrawerStaysSilentOnAnEmptyBoxedCollectionValue()
+        {
+            Assert.That(
+                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                    FindCollection(nameof(NestedCollectionSerializationHost.sortedDroppedValues))
+                ),
+                Is.False,
+                "An empty dictionary whose values DO round-trip must not be reported as broken."
+            );
+        }
+
         [Test]
         public void DictionaryDrawerAcceptsASupportedValueType()
         {
@@ -550,8 +595,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(message, Does.Not.Contain("SerializableList<T>"));
         }
 
+        // #354. Naming SerializableList<T> as the fix is only half true -- it serializes, but it
+        // keeps the reference equality that makes a set of collections the wrong model in the first
+        // place. The message has to point at the element type and say why, or it sends the reader
+        // to a wrapper that produces the same silent failure one layer down.
         [Test]
-        public void DroppedItemsMessageNamesTheField()
+        public void DroppedItemsMessagePointsAtTheElementTypeAndExplainsIdentity()
         {
             string message =
                 SerializableCollectionSerializationDiagnostics.BuildDroppedSetItemsMessage(
@@ -559,7 +608,36 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
             Assert.That(message, Does.Contain("Dropped Items"));
-            Assert.That(message, Does.Contain("SerializableList<T>"));
+            Assert.That(message, Does.Contain("element type is the thing to reconsider"));
+            Assert.That(message, Does.Contain("reference"));
+            Assert.That(message, Does.Contain("identity semantics"));
+        }
+
+        // #354. The consequence the guidance is built on, pinned so a later session cannot "fix"
+        // sets by giving them the dictionaries' boxing: the wrapper serializes, and the set is
+        // STILL useless, because every restored element is a new instance and SerializableList<T>
+        // compares by reference. Boxing would turn a shape that fails loudly at author time into
+        // one that fails silently at runtime.
+        [Test]
+        public void ARestoredSetOfListsDoesNotContainAnEqualContentList()
+        {
+            _host.wrappedItems.Add(new SerializableList<float> { 1f, 2f });
+
+            NestedCollectionSerializationHost restored = RoundTrip();
+
+            Assert.That(
+                restored.wrappedItems.Count,
+                Is.EqualTo(1),
+                "The wrapper is what makes the items array serialize at all; if this is 0 the test "
+                    + "below proves nothing about equality."
+            );
+            Assert.That(
+                restored.wrappedItems.Contains(new SerializableList<float> { 1f, 2f }),
+                Is.False,
+                "SerializableList<T> declares no value equality, so a restored set answers "
+                    + "Contains with reference identity. This is why sets of collections are "
+                    + "reported rather than repaired -- see #354 before adding boxing here."
+            );
         }
 
         private NestedCollectionSerializationHost RoundTrip()

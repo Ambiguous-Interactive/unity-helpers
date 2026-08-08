@@ -43,9 +43,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             return $"'{displayName}' cannot round-trip through Unity serialization: Unity refuses "
                 + "this element type -- most often a nested collection such as List<T> -- so the "
-                + "items array is never written and the set is always empty at runtime. For a list "
-                + "element, change the element type to SerializableList<T>. Otherwise wrap the "
-                + "element type in a [Serializable] class.";
+                + "items array is never written and the set is always empty at runtime. The "
+                + "element type is the thing to reconsider: a list compares by reference, so a set "
+                + "of lists already treats equal contents as distinct elements and a restored set "
+                + "contains none of the instances your code holds. Prefer a [Serializable] class "
+                + "element with value equality; use SerializableList<T> only when you genuinely "
+                + "want identity semantics.";
         }
     }
 }

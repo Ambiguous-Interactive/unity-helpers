@@ -61,7 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IReadOnlyDictionary<TKey, TValue>,
             ISerializationCallbackReceiver,
             IDeserializationCallback,
-            ISerializable
+            ISerializable,
+            ISerializableDictionaryBoxedValues
         where TKey : IComparable<TKey>
     {
         private const string KeysSerializationName = "Keys";
@@ -101,6 +102,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static readonly bool RequiresBoxedValues =
             IsCollectionUnityRefusesToNest(typeof(TValueCache))
             && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
+
+        bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
 
         private static bool IsCollectionUnityRefusesToNest(Type type)
         {

@@ -38,5 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         public DictionaryHashSet dictionaryItems = new();
 
         public StringNestedListDictionary nestedListValues = new();
+
+        public StringNestedListSortedDictionary sortedNestedListValues = new();
     }
 }
