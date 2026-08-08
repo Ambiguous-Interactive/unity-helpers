@@ -1954,6 +1954,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "A second disposal of scope2 took another live scope off the count"
             );
 
+            // scope1 opened the batch but scope3 is still live, so this really is an out-of-order
+            // disposal and the warning is correct. It did not fire before only because the extra
+            // decrement had already dropped the depth far enough for scope1 to look outermost.
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
+            );
             scope1.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1966,6 +1973,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Batching stopped while scope3 was still live"
             );
 
+            // Symmetrically, scope3 was not the outermost scope but is the one that brings the
+            // count to zero and performs the cleanup.
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
+            );
             scope3.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1974,8 +1987,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
             Assert.That(AssetDatabaseBatchHelper.IsCurrentlyBatching, Is.False);
 
-            // No warnings: every scope now decrements exactly once, in an order the counter agrees
-            // with, so there is no state mismatch left to report.
             LogAssert.NoUnexpectedReceived();
         }
 
