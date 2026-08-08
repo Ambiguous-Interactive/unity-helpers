@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
+    using System.Collections.Concurrent;
     using System.Threading;
     using System.Threading.Tasks;
 #endif
@@ -168,31 +169,121 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
         }
 
 #if !SINGLE_THREADED
+        // The one place two threads genuinely contend, so this has to be adversarial rather than
+        // merely concurrent. Threads spin on a release flag instead of a Barrier: a barrier's own
+        // synchronization scatters the wake-ups, which widens the gap between the racers and lets a
+        // deliberately non-atomic claim slip through unnoticed. Verified by mutation -- replacing
+        // the compare-and-swap with a read/compare/write fails this test, and did NOT fail the
+        // barrier version.
         [Test]
         public void ConcurrentClaimsOfOneLeaseElectOneWinner()
         {
-            for (int attempt = 0; attempt < 200; ++attempt)
+            const int Trials = 3000;
+            const int Racers = 4;
+            int totalWinners = 0;
+
+            for (int attempt = 0; attempt < Trials; ++attempt)
             {
                 DisposalLease lease = DisposalLeases.Acquire();
-                int claimed = 0;
+                int go = 0;
+                int winners = 0;
 
-                using Barrier barrier = new(4);
-                Task[] racers = new Task[4];
-                for (int i = 0; i < racers.Length; ++i)
+                Task[] racers = new Task[Racers];
+                for (int i = 0; i < Racers; ++i)
                 {
                     racers[i] = Task.Run(() =>
                     {
-                        barrier.SignalAndWait();
-                        if (lease.TryClaim())
+                        while (Volatile.Read(ref go) == 0)
                         {
-                            Interlocked.Increment(ref claimed);
+                            Thread.SpinWait(1);
+                        }
+
+                        if (lease.TryClaimWithoutRelease())
+                        {
+                            Interlocked.Increment(ref winners);
                         }
                     });
                 }
 
+                // Give the racers a chance to reach their spin loops before releasing them, so they
+                // arrive at the claim together rather than strung out behind task startup.
+                Thread.Yield();
+                Volatile.Write(ref go, 1);
                 Task.WaitAll(racers);
-                Assert.That(claimed, Is.EqualTo(1), $"attempt {attempt}");
+
+                totalWinners += Volatile.Read(ref winners);
+                DisposalLeases.Release(lease.SlotForTests);
             }
+
+            Assert.That(
+                totalWinners,
+                Is.EqualTo(Trials),
+                "Across all trials, each lease must be claimed by exactly one racer."
+            );
+        }
+
+        // The whole registry under contention: many threads acquiring, claiming and recycling at
+        // once, which is where a slot handed to two owners, a torn free list, or a lost generation
+        // would show up. Every acquire must produce exactly one claim, and no two threads may ever
+        // hold the same slot at the same time.
+        [Test]
+        public void ConcurrentAcquireAndClaimNeverHandsOneSlotToTwoOwners()
+        {
+            const int Threads = 8;
+            const int PerThread = 5_000;
+            int claimed = 0;
+            int doubleClaimed = 0;
+            ConcurrentDictionary<int, int> liveSlots = new();
+
+            Task[] workers = new Task[Threads];
+            for (int t = 0; t < Threads; ++t)
+            {
+                int id = t;
+                workers[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < PerThread; ++i)
+                    {
+                        DisposalLease lease = DisposalLeases.Acquire();
+                        int slot = lease.SlotForTests;
+
+                        // Two owners of one slot at the same moment is the failure this whole
+                        // design exists to prevent, and it would be invisible from claim counts
+                        // alone.
+                        if (!liveSlots.TryAdd(slot, id))
+                        {
+                            Interlocked.Increment(ref doubleClaimed);
+                        }
+
+                        DisposalLease copy = lease;
+                        int wins = 0;
+                        if (lease.TryClaimWithoutRelease())
+                        {
+                            ++wins;
+                        }
+                        if (copy.TryClaimWithoutRelease())
+                        {
+                            ++wins;
+                        }
+
+                        liveSlots.TryRemove(slot, out int _);
+                        DisposalLeases.Release(slot);
+
+                        if (wins == 1)
+                        {
+                            Interlocked.Increment(ref claimed);
+                        }
+                    }
+                });
+            }
+
+            Task.WaitAll(workers);
+
+            Assert.That(doubleClaimed, Is.Zero, "One slot was live on two threads at once.");
+            Assert.That(
+                claimed,
+                Is.EqualTo(Threads * PerThread),
+                "Some acquire did not produce exactly one winning claim."
+            );
         }
 
         // Slots are recycled per thread, so leases acquired on one thread and claimed on another

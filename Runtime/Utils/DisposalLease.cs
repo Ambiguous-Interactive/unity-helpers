@@ -64,6 +64,26 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
+        /// The slot behind this lease, so a test can assert on ownership. Not part of the disposal
+        /// contract.
+        /// </summary>
+        internal int SlotForTests
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _slot;
+        }
+
+        /// <summary>
+        /// Claims without recycling the slot, so a test can control exactly when it becomes
+        /// reusable and observe who holds it in between.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool TryClaimWithoutRelease()
+        {
+            return _slot != 0 && DisposalLeases.TryClaim(_slot, _generation);
+        }
+
+        /// <summary>
         /// Claims the right to dispose and hands the slot back for reuse, for the one copy still
         /// holding the current generation.
         /// </summary>
@@ -164,6 +184,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </list>
         /// The store-release pairs with the interlocked read-modify-write in
         /// <see cref="TryClaim"/>, so a lease handed to another thread sees the new generation.
+        /// <para>
+        /// The one thing to check when changing this: no outstanding lease may hold the generation
+        /// being written. It cannot, because the winning claim that freed this slot set the
+        /// generation to <c>g + 1</c> while every lease outstanding on it held at most <c>g</c>, and
+        /// nothing has since handed out a lease at <c>g + 1</c> — this call is the first. A stale
+        /// claim therefore fails its compare-and-swap rather than racing this write.
+        /// </para>
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static DisposalLease Acquire()
@@ -175,13 +202,21 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
+#if SINGLE_THREADED
+                slot = _nextNewSlot++;
+#else
                 slot = Interlocked.Increment(ref _nextNewSlot) - 1;
+#endif
                 EnsureBlock(slot >> BlockShift);
             }
 
             ref long generation = ref GenerationRef(slot);
             long acquired = generation + 1;
+#if SINGLE_THREADED
+            generation = acquired;
+#else
             Volatile.Write(ref generation, acquired);
+#endif
             return new DisposalLease(slot, acquired);
         }
 
@@ -191,23 +226,54 @@ namespace WallstopStudios.UnityHelpers.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static long CurrentGeneration(int slot)
         {
+#if SINGLE_THREADED
+            return GenerationRef(slot);
+#else
             return Interlocked.Read(ref GenerationRef(slot));
+#endif
         }
 
         /// <summary>
         /// Advances the generation past <paramref name="generation"/>, for the one claimer still
         /// holding it.
         /// </summary>
+        /// <remarks>
+        /// This is the only place two threads can contend, and it is the one place that must not be
+        /// resolved by anything weaker than a compare-and-swap: copies of a lease are exactly the
+        /// callers racing here, and electing more than one winner is the defect being prevented.
+        /// Under <c>SINGLE_THREADED</c> there is no second thread to race, and the package strips
+        /// synchronization there as it does in its pools.
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool TryClaim(int slot, long generation)
         {
+#if SINGLE_THREADED
+            ref long current = ref GenerationRef(slot);
+            if (current != generation)
+            {
+                return false;
+            }
+
+            current = generation + 1;
+            return true;
+#else
             return Interlocked.CompareExchange(ref GenerationRef(slot), generation + 1, generation)
                 == generation;
+#endif
         }
 
         /// <summary>
         /// Puts a slot back on the calling thread's free list.
         /// </summary>
+        /// <remarks>
+        /// Deliberately unsynchronized, and it does not need to be. <c>_freeHead</c> is
+        /// <see cref="ThreadStaticAttribute"/>, so this touches only the calling thread's own list
+        /// and no other thread can observe it. The <c>_freeNext</c> links live in a shared array,
+        /// but two threads can never write the same entry: a slot reaches here only through a
+        /// winning <see cref="TryClaim"/>, and the compare-and-swap elects exactly one winner, so
+        /// at most one thread owns any given slot at any moment. Distinct <c>int</c> elements of an
+        /// array are independent and aligned, so there is nothing left to tear.
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Release(int slot)
         {
