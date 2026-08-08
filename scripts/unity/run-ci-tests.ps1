@@ -76,14 +76,27 @@ param(
 
     [switch]$ReleasePlayerBuild,
 
-    # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
-    # both the default and what CI passes: it is what a shipped player runs, so it is
-    # what the IL2CPP-compat leg should validate, and the unoptimized alternative is
-    # expensive -- the standalone legs execute the same suite roughly 2x slower than
-    # the editor's Mono JIT does. 'Debug' skips the MSVC optimizer (pass 2), which has
-    # historically hit a `C1001` ICE on the very large generated test translation unit;
-    # keep it as the documented escape hatch if that ICE returns (a failed C++ compile
-    # is caught by the GameAssembly.dll freshness check, not silently green-lit).
+    # IL2CPP C++ compiler configuration for the standalone player build. The standalone
+    # leg pins 'Debug'; everything else uses 'Release'.
+    #
+    # 'Debug' is NOT the free choice -- it costs real time, because the standalone legs
+    # execute the same suite roughly 2x slower than the editor's Mono JIT (run
+    # 31221618477: 2021.3 203.3s vs 91.7s, 6000.3 314.1s vs 122.1s) -- and it means the
+    # leg validates a native configuration no shipped player uses. It is pinned anyway
+    # because 'Release' does not build. Re-measured 2026-08-08 on run 31280555886
+    # rather than inherited from #261's undated note:
+    #
+    #   WallstopStudios.UnityHelpers.Tests.Runtime__13.cpp(8962):
+    #       fatal error C1001: Internal compiler error.
+    #
+    # MSVC 14.51.36231 (VS 2026) at /Ox, Unity 6000.5.2f1, with the SSA common-
+    # subexpression workaround flag already on the command line. Note the translation unit: it is the TEST assembly's generated C++, not
+    # the package's -- so this is a property of compiling 8,700 tests into one player,
+    # and a consumer's own IL2CPP Release build is not implicated. Before trying
+    # 'Release' again, check whether that file still ICEs on a newer MSVC; a failed C++
+    # compile fails loudly via the GameAssembly.dll freshness check rather than being
+    # green-lit, so the experiment is cheap to repeat and unambiguous.
+    #
     # Inert for editmode/playmode and Mono (no IL2CPP player is built).
     [ValidateSet('Release', 'Debug')]
     [string]$Il2CppCompilerConfiguration = 'Release',
@@ -1256,9 +1269,10 @@ public static class UhCiTestConfigurator
         PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Disabled);
         // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
         // An ephemeral CI project has no committed default, so the pin removes the
-        // variable instead of trusting any implicit default. Release matches a shipped
-        // player, so the standalone leg validates the native configuration consumers
-        // actually run. Harmless under Mono.
+        // variable instead of trusting any implicit default. The standalone leg passes
+        // Debug because Release ICEs MSVC on the generated test C++ -- see the
+        // -Il2CppCompilerConfiguration parameter docs for the run and the exact file.
+        // Harmless under Mono.
         PlayerSettings.SetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone, Il2CppCompilerConfiguration.$CompilerConfiguration);
 
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
