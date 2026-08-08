@@ -6,6 +6,16 @@ updates:
   # .github/actions/return-unity-license/action.yml on an older central cleanup
   # classifier than the workflows, which fails the Unity lock contract because
   # the return action must delegate to the exact classifier the workflows use.
+  #
+  # The organization build-lock actions are grouped SEPARATELY from everything
+  # else. They gate the Unity legs, and Dependabot's own runs carry no
+  # organization secrets, so `matrix-config` skips every licensed tier and the
+  # legs never execute -- #334 reported 42 green checks while carrying a bump
+  # that reddens all twelve of them (#356). Grouped together, one unverifiable
+  # build-lock bump holds every routine third-party bump hostage indefinitely,
+  # because each rebase re-proposes it. Split, the third-party PR is decided by
+  # CI that actually ran, and the build-lock PR is the one a human must re-run
+  # on a credentialed branch before merging.
   - package-ecosystem: "github-actions"
     directories:
       - "/"
@@ -13,9 +23,14 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      organization-build-lock:
+        patterns:
+          - "Ambiguous-Interactive/ambiguous-organization-build-lock*"
       all-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "Ambiguous-Interactive/ambiguous-organization-build-lock*"
     assignees:
       - wallstop
     reviewers:
