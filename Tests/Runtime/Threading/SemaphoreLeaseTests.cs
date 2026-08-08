@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
 {
     using System;
     using System.Collections;
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
@@ -87,28 +88,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         }
 
         [Test]
-        public void DisposingACopiedLeaseIsSwallowedWhenTheMaximumIsExplicit()
+        public void DisposingACopiedLeaseReleasesOnceWhenTheMaximumIsExplicit()
         {
             using SemaphoreSlim semaphore = new(1, 1);
             SemaphoreLease lease = semaphore.Acquire();
-            // Copying is documented as forbidden. With an explicit maximum, doing it anyway degrades
-            // to a no-op: the extra release throws SemaphoreFullException and Dispose swallows it.
             SemaphoreLease copy = lease;
 
             lease.Dispose();
 
+            // The permit is released exactly once between the two copies. This used to survive only
+            // because the second release threw SemaphoreFullException and Dispose swallowed it --
+            // an accident of the explicit maximum, not a guarantee. There is no second release now.
             Assert.DoesNotThrow(() => copy.Dispose());
             Assert.AreEqual(1, semaphore.CurrentCount);
         }
 
+        // The case that used to be genuinely unsafe, and the reason the lease exists.
+        // new SemaphoreSlim(1) has a maximum of int.MaxValue, so a second release SUCCEEDS: nothing
+        // throws, nothing is swallowed, and the count silently rises to 2, admitting a second caller
+        // to a section built for one. A per-copy disposal flag cannot prevent that, because the copy
+        // carries its own. A DisposalLease can, because the state it reads lives outside the struct.
         [Test]
-        public void DisposingACopiedLeaseInflatesACountWithNoExplicitMaximum()
+        public void DisposingACopiedLeaseDoesNotInflateACountWithNoExplicitMaximum()
         {
-            // The unhappy half of the pair, pinned because the docs used to claim a guarantee that
-            // only ever held for the bounded case. new SemaphoreSlim(1) has a maximum of
-            // int.MaxValue, so the copy's release SUCCEEDS -- nothing throws, nothing is swallowed,
-            // and a second caller is now admitted to a section built for one. Per-lease disposal
-            // tracking cannot prevent this: the copy carries its own flags.
             using SemaphoreSlim semaphore = new(1);
             SemaphoreLease lease = semaphore.Acquire();
             SemaphoreLease copy = lease;
@@ -116,7 +118,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
             lease.Dispose();
             copy.Dispose();
 
-            Assert.AreEqual(2, semaphore.CurrentCount);
+            Assert.AreEqual(1, semaphore.CurrentCount);
+        }
+
+        [TestCase(2)]
+        [TestCase(5)]
+        [TestCase(16)]
+        public void ManyCopiesOfALeaseStillReleaseOnce(int copies)
+        {
+            using SemaphoreSlim semaphore = new(1);
+            SemaphoreLease lease = semaphore.Acquire();
+            List<SemaphoreLease> duplicates = new(copies);
+            for (int i = 0; i < copies; ++i)
+            {
+                duplicates.Add(lease);
+            }
+
+            lease.Dispose();
+            foreach (SemaphoreLease duplicate in duplicates)
+            {
+                duplicate.Dispose();
+            }
+
+            Assert.AreEqual(1, semaphore.CurrentCount);
+        }
+
+        // IsHeld now answers for every copy at once, rather than per copy.
+        [Test]
+        public void ACopyReportsNotHeldOnceAnotherCopyHasReleased()
+        {
+            using SemaphoreSlim semaphore = new(1, 1);
+            SemaphoreLease lease = semaphore.Acquire();
+            SemaphoreLease copy = lease;
+
+            Assert.IsTrue(copy.IsHeld);
+
+            lease.Dispose();
+
+            Assert.IsFalse(copy.IsHeld);
+            Assert.IsFalse(lease.IsHeld);
         }
 
         [Test]
