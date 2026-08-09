@@ -362,6 +362,14 @@ package-lock.json.meta
 Samples~/**/*.rsp
 Samples~/**/*.rsp.meta
 
+# The Roslyn source generator's own sources. The trailing ~ keeps Unity from compiling them (they
+# target netstandard2.0 and reference Microsoft.CodeAnalysis, which no Unity assembly may see); the
+# rule above it, `*~`, would otherwise drop the whole project from the repository.
+!Generator~/
+!Generator~/**
+Generator~/**/bin/**
+Generator~/**/obj/**
+
 PLAN.md*
 BACKUP_PLAN.md*
 

@@ -875,9 +875,9 @@ int payloadSize =
 
 ### Annotating your own contracts
 
-The attributes describe a contract for the (not yet shipped) generator. Field numbers are the wire
-contract; `Name` is not written to the wire at all, and exists so a schema, a diagnostic, or a payload
-dump does not change meaning when you rename a C# member:
+Annotate a type and a formatter is generated for it, in your assembly, at your build. Field numbers
+are the wire contract; `Name` is not written to the wire at all, and exists so a schema, a
+diagnostic, or a payload dump does not change meaning when you rename a C# member:
 
 ```csharp
 [WProtoContract(Name = "player_state")]
@@ -903,16 +903,51 @@ formatters are emitted as a nested type of the contract, which is why the contra
 `[WProtoAfterDeserialization]` runs only after a **successful** read, so a corrupt payload reports
 failure instead of handing back an object whose derived state was rebuilt from half-written members.
 
+### The generator
+
+The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset, so it runs on
+**your** assemblies as well as its own — including `Assembly-CSharp`. Nothing needs installing and
+nothing needs registering: a `[WProtoContract]` in your code gets a nested `WProtoFormatter` and an
+entry in a generated registrar that runs at `RuntimeInitializeLoadType.BeforeSceneLoad`.
+
+Supported member types today are the integer and floating-point primitives, `bool`, `string`,
+`byte[]`, enums, and `Nullable<T>` of any of those. Anything else is a **build error naming the type,
+the member and the remedy**, never a silent skip — a contract that quietly got no formatter would
+surface as an exception from the first save in a shipped player:
+
+| Code        | Meaning                                                                              |
+| ----------- | ------------------------------------------------------------------------------------ |
+| `WPROTO001` | The contract, or a type enclosing it, is not `partial`                               |
+| `WPROTO002` | Two members claim the same field number                                              |
+| `WPROTO003` | A member's type is not supported yet                                                 |
+| `WPROTO004` | A field number is outside 1-536,870,911, or inside the reserved 19000-19999          |
+| `WPROTO005` | A lifecycle hook sits on a type with no `[WProtoContract]`, so nothing calls it      |
+| `WPROTO006` | Two methods carry the same lifecycle attribute                                       |
+| `WPROTO007` | A member is read-only, so a decoded value cannot be assigned to it                   |
+| `WPROTO008` | A lifecycle hook is static, or takes parameters                                      |
+| `WPROTO009` | The contract is generic (not implemented yet)                                        |
+| `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
+| `WPROTO011` | A class contract has no parameterless constructor to read into                       |
+
+Two shapes are deliberately still out of scope and report a diagnostic rather than guessing: a member
+whose type is another contract, and a generic contract.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
 field on a closed generic type, so it costs a field read and IL2CPP compiles it ahead of time like any
 other generic call — there is no dictionary keyed by `Type` and no `MakeGenericType`:
 
-```csharp
-WProtoBuiltInFormatters.RegisterAll();                        // the package's own contracts
+Registration is automatic. The package registers its own formatters at
+`RuntimeInitializeLoadType.SubsystemRegistration`, the earliest phase Unity runs, and generated
+registrars run at `BeforeSceneLoad` -- so a formatter you register yourself, from any later phase,
+always wins. `Register<T>` is last-wins, and that ordering is the guarantee that makes it useful.
 
-WProtoFormatterProvider.Register(PlayerState.WProtoFormatter.Instance);   // yours
+```csharp
+// Nothing to call: the package's formatters and every generated one are already registered.
+// Outside a Unity runtime -- a plain dotnet test harness, say -- call WProtoBuiltInFormatters.RegisterAll().
+
+WProtoFormatterProvider.Register(new MyHandWrittenFormatter());   // overrides whatever was there
 
 IWProtoFormatter<PlayerState> formatter = WProtoFormatterProvider.Get<PlayerState>();
 int size = formatter.Measure(state);
@@ -925,8 +960,7 @@ formatter.Write(ref writer, state);
 alternative under IL2CPP is an `ExecutionEngineException` from inside the runtime that names nothing.
 
 Formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`. `Serializer` does
-not use them yet; they exist so the wire model is proven against real contracts before the generator
-is written.
+not use them yet; they exist so the wire model is proven against real contracts.
 
 ### Hostile payloads
 
@@ -937,6 +971,22 @@ caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 
 Failure propagates through return values, not through the outermost reader's `Malformed` flag: a
 refused nested read is reported by the nested reader, and each caller's job is to stop.
+
+A formatter reading a nested contract should call `reader.TryReadMessage(formatter, out T value)`,
+which descends and decodes in one call and applies the bound for free. Reading the payload with
+`TryReadBytes` and constructing a reader over it with the single-argument constructor restarts the
+depth count at zero at every level, which removes the bound entirely for that subtree while
+round-tripping perfectly well. A formatter that must build its own reader should pass the parent —
+`new WProtoReader(payload, in reader)` — which is the only way to name a depth, and therefore cannot
+understate one.
+
+A formatter reading a nested contract should call
+`reader.TryReadMessage(formatter, out T value)`, which descends and decodes in one call and applies
+the bound for free. Reading the payload with `TryReadBytes` and constructing a reader over it with
+the single-argument constructor restarts the depth count at zero at every level, which removes the
+bound entirely for that whole subtree while round-tripping perfectly well. A formatter that must
+build its own reader should pass the parent -- `new WProtoReader(payload, in reader)` -- which is the
+only way to name a depth, and therefore cannot understate one.
 
 ### Wire compatibility
 

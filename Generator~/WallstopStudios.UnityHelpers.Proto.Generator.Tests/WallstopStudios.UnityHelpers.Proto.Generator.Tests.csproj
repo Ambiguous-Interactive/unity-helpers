@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Compiled from the repository root so the generator sees the same sources Unity does. -->
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The real serializer, not a copy. The bootstrap is excluded because it is the one file that
+         references UnityEngine, and the Unity-free compilation is exactly what makes this harness
+         possible. -->
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/*.cs"
+      Exclude="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBootstrap.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBuiltInFormatters.cs"
+    />
+    <Compile Include="*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Referenced the way Unity references it: as an analyzer, not as a library. The formatters
+         under test are the generator's own output, compiled into this assembly. It is also
+         referenced normally, so the diagnostic tests can drive it through a Roslyn
+         GeneratorDriver over a synthetic consumer compilation. -->
+    <ProjectReference
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="true"
+    />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+</Project>

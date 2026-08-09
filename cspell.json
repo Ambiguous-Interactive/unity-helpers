@@ -856,7 +856,9 @@
         "zigzag",
         "MSVC",
         "vswhere",
-        "EAGAIN"
+        "EAGAIN",
+        "nologo",
+        "cmp"
       ]
     }
   ],

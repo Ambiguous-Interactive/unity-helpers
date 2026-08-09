@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- netstandard2.0 is what Unity's compiler loads analyzers as, on every version this package
+         supports. -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsPackable>false</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <AssemblyName>WallstopStudios.UnityHelpers.Proto.Generator</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers.Proto.Generator</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <!-- RS2008 wants an AnalyzerReleases.*.md ledger, which is for analyzer packages published on
+         NuGet with a release cadence; this generator ships inside the package it belongs to.
+         RS1032 objects to the multi-clause diagnostic messages, and those messages are the whole
+         point: a contract that cannot be serialized has to say what to do about it. -->
+    <NoWarn>$(NoWarn);RS2008;RS1032</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 3.8 deliberately, not 4.x. Unity 2021.3 ships Roslyn 3.9 and cannot load an analyzer built
+         against 4.x at all, nor run an IIncrementalGenerator, which did not exist yet. Compiling
+         against 3.8 produces an ISourceGenerator every Unity version this package supports can
+         run. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference
+      Include="Microsoft.CodeAnalysis.Analyzers"
+      Version="3.3.4"
+      PrivateAssets="all"
+    />
+  </ItemGroup>
+</Project>

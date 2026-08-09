@@ -1,0 +1,60 @@
+name: WallstopProto Generator
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Generator~/**"
+      - "Runtime/Analyzers/**"
+      - "Runtime/Core/Serialization/WallstopProto/**"
+      - ".github/workflows/wproto-generator.yml"
+  pull_request:
+    paths:
+      - "Generator~/**"
+      - "Runtime/Analyzers/**"
+      - "Runtime/Core/Serialization/WallstopProto/**"
+      - ".github/workflows/wproto-generator.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Build the generator
+        run: dotnet build "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" -c Release --nologo
+
+      - name: Verify the shipped analyzer matches its sources
+        # The DLL under Runtime/Analyzers is what Unity actually loads; the sources beside it are
+        # what a reviewer reads. A build that drifts from the binary means the reviewed code is not
+        # the code that runs, which no amount of test coverage would catch.
+        run: |
+          set -euo pipefail
+          built="Generator~/WallstopStudios.UnityHelpers.Proto.Generator/bin/Release/netstandard2.0/WallstopStudios.UnityHelpers.Proto.Generator.dll"
+          shipped="Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll"
+          if ! cmp -s "$built" "$shipped"; then
+            echo "::error::$shipped is stale. Rebuild and copy it:"
+            echo "  dotnet build \"Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj\" -c Release"
+            echo "  cp \"$built\" \"$shipped\""
+            exit 1
+          fi
+          echo "Shipped analyzer is byte-identical to a fresh build."
+
+      - name: Test the generator
+        # The test project references the generator as an analyzer, exactly as Unity does, so the
+        # formatters under test are the generator's own output rather than a transcription of it.
+        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo
