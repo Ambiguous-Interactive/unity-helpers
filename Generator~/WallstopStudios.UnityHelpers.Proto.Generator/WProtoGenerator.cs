@@ -166,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            if (contract.IsGenericType)
+            if (IsGenericAnywhere(contract))
             {
                 context.ReportDiagnostic(
                     Diagnostic.Create(
@@ -736,6 +736,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (IMethodSymbol constructor in contract.InstanceConstructors)
             {
                 if (constructor.Parameters.Length == 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Reports whether the contract, or any type enclosing it, takes type parameters.
+        /// </summary>
+        /// <remarks>
+        /// The enclosing types matter as much as the contract: the formatter is emitted by reopening
+        /// every one of them as <c>partial</c>, and a reopened declaration that drops its type
+        /// parameters does not compile. A diagnostic beats a generated file that breaks the build
+        /// somewhere the developer never wrote.
+        /// </remarks>
+        private static bool IsGenericAnywhere(INamedTypeSymbol symbol)
+        {
+            for (
+                INamedTypeSymbol current = symbol;
+                current != null;
+                current = current.ContainingType
+            )
+            {
+                if (current.IsGenericType)
                 {
                     return true;
                 }

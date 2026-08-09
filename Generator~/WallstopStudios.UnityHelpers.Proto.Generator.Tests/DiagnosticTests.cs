@@ -180,6 +180,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AContractNestedInsideAGenericTypeIsARefusalToo()
+        {
+            // The contract itself is not generic; the type it is nested in is. The formatter is
+            // emitted by reopening every enclosing type as partial, and a reopened declaration that
+            // drops its type parameters does not compile -- so this has to be caught here rather
+            // than surface as a compile error in a file the developer never wrote.
+            AssertDiagnostic(
+                "WPROTO009",
+                "Inner",
+                @"public static partial class Holder<T>
+                  {
+                      [WProtoContract] public sealed partial class Inner
+                      {
+                          [WProtoMember(1)] public int Value;
+                      }
+                  }"
+            );
+        }
+
+        [Test]
         public void AValidContractProducesNoDiagnosticsAtAll()
         {
             ImmutableArray<Diagnostic> diagnostics = Run(
