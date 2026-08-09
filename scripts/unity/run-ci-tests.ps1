@@ -108,13 +108,31 @@ param(
     #
     # Same compiler file and line as run 31280555886, so it is the same optimizer defect.
     # The line numbers moved (8962 -> 18446/5076) because the generated C++ shifted when
-    # tests were added, not because anything in our source provokes it. unity-tests.yml
-    # is back to pinning 'Debug' for standalone.
+    # tests were added, not because anything in our source provokes it.
     #
-    # Do NOT retry 'Release' on a toolset in the 14.51.x family; the next retry is worth
-    # making only when the runners carry a different MAJOR toolset, and the diagnostics
-    # print each installation's default MSVC so the log says which compiler produced the
-    # verdict before the experiment costs four legs. See #374.
+    # STEERING THE TOOLSET WAS TRIED AND IS DISPROVEN. Both runners carry 14.42.34433
+    # and 14.44.35207 beside the crashing 14.51.36231, which is merely the DEFAULT of the
+    # Visual Studio 2026 installation Unity resolves -- so f4d1d040 set the environment
+    # variable VCToolsVersion=14.44.35207 on every tier and restored 'Release'.
+    #
+    # Run 31288591021 answered it. The variable WAS set (it is in the job log), and the
+    # compiler that ran anyway was:
+    #
+    #   ...\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe
+    #
+    # followed by the same C1001, twice. VCToolsVersion is an MSBuild/vcvars mechanism;
+    # Bee resolves cl.exe itself and invokes it by absolute path, so the variable never
+    # reaches the compile. The env var has been removed rather than left inert, because a
+    # no-op that looks load-bearing is worse than no attempt at all.
+    #
+    # That leaves 'Debug' for standalone as the only lever that works from inside this
+    # repo, and unity-tests.yml pins it. Levers that would work but need administrator
+    # access on the runner: edit each installation's Microsoft.VCToolsVersion.default.txt,
+    # or remove the VS 2026 C++ workload so Unity resolves an older installation.
+    #
+    # The general lesson, and the reason the check is written down: confirm which compiler
+    # actually ran from the cl.exe path in the log, never from the env var being set. The
+    # two disagreed here, and only the log said so.
     #
     # Inert for editmode/playmode and Mono (no IL2CPP player is built).
     [ValidateSet('Release', 'Debug')]
