@@ -146,9 +146,27 @@ param(
     #     v145 component from VS 2026, or remove its C++ workload so Unity resolves the
     #     2022 Build Tools installation, whose highest is 14.44.35207.
     #
-    # Until then standalone stays on 'Debug'. The one untried in-repo lever is
-    # PlayerSettings.SetAdditionalIl2CppArgs with --compiler-flags="/O1", which the
-    # generated configurator can set without touching the runner at all. See #374.
+    # THE DIRECTORY IS GONE (2026-08-09). 14.51.36231 was removed from both runners --
+    # uninstalling the component alone did not delete it, so the directory was removed by
+    # hand, and the C++ workload was then reinstalled on every Visual Studio. Both hosts
+    # now top out at 14.44.35207. 'Release' is pinned again to test the one hypothesis
+    # that survives: Bee takes the highest directory, and the highest is no longer the
+    # one that ICEs.
+    #
+    # Known wrinkle, believed harmless: VS 2026's Microsoft.VCToolsVersion.default.txt
+    # still names 14.51.36231, a directory that no longer exists. Bee is measured not to
+    # read that file (run 31290048422), so it should not matter -- but if a leg fails
+    # with a missing-toolset error rather than C1001, that dangling default is the first
+    # suspect, and repointing it to 14.44.35207 is the fix.
+    #
+    # Check msvc-toolchains.txt in the artifact before the build result, as always: it
+    # reports the installed directories, so it says whether the removal survived the
+    # workload reinstall independently of whether the compile succeeded.
+    #
+    # If this ICEs on 14.44, the toolset is exonerated entirely and the defect is not
+    # version-specific. Set both call sites in unity-tests.yml back to
+    # `${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}` and the remaining
+    # lever is PlayerSettings.SetAdditionalIl2CppArgs with --compiler-flags="/O1". See #374.
     #
     # THE DEFAULT FILE IS IGNORED TOO. The administrator repoint landed -- run 31290048422
     # shows, on the very host that then failed:
