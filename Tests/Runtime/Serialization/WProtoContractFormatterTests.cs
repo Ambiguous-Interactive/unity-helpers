@@ -232,6 +232,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void GroupNestingIsBudgetedTogetherWithSubMessageNesting()
+        {
+            // A reader that is already deep inside sub-messages must not get a fresh group budget:
+            // MaxNestingDepth groups at each of MaxNestingDepth sub-message levels is a product,
+            // and the product is what overflows the stack the two kinds of nesting share.
+            int deepest = 0;
+            byte[] payload = BuildNesting(WProtoReader.MaxNestingDepth - 1, BuildGroupNesting(4));
+            WProtoReader reader = new(payload);
+
+            Assert.IsFalse(TryWalkNesting(ref reader, ref deepest));
+            Assert.AreEqual(WProtoReader.MaxNestingDepth - 1, deepest);
+        }
+
+        [Test]
         public void ASubMessageNestingBombIsRefusedRatherThanRecursed()
         {
             // A few kilobytes describe two thousand levels. A formatter reads a sub-message by
@@ -415,7 +429,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </remarks>
         private static byte[] BuildNesting(int depth)
         {
-            byte[] payload = Array.Empty<byte>();
+            return BuildNesting(depth, Array.Empty<byte>());
+        }
+
+        /// <summary>Wraps <paramref name="innermost"/> in <paramref name="depth"/> sub-messages.</summary>
+        private static byte[] BuildNesting(int depth, byte[] innermost)
+        {
+            byte[] payload = innermost;
             for (int level = 0; level < depth; level++)
             {
                 int lengthSize = WProtoSizes.Varint32Size((uint)payload.Length);
@@ -432,6 +452,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                 next[cursor++] = (byte)remainingLength;
                 Array.Copy(payload, 0, next, cursor, payload.Length);
+                payload = next;
+            }
+
+            return payload;
+        }
+
+        /// <summary>Builds <paramref name="depth"/> nested groups on field 2, innermost empty.</summary>
+        private static byte[] BuildGroupNesting(int depth)
+        {
+            byte[] payload = Array.Empty<byte>();
+            for (int level = 0; level < depth; level++)
+            {
+                byte[] next = new byte[payload.Length + 2];
+                next[0] = (byte)((2 << 3) | WProtoWireType.StartGroup);
+                Array.Copy(payload, 0, next, 1, payload.Length);
+                next[payload.Length + 1] = (byte)((2 << 3) | WProtoWireType.EndGroup);
                 payload = next;
             }
 

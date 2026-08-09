@@ -467,7 +467,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TrySkipField(int fieldNumber, int wireType)
         {
-            return TrySkipField(fieldNumber, wireType, 0);
+            // Group skipping continues from this reader's own nesting rather than restarting at
+            // zero, because the two kinds of nesting share one stack. Restarting would let a
+            // payload buy MaxNestingDepth group frames at every one of MaxNestingDepth sub-message
+            // levels, and the product is what actually overflows.
+            return TrySkipField(fieldNumber, wireType, _depth);
         }
 
         private bool TrySkipField(int fieldNumber, int wireType, int depth)
