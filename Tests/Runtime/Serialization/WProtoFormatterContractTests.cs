@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     [NUnit.Framework.Category("Serialization")]
-    public sealed class WProtoFormatterContractTests
+    public sealed partial class WProtoFormatterContractTests
     {
         [Test]
         public void SerializationHooksRunInOrderAndExactlyOnce()
@@ -150,8 +150,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// <summary>
         /// A consumer-shaped contract: private state, private hooks, and a nested formatter.
         /// </summary>
+        /// <remarks>
+        /// <c>partial</c> because <c>[WProtoContract]</c> means "generate a formatter for me", and
+        /// the generator emits it nested so it can reach these private members. The hand-written
+        /// <see cref="Formatter"/> below stays: it exposes <c>LastAttempted</c> so a test can inspect
+        /// the instance an abandoned read built, which generated code has no reason to surface. The
+        /// generated formatter is the one registered with <c>WProtoFormatterProvider</c>; nothing
+        /// here resolves through it, and every test names the formatter it means.
+        /// </remarks>
         [WProtoContract(Name = "player_state")]
-        internal sealed class HookedMessage
+        internal sealed partial class HookedMessage
         {
             /// <summary>The private member's name, so the test below carries no magic string.</summary>
             internal const string HealthFieldName = nameof(_health);

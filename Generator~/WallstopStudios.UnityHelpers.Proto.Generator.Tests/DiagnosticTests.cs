@@ -200,6 +200,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AContractNestedInAFixtureWithItsOwnHandWrittenFormatterIsAccepted()
+        {
+            // The shape of WProtoFormatterContractTests.HookedMessage, which is what actually broke
+            // the Unity legs the first time the analyzer shipped: a contract nested inside a test
+            // fixture, with private members, private hooks, and a hand-written formatter of its own.
+            // Every enclosing type has to be partial too, and a hand-written nested formatter must
+            // not be mistaken for a conflict.
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public sealed partial class Fixture
+                  {
+                      [WProtoContract(Name = ""player_state"")]
+                      internal sealed partial class Hooked
+                      {
+                          [WProtoMember(1, Name = ""health"")] private int _health;
+                          [WProtoMember(2, Name = ""label"")] private string _label;
+                          [WProtoIgnore] private string _derived;
+
+                          internal Hooked() { }
+                          internal Hooked(int health) { _health = health; }
+
+                          [WProtoBeforeSerialization] private void OnBeforeSerialization() { }
+                          [WProtoAfterSerialization] private void OnAfterSerialization() { }
+                          [WProtoBeforeDeserialization] private void OnBeforeDeserialization() { }
+                          [WProtoAfterDeserialization] private void OnAfterDeserialization() { _derived = _label; }
+
+                          internal sealed class Formatter : IWProtoFormatter<Hooked>
+                          {
+                              public int Measure(in Hooked value) { return 0; }
+                              public bool Write(ref WProtoWriter writer, in Hooked value) { return true; }
+                              public bool TryRead(ref WProtoReader reader, out Hooked value) { value = null; return true; }
+                          }
+                      }
+                  }"
+            );
+
+            Assert.IsEmpty(
+                diagnostics.Where(d => d.Id.StartsWith("WPROTO", StringComparison.Ordinal)),
+                string.Join("; ", diagnostics.Select(d => d.ToString()))
+            );
+        }
+
+        [Test]
         public void AValidContractProducesNoDiagnosticsAtAll()
         {
             ImmutableArray<Diagnostic> diagnostics = Run(
