@@ -97,13 +97,24 @@ param(
     # safe, because IL2CPP inlines across assemblies and package code can land in that
     # same translation unit.
     #
-    # The runners were updated after that run, so 'Release' is being retried. If the
-    # standalone legs die on C1001 again, set both call sites in unity-tests.yml back to
-    # `${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}`. A failed C++
-    # compile fails loudly via the GameAssembly.dll freshness check rather than being
-    # green-lit, so the retry is unambiguous, and the runner diagnostics now print each
-    # installation's default MSVC toolset so the log says which compiler produced the
-    # verdict. See #374.
+    # That retry was run, and it failed. Run 31286672790 (2026-08-09), after the runners
+    # were updated, still resolved MSVC 14.51.36231 -- the update did not move the
+    # toolset Unity selects. Two translation units ICEd on the 2022.3 leg, not one:
+    #
+    #   WallstopStudios.UnityHelpers.Tests.Runtime__13.cpp(18446)
+    #   WallstopStudios.UnityHelpers.Tests.Runtime__14.cpp(5076)
+    #       fatal error C1001: Internal compiler error.
+    #       (compiler file '...\Compiler\Utc\src\p2\main.cpp', line 262)
+    #
+    # Same compiler file and line as run 31280555886, so it is the same optimizer defect.
+    # The line numbers moved (8962 -> 18446/5076) because the generated C++ shifted when
+    # tests were added, not because anything in our source provokes it. unity-tests.yml
+    # is back to pinning 'Debug' for standalone.
+    #
+    # Do NOT retry 'Release' on a toolset in the 14.51.x family; the next retry is worth
+    # making only when the runners carry a different MAJOR toolset, and the diagnostics
+    # print each installation's default MSVC so the log says which compiler produced the
+    # verdict before the experiment costs four legs. See #374.
     #
     # Inert for editmode/playmode and Mono (no IL2CPP player is built).
     [ValidateSet('Release', 'Debug')]
@@ -3389,6 +3400,49 @@ $RepoRoot = Resolve-FullPath -Path $RepoRoot
 Assert-RepoRoot -Path $RepoRoot
 $ArtifactsPath = Resolve-FullPath -Path $ArtifactsPath
 New-Item -ItemType Directory -Force -Path $ArtifactsPath | Out-Null
+
+# Which MSVC toolset IL2CPP will use, written INTO THE ARTIFACT. The runner
+# diagnostics step prints the same thing, but that lands in the GitHub job log,
+# which is not retrievable through the REST API -- so the one place a toolchain
+# question can actually be answered after the fact is the artifact, next to
+# unity.log. Bee echoes the compiler command line only when a build FAILS, so
+# without this a green run records nothing about what compiled it. See #374:
+# MSVC 14.51.36231 ICEs at /Ox on the generated test C++.
+try {
+    $toolchainReport = Join-Path $ArtifactsPath 'msvc-toolchains.txt'
+    $vsWhereExe = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    $toolchainLines = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $vsWhereExe)) {
+        $toolchainLines.Add('vswhere.exe not found; no Visual Studio installation could be enumerated.')
+    }
+    else {
+        foreach ($vsInstance in @(& $vsWhereExe -products * -format json | ConvertFrom-Json)) {
+            $defaultVersionFile = Join-Path $vsInstance.installationPath 'VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt'
+            $defaultToolset = if (Test-Path -LiteralPath $defaultVersionFile) {
+                (Get-Content -LiteralPath $defaultVersionFile -Raw).Trim()
+            }
+            else { '<none>' }
+            $toolsRoot = Join-Path $vsInstance.installationPath 'VC\Tools\MSVC'
+            $installedToolsets = if (Test-Path -LiteralPath $toolsRoot) {
+                ((Get-ChildItem -LiteralPath $toolsRoot -Directory -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty Name | Sort-Object) -join ', ')
+            }
+            else { '<none>' }
+            $toolchainLines.Add(("{0} ({1})`n  path      = {2}`n  default   = {3}`n  installed = [{4}]" -f `
+                    $vsInstance.displayName, $vsInstance.installationVersion, $vsInstance.installationPath, `
+                    $defaultToolset, $installedToolsets))
+        }
+    }
+    if ($toolchainLines.Count -eq 0) {
+        $toolchainLines.Add('vswhere reported no Visual Studio installations.')
+    }
+    Set-Content -LiteralPath $toolchainReport -Value ($toolchainLines -join "`n") -Encoding utf8
+    Write-Host "MSVC toolchains recorded to $toolchainReport"
+}
+catch {
+    # Diagnostics that can fail a build are worse than no diagnostics.
+    Write-Host "MSVC toolchain report unavailable: $($_.Exception.Message)"
+}
 
 $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -RepoRoot $RepoRoot `
