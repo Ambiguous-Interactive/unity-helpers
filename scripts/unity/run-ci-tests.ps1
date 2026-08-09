@@ -125,10 +125,25 @@ param(
     # reaches the compile. The env var has been removed rather than left inert, because a
     # no-op that looks load-bearing is worse than no attempt at all.
     #
-    # That leaves 'Debug' for standalone as the only lever that works from inside this
-    # repo, and unity-tests.yml pins it. Levers that would work but need administrator
-    # access on the runner: edit each installation's Microsoft.VCToolsVersion.default.txt,
-    # or remove the VS 2026 C++ workload so Unity resolves an older installation.
+    # THE ADMINISTRATOR FIX WAS APPLIED (2026-08-09). VS 2026's
+    # Microsoft.VCToolsVersion.default.txt was repointed from 14.51.36231 to 14.44.35207
+    # on both runners, so 'Release' is pinned again to test it. This is a different
+    # experiment from the VCToolsVersion one: that failed because Bee never read the
+    # variable, whereas the default file is what the installation itself reports as its
+    # toolset, so Bee has to consult it -- unless Bee globs VC\Tools\MSVC and takes the
+    # highest directory, in which case 14.51 still wins and this fails the same way.
+    #
+    # Read msvc-toolchains.txt in the standalone artifact FIRST. It prints each
+    # installation's default, so it says whether the repoint took, independently of
+    # whether the build survived. Those are two separate facts and conflating them is how
+    # this question stayed folklore for three runs. If the default reads 14.44.35207 and
+    # the build still ICEs, the toolset is exonerated and the defect is not 14.51-specific.
+    #
+    # If it ICEs, set both call sites in unity-tests.yml back to
+    # `${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}`. The remaining
+    # untried in-repo lever is PlayerSettings.SetAdditionalIl2CppArgs with
+    # --compiler-flags="/O1", which the generated configurator can set without touching
+    # the runner.
     #
     # The general lesson, and the reason the check is written down: confirm which compiler
     # actually ran from the cl.exe path in the log, never from the env var being set. The

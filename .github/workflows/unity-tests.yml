@@ -546,7 +546,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
@@ -920,7 +920,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
