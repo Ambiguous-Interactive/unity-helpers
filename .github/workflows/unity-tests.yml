@@ -528,6 +528,23 @@ jobs:
           # serializes a misleading total=0 results.xml, the streamed lines still name
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
+          # Steer IL2CPP off the toolset that ICEs. Unity resolves Visual Studio 2026,
+          # whose default is MSVC 14.51.36231, and that crashes at /Ox on the generated
+          # test C++ (#374). Both runners also carry 14.42.34433 and 14.44.35207 side by
+          # side, installed but never selected -- measured 2026-08-09 by reading each
+          # installation's Microsoft.VCToolsVersion.default.txt, which still reports
+          # 14.51.36231 even after the v143 toolsets were added. Naming the newest
+          # non-14.51 toolset here is the only lever that needs no administrator access.
+          #
+          # UNPROVEN: VCToolsVersion is an MSBuild/vcvars mechanism and Bee invokes
+          # cl.exe directly, so it may simply be ignored. The run says which: every leg
+          # writes msvc-toolchains.txt into its artifact, and Bee names its compile
+          # action after the selected toolchain (C_Win_x64_VS####). If a standalone leg
+          # still reports 14.51, drop this and try --compiler-flags instead.
+          #
+          # Set on every tier so the three stay identical; inert where no IL2CPP player
+          # is built, which is every tier except the gated standalone one.
+          VCToolsVersion: "14.44.35207"
         run: |
           # -ProjectRoot puts the generated project and its Library OUTSIDE
           # $GITHUB_WORKSPACE. actions/checkout runs `git clean -ffdx` at the top of
@@ -546,7 +563,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
@@ -910,6 +927,23 @@ jobs:
           # serializes a misleading total=0 results.xml, the streamed lines still name
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
+          # Steer IL2CPP off the toolset that ICEs. Unity resolves Visual Studio 2026,
+          # whose default is MSVC 14.51.36231, and that crashes at /Ox on the generated
+          # test C++ (#374). Both runners also carry 14.42.34433 and 14.44.35207 side by
+          # side, installed but never selected -- measured 2026-08-09 by reading each
+          # installation's Microsoft.VCToolsVersion.default.txt, which still reports
+          # 14.51.36231 even after the v143 toolsets were added. Naming the newest
+          # non-14.51 toolset here is the only lever that needs no administrator access.
+          #
+          # UNPROVEN: VCToolsVersion is an MSBuild/vcvars mechanism and Bee invokes
+          # cl.exe directly, so it may simply be ignored. The run says which: every leg
+          # writes msvc-toolchains.txt into its artifact, and Bee names its compile
+          # action after the selected toolchain (C_Win_x64_VS####). If a standalone leg
+          # still reports 14.51, drop this and try --compiler-flags instead.
+          #
+          # Set on every tier so the three stay identical; inert where no IL2CPP player
+          # is built, which is every tier except the gated standalone one.
+          VCToolsVersion: "14.44.35207"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -920,7 +954,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
@@ -1258,6 +1292,23 @@ jobs:
           # serializes a misleading total=0 results.xml, the streamed lines still name
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
+          # Steer IL2CPP off the toolset that ICEs. Unity resolves Visual Studio 2026,
+          # whose default is MSVC 14.51.36231, and that crashes at /Ox on the generated
+          # test C++ (#374). Both runners also carry 14.42.34433 and 14.44.35207 side by
+          # side, installed but never selected -- measured 2026-08-09 by reading each
+          # installation's Microsoft.VCToolsVersion.default.txt, which still reports
+          # 14.51.36231 even after the v143 toolsets were added. Naming the newest
+          # non-14.51 toolset here is the only lever that needs no administrator access.
+          #
+          # UNPROVEN: VCToolsVersion is an MSBuild/vcvars mechanism and Bee invokes
+          # cl.exe directly, so it may simply be ignored. The run says which: every leg
+          # writes msvc-toolchains.txt into its artifact, and Bee names its compile
+          # action after the selected toolchain (C_Win_x64_VS####). If a standalone leg
+          # still reports 14.51, drop this and try --compiler-flags instead.
+          #
+          # Set on every tier so the three stay identical; inert where no IL2CPP player
+          # is built, which is every tier except the gated standalone one.
+          VCToolsVersion: "14.44.35207"
         run: |
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
