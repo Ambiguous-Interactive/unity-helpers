@@ -18,6 +18,10 @@
          on DeterministicSourcePaths, which rewrites those paths relative to the repository root
          the SDK's built-in SourceLink discovers, so a CI checkout and a working copy agree. -->
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!-- ...and turning that on makes SourceLink stamp the git commit into
+         AssemblyInformationalVersion, so the bytes change on every commit and no comparison against
+         a committed artifact can ever pass. This is the second half of the same setting. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <DebugType>none</DebugType>
     <!-- Where a build drops the analyzer Unity loads. Defaulting to the shipped location means the
          committed DLL cannot silently fall behind its sources: building the project IS refreshing
