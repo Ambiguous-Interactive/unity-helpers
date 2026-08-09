@@ -21,15 +21,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Referenced the way Unity references it: as an analyzer, not as a library. The formatters
-         under test are the generator's own output, compiled into this assembly. It is also
-         referenced normally, so the diagnostic tests can drive it through a Roslyn
-         GeneratorDriver over a synthetic consumer compilation. -->
-    <ProjectReference
-      Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj"
-      OutputItemType="Analyzer"
-      ReferenceOutputAssembly="true"
-    />
+    <!-- The analyzer under test is the DLL this package SHIPS, not a fresh build of the sources
+         beside it. That is the only binary Unity ever loads, and pointing the suite at a rebuild
+         would leave a stale committed DLL undetectable. Byte-comparing the two instead was tried
+         and abandoned: the compiler hashes source file paths into the assembly, so a CI checkout
+         and a developer's working copy never produce identical bytes however deterministic the
+         build is. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+
+    <!-- Referenced normally as well, so the diagnostic tests can drive the generator through a
+         Roslyn GeneratorDriver over a synthetic consumer compilation. -->
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" />
   </ItemGroup>
 
   <ItemGroup>
