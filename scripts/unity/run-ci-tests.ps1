@@ -125,25 +125,46 @@ param(
     # reaches the compile. The env var has been removed rather than left inert, because a
     # no-op that looks load-bearing is worse than no attempt at all.
     #
-    # THE ADMINISTRATOR FIX WAS APPLIED (2026-08-09). VS 2026's
-    # Microsoft.VCToolsVersion.default.txt was repointed from 14.51.36231 to 14.44.35207
-    # on both runners, so 'Release' is pinned again to test it. This is a different
-    # experiment from the VCToolsVersion one: that failed because Bee never read the
-    # variable, whereas the default file is what the installation itself reports as its
-    # toolset, so Bee has to consult it -- unless Bee globs VC\Tools\MSVC and takes the
-    # highest directory, in which case 14.51 still wins and this fails the same way.
+    # HOW BEE PICKS A TOOLSET, MEASURED (run 31290048422, 2026-08-09). This is the useful
+    # result of the whole investigation, so it is written down rather than re-derived.
     #
-    # Read msvc-toolchains.txt in the standalone artifact FIRST. It prints each
-    # installation's default, so it says whether the repoint took, independently of
-    # whether the build survived. Those are two separate facts and conflating them is how
-    # this question stayed folklore for three runs. If the default reads 14.44.35207 and
-    # the build still ICEs, the toolset is exonerated and the defect is not 14.51-specific.
+    # VS 2026's Microsoft.VCToolsVersion.default.txt was repointed to 14.44.35207 on the
+    # runners. msvc-toolchains.txt in that run's artifact confirms the repoint took:
     #
-    # If it ICEs, set both call sites in unity-tests.yml back to
-    # `${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}`. The remaining
-    # untried in-repo lever is PlayerSettings.SetAdditionalIl2CppArgs with
-    # --compiler-flags="/O1", which the generated configurator can set without touching
-    # the runner.
+    #   Visual Studio Community 2026 (18.8.12023.21)
+    #     default   = 14.44.35207
+    #     installed = [14.42.34433, 14.44.35207, 14.51.36231]
+    #
+    # And Bee invoked ...\Tools\MSVC\14.51.36231\...\cl.exe anyway, then ICEd.
+    #
+    # So Bee does NOT read the default file. It enumerates VC\Tools\MSVC and takes the
+    # HIGHEST version directory. Two consequences worth keeping:
+    #
+    #   * Repointing the default can never work, and neither can VCToolsVersion (already
+    #     disproven, run 31288591021). Nothing that merely expresses a preference works.
+    #   * The only install-side fix is to make 14.51 not exist on the box -- remove the
+    #     v145 component from VS 2026, or remove its C++ workload so Unity resolves the
+    #     2022 Build Tools installation, whose highest is 14.44.35207.
+    #
+    # Until then standalone stays on 'Debug'. The one untried in-repo lever is
+    # PlayerSettings.SetAdditionalIl2CppArgs with --compiler-flags="/O1", which the
+    # generated configurator can set without touching the runner at all. See #374.
+    #
+    # THE DEFAULT FILE IS IGNORED TOO. The administrator repoint landed -- run 31290048422
+    # shows, on the very host that then failed:
+    #
+    #   Visual Studio Community 2026  default=14.44.35207
+    #                                 installed=[14.42.34433, 14.44.35207, 14.51.36231]
+    #
+    # and the compiler that ran was still ...\Tools\MSVC\14.51.36231\bin, with C1001 four
+    # times. So Bee reads neither the environment variable nor the installation's declared
+    # default; it resolves the highest version directory present under VC\Tools\MSVC.
+    #
+    # That narrows the remaining runner-side fix to exactly one action: UNINSTALL
+    # 14.51.36231 from VS 2026. Un-defaulting it is not enough, and has now been measured
+    # not to be enough. Note also what this does NOT show: 14.51 is not exonerated by the
+    # repoint failing, because 14.51 is what compiled -- the toolset has never actually
+    # been swapped out under an IL2CPP build.
     #
     # The general lesson, and the reason the check is written down: confirm which compiler
     # actually ran from the cl.exe path in the log, never from the env var being set. The
