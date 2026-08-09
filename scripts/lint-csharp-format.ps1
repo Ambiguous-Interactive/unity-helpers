@@ -1,6 +1,10 @@
 Param(
   [switch]$VerboseOutput,
   [switch]$Fix,
+  # Report a missing tool manifest or a missing dotnet as a skip rather than a failure. Only the
+  # changed-file pass uses this, so it can run inside a scratch repository that has neither; the
+  # whole-repository check in validate:prepush never sets it, which is what keeps the gate real.
+  [switch]$SkipWhenUnavailable,
   [string[]]$Paths
 )
 
@@ -24,18 +28,34 @@ function Write-Remedy($msg) {
   Write-Host "  $msg" -ForegroundColor Yellow
 }
 
-$manifestPath = Join-Path -Path $repoRoot -ChildPath '.config/dotnet-tools.json'
-if (-not (Test-Path -LiteralPath $manifestPath)) {
-  Write-Failure "Missing .NET tool manifest at .config/dotnet-tools.json."
-  Write-Remedy 'CSharpier is pinned there; restore the file before formatting C#.'
+function Exit-Unavailable([string]$Reason, [string[]]$Remedies) {
+  if ($SkipWhenUnavailable) {
+    # Announced, never silent. A gate that quietly does nothing is the defect this script exists
+    # to close, so the skip is always printed even outside verbose mode.
+    Write-Host "[lint-csharp-format] Skipped: $Reason" -ForegroundColor Yellow
+    exit 0
+  }
+
+  Write-Failure $Reason
+  foreach ($remedy in $Remedies) {
+    Write-Remedy $remedy
+  }
+
   exit 1
 }
 
+$manifestPath = Join-Path -Path $repoRoot -ChildPath '.config/dotnet-tools.json'
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+  Exit-Unavailable 'no .NET tool manifest at .config/dotnet-tools.json.' @(
+    'CSharpier is pinned there; restore the file before formatting C#.'
+  )
+}
+
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-  Write-Failure 'dotnet was not found on PATH, so C# formatting cannot be verified.'
-  Write-Remedy 'Install the .NET SDK, then run: dotnet tool restore'
-  Write-Remedy 'CI runs "dotnet tool run csharpier check ." and will reject unformatted C# regardless.'
-  exit 1
+  Exit-Unavailable 'dotnet was not found on PATH, so C# formatting cannot be verified.' @(
+    'Install the .NET SDK, then run: dotnet tool restore',
+    'CI runs "dotnet tool run csharpier check ." and will reject unformatted C# regardless.'
+  )
 }
 
 # CSharpier only reaches the repository's pinned version through the manifest, and the manifest is

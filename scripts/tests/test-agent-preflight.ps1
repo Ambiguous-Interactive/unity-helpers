@@ -75,6 +75,10 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1') (Join-Path $scriptsDir 'lint-staged-markdown.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') (Join-Path $scriptsDir 'lint-duplicate-usings.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-tests.ps1') (Join-Path $scriptsDir 'lint-tests.ps1') -Force
+    # No .config/dotnet-tools.json is copied on purpose: these fixtures are synthetic repositories
+    # whose C# is written to exercise .meta and staging behavior, not formatting. agent-preflight
+    # passes -SkipWhenUnavailable, so the CSharpier step reports a skip here instead of failing.
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') (Join-Path $scriptsDir 'lint-csharp-format.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/comment-stripping.ps1') (Join-Path $scriptsDir 'comment-stripping.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force

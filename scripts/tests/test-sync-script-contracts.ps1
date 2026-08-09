@@ -2555,6 +2555,14 @@ function Run-CSharpierFormatGateContractTests {
     -Passed ($checkScript -match 'scripts/lint-csharp-format\.ps1') `
     -Message "format:csharp:check = $checkScript"
 
+  # -SkipWhenUnavailable degrades a missing dotnet or tool manifest to an announced skip. The
+  # changed-file pass needs it (it runs inside synthetic fixture repositories); the pre-push check
+  # must never have it, or the gate can pass on a machine where it never ran.
+  Write-TestResult `
+    -TestName 'format:csharp:check never skips when the toolchain is unavailable' `
+    -Passed ($checkScript -notmatch '-SkipWhenUnavailable' -and $fixScript -notmatch '-SkipWhenUnavailable') `
+    -Message "format:csharp:check = $checkScript; format:csharp = $fixScript"
+
   Write-TestResult `
     -TestName 'format:csharp invokes the CSharpier gate script with -Fix' `
     -Passed ($fixScript -match 'scripts/lint-csharp-format\.ps1' -and $fixScript -match '-Fix') `

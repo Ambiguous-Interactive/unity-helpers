@@ -2173,7 +2173,7 @@ if ($csharpTargets.Count -gt 0) {
             $failureCount++
         }
         else {
-            & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Fix -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+            & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Fix -SkipWhenUnavailable -Paths $csharpTargets -VerboseOutput:$VerboseOutput
             if ($LASTEXITCODE -ne 0) {
                 $failureCount++
             }
@@ -2195,7 +2195,7 @@ if ($csharpTargets.Count -gt 0) {
     }
 
     Write-Host '[agent-preflight] Checking CSharpier formatting on changed C# files...' -ForegroundColor Blue
-    & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+    & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -SkipWhenUnavailable -Paths $csharpTargets -VerboseOutput:$VerboseOutput
     if ($LASTEXITCODE -ne 0) {
         $failureCount++
     }
