@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     /// <summary>
@@ -105,6 +106,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // counter is too coarse, the allocation-based assertions cannot prove laziness here, so
             // we report Inconclusive instead of failing — the assertions still run wherever the
             // counter is reliable (desktop/editor Mono).
+            // Before the FIRST read of the counter: on IL2CPP before Unity 6 this call is an
+            // access violation, not an exception, so it takes the whole player down and the run
+            // produces no results.xml at all. Measured on run 31292390551.
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+
             long calibrationBefore = GC.GetAllocatedBytesForCurrentThread();
             string forcedAllocation = new('x', 512);
             long calibrationAfter = GC.GetAllocatedBytesForCurrentThread();

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Diagnostics;
     using System.Text.Json;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using SerializerAlias = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -383,14 +384,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static long GetAlloc()
         {
-            try
-            {
-                return GC.GetAllocatedBytesForCurrentThread();
-            }
-            catch
-            {
-                return 0;
-            }
+            // The try/catch this replaces was inert: on IL2CPP before Unity 6 the call is an access
+            // violation, which no catch block can intercept -- it takes the player down. CI never
+            // hit it because these fixtures are Category("Performance") and the Unity legs exclude
+            // that, but running them locally against such a player would have crashed it.
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            return GC.GetAllocatedBytesForCurrentThread();
         }
 
         private static int[] MakeIntArray(int len, int seed)
