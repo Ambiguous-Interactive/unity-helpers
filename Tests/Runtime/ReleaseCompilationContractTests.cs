@@ -79,31 +79,27 @@ namespace WallstopStudios.UnityHelpers.Tests
             unoptimized.Sort(StringComparer.Ordinal);
             unreadable.Sort(StringComparer.Ordinal);
 
-            // Named, not counted. The prefix also matches this fixture's own assembly, so a count
-            // of "assemblies inspected" is always at least one and can never catch the failure it
-            // was written for -- the runtime assembly being absent from the probe entirely.
+            // Named, not counted, and it must be READABLE. The prefix also matches this fixture's
+            // own assembly, so a count of "assemblies inspected" is always at least one and can
+            // never catch the failure it was written for. Counting is weaker in a second way too:
+            // the runtime assembly can be unreadable while a sibling is readable and optimized,
+            // which passes a count-based guard having verified nothing about the runtime package.
+            //
+            // Unreadable is a hard failure rather than a softer verdict. Measured on Unity CI run
+            // 31283057102: this test reports Passed on all four IL2CPP standalone legs, so a
+            // player DOES carry DebuggableAttribute and an unreadable one is a real regression --
+            // either in what CI compiles or in what the probe can see. Downgrading it would also
+            // be silent: verify-unity-results acts only on Failed cases and a zero total, so
+            // anything short of a failure here is a contract that stops reporting.
             Assert.IsTrue(
                 optimized.Contains(RuntimeAssemblyName)
-                    || unoptimized.Contains(RuntimeAssemblyName)
-                    || unreadable.Contains(RuntimeAssemblyName),
-                $"'{RuntimeAssemblyName}' was not among the loaded assemblies, so this contract "
-                    + "never inspected the runtime package at all."
+                    || unoptimized.Contains(RuntimeAssemblyName),
+                $"'{RuntimeAssemblyName}' carried no readable DebuggableAttribute, so this contract "
+                    + "verified nothing about the runtime package. "
+                    + $"Optimized: [{string.Join(", ", optimized)}]. "
+                    + $"Unoptimized: [{string.Join(", ", unoptimized)}]. "
+                    + $"Unreadable: [{string.Join(", ", unreadable)}]."
             );
-
-            // An assembly with no DebuggableAttribute is compiled for an optimizing JIT by default,
-            // so it is not a violation -- but it is not evidence either. If EVERY assembly comes
-            // back unreadable the probe is blind, which is the shape an IL2CPP player that dropped
-            // attribute metadata would take. That is a third outcome, not a failure: the build is
-            // fine and only the probe cannot see, so failing here would be a false alarm on the
-            // most expensive legs in the matrix. Inconclusive says so out loud and is still
-            // distinguishable by name in results.xml, and the ten Mono legs still enforce.
-            if (optimized.Count + unoptimized.Count == 0)
-            {
-                Assert.Inconclusive(
-                    "No package assembly carried a readable DebuggableAttribute, so this run "
-                        + $"verified nothing. Inspected: {string.Join(", ", unreadable)}."
-                );
-            }
 
             if (!Helpers.IsRunningInContinuousIntegration)
             {

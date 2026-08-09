@@ -546,7 +546,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
@@ -678,8 +678,7 @@ jobs:
   # serializes every leg onto the one Unity seat, standalone already ran last, so
   # gating it costs zero wall-clock. The steps are intentionally identical to
   # unity-tests -- the `matrix.test-mode == 'standalone'` inline conditionals select
-  # the IL2CPP provisioning profile, the Debug C++ config (Release ICEs MSVC on the
-  # generated test C++; see run-ci-tests.ps1), and the larger step timeout, and
+  # the IL2CPP provisioning profile and the larger step timeout, and
   # matrix.test-mode is always 'standalone' here. The `!= '[]'` if-guard skips the
   # job (instead of erroring on an empty matrix) for single-mode dispatch pins,
   # which run entirely in the fast tier.
@@ -919,7 +918,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration '${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}'
+            -Il2CppCompilerConfiguration 'Release'
 
       # Surface the slowest fixtures/cases every run (the measurement backbone for
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the

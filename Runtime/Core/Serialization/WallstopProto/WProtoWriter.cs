@@ -53,7 +53,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public int Remaining => _buffer.Length - _position;
 
         /// <summary>
-        /// Indicates whether any write has been refused for lack of space. Once set, it stays set.
+        /// Indicates whether any write has been refused -- for lack of space, or for an invalid
+        /// field number, wire type or length. Once set, it stays set and later writes are refused.
         /// </summary>
         public bool Faulted => _faulted;
 
@@ -304,10 +305,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            // Sliced OUTSIDE the try on purpose. Span.Slice throws ArgumentOutOfRangeException,
+            // which is an ArgumentException, so evaluating it inside would let an off-by-one in
+            // TryReserve be swallowed as an encoder fault instead of surfacing as the bug it is.
+            Span<byte> destination = _buffer.Slice(start, byteCount);
             int written;
             try
             {
-                written = Encoding.UTF8.GetBytes(value.AsSpan(), _buffer.Slice(start, byteCount));
+                written = Encoding.UTF8.GetBytes(value.AsSpan(), destination);
             }
             catch (ArgumentException)
             {

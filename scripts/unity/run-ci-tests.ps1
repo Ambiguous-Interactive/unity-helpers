@@ -76,26 +76,34 @@ param(
 
     [switch]$ReleasePlayerBuild,
 
-    # IL2CPP C++ compiler configuration for the standalone player build. The standalone
-    # leg pins 'Debug'; everything else uses 'Release'.
+    # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
+    # what CI passes on every leg: it is what a shipped player runs, so it is what the
+    # IL2CPP-compat leg should validate, and 'Debug' costs real time -- the standalone
+    # legs execute the same suite roughly 2x slower than the editor's Mono JIT (run
+    # 31221618477: 2021.3 203.3s vs 91.7s, 6000.3 314.1s vs 122.1s).
     #
-    # 'Debug' is NOT the free choice -- it costs real time, because the standalone legs
-    # execute the same suite roughly 2x slower than the editor's Mono JIT (run
-    # 31221618477: 2021.3 203.3s vs 91.7s, 6000.3 314.1s vs 122.1s) -- and it means the
-    # leg validates a native configuration no shipped player uses. It is pinned anyway
-    # because 'Release' does not build. Re-measured 2026-08-08 on run 31280555886
-    # rather than inherited from #261's undated note:
+    # 'Debug' remains the escape hatch, and it was needed once. On run 31280555886 the
+    # runners carried MSVC 14.51.36231 and all four standalone legs died with:
     #
     #   WallstopStudios.UnityHelpers.Tests.Runtime__13.cpp(8962):
     #       fatal error C1001: Internal compiler error.
     #
     # MSVC 14.51.36231 (VS 2026) at /Ox, Unity 6000.5.2f1, with the SSA common-
-    # subexpression workaround flag already on the command line. Note the translation unit: it is the TEST assembly's generated C++, not
-    # the package's -- so this is a property of compiling 8,700 tests into one player,
-    # and a consumer's own IL2CPP Release build is not implicated. Before trying
-    # 'Release' again, check whether that file still ICEs on a newer MSVC; a failed C++
+    # subexpression workaround flag already on the command line.
+    #
+    # Note the translation unit: it is the TEST assembly's generated C++, so this is a
+    # property of compiling 8,700 tests into one player. That is evidence the ICE has
+    # not been reproduced for a package-only build -- it is NOT proof a consumer is
+    # safe, because IL2CPP inlines across assemblies and package code can land in that
+    # same translation unit.
+    #
+    # The runners were updated after that run, so 'Release' is being retried. If the
+    # standalone legs die on C1001 again, set both call sites in unity-tests.yml back to
+    # `${{ matrix.test-mode == 'standalone' && 'Debug' || 'Release' }}`. A failed C++
     # compile fails loudly via the GameAssembly.dll freshness check rather than being
-    # green-lit, so the experiment is cheap to repeat and unambiguous.
+    # green-lit, so the retry is unambiguous, and the runner diagnostics now print each
+    # installation's default MSVC toolset so the log says which compiler produced the
+    # verdict. See #374.
     #
     # Inert for editmode/playmode and Mono (no IL2CPP player is built).
     [ValidateSet('Release', 'Debug')]

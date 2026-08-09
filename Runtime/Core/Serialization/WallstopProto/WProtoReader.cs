@@ -21,10 +21,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </para>
     /// <para>
     /// Payloads arrive from disk and from the network, so the reader treats every length, tag and
-    /// varint as hostile: overlong varints, varints wider than the 32 bits a key or length can
-    /// mean, zero field numbers, undefined wire types, out-of-range lengths, and groups that are
-    /// unterminated or closed by a terminator naming a different field are all rejected rather than
-    /// clamped.
+    /// varint as hostile: overlong varints, key and length values above the 32 bits those fields
+    /// can mean, zero field numbers, undefined wire types, out-of-range lengths, and groups that
+    /// are unterminated or closed by a terminator naming a different field are all rejected rather
+    /// than clamped.
     /// </para>
     /// </remarks>
     public ref struct WProtoReader
@@ -79,10 +79,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            // Strict: a key that needed more than 32 bits is not a large field number, it is a
-            // second encoding of a small one. Accepting it would let two different byte sequences
-            // decode to the same message, which breaks byte comparison for anything that hashes or
-            // signs a payload. Google's implementations cap a key at five bytes for the same reason.
+            // Strict: a key whose value exceeds 32 bits cannot name a field, since the field
+            // number is the top 29 bits of a 32-bit key. Truncating it would silently accept a
+            // payload no writer can produce and decode it as some unrelated small field. This caps
+            // the VALUE, not the byte width -- a redundantly padded key is still accepted, matching
+            // protobuf-net and Google's implementations.
             if (!TryReadVarint32Strict(out uint key))
             {
                 return false;
@@ -402,8 +403,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             length = 0;
 
-            // Strict for the same reason as a field key: a length encoded in more than 32 bits is a
-            // second spelling of a smaller one, and truncating it would silently accept it.
+            // Strict for the same reason as a field key: a length whose value exceeds 32 bits
+            // cannot address a span, and truncating it would turn an impossible length into a
+            // plausible one rather than rejecting the payload.
             if (!TryReadVarint32Strict(out uint raw))
             {
                 return false;

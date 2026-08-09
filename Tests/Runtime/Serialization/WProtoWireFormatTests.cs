@@ -467,8 +467,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             "888080808001",
             TestName = "OverWideStructuralVarintsAreRejected(field key above 32 bits)"
         )]
+        // The three trailing payload bytes matter. Without payload bytes behind it, a length TRUNCATED to 3
+        // also exceeds Remaining and the truncating reader rejects it too -- the case would pass
+        // against the very bug it names. With three bytes present, only the strict read rejects.
         [TestCase(
-            "0A8380808010",
+            "0A8380808010A1B2C3",
             TestName = "OverWideStructuralVarintsAreRejected(length above 32 bits)"
         )]
         public void OverWideStructuralVarintsAreRejected(string hex)
@@ -639,6 +642,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoWriter writer = new(scratch);
             Assert.IsFalse(writer.TryWriteTag(fieldNumber, wireType));
             Assert.AreEqual(0, writer.Position);
+            // Only when the FIELD NUMBER is what was rejected. TagSize is given a field number and
+            // nothing else, so it cannot know the wire type is bad -- for a valid number it
+            // correctly reports the size it would occupy, and holding it to the writer's verdict
+            // there would be asserting against an input it never saw.
+            if (WProtoWireType.IsDefined(wireType))
+            {
+                Assert.AreEqual(
+                    writer.Position,
+                    WProtoSizes.TagSize(fieldNumber),
+                    "Measure and Write must agree on the byte count for a rejected field number "
+                        + "too, or a caller sizing a message with an invalid tag under-allocates."
+                );
+            }
 
             // A skipped tag costs zero bytes, so WProtoSizes still agrees with the writer and an
             // enclosing length prefix is still correct -- the payload just decodes as a different
@@ -651,6 +667,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     + "emitted anyway and reads back as a well-formed, wrong message."
             );
             Assert.AreEqual(0, writer.Position);
+        }
+
+        [Test]
+        public void RunningOutOfRoomMidMessageFaultsTheWriter()
+        {
+            // The reservation path is the writer's real latch -- TryWriteTag and TryWriteString
+            // both pre-check and latch before reaching it, so nothing else exercises it. Without
+            // it a refused value write is silently skipped and the NEXT field's tag byte is read
+            // as the missing value: a truncated message that reports success and decodes as a
+            // different, plausible one.
+            byte[] scratch = new byte[5];
+            WProtoWriter writer = new(scratch);
+            Assert.IsTrue(writer.TryWriteTag(1, WProtoWireType.Varint));
+            Assert.IsFalse(
+                writer.TryWriteVarint64(ulong.MaxValue),
+                "Ten bytes cannot fit in the four that are left."
+            );
+            Assert.IsTrue(writer.Faulted);
+            Assert.AreEqual(1, writer.Position);
+
+            Assert.IsFalse(writer.TryWriteTag(2, WProtoWireType.Varint));
+            Assert.IsFalse(writer.TryWriteBool(true));
+            Assert.IsFalse(
+                writer.TryWriteRaw(ReadOnlySpan<byte>.Empty),
+                "Even a zero-byte write must be refused once faulted; returning true would let a "
+                    + "caller chaining writes conclude the message completed."
+            );
+            Assert.AreEqual(
+                "08",
+                ToHex(writer.Written),
+                "Nothing may be appended after the fault."
+            );
+        }
+
+        [Test]
+        public void FixedWritesFaultWhenTheBufferIsTooSmall()
+        {
+            byte[] scratch = new byte[1];
+            WProtoWriter writer = new(scratch);
+            Assert.IsFalse(writer.TryWriteFixed64(0ul));
+            Assert.IsTrue(writer.Faulted);
+            Assert.AreEqual(0, writer.Position);
+        }
+
+        // BALANCED nesting, at and just past the bound. Unclosed openers would prove nothing:
+        // they run out of input and latch whatever the bound is, so the case would pass against
+        // an unbounded reader too. Only a well-formed payload separates "refused at depth 64"
+        // from "recursed happily", and unbounded recursion here is a stack overflow, which cannot
+        // be caught -- the bound is the entire guarantee.
+        [TestCase(64, true, TestName = "GroupNestingIsBoundedAtTheDocumentedDepth(64 accepted)")]
+        [TestCase(65, false, TestName = "GroupNestingIsBoundedAtTheDocumentedDepth(65 rejected)")]
+        public void GroupNestingIsBoundedAtTheDocumentedDepth(int depth, bool expectSkipped)
+        {
+            byte[] payload = new byte[depth * 2];
+            for (int index = 0; index < depth; index++)
+            {
+                payload[index] = 0x0B;
+                payload[payload.Length - 1 - index] = 0x0C;
+            }
+
+            WProtoReader reader = new(payload);
+            Assert.IsTrue(reader.TryReadTag(out int fieldNumber, out int wireType));
+            Assert.AreEqual(WProtoWireType.StartGroup, wireType);
+            Assert.AreEqual(expectSkipped, reader.TrySkipField(fieldNumber, wireType));
+            Assert.AreEqual(!expectSkipped, reader.Malformed);
         }
 
         [Test]
