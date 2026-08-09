@@ -2163,6 +2163,43 @@ if ($testFiles.Count -gt 0) {
 }
 
 if ($csharpTargets.Count -gt 0) {
+    if ($Fix) {
+        Write-Host '[agent-preflight] Formatting changed C# files with CSharpier...' -ForegroundColor Blue
+        if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+                    -RepoRoot $repoRoot `
+                    -Paths $csharpTargets `
+                    -InitiallyUnstagedPaths $initiallyUnstagedPaths `
+                    -Context 'CSharpier formatting')) {
+            $failureCount++
+        }
+        else {
+            & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Fix -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+            if ($LASTEXITCODE -ne 0) {
+                $failureCount++
+            }
+            else {
+                $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
+                $stagedCSharpFiles = @($csharpTargets | Where-Object { $stagedPaths.Contains($_) })
+                if ($stagedCSharpFiles.Count -gt 0) {
+                    if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedCSharpFiles -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'CSharpier formatting')) {
+                        Write-ErrorMsg 'Failed to stage CSharpier formatting fixes. Git index.lock contention, pre-existing unstaged hunks, or another git error is likely.'
+                        foreach ($path in $stagedCSharpFiles) {
+                            Write-Host "  $path" -ForegroundColor Yellow
+                        }
+                        Write-Host 'Close other git operations or commit/stash unstaged hunks, then re-run npm run agent:preflight:fix.' -ForegroundColor Cyan
+                        $failureCount++
+                    }
+                }
+            }
+        }
+    }
+
+    Write-Host '[agent-preflight] Checking CSharpier formatting on changed C# files...' -ForegroundColor Blue
+    & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+    if ($LASTEXITCODE -ne 0) {
+        $failureCount++
+    }
+
     Write-Host '[agent-preflight] Checking duplicate using directives on changed C# files...' -ForegroundColor Blue
     Push-Location $repoRoot
     try {

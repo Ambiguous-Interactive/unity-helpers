@@ -8,7 +8,7 @@ This document provides a comprehensive reference for all formatting and linting 
 
 | Tool         | File Types                | Check Command                                  | Fix Command                                      |
 | ------------ | ------------------------- | ---------------------------------------------- | ------------------------------------------------ |
-| CSharpier    | `.cs`                     | `dotnet tool run csharpier check .`            | `dotnet tool run csharpier format .`             |
+| CSharpier    | `.cs`                     | `npm run format:csharp:check`                  | `npm run format:csharp`                          |
 | Prettier     | `.md`, `.json`, `.yml`    | `node scripts/run-prettier.js --check -- .`    | `node scripts/run-prettier.js --write -- <file>` |
 | markdownlint | `.md`                     | `npm run lint:markdown`                        | Manual fixes required                            |
 | yamllint     | `.yml`, `.yaml`           | `npm run lint:yaml`                            | Manual fixes required                            |

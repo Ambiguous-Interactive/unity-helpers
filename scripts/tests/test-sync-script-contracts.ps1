@@ -2529,6 +2529,142 @@ function Run-ReleasePackageContentContractTests {
     -Message "Missing exporter required entries: $($missingExportEntries -join ', ')"
 }
 
+function Run-CSharpierFormatGateContractTests {
+  Write-Host ""
+  Write-Host "CSharpier local gate contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $gatePath = Join-Path $repoRoot 'scripts/lint-csharp-format.ps1'
+  $packageJsonPath = Join-Path $repoRoot 'package.json'
+  $agentPreflightPath = Join-Path $repoRoot 'scripts/agent-preflight.ps1'
+  $toolManifestPath = Join-Path $repoRoot '.config/dotnet-tools.json'
+  $autofixWorkflowPath = Join-Path $repoRoot '.github/workflows/csharpier-autofix.yml'
+
+  Write-TestResult `
+    -TestName 'CSharpier gate script exists' `
+    -Passed (Test-Path $gatePath) `
+    -Message "Missing file: $gatePath"
+
+  $packageJson = Get-Content -Path $packageJsonPath -Raw | ConvertFrom-Json
+  $checkScript = [string]$packageJson.scripts.PSObject.Properties['format:csharp:check'].Value
+  $fixScript = [string]$packageJson.scripts.PSObject.Properties['format:csharp'].Value
+
+  Write-TestResult `
+    -TestName 'format:csharp:check invokes the CSharpier gate script' `
+    -Passed ($checkScript -match 'scripts/lint-csharp-format\.ps1') `
+    -Message "format:csharp:check = $checkScript"
+
+  Write-TestResult `
+    -TestName 'format:csharp invokes the CSharpier gate script with -Fix' `
+    -Passed ($fixScript -match 'scripts/lint-csharp-format\.ps1' -and $fixScript -match '-Fix') `
+    -Message "format:csharp = $fixScript"
+
+  # The whole point of #373: a C# formatting break must be reachable locally, before a push. The
+  # gate lives in validate:prepush because that is the documented pre-push parity command.
+  $prepushScript = [string]$packageJson.scripts.PSObject.Properties['validate:prepush'].Value
+  Write-TestResult `
+    -TestName 'validate:prepush runs the CSharpier check' `
+    -Passed ($prepushScript -match 'npm run format:csharp:check') `
+    -Message "validate:prepush = $prepushScript"
+
+  if (-not (Test-Path $agentPreflightPath)) {
+    Write-TestResult `
+      -TestName 'agent-preflight.ps1 exists for changed-file CSharpier contract' `
+      -Passed $false `
+      -Message "Missing file: $agentPreflightPath"
+  }
+  else {
+    $agentPreflight = Get-Content -Path $agentPreflightPath -Raw
+    Write-TestResult `
+      -TestName 'agent:preflight checks CSharpier formatting on changed C# files' `
+      -Passed ($agentPreflight -match 'lint-csharp-format\.ps1') `
+      -Message 'agent-preflight.ps1 never invokes scripts/lint-csharp-format.ps1'
+
+    Write-TestResult `
+      -TestName 'agent:preflight:fix formats changed C# files' `
+      -Passed ($agentPreflight -match "lint-csharp-format\.ps1'\)\s+-Fix") `
+      -Message 'agent-preflight.ps1 never invokes the CSharpier gate with -Fix'
+  }
+
+  # A fork PR is formatted by a globally installed CSharpier rather than the manifest-restored one.
+  # Restating the version there is how the bot and the "Verify formatting" gate drift apart, so the
+  # workflow must read it from the manifest instead.
+  if (-not (Test-Path $autofixWorkflowPath)) {
+    Write-TestResult `
+      -TestName 'csharpier-autofix.yml exists' `
+      -Passed $false `
+      -Message "Missing file: $autofixWorkflowPath"
+  }
+  else {
+    # Comment lines are stripped before matching. A comment that *mentions*
+    # .config/dotnet-tools.json would otherwise satisfy "reads the version from the manifest" while
+    # the step next to it hard-codes one -- the same vacuous-match failure this suite already
+    # carries a warning about for ordering assertions.
+    $autofixLines = @(Get-Content -Path $autofixWorkflowPath)
+    $autofixCommands = @($autofixLines | Where-Object { $_ -notmatch '^\s*#' })
+    $autofixCommandText = $autofixCommands -join "`n"
+
+    Write-TestResult `
+      -TestName 'csharpier-autofix.yml never restates a CSharpier version' `
+      -Passed ($autofixCommandText -notmatch '--version\s+\d+\.\d+') `
+      -Message 'A literal --version <x.y.z> is present; derive it from .config/dotnet-tools.json'
+
+    # A step that merely *names* the manifest in an echo satisfies a substring match while
+    # installing a hard-coded version next to it, so both halves are asserted: the manifest is
+    # parsed, and the installed version is the parsed value rather than a literal.
+    $manifestReads = @(
+      $autofixCommands |
+        Where-Object { $_ -match 'dotnet-tools\.json' -and $_ -match '\bjq\b|ConvertFrom-Json' }
+    )
+
+    Write-TestResult `
+      -TestName 'csharpier-autofix.yml parses the CSharpier version out of the tool manifest' `
+      -Passed ($manifestReads.Count -gt 0) `
+      -Message 'No step parses .config/dotnet-tools.json; naming it in an echo is not reading it'
+
+    $literalVersionInstalls = @(
+      $autofixCommands |
+        Where-Object { $_ -match 'dotnet tool install' -and $_ -match 'csharpier' } |
+        Where-Object { $_ -notmatch '--version\s+"?\$' }
+    )
+
+    Write-TestResult `
+      -TestName 'csharpier-autofix.yml installs the manifest-derived version' `
+      -Passed ($literalVersionInstalls.Count -eq 0) `
+      -Message "Installs not using a derived version: $($literalVersionInstalls -join ' | ')"
+
+    # CSharpier 1.x requires a `format`/`check` verb; a bare path prints usage and exits 1, which
+    # is how the fork job broke when the pin moved from 0.x to 1.x. Every invocation is checked --
+    # asserting only that *some* line names a verb passes while another line still runs bare.
+    $verblessInvocations = @(
+      $autofixCommands |
+        Where-Object { $_ -match 'csharpier' -and ($_ -match 'dotnet tool run' -or $_ -match 'dotnet/tools/csharpier') } |
+        Where-Object { $_ -notmatch 'csharpier\s+(format|check)\b' }
+    )
+
+    Write-TestResult `
+      -TestName 'csharpier-autofix.yml invokes CSharpier with an explicit verb' `
+      -Passed ($verblessInvocations.Count -eq 0) `
+      -Message "Invocations missing a format/check verb: $($verblessInvocations -join ' | ')"
+  }
+
+  if (-not (Test-Path $toolManifestPath)) {
+    Write-TestResult `
+      -TestName '.config/dotnet-tools.json pins CSharpier' `
+      -Passed $false `
+      -Message "Missing file: $toolManifestPath"
+  }
+  else {
+    $toolManifest = Get-Content -Path $toolManifestPath -Raw | ConvertFrom-Json
+    $csharpierVersion = [string]$toolManifest.tools.CSharpier.version
+    Write-TestResult `
+      -TestName '.config/dotnet-tools.json pins CSharpier' `
+      -Passed (-not [string]::IsNullOrWhiteSpace($csharpierVersion)) `
+      -Message 'tools.CSharpier.version is missing from the manifest'
+  }
+}
+
 function Print-SummaryAndExit {
   Write-Host ""
   Write-Host "Results:" -ForegroundColor Magenta
@@ -2566,4 +2702,5 @@ Run-ReleasePublishWorkflowBudgetContractTests
 Run-ReleasePrepareWorkflowContractTests
 Run-ReleaseTagWorkflowRetirementContractTests
 Run-ReleasePackageContentContractTests
+Run-CSharpierFormatGateContractTests
 Print-SummaryAndExit

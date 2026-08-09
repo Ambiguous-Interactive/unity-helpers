@@ -55,7 +55,15 @@ dotnet tool run csharpier format Runtime/Core/Helper/Buffers.cs
 
 # Check without modifying
 dotnet tool run csharpier check .
+
+# The same check, wired into the local gates (fails with remediation if tools are not restored)
+npm run format:csharp:check   # whole repo; also runs inside npm run validate:prepush
+npm run format:csharp         # whole repo, formatting in place
 ```
+
+`npm run agent:preflight` checks only the **changed** C# files, and `npm run agent:preflight:fix`
+formats them and re-stages the staged ones. Formatting a file and then editing it again is the
+common way to push unformatted C#, so the check runs after the fix rather than instead of it.
 
 ### Troubleshooting
 
