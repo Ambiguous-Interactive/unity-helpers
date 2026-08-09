@@ -29,9 +29,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public ref struct WProtoReader
     {
-        private const int MaxGroupDepth = 64;
+        /// <summary>
+        /// The deepest nesting a payload may request, counting sub-messages and groups together.
+        /// </summary>
+        /// <remarks>
+        /// A formatter reads a sub-message by handing the nested reader to another formatter, so
+        /// nesting depth is stack depth, and a stack overflow cannot be caught -- it takes the
+        /// process down. Two hundred bytes of hostile input can ask for two thousand levels. The
+        /// bound is shared with group skipping because both are the same question. Protobuf's
+        /// reference implementations bound recursion at 100; 64 is deliberately below that and far
+        /// above any schema that describes real data.
+        /// </remarks>
+        public const int MaxNestingDepth = 64;
 
         private readonly ReadOnlySpan<byte> _buffer;
+        private readonly int _depth;
         private int _position;
         private bool _malformed;
 
@@ -40,11 +52,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="buffer">The encoded bytes; an empty span reads as an empty message.</param>
         public WProtoReader(ReadOnlySpan<byte> buffer)
+            : this(buffer, 0) { }
+
+        private WProtoReader(ReadOnlySpan<byte> buffer, int depth)
         {
             _buffer = buffer;
+            _depth = depth;
             _position = 0;
             _malformed = false;
         }
+
+        /// <summary>
+        /// How many enclosing sub-messages this reader sits inside; 0 for a top-level message.
+        /// </summary>
+        public int Depth => _depth;
 
         /// <summary>Bytes consumed so far.</summary>
         public int Position => _position;
@@ -380,17 +401,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the sub-message was read.</returns>
         /// <remarks>
         /// The returned reader cannot run past the sub-message, so a nested field that lies about
-        /// its own length is contained rather than allowed to consume the parent's fields.
+        /// its own length is contained rather than allowed to consume the parent's fields. It also
+        /// carries this reader's depth plus one, and a request past
+        /// <see cref="MaxNestingDepth"/> is refused as malformed rather than turned into another
+        /// stack frame -- see that constant for why the alternative cannot be caught.
         /// </remarks>
         public bool TryReadMessage(out WProtoReader nested)
         {
-            if (!TryReadBytes(out ReadOnlySpan<byte> payload))
+            if (_depth >= MaxNestingDepth)
             {
-                nested = new WProtoReader(default);
+                _malformed = true;
+                nested = new WProtoReader(default, MaxNestingDepth);
                 return false;
             }
 
-            nested = new WProtoReader(payload);
+            if (!TryReadBytes(out ReadOnlySpan<byte> payload))
+            {
+                nested = new WProtoReader(default, _depth + 1);
+                return false;
+            }
+
+            nested = new WProtoReader(payload, _depth + 1);
             return true;
         }
 
@@ -484,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private bool TrySkipGroup(int groupFieldNumber, int depth)
         {
-            if (depth >= MaxGroupDepth)
+            if (depth >= MaxNestingDepth)
             {
                 _malformed = true;
                 return false;

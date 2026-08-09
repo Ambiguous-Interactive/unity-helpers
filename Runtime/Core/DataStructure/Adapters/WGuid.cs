@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public struct WGuid
+    public partial struct WGuid
         : IEquatable<WGuid>,
             IEquatable<Guid>,
             IComparable<WGuid>,

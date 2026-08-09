@@ -903,13 +903,52 @@ formatters are emitted as a nested type of the contract, which is why the contra
 `[WProtoAfterDeserialization]` runs only after a **successful** read, so a corrupt payload reports
 failure instead of handing back an object whose derived state was rebuilt from half-written members.
 
+### Resolving a formatter
+
+`WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
+field on a closed generic type, so it costs a field read and IL2CPP compiles it ahead of time like any
+other generic call — there is no dictionary keyed by `Type` and no `MakeGenericType`:
+
+```csharp
+WProtoBuiltInFormatters.RegisterAll();                        // the package's own contracts
+
+WProtoFormatterProvider.Register(PlayerState.WProtoFormatter.Instance);   // yours
+
+IWProtoFormatter<PlayerState> formatter = WProtoFormatterProvider.Get<PlayerState>();
+int size = formatter.Measure(state);
+WProtoWriter writer = new(new byte[size]);
+formatter.Write(ref writer, state);
+```
+
+`TryGet<T>()` reports a missing registration without throwing. `Get<T>()` throws an
+`InvalidOperationException` that names the type and how to annotate it, which is the whole point: the
+alternative under IL2CPP is an `ExecutionEngineException` from inside the runtime that names nothing.
+
+Formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`. `Serializer` does
+not use them yet; they exist so the wire model is proven against real contracts before the generator
+is written.
+
+### Hostile payloads
+
+`WProtoReader.MaxNestingDepth` (64) bounds how deep a payload may nest, counting sub-messages and
+groups together. A formatter reads a sub-message by calling another formatter, so nesting depth is
+stack depth — a few kilobytes can describe two thousand levels, and a stack overflow cannot be
+caught. `TryReadMessage` refuses past the bound and reports it as malformed.
+
+Failure propagates through return values, not through the outermost reader's `Malformed` flag: a
+refused nested read is reported by the nested reader, and each caller's job is to stop.
+
 ### Wire compatibility
 
 The writer is byte-for-byte identical to protobuf-net 3.2.56 across 90 differential cases covering
 varints, ZigZag, fixed32/64, strings, byte arrays, nested messages, unpacked repeated fields, and the
-maximum field number. Two protobuf-net behaviors are worth knowing because they are easy to trip over:
+maximum field number, plus 644 whole-message cases across the four contracts above — byte-equal and
+cross-deserialized in both directions. Three protobuf-net behaviors are worth knowing because they
+are easy to trip over:
 
 - An **empty but non-null** `string` or `byte[]` is written as tag plus a zero length. Only `null` is
   omitted.
 - **Negative zero is not preserved.** Default-value omission tests `value == 0`, and `-0.0 == 0.0`, so a
   `-0f` member is omitted and reads back as `+0f`.
+- **Members go out in ascending field number, not declaration order.** `FastVector3Int` declares
+  x, y, z, hash but tags them 1, 2, 4, 3, so its cached hash is written before z.

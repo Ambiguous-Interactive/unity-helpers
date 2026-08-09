@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
     [ProtoContract]
-    public readonly struct FastVector3Int
+    public readonly partial struct FastVector3Int
         : IEquatable<FastVector3Int>,
             IEquatable<FastVector2Int>,
             IEquatable<Vector3Int>,

@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public readonly struct RandomState : IEquatable<RandomState>
+    public readonly partial struct RandomState : IEquatable<RandomState>
     {
         [JsonInclude]
         public ulong State1 => _state1;
