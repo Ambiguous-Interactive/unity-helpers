@@ -8,10 +8,8 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.ComponentModel;
     using System.Globalization;
     using System.Runtime.CompilerServices;
-    using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Core.Extension;
-    using ProtoBuf;
     using UnityEngine;
 
     /// <summary>
@@ -117,6 +115,12 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="baseValue">The base value for this attribute.</param>
         /// <param name="currentValue">The cached current value.</param>
+        /// <remarks>
+        /// <paramref name="currentValue"/> is taken as already calculated. Active modifications are
+        /// not serialized, so recalculating on load would report the base value for an attribute
+        /// that was written while buffed. Call <see cref="ClearCache"/> after deserializing if the
+        /// caller intends to rebuild modifications and wants the value to follow them.
+        /// </remarks>
         [JsonConstructor]
         public Attribute(float baseValue, float currentValue)
         {
@@ -269,6 +273,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Clears the cached current value, forcing it to be recalculated on next access.
         /// </summary>
+        /// <remarks>
+        /// Deserialization does not call this, and the two paths differ deliberately. Unity restores
+        /// only the two <c>[SerializeField]</c> values and leaves the "already calculated" flag
+        /// false, so the first read recalculates from the base value. JSON goes through the
+        /// <see cref="Attribute(float, float)"/> constructor, which keeps the value it was given --
+        /// modifications are not serialized, so recalculating there would silently drop every
+        /// active effect's contribution rather than preserve the value that was written.
+        /// </remarks>
         public void ClearCache()
         {
             _currentValueCalculated = false;
@@ -342,18 +354,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             return removed;
-        }
-
-        [OnDeserialized]
-        private void AfterDeserialize(StreamingContext streamingContext)
-        {
-            ClearCache();
-        }
-
-        [ProtoAfterDeserialization]
-        private void AfterProtoDeserialized()
-        {
-            ClearCache();
         }
 
         private static void ApplyAttributeModification(
