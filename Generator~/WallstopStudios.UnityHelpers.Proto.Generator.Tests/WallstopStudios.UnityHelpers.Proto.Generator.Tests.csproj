@@ -31,7 +31,11 @@
 
     <!-- Referenced normally as well, so the diagnostic tests can drive the generator through a
          Roslyn GeneratorDriver over a synthetic consumer compilation. -->
-    <ProjectReference Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" />
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj">
+      <!-- Building the generator normally refreshes the shipped DLL. Not from here: these tests
+           validate the shipped artifact, and a run that rewrote it first could never fail. -->
+      <Properties>CopyAnalyzerPayload=false</Properties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>

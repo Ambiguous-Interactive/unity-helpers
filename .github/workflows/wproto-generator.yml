@@ -35,23 +35,34 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
-      - name: Build the generator
-        run: dotnet build "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" -c Release --nologo
+      - name: Build the generator to a scratch directory
+        # AnalyzerPayloadOutputDir is redirected so the build cannot quietly refresh the committed
+        # DLL it is about to be compared against.
+        run: |
+          dotnet build "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" \
+            -c Release --nologo -p:AnalyzerPayloadOutputDir=$RUNNER_TEMP/analyzer
 
-      - name: Verify the shipped analyzer is not stale
-        # The suite below loads the DLL under Runtime/Analyzers -- the only binary Unity ever loads
-        # -- rather than a fresh build of the sources beside it, so a committed DLL that lags its
-        # sources shows up as failing tests. Byte-comparing the two was tried and abandoned: the
-        # compiler hashes source file paths into the assembly, so a CI checkout and a working copy
-        # never produce identical bytes however deterministic the build is.
+      - name: Verify the shipped analyzer matches its sources
+        # Byte-exact, and reproducible off this machine only because the project sets
+        # ContinuousIntegrationBuild -- determinism alone still embeds source paths, which is what
+        # made an earlier version of this step fail for a reason no developer could reproduce.
         run: |
           set -euo pipefail
+          built="$RUNNER_TEMP/analyzer/WallstopStudios.UnityHelpers.Proto.Generator.dll"
           shipped="Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll"
-          if [ ! -f "$shipped" ]; then
-            echo "::error::$shipped is missing. Build the generator and copy its output there."
+          if ! cmp -s "$built" "$shipped"; then
+            echo "::error::$shipped does not match a build of the sources beside it. Rebuild it:"
+            echo "  dotnet build \"Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj\" -c Release"
+            echo "(the build copies its own output into Runtime/Analyzers)"
             exit 1
           fi
-          echo "Shipped analyzer present; the test suite below runs against it."
+          echo "Shipped analyzer is byte-identical to a fresh build of its sources."
+
+      - name: Verify where the analyzer is placed
+        # Unity scopes an analyzer by its nearest enclosing asmdef. Under an editor-only one it
+        # reaches no consumer runtime code at all, and the failure reads as a missing generated
+        # type rather than as anything naming the analyzer.
+        run: node scripts/tests/test-analyzer-placement.js
 
       - name: Test the generator
         # The formatters under test are the shipped analyzer's own output, produced the way Unity

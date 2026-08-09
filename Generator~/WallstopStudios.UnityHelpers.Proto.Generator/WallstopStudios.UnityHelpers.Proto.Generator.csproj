@@ -12,7 +12,20 @@
     <RootNamespace>WallstopStudios.UnityHelpers.Proto.Generator</RootNamespace>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <Deterministic>true</Deterministic>
+    <!-- Determinism alone is not reproducibility: the compiler embeds source file paths, so the
+         same sources built from two directories produce different bytes (measured), and it is
+         what made a byte-comparing CI gate fail on its first run. ContinuousIntegrationBuild turns
+         on DeterministicSourcePaths, which rewrites those paths relative to the repository root
+         the SDK's built-in SourceLink discovers, so a CI checkout and a working copy agree. -->
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <DebugType>none</DebugType>
+    <!-- Where a build drops the analyzer Unity loads. Defaulting to the shipped location means the
+         committed DLL cannot silently fall behind its sources: building the project IS refreshing
+         it. CI overrides this with a temporary directory so the byte comparison it makes does not
+         dirty the checkout, and the test project sets CopyAnalyzerPayload=false so running tests
+         never rewrites the artifact they are validating. -->
+    <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">true</CopyAnalyzerPayload>
+    <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
     <!-- RS2008 wants an AnalyzerReleases.*.md ledger, which is for analyzer packages published on
          NuGet with a release cadence; this generator ships inside the package it belongs to.
          RS1032 objects to the multi-clause diagnostic messages, and those messages are the whole
@@ -32,4 +45,21 @@
       PrivateAssets="all"
     />
   </ItemGroup>
+
+  <Target
+    Name="CopyAnalyzerToPackage"
+    AfterTargets="Build"
+    Condition="'$(CopyAnalyzerPayload)' == 'true'"
+  >
+    <MakeDir
+      Directories="$(AnalyzerPayloadOutputDir)"
+      Condition="!Exists('$(AnalyzerPayloadOutputDir)')"
+    />
+    <Copy
+      SourceFiles="$(TargetPath)"
+      DestinationFolder="$(AnalyzerPayloadOutputDir)"
+      SkipUnchangedFiles="true"
+    />
+    <Message Importance="high" Text="Analyzer payload -&gt; $(AnalyzerPayloadOutputDir)" />
+  </Target>
 </Project>
