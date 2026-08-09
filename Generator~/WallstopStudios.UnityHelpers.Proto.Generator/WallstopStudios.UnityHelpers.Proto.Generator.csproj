@@ -25,7 +25,8 @@
          dirty the checkout, and the test project sets CopyAnalyzerPayload=false so running tests
          never rewrites the artifact they are validating. -->
     <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">true</CopyAnalyzerPayload>
-    <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
+    <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''"
+      >$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
     <!-- RS2008 wants an AnalyzerReleases.*.md ledger, which is for analyzer packages published on
          NuGet with a release cadence; this generator ships inside the package it belongs to.
          RS1032 objects to the multi-clause diagnostic messages, and those messages are the whole

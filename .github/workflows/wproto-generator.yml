@@ -33,14 +33,17 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.x"
+          # Pinned to a patch. The byte comparison below is only meaningful against the same
+          # compiler, and every SDK patch ships its own Roslyn; 9.0.x floated onto a different one
+          # and the gate failed for a reason no developer could reproduce.
+          dotnet-version: "9.0.306"
 
       - name: Build the generator to a scratch directory
         # AnalyzerPayloadOutputDir is redirected so the build cannot quietly refresh the committed
         # DLL it is about to be compared against.
         run: |
           dotnet build "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" \
-            -c Release --nologo -p:AnalyzerPayloadOutputDir=$RUNNER_TEMP/analyzer
+            -c Release --nologo -p:AnalyzerPayloadOutputDir="$RUNNER_TEMP/analyzer"
 
       - name: Verify the shipped analyzer matches its sources
         # Byte-exact, and reproducible off this machine only because the project sets
