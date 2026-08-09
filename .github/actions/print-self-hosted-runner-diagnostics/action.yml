@@ -135,6 +135,45 @@ runs:
         } catch {
             Write-Output ("Unity processes:       <unreadable: " + $_.Exception.Message + ">")
         }
+        # The MSVC toolset IL2CPP will compile the generated C++ with. Recorded
+        # because it is the difference between a standalone leg that builds and
+        # one that does not: MSVC 14.51.36231 crashes with an internal compiler
+        # error (C1001) at /Ox on the generated test C++, which is why
+        # -Il2CppCompilerConfiguration is pinned to Debug (see #374). Bee only
+        # echoes the compiler command line when a build FAILS, so without this
+        # a green run leaves no record of which toolchain produced it -- and
+        # "did the runner update change anything?" becomes unanswerable.
+        # Unity resolves a toolset from the installation's own default file, so
+        # side-by-side toolsets present but not defaulted are reported too.
+        try {
+            $vsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+            if (-not (Test-Path -LiteralPath $vsWhere)) {
+                Write-Output ("MSVC toolchains:       <vswhere.exe not found>")
+            }
+            else {
+                $instances = @(& $vsWhere -products * -format json | ConvertFrom-Json)
+                if ($instances.Count -eq 0) {
+                    Write-Output ("MSVC toolchains:       none reported by vswhere")
+                }
+                foreach ($instance in $instances) {
+                    $defaultFile = Join-Path $instance.installationPath 'VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt'
+                    $defaultToolset = '<none>'
+                    if (Test-Path -LiteralPath $defaultFile) {
+                        $defaultToolset = (Get-Content -LiteralPath $defaultFile -Raw).Trim()
+                    }
+                    $toolsRoot = Join-Path $instance.installationPath 'VC\Tools\MSVC'
+                    $installed = '<none>'
+                    if (Test-Path -LiteralPath $toolsRoot) {
+                        $installed = ((Get-ChildItem -LiteralPath $toolsRoot -Directory -ErrorAction SilentlyContinue |
+                            Select-Object -ExpandProperty Name | Sort-Object) -join ', ')
+                    }
+                    Write-Output ("MSVC toolchains:       {0} ({1}) default={2} installed=[{3}]" -f `
+                        $instance.displayName, $instance.installationVersion, $defaultToolset, $installed)
+                }
+            }
+        } catch {
+            Write-Output ("MSVC toolchains:       <unreadable: " + $_.Exception.Message + ">")
+        }
         Write-Output ""
         Write-Output ("PowerShell version:    " + $PSVersionTable.PSVersion.ToString())
         # PATH-walk that mirrors actions/runner WhichUtil. The runner agent
