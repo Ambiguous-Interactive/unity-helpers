@@ -31,9 +31,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <typeparam name="T">The message type.</typeparam>
         /// <param name="formatter">The formatter, or <c>null</c> to clear the registration.</param>
         /// <remarks>
+        /// <para>
         /// Last registration wins, so a consumer can deliberately replace a formatter this package
-        /// registers for one of its own types. Registration is not thread-safe against concurrent
-        /// resolution and is meant to run once during startup, before anything serializes.
+        /// registers for one of its own types. That ordering is a guarantee, not an accident: this
+        /// package registers its built-ins from
+        /// <c>RuntimeInitializeLoadType.SubsystemRegistration</c>, the first phase Unity runs, so a
+        /// consumer registering from any later phase -- including the default,
+        /// <c>BeforeSceneLoad</c> -- always overrides it.
+        /// </para>
+        /// <para>
+        /// Registration is not thread-safe against concurrent resolution and is meant to run once
+        /// during startup, before anything serializes.
+        /// </para>
         /// </remarks>
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {
@@ -88,7 +97,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 $"No WallstopProto formatter is registered for '{typeof(T).FullName}'. "
                     + "Annotate the type with [WProtoContract] and its members with [WProtoMember] so a "
                     + "formatter is generated into the assembly that declares it, or register a "
-                    + $"hand-written one with WProtoFormatterProvider.Register<{typeof(T).Name}>(...)."
+                    + $"hand-written one with WProtoFormatterProvider.Register<{typeof(T).Name}>(...). "
+                    + "Types this package ships formatters for register themselves as Unity starts; "
+                    + "outside a Unity runtime, call WProtoBuiltInFormatters.RegisterAll() first."
             );
         }
 

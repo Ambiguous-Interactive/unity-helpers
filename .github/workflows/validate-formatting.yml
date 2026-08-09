@@ -65,5 +65,11 @@ jobs:
       - name: Test final newline
         run: bash scripts/tests/test-final-newline.sh
 
+      - name: Test stdin passthrough contract
+        # The runner this job's formatting checks go through used to drain stdin, which failed with
+        # EAGAIN on a non-blocking pipe and reported a phantom lint failure. Runs here because this
+        # is the job that installs the Node tooling the contract exercises.
+        run: node scripts/tests/test-read-stdin-sync.js
+
       - name: Validate formatting
         run: bash scripts/validate-formatting.sh

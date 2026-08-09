@@ -11,14 +11,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Registration is explicit rather than discovered, because discovery means reflecting over
-    /// loaded assemblies at startup -- the cost and the AOT hazard this serializer exists to avoid.
-    /// When the source generator lands it will emit the equivalent of this method per assembly,
-    /// including into a consumer's own assembly for a consumer's own contracts.
+    /// Inside Unity nothing has to call this: <c>WProtoBootstrap</c> runs it at
+    /// <c>SubsystemRegistration</c> and on editor domain load. It is public for the cases that sit
+    /// outside Unity's startup -- a plain <c>dotnet</c> test harness, or a tool that loads the
+    /// package's assembly directly -- and because calling it more than once is harmless.
     /// </para>
     /// <para>
-    /// Calling it more than once is harmless. A consumer that deliberately replaces one of these
-    /// formatters should register theirs after calling this, since last registration wins.
+    /// Every registration here is a direct call naming a closed generic the compiler emits, so
+    /// there is no assembly scan, no <c>MakeGenericType</c>, and nothing an AOT compiler cannot see.
+    /// The hazard this serializer exists to avoid is <i>discovery</i> -- reflecting over loaded
+    /// assemblies to find implementations of <see cref="IWProtoFormatter{T}"/> and closing generics
+    /// at runtime -- not registration itself. When the source generator lands it will emit the
+    /// equivalent of this method per assembly, including into a consumer's own assembly for a
+    /// consumer's own contracts, so nobody maintains this list by hand.
+    /// </para>
+    /// <para>
+    /// A consumer that deliberately replaces one of these formatters registers theirs from any
+    /// phase after <c>SubsystemRegistration</c>, since last registration wins.
     /// </para>
     /// </remarks>
     public static class WProtoBuiltInFormatters

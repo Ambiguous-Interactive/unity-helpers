@@ -54,6 +54,35 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public WProtoReader(ReadOnlySpan<byte> buffer)
             : this(buffer, 0) { }
 
+        /// <summary>
+        /// Initializes a reader over a sub-message payload already carved out of <paramref name="parent"/>.
+        /// </summary>
+        /// <param name="buffer">The sub-message payload.</param>
+        /// <param name="parent">The reader the payload was read from.</param>
+        /// <remarks>
+        /// <para>
+        /// <see cref="TryReadMessage(out WProtoReader)"/> is the normal way to descend and needs
+        /// none of this. This exists for the formatter that has already read a payload as bytes --
+        /// because it inspected it, or buffered it, or decided between shapes -- and now needs a
+        /// reader over it. Constructing one with the single-argument constructor instead would
+        /// restart the depth count at zero at every level, which removes
+        /// <see cref="MaxNestingDepth"/> entirely for the whole subtree beneath it.
+        /// </para>
+        /// <para>
+        /// The parent is taken rather than a depth so the count cannot be understated: the only way
+        /// to name a depth is to hold a reader that is already at the one below it. A parent
+        /// already at the bound, or one that has failed, yields a reader that refuses every read.
+        /// </para>
+        /// </remarks>
+        public WProtoReader(ReadOnlySpan<byte> buffer, in WProtoReader parent)
+        {
+            bool exhausted = parent._malformed || parent._depth >= MaxNestingDepth;
+            _buffer = exhausted ? default : buffer;
+            _depth = exhausted ? MaxNestingDepth : parent._depth + 1;
+            _position = 0;
+            _malformed = exhausted;
+        }
+
         private WProtoReader(ReadOnlySpan<byte> buffer, int depth)
         {
             _buffer = buffer;
@@ -423,6 +452,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             nested = new WProtoReader(payload, _depth + 1);
             return true;
+        }
+
+        /// <summary>
+        /// Reads a length-delimited sub-message and decodes it with <paramref name="formatter"/>.
+        /// </summary>
+        /// <typeparam name="T">The sub-message type.</typeparam>
+        /// <param name="formatter">The formatter for the sub-message.</param>
+        /// <param name="value">Receives the decoded value, or <c>default</c> on failure.</param>
+        /// <returns><c>true</c> when a complete sub-message was read.</returns>
+        /// <remarks>
+        /// This is what a formatter reading a nested contract should call. It is one line instead of
+        /// three, and unlike reading the payload as bytes and building a reader over it, the depth
+        /// bound is applied for free -- the whole hazard <see cref="MaxNestingDepth"/> exists for is
+        /// a formatter that descends without carrying the count. It also latches
+        /// <see cref="Malformed"/> here when the nested read fails, so the refusal reaches this
+        /// reader's caller rather than dying inside a reader nobody up the stack can see.
+        /// </remarks>
+        public bool TryReadMessage<T>(IWProtoFormatter<T> formatter, out T value)
+        {
+            value = default;
+            if (formatter == null)
+            {
+                _malformed = true;
+                return false;
+            }
+
+            if (!TryReadMessage(out WProtoReader nested))
+            {
+                return false;
+            }
+
+            if (formatter.TryRead(ref nested, out value))
+            {
+                return true;
+            }
+
+            value = default;
+            _malformed = true;
+            return false;
         }
 
         /// <summary>

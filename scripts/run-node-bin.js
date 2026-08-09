@@ -51,20 +51,16 @@ if (!existsSync(binPath)) {
   process.exit(127);
 }
 
-let stdinBuffer;
-if (!process.stdin.isTTY) {
-  try {
-    stdinBuffer = readFileSync(0);
-  } catch (error) {
-    console.error(`Failed to read stdin for ${requestedTool}: ${error.message}`);
-    process.exit(1);
-  }
-}
-
+// stdin is passed through, never read here. Every caller hands its file list to the tool in argv,
+// and a tool that does want stdin gets the descriptor itself. Reading it first cost nothing and
+// broke everything: touching `process.stdin` to decide whether to read makes Node set O_NONBLOCK on
+// fd 0, and the `readFileSync(0)` on the next line then failed with EAGAIN whenever the data had not
+// already arrived. That surfaced as a lint run reporting zero failures and exiting 1, which in a
+// `&&` chain like validate:prepush means every later check silently does not run. See
+// scripts/read-stdin-sync.js for the one place that genuinely has to read a non-blocking fd 0.
 const result = spawnSync(process.execPath, [binPath, ...process.argv.slice(3)], {
   cwd: repoRoot,
-  input: stdinBuffer,
-  stdio: [stdinBuffer ? "pipe" : "inherit", "inherit", "inherit"],
+  stdio: "inherit",
   windowsHide: true
 });
 

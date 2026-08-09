@@ -35,11 +35,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int ScratchSize = 512;
 
-        [OneTimeSetUp]
-        public void OneTimeSetUp()
-        {
-            WProtoBuiltInFormatters.RegisterAll();
-        }
+        // Nothing here registers the built-in formatters. That is deliberate: every test below
+        // resolves through WProtoFormatterProvider, so the whole fixture is the assertion that
+        // WProtoBootstrap ran. A RegisterAll() call in a setup would hide a stripped or unreached
+        // bootstrap on the one leg -- standalone IL2CPP -- where it can actually happen.
 
         [TestCase(0, 0, "18CDAFDA8B01")]
         [TestCase(1, 2, "08011002188AC1D0EBFEFFFFFFFF01")]
@@ -180,8 +179,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void TheProviderResolvesEveryBuiltInFormatter()
+        public void EveryBuiltInFormatterIsRegisteredWithoutAnyoneAskingForIt()
         {
+            // No RegisterAll() anywhere in this fixture: reaching this assertion at all means the
+            // startup hook ran. On the standalone IL2CPP leg this is the only check that the
+            // registrar survived managed stripping, which is why the hook is a
+            // [RuntimeInitializeOnLoadMethod] -- a linker root -- rather than a [ModuleInitializer].
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<FastVector2Int>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<FastVector3Int>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WGuid>());
@@ -192,6 +195,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     WProtoFormatterProvider.Get<RandomState>(),
                     RandomState.WProtoFormatter.Instance
                 )
+            );
+        }
+
+        [Test]
+        public void ARegistrationMadeAfterStartupReplacesTheBuiltInOne()
+        {
+            // The ordering guarantee auto-registration has to keep: built-ins go in at
+            // SubsystemRegistration, the earliest phase, so a consumer registering from any later
+            // one wins. Without that ordering this passes anyway -- what it pins is that
+            // registration stays last-wins rather than becoming first-wins or throwing on a
+            // duplicate, which is the shape auto-registration would tempt someone into.
+            IWProtoFormatter<RandomState> builtIn = WProtoFormatterProvider.Get<RandomState>();
+            StubFormatter replacement = new();
+            try
+            {
+                WProtoFormatterProvider.Register<RandomState>(replacement);
+                Assert.IsTrue(
+                    ReferenceEquals(replacement, WProtoFormatterProvider.Get<RandomState>())
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(builtIn);
+            }
+
+            Assert.IsTrue(
+                ReferenceEquals(builtIn, WProtoFormatterProvider.Get<RandomState>()),
+                "A consumer override must be reversible, or this fixture poisons every later test."
             );
         }
 
@@ -209,6 +240,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // ExecutionEngineException from IL2CPP names nothing.
             Assert.IsTrue(error.Message.Contains(typeof(Uri).FullName));
             Assert.IsTrue(error.Message.Contains(nameof(WProtoFormatterProvider)));
+        }
+
+        [TestCase(0, true)]
+        [TestCase(1, true)]
+        [TestCase(WProtoReader.MaxNestingDepth, true)]
+        [TestCase(WProtoReader.MaxNestingDepth + 1, false)]
+        [TestCase(WProtoReader.MaxNestingDepth + 8, false)]
+        public void ANestedContractIsBoundedByTheDepthLimitWhereverItDescends(
+            int depth,
+            bool expected
+        )
+        {
+            // The bound lives on the reader, so a formatter only gets it by descending through
+            // TryReadMessage. One that reads the payload as bytes and builds its own reader restarts
+            // the count at zero at every level and round-trips this same data happily -- which is
+            // exactly why the deep cases are here rather than only the shallow ones. Past-the-bound
+            // depths are kept small enough that the unbounded form would NOT overflow the stack:
+            // a test that crashes the runner proves nothing, and a stack overflow cannot be caught.
+            WProtoFormatterProvider.Register(NestingProbe.Formatter.Instance);
+            WProtoReader reader = new(BuildNesting(depth));
+
+            Assert.AreEqual(
+                expected,
+                WProtoFormatterProvider
+                    .Get<NestingProbe>()
+                    .TryRead(ref reader, out NestingProbe decoded)
+            );
+
+            if (expected)
+            {
+                Assert.AreEqual(depth, NestingProbe.DepthOf(decoded));
+            }
+        }
+
+        [Test]
+        public void AFormatterBuildingItsOwnReaderInheritsTheParentsDepth()
+        {
+            // The escape hatch for a formatter that has already read a payload as bytes. Taking the
+            // parent rather than an int is what stops the depth being understated back to zero.
+            byte[] payload = BuildNesting(1);
+            WProtoReader root = new(payload);
+            Assert.IsTrue(root.TryReadTag(out _, out _));
+            Assert.IsTrue(root.TryReadBytes(out ReadOnlySpan<byte> inner));
+
+            WProtoReader nested = new(inner, in root);
+            Assert.AreEqual(root.Depth + 1, nested.Depth);
+            Assert.IsFalse(nested.Malformed);
+        }
+
+        [Test]
+        public void AReaderBuiltFromAnExhaustedParentRefusesEveryRead()
+        {
+            WProtoReader root = new(BuildNesting(WProtoReader.MaxNestingDepth));
+            AssertDescendingPastTheBoundIsRefused(ref root);
         }
 
         [Test]
@@ -513,6 +598,124 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return !reader.Malformed;
+        }
+
+        /// <summary>Descends to the bound, then asserts the level past it is refused.</summary>
+        private static void AssertDescendingPastTheBoundIsRefused(ref WProtoReader reader)
+        {
+            if (reader.Depth >= WProtoReader.MaxNestingDepth)
+            {
+                WProtoReader past = new(new byte[] { 0x08, 0x01 }, in reader);
+                Assert.IsTrue(past.Malformed);
+                Assert.IsFalse(past.TryReadTag(out _, out _));
+                return;
+            }
+
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadMessage(out WProtoReader nested));
+            AssertDescendingPastTheBoundIsRefused(ref nested);
+        }
+
+        /// <summary>A self-nesting contract: the shape whose formatter has to carry the depth.</summary>
+        private sealed class NestingProbe
+        {
+            internal NestingProbe Child;
+
+            internal static int DepthOf(NestingProbe probe)
+            {
+                int depth = 0;
+                for (NestingProbe node = probe; node?.Child != null; node = node.Child)
+                {
+                    depth++;
+                }
+
+                return depth;
+            }
+
+            internal sealed class Formatter : IWProtoFormatter<NestingProbe>
+            {
+                internal static readonly Formatter Instance = new();
+
+                public int Measure(in NestingProbe value)
+                {
+                    if (value?.Child == null)
+                    {
+                        return 0;
+                    }
+
+                    int childSize = Measure(value.Child);
+                    return WProtoSizes.TagSize(1) + WProtoSizes.LengthDelimitedSize(childSize);
+                }
+
+                public bool Write(ref WProtoWriter writer, in NestingProbe value)
+                {
+                    if (value?.Child == null)
+                    {
+                        return true;
+                    }
+
+                    return writer.TryWriteTag(1, WProtoWireType.LengthDelimited)
+                        && writer.TryWriteLengthPrefix(Measure(value.Child))
+                        && Write(ref writer, value.Child);
+                }
+
+                public bool TryRead(ref WProtoReader reader, out NestingProbe value)
+                {
+                    NestingProbe read = new();
+                    while (reader.TryReadTag(out int fieldNumber, out int wireType))
+                    {
+                        if (fieldNumber == 1 && wireType == WProtoWireType.LengthDelimited)
+                        {
+                            // The bounded descent. Reading the payload with TryReadBytes and
+                            // constructing a reader over it with the single-argument constructor
+                            // passes every other test in this file and removes the bound entirely.
+                            if (!reader.TryReadMessage(Instance, out NestingProbe child))
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            read.Child = child;
+                            continue;
+                        }
+
+                        if (!reader.TrySkipField(fieldNumber, wireType))
+                        {
+                            value = null;
+                            return false;
+                        }
+                    }
+
+                    if (reader.Malformed)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = read;
+                    return true;
+                }
+            }
+        }
+
+        /// <summary>Stands in for a consumer's replacement formatter; never actually invoked.</summary>
+        private sealed class StubFormatter : IWProtoFormatter<RandomState>
+        {
+            public int Measure(in RandomState value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in RandomState value)
+            {
+                return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out RandomState value)
+            {
+                value = default;
+                return true;
+            }
         }
     }
 }

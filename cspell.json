@@ -855,7 +855,8 @@
         "varints",
         "zigzag",
         "MSVC",
-        "vswhere"
+        "vswhere",
+        "EAGAIN"
       ]
     }
   ],

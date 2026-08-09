@@ -35,6 +35,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { spawnSync } = require("child_process");
+const { readStdinSync } = require("../read-stdin-sync.js");
 
 const SUPPORTED_EXTENSIONS = new Set([
   ".md",
@@ -53,8 +54,11 @@ const CSPELL_TIMEOUT_MS = 30000;
 
 function readStdin() {
   try {
-    return fs.readFileSync(0, "utf8");
-  } catch {
+    return readStdinSync({ timeoutMs: 2000 }).data.toString("utf8");
+  } catch (error) {
+    // Distinguishable on purpose. Returning "" here means the hook checks nothing, and a silent
+    // no-op is indistinguishable from a clean spell check.
+    process.stderr.write(`cspell-post-edit: could not read the hook payload: ${error.message}\n`);
     return "";
   }
 }
