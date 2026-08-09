@@ -33,7 +33,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.x"
+          # Pinned to a patch, not 9.0.x. The staleness check below compares bytes, and a
+          # deterministic build is only byte-reproducible against the same compiler -- a different
+          # SDK patch ships a different Roslyn and would fail the comparison for no reason.
+          dotnet-version: "9.0.306"
 
       - name: Build the generator
         run: dotnet build "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj" -c Release --nologo
