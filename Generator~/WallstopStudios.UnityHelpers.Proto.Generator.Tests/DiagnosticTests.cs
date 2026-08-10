@@ -470,7 +470,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsNotNull(
                 match,
-                "expected " + id + ", saw: " + string.Join("; ", diagnostics.Select(d => d.Id))
+                "expected "
+                    + id
+                    + ", saw: "
+                    + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(
@@ -481,9 +484,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static ImmutableArray<Diagnostic> Run(string body)
         {
+            // An [assembly:] attribute must precede every namespace, so a fixture that needs one
+            // writes it at the top of its body and it is hoisted out here rather than ending up
+            // inside `namespace Consumer` where it would not compile.
+            List<string> assemblyAttributes = new List<string>();
+            List<string> rest = new List<string>();
+            foreach (string line in body.Split('\n'))
+            {
+                (
+                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
+                        ? assemblyAttributes
+                        : rest
+                ).Add(line);
+            }
+
             string source =
-                "namespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
-                + body
+                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                + string.Join("\n", assemblyAttributes)
+                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
+                + string.Join("\n", rest)
                 + " }";
 
             List<MetadataReference> references = new List<MetadataReference>();

@@ -13,12 +13,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     // Surrogates allow protobuf-net to serialize Unity structs we cannot annotate directly.
     [ProtoContract]
-    internal struct Vector2Surrogate
+    [WProtoContract]
+    internal partial struct Vector2Surrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float y;
 
         public static implicit operator Vector2Surrogate(Vector2 v) => new() { x = v.x, y = v.y };
@@ -27,15 +30,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct Vector3Surrogate
+    [WProtoContract]
+    internal partial struct Vector3Surrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float y;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float z;
 
         public static implicit operator Vector3Surrogate(Vector3 v) =>
@@ -50,18 +57,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct QuaternionSurrogate
+    [WProtoContract]
+    internal partial struct QuaternionSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float y;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float z;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public float w;
 
         public static implicit operator QuaternionSurrogate(Quaternion q) =>
@@ -78,18 +90,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct ColorSurrogate
+    [WProtoContract]
+    internal partial struct ColorSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float r;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float g;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float b;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public float a;
 
         public static implicit operator ColorSurrogate(Color c) =>
@@ -105,18 +122,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct Color32Surrogate
+    [WProtoContract]
+    internal partial struct Color32Surrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public byte r;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public byte g;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public byte b;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public byte a;
 
         public static implicit operator Color32Surrogate(Color32 c) =>
@@ -132,18 +154,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct RectSurrogate
+    [WProtoContract]
+    internal partial struct RectSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float y;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float width;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public float height;
 
         public static implicit operator RectSurrogate(Rect r) =>
@@ -159,18 +186,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct RectIntSurrogate
+    [WProtoContract]
+    internal partial struct RectIntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int y;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int width;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public int height;
 
         public static implicit operator RectIntSurrogate(RectInt r) =>
@@ -187,24 +219,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct BoundsSurrogate
+    [WProtoContract]
+    internal partial struct BoundsSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float cx;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float cy;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float cz;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public float sx;
 
         [ProtoMember(5)]
+        [WProtoMember(5)]
         public float sy;
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         public float sz;
 
         public static implicit operator BoundsSurrogate(Bounds b) =>
@@ -223,24 +262,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct BoundsIntSurrogate
+    [WProtoContract]
+    internal partial struct BoundsIntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int px;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int py;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int pz;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public int sx;
 
         [ProtoMember(5)]
+        [WProtoMember(5)]
         public int sy;
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         public int sz;
 
         public static implicit operator BoundsIntSurrogate(BoundsInt b) =>
@@ -259,12 +305,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct Vector2IntSurrogate
+    [WProtoContract]
+    internal partial struct Vector2IntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int y;
 
         public static implicit operator Vector2IntSurrogate(Vector2Int v) =>
@@ -274,15 +323,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct Vector3IntSurrogate
+    [WProtoContract]
+    internal partial struct Vector3IntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int y;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int z;
 
         public static implicit operator Vector3IntSurrogate(Vector3Int v) =>
@@ -297,15 +350,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct ResolutionSurrogate
+    [WProtoContract]
+    internal partial struct ResolutionSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int width;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int height;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int refreshRate;
 
         [Obsolete("Obsolete")]
@@ -335,17 +392,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     // the originals exactly so the wire format is byte-identical to the pre-surrogate mono output.
 
     [ProtoContract]
-    internal struct FastVector2IntSurrogate
+    [WProtoContract]
+    internal partial struct FastVector2IntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int y;
 
         // Mirrors FastVector2Int's serialized cached hash (ProtoMember 3) for wire parity; the value
         // is recomputed by the FastVector2Int constructor on conversion, so it is not trusted on read.
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int hash;
 
         public static implicit operator FastVector2IntSurrogate(FastVector2Int v) =>
@@ -360,20 +421,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct FastVector3IntSurrogate
+    [WProtoContract]
+    internal partial struct FastVector3IntSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public int x;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int y;
 
         // FastVector3Int intentionally serializes its cached hash as ProtoMember 3 and z as
         // ProtoMember 4 (out of order). The surrogate preserves that ordering for wire parity.
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public int hash;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public int z;
 
         public static implicit operator FastVector3IntSurrogate(FastVector3Int v) =>
@@ -390,18 +456,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct ParabolaSurrogate
+    [WProtoContract]
+    internal partial struct ParabolaSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public float length;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float a;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float b;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public float maxHeight;
 
         public static implicit operator ParabolaSurrogate(Parabola p) =>
@@ -420,12 +491,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     [ProtoContract]
-    internal struct ImmutableBitSetSurrogate
+    [WProtoContract]
+    internal partial struct ImmutableBitSetSurrogate
     {
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public ulong[] bits;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int capacity;
 
         public static implicit operator ImmutableBitSetSurrogate(ImmutableBitSet b) =>
@@ -444,9 +518,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for SerializableHashSet that avoids IEnumerable collection detection.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class SerializableHashSetProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
     }
 
@@ -454,9 +530,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for SerializableSortedSet that avoids IEnumerable collection detection.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class SerializableSortedSetProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
     }
 
@@ -464,12 +542,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for SerializableDictionary that avoids IEnumerable collection detection.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class SerializableDictionaryProtoWrapper<TKey, TValue>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public TKey[] Keys;
 
         [ProtoMember(2, OverwriteList = true)]
+        [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
     }
 
@@ -477,12 +558,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for SerializableSortedDictionary that avoids IEnumerable collection detection.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public TKey[] Keys;
 
         [ProtoMember(2, OverwriteList = true)]
+        [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
     }
 
@@ -496,12 +580,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for <see cref="Deque{T}"/>: ordered items (front to back) plus capacity.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class DequeProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int Capacity;
     }
 
@@ -509,12 +596,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for <see cref="CyclicBuffer{T}"/>: ordered items (oldest to newest) plus capacity.
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class CyclicBufferProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int Capacity;
     }
 
@@ -522,12 +612,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Protobuf wrapper for <see cref="SparseSet"/>: dense elements plus universe size (capacity).
     /// </summary>
     [ProtoContract]
+    [WProtoContract]
     internal sealed class SparseSetProtoWrapper
     {
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         public int[] Elements;
 
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public int Capacity;
     }
 

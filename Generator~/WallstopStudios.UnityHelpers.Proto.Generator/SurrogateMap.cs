@@ -84,6 +84,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>
         /// Finds the surrogate for <paramref name="type"/>, or <c>null</c> when it has none.
         /// </summary>
+        private INamedTypeSymbol Declared(ITypeSymbol type)
+        {
+            return
+                type is INamedTypeSymbol named
+                && _pairs.TryGetValue(named, out INamedTypeSymbol surrogate)
+                ? surrogate
+                : null;
+        }
+
         internal INamedTypeSymbol For(ITypeSymbol type)
         {
             return
