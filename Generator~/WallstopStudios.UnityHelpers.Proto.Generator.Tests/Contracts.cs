@@ -801,4 +801,55 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(4)]
         public System.Collections.Generic.Dictionary<string, ForeignVector3> Named;
     }
+
+    /// <summary>
+    /// A generic contract, whose members' encodings are only decided by the closure.
+    /// </summary>
+    /// <remarks>
+    /// Annotated for both serializers so the closures can be compared byte for byte. The field key
+    /// itself changes with <c>T</c> -- <c>08</c> for an int, <c>09</c> for a double, <c>0A</c> for a
+    /// string -- which is why the emitted code asks <c>WProtoGeneric&lt;T&gt;</c> instead of
+    /// carrying a constant.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class Box<T>
+    {
+        /// <summary>A member typed as the parameter.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public T Value;
+
+        /// <summary>A repeated member of the parameter.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public T[] Many;
+
+        /// <summary>A scalar, to pin ordering against the generic members.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public int Trailer;
+    }
+
+    /// <summary>Names the closures this assembly uses, so the generator registers them.</summary>
+    /// <remarks>
+    /// A registrar cannot register an open generic, and constructing one at runtime needs
+    /// <c>MakeGenericType</c> -- the exact call IL2CPP cannot compile. The generator therefore
+    /// registers the constructions it can see in source, and this is where these ones become
+    /// visible.
+    /// </remarks>
+    public static class BoxClosures
+    {
+        /// <summary>An integer closure.</summary>
+        public static Box<int> Ints;
+
+        /// <summary>A floating-point closure, whose wire type differs from the integer one.</summary>
+        public static Box<double> Doubles;
+
+        /// <summary>A length-delimited closure.</summary>
+        public static Box<string> Texts;
+
+        /// <summary>A message closure, so the sub-message path is covered too.</summary>
+        public static Box<Outer.Point> Points;
+    }
 }

@@ -53,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly bool _collectionIsValueType;
         private readonly bool _overwrite;
         private readonly bool _elementIsReference;
+        private readonly bool _elementIsGeneric;
 
         private RepeatedMember(
             string contractName,
@@ -64,7 +65,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string collectionQualified,
             bool isArray,
             bool collectionIsValueType,
-            bool overwrite
+            bool overwrite,
+            bool elementIsGeneric
         )
             : base(name, tag)
         {
@@ -76,7 +78,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _isArray = isArray;
             _collectionIsValueType = collectionIsValueType;
             _overwrite = overwrite;
-            _elementIsReference = shape.IsReference;
+            _elementIsGeneric = elementIsGeneric;
+            _elementIsReference = !elementIsGeneric && shape.IsReference;
         }
 
         /// <summary>
@@ -118,8 +121,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string elementQualified = element.ToDisplayString(
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
-            Shape shape = Shape.For(element, elementQualified, surrogates);
-            if (shape == null)
+
+            // An element typed as a type parameter defers its whole encoding to the closure, exactly
+            // as a member of that type would.
+            bool elementIsGeneric = element is ITypeParameterSymbol;
+            Shape shape = elementIsGeneric
+                ? null
+                : Shape.For(element, elementQualified, surrogates);
+            if (shape == null && !elementIsGeneric)
             {
                 return null;
             }
@@ -134,7 +143,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 isArray,
                 type.IsValueType,
-                overwriteList
+                overwriteList,
+                elementIsGeneric
             );
         }
 
@@ -266,6 +276,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
+        /// <summary>The closed-type dispatch used when the element type is a type parameter.</summary>
+        private string Generic => Proto + ".WProtoGeneric<" + _elementQualified + ">";
+
         private string IndexLocal => "index" + Tag;
 
         private string ElementLocal => "element" + Tag;
@@ -301,13 +314,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             int open = OpenLoop(writer);
             writer.Line(
-                "size += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + Tag
-                    + ") + "
-                    + Shape.Fill(_shape.SizeExpression, ElementLocal)
-                    + ";"
+                _elementIsGeneric
+                    ? "size += " + Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ");"
+                    : "size += "
+                        + Proto
+                        + ".WProtoSizes.TagSize("
+                        + Tag
+                        + ") + "
+                        + Shape.Fill(_shape.SizeExpression, ElementLocal)
+                        + ";"
             );
             CloseAll(writer, open);
             writer.Blank();
@@ -317,7 +332,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitWrite(Writer writer)
         {
             int open = OpenLoop(writer);
-            writer.Line("if (!(" + _shape.WriteCall(ElementLocal, Tag) + "))" + Writer.Open);
+            writer.Line(
+                "if (!("
+                    + (
+                        _elementIsGeneric
+                            ? Generic
+                                + ".WriteElement(ref writer, "
+                                + Tag
+                                + ", "
+                                + ElementLocal
+                                + ")"
+                            : _shape.WriteCall(ElementLocal, Tag)
+                    )
+                    + "))"
+                    + Writer.Open
+            );
             writer.Indent();
             writer.Line("return false;");
             Close(writer);
@@ -450,6 +479,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitReadCases(Writer writer, string qualifiedContract)
         {
             string local = "decoded" + Tag;
+
+            if (_elementIsGeneric)
+            {
+                writer.Line(
+                    "case " + Tag + " when " + Generic + ".Accepts(wireType):" + Writer.Open
+                );
+                writer.Indent();
+                EmitSeed(writer);
+                writer.Line(
+                    "if (!"
+                        + Generic
+                        + ".TryReadValue(ref reader, out "
+                        + _elementQualified
+                        + " "
+                        + local
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Blank();
+                writer.Line(Target + ".Add(" + local + ");");
+                writer.Line("break;");
+                Close(writer);
+                return;
+            }
 
             OpenCase(writer, _shape.WireType);
             EmitSeed(writer);

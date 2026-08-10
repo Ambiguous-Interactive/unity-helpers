@@ -85,8 +85,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal static readonly DiagnosticDescriptor GenericContract = new DiagnosticDescriptor(
             "WPROTO009",
-            "WallstopProto cannot generate for a generic contract yet",
-            "'{0}' is a generic [WProtoContract]. Closing a generic at the assembly that uses it is planned, but not implemented; write a formatter for each closed construction by hand and register it with WProtoFormatterProvider.Register<T> in the meantime.",
+            "WallstopProto cannot generate for a contract nested inside a generic type",
+            "'{0}' is a [WProtoContract] nested inside a generic type. A generic contract itself is supported -- its closed constructions are discovered and registered -- but a contract nested inside one is not: it is not generic, so there is no construction of it to find, and its formatter would be emitted and never registered. Move '{0}' out of its generic container, or make it generic itself.",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

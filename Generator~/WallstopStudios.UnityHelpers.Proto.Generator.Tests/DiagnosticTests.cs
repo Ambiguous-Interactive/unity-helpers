@@ -367,14 +367,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void AGenericContractIsARefusalRatherThanAWrongFormatter()
+        public void AGenericContractIsAccepted()
         {
-            AssertDiagnostic(
-                "WPROTO009",
-                "Boxed",
+            // Refused until this session. The closure decides each member's wire type, so the
+            // emitted code asks WProtoGeneric<T> rather than carrying a constant.
+            AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Boxed<T>
                   {
                       [WProtoMember(1)] public int Value;
+                      [WProtoMember(2)] public T Payload;
+                      [WProtoMember(3)] public T[] Many;
                   }"
             );
         }
@@ -382,10 +384,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AContractNestedInsideAGenericTypeIsARefusalToo()
         {
-            // The contract itself is not generic; the type it is nested in is. The formatter is
-            // emitted by reopening every enclosing type as partial, and a reopened declaration that
-            // drops its type parameters does not compile -- so this has to be caught here rather
-            // than surface as a compile error in a file the developer never wrote.
+            // The contract itself is not generic; the type it is nested in is. Emission would work
+            // -- every enclosing type is reopened with its type parameters -- but REGISTRATION would
+            // not: `Inner` has no constructions of its own to discover, so its formatter would be
+            // emitted and never registered, and `Get<Holder<int>.Inner>()` would throw at runtime in
+            // a shipped player. Refusing at build time is the lesser failure.
             AssertDiagnostic(
                 "WPROTO009",
                 "Inner",

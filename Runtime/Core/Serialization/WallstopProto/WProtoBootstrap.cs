@@ -41,6 +41,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private static void RegisterInEditor()
         {
             WProtoBuiltInFormatters.RegisterAll();
+            WProtoScalarFormatters.RegisterAll();
         }
 #endif
 
@@ -48,6 +49,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private static void RegisterInPlayer()
         {
             WProtoBuiltInFormatters.RegisterAll();
+            WProtoScalarFormatters.RegisterAll();
         }
     }
 }

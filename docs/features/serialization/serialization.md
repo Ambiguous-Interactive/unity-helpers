@@ -1095,6 +1095,37 @@ override a surrogate for a type you also use.
 Both conversions must exist, implicit or explicit. A default surrogated **struct** is still written
 (a tag and a zero length), following the same rule as any struct sub-message.
 
+#### Generic contracts
+
+A `[WProtoContract]` may be generic, and its members may be typed as its own parameters:
+
+```csharp
+[WProtoContract]
+public partial class Box<T>
+{
+    [WProtoMember(1)] public T Value;
+    [WProtoMember(2)] public T[] Many;
+}
+```
+
+**Each closure gets its own encoding, because it must.** The field key itself changes with `T` —
+`Box<int>.Value` is `08 01` (varint), `Box<double>` is `09 …` (fixed64), `Box<string>` is `0A …`
+(length-delimited). The generated code asks `WProtoGeneric<T>` rather than carrying a constant, and
+that is a closed generic IL2CPP compiles ahead of time like any other.
+
+**The closures you use must appear in source.** A registrar cannot register an open generic, and
+constructing one at runtime would need `MakeGenericType` — the exact call IL2CPP cannot compile. The
+generator registers every closed construction it can see in the compilation, which is what makes a
+consumer's own `Box<TheirStruct>` work without any manual registration. A construction that appears
+in no source could not have been reached at runtime either.
+
+If you need a closure that no code names directly, name it — a `static` field of that type is
+enough.
+
+A contract **nested inside** a generic type is still refused (`WPROTO009`): it is not itself generic,
+so there is no construction of it to discover, and its formatter would be emitted and never
+registered. Move it out, or make it generic itself.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
