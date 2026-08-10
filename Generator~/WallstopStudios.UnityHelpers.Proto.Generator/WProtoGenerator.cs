@@ -323,20 +323,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("int size = 0;");
             foreach (Member member in members)
             {
-                writer.Line("if (" + member.PresenceTest + ")" + Writer.Open);
-                writer.Indent();
-                writer.Line(
-                    "size += "
-                        + Proto
-                        + ".WProtoSizes.TagSize("
-                        + member.Tag
-                        + ") + "
-                        + member.SizeExpression
-                        + ";"
-                );
-                writer.Outdent();
-                writer.Line("}");
-                writer.Blank();
+                member.EmitMeasure(writer);
             }
 
             writer.Line("return size;");
@@ -364,16 +351,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Member member in members)
             {
-                writer.Line("if (" + member.PresenceTest + ")" + Writer.Open);
-                writer.Indent();
-                writer.Line("if (!(" + member.WriteExpression + "))" + Writer.Open);
-                writer.Indent();
-                writer.Line("return false;");
-                writer.Outdent();
-                writer.Line("}");
-                writer.Outdent();
-                writer.Line("}");
-                writer.Blank();
+                member.EmitWrite(writer);
             }
 
             if (hooks.AfterSerialization != null)
@@ -417,6 +395,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             writer.Blank();
+            foreach (Member member in members)
+            {
+                member.EmitReadLocals(writer);
+            }
+
             writer.Line(
                 "while (reader.TryReadTag(out int fieldNumber, out int wireType))" + Writer.Open
             );
@@ -426,23 +409,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Member member in members)
             {
-                writer.Line(
-                    "case "
-                        + member.Tag
-                        + " when wireType == "
-                        + member.WireType
-                        + ":"
-                        + Writer.Open
-                );
-                writer.Indent();
-                foreach (string line in member.ReadStatements("read", qualified))
-                {
-                    writer.Line(line);
-                }
-
-                writer.Line("break;");
-                writer.Outdent();
-                writer.Line("}");
+                member.EmitReadCases(writer, qualified);
             }
 
             writer.Line("default:" + Writer.Open);
@@ -473,6 +440,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Outdent();
             writer.Line("}");
             writer.Blank();
+
+            // After the malformed check, deliberately: a collection accumulated from a payload that
+            // turned out to be truncated must not be committed onto the instance the caller gets
+            // back, for the same reason the after-deserialization hook does not run on a failed read.
+            foreach (Member member in members)
+            {
+                member.EmitReadEpilogue(writer);
+            }
 
             if (hooks.AfterDeserialization != null)
             {
@@ -614,7 +589,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                Member member = Member.Create(symbol.Name, tag, type, IsRequired(attribute));
+                Member member = Member.Create(
+                    contract.Name,
+                    symbol.Name,
+                    tag,
+                    type,
+                    NamedFlag(attribute, "IsRequired"),
+                    NamedFlag(attribute, "OverwriteList")
+                );
                 if (member == null)
                 {
                     Report(
@@ -709,13 +691,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
         }
 
-        private static bool IsRequired(AttributeData attribute)
+        private static bool NamedFlag(AttributeData attribute, string name)
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
-                if (argument.Key == "IsRequired" && argument.Value.Value is bool required)
+                if (argument.Key == name && argument.Value.Value is bool flag)
                 {
-                    return required;
+                    return flag;
                 }
             }
 

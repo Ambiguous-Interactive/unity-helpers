@@ -39,6 +39,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The conformance oracle, the same vendored binary the package ships to Unity. Referencing it
+         here rather than only from the Unity test assembly is what makes byte-compatibility a
+         red-green loop a developer can run in seconds: the Unity differential can only run on the
+         Mono legs anyway, because protobuf-net is what does not work under IL2CPP. -->
+    <Reference Include="protobuf-net">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />

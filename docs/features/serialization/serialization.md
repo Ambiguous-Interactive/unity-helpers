@@ -965,6 +965,60 @@ reading. A graph deeper than that — in practice, one containing a cycle — th
 `InvalidOperationException` naming the type, because a cyclic message has no finite encoded size and
 the alternative is a stack overflow, which cannot be caught.
 
+#### Collections
+
+A `[WProtoMember]` may be an array or a collection, and it becomes a **repeated field** — a run of
+same-numbered fields on the wire rather than one value:
+
+```csharp
+[WProtoContract]
+public sealed partial class Inventory
+{
+    [WProtoMember(1)]
+    public int[] ItemIds;
+
+    [WProtoMember(2)]
+    public List<string> Tags;
+
+    [WProtoMember(3)]
+    public HashSet<int> UnlockedRecipes;
+
+    [WProtoMember(4, OverwriteList = true)]
+    public List<Loadout> Loadouts;   // replaced on read instead of appended to
+}
+```
+
+**What is accepted.** A single-dimension array, or any type that implements `ICollection<T>` exactly
+once, has a public parameterless constructor, and has a public `Add(T)`. That is `List<T>`,
+`HashSet<T>`, `SortedSet<T>`, `Collection<T>` and your own types. The element may be any scalar
+shape, an enum, a `byte[]`, or another `[WProtoContract]`.
+
+**A collection may be a `struct`.** Nothing about `ICollection<T>` requires a class, and an inline or
+pooled buffer is a good reason to make one a value type. A struct collection is never null-checked
+and is assigned back to its member after reading, because everything in between operated on a copy.
+Iteration binds to your concrete enumerator, so a struct collection is not boxed on the write path.
+
+**Five behaviors are worth knowing.** All five are protobuf-net's, measured rather than assumed, and
+three of them are the opposite of the rule for a plain member:
+
+- **Every element is written**, including one equal to its type's default. A member holding `0` is
+  omitted; an element holding `0` is not, because dropping it would shorten the collection.
+- **Null and empty are the same bytes** — both write nothing. So an empty collection with no
+  constructor value behind it **reads back as `null`**. This is a silent data change and it is
+  reproduced deliberately, because the alternative is data protobuf-net cannot read.
+- **A null element is refused**, with an `InvalidOperationException` naming the contract and the
+  member. There is no encoding for an absent value inside a run; writing one would either invent an
+  empty value or silently shorten the collection. protobuf-net raises on the same input.
+- **Reading appends** to whatever the constructor left in the member. `OverwriteList = true` replaces
+  it instead. An **absent** field leaves the constructor's value alone either way — there is nothing
+  for an overwrite to be triggered by.
+- **Packed payloads are accepted** even though this package always writes unpacked, which is what
+  protobuf-net does. A payload written by a contract that set `IsPacked` decodes here unchanged.
+
+Dictionaries are not supported yet: a protobuf map is a repeated _sub-message_ with the key at field
+1 and the value at field 2, which is a different encoding. `Dictionary<TKey, TValue>` and its
+relatives are a build error naming the member rather than bytes nothing could read back.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

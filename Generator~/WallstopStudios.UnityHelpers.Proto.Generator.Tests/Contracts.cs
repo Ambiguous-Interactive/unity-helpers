@@ -3,6 +3,8 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
+    using System.Collections.Generic;
+    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>Every member shape the generator claims to support, in one contract.</summary>
@@ -125,12 +127,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     public static partial class Outer
     {
         /// <summary>Proves the emitter reopens every enclosing type, not just the contract.</summary>
+        [ProtoContract]
         [WProtoContract]
         public partial struct Point
         {
+            [ProtoMember(1)]
             [WProtoMember(1)]
             public int X;
 
+            [ProtoMember(2)]
             [WProtoMember(2)]
             public int Y;
         }
@@ -194,6 +199,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>A contract with no members, so a present one is a key and a zero length.</summary>
+    [ProtoContract]
     [WProtoContract]
     public sealed partial class EmptyContract { }
 
@@ -232,6 +238,245 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         [WProtoMember(2)]
         public ChainContract Next;
+    }
+
+    /// <summary>Every repeated element shape the generator claims to support.</summary>
+    /// <remarks>
+    /// Annotated for both serializers, with identical field numbers, so
+    /// <c>OracleDifferentialTests</c> can hand the same instance to each and compare bytes. Tags
+    /// that drifted apart would make that comparison meaningless, which is why the two attributes
+    /// are declared beside each other rather than in separate files.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class RepeatedContract
+    {
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int[] Ints;
+
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public List<int> IntList;
+
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public string[] Texts;
+
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public double[] Doubles;
+
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public ulong[] Longs;
+
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        public bool[] Flags;
+
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        public Mode[] Modes;
+
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public Outer.Point[] Points;
+
+        [ProtoMember(9)]
+        [WProtoMember(9)]
+        public EmptyContract[] Messages;
+
+        [ProtoMember(10)]
+        [WProtoMember(10)]
+        public byte[][] Blobs;
+
+        [ProtoMember(11)]
+        [WProtoMember(11)]
+        public List<Outer.Point> PointList;
+
+        [ProtoMember(12)]
+        [WProtoMember(12)]
+        public short[] Shorts;
+    }
+
+    /// <summary>
+    /// Collections the constructor has already filled, which is the only way append and overwrite
+    /// can be told apart.
+    /// </summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class SeededRepeatedContract
+    {
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public List<int> AppendedList = new List<int> { 7, 8 };
+
+        [ProtoMember(2, OverwriteList = true)]
+        [WProtoMember(2, OverwriteList = true)]
+        public List<int> OverwrittenList = new List<int> { 7, 8 };
+
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public int[] AppendedArray = { 7, 8 };
+
+        [ProtoMember(4, OverwriteList = true)]
+        [WProtoMember(4, OverwriteList = true)]
+        public int[] OverwrittenArray = { 7, 8 };
+
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public int Marker;
+    }
+
+    /// <summary>A struct contract carrying a repeated member.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public partial struct RepeatedStructContract
+    {
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int[] Ints;
+
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public int Marker;
+    }
+
+    /// <summary>
+    /// A collection implemented as a <b>struct</b>, which is the shape the emitter must not assume
+    /// away.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately minimal, and deliberately lazy about its backing store, so a
+    /// <c>default(IntBag)</c> is a legal empty value. That is what makes the copy semantics visible:
+    /// the read loop accumulates into a local copy and the formatter has to assign it back, because
+    /// every <c>Add</c> in between landed on the copy.
+    /// </remarks>
+    public struct IntBag : ICollection<int>
+    {
+        private List<int> _items;
+
+        /// <inheritdoc />
+        public int Count => _items == null ? 0 : _items.Count;
+
+        /// <inheritdoc />
+        public bool IsReadOnly => false;
+
+        /// <inheritdoc />
+        public void Add(int item)
+        {
+            _items ??= new List<int>();
+            _items.Add(item);
+        }
+
+        /// <inheritdoc />
+        public void Clear()
+        {
+            _items = null;
+        }
+
+        /// <inheritdoc />
+        public bool Contains(int item)
+        {
+            return _items != null && _items.Contains(item);
+        }
+
+        /// <inheritdoc />
+        public void CopyTo(int[] array, int arrayIndex)
+        {
+            _items?.CopyTo(array, arrayIndex);
+        }
+
+        /// <inheritdoc />
+        public bool Remove(int item)
+        {
+            return _items != null && _items.Remove(item);
+        }
+
+        /// <summary>
+        /// Returns a non-boxing enumerator, which is what <c>foreach</c> in generated code binds to.
+        /// </summary>
+        /// <returns>The enumerator.</returns>
+        public List<int>.Enumerator GetEnumerator()
+        {
+            return (_items ?? Empty).GetEnumerator();
+        }
+
+        IEnumerator<int> IEnumerable<int>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        private static readonly List<int> Empty = new List<int>();
+    }
+
+    /// <summary>
+    /// The collection shapes beyond array and <c>List&lt;T&gt;</c>, annotated for both serializers.
+    /// </summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class CollectionShapesContract
+    {
+        /// <summary>A set, which protobuf-net also treats as a repeated field.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public HashSet<int> Set;
+
+        /// <summary>An ordered set of a length-delimited element.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public SortedSet<string> Sorted;
+
+        /// <summary>A collection that is neither a list nor a set.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public System.Collections.ObjectModel.Collection<int> Owned;
+    }
+
+    /// <summary>
+    /// A contract whose collection is a value type.
+    /// </summary>
+    /// <remarks>
+    /// Not annotated for protobuf-net: it cannot serialize this member at all, which is the whole
+    /// reason the shape is worth supporting. Its bytes are compared against the oracle's output for
+    /// an <c>int[]</c> at the same field number instead, which is the stronger claim -- a struct
+    /// collection is not a new encoding, it is the same repeated field with a different container.
+    /// </remarks>
+    [WProtoContract]
+    public sealed partial class ValueTypeCollectionContract
+    {
+        /// <summary>The struct collection.</summary>
+        [WProtoMember(1)]
+        public IntBag Bag;
+
+        /// <summary>The same, replaced rather than appended to on read.</summary>
+        [WProtoMember(2, OverwriteList = true)]
+        public IntBag Overwritten;
+
+        /// <summary>
+        /// A struct collection the constructor has already filled, which is the only way appending
+        /// into a copy can be told from replacing it.
+        /// </summary>
+        [WProtoMember(3)]
+        public IntBag Seeded = Filled();
+
+        /// <summary>The same, under <c>OverwriteList</c>.</summary>
+        [WProtoMember(4, OverwriteList = true)]
+        public IntBag SeededOverwritten = Filled();
+
+        private static IntBag Filled()
+        {
+            IntBag bag = new IntBag();
+            bag.Add(7);
+            bag.Add(8);
+            return bag;
+        }
     }
 
     /// <summary>The one enum the contracts above use.</summary>

@@ -455,6 +455,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Reads a packed repeated field's payload as its own reader.
+        /// </summary>
+        /// <param name="packed">Receives a reader scoped to the packed run.</param>
+        /// <returns><c>true</c> when the run was read.</returns>
+        /// <remarks>
+        /// <para>
+        /// A packed run holds primitives back to back with no field keys, so unlike
+        /// <see cref="TryReadMessage(out WProtoReader)"/> this does <b>not</b> spend a nesting level.
+        /// It cannot: the returned reader is only ever asked for varints and fixed-width values,
+        /// never for a tag, so no amount of input can make it recurse. Charging it a level would
+        /// refuse a packed array at the bottom of an otherwise legal message where protobuf-net
+        /// accepts one.
+        /// </para>
+        /// <para>
+        /// Every reader this package generates accepts the packed form for a member it writes
+        /// unpacked, because protobuf-net does: a payload written by a contract that set
+        /// <c>IsPacked</c> decodes into one that did not, and the two forms may be interleaved
+        /// within a single message. Measured against 3.2.56 rather than assumed.
+        /// </para>
+        /// </remarks>
+        public bool TryReadPackedRun(out WProtoReader packed)
+        {
+            if (!TryReadBytes(out ReadOnlySpan<byte> payload))
+            {
+                packed = new WProtoReader(default, _depth);
+                return false;
+            }
+
+            packed = new WProtoReader(payload, _depth);
+            return true;
+        }
+
+        /// <summary>
         /// Reads a length-delimited sub-message and decodes it with <paramref name="formatter"/>.
         /// </summary>
         /// <typeparam name="T">The sub-message type.</typeparam>

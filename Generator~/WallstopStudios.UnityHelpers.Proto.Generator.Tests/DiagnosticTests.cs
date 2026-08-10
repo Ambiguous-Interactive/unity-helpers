@@ -48,15 +48,99 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        [Test]
-        public void AnUnsupportedMemberTypeIsAnError()
+        // Every one of these is a shape a developer would reasonably expect to work, which is why it
+        // has to fail the build with a message rather than silently get no formatter.
+        //
+        // The dictionaries are refused because a protobuf map is a repeated SUB-MESSAGE with the key
+        // at field 1 and the value at field 2, not a repeated value -- accepting them here would
+        // produce bytes no protobuf implementation could read back. LinkedList and
+        // ReadOnlyCollection implement ICollection<T> with an explicit Add, so nothing can fill
+        // them; Queue and Stack do not implement it at all. The rest are element-shape refusals: a
+        // jagged array of anything but bytes, a rank-2 array, and a nullable element (protobuf-net
+        // refuses a null element, so Nullable<T>[] is a collection that can only hold values it
+        // cannot write).
+        [TestCase("System.Collections.Generic.Dictionary<string, int>")]
+        [TestCase("System.Collections.Generic.SortedDictionary<string, int>")]
+        [TestCase("System.Collections.Generic.LinkedList<int>")]
+        [TestCase("System.Collections.ObjectModel.ReadOnlyCollection<int>")]
+        [TestCase("System.Collections.Generic.Queue<int>")]
+        [TestCase("System.Collections.Generic.Stack<int>")]
+        [TestCase("System.Collections.Generic.IList<int>")]
+        [TestCase("System.Collections.Generic.List<System.Collections.Generic.List<int>>")]
+        [TestCase("int[][]")]
+        [TestCase("int[,]")]
+        [TestCase("int?[]")]
+        [TestCase("System.DateTime")]
+        public void AnUnsupportedMemberTypeIsAnError(string declaredType)
         {
             AssertDiagnostic(
                 "WPROTO003",
                 "Values",
                 @"[WProtoContract] public sealed partial class Unsupported
                   {
-                      [WProtoMember(1)] public System.Collections.Generic.List<int> Values;
+                      [WProtoMember(1)] public "
+                    + declaredType
+                    + @" Values;
+                  }"
+            );
+        }
+
+        [Test]
+        public void EveryConstructibleCollectionIsAccepted()
+        {
+            // The counterpart to the list above, and the reason it is worth having: WPROTO003 fired
+            // on List<int> until this session, so "it errors" is not by itself evidence that the
+            // error is right. The requirement is ICollection<T> plus a parameterless constructor
+            // plus an accessible Add -- not "is one of the types this generator has heard of".
+            AssertNoDiagnostics(
+                @"[WProtoContract] public sealed partial class Supported
+                  {
+                      [WProtoMember(1)] public int[] Ints;
+                      [WProtoMember(2)] public System.Collections.Generic.List<string> Texts;
+                      [WProtoMember(3)] public byte[][] Blobs;
+                      [WProtoMember(4, OverwriteList = true)] public double[] Doubles;
+                      [WProtoMember(5)] public System.Collections.Generic.HashSet<int> Set;
+                      [WProtoMember(6)] public System.Collections.Generic.SortedSet<string> Sorted;
+                      [WProtoMember(7)] public System.Collections.ObjectModel.Collection<int> Owned;
+                  }"
+            );
+        }
+
+        [Test]
+        public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
+        {
+            // The assumption being refused: nothing about ICollection<T> requires a class, and an
+            // inline or pooled buffer is a natural struct. A generator that emits `member != null`
+            // for every collection does not merely produce redundant code for one -- it produces
+            // code that does not compile.
+            AssertNoDiagnostics(
+                @"public struct Bag : System.Collections.Generic.ICollection<int>
+                  {
+                      private System.Collections.Generic.List<int> _items;
+                      public int Count { get { return _items == null ? 0 : _items.Count; } }
+                      public bool IsReadOnly { get { return false; } }
+                      public void Add(int item)
+                      {
+                          if (_items == null) { _items = new System.Collections.Generic.List<int>(); }
+                          _items.Add(item);
+                      }
+                      public void Clear() { _items = null; }
+                      public bool Contains(int item) { return _items != null && _items.Contains(item); }
+                      public void CopyTo(int[] array, int index) { }
+                      public bool Remove(int item) { return false; }
+                      public System.Collections.Generic.IEnumerator<int> GetEnumerator()
+                      {
+                          return (_items ?? new System.Collections.Generic.List<int>()).GetEnumerator();
+                      }
+                      System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+                      {
+                          return GetEnumerator();
+                      }
+                  }
+
+                  [WProtoContract] public sealed partial class Holder
+                  {
+                      [WProtoMember(1)] public Bag Values;
                   }"
             );
         }
@@ -207,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // fixture, with private members, private hooks, and a hand-written formatter of its own.
             // Every enclosing type has to be partial too, and a hand-written nested formatter must
             // not be mistaken for a conflict.
-            ImmutableArray<Diagnostic> diagnostics = Run(
+            AssertNoDiagnostics(
                 @"public sealed partial class Fixture
                   {
                       [WProtoContract(Name = ""player_state"")]
@@ -234,23 +318,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       }
                   }"
             );
-
-            Assert.IsEmpty(
-                diagnostics.Where(d => d.Id.StartsWith("WPROTO", StringComparison.Ordinal)),
-                string.Join("; ", diagnostics.Select(d => d.ToString()))
-            );
         }
 
         [Test]
         public void AValidContractProducesNoDiagnosticsAtAll()
         {
-            ImmutableArray<Diagnostic> diagnostics = Run(
+            AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Fine
                   {
                       [WProtoMember(1)] public int Value;
                   }"
             );
+        }
 
+        private static void AssertNoDiagnostics(string source)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(source);
             Assert.IsEmpty(
                 diagnostics.Where(d => d.Id.StartsWith("WPROTO", StringComparison.Ordinal)),
                 string.Join("; ", diagnostics.Select(d => d.ToString()))
