@@ -146,6 +146,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        // An include names a subtype the wire can identify, so all four of these would produce a
+        // formatter that cannot round-trip: a subtype that is not one, a subtype with no contract of
+        // its own, a reserved or out-of-range field number, and a number a member already claims.
+        [TestCase("[WProtoInclude(100, typeof(Stranger))]", "does not derive")]
+        [TestCase("[WProtoInclude(100, typeof(Bare))]", "not itself a [WProtoContract]")]
+        [TestCase("[WProtoInclude(19500, typeof(Sub))]", "reserved")]
+        [TestCase("[WProtoInclude(1, typeof(Sub))]", "already claimed")]
+        public void AnUnusableIncludeIsAnError(string include, string mustSay)
+        {
+            AssertDiagnostic(
+                "WPROTO013",
+                mustSay,
+                @"[WProtoContract] public partial class Stranger { }
+                  public partial class Bare : Root { }
+
+                  [WProtoContract] "
+                    + include
+                    + @" public partial class Root
+                  {
+                      [WProtoMember(1)] public int Value;
+                  }
+
+                  [WProtoContract] public partial class Sub : Root
+                  {
+                      [WProtoMember(1)] public int SubValue;
+                  }"
+            );
+        }
+
+        [Test]
+        public void AnAbstractContractWithNoIncludesIsAnError()
+        {
+            // Reading it could never produce an instance, and the failure would otherwise be a
+            // generated `new AbstractThing()` that does not compile in a file nobody wrote.
+            AssertDiagnostic(
+                "WPROTO014",
+                "Shape",
+                @"[WProtoContract] public abstract partial class Shape
+                  {
+                      [WProtoMember(1)] public int Sides;
+                  }"
+            );
+        }
+
+        [Test]
+        public void AnAbstractContractWithIncludesIsAccepted()
+        {
+            // The shape AbstractRandom has: no instance of its own, and 17 subtypes that do.
+            AssertNoDiagnostics(
+                @"[WProtoContract] [WProtoInclude(100, typeof(Square))] public abstract partial class Shape
+                  {
+                      [WProtoMember(1)] public int Sides;
+                  }
+
+                  [WProtoContract] public partial class Square : Shape
+                  {
+                      [WProtoMember(1)] public int Edge;
+                  }"
+            );
+        }
+
         [Test]
         public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
         {

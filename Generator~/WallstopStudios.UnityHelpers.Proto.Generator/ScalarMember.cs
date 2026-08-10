@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _presence;
         private readonly string _value;
         private readonly string _assign;
+        private readonly string _declared;
 
         private ScalarMember(
             string name,
@@ -23,7 +24,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Shape shape,
             string presence,
             string value,
-            string assign
+            string assign,
+            string declared
         )
             : base(name, tag)
         {
@@ -31,7 +33,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _presence = presence;
             _value = value;
             _assign = assign;
+            _declared = declared;
         }
+
+        private string Local => "value" + Tag;
+
+        private string SeenFlag => "seen" + Tag;
 
         internal static ScalarMember TryCreate(
             string name,
@@ -92,7 +99,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 ? "(" + qualifiedUnderlying + "?)(" + shape.AssignExpression + ")"
                 : shape.AssignExpression;
 
-            return new ScalarMember(name, tag, shape, presence, value, assign);
+            return new ScalarMember(
+                name,
+                tag,
+                shape,
+                presence,
+                value,
+                assign,
+                type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            );
         }
 
         /// <inheritdoc />
@@ -127,6 +142,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <inheritdoc />
+        internal override void EmitReadLocals(Writer writer)
+        {
+            if (!Deferred)
+            {
+                return;
+            }
+
+            writer.Line("bool " + SeenFlag + " = false;");
+            writer.Line(_declared + " " + Local + " = default(" + _declared + ");");
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadEpilogue(Writer writer)
+        {
+            if (!Deferred)
+            {
+                return;
+            }
+
+            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line("read." + Name + " = " + Local + ";");
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <inheritdoc />
         internal override void EmitReadCases(Writer writer, string qualifiedContract)
         {
             string local = "decoded" + Tag;
@@ -147,7 +189,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line("read." + Name + " = " + Shape.Fill(_assign, local) + ";");
+            if (Deferred)
+            {
+                // The instance this lands on is not known yet: an include tag later in the payload
+                // can replace it with a subtype. Assigning now would write onto an object that is
+                // about to be thrown away, and protobuf-net permits the include in either position.
+                writer.Line(Local + " = " + Shape.Fill(_assign, local) + ";");
+                writer.Line(SeenFlag + " = true;");
+            }
+            else
+            {
+                writer.Line("read." + Name + " = " + Shape.Fill(_assign, local) + ";");
+            }
+
             writer.Line("break;");
             Close(writer);
         }

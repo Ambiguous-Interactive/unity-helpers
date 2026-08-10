@@ -30,6 +30,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal int Tag { get; }
 
+        /// <summary>
+        /// Whether reading must hold this member's value aside and assign it after the loop.
+        /// </summary>
+        /// <remarks>
+        /// Set for every member of a contract that declares <c>[WProtoInclude]</c>. The instance a
+        /// member lands on is not known until an include tag is seen, and protobuf-net permits that
+        /// tag in either position -- it writes it first, but a payload with it last is legal and
+        /// decodes fine there. Assigning eagerly would write onto an object about to be replaced,
+        /// and the loss would be silent.
+        /// </remarks>
+        internal bool Deferred { get; set; }
+
         protected string Name { get; }
 
         /// <summary>The member access on the value being written.</summary>

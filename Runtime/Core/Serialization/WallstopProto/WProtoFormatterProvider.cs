@@ -103,6 +103,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             );
         }
 
+        /// <summary>
+        /// Builds the exception thrown when a value's runtime type is a subtype the contract does
+        /// not declare.
+        /// </summary>
+        /// <param name="contract">The declared contract type.</param>
+        /// <param name="actual">The value's runtime type.</param>
+        /// <returns>The exception to throw.</returns>
+        /// <remarks>
+        /// <para>
+        /// Returned rather than thrown so the call site reads
+        /// <c>throw WProtoFormatterProvider.UnexpectedSubtype(…)</c> and the compiler treats the
+        /// following code as unreachable.
+        /// </para>
+        /// <para>
+        /// Refusing is the compatible behaviour, not a stricter one: protobuf-net raises
+        /// <c>InvalidOperationException: Unexpected sub-type</c> on the same value, measured against
+        /// 3.2.56 — an include must name a <b>direct</b> subtype, and a grandchild declared on the
+        /// grandparent is rejected outright. The alternative is worse than an exception: the value
+        /// would be written under its nearest declared ancestor's tag and read back as that ancestor,
+        /// silently losing a level of type identity in saved data.
+        /// </para>
+        /// </remarks>
+        public static Exception UnexpectedSubtype(Type contract, Type actual)
+        {
+            return new InvalidOperationException(
+                $"WallstopProto cannot write a '{actual?.FullName}' as a '{contract?.FullName}': it "
+                    + "is a subtype the contract does not declare. Add "
+                    + $"[WProtoInclude(tag, typeof({actual?.Name}))] to its immediate base type — an "
+                    + "include names a direct subtype, so a deeper type is declared on the type it "
+                    + "actually derives from, not on the root."
+            );
+        }
+
         private static class Cache<T>
         {
             internal static IWProtoFormatter<T> Formatter;

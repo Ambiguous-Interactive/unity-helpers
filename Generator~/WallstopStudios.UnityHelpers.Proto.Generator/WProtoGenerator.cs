@@ -36,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string ContractAttribute = AttributeNamespace + ".WProtoContractAttribute";
         private const string MemberAttribute = AttributeNamespace + ".WProtoMemberAttribute";
         private const string IgnoreAttribute = AttributeNamespace + ".WProtoIgnoreAttribute";
+        private const string IncludeAttribute = AttributeNamespace + ".WProtoIncludeAttribute";
         private const string BeforeSerialization =
             AttributeNamespace + ".WProtoBeforeSerializationAttribute";
         private const string AfterSerialization =
@@ -184,6 +185,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
+            List<Include> includes = CollectIncludes(context, contract, members);
+            if (includes == null)
+            {
+                return null;
+            }
+
+            if (contract.IsAbstract && includes.Count == 0)
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.AbstractWithoutIncludes,
+                        contract.Locations.FirstOrDefault(),
+                        contract.Name
+                    )
+                );
+                return null;
+            }
+
+            // Every member of a polymorphic contract reads into a local and is assigned after the
+            // loop: an include tag can replace the instance, and protobuf-net allows that tag in
+            // either position even though it always writes it first.
+            foreach (Member member in members)
+            {
+                member.Deferred = 0 < includes.Count;
+            }
+
             Hooks hooks = CollectHooks(context, contract);
             if (hooks == null)
             {
@@ -202,7 +229,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            if (!contract.IsValueType && !HasAccessibleParameterlessConstructor(contract))
+            if (
+                !contract.IsValueType
+                && !contract.IsAbstract
+                && !HasAccessibleParameterlessConstructor(contract)
+            )
             {
                 context.ReportDiagnostic(
                     Diagnostic.Create(
@@ -250,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Indent();
             }
 
-            EmitFormatter(writer, contract, qualified, members, hooks);
+            EmitFormatter(writer, contract, qualified, members, includes, hooks);
 
             foreach (INamedTypeSymbol unused in nesting)
             {
@@ -272,6 +303,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             INamedTypeSymbol contract,
             string qualified,
             List<Member> members,
+            List<Include> includes,
             Hooks hooks
         )
         {
@@ -291,11 +323,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("public static readonly WProtoFormatter Instance = new WProtoFormatter();");
             writer.Blank();
 
-            EmitMeasure(writer, qualified, members, hooks);
+            EmitMeasure(writer, contract, qualified, members, includes, hooks);
             writer.Blank();
-            EmitWrite(writer, qualified, members, hooks);
+            EmitWrite(writer, contract, qualified, members, includes, hooks);
             writer.Blank();
-            EmitRead(writer, contract, qualified, members, hooks);
+            EmitRead(writer, contract, qualified, members, includes, hooks);
 
             writer.Outdent();
             writer.Line("}");
@@ -303,8 +335,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static void EmitMeasure(
             Writer writer,
+            INamedTypeSymbol contract,
             string qualified,
             List<Member> members,
+            List<Include> includes,
             Hooks hooks
         )
         {
@@ -321,6 +355,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             writer.Line("int size = 0;");
+
+            // Includes first, and not in field-number order. Measured against protobuf-net 3.2.56:
+            // the subtype's include field precedes every one of this contract's own members whatever
+            // its tag, confirmed with an include at tag 3 emitted ahead of members at tags 1 and 5.
+            EmitIncludeDispatch(
+                writer,
+                contract,
+                qualified,
+                includes,
+                include =>
+                    "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + include.Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.MessageSize("
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + ");"
+            );
+
             foreach (Member member in members)
             {
                 member.EmitMeasure(writer);
@@ -333,8 +390,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static void EmitWrite(
             Writer writer,
+            INamedTypeSymbol contract,
             string qualified,
             List<Member> members,
+            List<Include> includes,
             Hooks hooks
         )
         {
@@ -348,6 +407,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Writer.Open
             );
             writer.Indent();
+
+            EmitIncludeDispatch(
+                writer,
+                contract,
+                qualified,
+                includes,
+                include =>
+                    "if (!writer.TryWriteMessage("
+                    + include.Tag
+                    + ", "
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + "))"
+            );
 
             foreach (Member member in members)
             {
@@ -369,6 +443,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             INamedTypeSymbol contract,
             string qualified,
             List<Member> members,
+            List<Include> includes,
             Hooks hooks
         )
         {
@@ -383,13 +458,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Indent();
 
-            writer.Line(
-                contract.IsValueType
-                    ? qualified + " read = default(" + qualified + ");"
-                    : qualified + " read = new " + qualified + "();"
-            );
+            bool polymorphic = 0 < includes.Count;
 
-            if (hooks.BeforeDeserialization != null)
+            if (contract.IsValueType)
+            {
+                writer.Line(qualified + " read = default(" + qualified + ");");
+            }
+            else if (contract.IsAbstract)
+            {
+                // An abstract contract has no instance of its own; the payload's include tag is the
+                // only thing that can produce one, and a payload without one is malformed rather
+                // than an empty base.
+                writer.Line(qualified + " read = null;");
+            }
+            else
+            {
+                writer.Line(qualified + " read = new " + qualified + "();");
+            }
+
+            if (hooks.BeforeDeserialization != null && !polymorphic)
             {
                 writer.Line("read." + hooks.BeforeDeserialization + "();");
             }
@@ -406,6 +493,43 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Indent();
             writer.Line("switch (fieldNumber)" + Writer.Open);
             writer.Indent();
+
+            foreach (Include include in includes)
+            {
+                writer.Line(
+                    "case "
+                        + include.Tag
+                        + " when wireType == "
+                        + Proto
+                        + ".WProtoWireType.LengthDelimited:"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line(
+                    "if (!reader.TryReadMessage("
+                        + include.Formatter
+                        + ", out "
+                        + include.Qualified
+                        + " "
+                        + include.Local
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line("value = default(" + qualified + ");");
+                writer.Line("return false;");
+                writer.Outdent();
+                writer.Line("}");
+                writer.Blank();
+                // Last include wins. A payload naming two sibling subtypes is nonsense either way,
+                // and this is the branch where protobuf-net 3.2.56 recurses until the stack runs
+                // out -- an uncatchable crash from an untrusted save file. A plain assignment
+                // cannot.
+                writer.Line("read = " + include.Local + ";");
+                writer.Line("break;");
+                writer.Outdent();
+                writer.Line("}");
+            }
 
             foreach (Member member in members)
             {
@@ -440,6 +564,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Outdent();
             writer.Line("}");
             writer.Blank();
+
+            if (contract.IsAbstract)
+            {
+                writer.Line("if (read == null)" + Writer.Open);
+                writer.Indent();
+                writer.Line("value = default(" + qualified + ");");
+                writer.Line("return false;");
+                writer.Outdent();
+                writer.Line("}");
+                writer.Blank();
+            }
+
+            if (hooks.BeforeDeserialization != null && polymorphic)
+            {
+                // Deliberately here rather than at the top. The hook's contract is "after the
+                // instance exists and before any member is assigned", and for a polymorphic contract
+                // the instance does not exist until an include tag has been seen. Every member of
+                // such a contract is deferred, so nothing has been assigned yet either.
+                writer.Line("read." + hooks.BeforeDeserialization + "();");
+                writer.Blank();
+            }
 
             // After the malformed check, deliberately: a collection accumulated from a payload that
             // turned out to be truncated must not be committed onto the instance the caller gets
@@ -507,6 +652,188 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Outdent();
             writer.Line("}");
             return writer.ToString();
+        }
+
+        /// <summary>
+        /// Reads and validates the contract's <c>[WProtoInclude]</c> list, deepest subtype first.
+        /// </summary>
+        /// <remarks>
+        /// The ordering is load-bearing rather than cosmetic. <c>value is Beta</c> is true for a
+        /// <c>Gamma</c>, so a dispatch chain that tested the shallower type first would write a
+        /// <c>Gamma</c> under Beta's include tag and lose the Gamma level entirely -- a silent type
+        /// downgrade. Sorting by inheritance depth, deepest first, makes the first matching test the
+        /// most derived one.
+        /// </remarks>
+        private static List<Include> CollectIncludes(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol contract,
+            List<Member> members
+        )
+        {
+            List<Include> includes = new List<Include>();
+            HashSet<int> claimed = new HashSet<int>();
+            foreach (Member member in members)
+            {
+                claimed.Add(member.Tag);
+            }
+
+            bool failed = false;
+            foreach (AttributeData attribute in contract.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass == null
+                    || attribute.AttributeClass.ToDisplayString() != IncludeAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                int tag = (int)(attribute.ConstructorArguments[0].Value ?? 0);
+                INamedTypeSymbol subType =
+                    attribute.ConstructorArguments[1].Value as INamedTypeSymbol;
+                string name = subType == null ? "?" : subType.Name;
+
+                string problem = null;
+                if (subType == null)
+                {
+                    problem = "the subtype could not be resolved";
+                }
+                else if (!SymbolEqualityComparer.Default.Equals(subType.BaseType, contract))
+                {
+                    // Measured: protobuf-net 3.2.56 refuses a grandchild declared on the grandparent
+                    // with "Unexpected sub-type", so an include names a DIRECT subtype and a deeper
+                    // type is declared on the type it actually derives from.
+                    problem =
+                        "'"
+                        + name
+                        + "' does not derive DIRECTLY from '"
+                        + contract.Name
+                        + "'; declare it on its immediate base type instead";
+                }
+                else if (!Shape.IsContract(subType))
+                {
+                    problem = "'" + name + "' is not itself a [WProtoContract]";
+                }
+                else if (tag < 1 || 536870911 < tag || (19000 <= tag && tag <= 19999))
+                {
+                    problem =
+                        "field number "
+                        + tag
+                        + " is outside 1-536870911 or inside the reserved 19000-19999 range";
+                }
+                else if (!claimed.Add(tag))
+                {
+                    problem =
+                        "field number " + tag + " is already claimed on '" + contract.Name + "'";
+                }
+
+                if (problem != null)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.BadInclude,
+                            contract.Locations.FirstOrDefault(),
+                            contract.Name,
+                            tag,
+                            name,
+                            problem
+                        )
+                    );
+                    failed = true;
+                    continue;
+                }
+
+                includes.Add(new Include(tag, subType));
+            }
+
+            // Direct subtypes of one type are mutually exclusive, so the chain's order cannot
+            // change which branch matches; sorting by tag only makes the emitted code deterministic.
+            includes.Sort((left, right) => left.Tag.CompareTo(right.Tag));
+
+            return failed ? null : includes;
+        }
+
+        /// <summary>
+        /// Emits the runtime-type dispatch chain shared by measuring and writing.
+        /// </summary>
+        private static void EmitIncludeDispatch(
+            Writer writer,
+            INamedTypeSymbol contract,
+            string qualified,
+            List<Include> includes,
+            System.Func<Include, string> body
+        )
+        {
+            // The guard is needed whether or not this contract declares includes: a subtype nobody
+            // declared reaches its nearest ANNOTATED ancestor's formatter, which for a leaf contract
+            // has no dispatch chain at all. A sealed class and a struct cannot be subclassed, so
+            // they pay nothing.
+            bool guard = !contract.IsValueType && !contract.IsSealed;
+            if (includes.Count == 0 && !guard)
+            {
+                return;
+            }
+
+            bool first = true;
+            foreach (Include include in includes)
+            {
+                writer.Line(
+                    (first ? "if (" : "else if (")
+                        + "value is "
+                        + include.Qualified
+                        + " "
+                        + include.Local
+                        + ")"
+                        + Writer.Open
+                );
+                writer.Indent();
+
+                string emitted = body(include);
+                if (emitted.StartsWith("if (", System.StringComparison.Ordinal))
+                {
+                    writer.Line(emitted + Writer.Open);
+                    writer.Indent();
+                    writer.Line("return false;");
+                    writer.Outdent();
+                    writer.Line("}");
+                }
+                else
+                {
+                    writer.Line(emitted);
+                }
+
+                writer.Outdent();
+                writer.Line("}");
+                first = false;
+            }
+
+            if (guard)
+            {
+                // Not a fall-through: a value whose runtime type is a subtype nothing declares would
+                // otherwise be written under its nearest declared ancestor's tag and read back as
+                // that ancestor -- a level of type identity gone from saved data with nothing to
+                // report it. protobuf-net raises "Unexpected sub-type" on the same value.
+                writer.Line(
+                    (first ? "if (" : "else if (")
+                        + "value != null && value.GetType() != typeof("
+                        + qualified
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line(
+                    "throw "
+                        + Proto
+                        + ".WProtoFormatterProvider.UnexpectedSubtype(typeof("
+                        + qualified
+                        + "), value.GetType());"
+                );
+                writer.Outdent();
+                writer.Line("}");
+            }
+
+            writer.Blank();
         }
 
         private static List<Member> CollectMembers(

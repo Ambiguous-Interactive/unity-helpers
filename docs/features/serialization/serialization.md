@@ -1019,6 +1019,50 @@ Dictionaries are not supported yet: a protobuf map is a repeated _sub-message_ w
 1 and the value at field 2, which is a different encoding. `Dictionary<TKey, TValue>` and its
 relatives are a build error naming the member rather than bytes nothing could read back.
 
+#### Polymorphism
+
+`[WProtoInclude(tag, typeof(Subtype))]` on a contract lets a member typed as the base round-trip as
+the concrete subtype:
+
+```csharp
+[WProtoContract]
+[WProtoInclude(100, typeof(Melee))]
+[WProtoInclude(101, typeof(Ranged))]
+public abstract partial class Weapon
+{
+    [WProtoMember(1)]
+    public int Durability;
+}
+
+[WProtoContract]
+public partial class Melee : Weapon
+{
+    [WProtoMember(1)]     // the subtype has its own tag space
+    public int Reach;
+}
+```
+
+Dispatch is a chain of type tests over the declared subtypes — static code IL2CPP compiles like any
+other, with no reflection and no `MakeGenericType`.
+
+**Four things are worth knowing, and the first is the one that surprises:**
+
+- **The include is written first, before the base's own members**, whatever its tag number. Every
+  other member obeys ascending field order; includes do not. Measured, and confirmed with an include
+  at tag 3 emitted ahead of members at tags 1 and 5.
+- **An include names a _direct_ subtype.** A grandchild is declared on the type it actually derives
+  from, not on the root — protobuf-net refuses the other arrangement outright. Each level writes its
+  own include and then its own members, so a three-level hierarchy nests naturally.
+- **An all-default subtype still writes its include** (a tag and a zero length). Dropping it because
+  the payload is empty would read the value back as its base type.
+- **A subtype nothing declares is refused**, naming the type and the fix, rather than written under
+  its nearest declared ancestor's tag and silently downgraded on read. An unrecognized include tag in
+  a _payload_ is the opposite case and is skipped as an ordinary unknown field, so a save from a
+  newer build still loads.
+
+An abstract contract must declare at least one include — reading it could otherwise never produce an
+instance — and a payload for one that names no subtype is malformed rather than an empty base.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

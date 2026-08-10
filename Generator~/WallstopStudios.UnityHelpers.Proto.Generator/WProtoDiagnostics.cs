@@ -121,6 +121,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor BadInclude = new DiagnosticDescriptor(
+            "WPROTO013",
+            "WallstopProto include is not usable",
+            "'{0}' declares [WProtoInclude({1}, typeof({2}))], but {3}. An include names a subtype the wire can identify, so it must be a [WProtoContract] that derives from '{0}' and its field number must be free.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        internal static readonly DiagnosticDescriptor AbstractWithoutIncludes =
+            new DiagnosticDescriptor(
+                "WPROTO014",
+                "WallstopProto cannot instantiate this contract",
+                "'{0}' is an abstract [WProtoContract] with no [WProtoInclude], so reading it can never produce an instance. Declare an include for each concrete subtype, or move [WProtoContract] to the subtypes.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

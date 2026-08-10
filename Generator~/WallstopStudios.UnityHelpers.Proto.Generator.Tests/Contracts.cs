@@ -491,4 +491,153 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>A larger value, to exercise a multi-byte varint.</summary>
         Careful = 300,
     }
+
+    /// <summary>
+    /// A polymorphic base, annotated for both serializers so the include encoding can be compared.
+    /// </summary>
+    /// <remarks>
+    /// The shape mirrors <c>AbstractRandom</c>, which carries 17 includes at contiguous tags
+    /// 100-116 and is the reason this feature exists.
+    /// </remarks>
+    [ProtoContract]
+    [ProtoInclude(100, typeof(IncludeAlpha))]
+    [ProtoInclude(101, typeof(IncludeBeta))]
+    [WProtoContract]
+    [WProtoInclude(100, typeof(IncludeAlpha))]
+    [WProtoInclude(101, typeof(IncludeBeta))]
+    public partial class IncludeBase
+    {
+        /// <summary>A base member, written after the include.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int Id;
+
+        /// <summary>A length-delimited base member.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public string Label;
+    }
+
+    /// <summary>A leaf subtype.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class IncludeAlpha : IncludeBase
+    {
+        /// <summary>The subtype's own member, in its own tag space.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int AlphaOnly;
+
+        /// <summary>A second one, to prove the sub-message carries more than a marker.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public string AlphaText;
+    }
+
+    /// <summary>A subtype that is itself a base, so the nesting recurses.</summary>
+    [ProtoContract]
+    [ProtoInclude(200, typeof(IncludeGamma))]
+    [WProtoContract]
+    [WProtoInclude(200, typeof(IncludeGamma))]
+    public partial class IncludeBeta : IncludeBase
+    {
+        /// <summary>A fixed64 member at the middle level.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public double BetaOnly;
+    }
+
+    /// <summary>The third level.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class IncludeGamma : IncludeBeta
+    {
+        /// <summary>The deepest member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public bool GammaOnly;
+    }
+
+    /// <summary>Holds a polymorphic value, so the include chain sits under a length prefix.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class IncludeHolder
+    {
+        /// <summary>The polymorphic member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public IncludeBase Value;
+
+        /// <summary>A scalar after it.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public int Trailer;
+    }
+
+    /// <summary>
+    /// An include whose tag is <b>lower</b> than a base member's, which is what proves the include
+    /// is not merely sorted into field-number order.
+    /// </summary>
+    [ProtoContract]
+    [ProtoInclude(3, typeof(LowTagSub))]
+    [WProtoContract]
+    [WProtoInclude(3, typeof(LowTagSub))]
+    public partial class LowTagBase
+    {
+        /// <summary>A member numbered below the include.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int First;
+
+        /// <summary>A member numbered above the include.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public int Fifth;
+    }
+
+    /// <summary>The subtype for <see cref="LowTagBase"/>.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class LowTagSub : LowTagBase
+    {
+        /// <summary>The subtype's own member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int SubOnly;
+    }
+
+    /// <summary>
+    /// An abstract base with an include, which is the shape <c>AbstractRandom</c> has.
+    /// </summary>
+    /// <remarks>
+    /// Not annotated for protobuf-net: what it pins is that reading a payload with no include tag
+    /// fails rather than producing an instance of a type that cannot exist.
+    /// </remarks>
+    [WProtoContract]
+    [WProtoInclude(100, typeof(ConcreteShape))]
+    public abstract partial class AbstractShape
+    {
+        /// <summary>A base member.</summary>
+        [WProtoMember(1)]
+        public int Sides;
+    }
+
+    /// <summary>The only concrete shape.</summary>
+    [WProtoContract]
+    public partial class ConcreteShape : AbstractShape
+    {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int Edge;
+    }
+
+    /// <summary>
+    /// A subtype nothing declares, so writing it must be refused rather than downgraded.
+    /// </summary>
+    /// <remarks>
+    /// <c>value is IncludeAlpha</c> is true for this, so a formatter without the guard would write
+    /// it under Alpha's include tag and read it back as an <c>IncludeAlpha</c> — a level of type
+    /// identity lost from saved data with nothing to report it.
+    /// </remarks>
+    public sealed class UndeclaredAlpha : IncludeAlpha { }
 }
