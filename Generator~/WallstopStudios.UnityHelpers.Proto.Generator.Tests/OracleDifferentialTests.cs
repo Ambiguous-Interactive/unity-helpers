@@ -86,6 +86,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "0801100118012001",
                 "08011001180120010801",
                 "0A020102" + "12020102" + "1A020102" + "22020102",
+                // A present-but-EMPTY packed run against members the constructor already filled.
+                // The only shape where "the field was here and held nothing" is expressible, and
+                // the one place appending and overwriting can disagree about an empty payload.
+                "0A00" + "1200" + "1A00" + "2200",
             };
 
             foreach (string payload in payloads)

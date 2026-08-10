@@ -43,12 +43,29 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Indicates whether the member is written even when it holds its type's default value.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// It forces a <b>value</b> onto the wire, and never invents one: a required <c>int</c> at 0
+        /// and a required struct sub-message at <c>default</c> are both written, while a required
+        /// <c>null</c> <see cref="string"/>, <c>byte[]</c> or message reference is still absent.
+        /// </para>
+        /// <para>
+        /// It has <b>no effect on a repeated member</b>, because null and empty are already the same
+        /// bytes there and neither produces a field to force. protobuf-net ignores it in the same
+        /// place, and matching that is what keeps saved data readable.
+        /// </para>
+        /// </remarks>
         public bool IsRequired { get; set; }
 
         /// <summary>
         /// Indicates whether reading a repeated member replaces the existing collection instead of
         /// appending to it.
         /// </summary>
+        /// <remarks>
+        /// Appending is the default, and it appends to whatever the constructor left in the member.
+        /// An <b>absent</b> field leaves that value alone either way: "absent" and "empty" are the
+        /// same bytes, so there is nothing for a replacement to be triggered by.
+        /// </remarks>
         public bool OverwriteList { get; set; }
     }
 }
