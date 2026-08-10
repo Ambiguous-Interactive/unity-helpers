@@ -31,10 +31,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     public sealed class WProtoRepeatedContractTests
     {
         [Test]
-        public void AVarintElementRunIsUnpackedWithOneKeyPerElement()
+        public void AVarintElementRunIsPackedUnderOneKeyAndLength()
         {
+            // 0A = field 1, length-delimited; 0C = twelve payload bytes; then the three bare
+            // varints. protobuf-net writes one key per element instead, and reads this form
+            // regardless -- which is what makes the divergence safe. Roughly halves a repeated
+            // scalar: 102 bytes against 200 at a hundred elements, measured.
             Assert.AreEqual(
-                "0801080008FFFFFFFFFFFFFFFFFF01",
+                "0A0C0100FFFFFFFFFFFFFFFFFF01",
                 Encode(new WProtoRepeatedContract { Ints = new[] { 1, 0, -1 } })
             );
         }
@@ -44,8 +48,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             // The scalar rule reversed. A member holding 0 is omitted; an element holding 0 is not,
             // because dropping it would shorten the collection rather than restore a default.
-            Assert.AreEqual("0800", Encode(new WProtoRepeatedContract { Ints = new[] { 0 } }));
-            Assert.AreEqual("3000", Encode(new WProtoRepeatedContract { Flags = new[] { false } }));
+            Assert.AreEqual("0A0100", Encode(new WProtoRepeatedContract { Ints = new[] { 0 } }));
+            Assert.AreEqual(
+                "320100",
+                Encode(new WProtoRepeatedContract { Flags = new[] { false } })
+            );
             Assert.AreEqual(
                 "4200",
                 Encode(
@@ -55,10 +62,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void EveryElementShapeMatchesTheBytesTheOracleProduced()
+        public void EveryElementShapeMatchesItsGoldenBytes()
         {
+            // These are this package's OWN bytes, not protobuf-net's. Packable element runs are
+            // written packed here and unpacked by protobuf-net; the length-delimited shapes below
+            // (Texts, Points, Messages, Blobs, PointList) are identical in both, because a value
+            // that carries its own length cannot be packed at all.
+            //
+            // Committed as golden vectors because the IL2CPP legs cannot run the oracle -- it is the
+            // thing that does not work under IL2CPP. The interop claim itself is proven in the
+            // Generator~ differential suite, which can.
             Assert.AreEqual(
-                "1002",
+                "120102",
                 Encode(new WProtoRepeatedContract { IntList = new List<int> { 2 } })
             );
             Assert.AreEqual(
@@ -66,19 +81,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Encode(new WProtoRepeatedContract { Texts = new[] { "a", string.Empty } })
             );
             Assert.AreEqual(
-                "21000000000000000021000000000000F03F",
+                "22100000000000000000000000000000F03F",
                 Encode(new WProtoRepeatedContract { Doubles = new[] { 0d, 1d } })
             );
             Assert.AreEqual(
-                "28002801",
+                "2A020001",
                 Encode(new WProtoRepeatedContract { Longs = new ulong[] { 0, 1 } })
             );
             Assert.AreEqual(
-                "30003001",
+                "32020001",
                 Encode(new WProtoRepeatedContract { Flags = new[] { false, true } })
             );
             Assert.AreEqual(
-                "380038AC02",
+                "3A0300AC02",
                 Encode(
                     new WProtoRepeatedContract
                     {
@@ -127,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 )
             );
             Assert.AreEqual(
-                "60FEFFFFFFFFFFFFFFFF016000",
+                "620BFEFFFFFFFFFFFFFFFF0100",
                 Encode(new WProtoRepeatedContract { Shorts = new short[] { -2, 0 } })
             );
         }
@@ -136,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void MembersAreWrittenInAscendingFieldNumberOrder()
         {
             Assert.AreEqual(
-                "0801080210031A016160FEFFFFFFFFFFFFFFFF01",
+                "0A0201021201031A0161620AFEFFFFFFFFFFFFFFFF01",
                 Encode(
                     new WProtoRepeatedContract
                     {
@@ -220,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void AStructContractCarriesARepeatedMember()
         {
             Assert.AreEqual(
-                "080108021003",
+                "0A0201021003",
                 Encode(new WProtoRepeatedStructContract { Ints = new[] { 1, 2 }, Marker = 3 })
             );
 
@@ -347,16 +362,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryCollectionShapeEncodesAsTheSameRepeatedField()
         {
-            // The container is not part of the encoding. These bytes are protobuf-net's own output
-            // for a HashSet, a SortedSet, a Collection and an int[] at the same field numbers -- the
-            // struct collection at field 4 is compared against the array because protobuf-net cannot
-            // serialize one at all, which is the reason supporting it is worth doing.
+            // The container is not part of the encoding: a HashSet, a SortedSet, a Collection and a
+            // struct collection at the same field numbers produce the same shapes as any other
+            // repeated member. The int runs are packed, the string run is not. The struct collection
+            // at field 4 exists here because protobuf-net cannot serialize one at all, which is the
+            // reason supporting it is worth doing.
             WProtoIntBag bag = new();
             bag.Add(5);
             bag.Add(6);
 
             Assert.AreEqual(
-                "0801080208AC02120161120162180018FFFFFFFFFFFFFFFFFF0120052006",
+                "0A040102AC021201611201621A0B00FFFFFFFFFFFFFFFFFF0122020506",
                 Encode(
                     new WProtoCollectionShapesContract
                     {
