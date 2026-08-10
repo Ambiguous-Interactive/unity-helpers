@@ -23,6 +23,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     /// These run whether or not <c>WALLSTOP_PROTO</c> is defined, because the seam compiles
     /// unconditionally. What the define controls is only whether <c>Serializer</c> calls it.
     /// </para>
+    /// <para>
+    /// Only the oracle comparison is skipped under IL2CPP, and for the reason the package exists:
+    /// protobuf-net's own static initializer throws there. Everything else in this fixture runs on
+    /// every leg.
+    /// </para>
     /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -30,8 +35,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     public sealed class WProtoFacadeTests
     {
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void APortedTypeIsServedAndMatchesProtobufNetByteForByte()
         {
+            // Skipped under IL2CPP because the ORACLE cannot run there -- protobuf-net's
+            // `TypeHelper<T>` static constructor throws, which is the whole reason WallstopProto
+            // exists. Byte-equality is proven off-Unity by the differential suite under Generator~;
+            // what the IL2CPP legs verify is that the generated code itself runs, which the other
+            // tests in this fixture do without touching the oracle.
             // FastVector2Int and friends already have formatters, so the facade serves them -- and
             // the bytes have to equal what protobuf-net would have written, or the swap changes
             // saved data.
