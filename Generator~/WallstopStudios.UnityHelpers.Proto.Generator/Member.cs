@@ -76,6 +76,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             ITypeSymbol type,
             bool isRequired,
             bool overwriteList,
+            SurrogateMap surrogates,
             out bool ambiguous
         )
         {
@@ -85,14 +86,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (isContract && Shape.IgnoresListHandling(type))
             {
                 // Explicitly a message, whatever interfaces it implements.
-                return ScalarMember.TryCreate(name, tag, type, isRequired);
+                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates);
             }
 
             // Maps first: a dictionary also implements ICollection<KeyValuePair<K,V>>, and the
             // repeated path would take it and emit a repeated VALUE where protobuf wants a repeated
             // ENTRY MESSAGE. The two are different bytes, so the order of these two questions is
             // itself a wire-format decision.
-            MapMember map = MapMember.TryCreate(contractName, name, tag, type, overwriteList);
+            MapMember map = MapMember.TryCreate(
+                contractName,
+                name,
+                tag,
+                type,
+                overwriteList,
+                surrogates
+            );
             if (map != null)
             {
                 if (isContract)
@@ -109,11 +117,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 name,
                 tag,
                 type,
-                overwriteList
+                overwriteList,
+                surrogates
             );
             if (repeated == null)
             {
-                return ScalarMember.TryCreate(name, tag, type, isRequired);
+                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates);
             }
 
             if (isContract)

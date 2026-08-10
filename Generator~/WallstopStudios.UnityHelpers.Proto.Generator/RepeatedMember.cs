@@ -88,7 +88,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string name,
             int tag,
             ITypeSymbol type,
-            bool overwriteList
+            bool overwriteList,
+            SurrogateMap surrogates
         )
         {
             // byte[] first: it is the one array protobuf-net treats as a single length-delimited
@@ -117,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string elementQualified = element.ToDisplayString(
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
-            Shape shape = Shape.For(element, elementQualified);
+            Shape shape = Shape.For(element, elementQualified, surrogates);
             if (shape == null)
             {
                 return null;

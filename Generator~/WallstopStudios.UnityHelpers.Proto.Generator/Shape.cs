@@ -115,8 +115,44 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>
         /// Builds the shape for <paramref name="type"/>, or <c>null</c> when it is not supported.
         /// </summary>
-        internal static Shape For(ITypeSymbol type, string qualified)
+        internal static Shape For(ITypeSymbol type, string qualified, SurrogateMap surrogates)
         {
+            // Before anything else: a surrogated type has no wire shape of its own, and its values
+            // are converted at the boundary. Measured against protobuf-net -- a surrogated member is
+            // byte-identical to a member of the surrogate type, including `0A 00` for a default
+            // struct, so this is a substitution rather than a new encoding.
+            INamedTypeSymbol surrogate = surrogates?.For(type);
+            if (surrogate != null)
+            {
+                string surrogateQualified = surrogate.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat
+                );
+                string surrogateFormatter =
+                    Proto + ".WProtoFormatterProvider.Get<" + surrogateQualified + ">()";
+                return new Shape
+                {
+                    WireType = Proto + ".WProtoWireType.LengthDelimited",
+                    PresenceTest = type.IsValueType ? "true" : Placeholder + " != null",
+                    SizeExpression =
+                        Proto
+                        + ".WProtoSizes.MessageSize("
+                        + surrogateFormatter
+                        + ", ("
+                        + surrogateQualified
+                        + ")"
+                        + Placeholder
+                        + ")",
+                    WriteMethod = "TryWriteMessage",
+                    WriteCast = surrogateFormatter + ", (" + surrogateQualified + ")",
+                    WritesOwnTag = true,
+                    ReadMethod = "TryReadMessage",
+                    ReadArguments = surrogateFormatter + ", ",
+                    ReadLocalType = surrogateQualified,
+                    AssignExpression = "(" + qualified + ")" + Placeholder,
+                    IsReference = !type.IsValueType,
+                };
+            }
+
             if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
             {
                 bool wide =

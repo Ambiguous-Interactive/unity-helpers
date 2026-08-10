@@ -206,6 +206,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ASurrogateShippedByAReferencedAssemblyIsFoundFromAConsumerCompilation()
+        {
+            // The property the whole design exists for, and the one an in-assembly fixture cannot
+            // reach: this synthetic compilation is a *consumer*, and `ForeignVector3`'s surrogate is declared
+            // by an assembly attribute on the assembly it references. If referenced assemblies were
+            // not searched, `ForeignVector3` would be an unsupported member type and this would be WPROTO003 —
+            // which is exactly how a game would discover that none of its Vector3s serialize.
+            AssertNoDiagnostics(
+                @"[WProtoContract] public sealed partial class ConsumerThing
+                  {
+                      [WProtoMember(1)] public WallstopStudios.UnityHelpers.Proto.Generator.Tests.ForeignVector3 Where;
+                      [WProtoMember(2)] public WallstopStudios.UnityHelpers.Proto.Generator.Tests.ForeignVector3[] Path;
+                  }"
+            );
+        }
+
+        [Test]
         public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
         {
             // The assumption being refused: nothing about ICollection<T> requires a class, and an

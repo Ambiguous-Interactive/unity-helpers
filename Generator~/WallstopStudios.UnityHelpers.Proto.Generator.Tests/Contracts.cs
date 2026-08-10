@@ -715,4 +715,90 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(5)]
         public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
     }
+
+    /// <summary>
+    /// A type this assembly does not get to annotate, standing in for <c>UnityEngine.Vector3</c>.
+    /// </summary>
+    public struct ForeignVector3
+    {
+        /// <summary>The first component.</summary>
+        public float x;
+
+        /// <summary>The second component.</summary>
+        public float y;
+
+        /// <summary>The third component.</summary>
+        public float z;
+    }
+
+    /// <summary>The contract that gives <see cref="ForeignVector3"/> a wire shape.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public partial struct ForeignVector3Surrogate
+    {
+        /// <summary>The first component.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public float x;
+
+        /// <summary>The second component.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public float y;
+
+        /// <summary>The third component.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public float z;
+
+        /// <summary>Converts to the real type.</summary>
+        /// <param name="value">The surrogate.</param>
+        public static implicit operator ForeignVector3(ForeignVector3Surrogate value)
+        {
+            return new ForeignVector3
+            {
+                x = value.x,
+                y = value.y,
+                z = value.z,
+            };
+        }
+
+        /// <summary>Converts from the real type.</summary>
+        /// <param name="value">The real value.</param>
+        public static implicit operator ForeignVector3Surrogate(ForeignVector3 value)
+        {
+            return new ForeignVector3Surrogate
+            {
+                x = value.x,
+                y = value.y,
+                z = value.z,
+            };
+        }
+    }
+
+    /// <summary>Holds surrogated values in each position a member can occupy.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class SurrogateHolder
+    {
+        /// <summary>A plain surrogated member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public ForeignVector3 Position;
+
+        /// <summary>A repeated surrogated element.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public ForeignVector3[] Path;
+
+        /// <summary>A scalar after them, to pin ordering.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public int Trailer;
+
+        /// <summary>A surrogated map value, so the substitution reaches every shape.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public System.Collections.Generic.Dictionary<string, ForeignVector3> Named;
+    }
 }

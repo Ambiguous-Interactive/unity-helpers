@@ -860,7 +860,8 @@
         "vswhere",
         "EAGAIN",
         "nologo",
-        "cmp"
+        "cmp",
+        "surrogated"
       ]
     }
   ],

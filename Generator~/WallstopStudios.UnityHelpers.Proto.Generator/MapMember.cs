@@ -87,7 +87,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string name,
             int tag,
             ITypeSymbol type,
-            bool overwriteList
+            bool overwriteList,
+            SurrogateMap surrogates
         )
         {
             if (!(type is INamedTypeSymbol named))
@@ -142,8 +143,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            Shape key = Shape.For(keyType, keyQualified);
-            Shape value = Shape.For(valueType, valueQualified);
+            Shape key = Shape.For(keyType, keyQualified, surrogates);
+            Shape value = Shape.For(valueType, valueQualified, surrogates);
             if (key == null || value == null)
             {
                 return null;

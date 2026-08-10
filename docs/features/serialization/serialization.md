@@ -1063,6 +1063,38 @@ other, with no reflection and no `MakeGenericType`.
 An abstract contract must declare at least one include — reading it could otherwise never produce an
 instance — and a payload for one that names no subtype is malformed rather than an empty base.
 
+#### Surrogates
+
+Unity's `Vector3`, `Color` and `Bounds` cannot carry `[WProtoContract]` — they are not yours to
+annotate. A **surrogate** gives them a wire shape:
+
+```csharp
+[assembly: WProtoSurrogate(typeof(Vector3), typeof(Vector3Surrogate))]
+
+[WProtoContract]
+public partial struct Vector3Surrogate
+{
+    [WProtoMember(1)] public float x;
+    [WProtoMember(2)] public float y;
+    [WProtoMember(3)] public float z;
+
+    public static implicit operator Vector3(Vector3Surrogate v) => new(v.x, v.y, v.z);
+    public static implicit operator Vector3Surrogate(Vector3 v) => new() { x = v.x, y = v.y, z = v.z };
+}
+```
+
+Any member of the real type — plain, repeated, or a map value — is then written as the surrogate,
+byte-for-byte, and converted back on read. The surrogate's field numbers alone define the bytes.
+
+**The attribute goes on the assembly**, not on either type. The real type usually lives somewhere
+that cannot reference this package, and an assembly attribute is the one thing the generator can
+enumerate cheaply across every reference — which is what lets a **consumer's** build find the
+surrogates this package ships. The compilation's own declarations are searched first, so you can
+override a surrogate for a type you also use.
+
+Both conversions must exist, implicit or explicit. A default surrogated **struct** is still written
+(a tag and a zero length), following the same rule as any struct sub-message.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

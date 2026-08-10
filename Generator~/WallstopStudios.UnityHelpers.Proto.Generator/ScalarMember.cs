@@ -44,7 +44,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string name,
             int tag,
             ITypeSymbol type,
-            bool isRequired
+            bool isRequired,
+            SurrogateMap surrogates
         )
         {
             ITypeSymbol underlying = type;
@@ -66,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            Shape shape = Shape.For(underlying, qualifiedUnderlying);
+            Shape shape = Shape.For(underlying, qualifiedUnderlying, surrogates);
             if (shape == null)
             {
                 return null;

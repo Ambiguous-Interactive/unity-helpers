@@ -90,10 +90,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 ReportOrphanedHooks(context, symbol);
             }
 
+            SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
+
             List<string> registrations = new List<string>();
             foreach (INamedTypeSymbol contract in contracts)
             {
-                string source = Emit(context, contract, out string registration);
+                string source = Emit(context, contract, surrogates, out string registration);
                 if (source == null)
                 {
                     continue;
@@ -150,6 +152,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private static string Emit(
             GeneratorExecutionContext context,
             INamedTypeSymbol contract,
+            SurrogateMap surrogates,
             out string registration
         )
         {
@@ -179,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            List<Member> members = CollectMembers(context, contract);
+            List<Member> members = CollectMembers(context, contract, surrogates);
             if (members == null)
             {
                 return null;
@@ -838,7 +841,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static List<Member> CollectMembers(
             GeneratorExecutionContext context,
-            INamedTypeSymbol contract
+            INamedTypeSymbol contract,
+            SurrogateMap surrogates
         )
         {
             List<Member> members = new List<Member>();
@@ -923,6 +927,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     type,
                     NamedFlag(attribute, "IsRequired"),
                     NamedFlag(attribute, "OverwriteList"),
+                    surrogates,
                     out bool ambiguous
                 );
                 if (member == null)
