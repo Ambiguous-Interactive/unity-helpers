@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
+    using System;
     using System.Runtime.CompilerServices;
     using System.Text;
 
@@ -19,6 +20,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     {
         /// <summary>Bytes a ten-byte varint occupies; the widest encoding the format allows.</summary>
         public const int MaxVarintBytes = 10;
+
+        [ThreadStatic]
+        private static int _messageDepth;
 
         /// <summary>
         /// Returns the encoded size of <paramref name="value"/> as an unsigned varint.
@@ -133,6 +137,60 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             return Varint32Size((uint)payloadLength) + payloadLength;
+        }
+
+        /// <summary>
+        /// Returns the encoded size of <paramref name="value"/> as a nested message, length prefix
+        /// included, and excluding the field key its parent writes.
+        /// </summary>
+        /// <typeparam name="T">The sub-message type.</typeparam>
+        /// <param name="formatter">The sub-message's formatter; <c>null</c> measures as nothing.</param>
+        /// <param name="value">The value to measure.</param>
+        /// <returns>The prefix size plus the payload size.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when nesting passes <see cref="WProtoReader.MaxNestingDepth"/>.
+        /// </exception>
+        /// <remarks>
+        /// <para>
+        /// This is the measuring half of <see cref="WProtoWriter.TryWriteMessage{T}"/> and the two
+        /// have to agree for every input, since one produces the length prefix the other consumes.
+        /// </para>
+        /// <para>
+        /// The depth bound is the same one the reader applies, for the same reason: measurement
+        /// recurses through the object graph, and a graph that contains a cycle recurses forever.
+        /// Unlike a malformed payload -- which is reported by returning <see langword="false"/> --
+        /// there is no value that could be returned here, because a cyclic message has no finite
+        /// size. Throwing names the likely cause; the alternative is a stack overflow, which takes
+        /// the process down and cannot be caught.
+        /// </para>
+        /// </remarks>
+        public static int MessageSize<T>(IWProtoFormatter<T> formatter, in T value)
+        {
+            if (formatter == null)
+            {
+                return 0;
+            }
+
+            if (_messageDepth >= WProtoReader.MaxNestingDepth)
+            {
+                throw new InvalidOperationException(
+                    $"WallstopProto refused to measure past {WProtoReader.MaxNestingDepth} levels of "
+                        + $"nesting while sizing a '{typeof(T).FullName}'. A message that deep is "
+                        + "almost always a cycle in the object graph, which has no finite encoded size."
+                );
+            }
+
+            // No reset on the throw path: each enclosing frame's finally unwinds one level, so the
+            // counter is back at zero by the time the exception leaves the outermost call.
+            _messageDepth++;
+            try
+            {
+                return LengthDelimitedSize(formatter.Measure(value));
+            }
+            finally
+            {
+                _messageDepth--;
+            }
         }
 
         /// <summary>

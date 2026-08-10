@@ -735,6 +735,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void AFormatterThatIgnoresARefusedWriteStillFaultsTheMessage()
+        {
+            // A refused write leaves Position where it was, so a formatter that returns true anyway
+            // produces a length prefix that correctly describes a payload with a member missing --
+            // internally consistent and silently wrong, which is worse than a truncation. The
+            // formatter interface is public and hand-implementable, so this is not hypothetical.
+            byte[] scratch = new byte[6];
+            WProtoWriter writer = new(scratch);
+
+            Assert.IsFalse(writer.TryWriteMessage(1, new OptimisticFormatter(), 0));
+            Assert.IsTrue(writer.Faulted);
+        }
+
+        [TestCase(63, true, TestName = "TryWriteMessageIsBoundedAtTheDocumentedDepth(63 accepted)")]
+        [TestCase(
+            64,
+            false,
+            TestName = "TryWriteMessageIsBoundedAtTheDocumentedDepth(64 rejected)"
+        )]
+        public void TryWriteMessageIsBoundedAtTheDocumentedDepth(int depth, bool expectWritten)
+        {
+            // Symmetric with the reader's bound and with the one measurement applies: descending is
+            // stack depth, and a stack overflow cannot be caught.
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.AreEqual(expectWritten, writer.TryWriteMessage(1, new ChainFormatter(depth), 0));
+            Assert.AreEqual(!expectWritten, writer.Faulted);
+        }
+
+        [Test]
         public void VarintSizesAgreeWithTheEncoder()
         {
             ulong[] boundaries =
@@ -785,6 +815,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return bytes;
+        }
+
+        /// <summary>A formatter that reports success whether or not its writes were accepted.</summary>
+        private sealed class OptimisticFormatter : IWProtoFormatter<int>
+        {
+            public int Measure(in int value)
+            {
+                return 32;
+            }
+
+            public bool Write(ref WProtoWriter writer, in int value)
+            {
+                writer.TryWriteTag(1, WProtoWireType.LengthDelimited);
+                writer.TryWriteBytes(new byte[32]);
+                return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 0;
+                return true;
+            }
+        }
+
+        /// <summary>Nests itself a fixed number of levels, to probe the writer's depth bound.</summary>
+        private sealed class ChainFormatter : IWProtoFormatter<int>
+        {
+            private readonly int _remaining;
+
+            internal ChainFormatter(int remaining)
+            {
+                _remaining = remaining;
+            }
+
+            public int Measure(in int value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in int value)
+            {
+                if (_remaining <= 0)
+                {
+                    return true;
+                }
+
+                return writer.TryWriteMessage(1, new ChainFormatter(_remaining - 1), value);
+            }
+
+            public bool TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 0;
+                return true;
+            }
         }
     }
 }

@@ -366,16 +366,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (" + member.PresenceTest + ")" + Writer.Open);
                 writer.Indent();
-                writer.Line(
-                    "if (!writer.TryWriteTag("
-                        + member.Tag
-                        + ", "
-                        + member.WireType
-                        + ") || !writer."
-                        + member.WriteCall
-                        + ")"
-                        + Writer.Open
-                );
+                writer.Line("if (!(" + member.WriteExpression + "))" + Writer.Open);
                 writer.Indent();
                 writer.Line("return false;");
                 writer.Outdent();

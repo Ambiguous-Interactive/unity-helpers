@@ -25,14 +25,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// reports it.
     /// </para>
     /// <para>
-    /// Sizing comes from <see cref="WProtoSizes"/>. Measuring a sub-message before writing it is
-    /// what lets a length prefix be emitted up front with no scratch buffer and no back-patching.
+    /// Sizing comes from <see cref="WProtoSizes"/>. A message is measured once, by whoever sizes the
+    /// destination buffer, and <see cref="TryWriteMessage{T}"/> then back-patches each sub-message's
+    /// length prefix rather than measuring it a second time -- see that method for why the
+    /// alternative breaks the lifecycle-hook contract.
     /// </para>
     /// </remarks>
     public ref struct WProtoWriter
     {
         private readonly Span<byte> _buffer;
         private int _position;
+        private int _depth;
         private bool _faulted;
 
         /// <summary>
@@ -43,11 +46,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             _buffer = buffer;
             _position = 0;
+            _depth = 0;
             _faulted = false;
         }
 
         /// <summary>Bytes written so far.</summary>
         public int Position => _position;
+
+        /// <summary>
+        /// How many enclosing sub-messages this writer is currently inside; 0 at the top level.
+        /// </summary>
+        public int Depth => _depth;
 
         /// <summary>Bytes still available in the destination span.</summary>
         public int Remaining => _buffer.Length - _position;
@@ -350,6 +359,94 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             value.CopyTo(_buffer.Slice(start, value.Length));
+            return true;
+        }
+
+        /// <summary>
+        /// Writes <paramref name="value"/> as a nested message in field <paramref name="fieldNumber"/>.
+        /// </summary>
+        /// <typeparam name="T">The sub-message type.</typeparam>
+        /// <param name="fieldNumber">The field number, 1 through 536,870,911.</param>
+        /// <param name="formatter">The sub-message's formatter; <c>null</c> is refused.</param>
+        /// <param name="value">The value to write.</param>
+        /// <returns><c>true</c> when the tag, the length prefix and the whole payload were written.</returns>
+        /// <remarks>
+        /// <para>
+        /// The tag, the prefix and the payload are one operation on purpose: a caller that writes
+        /// them separately has to produce the length before the payload exists, and the only way to
+        /// do that is to measure the sub-message a second time. That second measurement is what
+        /// breaks the lifecycle-hook contract -- before-serialization belongs to
+        /// <see cref="IWProtoFormatter{T}.Measure"/> and after-serialization to
+        /// <see cref="IWProtoFormatter{T}.Write"/>, so re-measuring runs the before hook once per
+        /// enclosing level while the after hook still runs once, and a hook that rents pooled scratch
+        /// leaks one rental per level. Here the value is measured exactly once for the whole
+        /// serialization, by whoever sized this buffer, at every depth.
+        /// </para>
+        /// <para>
+        /// The prefix is reserved at its <i>minimum</i> width and the payload shifted right only when
+        /// the finished length needs a wider varint, so the output is the same minimal encoding
+        /// protobuf-net emits, and a sub-message under 128 bytes -- which is most of them -- moves no
+        /// bytes at all.
+        /// </para>
+        /// </remarks>
+        public bool TryWriteMessage<T>(int fieldNumber, IWProtoFormatter<T> formatter, in T value)
+        {
+            if (formatter == null || _depth >= WProtoReader.MaxNestingDepth)
+            {
+                _faulted = true;
+                return false;
+            }
+
+            if (!TryWriteTag(fieldNumber, WProtoWireType.LengthDelimited))
+            {
+                return false;
+            }
+
+            if (!TryReserve(1, out int prefixStart))
+            {
+                return false;
+            }
+
+            int payloadStart = _position;
+            _depth++;
+            bool written = formatter.Write(ref this, value);
+            _depth--;
+            if (!written || _faulted)
+            {
+                _faulted = true;
+                return false;
+            }
+
+            int length = _position - payloadStart;
+            int prefixSize = WProtoSizes.Varint32Size((uint)length);
+            if (prefixSize != 1)
+            {
+                int extra = prefixSize - 1;
+                if (extra > _buffer.Length - _position)
+                {
+                    _faulted = true;
+                    return false;
+                }
+
+                // Span.CopyTo is a memmove, so the overlap of a right shift is handled. Writing the
+                // payload one byte after the tag rather than at its final offset is what keeps this
+                // shift within a buffer sized for the finished message: the payload only ever sits
+                // to the LEFT of where it ends up.
+                _buffer
+                    .Slice(payloadStart, length)
+                    .CopyTo(_buffer.Slice(payloadStart + extra, length));
+                _position += extra;
+            }
+
+            uint remaining = (uint)length;
+            int index = prefixStart;
+            while (remaining >= 0x80u)
+            {
+                _buffer[index++] = (byte)(remaining | 0x80u);
+                remaining >>= 7;
+            }
+
+            _buffer[index] = (byte)remaining;
             return true;
         }
 

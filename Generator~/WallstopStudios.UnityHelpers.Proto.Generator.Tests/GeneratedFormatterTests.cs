@@ -232,11 +232,175 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ANestedContractRoundTripsThroughEveryMemberShape()
+        {
+            NestingContract original = new NestingContract
+            {
+                Id = 9,
+                Child = new HookedContract { Value = 5 },
+                Where = new Outer.Point { X = 3, Y = -4 },
+                MaybeWhere = new Outer.Point { X = 1, Y = 2 },
+            };
+
+            NestingContract restored = RoundTrip(original);
+
+            Assert.AreEqual(9, restored.Id);
+            Assert.AreEqual(5, restored.Child.Value);
+            Assert.AreEqual(3, restored.Where.X);
+            Assert.AreEqual(-4, restored.Where.Y);
+            Assert.IsTrue(restored.MaybeWhere.HasValue);
+            Assert.AreEqual(1, restored.MaybeWhere.Value.X);
+            Assert.AreEqual(2, restored.MaybeWhere.Value.Y);
+        }
+
+        [Test]
+        public void AStructSubMessageIsWrittenEvenWhenEveryMemberIsDefault()
+        {
+            // Measured against protobuf-net 3.2.56, not assumed, and it is the opposite of the rule
+            // for every scalar: a null reference sub-message is omitted, while a struct one at its
+            // default is still written -- as a key and a zero length. Guessing default-omission here
+            // produces a payload protobuf-net never wrote.
+            Assert.AreEqual("1A00", Encode(new NestingContract()));
+            Assert.AreEqual(
+                "1A00",
+                Encode(new NestingContract { Child = null, MaybeWhere = null }),
+                "A null reference sub-message and an absent nullable are both omitted."
+            );
+            Assert.AreEqual(
+                "1A00" + "2200",
+                Encode(new NestingContract { MaybeWhere = default(Outer.Point) }),
+                "A nullable sub-message holding a default value is present, because HasValue is "
+                    + "what decides -- the same distinction 0d and null draw for a scalar."
+            );
+        }
+
+        [Test]
+        public void ANestedHookRunsExactlyOncePerSerializationAtEveryDepth()
+        {
+            // The whole reason sub-message lengths are back-patched rather than re-measured. At two
+            // levels deep, sizing the prefix from a second Measure runs this hook three times
+            // against one after-serialization hook, so a hook that rents pooled scratch leaks twice.
+            HookedContract hooked = new HookedContract { Value = 5 };
+            DeepContract graph = new DeepContract
+            {
+                Id = 1,
+                Child = new NestingContract { Id = 2, Child = hooked },
+            };
+
+            IWProtoFormatter<DeepContract> formatter = WProtoFormatterProvider.Get<DeepContract>();
+            byte[] buffer = new byte[formatter.Measure(graph)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, graph));
+
+            CollectionAssert.AreEqual(
+                new[] { "OnBeforeSerialization", "OnAfterSerialization" },
+                hooked.Trace,
+                "Each hook runs exactly once per serialization no matter how deep the value sits."
+            );
+        }
+
+        [Test]
+        public void ASubMessageCrossingTheLengthPrefixWidthStaysExact()
+        {
+            // A payload of 127 bytes prefixes in one byte and 128 needs two, at every enclosing
+            // level in turn. That is where a back-patching writer either shifts the payload
+            // correctly or silently overlaps it, and where Measure and Write stop agreeing if the
+            // prefix width is computed from the wrong length.
+            for (int length = 0; length <= 300; length++)
+            {
+                BulkHolder holder = new BulkHolder
+                {
+                    Child = new BulkContract { Payload = new byte[length] },
+                    Trailer = 7,
+                };
+                for (int index = 0; index < length; index++)
+                {
+                    holder.Child.Payload[index] = (byte)(index * 31);
+                }
+
+                IWProtoFormatter<BulkHolder> formatter = WProtoFormatterProvider.Get<BulkHolder>();
+                int predicted = formatter.Measure(holder);
+                byte[] buffer = new byte[predicted];
+                WProtoWriter writer = new WProtoWriter(buffer);
+                Assert.IsTrue(formatter.Write(ref writer, holder), $"length {length}");
+                Assert.AreEqual(predicted, writer.Position, $"length {length}");
+
+                WProtoReader reader = new WProtoReader(buffer);
+                Assert.IsTrue(formatter.TryRead(ref reader, out BulkHolder restored));
+                Assert.AreEqual(7, restored.Trailer, $"length {length}");
+                CollectionAssert.AreEqual(holder.Child.Payload, restored.Child.Payload);
+            }
+        }
+
+        [Test]
+        public void ABufferOneByteShortRefusesRatherThanTruncating()
+        {
+            // The back-patched prefix is written after the payload, so a writer that runs out of
+            // room mid-shift must fault rather than leave a length that does not describe what
+            // follows it.
+            BulkHolder holder = new BulkHolder
+            {
+                Child = new BulkContract { Payload = new byte[200] },
+                Trailer = 7,
+            };
+
+            IWProtoFormatter<BulkHolder> formatter = WProtoFormatterProvider.Get<BulkHolder>();
+            byte[] cramped = new byte[formatter.Measure(holder) - 1];
+            WProtoWriter writer = new WProtoWriter(cramped);
+
+            Assert.IsFalse(formatter.Write(ref writer, holder));
+            Assert.IsTrue(writer.Faulted);
+        }
+
+        [Test]
+        public void ARecursiveContractRoundTripsWithinTheNestingBound()
+        {
+            ChainContract head = BuildChain(60);
+            ChainContract restored = RoundTrip(head);
+
+            int links = 0;
+            for (ChainContract current = restored; current != null; current = current.Next)
+            {
+                Assert.AreEqual(head.Id - links, current.Id);
+                links++;
+            }
+
+            Assert.AreEqual(60, links);
+        }
+
+        [Test]
+        public void MeasuringPastTheNestingBoundIsRefusedByNameRatherThanOverflowingTheStack()
+        {
+            // Measurement recurses through the object graph, so an unbounded graph takes the process
+            // down with a stack overflow that cannot be caught. There is no value to return instead:
+            // a cyclic message has no finite encoded size.
+            IWProtoFormatter<ChainContract> formatter =
+                WProtoFormatterProvider.Get<ChainContract>();
+
+            InvalidOperationException tooDeep = Assert.Throws<InvalidOperationException>(() =>
+                formatter.Measure(BuildChain(80))
+            );
+            StringAssert.Contains("nesting", tooDeep.Message);
+
+            ChainContract cycle = new ChainContract { Id = 1 };
+            cycle.Next = cycle;
+            Assert.Throws<InvalidOperationException>(() => formatter.Measure(cycle));
+
+            // The counter has to unwind on the way out, or the refusal above poisons every later
+            // serialization on this thread.
+            Assert.AreEqual(
+                RoundTrip(BuildChain(60)).Id,
+                60,
+                "A legal graph must still serialize after a refusal."
+            );
+        }
+
+        [Test]
         public void MeasurePredictsWriteExactlyForEveryShape()
         {
-            // The length-prefix protocol has no back-patching, so a parent emits a child's size
-            // before the child's bytes exist. A formatter whose measurement disagrees with its
-            // output corrupts every message that contains it.
+            // A parent emits a child's length prefix, and the writer produces it by back-patching a
+            // finished payload -- but the buffer itself is still sized from Measure. A formatter
+            // whose measurement disagrees with its output corrupts every message that contains it.
             ScalarContract[] cases =
             {
                 new ScalarContract(),
@@ -257,6 +421,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.IsTrue(formatter.Write(ref writer, value));
                 Assert.AreEqual(predicted, writer.Position);
             }
+        }
+
+        private static ChainContract BuildChain(int links)
+        {
+            ChainContract head = null;
+            for (int link = 1; link <= links; link++)
+            {
+                head = new ChainContract { Id = link, Next = head };
+            }
+
+            return head;
         }
 
         private static string Encode<T>(T value)

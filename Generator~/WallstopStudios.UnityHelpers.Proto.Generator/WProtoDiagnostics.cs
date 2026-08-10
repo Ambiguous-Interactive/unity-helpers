@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO003",
                 "WallstopProto cannot serialize this member type",
-                "'{0}.{1}' has type '{2}', which this generator cannot serialize yet. Supported: the integer and floating-point primitives, bool, string, byte[], enums, and Nullable<T> of any of those. Remove [WProtoMember], or write a formatter by hand and register it with WProtoFormatterProvider.Register<T>.",
+                "'{0}.{1}' has type '{2}', which this generator cannot serialize yet. Supported: the integer and floating-point primitives, bool, string, byte[], enums, another [WProtoContract] type, and Nullable<T> of any of those. Annotate '{2}' with [WProtoContract] if it is yours, or remove [WProtoMember], or write a formatter by hand and register it with WProtoFormatterProvider.Register<T>.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true

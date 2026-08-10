@@ -22,14 +22,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string Proto =
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
+        private const string ContractAttribute =
+            "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute";
+
         private readonly string _name;
         private readonly string _valueExpression;
         private readonly string _sizeExpression;
         private readonly string _writeMethod;
         private readonly string _readMethod;
+        private readonly string _readArguments;
         private readonly string _readLocalType;
         private readonly string _assignExpression;
         private readonly string _writeCast;
+        private readonly bool _writesOwnTag;
 
         private Member(
             string name,
@@ -40,9 +45,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string sizeExpression,
             string writeMethod,
             string readMethod,
+            string readArguments,
             string readLocalType,
             string assignExpression,
-            string writeCast
+            string writeCast,
+            bool writesOwnTag
         )
         {
             _name = name;
@@ -53,9 +60,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _sizeExpression = sizeExpression;
             _writeMethod = writeMethod;
             _readMethod = readMethod;
+            _readArguments = readArguments;
             _readLocalType = readLocalType;
             _assignExpression = assignExpression;
             _writeCast = writeCast;
+            _writesOwnTag = writesOwnTag;
         }
 
         internal int Tag { get; }
@@ -67,14 +76,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal string SizeExpression => _sizeExpression;
 
-        internal string WriteCall => _writeMethod + "(" + _writeCast + _valueExpression + ")";
+        /// <summary>
+        /// The whole write, field key included, as one boolean expression.
+        /// </summary>
+        /// <remarks>
+        /// A nested message writes its own key because the key, the length prefix and the payload
+        /// have to be one operation -- see <c>WProtoWriter.TryWriteMessage</c>. Splitting them would
+        /// mean producing the length before the payload exists, which is only possible by measuring
+        /// the sub-message a second time, and that is what breaks the lifecycle-hook contract.
+        /// </remarks>
+        internal string WriteExpression =>
+            _writesOwnTag
+                ? "writer." + _writeMethod + "(" + Tag + ", " + _writeCast + _valueExpression + ")"
+                : "writer.TryWriteTag("
+                    + Tag
+                    + ", "
+                    + WireType
+                    + ") && writer."
+                    + _writeMethod
+                    + "("
+                    + _writeCast
+                    + _valueExpression
+                    + ")";
 
         internal IEnumerable<string> ReadStatements(string target, string qualifiedContract)
         {
             string local = "decoded" + Tag;
             yield return "if (!reader."
                 + _readMethod
-                + "(out "
+                + "("
+                + _readArguments
+                + "out "
                 + _readLocalType
                 + " "
                 + local
@@ -144,9 +176,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 shape.SizeExpression,
                 shape.WriteMethod,
                 shape.ReadMethod,
+                shape.ReadArguments,
                 shape.ReadLocalType,
                 assign,
-                shape.WriteCast
+                shape.WriteCast,
+                shape.WritesOwnTag
             );
         }
 
@@ -301,7 +335,65 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 };
             }
 
+            if (IsContract(type))
+            {
+                string formatter = Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()";
+                return new Shape
+                {
+                    WireType = Proto + ".WProtoWireType.LengthDelimited",
+
+                    // Measured against protobuf-net 3.2.56 rather than assumed, because the two
+                    // halves disagree: a null reference sub-message is omitted, but a struct one is
+                    // written even when every member equals its default -- `default(Point)` emits
+                    // `12 00`, a zero-length payload, where a null `Point` reference emits nothing.
+                    PresenceTest = type.IsValueType ? "true" : valueExpression + " != null",
+                    SizeExpression =
+                        Proto
+                        + ".WProtoSizes.MessageSize("
+                        + formatter
+                        + ", "
+                        + valueExpression
+                        + ")",
+                    WriteMethod = "TryWriteMessage",
+                    WriteCast = formatter + ", ",
+                    WritesOwnTag = true,
+                    ReadMethod = "TryReadMessage",
+                    ReadArguments = formatter + ", ",
+                    ReadLocalType = qualified,
+                    AssignExpression = "$",
+                };
+            }
+
             return null;
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="type"/> carries <c>[WProtoContract]</c>.
+        /// </summary>
+        /// <remarks>
+        /// The attribute is matched by name rather than by symbol identity so a contract declared in
+        /// a referenced assembly counts too -- which is the whole point, since a consumer nesting one
+        /// of this package's contracts inside one of its own is the case the generator exists for.
+        /// </remarks>
+        private static bool IsContract(ITypeSymbol type)
+        {
+            if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
+            {
+                return false;
+            }
+
+            foreach (AttributeData attribute in type.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass != null
+                    && attribute.AttributeClass.ToDisplayString() == ContractAttribute
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static Shape Integer(string valueExpression, string qualified, bool exact)
@@ -346,6 +438,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             internal string ReadLocalType;
             internal string AssignExpression;
             internal string WriteCast = string.Empty;
+            internal string ReadArguments = string.Empty;
+            internal bool WritesOwnTag;
         }
     }
 }
