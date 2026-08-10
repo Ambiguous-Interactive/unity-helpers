@@ -1024,8 +1024,19 @@ function New-UnityMetaFile {
     }
 
     $guid = [guid]::NewGuid().ToString('N')
-    $content = (New-UnityMetaContent -TargetPath $targetPath -Guid $guid).TrimEnd() + "`n"
-    [System.IO.File]::WriteAllText($metaPath, $content, [System.Text.UTF8Encoding]::new($false))
+
+    # CRLF, because .gitattributes declares '*.meta text eol=crlf' and check-eol.ps1 -- which
+    # validate:prepush runs -- enforces that in the WORKING TREE. A file written here never passes
+    # through git's smudge filter, so writing LF leaves a failure that agent:preflight:fix cannot
+    # clear: its EOL normalization runs before this step, so the file it just created is not in the
+    # set it already normalized.
+    $content = (New-UnityMetaContent -TargetPath $targetPath -Guid $guid).TrimEnd()
+    $content = ($content -replace "`r`n", "`n") -replace "`n", "`r`n"
+    [System.IO.File]::WriteAllText(
+        $metaPath,
+        $content + "`r`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
     Write-Info "Generated meta for $RelativePath"
     return $true
 }

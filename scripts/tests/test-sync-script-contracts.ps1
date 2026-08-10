@@ -2326,6 +2326,56 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
     -Message 'Expected release-prepare.yml PR body to instruct operators to run Release Publish, not Release Tag.'
 }
 
+function Run-GeneratedMetaLineEndingContractTests {
+  Write-Host ""
+  Write-Host "Generated .meta line-ending contracts:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+
+  # .gitattributes declares '*.meta text eol=crlf' and check-eol.ps1 enforces that in the WORKING
+  # TREE, but a freshly generated file never passes through git's smudge filter. A generator that
+  # writes LF therefore leaves validate:prepush failing on a file the developer did not hand-write --
+  # and agent:preflight:fix cannot clear it, because its EOL normalization runs before the step that
+  # creates the .meta. Observed twice: session 173 committed one and session 174 produced two more.
+  $attributesPath = Join-Path $repoRoot '.gitattributes'
+  $attributesContent = Get-Content -LiteralPath $attributesPath -Raw
+  $declaresCrlf = $attributesContent -match '(?m)^\*\.meta\s+text\s+eol=crlf\s*$'
+
+  Write-TestResult `
+    -TestName '.gitattributes still declares .meta as CRLF in the working tree' `
+    -Passed $declaresCrlf `
+    -Message 'Expected .gitattributes to carry "*.meta text eol=crlf"; the generators below are written to match it.'
+
+  $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "meta-eol-contract-$([System.Guid]::NewGuid().ToString('N'))"
+  New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+  try {
+    $probePath = Join-Path $tempRoot 'Probe.cs'
+    Set-Content -LiteralPath $probePath -Value 'namespace Probe { }' -NoNewline
+
+    $generator = Join-Path $repoRoot 'scripts/generate-meta.sh'
+    & bash $generator $probePath 2>&1 | Out-Null
+
+    $metaPath = "$probePath.meta"
+    $generated = Test-Path -LiteralPath $metaPath -PathType Leaf
+    $carriageReturns = 0
+    $lineFeeds = 0
+    if ($generated) {
+      $bytes = [System.IO.File]::ReadAllBytes($metaPath)
+      $carriageReturns = @($bytes | Where-Object { $_ -eq 13 }).Count
+      $lineFeeds = @($bytes | Where-Object { $_ -eq 10 }).Count
+    }
+
+    Write-TestResult `
+      -TestName 'generate-meta.sh writes CRLF line endings' `
+      -Passed ($generated -and $lineFeeds -gt 0 -and $carriageReturns -eq $lineFeeds) `
+      -Message "Generated: $generated, CR=$carriageReturns, LF=$lineFeeds (every LF must be preceded by a CR)."
+  }
+  finally {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 function Run-ReleasePackageContentContractTests {
   Write-Host ""
   Write-Host "Release package content contracts:" -ForegroundColor Magenta
@@ -2766,5 +2816,6 @@ Run-ReleasePublishWorkflowBudgetContractTests
 Run-ReleasePrepareWorkflowContractTests
 Run-ReleaseTagWorkflowRetirementContractTests
 Run-ReleasePackageContentContractTests
+Run-GeneratedMetaLineEndingContractTests
 Run-CSharpierFormatGateContractTests
 Print-SummaryAndExit
