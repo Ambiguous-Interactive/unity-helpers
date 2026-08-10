@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class SerializableHashSetProtoWrapper<T>
+    internal sealed partial class SerializableHashSetProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -532,7 +532,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class SerializableSortedSetProtoWrapper<T>
+    internal sealed partial class SerializableSortedSetProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -544,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class SerializableDictionaryProtoWrapper<TKey, TValue>
+    internal sealed partial class SerializableDictionaryProtoWrapper<TKey, TValue>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -560,7 +560,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
+    internal sealed partial class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -582,7 +582,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class DequeProtoWrapper<T>
+    internal sealed partial class DequeProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class CyclicBufferProtoWrapper<T>
+    internal sealed partial class CyclicBufferProtoWrapper<T>
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -614,7 +614,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     [ProtoContract]
     [WProtoContract]
-    internal sealed class SparseSetProtoWrapper
+    internal sealed partial class SparseSetProtoWrapper
     {
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
