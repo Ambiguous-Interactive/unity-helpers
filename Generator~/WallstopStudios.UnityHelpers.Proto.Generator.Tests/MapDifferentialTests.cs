@@ -338,6 +338,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 value.Trace.FindAll(entry => entry == "OnBeforeSerialization").Count,
                 "before-serialization ran " + string.Join(", ", value.Trace)
             );
+
+            // Map entries open and close a length-delimited block by hand now, so their nesting
+            // bookkeeping has to balance the same way a sub-message's does.
+            Assert.AreEqual(0, writer.Depth, "a map entry left the nesting depth unbalanced");
         }
 
         [Test]

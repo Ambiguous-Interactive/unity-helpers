@@ -492,5 +492,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
         }
+
+        [Test]
+        public void WritingASubMessageLeavesTheNestingDepthWhereItStarted()
+        {
+            // The nesting bound is the only thing standing between a self-referential contract and a
+            // stack overflow, and it is enforced by a counter that both ends of a sub-message have to
+            // agree on. A write that decrements once too often makes the counter drift NEGATIVE,
+            // which raises the effective bound for the rest of the message rather than lowering it --
+            // so the failure is a deeper recursion than the limit allows, not a rejected one.
+            //
+            // Asserted on the writer rather than on the bytes because the bytes are correct either
+            // way. Nothing in the differential suite can see this.
+            NestingContract value = new NestingContract
+            {
+                Id = 1,
+                Child = new HookedContract { Value = 2 },
+                Where = new Outer.Point { X = 3 },
+            };
+
+            IWProtoFormatter<NestingContract> formatter =
+                WProtoFormatterProvider.Get<NestingContract>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+
+            Assert.AreEqual(0, writer.Depth);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(0, writer.Depth, "depth did not return to zero after a complete write");
+        }
     }
 }

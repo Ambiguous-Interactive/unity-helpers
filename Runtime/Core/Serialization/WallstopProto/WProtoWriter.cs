@@ -407,16 +407,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 written = formatter.Write(ref this, value);
             }
-            finally
+            catch
             {
                 // A formatter is contractually not allowed to throw, but this writer can outlive one
                 // that does: a caller may catch and keep writing, and a depth left one too high
                 // silently lowers the nesting bound for the rest of the message.
+                //
+                // Every path out of here decrements EXACTLY once -- this one, the failure below, and
+                // TryCloseLengthDelimited on success. A `finally` would have been simpler and was
+                // wrong: it also runs on the success path, where the close decrements too, and the
+                // counter drifts negative. Negative is the dangerous direction, because it RAISES the
+                // effective nesting bound instead of lowering it.
                 _depth--;
+                throw;
             }
 
             if (!written || _faulted)
             {
+                _depth--;
                 _faulted = true;
                 return false;
             }
