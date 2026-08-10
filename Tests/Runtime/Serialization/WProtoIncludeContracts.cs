@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
+    using System.Collections.Generic;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -116,5 +117,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// <summary>The subtype's own member.</summary>
         [WProtoMember(1)]
         public int Edge;
+    }
+
+    /// <summary>
+    /// An abstract polymorphic base whose members include a <b>collection</b>.
+    /// </summary>
+    /// <remarks>
+    /// The shape that crashed before review caught it: an abstract base has no instance until an
+    /// include tag arrives, so a collection element read before that tag had no member to seed from.
+    /// Elements are collected aside and combined once the instance is final, which is generated code
+    /// worth AOT-compiling.
+    /// </remarks>
+    [WProtoContract]
+    [WProtoInclude(100, typeof(WProtoPolyListSub))]
+    public abstract partial class WProtoPolyListBase
+    {
+        /// <summary>A collection on an abstract base.</summary>
+        [WProtoMember(1)]
+        public List<int> Items = new List<int> { 7, 8 };
+
+        /// <summary>An array too, since the two take different epilogue paths.</summary>
+        [WProtoMember(2)]
+        public int[] Extras;
+    }
+
+    /// <summary>The subtype, whose constructor seeds a different collection from its base's.</summary>
+    [WProtoContract]
+    public partial class WProtoPolyListSub : WProtoPolyListBase
+    {
+        /// <summary>Replaces the base constructor's seed, so the two are distinguishable.</summary>
+        public WProtoPolyListSub()
+        {
+            Items = new List<int> { 5 };
+        }
+
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
     }
 }

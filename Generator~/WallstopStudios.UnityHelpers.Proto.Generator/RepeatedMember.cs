@@ -271,6 +271,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string Accumulator => "repeated" + Tag;
 
+        /// <summary>The list a deferred read collects into before it knows what to commit onto.</summary>
+        private string Pending => "pending" + Tag;
+
+        /// <summary>
+        /// Whether the read collects elements aside and commits them once the instance is final.
+        /// </summary>
+        /// <remarks>
+        /// Read in three places that must agree -- the locals, the seed and the epilogue -- so it is
+        /// named once rather than tested three times. Splitting it is how a half-reverted version
+        /// would still compile and read from a <c>null</c> instance.
+        /// </remarks>
+        private bool DeferSeeding => Deferred;
+
+        /// <summary>Where a decoded element goes: the pending list when deferred, else the member's own accumulator.</summary>
+        private string Target => DeferSeeding ? Pending : Accumulator;
+
+        private string PendingType => ListType + "<" + _elementQualified + ">";
+
         private string SeenFlag => "seen" + Tag;
 
         /// <summary>The type the read loop accumulates into before committing it.</summary>
@@ -410,6 +428,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // Presence is a flag rather than "the accumulator is not null", because a struct
             // collection has no null state to test and `default(T)` is a legitimate value for it.
             writer.Line("bool " + SeenFlag + " = false;");
+
+            if (DeferSeeding)
+            {
+                // A polymorphic contract cannot seed from the member yet. `read` may still be null
+                // -- an abstract base has no instance until an include tag arrives -- and even when
+                // it is not, an include later in the payload replaces it, so seeding now would
+                // append onto a constructor value that is about to be discarded. Elements are
+                // collected on their own and combined in the epilogue, once the instance is final.
+                writer.Line(PendingType + " " + Pending + " = null;");
+                return;
+            }
+
             writer.Line(
                 AccumulatorType + " " + Accumulator + " = default(" + AccumulatorType + ");"
             );
@@ -438,7 +468,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line(Accumulator + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
+            writer.Line(Target + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
             writer.Line("break;");
             Close(writer);
 
@@ -486,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line(Accumulator + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
+            writer.Line(Target + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
             Close(writer);
             writer.Blank();
             writer.Line("break;");
@@ -503,6 +533,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("if (!" + SeenFlag + ")" + Writer.Open);
             writer.Indent();
             writer.Line(SeenFlag + " = true;");
+
+            if (DeferSeeding)
+            {
+                writer.Line(Pending + " = new " + PendingType + "();");
+                Close(writer);
+                writer.Blank();
+                return;
+            }
 
             string fresh = "new " + AccumulatorType + "()";
 
@@ -545,9 +583,72 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // The assignment is not redundant for a class either: the member may have started null.
             writer.Line("if (" + SeenFlag + ")" + Writer.Open);
             writer.Indent();
+
+            if (DeferSeeding)
+            {
+                // Runs after the include has settled `read` and after the abstract-contract null
+                // check, so this is the first point at which the constructor value to append onto is
+                // knowable. protobuf-net, handed an include AFTER the elements, appends onto the
+                // base instance and then merges into the subtype's own collection, duplicating the
+                // constructor's entries -- measured, {7,8,1} against {7,8,7,8,1} for the same
+                // elements in the other order. It always writes the include first, so no payload it
+                // produces reaches that path; this yields the same answer either way instead.
+                writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
+                if (_isArray)
+                {
+                    writer.Line(Accumulator + ".AddRange(" + Pending + ");");
+                }
+                else
+                {
+                    writer.Line(
+                        "foreach ("
+                            + _elementQualified
+                            + " "
+                            + ElementLocal
+                            + " in "
+                            + Pending
+                            + ")"
+                            + Writer.Open
+                    );
+                    writer.Indent();
+                    writer.Line(Accumulator + ".Add(" + ElementLocal + ");");
+                    Close(writer);
+                }
+            }
+
             writer.Line("read." + Name + " = " + Accumulator + (_isArray ? ".ToArray();" : ";"));
             Close(writer);
             writer.Blank();
+        }
+
+        /// <summary>
+        /// The collection a deferred read commits onto, seeded from the final instance.
+        /// </summary>
+        private string DeferredSeed()
+        {
+            string fresh = "new " + AccumulatorType + "()";
+
+            if (_overwrite)
+            {
+                return fresh;
+            }
+
+            if (_isArray)
+            {
+                // The pending elements are appended after this, so the constructor's array only has
+                // to be copied in first.
+                return "read."
+                    + Name
+                    + " == null ? "
+                    + fresh
+                    + " : new "
+                    + AccumulatorType
+                    + "(read."
+                    + Name
+                    + ")";
+            }
+
+            return _collectionIsValueType ? "read." + Name : "read." + Name + " ?? " + fresh;
         }
     }
 }

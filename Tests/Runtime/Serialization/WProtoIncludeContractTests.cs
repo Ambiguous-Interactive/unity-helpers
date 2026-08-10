@@ -190,6 +190,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ACollectionOnAnAbstractBaseSurvivesAnElementBeforeTheIncludeTag()
+        {
+            // The crash. An abstract base has no instance until the include arrives, so seeding a
+            // collection from the member at the moment the element is read dereferences a null.
+            // Elements are collected aside and combined once the instance is final -- and the
+            // append lands on the SUBTYPE's constructor collection, whichever order they arrive in.
+            foreach (string hex in new[] { "08011009A206020802", "A20602080208011009" })
+            {
+                WProtoPolyListBase decoded = Decode<WProtoPolyListBase>(hex);
+
+                Assert.IsInstanceOf<WProtoPolyListSub>(decoded, hex);
+                Assert.AreEqual(2, ((WProtoPolyListSub)decoded).SubOnly, hex);
+                CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items, hex);
+                CollectionAssert.AreEqual(new[] { 9 }, decoded.Extras, hex);
+            }
+        }
+
+        [Test]
         public void MeasurePredictsWriteExactlyForEveryPolymorphicShape()
         {
             WProtoIncludeBase[] values =

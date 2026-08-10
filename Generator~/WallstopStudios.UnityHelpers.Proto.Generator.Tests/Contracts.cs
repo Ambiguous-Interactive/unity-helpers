@@ -640,4 +640,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// identity lost from saved data with nothing to report it.
     /// </remarks>
     public sealed class UndeclaredAlpha : IncludeAlpha { }
+
+    /// <summary>
+    /// An abstract polymorphic base whose members include a <b>collection</b>.
+    /// </summary>
+    /// <remarks>
+    /// The shape that crashed. An abstract base has no instance until an include tag arrives, so a
+    /// collection element read before that tag has no member to seed from -- the generated seed
+    /// dereferenced a null <c>read</c>. Nothing covered it because the first abstract fixture held
+    /// only scalars.
+    /// </remarks>
+    [WProtoContract]
+    [WProtoInclude(100, typeof(PolyListSub))]
+    public abstract partial class PolyListBase
+    {
+        /// <summary>A collection on an abstract base.</summary>
+        [WProtoMember(1)]
+        public List<int> Items = new List<int> { 7, 8 };
+
+        /// <summary>An array too, since the two take different epilogue paths.</summary>
+        [WProtoMember(2)]
+        public int[] Extras;
+    }
+
+    /// <summary>
+    /// The subtype, whose constructor seeds a <b>different</b> collection from its base's.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately different. With identical seeds, appending onto the provisional base instance
+    /// and appending onto the final subtype produce the same answer, and a test cannot tell a
+    /// correct implementation from one that seeds too early.
+    /// </remarks>
+    [WProtoContract]
+    public partial class PolyListSub : PolyListBase
+    {
+        /// <summary>Replaces the base constructor's seed.</summary>
+        public PolyListSub()
+        {
+            Items = new List<int> { 5 };
+        }
+
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
+    }
 }

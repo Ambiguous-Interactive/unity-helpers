@@ -295,6 +295,47 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ACollectionOnAnAbstractBaseSurvivesAnElementBeforeTheIncludeTag()
+        {
+            // The crash. An abstract base has no instance until the include arrives, so seeding a
+            // collection from the member at the moment the element is read dereferences a null.
+            // Elements are collected on their own and combined once the instance is final.
+            PolyListBase decoded = Decode<PolyListBase>("0801" + "1009" + "A20602" + "0802");
+
+            Assert.IsInstanceOf<PolyListSub>(decoded);
+            Assert.AreEqual(2, ((PolyListSub)decoded).SubOnly);
+            CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 9 }, decoded.Extras);
+        }
+
+        [Test]
+        public void ACollectionAppendsOntoTheSubtypesConstructorWhicheverOrderTheIncludeArrivesIn()
+        {
+            // The base seeds {7,8} and the subtype seeds {5}, so seeding from the provisional base
+            // instance and seeding from the final subtype give different answers -- which is the
+            // only way a test can tell the two apart.
+            //
+            // protobuf-net, handed the include LAST, appends onto the base and then merges into the
+            // subtype's own collection, duplicating the constructor's entries (measured: {7,8,1}
+            // against {7,8,7,8,1} for the same elements in the other order). It always writes the
+            // include first, so no payload it produces reaches that path, and reproducing the
+            // duplication would buy nothing. Both orders give the same answer here.
+            foreach (string hex in new[] { "A20602" + "0802" + "0801", "0801" + "A20602" + "0802" })
+            {
+                PolyListBase decoded = Decode<PolyListBase>(hex);
+
+                Assert.IsInstanceOf<PolyListSub>(decoded, hex);
+                CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items, hex);
+            }
+
+            // ...and with no include at all the payload is malformed, because the base is abstract.
+            WProtoReader reader = new WProtoReader(Parse("0801"));
+            Assert.IsFalse(
+                WProtoFormatterProvider.Get<PolyListBase>().TryRead(ref reader, out PolyListBase _)
+            );
+        }
+
+        [Test]
         public void MeasurePredictsWriteExactlyForEveryPolymorphicShape()
         {
             IncludeBase[] values =
