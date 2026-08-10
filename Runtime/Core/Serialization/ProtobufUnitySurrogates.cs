@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     // Surrogates allow protobuf-net to serialize Unity structs we cannot annotate directly.
     [ProtoContract]
