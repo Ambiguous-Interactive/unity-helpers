@@ -798,9 +798,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Indent();
             writer.Line(
+                // `false`: a packed run holds bare scalars and cannot recurse, so it spends no
+                // nesting level -- matching TryReadPackedRun, which hands its nested reader the same
+                // depth. Charging it would make a deep-but-legal message decodable and not encodable.
                 "if (!writer.TryBeginLengthDelimited("
                     + Tag
-                    + ", out "
+                    + ", false, out "
                     + Proto
                     + ".WProtoLengthToken "
                     + PackedToken
@@ -867,9 +870,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Indent();
 
             writer.Line(
+                // `false`: a packed run holds bare scalars and cannot recurse, so it spends no
+                // nesting level -- matching TryReadPackedRun, which hands its nested reader the same
+                // depth. Charging it would make a deep-but-legal message decodable and not encodable.
                 "if (!writer.TryBeginLengthDelimited("
                     + Tag
-                    + ", out "
+                    + ", false, out "
                     + Proto
                     + ".WProtoLengthToken "
                     + PackedToken

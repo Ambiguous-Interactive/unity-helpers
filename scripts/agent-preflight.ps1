@@ -2205,7 +2205,11 @@ if ($csharpierTargets.Count -gt 0) {
             }
             else {
                 $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
-                $stagedCSharpFiles = @($csharpTargets | Where-Object { $stagedPaths.Contains($_) })
+                # $csharpierTargets, not $csharpTargets: CSharpier just reformatted the MSBuild
+                # project files too, and re-staging only the .cs ones left a reformatted .csproj
+                # out of the index -- so the next commit would push the unformatted copy and fail
+                # the very CI format leg this scope widening was meant to catch.
+                $stagedCSharpFiles = @($csharpierTargets | Where-Object { $stagedPaths.Contains($_) })
                 if ($stagedCSharpFiles.Count -gt 0) {
                     if (-not (Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $stagedCSharpFiles -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'CSharpier formatting')) {
                         Write-ErrorMsg 'Failed to stage CSharpier formatting fixes. Git index.lock contention, pre-existing unstaged hunks, or another git error is likely.'

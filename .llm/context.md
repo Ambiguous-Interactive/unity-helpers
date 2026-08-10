@@ -228,6 +228,30 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
 - PRs: clear description, link related issues (`#123`), include before/after screenshots for UI changes
 
+### Pushing costs a full CI matrix -- batch before you push
+
+**Every push to the remote triggers the whole CI matrix**, including four Unity editor versions in
+editmode, playmode and gated IL2CPP standalone. That is expensive and slow. Treat a push as a
+deliberate act, not the tail of every commit.
+
+- **Commit locally as often as is useful; push once**, when a coherent unit of work is verified.
+  Small, focused commits are still right -- it is the _pushing_ that is costly, not the committing.
+- **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
+  - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
+    assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
+  - `dotnet test` in `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real
+    serializer sources against the protobuf-net oracle.
+  - `npm run agent:preflight:fix` then `npm run agent:preflight`.
+  - `npm run validate:prepush` for the wider contract suites.
+  - The Unity MCP bridge for a real editor compile (see the Unity MCP notes).
+- **When a change spans both suites, update both before pushing.** A packed-encoding change in
+  session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
+  `Tests/Runtime/Serialization/`, and cost a full matrix run to discover. Grep for the affected byte
+  literals in `Tests/` as well as `Generator~/`.
+- **Superseding your own run is pure waste**, and it also reds the previous commit: a stale run
+  fails with a `Stale pull request run for <sha>` annotation, which looks like breakage until you
+  read the annotations.
+
 ### Test Execution
 
 Run Unity tests directly via Docker-in-Docker:

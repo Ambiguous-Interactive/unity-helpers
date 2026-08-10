@@ -18,10 +18,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         internal readonly int PrefixStart;
         internal readonly int PayloadStart;
 
-        internal WProtoLengthToken(int prefixStart, int payloadStart)
+        /// <summary>
+        /// Whether opening this field charged a level against the nesting bound.
+        /// </summary>
+        /// <remarks>
+        /// Carried on the token rather than passed to the close, so the two halves cannot disagree.
+        /// A sub-message spends a level because it can contain another message; a PACKED RUN spends
+        /// none, because it holds bare scalars and cannot recurse at all. The reader already works
+        /// this way -- <c>TryReadPackedRun</c> hands the nested reader the SAME depth -- so charging
+        /// it on the write side would make a deep-but-legal message decodable and not encodable.
+        /// </remarks>
+        internal readonly bool Nested;
+
+        internal WProtoLengthToken(int prefixStart, int payloadStart, bool nested)
         {
             PrefixStart = prefixStart;
             PayloadStart = payloadStart;
+            Nested = nested;
         }
     }
 }

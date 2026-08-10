@@ -179,5 +179,43 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.AreEqual(exact[index], buffer[index], "byte " + index);
             }
         }
+
+        [Test]
+        public void AFailedWriteIsReportedRatherThanLookingUnserved()
+        {
+            // The serialize-side mirror of the refused-read fallthrough. "Not served" sends the
+            // value on to protobuf-net; a registered formatter that FAILED must not do that, or the
+            // bytes come from the reflection path this serializer exists to avoid.
+            //
+            // Driven through a formatter that measures more than it writes, which is the exact
+            // internal inconsistency the throw is meant to surface.
+            WProtoFormatterProvider.Register<FacadeBrokenContract>(new BrokenFormatter());
+            try
+            {
+                byte[] buffer = null;
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.Serialize(new FacadeBrokenContract(), ref buffer)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register<FacadeBrokenContract>(null);
+            }
+        }
+
+        private sealed class FacadeBrokenContract { }
+
+        private sealed class BrokenFormatter : IWProtoFormatter<FacadeBrokenContract>
+        {
+            public int Measure(in FacadeBrokenContract value) => 4;
+
+            public bool Write(ref WProtoWriter writer, in FacadeBrokenContract value) => false;
+
+            public bool TryRead(ref WProtoReader reader, out FacadeBrokenContract value)
+            {
+                value = null;
+                return false;
+            }
+        }
     }
 }

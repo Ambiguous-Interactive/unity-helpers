@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (!TryBeginLengthDelimited(fieldNumber, out WProtoLengthToken token))
+            if (!TryBeginLengthDelimited(fieldNumber, true, out WProtoLengthToken token))
             {
                 return false;
             }
@@ -456,7 +456,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryBeginLengthDelimited(int fieldNumber, out WProtoLengthToken token)
         {
-            if (_depth >= WProtoReader.MaxNestingDepth)
+            return TryBeginLengthDelimited(fieldNumber, true, out token);
+        }
+
+        /// <summary>
+        /// Opens a length-delimited field, optionally without charging the nesting bound.
+        /// </summary>
+        /// <param name="fieldNumber">The field number.</param>
+        /// <param name="nested">
+        /// <c>false</c> for a payload that cannot itself contain a message -- a packed run of
+        /// scalars. Such a run spends no nesting level, matching <c>TryReadPackedRun</c>, which hands
+        /// its nested reader the same depth. Charging it here would make a deep-but-legal message
+        /// decodable and not encodable.
+        /// </param>
+        /// <param name="token">Receives the bookkeeping the close needs.</param>
+        /// <returns><c>true</c> when the field was opened.</returns>
+        public bool TryBeginLengthDelimited(
+            int fieldNumber,
+            bool nested,
+            out WProtoLengthToken token
+        )
+        {
+            if (nested && _depth >= WProtoReader.MaxNestingDepth)
             {
                 _faulted = true;
                 token = default;
@@ -475,8 +496,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            _depth++;
-            token = new WProtoLengthToken(prefixStart, _position);
+            if (nested)
+            {
+                _depth++;
+            }
+
+            token = new WProtoLengthToken(prefixStart, _position, nested);
             return true;
         }
 
@@ -487,7 +512,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the length was written.</returns>
         public bool TryCloseLengthDelimited(in WProtoLengthToken token)
         {
-            _depth--;
+            if (token.Nested)
+            {
+                _depth--;
+            }
+
             return TryBackfillLength(token.PrefixStart, token.PayloadStart);
         }
 

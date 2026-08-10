@@ -566,5 +566,66 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual("1A01611A0162", mine);
         }
+
+        [Test]
+        public void AGeneratedPackedRunStillWritesAtTheNestingBound()
+        {
+            // The mirror of APackedRunDoesNotSpendANestingLevel on the read side, and the version
+            // that actually discriminates. Asserting the depth returns to zero proves nothing here:
+            // open and close are symmetric, so it balances whether or not the run was charged. What
+            // separates the two is writing one at the BOUND -- if the generator charges a level, the
+            // open is refused and a deep-but-legal message becomes decodable and not encodable.
+            RepeatedContract value = new RepeatedContract { Ints = new[] { 1, 2, 3 } };
+            IWProtoFormatter<RepeatedContract> formatter =
+                WProtoFormatterProvider.Get<RepeatedContract>();
+
+            byte[] buffer = new byte[4096];
+            WProtoWriter writer = new WProtoWriter(buffer);
+
+            // Sit exactly AT the bound. One level below is not enough to discriminate: a charged
+            // open at depth 63 still passes the `>= 64` test and only fails at 64.
+            WProtoLengthToken[] open = new WProtoLengthToken[WProtoReader.MaxNestingDepth];
+            for (int level = 0; level < open.Length; level++)
+            {
+                Assert.IsTrue(
+                    writer.TryBeginLengthDelimited(1, true, out open[level]),
+                    "level " + level
+                );
+            }
+
+            Assert.AreEqual(WProtoReader.MaxNestingDepth, writer.Depth);
+            Assert.IsTrue(
+                formatter.Write(ref writer, value),
+                "a packed run must not need a nesting level it cannot have"
+            );
+
+            for (int level = open.Length - 1; level >= 0; level--)
+            {
+                Assert.IsTrue(writer.TryCloseLengthDelimited(open[level]), "close " + level);
+            }
+
+            Assert.AreEqual(0, writer.Depth);
+        }
+
+        [Test]
+        public void OpeningAPackedRunDoesNotConsumeTheNestingBudget()
+        {
+            // Asserted on the writer directly, because the formatter above never gets near the
+            // bound: what matters is that opening the run does not move Depth at all, where opening
+            // a sub-message does.
+            byte[] buffer = new byte[64];
+            WProtoWriter writer = new WProtoWriter(buffer);
+
+            Assert.IsTrue(writer.TryBeginLengthDelimited(1, false, out WProtoLengthToken packed));
+            Assert.AreEqual(0, writer.Depth, "a packed run must not charge the nesting bound");
+            Assert.IsTrue(writer.TryWriteInt32(7));
+            Assert.IsTrue(writer.TryCloseLengthDelimited(packed));
+            Assert.AreEqual(0, writer.Depth);
+
+            Assert.IsTrue(writer.TryBeginLengthDelimited(2, true, out WProtoLengthToken message));
+            Assert.AreEqual(1, writer.Depth, "a sub-message must still charge it");
+            Assert.IsTrue(writer.TryCloseLengthDelimited(message));
+            Assert.AreEqual(0, writer.Depth);
+        }
     }
 }

@@ -92,9 +92,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size));
             if (!formatter.Write(ref writer, value))
             {
-                // The swap is reported even on failure: it already happened, and a caller that
-                // re-reads its buffer only when the write succeeded would keep using the stale one.
-                return new WProtoWriteResult(null, resized);
+                // Thrown, not reported as "not served" -- the serialize-side mirror of the refused
+                // READ that already throws below. A registered formatter that fails is a defect in
+                // this package (Measure and Write disagreeing, or a latched fault), and returning
+                // the not-served answer would send the value on to protobuf-net, silently producing
+                // bytes from the reflection path this whole serializer exists to avoid. The buffer
+                // may also be half-written by now, so there is nothing coherent to hand back.
+                throw new InvalidOperationException(
+                    $"WallstopProto failed to write a '{typeof(T).FullName}' into {size} measured "
+                        + "byte(s). Measure and Write disagree, or the writer latched a fault. This "
+                        + "type has a generated formatter, so it is not retried with protobuf-net."
+                );
             }
 
             return new WProtoWriteResult(size, resized);
