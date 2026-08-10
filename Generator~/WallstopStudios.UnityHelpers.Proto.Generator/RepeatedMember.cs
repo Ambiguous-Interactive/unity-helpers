@@ -309,28 +309,159 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private string AccumulatorType =>
             _isArray ? ListType + "<" + _elementQualified + ">" : _collectionQualified;
 
+        /// <summary>
+        /// Whether this member is written as a single packed run rather than one field per element.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Packed is proto3's default and roughly HALVES a repeated scalar: unpacked pays a field key
+        /// per element, packed pays one key and one length for the whole run. Measured on
+        /// <c>int[]</c>: 200 bytes unpacked against 102 packed at 100 elements, 2872 against 1875 at
+        /// 1000.
+        /// </para>
+        /// <para>
+        /// This is a deliberate divergence from protobuf-net's OUTPUT at CompatibilityLevel 200,
+        /// which writes unpacked, and it is safe because wire compatibility is about what the other
+        /// side can READ. Measured against protobuf-net 3.2.56: a packed run decodes into a field it
+        /// declares unpacked, exactly, for every packable element type -- int, long, ulong, bool,
+        /// enum, float, double, short -- and into both arrays and List&lt;T&gt;. The reader here
+        /// already accepted both forms, so old data keeps working in the other direction too.
+        /// </para>
+        /// <para>
+        /// A generic element cannot take this path: whether <c>T</c> packs is a property of the
+        /// closure, so its run is decided at runtime by <c>WProtoGeneric&lt;T&gt;</c> instead.
+        /// </para>
+        /// </remarks>
+        private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
+
+        /// <summary>The element count, however this collection spells it.</summary>
+        private string CountAccess => Access + (_isArray ? ".Length" : ".Count");
+
+        private string PayloadSize => "packedSize" + Tag;
+
+        private string PackedToken => "packedToken" + Tag;
+
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
         {
+            if (WritesPacked)
+            {
+                EmitPackedMeasure(writer);
+                return;
+            }
+
+            if (_elementIsGeneric)
+            {
+                EmitGenericMeasure(writer);
+                return;
+            }
+
             int open = OpenLoop(writer);
             writer.Line(
-                _elementIsGeneric
-                    ? "size += " + Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ");"
-                    : "size += "
-                        + Proto
-                        + ".WProtoSizes.TagSize("
-                        + Tag
-                        + ") + "
-                        + Shape.Fill(_shape.SizeExpression, ElementLocal)
-                        + ";"
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Shape.Fill(_shape.SizeExpression, ElementLocal)
+                    + ";"
             );
             CloseAll(writer, open);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Sizes a generic run, choosing packed or unpacked once the closure is known.
+        /// </summary>
+        /// <remarks>
+        /// Both forms are emitted and the branch is taken at runtime, because whether <c>T</c> packs
+        /// is a property of the closure: <c>Deque&lt;int&gt;</c> packs and <c>Deque&lt;string&gt;</c>
+        /// cannot. The generated code costs one static bool read per member to decide.
+        /// </remarks>
+        private void EmitGenericMeasure(Writer writer)
+        {
+            writer.Line("if (" + Generic + ".Packable)" + Writer.Open);
+            writer.Indent();
+            writer.Line("int " + PayloadSize + " = 0;");
+            int packedOpen = OpenLoop(writer);
+            writer.Line(PayloadSize + " += " + Generic + ".MeasureValue(" + ElementLocal + ");");
+            CloseAll(writer, packedOpen);
+            writer.Blank();
+            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.LengthDelimitedSize("
+                    + PayloadSize
+                    + ");"
+            );
+            Close(writer);
+            Close(writer);
+            writer.Line("else" + Writer.Open);
+            writer.Indent();
+            int looseOpen = OpenLoop(writer);
+            writer.Line(
+                "size += " + Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ");"
+            );
+            CloseAll(writer, looseOpen);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Sizes the run: one key and one length prefix for the whole member, and the bare values.
+        /// </summary>
+        private void EmitPackedMeasure(Writer writer)
+        {
+            writer.Line("int " + PayloadSize + " = 0;");
+            int open = OpenLoop(writer);
+            writer.Line(
+                PayloadSize + " += " + Shape.Fill(_shape.SizeExpression, ElementLocal) + ";"
+            );
+            CloseAll(writer, open);
+            writer.Blank();
+
+            // `> 0` is exactly "the collection is not empty" for a packable shape, because every
+            // packable element occupies at least one byte -- a varint zero is one byte, a fixed32 is
+            // four. An empty collection therefore writes nothing at all, which is what protobuf-net
+            // does and what keeps absent and empty indistinguishable on the wire, as before.
+            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.LengthDelimitedSize("
+                    + PayloadSize
+                    + ");"
+            );
+            Close(writer);
             writer.Blank();
         }
 
         /// <inheritdoc />
         internal override void EmitWrite(Writer writer)
         {
+            if (WritesPacked)
+            {
+                EmitPackedWrite(writer);
+                return;
+            }
+
+            if (_elementIsGeneric)
+            {
+                EmitGenericWrite(writer);
+                return;
+            }
+
             int open = OpenLoop(writer);
             writer.Line(
                 "if (!("
@@ -365,14 +496,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// collection: enumerating it through <c>IEnumerable&lt;T&gt;</c> would box it on every
         /// serialization, which is exactly the cost a struct collection exists to avoid.
         /// </remarks>
-        private int OpenLoop(Writer writer)
+        /// <param name="guarded">
+        /// Whether to emit the collection's null guard. The packed path passes <c>false</c> because
+        /// it has already tested both null and emptiness in one condition, and a second identical
+        /// guard inside it would be dead.
+        /// </param>
+        private int OpenLoop(Writer writer, bool guarded = true)
         {
             int open = 0;
 
             // A struct collection is always present. Emitting `!= null` for one is a compile error,
             // not merely redundant -- which is the tell that treating every collection as a
             // reference is a real assumption rather than a harmless simplification.
-            if (!_collectionIsValueType)
+            if (guarded && !_collectionIsValueType)
             {
                 writer.Line("if (" + Access + " != null)" + Writer.Open);
                 writer.Indent();
@@ -641,6 +777,125 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
             writer.Line("break;");
             Close(writer);
+        }
+
+        /// <summary>
+        /// Writes a generic run, choosing packed or unpacked once the closure is known.
+        /// </summary>
+        private void EmitGenericWrite(Writer writer)
+        {
+            string presence = _collectionIsValueType ? string.Empty : Access + " != null && ";
+
+            writer.Line(
+                "if ("
+                    + Generic
+                    + ".Packable && "
+                    + presence
+                    + "0 < "
+                    + CountAccess
+                    + ")"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line(
+                "if (!writer.TryBeginLengthDelimited("
+                    + Tag
+                    + ", out "
+                    + Proto
+                    + ".WProtoLengthToken "
+                    + PackedToken
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            writer.Blank();
+            int packedOpen = OpenLoop(writer, guarded: false);
+            writer.Line(
+                "if (!" + Generic + ".WriteValue(ref writer, " + ElementLocal + "))" + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            CloseAll(writer, packedOpen);
+            writer.Blank();
+            writer.Line("if (!writer.TryCloseLengthDelimited(" + PackedToken + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            Close(writer);
+
+            writer.Line("else if (!" + Generic + ".Packable)" + Writer.Open);
+            writer.Indent();
+            int looseOpen = OpenLoop(writer);
+            writer.Line(
+                "if (!"
+                    + Generic
+                    + ".WriteElement(ref writer, "
+                    + Tag
+                    + ", "
+                    + ElementLocal
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            CloseAll(writer, looseOpen);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Writes the run: one key, one back-filled length, then the bare values.
+        /// </summary>
+        /// <remarks>
+        /// The length is back-filled rather than measured again. Measure already walked this
+        /// collection once; walking it a second time here would double the cost of every repeated
+        /// field, and for a large collection that is the dominant cost of serializing at all.
+        /// </remarks>
+        private void EmitPackedWrite(Writer writer)
+        {
+            // The emptiness test is on the COUNT here rather than on a computed payload size,
+            // because the whole point of this path is not to compute that size twice.
+            string guard =
+                (_collectionIsValueType ? string.Empty : Access + " != null && ")
+                + "0 < "
+                + CountAccess;
+            writer.Line("if (" + guard + ")" + Writer.Open);
+            writer.Indent();
+
+            writer.Line(
+                "if (!writer.TryBeginLengthDelimited("
+                    + Tag
+                    + ", out "
+                    + Proto
+                    + ".WProtoLengthToken "
+                    + PackedToken
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            writer.Blank();
+
+            int open = OpenLoop(writer, guarded: false);
+            writer.Line("if (!" + _shape.RawWriteCall(ElementLocal) + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            CloseAll(writer, open);
+            writer.Blank();
+
+            writer.Line("if (!writer.TryCloseLengthDelimited(" + PackedToken + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+
+            Close(writer);
+            writer.Blank();
         }
 
         /// <summary>

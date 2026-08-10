@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void EveryImmutableShapeMatchesTheOracleByteForByte()
+        public void EveryImmutableShapeRoundTripsThroughProtobufNet()
         {
             ImmutablePoint[] values =
             {
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             foreach (ImmutablePoint value in values)
             {
-                Assert.AreEqual(OracleHex(value), Encode(value), Describe(value));
+                AssertProtobufNetReadsMine(value, Describe(value));
             }
 
             ImmutableRecord[] records =
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             foreach (ImmutableRecord record in records)
             {
-                Assert.AreEqual(OracleHex(record), Encode(record), record.Id.ToString());
+                AssertProtobufNetReadsMine(record, record.Id.ToString());
             }
         }
 
@@ -178,6 +178,44 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 + "',"
                 + (value.Marks == null ? "null" : value.Marks.Length.ToString())
                 + ")";
+        }
+
+        /// <summary>
+        /// Asserts protobuf-net decodes this package's bytes to the same values it would produce.
+        /// </summary>
+        /// <remarks>
+        /// Byte equality no longer holds: <c>Marks</c> is an <c>int[]</c>, which this package packs
+        /// and protobuf-net does not. Interop is the property that actually matters, and it is the
+        /// stronger one -- it exercises protobuf-net's decoder rather than only its encoder.
+        /// </remarks>
+        private static void AssertProtobufNetReadsMine<T>(T value, string context)
+        {
+            byte[] mine = Parse(Encode(value));
+
+            T theirs;
+            using (MemoryStream stream = new MemoryStream(mine))
+            {
+                theirs = ProtoBuf.Serializer.Deserialize<T>(stream);
+            }
+
+            T reference;
+            using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
+            {
+                reference = ProtoBuf.Serializer.Deserialize<T>(stream);
+            }
+
+            Assert.AreEqual(OracleHex(reference), OracleHex(theirs), context);
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = System.Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
         }
 
         private static string OracleHex<T>(T value)

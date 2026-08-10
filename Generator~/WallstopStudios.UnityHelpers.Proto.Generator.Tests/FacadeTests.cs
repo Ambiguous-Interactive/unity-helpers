@@ -66,10 +66,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             byte[] buffer = new byte[256];
             byte[] original = buffer;
 
-            int written = WProtoFacade.Serialize(new ScalarContract { Int32 = 7 }, ref buffer);
+            WProtoWriteResult result = WProtoFacade.Serialize(
+                new ScalarContract { Int32 = 7 },
+                ref buffer
+            );
 
-            Assert.Greater(written, 0);
-            Assert.AreSame(original, buffer, "a buffer with room to spare must not be replaced");
+            Assert.IsTrue(result.Served);
+            Assert.Greater(result.Length, 0);
+            Assert.IsFalse(result.Resized, "a buffer with room to spare must not be replaced");
+            Assert.AreSame(original, buffer);
             Assert.AreEqual(256, buffer.Length, "the buffer must not be trimmed to the payload");
         }
 
@@ -79,7 +84,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // The property a caller has to respect: writing buffer.Length bytes would append
             // whatever the previous, larger message left behind.
             byte[] buffer = new byte[256];
-            int written = WProtoFacade.Serialize(new ScalarContract { Int32 = 7 }, ref buffer);
+            int written = WProtoFacade
+                .Serialize(new ScalarContract { Int32 = 7 }, ref buffer)
+                .Length;
 
             Assert.IsTrue(
                 WProtoFacade.TrySerialize(new ScalarContract { Int32 = 7 }, out byte[] exact)
@@ -97,26 +104,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             byte[] buffer = new byte[1];
             byte[] original = buffer;
 
-            int written = WProtoFacade.Serialize(
+            WProtoWriteResult result = WProtoFacade.Serialize(
                 new ScalarContract { Text = "a string comfortably longer than one byte" },
                 ref buffer
             );
 
-            Assert.Greater(written, 1);
+            Assert.IsTrue(result.Served);
+            Assert.Greater(result.Length, 1);
+            Assert.IsTrue(result.Resized, "the caller must be told its array was replaced");
             Assert.AreNotSame(original, buffer);
-            Assert.GreaterOrEqual(buffer.Length, written);
+            Assert.GreaterOrEqual(buffer.Length, result.Length);
         }
 
         [Test]
-        public void AnUnservedTypeReturnsMinusOneAndLeavesTheBufferAlone()
+        public void AnUnservedTypeIsNotExpressibleAsALengthAndLeavesTheBufferAlone()
         {
-            // -1 rather than 0, because 0 is a legitimate payload length: an empty contract and a
-            // null root both encode to nothing. A caller that treated "not served" as "empty" would
-            // silently persist zero bytes for a type this serializer never handled.
+            // A null count rather than a sentinel, because 0 is a legitimate payload length: an
+            // empty contract and a null root both encode to nothing. A magic -1 would read as a
+            // length everywhere it was passed on.
             byte[] buffer = new byte[8];
             byte[] original = buffer;
 
-            Assert.AreEqual(-1, WProtoFacade.Serialize(new Uri("https://example.com"), ref buffer));
+            WProtoWriteResult result = WProtoFacade.Serialize(
+                new Uri("https://example.com"),
+                ref buffer
+            );
+
+            Assert.IsFalse(result.Served);
+            Assert.IsNull(result.BytesWritten);
+            Assert.IsFalse(result.Resized);
             Assert.AreSame(original, buffer);
         }
 
@@ -125,7 +141,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             byte[] buffer = null;
 
-            Assert.AreEqual(0, WProtoFacade.Serialize<ScalarContract>(null, ref buffer));
+            WProtoWriteResult result = WProtoFacade.Serialize<ScalarContract>(null, ref buffer);
+
+            Assert.IsTrue(result.Served, "a null root IS served; it simply encodes to nothing");
+            Assert.AreEqual(0, result.BytesWritten);
+            Assert.IsFalse(result.Resized);
             Assert.IsNull(buffer, "a null root has no payload, so it must not force an allocation");
         }
 
@@ -136,13 +156,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // by a short one leaves stale bytes past the short one's end.
             byte[] buffer = null;
 
-            int big = WProtoFacade.Serialize(
-                new ScalarContract { Text = "a considerably longer string value" },
+            int big = WProtoFacade
+                .Serialize(
+                    new ScalarContract { Text = "a considerably longer string value" },
+                    ref buffer
+                )
+                .Length;
+            WProtoWriteResult second = WProtoFacade.Serialize(
+                new ScalarContract { Int32 = 1 },
                 ref buffer
             );
-            int small = WProtoFacade.Serialize(new ScalarContract { Int32 = 1 }, ref buffer);
+            int small = second.Length;
 
             Assert.Less(small, big);
+            Assert.IsFalse(second.Resized, "the second, smaller message must reuse the buffer");
             Assert.IsTrue(
                 WProtoFacade.TrySerialize(new ScalarContract { Int32 = 1 }, out byte[] exact)
             );

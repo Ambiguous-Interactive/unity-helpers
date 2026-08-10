@@ -212,6 +212,49 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return writer.TryWriteMessage(tag, Message(), value);
         }
 
+        /// <summary>
+        /// Returns the encoded size of the value with <b>no field key</b>, for a packed run.
+        /// </summary>
+        /// <param name="value">The element.</param>
+        /// <returns>The encoded size in bytes.</returns>
+        /// <remarks>
+        /// Only meaningful when <see cref="Packable"/>; a caller that asks for it otherwise is
+        /// building a run that cannot be parsed, so this refuses rather than inventing a size.
+        /// </remarks>
+        public static int MeasureValue(in T value)
+        {
+            Resolve();
+
+            if (_scalar == null)
+            {
+                throw new InvalidOperationException(
+                    $"'{typeof(T).FullName}' is not a packable scalar, so it has no keyless size. "
+                        + "Check WProtoGeneric<T>.Packable before building a packed run."
+                );
+            }
+
+            return _scalar.MeasureValue(value);
+        }
+
+        /// <summary>Writes the value with <b>no field key</b>, as an element of a packed run.</summary>
+        /// <param name="writer">The destination.</param>
+        /// <param name="value">The element.</param>
+        /// <returns><c>true</c> when the value was written.</returns>
+        public static bool WriteValue(ref WProtoWriter writer, in T value)
+        {
+            Resolve();
+
+            if (_scalar == null)
+            {
+                throw new InvalidOperationException(
+                    $"'{typeof(T).FullName}' is not a packable scalar, so it cannot be written into "
+                        + "a packed run. Check WProtoGeneric<T>.Packable first."
+                );
+            }
+
+            return _scalar.WriteValue(ref writer, value);
+        }
+
         /// <summary>Reads a value written by <see cref="WriteField"/> or <see cref="WriteElement"/>.</summary>
         /// <param name="reader">The source.</param>
         /// <param name="value">Receives the value, or <c>default</c> on failure.</param>

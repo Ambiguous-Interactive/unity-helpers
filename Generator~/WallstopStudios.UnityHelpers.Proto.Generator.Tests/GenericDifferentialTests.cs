@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void EveryClosureMatchesTheOracleByteForByte()
+        public void EveryClosureRoundTripsThroughProtobufNet()
         {
             AssertMatches(new Box<int>());
             AssertMatches(new Box<int> { Value = 1 });
@@ -204,10 +204,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        /// <summary>
+        /// Asserts protobuf-net decodes this closure's bytes to the values it would have produced.
+        /// </summary>
+        /// <remarks>
+        /// Not byte equality: <c>Many</c> is a repeated member, and a closure whose element packs is
+        /// written PACKED here where protobuf-net writes one key per element. Which closures pack is
+        /// decided at runtime by <c>WProtoGeneric&lt;T&gt;.Packable</c> -- <c>Box&lt;int&gt;</c> does,
+        /// <c>Box&lt;string&gt;</c> cannot -- so this covers both branches of that decision.
+        /// </remarks>
         private static void AssertMatches<T>(Box<T> value)
         {
             string label = typeof(T).Name + " " + Describe(value);
-            Assert.AreEqual(OracleHex(value), Encode(value), label);
+            byte[] mine = ParseHex(Encode(value));
+
+            Box<T> theirs = Deserialize<Box<T>>(mine);
+            Box<T> reference = Deserialize<Box<T>>(ParseHex(OracleHex(value)));
+
+            Assert.AreEqual(OracleHex(reference), OracleHex(theirs), label);
+        }
+
+        private static byte[] ParseHex(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
         }
 
         private static string Describe<T>(Box<T> value)

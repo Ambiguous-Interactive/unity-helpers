@@ -80,6 +80,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
+        /// Builds the write call for a value of this shape with <b>no field key</b>.
+        /// </summary>
+        /// <remarks>
+        /// The form a packed run needs: the key and length belong to the run, and the elements
+        /// inside it are bare values. Only ever valid for a <see cref="Packable"/> shape, which is
+        /// also the only kind that never writes its own tag.
+        /// </remarks>
+        internal string RawWriteCall(string value)
+        {
+            return "writer." + WriteMethod + "(" + Fill(WriteCast, value) + value + ")";
+        }
+
+        /// <summary>
         /// Builds the write call for a value of this shape at <paramref name="tag"/>.
         /// </summary>
         internal string WriteCall(string value, int tag)

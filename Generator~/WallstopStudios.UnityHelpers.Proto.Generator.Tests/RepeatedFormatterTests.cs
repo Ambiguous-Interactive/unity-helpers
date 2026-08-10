@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -29,13 +30,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 "Ints {1,0,-1}",
                 new RepeatedContract { Ints = new[] { 1, 0, -1 } },
-                "0801080008FFFFFFFFFFFFFFFFFF01",
+                "0A0C0100FFFFFFFFFFFFFFFFFF01",
             },
             new object[]
             {
                 "IntList {2}",
                 new RepeatedContract { IntList = new List<int> { 2 } },
-                "1002",
+                "120102",
             },
             new object[]
             {
@@ -47,25 +48,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 "Doubles {0,1}",
                 new RepeatedContract { Doubles = new[] { 0d, 1d } },
-                "21000000000000000021000000000000F03F",
+                "22100000000000000000000000000000F03F",
             },
             new object[]
             {
                 "Longs {0,1}",
                 new RepeatedContract { Longs = new ulong[] { 0, 1 } },
-                "28002801",
+                "2A020001",
             },
             new object[]
             {
                 "Flags {false,true}",
                 new RepeatedContract { Flags = new[] { false, true } },
-                "30003001",
+                "32020001",
             },
             new object[]
             {
                 "Modes {None,Careful}",
                 new RepeatedContract { Modes = new[] { Mode.None, Mode.Careful } },
-                "380038AC02",
+                "3A0300AC02",
             },
             new object[]
             {
@@ -105,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 "Shorts {-2,0}",
                 new RepeatedContract { Shorts = new short[] { -2, 0 } },
-                "60FEFFFFFFFFFFFFFFFF016000",
+                "620BFEFFFFFFFFFFFFFFFF0100",
             },
             new object[]
             {
@@ -117,18 +118,60 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Texts = new[] { "a" },
                     Shorts = new short[] { -2 },
                 },
-                "0801080210031A016160FEFFFFFFFFFFFFFFFF01",
+                "0A0201021201031A0161620AFEFFFFFFFFFFFFFFFF01",
             },
         };
 
+        /// <summary>
+        /// Pins the exact bytes each element shape produces, and that protobuf-net reads them.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// These are no longer protobuf-net's OWN bytes for the packable shapes. A packable repeated
+        /// member is written PACKED here -- proto3's default, one key and one length for the run --
+        /// where protobuf-net at CompatibilityLevel 200 writes one key per element. `Texts` is
+        /// unchanged, because strings are length-delimited and cannot be packed at all; that
+        /// contrast is the point of leaving it in the table.
+        /// </para>
+        /// <para>
+        /// The expectations are literal so a change in encoding is visible as a diff here, and each
+        /// one is checked against protobuf-net's decoder in the same test, so a literal that is
+        /// simply wrong cannot pass.
+        /// </para>
+        /// </remarks>
         [TestCaseSource(nameof(OracleBytes))]
-        public void EveryElementShapeEncodesExactlyAsProtobufNetDoes(
+        public void EveryElementShapeEncodesAsExpectedAndProtobufNetReadsItBack(
             string label,
             RepeatedContract value,
             string expected
         )
         {
-            Assert.AreEqual(expected, Encode(value), label);
+            string mine = Encode(value);
+            Assert.AreEqual(expected, mine, label);
+
+            // The half that makes the divergence safe rather than merely intentional.
+            RepeatedContract theirs;
+            using (MemoryStream stream = new MemoryStream(Parse(mine)))
+            {
+                theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+            }
+
+            RepeatedContract reference;
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                stream.Position = 0;
+                reference = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+            }
+
+            CollectionAssert.AreEqual(reference.Ints, theirs.Ints, label + " Ints");
+            CollectionAssert.AreEqual(reference.IntList, theirs.IntList, label + " IntList");
+            CollectionAssert.AreEqual(reference.Texts, theirs.Texts, label + " Texts");
+            CollectionAssert.AreEqual(reference.Doubles, theirs.Doubles, label + " Doubles");
+            CollectionAssert.AreEqual(reference.Longs, theirs.Longs, label + " Longs");
+            CollectionAssert.AreEqual(reference.Flags, theirs.Flags, label + " Flags");
+            CollectionAssert.AreEqual(reference.Modes, theirs.Modes, label + " Modes");
+            CollectionAssert.AreEqual(reference.Shorts, theirs.Shorts, label + " Shorts");
         }
 
         [Test]
@@ -136,8 +179,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             // The scalar rule reversed. A member holding 0 is omitted; an element holding 0 is not,
             // because dropping it would shorten the collection rather than restore a default.
-            Assert.AreEqual("0800", Encode(new RepeatedContract { Ints = new[] { 0 } }));
-            Assert.AreEqual("3000", Encode(new RepeatedContract { Flags = new[] { false } }));
+            // Packed: one key, a length of 1, then the bare zero. The element is still WRITTEN,
+            // which is the rule this test exists for -- dropping it would shorten the collection.
+            Assert.AreEqual("0A0100", Encode(new RepeatedContract { Ints = new[] { 0 } }));
+            Assert.AreEqual("320100", Encode(new RepeatedContract { Flags = new[] { false } }));
             Assert.AreEqual(
                 "4200",
                 Encode(new RepeatedContract { Points = new[] { default(Outer.Point) } })
@@ -228,7 +273,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AStructContractCarriesARepeatedMember()
         {
             Assert.AreEqual(
-                "080108021003",
+                "0A0201021003",
                 Encode(new RepeatedStructContract { Ints = new[] { 1, 2 }, Marker = 3 })
             );
 
@@ -243,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ConstructorSeededCollectionsAreWrittenLikeAnyOther()
         {
             Assert.AreEqual(
-                "08070808100710081807180820072008",
+                "0A020708120207081A02070822020708",
                 Encode(new SeededRepeatedContract())
             );
         }
@@ -465,6 +510,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoReader reader = new WProtoReader(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        [Test]
+        public void PackableRepeatedMembersAreWrittenPackedAndAreSmallerForIt()
+        {
+            // The deliberate divergence from protobuf-net's OUTPUT, pinned so it cannot regress
+            // silently in either direction. Unpacked pays a field key per element; packed pays one
+            // key and one length for the whole run.
+            int[] many = new int[100];
+            for (int index = 0; index < many.Length; index++)
+            {
+                many[index] = index;
+            }
+
+            byte[] mine = Parse(Encode(new RepeatedContract { Ints = many }));
+
+            byte[] theirs;
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, new RepeatedContract { Ints = many });
+                theirs = stream.ToArray();
+            }
+
+            Assert.Less(
+                mine.Length,
+                theirs.Length,
+                "packed must be smaller, or there is no reason to diverge"
+            );
+
+            // Roughly half, and asserted as a bound rather than an exact ratio so a varint-width
+            // change in the corpus does not make this brittle.
+            Assert.Less(mine.Length, theirs.Length * 0.6, "expected close to a halving");
+
+            // One field key for the whole member: 0x0A is tag 1, length-delimited.
+            Assert.AreEqual(0x0A, mine[0]);
+
+            // And protobuf-net still reads it, which is what makes the divergence safe.
+            RepeatedContract decoded;
+            using (MemoryStream stream = new MemoryStream(mine))
+            {
+                decoded = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+            }
+
+            CollectionAssert.AreEqual(many, decoded.Ints);
+        }
+
+        [Test]
+        public void AStringRunIsNeverPackedBecauseItCannotBe()
+        {
+            // The boundary of the change. A length-delimited element carries its own length, so a
+            // packed run of them could not be parsed at all -- protobuf-net writes one key per
+            // string and so must this package.
+            string mine = Encode(new RepeatedContract { Texts = new[] { "a", "b" } });
+
+            Assert.AreEqual("1A01611A0162", mine);
         }
     }
 }

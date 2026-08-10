@@ -64,11 +64,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         Marker = marker,
                     };
 
-                    Assert.AreEqual(
-                        OracleHex(value),
-                        MineHex(value),
-                        Describe(ints) + " / " + marker
-                    );
+                    // Packed here too, so the claim is interop rather than identical bytes.
+                    AssertRoundTripsBothWays(value, Describe(ints) + " / " + marker);
                 }
             }
         }
@@ -224,7 +221,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             foreach (CollectionShapesContract value in cases)
             {
-                Assert.AreEqual(OracleHex(value), MineHex(value));
+                // `Set` and `Owned` hold ints, so they are packed here and unpacked by the oracle.
+                // What has to hold is that protobuf-net reads what this package writes.
+                CollectionShapesContract theirs;
+                using (MemoryStream stream = new MemoryStream(Parse(MineHex(value))))
+                {
+                    theirs = ProtoBuf.Serializer.Deserialize<CollectionShapesContract>(stream);
+                }
+
+                CollectionShapesContract reference;
+                using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
+                {
+                    reference = ProtoBuf.Serializer.Deserialize<CollectionShapesContract>(stream);
+                }
+
+                CollectionAssert.AreEqual(reference.Set, theirs.Set, "Set");
+                CollectionAssert.AreEqual(reference.Sorted, theirs.Sorted, "Sorted");
+                CollectionAssert.AreEqual(reference.Owned, theirs.Owned, "Owned");
             }
         }
 
@@ -252,16 +265,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
 
                 string oracle = OracleHex(new RepeatedContract { Ints = elements });
-                Assert.AreEqual(
-                    oracle,
-                    MineHex(
-                        new ValueTypeCollectionContract
-                        {
-                            Bag = bag,
-                            Seeded = default,
-                            SeededOverwritten = default,
-                        }
-                    ),
+                string mine = MineHex(
+                    new ValueTypeCollectionContract
+                    {
+                        Bag = bag,
+                        Seeded = default,
+                        SeededOverwritten = default,
+                    }
+                );
+
+                // Not byte equality: this package packs an int run and protobuf-net does not. The
+                // claim is unchanged in substance -- a struct container is not a new wire shape --
+                // so it is made by having the oracle READ what the struct container produced.
+                RepeatedContract theirs;
+                using (MemoryStream stream = new MemoryStream(Parse(mine)))
+                {
+                    theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+                }
+
+                CollectionAssert.AreEqual(
+                    elements.Length == 0 ? null : elements,
+                    theirs.Ints,
                     Describe(elements)
                 );
 
@@ -494,29 +518,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        /// <summary>
+        /// Asserts that this package and protobuf-net can each read what the other writes.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>This deliberately does not assert identical bytes any more.</b> Packable repeated
+        /// members are written PACKED here -- proto3's default, one key and one length for the whole
+        /// run -- while protobuf-net at CompatibilityLevel 200 writes them unpacked, one key per
+        /// element. Measured on <c>int[]</c>: 102 bytes against 200 at 100 elements.
+        /// </para>
+        /// <para>
+        /// Wire compatibility is about what the other side can READ, and that is what is checked in
+        /// both directions below. It is a stronger claim than byte equality, not a weaker one:
+        /// identical output only ever exercised this package's encoder and protobuf-net's, while
+        /// this exercises both decoders as well.
+        /// </para>
+        /// </remarks>
         private static void AssertMatchesOracle(RepeatedContract value, ref int checks)
         {
             checks++;
             string oracle = OracleHex(value);
-            Assert.AreEqual(oracle, MineHex(value), "bytes diverged");
+            string mine = MineHex(value);
 
-            // Matching bytes is not the same as agreeing on what they mean, so the oracle's payload
-            // is decoded here and this package's payload is decoded there.
-            byte[] bytes = Parse(oracle);
-            WProtoReader reader = new WProtoReader(bytes);
+            // Their bytes, our decoder.
+            byte[] theirBytes = Parse(oracle);
+            WProtoReader reader = new WProtoReader(theirBytes);
             Assert.IsTrue(
                 WProtoFormatterProvider
                     .Get<RepeatedContract>()
-                    .TryRead(ref reader, out RepeatedContract mine)
+                    .TryRead(ref reader, out RepeatedContract fromTheirs),
+                "could not read protobuf-net's bytes: " + oracle
             );
 
-            RepeatedContract theirs;
-            using (MemoryStream stream = new MemoryStream(bytes))
+            RepeatedContract theirsFromTheirs;
+            using (MemoryStream stream = new MemoryStream(theirBytes))
             {
-                theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+                theirsFromTheirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
             }
 
-            AssertSameValue(theirs, mine, oracle);
+            AssertSameValue(theirsFromTheirs, fromTheirs, oracle);
+
+            // Our bytes, their decoder. This is the direction the packed change puts at risk, and
+            // the one that would break a consumer who downgrades.
+            byte[] myBytes = Parse(mine);
+            RepeatedContract theirsFromMine;
+            using (MemoryStream stream = new MemoryStream(myBytes))
+            {
+                theirsFromMine = ProtoBuf.Serializer.Deserialize<RepeatedContract>(stream);
+            }
+
+            AssertSameValue(theirsFromTheirs, theirsFromMine, "protobuf-net reading mine: " + mine);
+
+            // And our own round trip, so a symmetric encoder/decoder bug cannot hide between them.
+            WProtoReader mineReader = new WProtoReader(myBytes);
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<RepeatedContract>()
+                    .TryRead(ref mineReader, out RepeatedContract fromMine),
+                "could not read my own bytes: " + mine
+            );
+            AssertSameValue(theirsFromTheirs, fromMine, "mine reading mine: " + mine);
         }
 
         private static void AssertSameValue(
@@ -563,6 +625,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static string Describe(int[] values)
         {
             return values == null ? "null" : "[" + string.Join(",", values) + "]";
+        }
+
+        /// <summary>
+        /// Asserts each serializer reads the other's bytes, for a contract with no shared corpus.
+        /// </summary>
+        private static void AssertRoundTripsBothWays(RepeatedStructContract value, string context)
+        {
+            byte[] theirs = Parse(OracleHex(value));
+            byte[] mine = Parse(MineHex(value));
+
+            RepeatedStructContract theirsFromTheirs;
+            using (MemoryStream stream = new MemoryStream(theirs))
+            {
+                theirsFromTheirs = ProtoBuf.Serializer.Deserialize<RepeatedStructContract>(stream);
+            }
+
+            RepeatedStructContract theirsFromMine;
+            using (MemoryStream stream = new MemoryStream(mine))
+            {
+                theirsFromMine = ProtoBuf.Serializer.Deserialize<RepeatedStructContract>(stream);
+            }
+
+            WProtoReader reader = new WProtoReader(theirs);
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<RepeatedStructContract>()
+                    .TryRead(ref reader, out RepeatedStructContract mineFromTheirs),
+                context
+            );
+
+            Assert.AreEqual(theirsFromTheirs.Marker, theirsFromMine.Marker, context);
+            Assert.AreEqual(theirsFromTheirs.Marker, mineFromTheirs.Marker, context);
+            CollectionAssert.AreEqual(theirsFromTheirs.Ints, theirsFromMine.Ints, context);
+            CollectionAssert.AreEqual(theirsFromTheirs.Ints, mineFromTheirs.Ints, context);
         }
 
         private static string OracleHex<T>(T value)

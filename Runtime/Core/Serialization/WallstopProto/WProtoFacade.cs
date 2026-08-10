@@ -41,8 +41,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// when it is not. May be <c>null</c>. Left untouched when the request is not served.
         /// </param>
         /// <returns>
-        /// The number of bytes written, which may be less than <c>buffer.Length</c>; or <c>-1</c>
-        /// when WallstopProto does not serve <typeparamref name="T"/>.
+        /// A <see cref="WProtoWriteResult"/> carrying the byte count -- which may be less than
+        /// <c>buffer.Length</c> -- and whether the buffer had to be replaced to fit it.
         /// </returns>
         /// <remarks>
         /// <para>
@@ -58,29 +58,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// message left behind.
         /// </para>
         /// <para>
-        /// <c>-1</c> rather than <c>0</c> for "not served", because <c>0</c> is a legitimate result:
-        /// an empty contract and a null root both encode to nothing (measured against protobuf-net).
-        /// Conflating them would silently write an empty payload for a type this serializer cannot
-        /// handle at all.
+        /// The result is a struct rather than an <c>int</c> with a sentinel. <c>0</c> is a legitimate
+        /// length -- an empty contract and a null root both encode to nothing, measured against
+        /// protobuf-net -- so "not served" needed a representation that is not a number at all, and a
+        /// magic <c>-1</c> reads as a length everywhere it is passed on.
         /// </para>
         /// </remarks>
-        public static int Serialize<T>(T value, ref byte[] buffer)
+        public static WProtoWriteResult Serialize<T>(T value, ref byte[] buffer)
         {
             if (
                 !CanServe(value)
                 || !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
             )
             {
-                return -1;
+                return new WProtoWriteResult(null, false);
             }
 
             if (!typeof(T).IsValueType && value == null)
             {
-                return 0;
+                return new WProtoWriteResult(0, false);
             }
 
             int size = formatter.Measure(value);
-            if (buffer == null || buffer.Length < size)
+            bool resized = buffer == null || buffer.Length < size;
+            if (resized)
             {
                 buffer = new byte[size];
             }
@@ -91,10 +92,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size));
             if (!formatter.Write(ref writer, value))
             {
-                return -1;
+                // The swap is reported even on failure: it already happened, and a caller that
+                // re-reads its buffer only when the write succeeded would keep using the stale one.
+                return new WProtoWriteResult(null, resized);
             }
 
-            return size;
+            return new WProtoWriteResult(size, resized);
         }
 
         /// <summary>
@@ -115,16 +118,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // `size` when it has nothing to reuse, so the array handed back is never oversized and
             // the caller does not need the written count to interpret it.
             byte[] buffer = null;
-            int written = Serialize(value, ref buffer);
+            WProtoWriteResult result = Serialize(value, ref buffer);
 
-            if (written < 0)
+            if (!result.Served)
             {
                 bytes = null;
                 return false;
             }
 
             // A null root and an empty contract both encode to nothing, and neither allocates.
-            bytes = written == 0 ? Array.Empty<byte>() : buffer;
+            bytes = result.Length == 0 ? Array.Empty<byte>() : buffer;
             return true;
         }
 
