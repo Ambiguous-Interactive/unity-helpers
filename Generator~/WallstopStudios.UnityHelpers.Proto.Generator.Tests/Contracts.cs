@@ -684,4 +684,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(1)]
         public int SubOnly;
     }
+
+    /// <summary>Map-shaped members, annotated for both serializers.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class MapContract
+    {
+        /// <summary>A length-delimited key with a varint value.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public Dictionary<string, int> ByName;
+
+        /// <summary>A varint key with a sub-message value.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public Dictionary<int, Outer.Point> ById;
+
+        /// <summary>An ordered dictionary, so enumeration order is deterministic.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public SortedDictionary<string, string> Sorted;
+
+        /// <summary>Replaced on read rather than merged into.</summary>
+        [ProtoMember(4, OverwriteList = true)]
+        [WProtoMember(4, OverwriteList = true)]
+        public Dictionary<string, int> Overwritten = new Dictionary<string, int> { { "seed", 9 } };
+
+        /// <summary>Merged into on read.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
+    }
 }

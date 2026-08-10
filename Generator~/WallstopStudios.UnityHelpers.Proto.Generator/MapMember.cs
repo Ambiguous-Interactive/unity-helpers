@@ -1,0 +1,610 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Proto.Generator
+{
+    using Microsoft.CodeAnalysis;
+
+    /// <summary>
+    /// A member whose field number carries a map: a dictionary, written as a repeated sub-message.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A protobuf map is not a repeated value; it is a repeated <b>entry message</b> with the key at
+    /// field 1 and the value at field 2. That is why a dictionary could not simply ride the
+    /// repeated-field path -- the bytes are a different shape, and accepting one there would have
+    /// produced a payload no protobuf implementation could read back.
+    /// </para>
+    /// <para>
+    /// Measured against protobuf-net 3.2.56, and the surprise is that the entry obeys the ordinary
+    /// scalar rules rather than always carrying both halves. <c>{"a": 0}</c> encodes as
+    /// <c>0A 03 0A 01 61</c> -- tag, length 3, key only -- because the value equals its default and
+    /// is omitted exactly as a member would be. An empty-string key is still written (<c>0A 00</c>),
+    /// only null is absent, and a null value is dropped the same way. An empty dictionary writes
+    /// nothing at all, so it reads back as whatever the constructor left behind.
+    /// </para>
+    /// <para>
+    /// Reading an entry with no key yields the key type's default, and a repeated key is last-wins --
+    /// the entry is applied through the indexer rather than <c>Add</c>, which would throw on the
+    /// second occurrence of a key a hostile payload repeated.
+    /// </para>
+    /// </remarks>
+    internal sealed class MapMember : Member
+    {
+        private const string ListType = "global::System.Collections.Generic.List";
+
+        private const string PairType = "global::System.Collections.Generic.KeyValuePair";
+
+        private readonly Shape _key;
+        private readonly Shape _value;
+        private readonly string _keyQualified;
+        private readonly string _valueQualified;
+        private readonly string _mapQualified;
+        private readonly string _contractName;
+        private readonly bool _overwrite;
+        private readonly bool _valueIsReference;
+        private readonly bool _keyIsString;
+
+        private MapMember(
+            string contractName,
+            string name,
+            int tag,
+            Shape key,
+            Shape value,
+            string keyQualified,
+            string valueQualified,
+            string mapQualified,
+            bool overwrite,
+            bool valueIsReference,
+            bool keyIsString
+        )
+            : base(name, tag)
+        {
+            _contractName = contractName;
+            _key = key;
+            _value = value;
+            _keyQualified = keyQualified;
+            _valueQualified = valueQualified;
+            _mapQualified = mapQualified;
+            _overwrite = overwrite;
+            _valueIsReference = valueIsReference;
+            _keyIsString = keyIsString;
+        }
+
+        /// <summary>
+        /// Builds the member when <paramref name="type"/> is a supported map, and returns
+        /// <c>null</c> otherwise so the caller can try the other shapes.
+        /// </summary>
+        /// <remarks>
+        /// The requirements mirror the collection path: it implements <c>IDictionary&lt;K,V&gt;</c>
+        /// exactly once so the key and value types are unambiguous, it has an accessible
+        /// parameterless constructor because reading has to produce one, and it exposes a settable
+        /// indexer because entries are applied last-wins. Nothing here requires a class -- a
+        /// dictionary implemented as a struct is accepted on the same terms as any other.
+        /// </remarks>
+        internal static MapMember TryCreate(
+            string contractName,
+            string name,
+            int tag,
+            ITypeSymbol type,
+            bool overwriteList
+        )
+        {
+            if (!(type is INamedTypeSymbol named))
+            {
+                return null;
+            }
+
+            if (named.TypeKind != TypeKind.Class && named.TypeKind != TypeKind.Struct)
+            {
+                return null;
+            }
+
+            if (named.IsAbstract)
+            {
+                return null;
+            }
+
+            ITypeSymbol keyType = null;
+            ITypeSymbol valueType = null;
+            foreach (INamedTypeSymbol candidate in named.AllInterfaces)
+            {
+                if (
+                    !candidate.IsGenericType
+                    || candidate.ConstructedFrom.ToDisplayString()
+                        != "System.Collections.Generic.IDictionary<TKey, TValue>"
+                )
+                {
+                    continue;
+                }
+
+                if (keyType != null)
+                {
+                    return null;
+                }
+
+                keyType = candidate.TypeArguments[0];
+                valueType = candidate.TypeArguments[1];
+            }
+
+            if (keyType == null)
+            {
+                return null;
+            }
+
+            if (!HasParameterlessConstructor(named) || !HasSettableIndexer(named, keyType))
+            {
+                return null;
+            }
+
+            string keyQualified = keyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            string valueQualified = valueType.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat
+            );
+
+            Shape key = Shape.For(keyType, keyQualified);
+            Shape value = Shape.For(valueType, valueQualified);
+            if (key == null || value == null)
+            {
+                return null;
+            }
+
+            // protobuf restricts map keys to the integral types, bool and string. A `byte[]` or a
+            // message key is expressible in C# and meaningless on the wire, so it is refused rather
+            // than encoded into something no other implementation would read back.
+            bool keyIsString = keyType.SpecialType == SpecialType.System_String;
+            if (key.IsReference && !keyIsString)
+            {
+                return null;
+            }
+
+            return new MapMember(
+                contractName,
+                name,
+                tag,
+                key,
+                value,
+                keyQualified,
+                valueQualified,
+                named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                overwriteList,
+                value.IsReference,
+                keyIsString
+            );
+        }
+
+        private static bool HasParameterlessConstructor(INamedTypeSymbol type)
+        {
+            if (type.IsValueType)
+            {
+                return true;
+            }
+
+            foreach (IMethodSymbol constructor in type.InstanceConstructors)
+            {
+                if (
+                    constructor.Parameters.Length == 0
+                    && constructor.DeclaredAccessibility == Accessibility.Public
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasSettableIndexer(INamedTypeSymbol type, ITypeSymbol keyType)
+        {
+            for (INamedTypeSymbol current = type; current != null; current = current.BaseType)
+            {
+                foreach (ISymbol member in current.GetMembers("this[]"))
+                {
+                    if (
+                        member is IPropertySymbol indexer
+                        && indexer.SetMethod != null
+                        && indexer.SetMethod.DeclaredAccessibility == Accessibility.Public
+                        && indexer.Parameters.Length == 1
+                        && SymbolEqualityComparer.Default.Equals(
+                            indexer.Parameters[0].Type,
+                            keyType
+                        )
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private string PairLocal => "pair" + Tag;
+
+        private string EntrySize => "entrySize" + Tag;
+
+        private string Accumulator => "map" + Tag;
+
+        private string SeenFlag => "seen" + Tag;
+
+        private string PendingType =>
+            ListType + "<" + PairType + "<" + _keyQualified + ", " + _valueQualified + ">>";
+
+        private string KeyAccess => PairLocal + ".Key";
+
+        private string ValueAccess => PairLocal + ".Value";
+
+        /// <inheritdoc />
+        internal override void EmitMeasure(Writer writer)
+        {
+            OpenLoop(writer);
+            EmitEntrySize(writer);
+            writer.Line(
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.LengthDelimitedSize("
+                    + EntrySize
+                    + ");"
+            );
+            Close(writer);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <inheritdoc />
+        internal override void EmitWrite(Writer writer)
+        {
+            OpenLoop(writer);
+            EmitEntrySize(writer);
+
+            // The key and the length prefix are written before the payload, which is safe here in a
+            // way it is not for a nested contract: an entry is two scalars with no lifecycle hooks,
+            // so measuring it twice cannot run user code twice. That is the whole reason
+            // WProtoWriter.TryWriteMessage exists for contracts and is not needed here.
+            writer.Line(
+                "if (!writer.TryWriteTag("
+                    + Tag
+                    + ", "
+                    + Proto
+                    + ".WProtoWireType.LengthDelimited))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            writer.Blank();
+            writer.Line("if (!writer.TryWriteLengthPrefix(" + EntrySize + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            writer.Blank();
+
+            EmitHalfWrite(writer, _key, KeyAccess, 1);
+            EmitHalfWrite(writer, _value, ValueAccess, 2);
+
+            Close(writer);
+            Close(writer);
+            writer.Blank();
+        }
+
+        private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag)
+        {
+            writer.Line("if (" + Shape.Fill(shape.PresenceTest, access) + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line("if (!(" + shape.WriteCall(access, tag) + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Emits the null guard and the <c>foreach</c> header, leaving two blocks open.
+        /// </summary>
+        private void OpenLoop(Writer writer)
+        {
+            writer.Line("if (" + Access + " != null)" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "foreach ("
+                    + PairType
+                    + "<"
+                    + _keyQualified
+                    + ", "
+                    + _valueQualified
+                    + "> "
+                    + PairLocal
+                    + " in "
+                    + Access
+                    + ")"
+                    + Writer.Open
+            );
+            writer.Indent();
+
+            if (_valueIsReference)
+            {
+                // Unlike a repeated element, a null VALUE is legal -- protobuf-net omits it and the
+                // entry carries only its key. Nothing to guard.
+            }
+        }
+
+        /// <summary>
+        /// Emits the entry's payload size, which both halves obey the ordinary omission rules for.
+        /// </summary>
+        private void EmitEntrySize(Writer writer)
+        {
+            writer.Line("int " + EntrySize + " = 0;");
+            EmitHalfSize(writer, _key, KeyAccess, 1);
+            EmitHalfSize(writer, _value, ValueAccess, 2);
+            writer.Blank();
+        }
+
+        private void EmitHalfSize(Writer writer, Shape shape, string access, int tag)
+        {
+            writer.Line("if (" + Shape.Fill(shape.PresenceTest, access) + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                EntrySize
+                    + " += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + tag
+                    + ") + "
+                    + Shape.Fill(shape.SizeExpression, access)
+                    + ";"
+            );
+            Close(writer);
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadLocals(Writer writer)
+        {
+            writer.Line("bool " + SeenFlag + " = false;");
+
+            if (Deferred)
+            {
+                writer.Line(PendingType + " " + Accumulator + " = null;");
+                return;
+            }
+
+            writer.Line(_mapQualified + " " + Accumulator + " = default(" + _mapQualified + ");");
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadCases(Writer writer, string qualifiedContract)
+        {
+            string entry = "entry" + Tag;
+            string keyLocal = "key" + Tag;
+            string valueLocal = "value" + Tag;
+            string decodedKey = "decodedKey" + Tag;
+            string decodedValue = "decodedValue" + Tag;
+
+            OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
+            EmitSeed(writer);
+
+            // A real sub-message, so it spends a nesting level -- unlike a packed run, an entry can
+            // contain another message when the value type is a contract.
+            writer.Line(
+                "if (!reader.TryReadMessage(out "
+                    + Proto
+                    + ".WProtoReader "
+                    + entry
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+
+            writer.Line(
+                _keyQualified
+                    + " "
+                    + keyLocal
+                    + " = "
+                    + (_keyIsString ? "string.Empty" : "default(" + _keyQualified + ")")
+                    + ";"
+            );
+            writer.Line(
+                _valueQualified + " " + valueLocal + " = default(" + _valueQualified + ");"
+            );
+            writer.Blank();
+            writer.Line(
+                "while ("
+                    + entry
+                    + ".TryReadTag(out int entryField"
+                    + Tag
+                    + ", out int entryWire"
+                    + Tag
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("switch (entryField" + Tag + ")" + Writer.Open);
+            writer.Indent();
+
+            EmitHalfRead(writer, _key, 1, keyLocal, decodedKey, entry, qualifiedContract);
+            EmitHalfRead(writer, _value, 2, valueLocal, decodedValue, entry, qualifiedContract);
+
+            writer.Line("default:" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "if (!"
+                    + entry
+                    + ".TrySkipField(entryField"
+                    + Tag
+                    + ", entryWire"
+                    + Tag
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+            writer.Line("break;");
+            Close(writer);
+
+            Close(writer);
+            Close(writer);
+            writer.Blank();
+
+            writer.Line("if (" + entry + ".Malformed)" + Writer.Open);
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+
+            // Last-wins through the indexer. `Add` would throw on a key a hostile payload repeated,
+            // and a throwing reader is a worse failure than a decided one.
+            if (Deferred)
+            {
+                writer.Line(
+                    Accumulator
+                        + ".Add(new "
+                        + PairType
+                        + "<"
+                        + _keyQualified
+                        + ", "
+                        + _valueQualified
+                        + ">("
+                        + keyLocal
+                        + ", "
+                        + valueLocal
+                        + "));"
+                );
+            }
+            else
+            {
+                writer.Line(Accumulator + "[" + keyLocal + "] = " + valueLocal + ";");
+            }
+
+            writer.Line("break;");
+            Close(writer);
+        }
+
+        private void EmitHalfRead(
+            Writer writer,
+            Shape shape,
+            int tag,
+            string target,
+            string decoded,
+            string entry,
+            string qualifiedContract
+        )
+        {
+            writer.Line(
+                "case "
+                    + tag
+                    + " when entryWire"
+                    + Tag
+                    + " == "
+                    + shape.WireType
+                    + ":"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line(
+                "if (!"
+                    + entry
+                    + "."
+                    + shape.ReadMethod
+                    + "("
+                    + shape.ReadArguments
+                    + "out "
+                    + shape.ReadLocalType
+                    + " "
+                    + decoded
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+            writer.Line(target + " = " + Shape.Fill(shape.AssignExpression, decoded) + ";");
+            writer.Line("break;");
+            Close(writer);
+        }
+
+        /// <summary>
+        /// Emits the one-time creation of the accumulator.
+        /// </summary>
+        private void EmitSeed(Writer writer)
+        {
+            writer.Line("if (!" + SeenFlag + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(SeenFlag + " = true;");
+
+            if (Deferred)
+            {
+                writer.Line(Accumulator + " = new " + PendingType + "();");
+            }
+            else if (_overwrite)
+            {
+                writer.Line(Accumulator + " = new " + _mapQualified + "();");
+            }
+            else
+            {
+                writer.Line(Accumulator + " = read." + Name + " ?? new " + _mapQualified + "();");
+            }
+
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadEpilogue(Writer writer)
+        {
+            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
+            writer.Indent();
+
+            if (Deferred)
+            {
+                string target = "target" + Tag;
+                writer.Line(
+                    _mapQualified
+                        + " "
+                        + target
+                        + " = "
+                        + (
+                            _overwrite
+                                ? "new " + _mapQualified + "()"
+                                : "read." + Name + " ?? new " + _mapQualified + "()"
+                        )
+                        + ";"
+                );
+                writer.Line(
+                    "foreach ("
+                        + PairType
+                        + "<"
+                        + _keyQualified
+                        + ", "
+                        + _valueQualified
+                        + "> "
+                        + PairLocal
+                        + " in "
+                        + Accumulator
+                        + ")"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line(target + "[" + KeyAccess + "] = " + ValueAccess + ";");
+                Close(writer);
+                writer.Line("read." + Name + " = " + target + ";");
+            }
+            else
+            {
+                writer.Line("read." + Name + " = " + Accumulator + ";");
+            }
+
+            Close(writer);
+            writer.Blank();
+        }
+    }
+}

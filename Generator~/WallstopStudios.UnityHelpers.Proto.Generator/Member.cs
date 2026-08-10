@@ -88,6 +88,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return ScalarMember.TryCreate(name, tag, type, isRequired);
             }
 
+            // Maps first: a dictionary also implements ICollection<KeyValuePair<K,V>>, and the
+            // repeated path would take it and emit a repeated VALUE where protobuf wants a repeated
+            // ENTRY MESSAGE. The two are different bytes, so the order of these two questions is
+            // itself a wire-format decision.
+            MapMember map = MapMember.TryCreate(contractName, name, tag, type, overwriteList);
+            if (map != null)
+            {
+                if (isContract)
+                {
+                    ambiguous = true;
+                    return null;
+                }
+
+                return map;
+            }
+
             RepeatedMember repeated = RepeatedMember.TryCreate(
                 contractName,
                 name,
