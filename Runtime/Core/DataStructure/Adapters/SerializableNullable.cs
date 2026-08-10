@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Unity-serializable alternative to <see cref="Nullable{T}"/> that supports ProtoBuf and JSON.
@@ -37,8 +38,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <typeparam name="T">The underlying value type.</typeparam>
     [Serializable]
     [ProtoContract]
+    [WProtoContract]
     [JsonConverter(typeof(SerializableNullableJsonConverterFactory))]
-    public struct SerializableNullable<T>
+    public partial struct SerializableNullable<T>
         : IEquatable<SerializableNullable<T>>,
             IEquatable<T?>,
             IEquatable<T>,
@@ -48,10 +50,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     {
         [SerializeField]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         private bool _hasValue;
 
         [SerializeField]
         [ProtoMember(2, IsRequired = false)]
+        [WProtoMember(2, IsRequired = false)]
         [WShowIf(nameof(_hasValue))]
         private T _value;
 

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Represents a line segment defined by two endpoints in 3D space.
@@ -17,13 +18,15 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public readonly struct Line3D : IEquatable<Line3D>
+    [WProtoContract]
+    public readonly partial struct Line3D : IEquatable<Line3D>
     {
         /// <summary>
         /// The starting point of the line segment.
         /// </summary>
         [DataMember]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public readonly Vector3 from;
 
         /// <summary>
@@ -31,6 +34,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// </summary>
         [DataMember]
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public readonly Vector3 to;
 
         /// <summary>

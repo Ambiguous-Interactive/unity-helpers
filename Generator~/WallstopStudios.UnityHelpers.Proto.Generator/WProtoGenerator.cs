@@ -881,7 +881,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     }
 
                     if (
-                        !(model.GetTypeInfo(type).Type is INamedTypeSymbol named)
+                        !(Resolve(model, type) is INamedTypeSymbol named)
                         || !named.IsGenericType
                         || named.IsUnboundGenericType
                     )
@@ -912,6 +912,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return found;
+        }
+
+        /// <summary>
+        /// Resolves the type a piece of type syntax names, however it is spelled.
+        /// </summary>
+        /// <param name="model">The semantic model for the syntax's tree.</param>
+        /// <param name="type">The type syntax.</param>
+        /// <returns>The named type, or <c>null</c> when the syntax names none.</returns>
+        /// <remarks>
+        /// <c>GetTypeInfo</c> alone is not enough, and the gap has a specific shape:
+        /// <c>new Box&lt;int&gt;()</c> binds its type syntax to a CONSTRUCTOR, so the type info is
+        /// empty and the closure went undiscovered -- silently, and only until the first
+        /// serialization in a shipped player. Object creation is the most natural way to name a
+        /// closure and can easily be the only one in a consumer's assembly, so both questions are
+        /// asked.
+        /// </remarks>
+        private static ITypeSymbol Resolve(SemanticModel model, TypeSyntax type)
+        {
+            return model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
         }
 
         /// <summary>

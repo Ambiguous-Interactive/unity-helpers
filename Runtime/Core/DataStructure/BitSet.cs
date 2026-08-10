@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -24,7 +25,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     [Serializable]
     [ProtoContract(IgnoreListHandling = true)]
-    public sealed class BitSet : IReadOnlyList<bool>
+    [WProtoContract(IgnoreListHandling = true)]
+    public sealed partial class BitSet : IReadOnlyList<bool>
     {
         private const int BitsPerLong = 64;
         private const int BitsPerLongShift = 6; // log2(64)
@@ -33,10 +35,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         [SerializeField]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         private ulong[] _bits;
 
         [SerializeField]
         [ProtoMember(2)]
+        [WProtoMember(2)]
         private int _capacity;
 
         public struct BitEnumerator : IEnumerator<bool>

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using Core.Helper;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Declarative change applied to an <see cref="Attribute"/>.
@@ -51,7 +52,8 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </remarks>
     [Serializable]
     [ProtoContract]
-    public struct AttributeModification
+    [WProtoContract]
+    public partial struct AttributeModification
         : IEquatable<AttributeModification>,
             IComparable<AttributeModification>,
             IComparable
@@ -61,12 +63,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         [StringInList(typeof(AttributeUtilities), nameof(AttributeUtilities.GetAllAttributeNames))]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public string attribute;
 
         /// <summary>
         /// The type of modification action to perform (Addition, Multiplication, or Override).
         /// </summary>
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public ModificationAction action;
 
         /// <summary>
@@ -76,6 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <para>- Override: The new absolute value to set</para>
         /// </summary>
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float value;
 
         [JsonConstructor]

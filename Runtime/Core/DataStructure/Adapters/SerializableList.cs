@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Unity-serializable box around a <see cref="List{T}"/>, for use as the element or value type of
@@ -59,8 +60,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </remarks>
     [Serializable]
     [ProtoContract]
+    [WProtoContract]
     [JsonConverter(typeof(SerializableListConverterFactory))]
-    public sealed class SerializableList<T> : IList<T>, IReadOnlyList<T>
+    public sealed partial class SerializableList<T> : IList<T>, IReadOnlyList<T>
     {
         static SerializableList()
         {
@@ -74,6 +76,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         [SerializeField]
         [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
         private List<T> _items = new();
 
         /// <summary>

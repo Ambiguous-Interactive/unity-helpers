@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 #if UNITY_EDITOR
     using UnityEditor;
@@ -1594,13 +1595,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <summary>
     /// Factory and cache helpers for serializable dictionaries.
     /// </summary>
-    public static class SerializableDictionary
+    public static partial class SerializableDictionary
     {
         [Serializable]
         [ProtoContract]
-        public class Cache<T> : SerializableDictionaryBase.Cache
+        [WProtoContract]
+        public partial class Cache<T> : SerializableDictionaryBase.Cache
         {
             [ProtoMember(1)]
+            [WProtoMember(1)]
             public T Data;
         }
     }

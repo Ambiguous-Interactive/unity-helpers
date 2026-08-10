@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.Collections.Generic;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Authoring data for a periodic modifier bundle that executes on a cadence while an effect is active.
@@ -72,12 +73,14 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </example>
     [Serializable]
     [ProtoContract]
-    public sealed class PeriodicEffectDefinition
+    [WProtoContract]
+    public sealed partial class PeriodicEffectDefinition
     {
         /// <summary>
         /// Optional label shown in tooling to help distinguish multiple periodic definitions.
         /// </summary>
         [ProtoMember(1)]
+        [WProtoMember(1)]
         public string name;
 
         /// <summary>
@@ -85,6 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         [Min(0f)]
         [ProtoMember(2)]
+        [WProtoMember(2)]
         public float initialDelay;
 
         /// <summary>
@@ -92,6 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         [Min(0.01f)]
         [ProtoMember(3)]
+        [WProtoMember(3)]
         public float interval = 1f;
 
         /// <summary>
@@ -99,12 +104,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         [Min(0)]
         [ProtoMember(4)]
+        [WProtoMember(4)]
         public int maxTicks;
 
         /// <summary>
         /// Attribute modifications applied each time the tick fires.
         /// </summary>
         [ProtoMember(5)]
+        [WProtoMember(5)]
         public List<AttributeModification> modifications = new();
     }
 }

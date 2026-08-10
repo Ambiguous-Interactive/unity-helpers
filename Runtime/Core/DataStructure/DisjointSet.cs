@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -24,18 +25,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     [Serializable]
     [ProtoContract]
-    public sealed class DisjointSet
+    [WProtoContract]
+    public sealed partial class DisjointSet
     {
         [SerializeField]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         private int[] _parent = Array.Empty<int>();
 
         [SerializeField]
         [ProtoMember(2)]
+        [WProtoMember(2)]
         private int[] _rank = Array.Empty<int>();
 
         [SerializeField]
         [ProtoMember(3)]
+        [WProtoMember(3)]
         private int _setCount;
 
         /// <summary>

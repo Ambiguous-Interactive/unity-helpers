@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -36,14 +37,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
     [ProtoContract]
+    [WProtoContract]
     [JsonConverter(typeof(SerializableTypeJsonConverter))]
-    public struct SerializableType
+    public partial struct SerializableType
         : IEquatable<SerializableType>,
             ISerializationCallbackReceiver,
             ISerializable
     {
         [SerializeField]
         [ProtoMember(1)]
+        [WProtoMember(1)]
         [StringInList(
             typeof(SerializableTypeCatalog),
             nameof(SerializableTypeCatalog.GetAssemblyQualifiedNames)
@@ -52,11 +55,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         [NonSerialized]
         [ProtoIgnore]
+        [WProtoIgnore]
         [JsonIgnore]
         private Type _cachedType;
 
         [NonSerialized]
         [ProtoIgnore]
+        [WProtoIgnore]
         [JsonIgnore]
         private bool _resolutionAttempted;
 

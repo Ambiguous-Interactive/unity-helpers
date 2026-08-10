@@ -23,16 +23,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SurrogateDifferentialTests
     {
-        [OneTimeSetUp]
-        public void RegisterOracleSurrogate()
-        {
-            // protobuf-net learns the pair from its runtime model; this package learns it from an
-            // assembly attribute at build time. Both have to describe the same mapping for the
-            // comparison below to mean anything.
-            RuntimeTypeModel
-                .Default.Add(typeof(ForeignVector3), false)
-                .SetSurrogate(typeof(ForeignVector3Surrogate));
-        }
+        // The oracle's surrogate pair is registered once for the whole assembly by OracleModelSetup;
+        // registering it here as well throws, because the model freezes a type the first time it
+        // serializes one.
 
         [Test]
         public void ASurrogatedMemberIsExactlyTheSurrogatesShape()

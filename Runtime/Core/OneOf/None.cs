@@ -6,10 +6,12 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
     using System;
     using System.Runtime.CompilerServices;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     [Serializable]
     [ProtoContract]
-    public readonly struct None : IEquatable<None>
+    [WProtoContract]
+    public readonly partial struct None : IEquatable<None>
     {
         public static readonly None Default = default;
 
