@@ -511,6 +511,62 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(Target + ".Add(" + local + ");");
                 writer.Line("break;");
                 Close(writer);
+
+                // The packed spelling of the same field. A generic element gets this for the same
+                // reason a known one does -- a packed run is what every other protobuf implementation
+                // emits, and skipping it hands back a silently short collection -- but the decision
+                // has to be deferred to the closure: `Packable` is false when T is itself
+                // length-delimited, where this case would otherwise steal a single string element.
+                // The guard makes the two cases mutually exclusive, so order between them is not load
+                // bearing.
+                string genericPacked = "packed" + Tag;
+                writer.Line(
+                    "case "
+                        + Tag
+                        + " when "
+                        + Generic
+                        + ".Packable && wireType == "
+                        + Proto
+                        + ".WProtoWireType.LengthDelimited:"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitSeed(writer);
+                writer.Line(
+                    "if (!reader.TryReadPackedRun(out "
+                        + Proto
+                        + ".WProtoReader "
+                        + genericPacked
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Blank();
+                writer.Line("while (!" + genericPacked + ".End)" + Writer.Open);
+                writer.Indent();
+                writer.Line(
+                    "if (!"
+                        + Generic
+                        + ".TryReadValue(ref "
+                        + genericPacked
+                        + ", out "
+                        + _elementQualified
+                        + " "
+                        + local
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Blank();
+                writer.Line(Target + ".Add(" + local + ");");
+                Close(writer);
+                writer.Blank();
+                writer.Line("break;");
+                Close(writer);
                 return;
             }
 

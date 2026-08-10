@@ -310,5 +310,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
         }
+
+        [Test]
+        public void AHookedMapValueRunsItsSerializationHookOnce()
+        {
+            // The rule the whole Measure/Write split exists to enforce: a before-serialization hook
+            // runs exactly once per serialize. A hook that projects live state into serialized
+            // members is idempotent by luck; one that rents a pooled buffer -- the shape CyclicBuffer
+            // in this package actually uses -- leaks the first lease when it runs twice.
+            //
+            // Map entries were sized in BOTH Measure and Write, and sizing a contract value calls its
+            // Measure, so a hooked value ran its hook once per pass instead of once per serialize.
+            HookedContract value = new HookedContract { Value = 7 };
+            HookedMapContract contract = new HookedMapContract
+            {
+                ById = new Dictionary<int, HookedContract> { { 1, value } },
+            };
+
+            IWProtoFormatter<HookedMapContract> formatter =
+                WProtoFormatterProvider.Get<HookedMapContract>();
+            byte[] buffer = new byte[formatter.Measure(contract)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, contract));
+
+            Assert.AreEqual(
+                1,
+                value.Trace.FindAll(entry => entry == "OnBeforeSerialization").Count,
+                "before-serialization ran " + string.Join(", ", value.Trace)
+            );
+        }
     }
 }

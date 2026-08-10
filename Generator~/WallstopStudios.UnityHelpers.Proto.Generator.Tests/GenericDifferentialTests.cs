@@ -125,6 +125,59 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual("0A00", Encode(new Box<string> { Value = string.Empty }));
         }
 
+        [Test]
+        public void AGenericRepeatedMemberReadsAPackedRun()
+        {
+            // Tag 2, length-delimited, three varints: the packed spelling of Many = {1, 2, 3}.
+            // Neither serializer WRITES this for these closures, and that is exactly why it has to be
+            // read: packed is the proto3 default and what every other implementation emits, so a
+            // payload from outside this package arrives in this shape.
+            byte[] packed = { 0x12, 0x03, 0x01, 0x02, 0x03 };
+
+            // The oracle accepts it, which is what makes dropping it a compatibility defect rather
+            // than a policy choice.
+            Box<int> oracle = Deserialize<Box<int>>(packed);
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, oracle.Many);
+
+            // The non-generic path emits a second case for this and calls the alternative "the worst
+            // of the available failures" -- a silently short collection. The generic path gated its
+            // only case on the element's native wire type, so the run fell through to TrySkipField.
+            IWProtoFormatter<Box<int>> formatter = WProtoFormatterProvider.Get<Box<int>>();
+            WProtoReader reader = new WProtoReader(packed);
+            Assert.IsTrue(formatter.TryRead(ref reader, out Box<int> restored));
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, restored.Many);
+        }
+
+        [Test]
+        public void AGenericRepeatedMemberReadsPackedAndUnpackedInterleaved()
+        {
+            // A packed run followed by a loose element, the same mixture the non-generic path is
+            // pinned on. The seed runs once across BOTH cases, so a per-case accumulator would drop
+            // whichever half came first.
+            //
+            // The bound is the oracle's, not a guess: protobuf-net REFUSES a second packed run after
+            // a loose element (measured -- "Invalid wire-type (String)" at the third group), so this
+            // is the widest interleaving that is actually legal, and asserting more would have been
+            // asserting a shape no reader accepts.
+            byte[] mixed = { 0x12, 0x02, 0x01, 0x02, 0x10, 0x03 };
+
+            Box<int> oracle = Deserialize<Box<int>>(mixed);
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, oracle.Many);
+
+            IWProtoFormatter<Box<int>> formatter = WProtoFormatterProvider.Get<Box<int>>();
+            WProtoReader reader = new WProtoReader(mixed);
+            Assert.IsTrue(formatter.TryRead(ref reader, out Box<int> restored));
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, restored.Many);
+        }
+
+        private static T Deserialize<T>(byte[] bytes)
+        {
+            using (MemoryStream stream = new MemoryStream(bytes))
+            {
+                return ProtoBuf.Serializer.Deserialize<T>(stream);
+            }
+        }
+
         private static void AssertMatches<T>(Box<T> value)
         {
             string label = typeof(T).Name + " " + Describe(value);

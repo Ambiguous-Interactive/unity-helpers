@@ -391,25 +391,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryWriteMessage<T>(int fieldNumber, IWProtoFormatter<T> formatter, in T value)
         {
-            if (formatter == null || _depth >= WProtoReader.MaxNestingDepth)
+            if (formatter == null)
             {
                 _faulted = true;
                 return false;
             }
 
-            if (!TryWriteTag(fieldNumber, WProtoWireType.LengthDelimited))
+            if (!TryBeginLengthDelimited(fieldNumber, out WProtoLengthToken token))
             {
                 return false;
             }
 
-            if (!TryReserve(1, out int prefixStart))
-            {
-                return false;
-            }
-
-            int payloadStart = _position;
             bool written;
-            _depth++;
             try
             {
                 written = formatter.Write(ref this, value);
@@ -425,6 +418,74 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (!written || _faulted)
             {
                 _faulted = true;
+                return false;
+            }
+
+            return TryCloseLengthDelimited(token);
+        }
+
+        /// <summary>
+        /// Opens a length-delimited field: writes its key and reserves the length prefix, leaving the
+        /// payload to be written directly into this writer.
+        /// </summary>
+        /// <param name="fieldNumber">The field number.</param>
+        /// <param name="token">Receives the bookkeeping <see cref="TryCloseLengthDelimited"/> needs.</param>
+        /// <returns><c>true</c> when the field was opened.</returns>
+        /// <remarks>
+        /// <para>
+        /// The pair exists for payloads that are <b>not</b> a single sub-message and so cannot go
+        /// through <see cref="TryWriteMessage{T}"/> -- a map entry, which is a synthetic message built
+        /// from two independent halves. The reason to prefer it over computing the length up front is
+        /// the one in <see cref="TryWriteMessage{T}"/>'s remarks: sizing the payload during the write
+        /// pass re-measures whatever it contains, and re-measuring a contract runs its
+        /// before-serialization hook a second time.
+        /// </para>
+        /// <para>
+        /// The caller must close every token it opens. A failure between the two leaves the writer
+        /// faulted, and a faulted writer refuses all further work, so an unclosed token cannot produce
+        /// a wrong payload -- only a dead one.
+        /// </para>
+        /// </remarks>
+        public bool TryBeginLengthDelimited(int fieldNumber, out WProtoLengthToken token)
+        {
+            token = default;
+
+            if (_depth >= WProtoReader.MaxNestingDepth)
+            {
+                _faulted = true;
+                return false;
+            }
+
+            if (!TryWriteTag(fieldNumber, WProtoWireType.LengthDelimited))
+            {
+                return false;
+            }
+
+            if (!TryReserve(1, out int prefixStart))
+            {
+                return false;
+            }
+
+            token = new WProtoLengthToken(prefixStart, _position);
+            _depth++;
+            return true;
+        }
+
+        /// <summary>
+        /// Closes a field opened by <see cref="TryBeginLengthDelimited"/>, back-filling its length.
+        /// </summary>
+        /// <param name="token">The token from the matching open.</param>
+        /// <returns><c>true</c> when the length was written.</returns>
+        public bool TryCloseLengthDelimited(in WProtoLengthToken token)
+        {
+            _depth--;
+            return TryBackfillLength(token.PrefixStart, token.PayloadStart);
+        }
+
+        private bool TryBackfillLength(int prefixStart, int payloadStart)
+        {
+            if (_faulted)
+            {
                 return false;
             }
 

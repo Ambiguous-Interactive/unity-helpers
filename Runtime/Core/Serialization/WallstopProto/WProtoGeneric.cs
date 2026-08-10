@@ -50,6 +50,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Reports whether a repeated field of this type can arrive as a packed run.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Only the fixed-width and varint scalars pack. The distinction matters because a packed run
+        /// is length-delimited, so for a <c>T</c> that is <b>already</b> length-delimited -- a string,
+        /// a byte array, a message -- a length-delimited field is one ELEMENT and not a run of them.
+        /// Reading it as a run would decode a string's characters as separate values.
+        /// </para>
+        /// <para>
+        /// This has to be a property of the closed type rather than of emitted code, for the same
+        /// reason <see cref="WireType"/> does: at generate time <c>T</c> is not yet known.
+        /// </para>
+        /// </remarks>
+        public static bool Packable
+        {
+            get
+            {
+                Resolve();
+                return _scalar != null && _scalar.WireType != WProtoWireType.LengthDelimited;
+            }
+        }
+
+        /// <summary>
         /// Returns the encoded size of the field, key included, or 0 when it is omitted.
         /// </summary>
         /// <param name="tag">The field number.</param>

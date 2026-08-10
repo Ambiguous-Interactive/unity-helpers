@@ -716,6 +716,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
     }
 
+    /// <summary>A map whose VALUE is a contract carrying lifecycle hooks.</summary>
+    /// <remarks>
+    /// The case the map emitter's own comment assumed away: it justified measuring an entry twice on
+    /// the grounds that "an entry is two scalars with no lifecycle hooks". A map value may be any
+    /// contract, and this is the fixture that says so.
+    /// </remarks>
+    [WProtoContract]
+    public sealed partial class HookedMapContract
+    {
+        /// <summary>A varint key with a hooked sub-message value.</summary>
+        [WProtoMember(1)]
+        public Dictionary<int, HookedContract> ById;
+    }
+
     /// <summary>
     /// A type this assembly does not get to annotate, standing in for <c>UnityEngine.Vector3</c>.
     /// </summary>

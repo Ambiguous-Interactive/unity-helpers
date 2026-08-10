@@ -50,6 +50,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            // A null root is the empty payload and must never reach the formatter. Measure is where
+            // a generated formatter runs the before-serialization hook and reads every member, so
+            // handing it null turns a legal call into a NullReferenceException. Measured against
+            // protobuf-net 3.2.56: serializing a null root yields zero bytes and does not throw.
+            if (!typeof(T).IsValueType && value == null)
+            {
+                bytes = Array.Empty<byte>();
+                return true;
+            }
+
             byte[] buffer = new byte[formatter.Measure(value)];
             WProtoWriter writer = new WProtoWriter(buffer);
             if (!formatter.Write(ref writer, value))
@@ -79,7 +89,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             WProtoReader reader = new WProtoReader(data);
-            return formatter.TryRead(ref reader, out value);
+            if (formatter.TryRead(ref reader, out value))
+            {
+                return true;
+            }
+
+            // "No formatter for this type" and "this type's formatter rejected the payload" are
+            // different answers, and only the first one means "not ours". Reporting both as false
+            // sent a payload WallstopProto had already refused on to protobuf-net for a second,
+            // differently-implemented decode -- which under IL2CPP is the path that cannot run at
+            // all, so the real error would surface as a reflection failure somewhere else entirely.
+            throw new InvalidOperationException(
+                $"WallstopProto could not read a '{typeof(T).FullName}' from {data.Length} byte(s): "
+                    + "the payload is truncated, malformed, or was written by a different contract. "
+                    + "This type has a generated formatter, so it is not retried with protobuf-net."
+            );
         }
 
         /// <summary>

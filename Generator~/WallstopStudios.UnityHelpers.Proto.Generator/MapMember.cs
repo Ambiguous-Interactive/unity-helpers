@@ -260,25 +260,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitWrite(Writer writer)
         {
             OpenLoop(writer);
-            EmitEntrySize(writer);
 
-            // The key and the length prefix are written before the payload, which is safe here in a
-            // way it is not for a nested contract: an entry is two scalars with no lifecycle hooks,
-            // so measuring it twice cannot run user code twice. That is the whole reason
-            // WProtoWriter.TryWriteMessage exists for contracts and is not needed here.
+            // The payload is written first and its length back-filled, rather than measured up front
+            // as the Measure pass does. A map VALUE may be any contract, hooks included -- the earlier
+            // version justified a second measurement on the grounds that "an entry is two scalars",
+            // which a Dictionary<int, SomeContract> is not -- and measuring a contract runs its
+            // before-serialization hook. Sizing the entry here ran that hook once per pass instead of
+            // once per serialize, which is exactly what WProtoWriter.TryWriteMessage exists to stop.
+            string token = "entry" + Tag;
             writer.Line(
-                "if (!writer.TryWriteTag("
+                "if (!writer.TryBeginLengthDelimited("
                     + Tag
-                    + ", "
+                    + ", out "
                     + Proto
-                    + ".WProtoWireType.LengthDelimited))"
+                    + ".WProtoLengthToken "
+                    + token
+                    + "))"
                     + Writer.Open
             );
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
-            writer.Blank();
-            writer.Line("if (!writer.TryWriteLengthPrefix(" + EntrySize + "))" + Writer.Open);
             writer.Indent();
             writer.Line("return false;");
             Close(writer);
@@ -286,6 +285,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             EmitHalfWrite(writer, _key, KeyAccess, 1);
             EmitHalfWrite(writer, _value, ValueAccess, 2);
+
+            writer.Line("if (!writer.TryCloseLengthDelimited(" + token + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
 
             Close(writer);
             Close(writer);
