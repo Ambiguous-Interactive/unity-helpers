@@ -170,6 +170,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, restored.Many);
         }
 
+        [Test]
+        public void ARequiredGenericMemberObeysTheOmissionRuleOfItsClosure()
+        {
+            // What "required" means depends on the closure, so it cannot be decided when the generic
+            // contract is emitted: a required int at 0 IS written, while a required null string is
+            // still absent. Both expectations are the oracle's, asserted below rather than asserted
+            // from memory.
+            Assert.AreEqual(
+                OracleHex(new RequiredBox<int> { Value = 0 }),
+                Encode(new RequiredBox<int> { Value = 0 })
+            );
+            Assert.AreEqual(
+                OracleHex(new RequiredBox<string> { Value = null }),
+                Encode(new RequiredBox<string> { Value = null })
+            );
+            Assert.AreEqual(
+                OracleHex(new RequiredBox<string> { Value = string.Empty }),
+                Encode(new RequiredBox<string> { Value = string.Empty })
+            );
+
+            // Spelled out, so a change to the oracle's behaviour is visible as a change here and not
+            // absorbed silently by comparing two things that moved together.
+            Assert.AreEqual("0800", Encode(new RequiredBox<int> { Value = 0 }));
+            Assert.AreEqual(string.Empty, Encode(new RequiredBox<string> { Value = null }));
+        }
+
         private static T Deserialize<T>(byte[] bytes)
         {
             using (MemoryStream stream = new MemoryStream(bytes))

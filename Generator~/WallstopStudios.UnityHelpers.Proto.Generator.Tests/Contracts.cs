@@ -716,6 +716,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
     }
 
+    /// <summary>An enum, so an enum-keyed map has something to name.</summary>
+    public enum MapKeyKind
+    {
+        /// <summary>The default, which is also a map key worth pinning.</summary>
+        None = 0,
+
+        /// <summary>A non-default value.</summary>
+        Other = 7,
+    }
+
+    /// <summary>Map keys the protobuf SPEC does not allow but protobuf-net encodes anyway.</summary>
+    /// <remarks>
+    /// The map emitter's comment used to claim keys were restricted to "the integral types, bool and
+    /// string" and that anything else was refused. Measured against protobuf-net 3.2.56, all four of
+    /// these encode without complaint, so refusing them would have broken parity with the oracle
+    /// rather than protected anyone. This fixture is what keeps the permissiveness deliberate.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class ExoticKeyContract
+    {
+        /// <summary>A fixed32 key.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public Dictionary<float, int> ByFloat;
+
+        /// <summary>A fixed64 key.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public Dictionary<double, int> ByDouble;
+
+        /// <summary>An enum key, which travels as a varint.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public Dictionary<MapKeyKind, int> ByEnum;
+
+        /// <summary>A bool key, which the spec does allow.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public Dictionary<bool, int> ByBool;
+    }
+
     /// <summary>A map whose VALUE is a contract carrying lifecycle hooks.</summary>
     /// <remarks>
     /// The case the map emitter's own comment assumed away: it justified measuring an entry twice on
@@ -843,6 +885,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(3)]
         [WProtoMember(3)]
         public int Trailer;
+    }
+
+    /// <summary>A generic contract whose member is required.</summary>
+    /// <remarks>
+    /// IsRequired is decided at generate time for a scalar and cannot be for a type parameter: what
+    /// "required" does to a default depends on whether the closure is a value type, which is exactly
+    /// what is unknown until it closes.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class RequiredBox<T>
+    {
+        /// <summary>A required member typed as the parameter.</summary>
+        [ProtoMember(1, IsRequired = true)]
+        [WProtoMember(1, IsRequired = true)]
+        public T Value;
+    }
+
+    /// <summary>Closures of <see cref="RequiredBox{T}"/>, one per omission rule.</summary>
+    public static class RequiredBoxClosures
+    {
+        /// <summary>A value-type closure, whose default is still written.</summary>
+        public static RequiredBox<int> Ints;
+
+        /// <summary>A reference closure, whose null stays absent even when required.</summary>
+        public static RequiredBox<string> Texts;
     }
 
     /// <summary>Names the closures this assembly uses, so the generator registers them.</summary>

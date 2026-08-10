@@ -19,19 +19,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     internal sealed class GenericMember : Member
     {
         private readonly string _parameter;
+        private readonly bool _required;
 
-        private GenericMember(string name, int tag, string parameter)
+        private GenericMember(string name, int tag, string parameter, bool required)
             : base(name, tag)
         {
             _parameter = parameter;
+            _required = required;
         }
 
-        internal static GenericMember TryCreate(string name, int tag, ITypeSymbol type)
+        internal static GenericMember TryCreate(
+            string name,
+            int tag,
+            ITypeSymbol type,
+            bool isRequired
+        )
         {
             return type is ITypeParameterSymbol parameter
-                ? new GenericMember(name, tag, parameter.Name)
+                ? new GenericMember(name, tag, parameter.Name, isRequired)
                 : null;
         }
+
+        /// <summary>
+        /// The literal passed to <c>WProtoGeneric&lt;T&gt;</c> for this member's IsRequired.
+        /// </summary>
+        /// <remarks>
+        /// Passed as a runtime argument rather than resolved here, because what "required" does to a
+        /// default depends on whether the closure is a value type -- a required int at 0 is written
+        /// and a required null string is not -- and the closure is exactly what is unknown at this
+        /// point.
+        /// </remarks>
+        private string Required => _required ? "true" : "false";
 
         private string Generic => Proto + ".WProtoGeneric<" + _parameter + ">";
 
@@ -42,7 +60,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
         {
-            writer.Line("size += " + Generic + ".MeasureField(" + Tag + ", " + Access + ");");
+            writer.Line(
+                "size += "
+                    + Generic
+                    + ".MeasureField("
+                    + Tag
+                    + ", "
+                    + Access
+                    + ", "
+                    + Required
+                    + ");"
+            );
             writer.Blank();
         }
 
@@ -56,6 +84,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Tag
                     + ", "
                     + Access
+                    + ", "
+                    + Required
                     + "))"
                     + Writer.Open
             );

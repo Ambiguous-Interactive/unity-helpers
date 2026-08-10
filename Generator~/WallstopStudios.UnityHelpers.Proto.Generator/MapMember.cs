@@ -150,9 +150,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // protobuf restricts map keys to the integral types, bool and string. A `byte[]` or a
-            // message key is expressible in C# and meaningless on the wire, so it is refused rather
-            // than encoded into something no other implementation would read back.
+            // Only REFERENCE keys other than string are refused, and that is narrower than the
+            // protobuf spec on purpose. The spec restricts map keys to the integral types, bool and
+            // string; protobuf-net does not, and this package's contract is byte-compatibility with
+            // protobuf-net. Measured against 3.2.56: float, double and enum keys all encode without
+            // complaint, so refusing them would break parity rather than protect anyone -- see
+            // ExoticKeyContract, which pins those bytes.
+            //
+            // What stays refused is a `byte[]` or a message key: expressible in C#, and with no
+            // stable identity to key on once it has been round-tripped.
             bool keyIsString = keyType.SpecialType == SpecialType.System_String;
             if (key.IsReference && !keyIsString)
             {

@@ -463,6 +463,139 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [Test]
+        public void ASurrogateThatIsNotAContractIsAnError()
+        {
+            // Without this the pair compiles, emits a formatter lookup for a type that has none, and
+            // fails on the first save in a shipped player.
+            AssertDiagnostic(
+                "WPROTO016",
+                "Plain",
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real), typeof(Consumer.Plain))]
+                  public struct Real { public int X; }
+                  public struct Plain
+                  {
+                      public int X;
+                      public static implicit operator Plain(Real value) => new Plain { X = value.X };
+                      public static implicit operator Real(Plain value) => new Real { X = value.X };
+                  }"
+            );
+        }
+
+        [Test]
+        public void ASurrogateThatCannotConvertBackIsAnError()
+        {
+            // The worse of the two failures: one-way conversion writes bytes that look correct and
+            // reads a value that never comes back.
+            AssertDiagnostic(
+                "WPROTO017",
+                "OneWay",
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real), typeof(Consumer.OneWay))]
+                  public struct Real { public int X; }
+                  [WProtoContract] public partial struct OneWay
+                  {
+                      [WProtoMember(1)] public int X;
+                      public static implicit operator OneWay(Real value) => new OneWay { X = value.X };
+                  }"
+            );
+        }
+
+        [Test]
+        public void AWellFormedSurrogatePairIsNotAnError()
+        {
+            // The control. Both checks are cheap to write in a way that fires on everything, and a
+            // pair of red tests cannot tell that apart from working.
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real), typeof(Consumer.Good))]
+                  public struct Real { public int X; }
+                  [WProtoContract] public partial struct Good
+                  {
+                      [WProtoMember(1)] public int X;
+                      public static implicit operator Good(Real value) => new Good { X = value.X };
+                      public static implicit operator Real(Good value) => new Real { X = value.X };
+                  }"
+            );
+
+            Assert.IsFalse(
+                diagnostics.Any(d => d.Id == "WPROTO016" || d.Id == "WPROTO017"),
+                string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+        }
+
+        [Test]
+        public void AnOpenConstructionNestedInATypeArgumentIsNotRegistered()
+        {
+            // The registrar can only name CLOSED types. `Box<int>` is closed; `Box<Wrapper<T>>` is
+            // not, because T is still unbound -- but the check only looked at DIRECT type arguments,
+            // and `Wrapper<T>` is not itself a type parameter, so it was recorded as closed and
+            // emitted into a registrar that cannot name it.
+            //
+            // Asserted by compiling the generated code rather than by reading it: "the consumer's
+            // build fails" is the actual symptom, and it is what a reader of this test cares about.
+            ImmutableArray<Diagnostic> errors = CompileGenerated(
+                @"public sealed class Wrapper<T> { public T Item; }
+                  [WProtoContract] public partial class Box<T> { [WProtoMember(1)] public int Value; }
+                  public static class Holder<T> { public static Box<Wrapper<T>> Nested; }
+                  public static class Closed { public static Box<int> Fine; }"
+            );
+
+            Assert.IsEmpty(
+                errors.Select(d => d.Id + " " + d.GetMessage()),
+                "the generated registrar must not name an open construction"
+            );
+        }
+
+        [Test]
+        public void AnImmutableClassWithOnlyAParameterizedConstructorIsAccepted()
+        {
+            // WPROTO011 exists because the formatter normally calls `new T()` to have something to
+            // read into. A contract with a member that cannot be assigned after construction does not
+            // take that path at all -- it holds every value in a local and BUILDS the instance with
+            // the constructor the generator emits -- so demanding a parameterless one rejected the
+            // canonical immutable class for a reason that no longer applied to it.
+            ImmutableArray<Diagnostic> reported = Run(
+                @"[WProtoContract] public sealed partial class Immutable
+                  {
+                      [WProtoMember(1)] public readonly int X;
+                      public Immutable(int x) { X = x; }
+                  }"
+            );
+
+            Assert.IsFalse(
+                reported.Any(d => d.Id == "WPROTO011"),
+                string.Join("; ", reported.Select(d => d.Id + " " + d.GetMessage()))
+            );
+
+            // And the emitted constructor has to actually compile, which is the half a diagnostic
+            // assertion cannot see.
+            Assert.IsEmpty(
+                CompileGenerated(
+                        @"[WProtoContract] public sealed partial class Immutable
+                          {
+                              [WProtoMember(1)] public readonly int X;
+                              public Immutable(int x) { X = x; }
+                          }"
+                    )
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+        }
+
+        [Test]
+        public void AMutableClassWithNoParameterlessConstructorIsStillAnError()
+        {
+            // The control for the relaxation above: nothing here is immutable, so the formatter does
+            // need `new T()` and the diagnostic must still fire.
+            AssertDiagnostic(
+                "WPROTO011",
+                "Mutable",
+                @"[WProtoContract] public sealed partial class Mutable
+                  {
+                      [WProtoMember(1)] public int X;
+                      public Mutable(int x) { X = x; }
+                  }"
+            );
+        }
+
         private static void AssertDiagnostic(string id, string mustName, string source)
         {
             ImmutableArray<Diagnostic> diagnostics = Run(source);
@@ -483,6 +616,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         private static ImmutableArray<Diagnostic> Run(string body)
+        {
+            return Run(body, out Compilation _);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(string body, out Compilation generated)
         {
             // An [assembly:] attribute must precede every namespace, so a fixture that needs one
             // writes it at the top of its body and it is hoisted out here rather than ending up
@@ -525,11 +663,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .Create(new WProtoGenerator())
                 .RunGeneratorsAndUpdateCompilation(
                     compilation,
-                    out Compilation _,
+                    out Compilation updated,
                     out ImmutableArray<Diagnostic> diagnostics
                 );
 
+            generated = updated;
             return diagnostics;
+        }
+
+        /// <summary>
+        /// Compiles the generator's own output and returns its errors.
+        /// </summary>
+        /// <remarks>
+        /// The generator reporting no diagnostic is not the same as the consumer's build succeeding.
+        /// Emitted code that does not compile is the failure a developer actually hits, and it is
+        /// invisible to a suite that only inspects what the generator chose to report.
+        /// </remarks>
+        private static ImmutableArray<Diagnostic> CompileGenerated(string body)
+        {
+            Run(body, out Compilation generated);
+            return generated
+                .GetDiagnostics()
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
         }
     }
 }

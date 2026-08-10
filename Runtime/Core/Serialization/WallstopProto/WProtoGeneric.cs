@@ -81,11 +81,29 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns>The encoded size in bytes.</returns>
         public static int MeasureField(int tag, in T value)
         {
+            return MeasureField(tag, value, false);
+        }
+
+        /// <summary>
+        /// Returns the encoded size of the field, key included, or 0 when it is omitted.
+        /// </summary>
+        /// <param name="tag">The field number.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="required">Whether the member declared <c>IsRequired</c>.</param>
+        /// <returns>The encoded size in bytes.</returns>
+        /// <remarks>
+        /// What <c>IsRequired</c> does is decided by the closure, which is why it is a parameter here
+        /// rather than a constant in emitted code. Measured against protobuf-net 3.2.56: a required
+        /// <c>int</c> at 0 is written, while a required <c>null</c> string is still absent. Required
+        /// forces a VALUE onto the wire; it does not invent one where there is no value at all.
+        /// </remarks>
+        public static int MeasureField(int tag, in T value, bool required)
+        {
             Resolve();
 
             if (_scalar != null)
             {
-                return _scalar.IsDefault(value)
+                return Omit(value, required)
                     ? 0
                     : WProtoSizes.TagSize(tag) + _scalar.MeasureValue(value);
             }
@@ -106,11 +124,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the field was written or deliberately skipped.</returns>
         public static bool WriteField(ref WProtoWriter writer, int tag, in T value)
         {
+            return WriteField(ref writer, tag, value, false);
+        }
+
+        /// <summary>Writes the field, key included, or nothing when it is omitted.</summary>
+        /// <param name="writer">The destination.</param>
+        /// <param name="tag">The field number.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="required">Whether the member declared <c>IsRequired</c>.</param>
+        /// <returns><c>true</c> when the field was written or deliberately skipped.</returns>
+        public static bool WriteField(ref WProtoWriter writer, int tag, in T value, bool required)
+        {
             Resolve();
 
             if (_scalar != null)
             {
-                if (_scalar.IsDefault(value))
+                if (Omit(value, required))
                 {
                     return true;
                 }
@@ -196,6 +225,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             return reader.TryReadMessage(Message(), out value);
+        }
+
+        /// <summary>
+        /// Reports whether a scalar member is left off the wire.
+        /// </summary>
+        /// <remarks>
+        /// The two rules differ only for a value type. For a reference scalar -- a string, a byte
+        /// array -- <c>IsDefault</c> already means "null", so a required one omits exactly when an
+        /// optional one does, and an EMPTY string is written either way.
+        /// </remarks>
+        private static bool Omit(in T value, bool required)
+        {
+            if (!required)
+            {
+                return _scalar.IsDefault(value);
+            }
+
+            return !typeof(T).IsValueType && value == null;
         }
 
         private static IWProtoFormatter<T> Message()

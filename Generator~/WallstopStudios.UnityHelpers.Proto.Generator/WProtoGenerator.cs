@@ -91,6 +91,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
+            SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
 
             List<string> registrations = new List<string>();
             foreach (INamedTypeSymbol contract in contracts)
@@ -269,9 +270,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
+            // Not asked of a contract that builds itself. The diagnostic exists because the formatter
+            // normally calls `new T()` to have something to read into; a contract with a member that
+            // cannot be assigned after construction never takes that path, holding every value in a
+            // local and passing them to the constructor emitted just below. Requiring a parameterless
+            // constructor as well rejected the canonical immutable class -- one parameterized
+            // constructor, all-readonly members -- for a reason that had stopped applying to it.
             if (
                 !contract.IsValueType
                 && !contract.IsAbstract
+                && !constructAtEnd
                 && !HasAccessibleParameterlessConstructor(contract)
             )
             {
@@ -891,17 +899,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    bool open = false;
-                    foreach (ITypeSymbol argument in named.TypeArguments)
-                    {
-                        if (argument is ITypeParameterSymbol)
-                        {
-                            open = true;
-                            break;
-                        }
-                    }
-
-                    if (!open)
+                    // Recursive, not a scan of the direct arguments. `Box<Wrapper<T>>` has no type
+                    // parameter among its own arguments -- `Wrapper<T>` is a named type -- yet T is
+                    // still unbound, and a registrar cannot name it. Recording it as closed emitted a
+                    // registration that fails the CONSUMER's build, which is a worse failure than the
+                    // missing registration it was trying to avoid.
+                    if (!IsOpen(named))
                     {
                         found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                     }
@@ -909,6 +912,44 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return found;
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="type"/> still mentions a type parameter anywhere within
+        /// it, at any depth.
+        /// </summary>
+        /// <param name="type">The type to inspect.</param>
+        /// <returns><c>true</c> when the type cannot be named as a closed construction.</returns>
+        private static bool IsOpen(ITypeSymbol type)
+        {
+            switch (type)
+            {
+                case ITypeParameterSymbol _:
+                    return true;
+                case IArrayTypeSymbol array:
+                    return IsOpen(array.ElementType);
+                case IPointerTypeSymbol pointer:
+                    return IsOpen(pointer.PointedAtType);
+                case INamedTypeSymbol named:
+                    // The containing type matters as much as the arguments: `Outer<T>.Inner<int>` has
+                    // only closed arguments of its own and still cannot be named.
+                    if (named.ContainingType != null && IsOpen(named.ContainingType))
+                    {
+                        return true;
+                    }
+
+                    foreach (ITypeSymbol argument in named.TypeArguments)
+                    {
+                        if (IsOpen(argument))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                default:
+                    return false;
+            }
         }
 
         private static List<Include> CollectIncludes(

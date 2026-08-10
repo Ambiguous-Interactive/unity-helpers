@@ -339,5 +339,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "before-serialization ran " + string.Join(", ", value.Trace)
             );
         }
+
+        [Test]
+        public void KeysTheSpecForbidsMatchTheOracleRatherThanBeingRefused()
+        {
+            // protobuf restricts map keys to the integral types, bool and string. protobuf-net does
+            // not, and THIS package's contract is byte-compatibility with protobuf-net -- so a float,
+            // double or enum key is encoded rather than rejected, and these are the bytes it has to
+            // produce. Measured, then asserted literally so a change is visible here.
+            Assert.AreEqual(
+                "0A070D0000C03F1002",
+                Encode(
+                    new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 1.5f, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "120B09000000000000F83F1002",
+                Encode(
+                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 1.5, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "1A0408071002",
+                Encode(
+                    new ExoticKeyContract
+                    {
+                        ByEnum = new Dictionary<MapKeyKind, int> { { MapKeyKind.Other, 2 } },
+                    }
+                )
+            );
+            Assert.AreEqual(
+                "220408011002",
+                Encode(new ExoticKeyContract { ByBool = new Dictionary<bool, int> { { true, 2 } } })
+            );
+        }
     }
 }

@@ -150,6 +150,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor SurrogateNotAContract =
+            new DiagnosticDescriptor(
+                "WPROTO016",
+                "WallstopProto surrogate is not a contract",
+                "[assembly: WProtoSurrogate(typeof({0}), typeof({1}))] names '{1}' as the surrogate for '{0}', but '{1}' is not a [WProtoContract]. A surrogate is what actually gets written, so it needs a formatter of its own; annotate '{1}' with [WProtoContract] and give its members [WProtoMember].",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor SurrogateCannotConvert =
+            new DiagnosticDescriptor(
+                "WPROTO017",
+                "WallstopProto surrogate cannot convert both ways",
+                "[assembly: WProtoSurrogate(typeof({0}), typeof({1}))] needs conversion operators in BOTH directions, and '{0}' to '{1}' or '{1}' to '{0}' is missing. A surrogate that cannot be converted back writes bytes that look correct and reads a value that never returns, so declare 'public static implicit operator {1}({0} value)' and its inverse on either type.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

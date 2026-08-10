@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System;
     using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
 
@@ -20,6 +21,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     {
         private const string SurrogateAttribute =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSurrogateAttribute";
+
+        private const string ContractAttribute =
+            "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute";
 
         private readonly Dictionary<INamedTypeSymbol, INamedTypeSymbol> _pairs;
 
@@ -82,15 +86,80 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Finds the surrogate for <paramref name="type"/>, or <c>null</c> when it has none.
+        /// Reports every pair declared by this compilation that cannot work, before anything is
+        /// emitted against it.
         /// </summary>
-        private INamedTypeSymbol Declared(ITypeSymbol type)
+        /// <param name="compilation">The compilation being generated for.</param>
+        /// <param name="report">Receives one diagnostic per unusable pair.</param>
+        /// <remarks>
+        /// <para>
+        /// Only the compilation's OWN attributes are checked. A pair from a referenced assembly was
+        /// validated when that assembly was built, and re-reporting it would blame a consumer for a
+        /// declaration it cannot edit -- while still failing their build on someone else's mistake.
+        /// </para>
+        /// <para>
+        /// Both failures are otherwise deferred to places that do not name the cause: a non-contract
+        /// surrogate compiles and then finds no formatter at runtime, and a missing conversion
+        /// surfaces as a cast error inside generated code the developer never wrote.
+        /// </para>
+        /// </remarks>
+        internal static void Validate(Compilation compilation, Action<Diagnostic> report)
         {
-            return
-                type is INamedTypeSymbol named
-                && _pairs.TryGetValue(named, out INamedTypeSymbol surrogate)
-                ? surrogate
-                : null;
+            foreach (AttributeData attribute in compilation.Assembly.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass == null
+                    || attribute.AttributeClass.ToDisplayString() != SurrogateAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                    || !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
+                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol surrogate)
+                )
+                {
+                    continue;
+                }
+
+                Location location =
+                    attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                    ?? Location.None;
+
+                if (!IsContract(surrogate))
+                {
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.SurrogateNotAContract,
+                            location,
+                            real.ToDisplayString(),
+                            surrogate.ToDisplayString()
+                        )
+                    );
+                    continue;
+                }
+
+                if (!ConvertsBothWays(real, surrogate))
+                {
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.SurrogateCannotConvert,
+                            location,
+                            real.ToDisplayString(),
+                            surrogate.ToDisplayString()
+                        )
+                    );
+                }
+            }
+        }
+
+        private static bool IsContract(INamedTypeSymbol type)
+        {
+            foreach (AttributeData attribute in type.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal INamedTypeSymbol For(ITypeSymbol type)

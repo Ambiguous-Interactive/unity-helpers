@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // A member typed as one of the contract's own type parameters cannot be given a wire
             // type here; the closure decides it. Checked first, because a type parameter is neither
             // a contract nor a collection and every later question would answer "unsupported".
-            GenericMember generic = GenericMember.TryCreate(name, tag, type);
+            GenericMember generic = GenericMember.TryCreate(name, tag, type, isRequired);
             if (generic != null)
             {
                 return generic;
