@@ -31,6 +31,73 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public static class WProtoFacade
     {
         /// <summary>
+        /// Serializes <paramref name="value"/> into <paramref name="buffer"/>, growing it only when
+        /// what is already there is too small.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="buffer">
+        /// The destination, reused in place when it is large enough and replaced with a larger array
+        /// when it is not. May be <c>null</c>. Left untouched when the request is not served.
+        /// </param>
+        /// <returns>
+        /// The number of bytes written, which may be less than <c>buffer.Length</c>; or <c>-1</c>
+        /// when WallstopProto does not serve <typeparamref name="T"/>.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// The allocation-free entry point, and the one a caller serializing every frame should use.
+        /// <see cref="TrySerialize{T}"/> hands back an array sized exactly to the payload, which
+        /// means a fresh allocation per call; this one lets a caller keep a single scratch buffer for
+        /// the lifetime of the program.
+        /// </para>
+        /// <para>
+        /// The length is the RETURN VALUE rather than the buffer's length, because a reused buffer is
+        /// almost never exactly the right size. Callers must slice to it -- writing
+        /// <c>buffer.Length</c> bytes to a file or socket would append whatever the previous, larger
+        /// message left behind.
+        /// </para>
+        /// <para>
+        /// <c>-1</c> rather than <c>0</c> for "not served", because <c>0</c> is a legitimate result:
+        /// an empty contract and a null root both encode to nothing (measured against protobuf-net).
+        /// Conflating them would silently write an empty payload for a type this serializer cannot
+        /// handle at all.
+        /// </para>
+        /// </remarks>
+        public static int Serialize<T>(T value, ref byte[] buffer)
+        {
+            if (
+                !CanServe(value)
+                || !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
+            )
+            {
+                return -1;
+            }
+
+            if (!typeof(T).IsValueType && value == null)
+            {
+                return 0;
+            }
+
+            int size = formatter.Measure(value);
+            if (buffer == null || buffer.Length < size)
+            {
+                buffer = new byte[size];
+            }
+
+            // Sliced to `size`, not handed the whole buffer: a reused buffer is longer than this
+            // message, and the writer's bounds checks are what stop a formatter from running past
+            // its own payload into the previous one's bytes.
+            WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size));
+            if (!formatter.Write(ref writer, value))
+            {
+                return -1;
+            }
+
+            return size;
+        }
+
+        /// <summary>
         /// Serializes <paramref name="value"/> when a formatter is registered for
         /// <typeparamref name="T"/>.
         /// </summary>
@@ -38,36 +105,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="value">The value to serialize.</param>
         /// <param name="bytes">Receives the payload, or <c>null</c> when unhandled.</param>
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
+        /// <remarks>
+        /// Allocates an array sized exactly to the payload. A caller that serializes repeatedly
+        /// should prefer <see cref="Serialize{T}"/>, which reuses a buffer it is given.
+        /// </remarks>
         public static bool TrySerialize<T>(T value, out byte[] bytes)
         {
-            if (
-                !CanServe(value)
-                || !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
-            )
+            // Starting from null is what makes the delegation exact: Serialize allocates precisely
+            // `size` when it has nothing to reuse, so the array handed back is never oversized and
+            // the caller does not need the written count to interpret it.
+            byte[] buffer = null;
+            int written = Serialize(value, ref buffer);
+
+            if (written < 0)
             {
                 bytes = null;
                 return false;
             }
 
-            // A null root is the empty payload and must never reach the formatter. Measure is where
-            // a generated formatter runs the before-serialization hook and reads every member, so
-            // handing it null turns a legal call into a NullReferenceException. Measured against
-            // protobuf-net 3.2.56: serializing a null root yields zero bytes and does not throw.
-            if (!typeof(T).IsValueType && value == null)
-            {
-                bytes = Array.Empty<byte>();
-                return true;
-            }
-
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            if (!formatter.Write(ref writer, value))
-            {
-                bytes = null;
-                return false;
-            }
-
-            bytes = buffer;
+            // A null root and an empty contract both encode to nothing, and neither allocates.
+            bytes = written == 0 ? Array.Empty<byte>() : buffer;
             return true;
         }
 

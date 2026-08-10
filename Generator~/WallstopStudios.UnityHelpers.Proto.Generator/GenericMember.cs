@@ -61,15 +61,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitMeasure(Writer writer)
         {
             writer.Line(
-                "size += "
-                    + Generic
-                    + ".MeasureField("
-                    + Tag
-                    + ", "
-                    + Access
-                    + ", "
-                    + Required
-                    + ");"
+                "size += ",
+                Generic,
+                ".MeasureField(",
+                Tag.ToString(),
+                ", ",
+                Access,
+                ", " + Required + ");"
             );
             writer.Blank();
         }
@@ -78,16 +76,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitWrite(Writer writer)
         {
             writer.Line(
-                "if (!"
-                    + Generic
-                    + ".WriteField(ref writer, "
-                    + Tag
-                    + ", "
-                    + Access
-                    + ", "
-                    + Required
-                    + "))"
-                    + Writer.Open
+                "if (!",
+                Generic,
+                ".WriteField(ref writer, ",
+                Tag.ToString(),
+                ", ",
+                Access,
+                ", " + Required + "))" + Writer.Open
             );
             writer.Indent();
             writer.Line("return false;");
@@ -103,8 +98,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            writer.Line("bool " + SeenFlag + " = false;");
-            writer.Line(_parameter + " " + Local + " = default(" + _parameter + ");");
+            writer.Line("bool ", SeenFlag, " = false;");
+            writer.Line(_parameter, " ", Local, " = default(", _parameter, ");");
         }
 
         /// <inheritdoc />

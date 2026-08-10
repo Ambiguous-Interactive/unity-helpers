@@ -59,5 +59,98 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out Uri _));
             Assert.IsFalse(WProtoFacade.TrySerialize(new Uri("https://example.com"), out byte[] _));
         }
+
+        [Test]
+        public void SerializingIntoABigEnoughBufferReusesItWithoutAllocating()
+        {
+            byte[] buffer = new byte[256];
+            byte[] original = buffer;
+
+            int written = WProtoFacade.Serialize(new ScalarContract { Int32 = 7 }, ref buffer);
+
+            Assert.Greater(written, 0);
+            Assert.AreSame(original, buffer, "a buffer with room to spare must not be replaced");
+            Assert.AreEqual(256, buffer.Length, "the buffer must not be trimmed to the payload");
+        }
+
+        [Test]
+        public void TheWrittenCountIsThePayloadLengthNotTheBufferLength()
+        {
+            // The property a caller has to respect: writing buffer.Length bytes would append
+            // whatever the previous, larger message left behind.
+            byte[] buffer = new byte[256];
+            int written = WProtoFacade.Serialize(new ScalarContract { Int32 = 7 }, ref buffer);
+
+            Assert.IsTrue(
+                WProtoFacade.TrySerialize(new ScalarContract { Int32 = 7 }, out byte[] exact)
+            );
+            Assert.AreEqual(exact.Length, written);
+            for (int index = 0; index < written; index++)
+            {
+                Assert.AreEqual(exact[index], buffer[index], "byte " + index);
+            }
+        }
+
+        [Test]
+        public void ATooSmallBufferIsGrownRatherThanOverrun()
+        {
+            byte[] buffer = new byte[1];
+            byte[] original = buffer;
+
+            int written = WProtoFacade.Serialize(
+                new ScalarContract { Text = "a string comfortably longer than one byte" },
+                ref buffer
+            );
+
+            Assert.Greater(written, 1);
+            Assert.AreNotSame(original, buffer);
+            Assert.GreaterOrEqual(buffer.Length, written);
+        }
+
+        [Test]
+        public void AnUnservedTypeReturnsMinusOneAndLeavesTheBufferAlone()
+        {
+            // -1 rather than 0, because 0 is a legitimate payload length: an empty contract and a
+            // null root both encode to nothing. A caller that treated "not served" as "empty" would
+            // silently persist zero bytes for a type this serializer never handled.
+            byte[] buffer = new byte[8];
+            byte[] original = buffer;
+
+            Assert.AreEqual(-1, WProtoFacade.Serialize(new Uri("https://example.com"), ref buffer));
+            Assert.AreSame(original, buffer);
+        }
+
+        [Test]
+        public void ANullRootWritesNothingAndAllocatesNothing()
+        {
+            byte[] buffer = null;
+
+            Assert.AreEqual(0, WProtoFacade.Serialize<ScalarContract>(null, ref buffer));
+            Assert.IsNull(buffer, "a null root has no payload, so it must not force an allocation");
+        }
+
+        [Test]
+        public void ReusingOneBufferAcrossDifferentSizesNeverLeaksTheOlderPayload()
+        {
+            // The failure this API makes possible if the count is ignored: a long message followed
+            // by a short one leaves stale bytes past the short one's end.
+            byte[] buffer = null;
+
+            int big = WProtoFacade.Serialize(
+                new ScalarContract { Text = "a considerably longer string value" },
+                ref buffer
+            );
+            int small = WProtoFacade.Serialize(new ScalarContract { Int32 = 1 }, ref buffer);
+
+            Assert.Less(small, big);
+            Assert.IsTrue(
+                WProtoFacade.TrySerialize(new ScalarContract { Int32 = 1 }, out byte[] exact)
+            );
+            Assert.AreEqual(exact.Length, small);
+            for (int index = 0; index < small; index++)
+            {
+                Assert.AreEqual(exact[index], buffer[index], "byte " + index);
+            }
+        }
     }
 }
