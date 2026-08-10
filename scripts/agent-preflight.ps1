@@ -1912,7 +1912,15 @@ if ($spellingTargets.Count -gt 0) {
         $spellingFileList = $null
         try {
             $spellingFileList = [System.IO.Path]::GetTempFileName()
-            Set-Content -LiteralPath $spellingFileList -Value $spellingTargets -Encoding UTF8
+            # ABSOLUTE paths, deliberately. cspell resolves --file-list entries relative to the
+            # LIST FILE's directory, not the working directory, and this list lives in the system
+            # temp directory -- so repo-relative entries became /tmp/<path>, every one was reported
+            # "File not found", and the step checked zero files while printing a clean summary.
+            # Measured: a misspelling in a changed C# file passed here and failed in CI.
+            $spellingAbsolute = @(
+                $spellingTargets | ForEach-Object { Join-Path -Path $repoRoot -ChildPath $_ }
+            )
+            Set-Content -LiteralPath $spellingFileList -Value $spellingAbsolute -Encoding UTF8
         }
         catch {
             Write-ErrorMsg "Failed to prepare temporary spelling file list: $($_.Exception.Message)"

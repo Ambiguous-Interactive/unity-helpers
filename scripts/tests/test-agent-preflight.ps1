@@ -218,7 +218,7 @@ function Add-FakeCspellPackage {
         [Parameter(Mandatory = $true)]
         [string]$RepoPath,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Pass', 'FailLint')]
+        [ValidateSet('Pass', 'FailLint', 'VerifyFileList')]
         [string]$Mode
     )
 
@@ -226,6 +226,41 @@ function Add-FakeCspellPackage {
     $binDir = Join-Path $RepoPath 'node_modules/cspell/bin'
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
     Set-Content -Path (Join-Path $RepoPath 'node_modules/cspell/package.json') -Value '{"bin":{"cspell":"bin/cspell.cjs"}}' -Encoding ascii
+    $verifyBody = @'
+  // The real cspell resolves --file-list entries relative to the LIST FILE, not the working
+  // directory. The preflight writes that list to the system temp directory, so repo-relative
+  // entries silently became /tmp/<path> and every file was skipped while the summary still read
+  // clean. Refusing an unresolvable entry here is what makes that regression fail the suite.
+  const fs = require("fs");
+  const path = require("path");
+  const index = process.argv.indexOf("--file-list");
+  if (index < 0 || !process.argv[index + 1]) {
+    console.error("cspell stub: expected --file-list");
+    process.exit(2);
+  }
+  const listPath = process.argv[index + 1];
+  const listDir = path.dirname(path.resolve(listPath));
+  const entries = fs
+    .readFileSync(listPath, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (entries.length === 0) {
+    console.error("cspell stub: the file list was empty");
+    process.exit(2);
+  }
+  for (const entry of entries) {
+    const resolved = path.isAbsolute(entry) ? entry : path.join(listDir, entry);
+    if (!fs.existsSync(resolved)) {
+      console.error("cspell stub: file list entry does not resolve: " + resolved);
+      process.exit(2);
+    }
+  }
+  process.exit(0);
+'@
+
+    $lintBody = if ($Mode -eq 'VerifyFileList') { $verifyBody } else { "  process.exit(__EXIT_CODE__);" }
+
     $script = @'
 #!/usr/bin/env node
 if (process.argv.includes("--version")) {
@@ -233,10 +268,11 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 if (process.argv.includes("lint")) {
-  process.exit(__EXIT_CODE__);
+__LINT_BODY__
 }
 process.exit(0);
 '@
+    $script = $script.Replace('__LINT_BODY__', $lintBody)
     $script = $script.Replace('__EXIT_CODE__', $exitCode)
     Set-Content -Path (Join-Path $binDir 'cspell.cjs') -Value $script -Encoding ascii
 }
@@ -704,6 +740,25 @@ try {
 }
 finally {
     Remove-Item -Path $repo8 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Test 8c: the file list handed to cspell must actually resolve
+Write-Host "`nTest group: spelling file list resolves" -ForegroundColor Magenta
+$repo8c = New-TestRepo -ConfigurePushDefaults
+try {
+    Set-Content -Path (Join-Path $repo8c 'README.md') -Value 'File list resolution.' -Encoding UTF8
+    Add-FakePrettierPackage -RepoPath $repo8c
+    Add-FakeMarkdownlintPackage -RepoPath $repo8c
+    Add-FakeCspellPackage -RepoPath $repo8c -Mode VerifyFileList
+    $result8c = Invoke-Preflight -RepoPath $repo8c -Arguments @('-Paths', 'README.md')
+
+    # Before the fix this failed: the list lived in the system temp directory and held repo-relative
+    # paths, so cspell resolved every one against /tmp, skipped them all, and still printed a clean
+    # summary. A misspelling in a changed file passed the local gate and failed in CI.
+    Write-TestResult 'SpellingFileList_Resolves' ($result8c.ExitCode -eq 0) "The spelling file list did not resolve. Output: $($result8c.Output)"
+}
+finally {
+    Remove-Item -Path $repo8c -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 8b: -Fix should add missing Markdown fence languages before markdownlint is the last resort
