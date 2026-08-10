@@ -435,3 +435,7 @@ pr-description.md*
 test-results*
 .artifacts/
 .artifacts.meta
+
+# Local Unity type-check harness build output (Generator~ is invisible to Unity).
+Generator~/WallstopStudios.UnityHelpers.TypeCheck/bin/
+Generator~/WallstopStudios.UnityHelpers.TypeCheck/obj/

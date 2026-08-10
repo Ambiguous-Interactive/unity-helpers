@@ -189,6 +189,7 @@
     "test:read-stdin-sync": "node scripts/tests/test-read-stdin-sync.js",
     "test:analyzer-placement": "node scripts/tests/test-analyzer-placement.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
+    "typecheck:unity": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v quiet",
     "test:validate-git-push-config": "pwsh -NoProfile -File scripts/tests/test-validate-git-push-config.ps1 -VerboseOutput",
     "test:validate-lint-error-codes": "pwsh -NoProfile -File scripts/tests/test-validate-lint-error-codes.ps1 -VerboseOutput",
     "test:precommit-integration": "bash scripts/tests/test-precommit-integration.sh",
