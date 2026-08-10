@@ -595,13 +595,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     tag,
                     type,
                     NamedFlag(attribute, "IsRequired"),
-                    NamedFlag(attribute, "OverwriteList")
+                    NamedFlag(attribute, "OverwriteList"),
+                    out bool ambiguous
                 );
                 if (member == null)
                 {
                     Report(
                         context,
-                        WProtoDiagnostics.UnsupportedMemberType,
+                        ambiguous
+                            ? WProtoDiagnostics.AmbiguousListContract
+                            : WProtoDiagnostics.UnsupportedMemberType,
                         symbol,
                         contract.Name,
                         symbol.Name,

@@ -111,6 +111,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor AmbiguousListContract =
+            new DiagnosticDescriptor(
+                "WPROTO012",
+                "WallstopProto cannot tell whether this member is a message or a collection",
+                "'{0}.{1}' has type '{2}', which is both a [WProtoContract] and a collection, and nothing says which encoding it should get. Writing it as a repeated field discards its [WProtoMember]s; writing it as a message discards its elements. Set [WProtoContract(IgnoreListHandling = true)] on '{2}' to write it as a message, or remove [WProtoContract] from it to write it as a repeated field.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

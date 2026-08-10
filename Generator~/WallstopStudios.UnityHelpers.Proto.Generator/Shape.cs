@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
 
     /// <summary>
@@ -302,9 +303,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal static bool IsContract(ITypeSymbol type)
         {
-            if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
+            return FindContractAttribute(type) != null;
+        }
+
+        /// <summary>
+        /// Reports whether the contract on <paramref name="type"/> sets <c>IgnoreListHandling</c>,
+        /// which declares it a message even though it is also a collection.
+        /// </summary>
+        internal static bool IgnoresListHandling(ITypeSymbol type)
+        {
+            AttributeData contract = FindContractAttribute(type);
+            if (contract == null)
             {
                 return false;
+            }
+
+            foreach (KeyValuePair<string, TypedConstant> argument in contract.NamedArguments)
+            {
+                if (argument.Key == "IgnoreListHandling" && argument.Value.Value is bool ignore)
+                {
+                    return ignore;
+                }
+            }
+
+            return false;
+        }
+
+        private static AttributeData FindContractAttribute(ITypeSymbol type)
+        {
+            if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
+            {
+                return null;
             }
 
             foreach (AttributeData attribute in type.GetAttributes())
@@ -315,11 +344,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         == "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute"
                 )
                 {
-                    return true;
+                    return attribute;
                 }
             }
 
-            return false;
+            return null;
         }
 
         private static Shape Integer(string qualified, bool exact)

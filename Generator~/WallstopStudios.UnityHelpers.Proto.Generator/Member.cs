@@ -44,15 +44,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="type">The member's declared type.</param>
         /// <param name="isRequired">Whether <c>IsRequired</c> was set.</param>
         /// <param name="overwriteList">Whether <c>OverwriteList</c> was set.</param>
+        /// <param name="ambiguous">
+        /// Set when the type is both a contract and a collection and nothing says which it is, so
+        /// the caller reports <c>WPROTO012</c> rather than "unsupported".
+        /// </param>
+        /// <remarks>
+        /// The order of these three questions is the whole encoding decision for a type that is both
+        /// a message and a collection -- <c>Deque</c>, <c>CyclicBuffer</c>, <c>SparseSet</c>,
+        /// <c>BitSet</c> and the four <c>Serializable*</c> collections are all exactly that. Reading
+        /// one as a repeated field silently discards its <c>[WProtoMember]</c>s; reading it as a
+        /// message silently discards its elements. protobuf-net resolves it by letting list handling
+        /// win unless <c>IgnoreListHandling</c> is set, which is why that flag exists on eight of
+        /// this package's own contracts. Guessing is refused here instead.
+        /// </remarks>
         internal static Member Create(
             string contractName,
             string name,
             int tag,
             ITypeSymbol type,
             bool isRequired,
-            bool overwriteList
+            bool overwriteList,
+            out bool ambiguous
         )
         {
+            ambiguous = false;
+
+            bool isContract = Shape.IsContract(type);
+            if (isContract && Shape.IgnoresListHandling(type))
+            {
+                // Explicitly a message, whatever interfaces it implements.
+                return ScalarMember.TryCreate(name, tag, type, isRequired);
+            }
+
             RepeatedMember repeated = RepeatedMember.TryCreate(
                 contractName,
                 name,
@@ -60,12 +83,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 type,
                 overwriteList
             );
-            if (repeated != null)
+            if (repeated == null)
             {
-                return repeated;
+                return ScalarMember.TryCreate(name, tag, type, isRequired);
             }
 
-            return ScalarMember.TryCreate(name, tag, type, isRequired);
+            if (isContract)
+            {
+                ambiguous = true;
+                return null;
+            }
+
+            return repeated;
         }
 
         /// <summary>Appends this member's contribution to the formatter's <c>Measure</c>.</summary>

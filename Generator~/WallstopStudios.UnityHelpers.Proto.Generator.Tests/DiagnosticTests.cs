@@ -107,6 +107,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ATypeThatIsBothAMessageAndACollectionIsRefusedRatherThanGuessedAt()
+        {
+            // Eight of this package's own contracts are exactly this shape -- Deque, CyclicBuffer,
+            // SparseSet, BitSet and the four Serializable* collections all carry
+            // [ProtoContract(IgnoreListHandling = true)] today. Reading one as a repeated field
+            // silently discards its [WProtoMember]s; reading it as a message silently discards its
+            // elements. protobuf-net picks list handling and needs a flag to be told otherwise;
+            // this refuses to pick.
+            AssertDiagnostic(
+                "WPROTO012",
+                "Items",
+                @"[WProtoContract] public sealed partial class Bag : System.Collections.Generic.List<int>
+                  {
+                      [WProtoMember(1)] public int Capacity;
+                  }
+
+                  [WProtoContract] public sealed partial class Holder
+                  {
+                      [WProtoMember(1)] public Bag Items;
+                  }"
+            );
+        }
+
+        [Test]
+        public void IgnoreListHandlingResolvesTheAmbiguityTowardsAMessage()
+        {
+            AssertNoDiagnostics(
+                @"[WProtoContract(IgnoreListHandling = true)] public sealed partial class Bag : System.Collections.Generic.List<int>
+                  {
+                      [WProtoMember(1)] public int Capacity;
+                  }
+
+                  [WProtoContract] public sealed partial class Holder
+                  {
+                      [WProtoMember(1)] public Bag Items;
+                  }"
+            );
+        }
+
+        [Test]
         public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
         {
             // The assumption being refused: nothing about ICollection<T> requires a class, and an
