@@ -911,9 +911,9 @@ nothing needs registering: a `[WProtoContract]` in your code gets a nested `WPro
 entry in a generated registrar that runs at `RuntimeInitializeLoadType.BeforeSceneLoad`.
 
 Supported member types today are the integer and floating-point primitives, `bool`, `string`,
-`byte[]`, enums, and `Nullable<T>` of any of those. Anything else is a **build error naming the type,
-the member and the remedy**, never a silent skip — a contract that quietly got no formatter would
-surface as an exception from the first save in a shipped player:
+`byte[]`, enums, another `[WProtoContract]` type, and `Nullable<T>` of any of those. Anything else is
+a **build error naming the type, the member and the remedy**, never a silent skip — a contract that
+quietly got no formatter would surface as an exception from the first save in a shipped player:
 
 | Code        | Meaning                                                                              |
 | ----------- | ------------------------------------------------------------------------------------ |
@@ -929,8 +929,38 @@ surface as an exception from the first save in a shipped player:
 | `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
 | `WPROTO011` | A class contract has no parameterless constructor to read into                       |
 
-Two shapes are deliberately still out of scope and report a diagnostic rather than guessing: a member
-whose type is another contract, and a generic contract.
+A generic contract is still out of scope and reports `WPROTO009` rather than guessing.
+
+#### Contracts that hold other contracts
+
+A `[WProtoMember]` whose type is another contract is written as a nested message, and a contract may
+refer to itself, so a linked list or a tree serializes without a hand-written formatter:
+
+```csharp
+[WProtoContract]
+public sealed partial class Inventory
+{
+    [WProtoMember(1)]
+    public int Gold;
+
+    [WProtoMember(2)]
+    public Loadout Equipped;   // another [WProtoContract]
+}
+```
+
+Three behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
+
+- **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length —
+  the same distinction an empty `string` draws.
+- **A struct sub-message is always written**, even when every member equals its default. protobuf-net
+  does the same, and matching it is what keeps saved data readable.
+- **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so
+  a `[WProtoBeforeSerialization]` hook that rents pooled scratch releases it exactly once.
+
+Nesting is bounded at `WProtoReader.MaxNestingDepth` (64) when writing and measuring as well as when
+reading. A graph deeper than that — in practice, one containing a cycle — throws an
+`InvalidOperationException` naming the type, because a cyclic message has no finite encoded size and
+the alternative is a stack overflow, which cannot be caught.
 
 ### Resolving a formatter
 
