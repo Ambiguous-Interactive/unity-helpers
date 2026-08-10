@@ -523,8 +523,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Blank();
                 // Last include wins. A payload naming two sibling subtypes is nonsense either way,
                 // and this is the branch where protobuf-net 3.2.56 recurses until the stack runs
-                // out -- an uncatchable crash from an untrusted save file. A plain assignment
-                // cannot.
+                // out -- a crash that cannot be caught, from an untrusted save file. A plain
+                // assignment cannot.
                 writer.Line("read = " + include.Local + ";");
                 writer.Line("break;");
                 writer.Outdent();
