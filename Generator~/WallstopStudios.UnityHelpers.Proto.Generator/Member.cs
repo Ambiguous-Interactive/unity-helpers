@@ -44,6 +44,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         protected string Name { get; }
 
+        /// <summary>
+        /// The member's declared type, fully qualified — needed by a contract that has to be built
+        /// through a constructor rather than assigned member by member.
+        /// </summary>
+        internal string DeclaredType { get; set; }
+
+        /// <summary>
+        /// The local a deferred read holds this member in before the instance exists.
+        /// </summary>
+        internal string ReadLocal => "value" + Tag;
+
+        /// <summary>The member's own name, for a constructor parameter list.</summary>
+        internal string MemberName => Name;
+
+        /// <summary>
+        /// Whether this member cannot be assigned after construction -- a <c>readonly</c> field, or
+        /// a property with no setter.
+        /// </summary>
+        /// <remarks>
+        /// One of these anywhere on a contract switches the whole contract to being built through a
+        /// generated constructor, because C# allows a readonly field to be assigned only there. That
+        /// keeps the type's immutability intact instead of asking its author to give it up.
+        /// </remarks>
+        internal bool RequiresConstruction { get; set; }
+
+        /// <summary>
+        /// Whether the contract is built by a constructor once every member has been read, which
+        /// means no member may be assigned onto the instance and none may seed from it.
+        /// </summary>
+        internal bool ConstructAtEnd { get; set; }
+
         /// <summary>The member access on the value being written.</summary>
         protected string Access => "value." + Name;
 

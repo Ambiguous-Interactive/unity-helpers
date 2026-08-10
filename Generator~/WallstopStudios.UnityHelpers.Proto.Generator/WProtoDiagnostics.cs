@@ -140,6 +140,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor ImmutableWithIncludes =
+            new DiagnosticDescriptor(
+                "WPROTO015",
+                "WallstopProto cannot combine immutable members with subtypes",
+                "'{0}' has a member that cannot be assigned after construction AND declares [WProtoInclude]. The first needs the instance built once every value is read; the second replaces the instance when an include tag arrives. Give the member a setter, or move the polymorphism to a type whose members are assignable.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

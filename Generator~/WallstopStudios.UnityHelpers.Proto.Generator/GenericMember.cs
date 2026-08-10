@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string Generic => Proto + ".WProtoGeneric<" + _parameter + ">";
 
-        private string Local => "value" + Tag;
+        private string Local => ReadLocal;
 
         private string SeenFlag => "seen" + Tag;
 
@@ -81,6 +81,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitReadEpilogue(Writer writer)
         {
             if (!Deferred)
+            {
+                return;
+            }
+
+            if (ConstructAtEnd)
             {
                 return;
             }

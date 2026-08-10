@@ -1126,6 +1126,37 @@ A contract **nested inside** a generic type is still refused (`WPROTO009`): it i
 so there is no construction of it to discover, and its formatter would be emitted and never
 registered. Move it out, or make it generic itself.
 
+#### Immutable contracts
+
+A contract may keep its `readonly` fields and get-only properties:
+
+```csharp
+[WProtoContract]
+public readonly partial struct Coordinate
+{
+    [WProtoMember(1)] public readonly int X;
+    [WProtoMember(2)] public readonly int Y;
+}
+```
+
+C# permits a `readonly` field to be assigned only by a constructor of its declaring type — a nested
+formatter is not enough. But the generator reopens the contract as `partial`, so it emits a **private
+constructor there**, and the formatter builds the value once every member has been read. Your type
+keeps the immutability you chose and gains no public surface.
+
+The generated constructor takes a `WProtoConstruct` marker as its first parameter purely so it cannot
+collide with one you wrote yourself — a two-field type very plausibly has its own `(int, int)`
+constructor, and both continue to exist.
+
+Two consequences worth knowing:
+
+- **A `[WProtoBeforeDeserialization]` hook runs after construction**, because for a type whose members
+  _are_ its construction there is no earlier moment. Nothing is assigned after it, since nothing can
+  be.
+- **Immutable members and `[WProtoInclude]` cannot be combined** (`WPROTO015`). One needs the instance
+  built once the last member is read; the other replaces the instance when an include tag arrives.
+  The generator refuses rather than picking.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

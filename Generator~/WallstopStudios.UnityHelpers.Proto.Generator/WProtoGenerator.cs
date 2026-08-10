@@ -221,12 +221,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // Every member of a polymorphic contract reads into a local and is assigned after the
-            // loop: an include tag can replace the instance, and protobuf-net allows that tag in
-            // either position even though it always writes it first.
+            // Two reasons a member reads into a local and is committed after the loop. A polymorphic
+            // contract can have its instance replaced by an include tag, which protobuf-net allows
+            // in either position. And a contract with a `readonly` member cannot be assigned at all
+            // -- it has to be BUILT -- so every value has to be in hand before construction.
+            bool constructAtEnd = false;
             foreach (Member member in members)
             {
-                member.Deferred = 0 < includes.Count;
+                constructAtEnd |= member.RequiresConstruction;
+            }
+
+            if (constructAtEnd && 0 < includes.Count)
+            {
+                // Both mechanisms want to own the instance: one replaces it when an include arrives,
+                // the other cannot create it until the last member is read. Refusing beats picking.
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.ImmutableWithIncludes,
+                        contract.Locations.FirstOrDefault(),
+                        contract.Name
+                    )
+                );
+                return null;
+            }
+
+            foreach (Member member in members)
+            {
+                member.Deferred = constructAtEnd || 0 < includes.Count;
+                member.ConstructAtEnd = constructAtEnd;
             }
 
             Hooks hooks = CollectHooks(context, contract);
@@ -310,7 +332,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Indent();
             }
 
-            EmitFormatter(writer, contract, qualified, members, includes, hooks);
+            if (constructAtEnd)
+            {
+                EmitConstructor(writer, contract, members);
+                writer.Blank();
+            }
+
+            EmitFormatter(writer, contract, qualified, members, includes, hooks, constructAtEnd);
 
             foreach (INamedTypeSymbol unused in nesting)
             {
@@ -333,7 +361,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string qualified,
             List<Member> members,
             List<Include> includes,
-            Hooks hooks
+            Hooks hooks,
+            bool constructAtEnd
         )
         {
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
@@ -356,7 +385,66 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
             EmitWrite(writer, contract, qualified, members, includes, hooks);
             writer.Blank();
-            EmitRead(writer, contract, qualified, members, includes, hooks);
+            EmitRead(writer, contract, qualified, members, includes, hooks, constructAtEnd);
+
+            writer.Outdent();
+            writer.Line("}");
+        }
+
+        /// <summary>
+        /// Emits a private constructor that assigns every member, for a contract that cannot be
+        /// assigned after construction.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is what lets a type keep <c>readonly</c> fields and still be read. C# permits a
+        /// readonly field to be assigned only in a constructor of its declaring type -- a nested
+        /// formatter is not enough, but the generator reopens the contract as <c>partial</c>, and a
+        /// constructor emitted there IS one. No public surface changes: the constructor is private,
+        /// and the type keeps the immutability its author chose.
+        /// </para>
+        /// <para>
+        /// The <c>WProtoConstruct</c> first parameter exists only so the signature cannot collide
+        /// with a constructor the author already wrote -- a two-int type very plausibly has an
+        /// <c>(int, int)</c> constructor of its own.
+        /// </para>
+        /// <para>
+        /// A struct assigns <c>this = default</c> first, because C# requires every field to be
+        /// definitely assigned and a contract may hold fields no <c>[WProtoMember]</c> covers.
+        /// </para>
+        /// </remarks>
+        private static void EmitConstructor(
+            Writer writer,
+            INamedTypeSymbol contract,
+            List<Member> members
+        )
+        {
+            writer.Line(
+                "/// <summary>Generated WallstopProto constructor. Do not edit or call.</summary>"
+            );
+
+            StringBuilder parameters = new StringBuilder(Proto + ".WProtoConstruct wprotoMarker");
+            foreach (Member member in members)
+            {
+                parameters.Append(", ");
+                parameters.Append(member.DeclaredType);
+                parameters.Append(" wproto_");
+                parameters.Append(member.MemberName);
+            }
+
+            writer.Line("private " + contract.Name + "(" + parameters + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line("_ = wprotoMarker;");
+
+            if (contract.IsValueType)
+            {
+                writer.Line("this = default(" + contract.Name + ");");
+            }
+
+            foreach (Member member in members)
+            {
+                writer.Line("this." + member.MemberName + " = wproto_" + member.MemberName + ";");
+            }
 
             writer.Outdent();
             writer.Line("}");
@@ -473,7 +561,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string qualified,
             List<Member> members,
             List<Include> includes,
-            Hooks hooks
+            Hooks hooks,
+            bool constructAtEnd
         )
         {
             writer.Line("/// <inheritdoc />");
@@ -489,7 +578,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             bool polymorphic = 0 < includes.Count;
 
-            if (contract.IsValueType)
+            if (constructAtEnd)
+            {
+                // Deliberately not created here: a readonly member can only be assigned by a
+                // constructor, so there is nothing to assign onto until the last value is in hand.
+                writer.Line(qualified + " read = default(" + qualified + ");");
+            }
+            else if (contract.IsValueType)
             {
                 writer.Line(qualified + " read = default(" + qualified + ");");
             }
@@ -505,7 +600,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(qualified + " read = new " + qualified + "();");
             }
 
-            if (hooks.BeforeDeserialization != null && !polymorphic)
+            if (hooks.BeforeDeserialization != null && !polymorphic && !constructAtEnd)
             {
                 writer.Line("read." + hooks.BeforeDeserialization + "();");
             }
@@ -621,6 +716,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (Member member in members)
             {
                 member.EmitReadEpilogue(writer);
+            }
+
+            if (constructAtEnd)
+            {
+                StringBuilder arguments = new StringBuilder(
+                    "default(" + Proto + ".WProtoConstruct)"
+                );
+                foreach (Member member in members)
+                {
+                    arguments.Append(", ");
+                    arguments.Append(member.ReadLocal);
+                }
+
+                writer.Line("read = new " + qualified + "(" + arguments + ");");
+                writer.Blank();
+
+                if (hooks.BeforeDeserialization != null)
+                {
+                    // The instance did not exist any earlier, so this is the first moment the hook
+                    // could run. Its contract -- "after the instance exists, before any member is
+                    // assigned" -- cannot be honoured literally for a type whose members ARE its
+                    // construction; the closest true statement is that nothing has been assigned
+                    // since, because nothing can be.
+                    writer.Line("read." + hooks.BeforeDeserialization + "();");
+                    writer.Blank();
+                }
             }
 
             if (hooks.AfterDeserialization != null)
@@ -1030,19 +1151,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (!assignable)
-                {
-                    Report(
-                        context,
-                        WProtoDiagnostics.MemberNotAssignable,
-                        symbol,
-                        contract.Name,
-                        symbol.Name
-                    );
-                    failed = true;
-                    continue;
-                }
-
                 Member member = Member.Create(
                     contract.Name,
                     symbol.Name,
@@ -1069,6 +1177,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                member.DeclaredType = type.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat
+                );
+                member.RequiresConstruction = !assignable;
                 claimed[tag] = symbol.Name;
                 members.Add(member);
             }

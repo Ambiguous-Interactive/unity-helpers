@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _declared = declared;
         }
 
-        private string Local => "value" + Tag;
+        private string Local => ReadLocal;
 
         private string SeenFlag => "seen" + Tag;
 
@@ -159,6 +159,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (!Deferred)
             {
+                return;
+            }
+
+            if (ConstructAtEnd)
+            {
+                // The constructor takes this local directly; there is no instance to assign onto.
                 return;
             }
 

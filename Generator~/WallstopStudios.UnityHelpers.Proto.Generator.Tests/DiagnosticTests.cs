@@ -294,14 +294,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void AReadOnlyMemberIsAnError()
+        public void AnImmutableContractIsAccepted()
         {
-            AssertDiagnostic(
-                "WPROTO007",
-                "Value",
+            // Refused until this session. A readonly field can only be assigned by a constructor of
+            // its declaring type -- and the generator reopens the contract as partial, so it emits
+            // one there. The type keeps its immutability and gains no public surface.
+            AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Frozen
                   {
                       [WProtoMember(1)] public readonly int Value;
+                      [WProtoMember(2)] public string Name { get; }
+                      [WProtoMember(3)] public readonly int[] Marks;
+                      public Frozen() { }
                   }"
             );
         }

@@ -467,6 +467,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // append onto a constructor value that is about to be discarded. Elements are
                 // collected on their own and combined in the epilogue, once the instance is final.
                 writer.Line(PendingType + " " + Pending + " = null;");
+                if (ConstructAtEnd)
+                {
+                    writer.Line(
+                        DeclaredType + " " + ReadLocal + " = default(" + DeclaredType + ");"
+                    );
+                }
+
                 return;
             }
 
@@ -673,7 +680,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            writer.Line("read." + Name + " = " + Accumulator + (_isArray ? ".ToArray();" : ";"));
+            writer.Line(
+                (ConstructAtEnd ? ReadLocal : "read." + Name)
+                    + " = "
+                    + Accumulator
+                    + (_isArray ? ".ToArray();" : ";")
+            );
             Close(writer);
             writer.Blank();
         }
@@ -685,7 +697,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string fresh = "new " + AccumulatorType + "()";
 
-            if (_overwrite)
+            // A contract built by a constructor has no instance to append onto: the formatter never
+            // runs the author's constructor, so there is no seeded collection to preserve.
+            if (_overwrite || ConstructAtEnd)
             {
                 return fresh;
             }

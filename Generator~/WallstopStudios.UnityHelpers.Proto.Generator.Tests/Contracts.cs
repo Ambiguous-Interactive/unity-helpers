@@ -852,4 +852,77 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>A message closure, so the sub-message path is covered too.</summary>
         public static Box<Outer.Point> Points;
     }
+
+    /// <summary>
+    /// An immutable contract: every serialized member is <c>readonly</c>.
+    /// </summary>
+    /// <remarks>
+    /// The shape thirty of this package's serialized fields have -- <c>FastVector2Int.x</c>,
+    /// <c>Line2D.from</c>, <c>ImmutableBitSet._bits</c> and the rest. protobuf-net assigns them by
+    /// reflection; this generator cannot, so it emits a private constructor into the contract's
+    /// partial declaration instead. The type keeps its immutability and gains no public surface.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public readonly partial struct ImmutablePoint
+    {
+        /// <summary>A readonly scalar.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly int X;
+
+        /// <summary>A second one, so the constructor takes more than one argument.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly int Y;
+
+        /// <summary>A readonly length-delimited member.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public readonly string Label;
+
+        /// <summary>A readonly collection, which takes the repeated path.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public readonly int[] Marks;
+
+        /// <summary>The author's own constructor, which the generated one must not collide with.</summary>
+        /// <param name="x">The first component.</param>
+        /// <param name="y">The second component.</param>
+        public ImmutablePoint(int x, int y)
+        {
+            X = x;
+            Y = y;
+            Label = null;
+            Marks = null;
+        }
+    }
+
+    /// <summary>An immutable reference contract, so the class path is covered too.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class ImmutableRecord
+    {
+        /// <summary>A get-only property, which is equally unassignable.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int Id { get; }
+
+        /// <summary>A readonly field.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly string Name;
+
+        /// <summary>
+        /// A readonly collection on a REFERENCE contract, which is the case that crashes if the
+        /// seed reaches for an instance that does not exist yet: `read` is null until the
+        /// constructor runs, so seeding from `read.Tags` dereferences it.
+        /// </summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public readonly int[] Tags;
+
+        /// <summary>protobuf-net needs one; the generated constructor is separate.</summary>
+        public ImmutableRecord() { }
+    }
 }

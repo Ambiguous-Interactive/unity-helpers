@@ -370,6 +370,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (Deferred)
             {
                 writer.Line(PendingType + " " + Accumulator + " = null;");
+                if (ConstructAtEnd)
+                {
+                    writer.Line(
+                        DeclaredType + " " + ReadLocal + " = default(" + DeclaredType + ");"
+                    );
+                }
+
                 return;
             }
 
@@ -597,11 +604,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Indent();
                 writer.Line(target + "[" + KeyAccess + "] = " + ValueAccess + ";");
                 Close(writer);
-                writer.Line("read." + Name + " = " + target + ";");
+                writer.Line((ConstructAtEnd ? ReadLocal : "read." + Name) + " = " + target + ";");
             }
             else
             {
-                writer.Line("read." + Name + " = " + Accumulator + ";");
+                writer.Line(
+                    (ConstructAtEnd ? ReadLocal : "read." + Name) + " = " + Accumulator + ";"
+                );
             }
 
             Close(writer);
