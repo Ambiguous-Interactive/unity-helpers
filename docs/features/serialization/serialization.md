@@ -948,7 +948,7 @@ public sealed partial class Inventory
 }
 ```
 
-Three behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
+Four behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
 
 - **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length —
   the same distinction an empty `string` draws.
@@ -956,6 +956,9 @@ Three behaviors are worth knowing, because two of them are the opposite of the r
   does the same, and matching it is what keeps saved data readable.
 - **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so
   a `[WProtoBeforeSerialization]` hook that rents pooled scratch releases it exactly once.
+- **`IsRequired` does not make a null appear.** It forces a value equal to its default onto the wire —
+  a `0` int, a `default` struct sub-message — but a `null` string, `byte[]` or message reference is
+  still absent, which is what protobuf-net does.
 
 Nesting is bounded at `WProtoReader.MaxNestingDepth` (64) when writing and measuring as well as when
 reading. A graph deeper than that — in practice, one containing a cycle — throws an

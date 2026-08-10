@@ -408,9 +408,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int payloadStart = _position;
+            bool written;
             _depth++;
-            bool written = formatter.Write(ref this, value);
-            _depth--;
+            try
+            {
+                written = formatter.Write(ref this, value);
+            }
+            finally
+            {
+                // A formatter is contractually not allowed to throw, but this writer can outlive one
+                // that does: a caller may catch and keep writing, and a depth left one too high
+                // silently lowers the nesting bound for the rest of the message.
+                _depth--;
+            }
+
             if (!written || _faulted)
             {
                 _faulted = true;
@@ -418,8 +429,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int length = _position - payloadStart;
+
+            // Structurally unreachable -- nothing decrements _position, and it is private -- but the
+            // cast below is what makes it worth a branch rather than a comment: a negative length
+            // becomes a huge uint, which yields a five-byte prefix and a Slice far past the payload.
+            // That is a memory-safety failure, not a wrong number, so it is refused rather than
+            // trusted.
+            if (length < 0)
+            {
+                _faulted = true;
+                return false;
+            }
+
             int prefixSize = WProtoSizes.Varint32Size((uint)length);
-            if (prefixSize != 1)
+
+            // Directional, not `!= 1`. Varint32Size never returns 0, but if it ever did, `!= 1`
+            // would compute extra = -1 and shift the payload LEFT over its own length prefix --
+            // silent corruption. `1 < prefixSize` can only ever widen.
+            if (1 < prefixSize)
             {
                 int extra = prefixSize - 1;
                 if (extra > _buffer.Length - _position)

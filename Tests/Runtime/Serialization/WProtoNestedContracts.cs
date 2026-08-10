@@ -74,6 +74,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public int Trailer;
     }
 
+    /// <summary>A contract with no members, so a present one is a key and a zero length.</summary>
+    [WProtoContract]
+    public sealed partial class WProtoEmptyContract { }
+
+    /// <summary>
+    /// Every shape that can carry <c>IsRequired</c>, so what it forces can be pinned.
+    /// </summary>
+    /// <remarks>
+    /// The reference members are the interesting ones. <c>IsRequired</c> forces a value that equals
+    /// its default onto the wire; it does not invent one for a <c>null</c>. Reading it as "always
+    /// present" writes an empty string where protobuf-net wrote nothing, and hands the nested
+    /// formatter's <c>Measure</c> a null to dereference -- an exception from the first save in a
+    /// shipped player, which is the failure mode this whole serializer exists to remove.
+    /// </remarks>
+    [WProtoContract]
+    public sealed partial class WProtoRequiredContract
+    {
+        /// <summary>A value type, written even at its default.</summary>
+        [WProtoMember(1, IsRequired = true)]
+        public int Number;
+
+        /// <summary>A reference sub-message, absent when null.</summary>
+        [WProtoMember(2, IsRequired = true)]
+        public WProtoEmptyContract Message;
+
+        /// <summary>A string, absent when null and present when empty.</summary>
+        [WProtoMember(3, IsRequired = true)]
+        public string Text;
+
+        /// <summary>Bytes, absent when null and present when empty.</summary>
+        [WProtoMember(4, IsRequired = true)]
+        public byte[] Bytes;
+    }
+
     /// <summary>
     /// A contract that refers to itself: a legal schema whose measurement is unbounded unless
     /// something bounds it.

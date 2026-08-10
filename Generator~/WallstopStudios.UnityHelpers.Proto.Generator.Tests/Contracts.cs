@@ -193,6 +193,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public int Trailer;
     }
 
+    /// <summary>A contract with no members, so a present one is a key and a zero length.</summary>
+    [WProtoContract]
+    public sealed partial class EmptyContract { }
+
+    /// <summary>Every shape that can carry <c>IsRequired</c>, so what it forces can be pinned.</summary>
+    [WProtoContract]
+    public sealed partial class RequiredContract
+    {
+        [WProtoMember(1, IsRequired = true)]
+        public int Number;
+
+        [WProtoMember(2, IsRequired = true)]
+        public EmptyContract Message;
+
+        [WProtoMember(3, IsRequired = true)]
+        public string Text;
+
+        [WProtoMember(4, IsRequired = true)]
+        public byte[] Bytes;
+
+        [WProtoMember(5, IsRequired = true)]
+        public Outer.Point Where;
+
+        [WProtoMember(6, IsRequired = true)]
+        public double? Ratio;
+    }
+
     /// <summary>
     /// A contract that refers to itself: a legal schema, and one whose measurement is unbounded
     /// unless something bounds it.

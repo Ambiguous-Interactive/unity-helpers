@@ -303,6 +303,17 @@ Four rules, with worked examples in
 - Map negative-capable hashes and indices with `WallMath.PositiveMod`, never `Math.Abs` or
   `& int.MaxValue`.
 
+### 8. Calling Foreign Code, and the Casts Around It
+
+Three rules for any method that hands control to an interface a consumer implements — a formatter, a
+visitor, a callback. Worked examples in
+[forbidden-patterns](../references/forbidden-patterns.md#foreign-call-and-cast-patterns):
+
+- Restore shared counters in a `finally`, even when the callee's contract forbids throwing.
+- Guard the cast, not just the invariant: an unreachable negative behind `(uint)` is a memory-safety
+  failure, not a wrong number.
+- Compare directionally (`1 < n`), not by equality (`n != 1`), when only one direction is actionable.
+
 ---
 
 ## Internal State Consistency
@@ -448,6 +459,7 @@ Before submitting production code, verify:
 - [ ] State restoration uses a `readonly struct` `IDisposable` scope, not `try`/`finally`
 - [ ] No `Dispose()` can throw
 - [ ] Negative-capable hashes and indices go through `WallMath.PositiveMod`
+- [ ] Counters mutated around consumer-implemented calls restore in a `finally`; size casts are range-guarded even when unreachable; width comparisons are directional (`1 < n`)
 
 For Editor-specific defensive patterns, see [defensive-editor-programming](./defensive-editor-programming.md).
 

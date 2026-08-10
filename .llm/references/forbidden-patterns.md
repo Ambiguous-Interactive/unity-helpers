@@ -458,6 +458,24 @@ way. Where a failure means a resource genuinely leaked, log it rather than hidin
 not throw. Existing examples: `SingleThreadedThreadPool.Signal`, `DurableFile.TryDelete`, and
 `SingleThreadedThreadPool.DoWorkAsync`'s outer `catch (ObjectDisposedException)`.
 
+## Foreign-Call and Cast Patterns
+
+For any method that hands control to an interface a consumer implements — a formatter, a visitor, a
+callback. All three came out of review on `WProtoWriter.TryWriteMessage`, and two of them are
+untestable by construction, which is why they are a standard rather than a test.
+
+| Forbidden                                                                                           | Use Instead                                          | Reason                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mutating a shared counter around a call into consumer code and restoring it on the normal path only | `try` / `finally`, or a `using` scope where one fits | A contract that forbids throwing says what implementers _should_ do. The holder often outlives the call, and a depth left one too high silently lowers a nesting bound for the rest of the operation. |
+| `(uint)length` on a value that "cannot" be negative                                                 | The same cast behind an explicit `length < 0` guard  | The failure mode is not a wrong number, it is a huge one — a five-byte prefix and a `Slice` far past the payload. That is memory safety, not arithmetic.                                              |
+| `if (size != 1)` to mean "wider than one byte"                                                      | `if (1 < size)`                                      | Identical today; if the helper ever returns 0 the first computes `extra = -1` and shifts a payload backwards over its own header. Prefer the comparison whose wrong answer is inert.                  |
+
+The pattern behind all three: prefer the form whose failure is **loud or inert** over the form whose
+failure is **silent and memory-unsafe**, even when the silent form is currently unreachable. Write the
+guard, and say in the comment that it is unreachable and what makes it worth having anyway.
+
+---
+
 ---
 
 ## Related Documentation

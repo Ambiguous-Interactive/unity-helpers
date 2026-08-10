@@ -748,6 +748,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(writer.Faulted);
         }
 
+        [Test]
+        public void AFormatterThatThrowsLeavesTheNestingDepthWhereItFoundIt()
+        {
+            // A formatter is contractually not allowed to throw, but this writer can outlive one
+            // that does -- a caller may catch and keep writing. A depth left one too high lowers the
+            // nesting bound for the rest of the message, silently, and only for deep payloads.
+            // Assert.Throws is unusable here: a lambda cannot capture a ref struct.
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.AreEqual(0, writer.Depth);
+
+            bool threw = false;
+            try
+            {
+                writer.TryWriteMessage(1, new ThrowingFormatter(), 0);
+            }
+            catch (InvalidOperationException)
+            {
+                threw = true;
+            }
+
+            Assert.IsTrue(threw, "The test double did not throw, so this proves nothing.");
+            Assert.AreEqual(0, writer.Depth, "The nesting depth was not restored.");
+        }
+
         [TestCase(63, true, TestName = "TryWriteMessageIsBoundedAtTheDocumentedDepth(63 accepted)")]
         [TestCase(
             64,
@@ -830,6 +855,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 writer.TryWriteTag(1, WProtoWireType.LengthDelimited);
                 writer.TryWriteBytes(new byte[32]);
                 return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 0;
+                return true;
+            }
+        }
+
+        /// <summary>A formatter that violates the no-throw contract, to prove the depth unwinds.</summary>
+        private sealed class ThrowingFormatter : IWProtoFormatter<int>
+        {
+            public int Measure(in int value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in int value)
+            {
+                throw new InvalidOperationException("formatters are not allowed to do this");
             }
 
             public bool TryRead(ref WProtoReader reader, out int value)

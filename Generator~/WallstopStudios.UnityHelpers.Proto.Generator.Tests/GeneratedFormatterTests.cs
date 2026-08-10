@@ -353,6 +353,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void IsRequiredForcesADefaultValueOntoTheWireButNeverMaterializesANull()
+        {
+            // Measured against protobuf-net 3.2.56, which emits exactly 08-00-2A-00 for this shape:
+            // the int and the struct sub-message are written at their defaults because IsRequired
+            // says so, and the three null references are still absent because IsRequired forces a
+            // VALUE onto the wire -- it does not invent one. Treating "required" as "always present"
+            // writes an empty string where protobuf-net wrote nothing, and calls Measure on a null
+            // sub-message, which dereferences it.
+            Assert.AreEqual("0800" + "2A00", Encode(new RequiredContract()));
+
+            Assert.AreEqual(
+                "0800" + "1200" + "1A00" + "2200" + "2A00",
+                Encode(
+                    new RequiredContract
+                    {
+                        Message = new EmptyContract(),
+                        Text = string.Empty,
+                        Bytes = Array.Empty<byte>(),
+                    }
+                ),
+                "An empty-but-non-null reference is present; only null is absent."
+            );
+
+            RequiredContract restored = RoundTrip(new RequiredContract());
+            Assert.IsNull(restored.Message);
+            Assert.IsNull(restored.Text);
+            Assert.IsNull(restored.Bytes);
+            Assert.IsNull(restored.Ratio);
+        }
+
+        [Test]
         public void ARecursiveContractRoundTripsWithinTheNestingBound()
         {
             ChainContract head = BuildChain(60);

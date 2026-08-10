@@ -140,6 +140,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void IsRequiredForcesADefaultValueOntoTheWireButNeverMaterializesANull()
+        {
+            // Measured against protobuf-net 3.2.56, which emits exactly 0800 for this shape: the int
+            // is written at its default because IsRequired says so, and the three null references are
+            // still absent. Reading "required" as "always present" hands the nested formatter's
+            // Measure a null to dereference -- a crash on the first save in a shipped player.
+            IWProtoFormatter<WProtoRequiredContract> formatter =
+                WProtoFormatterProvider.Get<WProtoRequiredContract>();
+            WProtoRequiredContract empty = new();
+
+            byte[] buffer = new byte[formatter.Measure(empty)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, empty));
+            Assert.AreEqual("0800", ToHex(writer.Written));
+
+            WProtoReader reader = new(writer.Written);
+            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoRequiredContract restored));
+            Assert.IsTrue(restored.Message == null);
+            Assert.IsTrue(restored.Text == null);
+            Assert.IsTrue(restored.Bytes == null);
+        }
+
+        [Test]
         public void ARecursiveContractRoundTripsWithinTheNestingBound()
         {
             WProtoNestedChainContract head = BuildChain(60);
@@ -241,6 +264,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return head;
+        }
+
+        private static string ToHex(ReadOnlySpan<byte> bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                builder.Append(bytes[index].ToString("X2"));
+            }
+
+            return builder.ToString();
         }
 
         private static string Encode(WProtoNestedRootContract value)

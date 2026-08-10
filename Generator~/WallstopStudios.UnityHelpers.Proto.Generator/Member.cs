@@ -152,7 +152,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string presence;
             if (isRequired)
             {
-                presence = nullable ? access + ".HasValue" : "true";
+                // IsRequired forces a VALUE onto the wire even when it equals its default; it does
+                // not invent one. Measured against protobuf-net 3.2.56: a required int at 0 and a
+                // required struct sub-message at default are both written, while a required null
+                // string, byte[] or message reference is still absent. Treating "required" as
+                // "always present" writes an empty string where protobuf-net wrote nothing -- and,
+                // for a message, hands Measure a null to dereference.
+                presence =
+                    nullable ? access + ".HasValue"
+                    : shape.IsReference ? shape.PresenceTest
+                    : "true";
             }
             else if (nullable)
             {
@@ -308,6 +317,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         ReadMethod = "TryReadString",
                         ReadLocalType = "string",
                         AssignExpression = "$",
+                        IsReference = true,
                     };
                 }
                 default:
@@ -332,6 +342,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     ReadMethod = "TryReadBytes",
                     ReadLocalType = "global::System.ReadOnlySpan<byte>",
                     AssignExpression = "$.ToArray()",
+                    IsReference = true,
                 };
             }
 
@@ -361,6 +372,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     ReadArguments = formatter + ", ",
                     ReadLocalType = qualified,
                     AssignExpression = "$",
+                    IsReference = !type.IsValueType,
                 };
             }
 
@@ -440,6 +452,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             internal string WriteCast = string.Empty;
             internal string ReadArguments = string.Empty;
             internal bool WritesOwnTag;
+
+            /// <summary>
+            /// Whether a value of this shape can be <c>null</c>, which is what decides how far
+            /// <c>IsRequired</c> is allowed to go.
+            /// </summary>
+            internal bool IsReference;
         }
     }
 }
