@@ -1685,6 +1685,13 @@ $spellingTargets = @(
     }
 )
 $csharpTargets = @($relativePaths | Where-Object { $_ -like '*.cs' })
+# CSharpier formats MSBuild project files as well as C# sources, and CI runs it over the WHOLE
+# repository -- so a changed .csproj that this script never looked at still fails the build. That
+# happened: a new .csproj passed preflight and reddened the format leg. Kept separate from
+# $csharpTargets because the license-header and duplicate-using checks beside it are .cs-only.
+$csharpierTargets = @($relativePaths | Where-Object {
+        $_ -like '*.cs' -or $_ -like '*.csproj' -or $_ -like '*.props' -or $_ -like '*.targets'
+    })
 $testFiles = @($csharpTargets | Where-Object { $_ -like 'Tests/*.cs' })
 $metaRelevantPaths = @($relativePaths | Where-Object { Test-MetaRequiredPath -RelativePath $_ })
 $eolTargets = @($relativePaths)
@@ -2181,18 +2188,18 @@ if ($testFiles.Count -gt 0) {
     }
 }
 
-if ($csharpTargets.Count -gt 0) {
+if ($csharpierTargets.Count -gt 0) {
     if ($Fix) {
         Write-Host '[agent-preflight] Formatting changed C# files with CSharpier...' -ForegroundColor Blue
         if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
                     -RepoRoot $repoRoot `
-                    -Paths $csharpTargets `
+                    -Paths $csharpierTargets `
                     -InitiallyUnstagedPaths $initiallyUnstagedPaths `
                     -Context 'CSharpier formatting')) {
             $failureCount++
         }
         else {
-            & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Fix -SkipWhenUnavailable -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+            & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -Fix -SkipWhenUnavailable -Paths $csharpierTargets -VerboseOutput:$VerboseOutput
             if ($LASTEXITCODE -ne 0) {
                 $failureCount++
             }
@@ -2214,7 +2221,7 @@ if ($csharpTargets.Count -gt 0) {
     }
 
     Write-Host '[agent-preflight] Checking CSharpier formatting on changed C# files...' -ForegroundColor Blue
-    & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -SkipWhenUnavailable -Paths $csharpTargets -VerboseOutput:$VerboseOutput
+    & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -SkipWhenUnavailable -Paths $csharpierTargets -VerboseOutput:$VerboseOutput
     if ($LASTEXITCODE -ne 0) {
         $failureCount++
     }

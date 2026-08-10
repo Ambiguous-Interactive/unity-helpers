@@ -456,26 +456,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryBeginLengthDelimited(int fieldNumber, out WProtoLengthToken token)
         {
-            token = default;
-
             if (_depth >= WProtoReader.MaxNestingDepth)
             {
                 _faulted = true;
+                token = default;
                 return false;
             }
 
             if (!TryWriteTag(fieldNumber, WProtoWireType.LengthDelimited))
             {
+                token = default;
                 return false;
             }
 
             if (!TryReserve(1, out int prefixStart))
             {
+                token = default;
                 return false;
             }
 
-            token = new WProtoLengthToken(prefixStart, _position);
             _depth++;
+            token = new WProtoLengthToken(prefixStart, _position);
             return true;
         }
 
@@ -549,14 +550,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReserve(int count, out int start)
         {
-            start = _position;
             if (_faulted || count > _buffer.Length - _position)
             {
                 _faulted = true;
+                start = 0;
                 return false;
             }
 
+            // Held in a local because the reservation moves _position, and `start` has to be where
+            // the region BEGAN. Assigning it at the top and letting _position drift underneath is
+            // the shape this rule exists to stop.
+            int reserved = _position;
             _position += count;
+            start = reserved;
             return true;
         }
     }

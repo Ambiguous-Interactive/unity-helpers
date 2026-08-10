@@ -40,13 +40,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
         public static bool TrySerialize<T>(T value, out byte[] bytes)
         {
-            bytes = null;
-
             if (
                 !CanServe(value)
                 || !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
             )
             {
+                bytes = null;
                 return false;
             }
 
@@ -64,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoWriter writer = new WProtoWriter(buffer);
             if (!formatter.Write(ref writer, value))
             {
+                bytes = null;
                 return false;
             }
 
@@ -81,10 +81,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
         public static bool TryDeserialize<T>(ReadOnlySpan<byte> data, out T value)
         {
-            value = default;
-
             if (!WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter))
             {
+                value = default;
                 return false;
             }
 

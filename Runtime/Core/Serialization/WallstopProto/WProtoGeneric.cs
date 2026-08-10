@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Threading;
 
     /// <summary>
     /// Encodes one field whose type is only known when a generic contract is closed.
@@ -250,18 +251,43 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return _message ?? WProtoFormatterProvider.Get<T>();
         }
 
+        /// <summary>
+        /// Caches which of the two formatter kinds serves <typeparamref name="T"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The flag is published last, and that ordering is the whole point.</b> Setting
+        /// <c>_resolved</c> first left a window where a second thread saw "already resolved" and read
+        /// <c>_scalar</c> and <c>_message</c> while both were still <c>null</c> -- so a scalar
+        /// <c>T</c> took the message path and produced a length-delimited field where the oracle
+        /// writes a varint. Silently wrong bytes, not a crash.
+        /// </para>
+        /// <para>
+        /// Deliberately lock-free rather than double-checked locking. Resolution is pure and
+        /// deterministic, so two threads racing here compute the <b>same</b> answer and the worst
+        /// case is doing it twice, once, at startup. <see cref="Volatile"/> is what makes it correct:
+        /// the write releases the field stores that precede it, and the read acquires them, so a
+        /// thread that sees the flag set cannot see stale fields. A lock would add contention to a
+        /// path taken for every field of every message.
+        /// </para>
+        /// </remarks>
         private static void Resolve()
         {
-            if (_resolved)
+            if (Volatile.Read(ref _resolved))
             {
                 return;
             }
 
-            _resolved = true;
-            if (!WProtoScalarFormatterProvider.TryGet(out _scalar))
+            IWProtoScalarFormatter<T> scalar;
+            IWProtoFormatter<T> message = null;
+            if (!WProtoScalarFormatterProvider.TryGet(out scalar))
             {
-                WProtoFormatterProvider.TryGet(out _message);
+                WProtoFormatterProvider.TryGet(out message);
             }
+
+            _scalar = scalar;
+            _message = message;
+            Volatile.Write(ref _resolved, true);
         }
 
         /// <summary>
@@ -274,7 +300,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static void Reset()
         {
-            _resolved = false;
+            // Cleared in the MIRROR of the publish order: the flag goes down first, so no thread can
+            // observe "resolved" alongside the nulls this is about to write. Nulling the fields first
+            // would open exactly the window Resolve was fixed to close.
+            Volatile.Write(ref _resolved, false);
             _scalar = null;
             _message = null;
         }

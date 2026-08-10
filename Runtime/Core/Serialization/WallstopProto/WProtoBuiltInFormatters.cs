@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
+    using System.Threading;
     using DataStructure.Adapters;
     using Random;
 
@@ -32,24 +33,41 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public static class WProtoBuiltInFormatters
     {
+        private static readonly object RegistrationGate = new object();
+
         private static bool _registered;
 
         /// <summary>
         /// Registers every built-in formatter, once.
         /// </summary>
+        /// <remarks>
+        /// The flag is published <b>after</b> the registrations and read through
+        /// <see cref="Volatile"/>. Setting it first left a window where a second thread saw
+        /// "already registered" and serialized against a provider that had none of these four yet,
+        /// which surfaces as "no formatter is registered for FastVector2Int" from a type this
+        /// package ships a formatter for.
+        /// </remarks>
         public static void RegisterAll()
         {
-            if (_registered)
+            if (Volatile.Read(ref _registered))
             {
                 return;
             }
 
-            _registered = true;
+            lock (RegistrationGate)
+            {
+                if (_registered)
+                {
+                    return;
+                }
 
-            WProtoFormatterProvider.Register(FastVector2Int.WProtoFormatter.Instance);
-            WProtoFormatterProvider.Register(FastVector3Int.WProtoFormatter.Instance);
-            WProtoFormatterProvider.Register(WGuid.WProtoFormatter.Instance);
-            WProtoFormatterProvider.Register(RandomState.WProtoFormatter.Instance);
+                WProtoFormatterProvider.Register(FastVector2Int.WProtoFormatter.Instance);
+                WProtoFormatterProvider.Register(FastVector3Int.WProtoFormatter.Instance);
+                WProtoFormatterProvider.Register(WGuid.WProtoFormatter.Instance);
+                WProtoFormatterProvider.Register(RandomState.WProtoFormatter.Instance);
+
+                Volatile.Write(ref _registered, true);
+            }
         }
     }
 }

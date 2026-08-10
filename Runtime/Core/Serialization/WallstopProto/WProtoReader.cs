@@ -122,10 +122,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryReadTag(out int fieldNumber, out int wireType)
         {
-            fieldNumber = 0;
-            wireType = -1;
             if (_malformed || End)
             {
+                fieldNumber = 0;
+                wireType = -1;
                 return false;
             }
 
@@ -136,6 +136,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // protobuf-net and Google's implementations.
             if (!TryReadVarint32Strict(out uint key))
             {
+                fieldNumber = 0;
+                wireType = -1;
                 return false;
             }
 
@@ -144,6 +146,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (number <= 0 || !WProtoWireType.IsDefined(type))
             {
                 _malformed = true;
+                fieldNumber = 0;
+                wireType = -1;
                 return false;
             }
 
@@ -186,15 +190,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryReadVarint32Strict(out uint value)
         {
-            value = 0;
             if (!TryReadVarint64(out ulong wide))
             {
+                value = 0;
                 return false;
             }
 
             if (wide > uint.MaxValue)
             {
                 _malformed = true;
+                value = 0;
                 return false;
             }
 
@@ -209,9 +214,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadVarint64(out ulong value)
         {
-            value = 0;
             if (_malformed)
             {
+                value = 0;
                 return false;
             }
 
@@ -222,6 +227,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 if (index >= _buffer.Length)
                 {
                     _malformed = true;
+                    value = 0;
                     return false;
                 }
 
@@ -232,6 +238,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 if (shift == WProtoSizes.MaxVarintBytes - 1 && current > 0x01)
                 {
                     _malformed = true;
+                    value = 0;
                     return false;
                 }
 
@@ -245,6 +252,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             _malformed = true;
+            value = 0;
             return false;
         }
 
@@ -316,9 +324,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadFixed32(out uint value)
         {
-            value = 0;
             if (!TryConsume(sizeof(uint), out int start))
             {
+                value = 0;
                 return false;
             }
 
@@ -337,9 +345,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadFixed64(out ulong value)
         {
-            value = 0;
             if (!TryConsume(sizeof(ulong), out int start))
             {
+                value = 0;
                 return false;
             }
 
@@ -384,14 +392,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the payload was read.</returns>
         public bool TryReadBytes(out ReadOnlySpan<byte> value)
         {
-            value = default;
             if (!TryReadLength(out int length))
             {
+                value = default;
                 return false;
             }
 
             if (!TryConsume(length, out int start))
             {
+                value = default;
                 return false;
             }
 
@@ -407,9 +416,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>A zero-length field decodes to <see cref="string.Empty"/>, never to <c>null</c>.</remarks>
         public bool TryReadString(out string value)
         {
-            value = null;
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
+                value = null;
                 return false;
             }
 
@@ -504,15 +513,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryReadMessage<T>(IWProtoFormatter<T> formatter, out T value)
         {
-            value = default;
             if (formatter == null)
             {
                 _malformed = true;
+                value = default;
                 return false;
             }
 
             if (!TryReadMessage(out WProtoReader nested))
             {
+                value = default;
                 return false;
             }
 
@@ -521,8 +531,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            value = default;
             _malformed = true;
+            value = default;
             return false;
         }
 
@@ -533,13 +543,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a length that fits the remaining input was read.</returns>
         public bool TryReadLength(out int length)
         {
-            length = 0;
-
             // Strict for the same reason as a field key: a length whose value exceeds 32 bits
             // cannot address a span, and truncating it would turn an impossible length into a
             // plausible one rather than rejecting the payload.
             if (!TryReadVarint32Strict(out uint raw))
             {
+                length = 0;
                 return false;
             }
 
@@ -548,6 +557,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (raw > int.MaxValue || raw > (uint)Remaining)
             {
                 _malformed = true;
+                length = 0;
                 return false;
             }
 
@@ -659,14 +669,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryConsume(int count, out int start)
         {
-            start = _position;
             if (_malformed || count < 0 || count > _buffer.Length - _position)
             {
                 _malformed = true;
+                start = 0;
                 return false;
             }
 
+            // Held in a local: the consume moves _position, and `start` has to be where the run
+            // BEGAN, so it cannot be read back from the field after the fact.
+            int consumed = _position;
             _position += count;
+            start = consumed;
             return true;
         }
     }

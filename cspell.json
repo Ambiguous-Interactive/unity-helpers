@@ -502,7 +502,8 @@
         "asmdef",
         "asmref",
         "stcf",
-        "WProto"
+        "WProto",
+        "Prd"
       ]
     },
     {

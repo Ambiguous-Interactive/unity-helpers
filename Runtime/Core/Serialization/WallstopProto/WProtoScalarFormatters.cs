@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Threading;
 
     /// <summary>
     /// Resolves the <see cref="IWProtoScalarFormatter{T}"/> for a non-message type.
@@ -49,6 +50,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     public static class WProtoScalarFormatters
     {
+        private static readonly object RegistrationGate = new object();
+
         private static bool _registered;
 
         /// <summary>
@@ -60,13 +63,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static void RegisterAll()
         {
-            if (_registered)
+            if (Volatile.Read(ref _registered))
             {
                 return;
             }
 
-            _registered = true;
+            // Locked, unlike WProtoGeneric's resolution, and for a reason worth stating: this is not
+            // an idempotent computation of one value but thirteen writes to thirteen different
+            // caches, so a second thread that raced past the flag could serialize against a
+            // HALF-REGISTERED provider -- finding no formatter for `int` and encoding it as a message.
+            // The flag used to be set before the registrations, which made that window certain rather
+            // than merely possible. It runs once at startup, so the lock costs nothing measurable.
+            lock (RegistrationGate)
+            {
+                if (_registered)
+                {
+                    return;
+                }
 
+                RegisterBuiltIns();
+
+                // Last, and volatile: a reader that sees this cannot see an unregistered provider.
+                Volatile.Write(ref _registered, true);
+            }
+        }
+
+        private static void RegisterBuiltIns()
+        {
             WProtoScalarFormatterProvider.Register(new Int32Formatter());
             WProtoScalarFormatterProvider.Register(new Int64Formatter());
             WProtoScalarFormatterProvider.Register(new UInt32Formatter());

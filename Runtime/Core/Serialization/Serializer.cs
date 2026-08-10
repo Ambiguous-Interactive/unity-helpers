@@ -2915,8 +2915,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             out string resolvedName
         )
         {
-            resolvedName = member.Name;
-
             JsonIgnoreAttribute ignore = null;
             JsonPropertyNameAttribute propertyName = null;
             try
@@ -2927,19 +2925,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch
             {
                 // Defensive: malformed attribute metadata must not throw from the public API.
+                resolvedName = member.Name;
                 return true;
             }
 
             if (ignore != null && ignore.Condition == JsonIgnoreCondition.Always)
             {
+                resolvedName = null;
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(propertyName?.Name))
-            {
-                resolvedName = propertyName.Name;
-            }
-
+            resolvedName = string.IsNullOrEmpty(propertyName?.Name)
+                ? member.Name
+                : propertyName.Name;
             return true;
         }
 

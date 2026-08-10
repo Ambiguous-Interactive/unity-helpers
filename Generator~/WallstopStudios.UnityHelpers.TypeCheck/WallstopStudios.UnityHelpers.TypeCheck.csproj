@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <!--
     A LOCAL TYPE-CHECKER for the package's Unity-dependent runtime sources.
 
@@ -36,7 +35,6 @@
     an installed editor. It is unofficial, and it is used ONLY here: this project lives under
     `Generator~`, which Unity ignores by the trailing-tilde convention, and ships to nobody.
   -->
-
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
@@ -52,13 +50,11 @@
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612</NoWarn>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
     <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. -->
     <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
   </ItemGroup>
-
   <ItemGroup>
     <!-- The same vendored binaries the package ships to Unity. -->
     <Reference Include="protobuf-net">
@@ -86,7 +82,6 @@
       <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="Shims/*.cs" />
     <!-- The main runtime asmdef's scope, minus the exclusions documented at the top. -->
@@ -95,5 +90,4 @@
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
   </ItemGroup>
-
 </Project>
