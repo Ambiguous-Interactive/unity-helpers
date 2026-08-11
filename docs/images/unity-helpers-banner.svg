@@ -132,11 +132,11 @@
           fill="none" stroke="#f39c12" stroke-width="1.4" opacity="0.85"/>
     <text x="75" y="17" text-anchor="middle" fill="#ffd9b5">🎮 Unity 2021.3+</text>
 
-    <!-- 11,000+ tests -->
+    <!-- 12,000+ tests -->
     <rect x="0" y="43" width="150" height="26" rx="13" ry="13" fill="#1a1a2e" opacity="0.88"/>
     <rect x="0" y="43" width="150" height="26" rx="13" ry="13"
           fill="none" stroke="#e94560" stroke-width="1.4" opacity="0.85"/>
-    <text x="75" y="60" text-anchor="middle" fill="#ffd9b5">✅️ 11,000+ tests</text>
+    <text x="75" y="60" text-anchor="middle" fill="#ffd9b5">✅️ 12,000+ tests</text>
 
     <!-- Performant -->
     <rect x="0" y="86" width="150" height="26" rx="13" ry="13" fill="#1a1a2e" opacity="0.88"/>

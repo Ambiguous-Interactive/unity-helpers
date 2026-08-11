@@ -11,7 +11,7 @@ Procedural skills are in the [skills/](./skills/) directory.
 **Repository**: <https://github.com/wallstop/unity-helpers>
 **Root Namespace**: `WallstopStudios.UnityHelpers`
 
-**Design Principles**: Zero boilerplate, performance-proven (11,000+ tests, IL2CPP/WebGL compatible), DRY architecture, self-documenting code (minimal comments, descriptive names).
+**Design Principles**: Zero boilerplate, performance-proven (12,000+ tests, IL2CPP/WebGL compatible), DRY architecture, self-documenting code (minimal comments, descriptive names).
 
 ---
 

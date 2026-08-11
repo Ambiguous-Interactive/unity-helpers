@@ -60,7 +60,7 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
 - 🌳 **O(log n)** spatial queries instead of O(n) loops
 - 🛠️ **20+ editor tools** that automate sprite/animation workflows
-- ✅ **11,000+ tests**
+- ✅ **12,000+ tests**
 
 ---
 
@@ -388,7 +388,7 @@ Unity Helpers reduces repetitive work by providing tested utilities for common U
 **Built for Real Projects:**
 
 - ✅ **Tested** in shipped commercial games
-- ✅ **11,000+ automated tests** catch edge cases before you hit them
+- ✅ **12,000+ automated tests** catch edge cases before you hit them
 - ✅ **Minimal external dependencies** - depends on protobuf-net for binary serialization
 - ✅ **IL2CPP/WebGL ready** with optimized SINGLE_THREADED paths
 - ✅ **MIT Licensed** - use freely in commercial projects
