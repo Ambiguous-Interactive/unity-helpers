@@ -21,19 +21,6 @@ const ACTION_PATH_PREFIX =
   "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/";
 
 /**
- * Effective indentation of a `uses:`/`with:` key, counting a leading YAML sequence dash as
- * indentation. `- uses: x` and a `uses:` on its own line inside the same step both report the
- * column the key itself starts at, which is the level its sibling keys share.
- *
- * @param {string} line Raw line.
- * @param {number} keyIndex Index within the line where the key name starts.
- * @returns {number} Column of the key.
- */
-function keyColumn(line, keyIndex) {
-  return keyIndex;
-}
-
-/**
  * @param {string} line Raw line.
  * @returns {boolean} True when the line carries no YAML content.
  */
@@ -135,7 +122,9 @@ function collectCalls(filePath, relativePath) {
       ref,
       file: relativePath,
       line: index + 1,
-      supplied: collectWithKeys(lines, index, keyColumn(line, line.indexOf("uses:")))
+      // The column the key itself starts at, which is the level its sibling keys share -- so
+      // `- uses: x` and a `uses:` on its own line inside the same step both resolve correctly.
+      supplied: collectWithKeys(lines, index, line.indexOf("uses:"))
     });
   }
   return calls;
@@ -147,13 +136,19 @@ function collectCalls(filePath, relativePath) {
  * Attribute lines are read only at the input block's own attribute column, so a folded
  * `description:` whose text happens to contain `required:` cannot change the answer.
  *
+ * An input carrying a `default:` is reported as not-required however it declares `required:`. The
+ * runner substitutes the default when the caller omits it, so demanding one would fail a call that
+ * works -- and a false failure here reds the Dependabot pull request that proposes a perfectly good
+ * bump. No build-lock action declares both today; this keeps that from becoming a trap.
+ *
  * @param {string} content Contents of an `action.yml`.
  * @param {string} label Identifier for error messages.
- * @returns {Map<string, boolean>} Input name to whether it is required.
+ * @returns {Map<string, boolean>} Input name to whether the caller must supply it.
  */
 function parseActionInputs(content, label) {
   const lines = content.split(/\r?\n/);
   const inputs = new Map();
+  const defaulted = new Set();
 
   let inputsIndex = -1;
   for (let index = 0; index < lines.length; index += 1) {
@@ -201,10 +196,19 @@ function parseActionInputs(content, label) {
     if (indent !== attributeColumn) {
       continue;
     }
+    if (/^default:/.test(line.trim())) {
+      defaulted.add(current);
+      continue;
+    }
     const required = /^required:\s*(\S+)\s*$/.exec(line.trim());
     if (required) {
       inputs.set(current, required[1].replace(/^["']|["']$/g, "") === "true");
     }
+  }
+
+  // Applied after the walk, because `default:` may be declared either side of `required:`.
+  for (const name of defaulted) {
+    inputs.set(name, false);
   }
   return inputs;
 }
