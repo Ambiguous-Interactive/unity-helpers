@@ -89,38 +89,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ["SerializableSetBase"] =
                 "Serializer marshals SerializableHashSet and SerializableSortedSet through "
                 + "SerializableHashSetProtoWrapper and SerializableSortedSetProtoWrapper.",
-            ["AbstractRandom"] =
-                "The seventeen PRNG subtypes it declares as includes use "
-                + "[ProtoContract(SkipConstructor = true)], which the generator does not yet honour; "
-                + "porting the base without them would strand the includes. Tracked on the porting issue.",
-            ["DotNetRandom"] = SkipConstructorReason,
-            ["SystemRandom"] = SkipConstructorReason,
-            ["WyRandom"] = SkipConstructorReason,
-            ["PhotonSpinRandom"] = SkipConstructorReason,
-            ["StormDropRandom"] = SkipConstructorReason,
-            ["PcgRandom"] = IncludeSubtypeReason,
-            ["XorShiftRandom"] = IncludeSubtypeReason,
-            ["XoroShiroRandom"] = IncludeSubtypeReason,
-            ["UnityRandom"] = IncludeSubtypeReason,
-            ["LinearCongruentialGenerator"] = IncludeSubtypeReason,
-            ["SquirrelRandom"] = IncludeSubtypeReason,
-            ["RomuDuo"] = IncludeSubtypeReason,
-            ["SplitMix64"] = IncludeSubtypeReason,
-            ["IllusionFlow"] = IncludeSubtypeReason,
-            ["FlurryBurstRandom"] = IncludeSubtypeReason,
-            ["BlastCircuitRandom"] = IncludeSubtypeReason,
-            ["WaveSplatRandom"] = IncludeSubtypeReason,
         };
-
-        private const string SkipConstructorReason =
-            "[ProtoContract(SkipConstructor = true)]. Its parameterless constructor seeds a live "
-            + "generator, and the after-deserialization hook returns early when one already exists, so "
-            + "calling it would hand back an RNG on a random stream instead of the saved one. The "
-            + "generator has no SkipConstructor support yet.";
-
-        private const string IncludeSubtypeReason =
-            "A subtype of AbstractRandom, which is itself not mirrored; an include cannot be annotated "
-            + "ahead of the base that declares it.";
 
         private static readonly string[] MemberHookNames =
         {

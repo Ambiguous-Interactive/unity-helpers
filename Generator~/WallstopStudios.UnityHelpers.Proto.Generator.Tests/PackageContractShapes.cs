@@ -353,6 +353,106 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
+    /// Stands in for <c>AbstractRandom</c>: an abstract base whose subtypes are reached through
+    /// includes, holding a nullable and two reservoir counters.
+    /// </summary>
+    /// <remarks>
+    /// The whole generator family shares this shape. What it pins is that a subtype encodes the same
+    /// under its own declared type as under this one, which is what protobuf-net does and what a
+    /// saved generator's fields landing in the right places depends on.
+    /// </remarks>
+    [ProtoContract]
+    [ProtoInclude(100, typeof(RandomLeafShape))]
+    [ProtoInclude(101, typeof(RandomSkippingShape))]
+    [WProtoContract]
+    [WProtoInclude(100, typeof(RandomLeafShape))]
+    [WProtoInclude(101, typeof(RandomSkippingShape))]
+    public abstract partial class RandomBaseShape
+    {
+        /// <summary>A cached spare value, present only when one is held.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public double? cachedGaussian;
+
+        /// <summary>A bit reservoir.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public uint bitBuffer;
+
+        /// <summary>How much of the reservoir is unread.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public int bitCount;
+    }
+
+    /// <summary>
+    /// Stands in for the twelve generators whose state is plain fields, in the subtype tag space the
+    /// real ones use.
+    /// </summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class RandomLeafShape : RandomBaseShape
+    {
+        /// <summary>The generator's state word.</summary>
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        public ulong state;
+
+        /// <summary>An optional seed, present only when the generator was given one.</summary>
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        public int? seed;
+    }
+
+    /// <summary>
+    /// Stands in for the five generators declared <c>SkipConstructor</c>, including the serialized
+    /// state property and the hook that rebuilds from it.
+    /// </summary>
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class RandomSkippingShape : RandomBaseShape
+    {
+        /// <summary>How many values have been drawn.</summary>
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        public ulong generated;
+
+        /// <summary>The seed the generator was built from.</summary>
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        public int seed;
+
+        /// <summary>
+        /// The opaque state blob, captured on write and held for the hook on read.
+        /// </summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public byte[] SerializedState
+        {
+            get => pending;
+            set => pending = value;
+        }
+
+        /// <summary>Where the blob waits until the hook consumes it.</summary>
+        [ProtoIgnore]
+        [WProtoIgnore]
+        public byte[] pending;
+
+        /// <summary>
+        /// The expensive constructor the flag exists to keep out of the read path.
+        /// </summary>
+        /// <remarks>
+        /// Present because every real generator declares one, and because the flag is inert on a type
+        /// that declares none -- emitting a constructor there would delete the implicit parameterless
+        /// one and break <c>new Theirs()</c> in a consumer's source.
+        /// </remarks>
+        public RandomSkippingShape()
+        {
+            seed = -1;
+        }
+    }
+
+    /// <summary>
     /// Stands in for <c>SerializableDictionary</c>, whose only role here is to be the non-generic
     /// type a generic contract is nested inside.
     /// </summary>

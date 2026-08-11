@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A simple Linear Congruential Generator (LCG): extremely fast with low-quality randomness.
@@ -52,7 +53,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class LinearCongruentialGenerator : AbstractRandom
+    [WProtoContract]
+    public sealed partial class LinearCongruentialGenerator : AbstractRandom
     {
         public static LinearCongruentialGenerator Instance =>
             ThreadLocalRandom<LinearCongruentialGenerator>.Instance;
@@ -60,6 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState => BuildState(_state);
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint _state;
 
         public LinearCongruentialGenerator()

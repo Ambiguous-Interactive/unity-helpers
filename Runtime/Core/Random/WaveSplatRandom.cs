@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// WaveSplat: a one-word chaotic generator that increments by a fixed large constant and emits rotated high bits.
@@ -54,7 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class WaveSplatRandom : AbstractRandom
+    [WProtoContract]
+    public sealed partial class WaveSplatRandom : AbstractRandom
     {
         private const ulong Increment = 11_111_111_111_111_111UL;
         private const ulong DefaultGuidSeed = 0x9E3779B97F4A7C15UL;
@@ -66,6 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState => BuildState(_state);
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private ulong _state;
 
         public WaveSplatRandom()

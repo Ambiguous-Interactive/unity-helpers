@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// IllusionFlow: a modern, high-performance PRNG building on Xoroshiro concepts with additional state and mixing.
@@ -71,7 +72,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class IllusionFlow : AbstractRandom
+    [WProtoContract]
+    public sealed partial class IllusionFlow : AbstractRandom
     {
         private const int UintByteCount = sizeof(uint) * 8;
         private const int StatePayloadLength = sizeof(uint);
@@ -90,18 +92,23 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint _a;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private uint _b;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private uint _c;
 
         [ProtoMember(9)]
+        [WProtoMember(9)]
         private uint _d;
 
         [ProtoMember(10)]
+        [WProtoMember(10)]
         private uint _e;
 
         // Cached space for RandomState

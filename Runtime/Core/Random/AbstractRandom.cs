@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using ProtoBuf;
     using UnityEngine;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
 #else
@@ -60,24 +61,42 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
+    [WProtoContract]
     [ProtoInclude(100, typeof(DotNetRandom))]
+    [WProtoInclude(100, typeof(DotNetRandom))]
     [ProtoInclude(101, typeof(PcgRandom))]
+    [WProtoInclude(101, typeof(PcgRandom))]
     [ProtoInclude(102, typeof(XorShiftRandom))]
+    [WProtoInclude(102, typeof(XorShiftRandom))]
     [ProtoInclude(103, typeof(WyRandom))]
+    [WProtoInclude(103, typeof(WyRandom))]
     [ProtoInclude(104, typeof(XoroShiroRandom))]
+    [WProtoInclude(104, typeof(XoroShiroRandom))]
     [ProtoInclude(105, typeof(UnityRandom))]
+    [WProtoInclude(105, typeof(UnityRandom))]
     [ProtoInclude(106, typeof(SystemRandom))]
+    [WProtoInclude(106, typeof(SystemRandom))]
     [ProtoInclude(107, typeof(LinearCongruentialGenerator))]
+    [WProtoInclude(107, typeof(LinearCongruentialGenerator))]
     [ProtoInclude(108, typeof(SquirrelRandom))]
+    [WProtoInclude(108, typeof(SquirrelRandom))]
     [ProtoInclude(109, typeof(RomuDuo))]
+    [WProtoInclude(109, typeof(RomuDuo))]
     [ProtoInclude(110, typeof(SplitMix64))]
+    [WProtoInclude(110, typeof(SplitMix64))]
     [ProtoInclude(111, typeof(IllusionFlow))]
+    [WProtoInclude(111, typeof(IllusionFlow))]
     [ProtoInclude(112, typeof(FlurryBurstRandom))]
+    [WProtoInclude(112, typeof(FlurryBurstRandom))]
     [ProtoInclude(113, typeof(PhotonSpinRandom))]
+    [WProtoInclude(113, typeof(PhotonSpinRandom))]
     [ProtoInclude(114, typeof(StormDropRandom))]
+    [WProtoInclude(114, typeof(StormDropRandom))]
     [ProtoInclude(115, typeof(BlastCircuitRandom))]
+    [WProtoInclude(115, typeof(BlastCircuitRandom))]
     [ProtoInclude(116, typeof(WaveSplatRandom))]
-    public abstract class AbstractRandom : IRandom
+    [WProtoInclude(116, typeof(WaveSplatRandom))]
+    public abstract partial class AbstractRandom : IRandom
     {
 #if SINGLE_THREADED
         private static readonly Dictionary<Type, Array> EnumTypeCache = new();
@@ -93,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const int MaxDoubleBitAttempts = 1 << 20;
 
         [ProtoMember(1)]
+        [WProtoMember(1)]
         protected double? _cachedGaussian;
 
         public abstract RandomState InternalState { get; }
@@ -102,15 +122,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         // Bit/byte reservoirs to accelerate small requests
         // Note: included in protobuf to preserve exact generator state across round-trips
         [ProtoMember(2)]
+        [WProtoMember(2)]
         protected uint _bitBuffer;
 
         [ProtoMember(3)]
+        [WProtoMember(3)]
         protected int _bitCount;
 
         [ProtoMember(4)]
+        [WProtoMember(4)]
         protected uint _byteBuffer;
 
         [ProtoMember(5)]
+        [WProtoMember(5)]
         protected int _byteCount;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

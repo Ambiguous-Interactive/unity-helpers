@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A wyhash-inspired PRNG variant (WyRandom) leveraging multiply-mix operations for speed and good distribution.
@@ -56,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
-    public sealed class WyRandom : AbstractRandom
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class WyRandom : AbstractRandom
     {
         private const ulong Prime0 = 0xa0761d6478bd642f;
         private const ulong Prime1 = 0xe7037ed1a0b428db;
@@ -66,6 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState => BuildState(_state);
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private ulong _state;
 
         public WyRandom()

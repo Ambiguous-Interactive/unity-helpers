@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A classic, extremely fast XorShift PRNG with small state and modest quality.
@@ -62,7 +63,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class XorShiftRandom : AbstractRandom
+    [WProtoContract]
+    public sealed partial class XorShiftRandom : AbstractRandom
     {
         public static XorShiftRandom Instance => ThreadLocalRandom<XorShiftRandom>.Instance;
 
@@ -71,6 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const uint DefaultState = 2463534242U;
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint _state;
 
         private static uint NormalizeState(uint state)

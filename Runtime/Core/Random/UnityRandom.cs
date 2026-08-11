@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// An adapter over <c>UnityEngine.Random</c> exposing the <see cref="IRandom"/> interface.
@@ -56,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class UnityRandom : AbstractRandom
+    [WProtoContract]
+    public sealed partial class UnityRandom : AbstractRandom
     {
         public static readonly UnityRandom Instance = new();
 
@@ -80,6 +82,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private readonly int? _seed;
 
         public UnityRandom()

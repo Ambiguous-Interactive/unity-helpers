@@ -105,6 +105,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual("initialized", read.FromInitializer);
         }
 
+        /// <summary>
+        /// The flag leaves a type that writes no constructor of its own constructible.
+        /// </summary>
+        /// <remarks>
+        /// The real assertion is that this file compiles: <c>new NoConstructorContract()</c> resolves
+        /// to the implicit parameterless constructor, which a generated one would have removed. The
+        /// runtime half checks the type still reads, so the case is not merely compiled and ignored.
+        /// </remarks>
+        [Test]
+        public void TheFlagDoesNotRemoveAnImplicitConstructor()
+        {
+            NoConstructorContract fresh = new NoConstructorContract();
+
+            Assert.AreEqual(0, fresh.Seed);
+            Assert.AreEqual(7, Read<NoConstructorContract>("0807").Seed);
+        }
+
         [Test]
         public void SkipConstructorDoesNotChangeTheBytes()
         {

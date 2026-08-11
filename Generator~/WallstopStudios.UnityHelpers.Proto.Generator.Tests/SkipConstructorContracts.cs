@@ -67,6 +67,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
     }
 
+    /// <summary>
+    /// The flag on a type that writes no constructor of its own, which must stay constructible.
+    /// </summary>
+    /// <remarks>
+    /// Emitting a constructor here would remove the implicit parameterless one and break
+    /// <c>new NoConstructorContract()</c> in the consumer's own source -- an attribute silently
+    /// breaking unrelated code. There is also nothing to skip: the implicit constructor runs field
+    /// initializers and nothing else.
+    /// </remarks>
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class NoConstructorContract
+    {
+        /// <summary>The saved seed.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int Seed;
+    }
+
     /// <summary>The same shape without the flag, as the control.</summary>
     [ProtoContract]
     [WProtoContract]

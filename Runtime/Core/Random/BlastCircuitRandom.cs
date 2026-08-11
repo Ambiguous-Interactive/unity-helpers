@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// BlastCircuit: a four-word ARX-style generator with rotational feedback.
@@ -57,7 +58,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class BlastCircuitRandom : AbstractRandom
+    [WProtoContract]
+    public sealed partial class BlastCircuitRandom : AbstractRandom
     {
         private const ulong Increment = 111_111_111_111_111UL;
         private const ulong GoldenGamma = 0x9E3779B97F4A7C15UL;
@@ -80,15 +82,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private ulong _a;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private ulong _b;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private ulong _c;
 
         [ProtoMember(9)]
+        [WProtoMember(9)]
         private ulong _d;
 
         public BlastCircuitRandom()

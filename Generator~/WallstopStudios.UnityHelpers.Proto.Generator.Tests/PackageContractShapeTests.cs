@@ -58,6 +58,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ["AttributeModification"] = typeof(ModificationShape),
             ["PeriodicEffectDefinition"] = typeof(PeriodicShape),
             ["Cache"] = typeof(CacheHolderShape.CacheShape<>),
+            ["AbstractRandom"] = typeof(RandomBaseShape),
+            ["PcgRandom"] = typeof(RandomLeafShape),
+            ["XorShiftRandom"] = typeof(RandomLeafShape),
+            ["XoroShiroRandom"] = typeof(RandomLeafShape),
+            ["UnityRandom"] = typeof(RandomLeafShape),
+            ["LinearCongruentialGenerator"] = typeof(RandomLeafShape),
+            ["SquirrelRandom"] = typeof(RandomLeafShape),
+            ["RomuDuo"] = typeof(RandomLeafShape),
+            ["SplitMix64"] = typeof(RandomLeafShape),
+            ["IllusionFlow"] = typeof(RandomLeafShape),
+            ["FlurryBurstRandom"] = typeof(RandomLeafShape),
+            ["BlastCircuitRandom"] = typeof(RandomLeafShape),
+            ["WaveSplatRandom"] = typeof(RandomLeafShape),
+            ["DotNetRandom"] = typeof(RandomSkippingShape),
+            ["SystemRandom"] = typeof(RandomSkippingShape),
+            ["WyRandom"] = typeof(RandomSkippingShape),
+            ["PhotonSpinRandom"] = typeof(RandomSkippingShape),
+            ["StormDropRandom"] = typeof(RandomSkippingShape),
         };
 
         // ForeignVector3's surrogate pair is registered for the whole assembly by OracleModelSetup.
@@ -294,6 +312,54 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             AssertIdentical(gamma, "three levels deep");
             AssertIdentical<IncludeBeta>(gamma, "middle level holding a deeper runtime type");
+        }
+
+        /// <summary>
+        /// The generator family's shape, in every position a saved generator can be in.
+        /// </summary>
+        /// <remarks>
+        /// Seventeen contracts share it, and all seventeen are reached through the base's includes.
+        /// The declared type is asserted both ways round because a generator is usually held as
+        /// <c>IRandom</c> and saved as its concrete self.
+        /// </remarks>
+        [Test]
+        public void TheGeneratorFamilyEncodesAsTheOracleEncodesIt()
+        {
+            RandomLeafShape leaf = new RandomLeafShape
+            {
+                cachedGaussian = 0.25,
+                bitBuffer = 12,
+                bitCount = 3,
+                state = ulong.MaxValue,
+                seed = -1,
+            };
+
+            AssertIdentical(leaf, "leaf, fully populated");
+            AssertIdentical<RandomBaseShape>(leaf, "leaf through the base");
+            AssertIdentical(new RandomLeafShape(), "leaf, all defaults");
+            AssertIdentical(
+                new RandomLeafShape { cachedGaussian = null, seed = null },
+                "both nullables absent"
+            );
+            AssertIdentical(
+                new RandomLeafShape { cachedGaussian = 0, seed = 0 },
+                "both nullables present and zero"
+            );
+
+            RandomSkippingShape skipping = new RandomSkippingShape
+            {
+                bitBuffer = 1,
+                generated = 9,
+                seed = 7,
+                pending = new byte[] { 1, 2, 3 },
+            };
+
+            AssertIdentical(skipping, "skip-constructor leaf");
+            AssertIdentical<RandomBaseShape>(skipping, "skip-constructor leaf through the base");
+            AssertIdentical(
+                new RandomSkippingShape { pending = Array.Empty<byte>() },
+                "an empty blob, which is written where a null one is not"
+            );
         }
 
         [Test]

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using Extension;
     using Helper;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A fast 128-bit state Xoroshiro-based PRNG with good quality and tiny footprint.
@@ -64,7 +65,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class XoroShiroRandom
+    [WProtoContract]
+    public sealed partial class XoroShiroRandom
         : AbstractRandom,
             IEquatable<XoroShiroRandom>,
             IComparable,
@@ -75,9 +77,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState => BuildState(_s0, _s1);
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         internal ulong _s0;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         internal ulong _s1;
 
         private void EnsureNonZeroState()

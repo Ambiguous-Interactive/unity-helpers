@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using Extension;
     using Helper;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -61,7 +62,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class FlurryBurstRandom
+    [WProtoContract]
+    public sealed partial class FlurryBurstRandom
         : AbstractRandom,
             IEquatable<FlurryBurstRandom>,
             IComparable,
@@ -98,21 +100,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint _a;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private uint _b;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private uint _c;
 
         [ProtoMember(9)]
+        [WProtoMember(9)]
         private uint _d;
 
         [ProtoMember(10)]
+        [WProtoMember(10)]
         private uint _e;
 
         [ProtoMember(11)]
+        [WProtoMember(11)]
         private uint _f;
 
         public FlurryBurstRandom()

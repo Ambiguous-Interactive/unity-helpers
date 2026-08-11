@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Helper;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A thin wrapper around <c>System.Random</c> that exposes the <see cref="IRandom"/> API and supports state capture.
@@ -59,7 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
-    public sealed class DotNetRandom : AbstractRandom
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class DotNetRandom : AbstractRandom
     {
         private const BindingFlags RandomFieldFlags =
             BindingFlags.Instance | BindingFlags.NonPublic;
@@ -109,12 +111,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             );
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private ulong _numberGenerated;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private int _seed;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         [JsonInclude]
         private byte[] SerializedState
         {
@@ -123,6 +128,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoIgnore]
+        [WProtoIgnore]
         [JsonIgnore]
         private byte[] _pendingStatePayload;
 
@@ -150,6 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoAfterDeserialization]
+        [WProtoAfterDeserialization]
         private void OnProtoDeserialize()
         {
             EnsureRandomInitialized();

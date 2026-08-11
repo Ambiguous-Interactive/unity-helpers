@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -60,7 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
-    public sealed class StormDropRandom
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class StormDropRandom
         : AbstractRandom,
             IEquatable<StormDropRandom>,
             IComparable,
@@ -93,12 +95,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint[] _elements = new uint[ElementCount];
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private uint _a;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private uint _b;
 
         public StormDropRandom()

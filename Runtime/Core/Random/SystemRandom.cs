@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Helper;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A reimplementation of legacy .NET <c>System.Random</c> behavior for deterministic, serializable use.
@@ -56,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
-    public sealed class SystemRandom : AbstractRandom
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class SystemRandom : AbstractRandom
     {
         private const int HalfwayInt = int.MaxValue / 2;
         private const int SeedArraySize = 56;
@@ -77,12 +79,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             randoms.
          */
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private int _inext;
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private int _inextp;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private readonly int[] _seedArray = new int[SeedArraySize];
 
         public SystemRandom()

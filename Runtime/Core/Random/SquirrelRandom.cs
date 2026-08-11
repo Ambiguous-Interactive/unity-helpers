@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// A hash-based PRNG inspired by Squirrel Eiserloh's "Squirrel Noise" approach for deterministic noise.
@@ -60,7 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract]
-    public sealed class SquirrelRandom : AbstractRandom
+    [WProtoContract]
+    public sealed partial class SquirrelRandom : AbstractRandom
     {
         private const uint BitNoise1 = 0xB5297A4D;
         private const uint BitNoise2 = 0x68E31DA4;
@@ -72,6 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState => BuildState(_position);
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint _position;
 
         public SquirrelRandom()

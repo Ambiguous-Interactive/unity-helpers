@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using Extension;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -59,7 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
-    public sealed class PhotonSpinRandom
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class PhotonSpinRandom
         : AbstractRandom,
             IEquatable<PhotonSpinRandom>,
             IComparable,
@@ -98,21 +100,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [ProtoMember(6)]
+        [WProtoMember(6)]
         private uint[] _elements = new uint[BlockSize];
 
         [ProtoMember(7)]
+        [WProtoMember(7)]
         private uint _a;
 
         [ProtoMember(8)]
+        [WProtoMember(8)]
         private uint _b;
 
         [ProtoMember(9)]
+        [WProtoMember(9)]
         private uint _c;
 
         [ProtoMember(10)]
+        [WProtoMember(10)]
         private int _index;
 
         [ProtoMember(11)]
+        [WProtoMember(11)]
         private bool _hasPrimed;
 
         public PhotonSpinRandom()

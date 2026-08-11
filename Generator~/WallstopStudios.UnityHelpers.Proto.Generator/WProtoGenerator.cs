@@ -279,11 +279,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // into an instance made by a private constructor emitted alongside it. Only meaningful
             // for a reference type that is created here at all: a struct has no constructor to skip,
             // an abstract contract creates nothing, and one that builds itself never calls `new`.
+            //
+            // The last condition is about not breaking the consumer's source. Emitting ANY
+            // constructor into a type that declares none removes the implicit parameterless one, so
+            // `new Theirs()` stops compiling -- an attribute silently breaking unrelated code. A type
+            // that declares no constructor also has nothing to skip: the implicit one runs field
+            // initializers and nothing else, which is exactly what the emitted one would do.
             bool skipConstructor =
                 Shape.SkipsConstructor(contract)
                 && !contract.IsValueType
                 && !contract.IsAbstract
-                && !constructAtEnd;
+                && !constructAtEnd
+                && DeclaresAConstructor(contract);
 
             // Not asked of a contract that builds itself. The diagnostic exists because the formatter
             // normally calls `new T()` to have something to read into; a contract with a member that
@@ -452,6 +459,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Outdent();
             writer.Line("}");
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="contract"/> writes any constructor of its own.
+        /// </summary>
+        /// <param name="contract">The contract to inspect.</param>
+        /// <returns><c>true</c> when at least one instance constructor appears in source.</returns>
+        private static bool DeclaresAConstructor(INamedTypeSymbol contract)
+        {
+            foreach (IMethodSymbol constructor in contract.InstanceConstructors)
+            {
+                if (!constructor.IsImplicitlyDeclared)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
