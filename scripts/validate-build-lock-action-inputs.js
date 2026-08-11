@@ -30,11 +30,28 @@ function isBlankOrComment(line) {
 }
 
 /**
- * Collects the `with:` keys a step supplies, starting from the step's `uses:` line.
+ * Column a line's first key sits at.
  *
- * Only lines at exactly the mapping's key column count as keys, so a block scalar's content and a
- * nested mapping cannot be mistaken for one. Scanning stops at the first line indented less than
- * the step's own keys, which is what ends a step in workflow and composite-action YAML alike.
+ * A YAML sequence item carries its first key after the dash, so `- uses: x` and a `uses:` on its own
+ * line inside the same step share a key column even though their raw indentation differs by two.
+ * Measuring raw indentation instead makes a step's own opening line look like it belongs to the
+ * enclosing block.
+ *
+ * @param {string} line Raw line.
+ * @returns {number} Column the first key starts at.
+ */
+function keyColumn(line) {
+  const indent = line.length - line.trimStart().length;
+  return /^-\s/.test(line.trim()) ? indent + 2 : indent;
+}
+
+/**
+ * Collects the `with:` keys a step supplies.
+ *
+ * Only lines at exactly the mapping's key column count as keys, so a block scalar's content, a
+ * nested mapping and a list-valued input's items cannot be mistaken for one. Scanning stops at the
+ * first line whose keys sit outside the step, which is what ends a step in workflow and
+ * composite-action YAML alike.
  *
  * @param {string[]} lines All lines of the file.
  * @param {number} usesLineIndex Index of the `uses:` line.
@@ -44,17 +61,48 @@ function isBlankOrComment(line) {
 function collectWithKeys(lines, usesLineIndex, stepColumn) {
   let withColumn = -1;
   let keyColumnInWith = -1;
+  let start = usesLineIndex;
   const supplied = [];
 
-  for (let index = usesLineIndex + 1; index < lines.length; index += 1) {
+  // Scanning starts at the step's FIRST line, not at `uses:`. A mapping's keys are unordered in
+  // YAML, so `with:` may legally precede `uses:` in the same step; a forward-only scan would find no
+  // `with:` at all and report every required input missing. A false failure here blocks a bump that
+  // works, which is worse than the drift this gate exists to catch.
+  for (let index = usesLineIndex; index >= 0; index -= 1) {
     const line = lines[index];
     if (isBlankOrComment(line)) {
       continue;
     }
-    const indent = line.length - line.trimStart().length;
+    const indent = keyColumn(line);
+    // Deeper lines belong to a sibling key's own block -- `with:`'s inputs, an `env:` mapping -- and
+    // must be walked THROUGH, not treated as the boundary. Only a shallower line leaves the step.
+    if (indent > stepColumn) {
+      continue;
+    }
+    if (indent < stepColumn) {
+      break;
+    }
+    start = index;
+    if (/^-\s/.test(line.trim())) {
+      break;
+    }
+  }
+
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (isBlankOrComment(line)) {
+      continue;
+    }
+    const indent = keyColumn(line);
 
     if (withColumn === -1) {
       if (indent < stepColumn) {
+        return supplied;
+      }
+      // A sequence item at the step's own column past the first line is the NEXT step. Without this
+      // the scan runs on and adopts that step's `with:` block as this call's, reporting inputs the
+      // call never passed -- and reporting them against the wrong action.
+      if (index > start && indent === stepColumn && /^-\s/.test(line.trim())) {
         return supplied;
       }
       if (indent === stepColumn && /^with:\s*$/.test(line.trim())) {
@@ -122,9 +170,7 @@ function collectCalls(filePath, relativePath) {
       ref,
       file: relativePath,
       line: index + 1,
-      // The column the key itself starts at, which is the level its sibling keys share -- so
-      // `- uses: x` and a `uses:` on its own line inside the same step both resolve correctly.
-      supplied: collectWithKeys(lines, index, line.indexOf("uses:"))
+      supplied: collectWithKeys(lines, index, keyColumn(line))
     });
   }
   return calls;
