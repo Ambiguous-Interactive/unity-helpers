@@ -875,6 +875,17 @@ int payloadSize =
 
 ### Annotating your own contracts
 
+> **`[ProtoContract]` is not read.** WallstopProto has its own attributes and only its own attributes.
+> A type annotated for protobuf-net keeps being served by protobuf-net; it does **not** get a
+> generated formatter, and it will not be AOT-safe under IL2CPP. Moving a contract across means
+> adding `[WProtoContract]` beside `[ProtoContract]` and `[WProtoMember(n)]` beside each
+> `[ProtoMember(n)]`, with the same field numbers.
+>
+> This is deliberate. Reusing protobuf-net's attributes would have made the two serializers
+> indistinguishable at the declaration, so a feature protobuf-net supports and this one does not —
+> `AsReference`, `DynamicType`, `DataFormat` — would read as supported and silently mean something
+> else. Separate attributes make the set of things that round-trip explicit.
+
 Annotate a type and a formatter is generated for it, in your assembly, at your build. Field numbers
 are the wire contract; `Name` is not written to the wire at all, and exists so a schema, a
 diagnostic, or a payload dump does not change meaning when you rename a C# member:
