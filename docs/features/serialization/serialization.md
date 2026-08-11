@@ -1314,8 +1314,10 @@ own `IWProtoFormatter<T>` implementation, and the generator registers one per cl
 finds — `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
 something this package hard-codes.
 
-Nothing about your own contracts changes: a member typed as one of these collections is still written
-as a repeated field or a map, exactly as protobuf-net writes it.
+Nothing about your own contracts changes. A member typed as one of these collections is written
+exactly as it was before — a map for the dictionaries, a repeated field for the sets — and the three
+that implement neither `ICollection<T>` nor `IDictionary<,>` are still refused as members, with the
+same `WPROTO003` they always produced.
 
 ### Hostile payloads
 

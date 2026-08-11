@@ -58,10 +58,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            value = new SerializableHashSet<T>();
-            value._items = wrapper.Items;
-            value._preserveSerializedEntries = true;
-            value.OnAfterDeserialize();
+            SerializableHashSet<T> restored = new SerializableHashSet<T>();
+            restored._items = wrapper.Items;
+            restored._preserveSerializedEntries = true;
+            restored.OnAfterDeserialize();
+
+            value = restored;
             return true;
         }
 
@@ -111,10 +113,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            value = new SerializableSortedSet<T>();
-            value._items = wrapper.Items;
-            value._preserveSerializedEntries = true;
-            value.OnAfterDeserialize();
+            SerializableSortedSet<T> restored = new SerializableSortedSet<T>();
+            restored._items = wrapper.Items;
+            restored._preserveSerializedEntries = true;
+            restored.OnAfterDeserialize();
+
+            value = restored;
             return true;
         }
 
@@ -165,11 +169,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            value = new SerializableDictionary<TKey, TValue>();
-            value._keys = wrapper.Keys;
-            value._values = wrapper.Values;
-            value._preserveSerializedEntries = true;
-            value.OnAfterDeserialize();
+            SerializableDictionary<TKey, TValue> restored =
+                new SerializableDictionary<TKey, TValue>();
+            restored._keys = wrapper.Keys;
+            restored._values = wrapper.Values;
+            restored._preserveSerializedEntries = true;
+            restored.OnAfterDeserialize();
+
+            value = restored;
             return true;
         }
 
@@ -237,11 +244,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            value = new SerializableSortedDictionary<TKey, TValue>();
-            value._keys = wrapper.Keys;
-            value._values = wrapper.Values;
-            value._preserveSerializedEntries = true;
-            value.OnAfterDeserialize();
+            SerializableSortedDictionary<TKey, TValue> restored =
+                new SerializableSortedDictionary<TKey, TValue>();
+            restored._keys = wrapper.Keys;
+            restored._values = wrapper.Values;
+            restored._preserveSerializedEntries = true;
+            restored.OnAfterDeserialize();
+
+            value = restored;
             return true;
         }
 
@@ -306,12 +316,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 capacity = itemCount;
             }
 
-            value = new Deque<T>(capacity);
+            Deque<T> restored = new Deque<T>(capacity);
             for (int index = 0; index < itemCount; index++)
             {
-                value.PushBack(wrapper.Items[index]);
+                restored.PushBack(wrapper.Items[index]);
             }
 
+            value = restored;
             return true;
         }
 
@@ -435,12 +446,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            value = new SparseSet(capacity);
+            SparseSet restored = new SparseSet(capacity);
             for (int index = 0; index < itemCount; index++)
             {
-                value.TryAdd(wrapper.Elements[index]);
+                restored.TryAdd(wrapper.Elements[index]);
             }
 
+            value = restored;
             return true;
         }
 
