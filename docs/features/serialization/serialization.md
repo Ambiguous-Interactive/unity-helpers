@@ -1157,6 +1157,42 @@ Two consequences worth knowing:
   built once the last member is read; the other replaces the instance when an include tag arrives.
   The generator refuses rather than picking.
 
+#### Reading without running your constructor
+
+Some types cannot be read into a freshly constructed instance, because the constructor does work the
+payload is meant to replace. A pseudo-random generator is the canonical case: its constructor seeds a
+live generator, and the hook that rebuilds one from a saved seed sensibly does nothing when a
+generator already exists — so constructing first hands back a generator on a **different stream** than
+the one you saved, with nothing to report it.
+
+`SkipConstructor` says not to:
+
+```csharp
+[WProtoContract(SkipConstructor = true)]
+public sealed partial class Generator
+{
+    [WProtoMember(1)]
+    private int _seed;
+
+    private State _state;
+
+    public Generator() => _state = State.From(Guid.NewGuid());   // never runs on read
+
+    [WProtoAfterDeserialization]
+    private void Rebuild() => _state ??= State.From(_seed);
+}
+```
+
+This mirrors protobuf-net's flag of the same name, and produces the same bytes. It differs in **how**:
+protobuf-net allocates the object uninitialized through reflection, which is exactly what does not
+survive IL2CPP, so the generator emits a private constructor into your type's `partial` declaration
+instead. The consequence is that C# field initializers and base constructors still run, where under
+protobuf-net they do not — the object is more initialized, never less.
+
+The flag is **inert on a type that declares no constructor of its own**. There is nothing to skip
+there, and emitting a constructor would delete the implicit parameterless one and stop `new Yours()`
+from compiling in your own code.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
