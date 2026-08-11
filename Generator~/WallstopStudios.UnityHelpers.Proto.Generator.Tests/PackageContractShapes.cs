@@ -383,12 +383,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(3)]
         [WProtoMember(3)]
         public int bitCount;
+
+        /// <summary>A byte reservoir.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public uint byteBuffer;
+
+        /// <summary>How much of the byte reservoir is unread.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public int byteCount;
     }
 
     /// <summary>
-    /// Stands in for the twelve generators whose state is plain fields, in the subtype tag space the
-    /// real ones use.
+    /// Stands in for the twelve generators whose state is plain fields, over the union of the tags
+    /// and member shapes they use.
     /// </summary>
+    /// <remarks>
+    /// The tag span is 6 to 11 because <c>FlurryBurstRandom</c> reaches 11, and the member types are
+    /// the union across all twelve: <c>ulong</c>, <c>uint</c>, <c>int</c>, <c>bool</c>,
+    /// <c>uint[]</c> and a nullable. Covering the union is what
+    /// <c>ContractMirrorTests.EveryStandInCoversTheTagsOfEveryContractItPinsFor</c> requires, and it
+    /// is the rule that keeps a stand-in from quietly pinning less than the contract declares.
+    /// </remarks>
     [ProtoContract]
     [WProtoContract]
     public sealed partial class RandomLeafShape : RandomBaseShape
@@ -398,9 +415,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(6)]
         public ulong state;
 
-        /// <summary>An optional seed, present only when the generator was given one.</summary>
+        /// <summary>A second state word, or a readonly increment.</summary>
         [ProtoMember(7)]
         [WProtoMember(7)]
+        public ulong increment;
+
+        /// <summary>A block of drawn values, as the block generators keep.</summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public uint[] elements;
+
+        /// <summary>A word-sized piece of state.</summary>
+        [ProtoMember(9)]
+        [WProtoMember(9)]
+        public uint word;
+
+        /// <summary>A position within the block.</summary>
+        [ProtoMember(10)]
+        [WProtoMember(10)]
+        public int index;
+
+        /// <summary>An optional seed, present only when the generator was given one.</summary>
+        [ProtoMember(11)]
+        [WProtoMember(11)]
         public int? seed;
     }
 
@@ -421,6 +458,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(7)]
         [WProtoMember(7)]
         public int seed;
+
+        /// <summary>A block of drawn values, as the block generators keep.</summary>
+        [ProtoMember(9)]
+        [WProtoMember(9)]
+        public uint[] elements;
+
+        /// <summary>A word-sized piece of state.</summary>
+        [ProtoMember(10)]
+        [WProtoMember(10)]
+        public uint word;
+
+        /// <summary>Whether the block has been filled once.</summary>
+        [ProtoMember(11)]
+        [WProtoMember(11)]
+        public bool primed;
 
         /// <summary>
         /// The opaque state blob, captured on write and held for the hook on read.

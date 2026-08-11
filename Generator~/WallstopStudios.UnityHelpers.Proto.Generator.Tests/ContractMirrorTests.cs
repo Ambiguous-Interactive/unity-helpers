@@ -402,6 +402,100 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// Every stand-in declares at least the field numbers of every contract it pins bytes for.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Requiring a stand-in at all is not enough if the stand-in can quietly be smaller than the
+        /// contract. The first one written for <c>AbstractRandom</c> declared tags 1 to 3 where the
+        /// real base declares 1 to 5, so nothing pinned the byte reservoir's encoding — it passed the
+        /// mirror gate, passed the shape differential, and covered less than either implied. A
+        /// reviewer caught it; this is what catches the next one.
+        /// </para>
+        /// <para>
+        /// A superset rather than an exact match, because one stand-in deliberately serves many
+        /// contracts: seventeen generators share two shapes between them, and the stand-in spans the
+        /// union of the tags they use.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void EveryStandInCoversTheTagsOfEveryContractItPinsFor()
+        {
+            Dictionary<string, ContractDeclaration> byName = RuntimeContracts()
+                .GroupBy(contract => contract.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+            List<string> failures = new List<string>();
+            foreach (KeyValuePair<string, Type> entry in PackageContractShapeTests.Mirrors)
+            {
+                if (!byName.TryGetValue(entry.Key, out ContractDeclaration contract))
+                {
+                    failures.Add(
+                        $"'{entry.Key}' is mapped to a stand-in but declares no contract."
+                    );
+                    continue;
+                }
+
+                HashSet<string> standIn = new HashSet<string>(
+                    TagsOf(entry.Value),
+                    StringComparer.Ordinal
+                );
+
+                foreach (string tag in TagsOf(contract).Where(tag => !standIn.Contains(tag)))
+                {
+                    failures.Add(
+                        contract.Where
+                            + $"'{contract.Name}' declares field {tag}, which its stand-in "
+                            + $"'{entry.Value.Name}' does not, so nothing pins that member's encoding."
+                    );
+                }
+            }
+
+            Assert.That(failures, Is.Empty, string.Join(Environment.NewLine, failures));
+        }
+
+        private static IEnumerable<string> TagsOf(ContractDeclaration contract)
+        {
+            return contract
+                .Members.Select(member =>
+                    member.WProtoArguments.TryGetValue("tag", out string tag) ? tag : null
+                )
+                .Where(tag => tag != null);
+        }
+
+        private static IEnumerable<string> TagsOf(Type standIn)
+        {
+            const string attribute =
+                "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoMemberAttribute";
+
+            // Reflection is fine HERE and nowhere near the serializer: these stand-ins live in the
+            // test assembly, which does load, and reading their attributes is the only way to compare
+            // them against contracts that are parsed from source rather than compiled.
+            foreach (
+                System.Reflection.MemberInfo member in standIn.GetMembers(
+                    System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.NonPublic
+                        | System.Reflection.BindingFlags.Instance
+                        | System.Reflection.BindingFlags.DeclaredOnly
+                )
+            )
+            {
+                foreach (
+                    System.Reflection.CustomAttributeData data in member.GetCustomAttributesData()
+                )
+                {
+                    if (
+                        data.AttributeType.FullName == attribute
+                        && 0 < data.ConstructorArguments.Count
+                    )
+                    {
+                        yield return data.ConstructorArguments[0].Value.ToString();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Every reason either stands on its own or defers to another entry that does.
         /// </summary>
         /// <remarks>

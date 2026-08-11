@@ -330,12 +330,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 cachedGaussian = 0.25,
                 bitBuffer = 12,
                 bitCount = 3,
+                byteBuffer = uint.MaxValue,
+                byteCount = -1,
                 state = ulong.MaxValue,
+                increment = 7,
+                elements = new uint[] { 1, 0, uint.MaxValue },
+                word = 5,
+                index = 2,
                 seed = -1,
             };
 
-            AssertIdentical(leaf, "leaf, fully populated");
-            AssertIdentical<RandomBaseShape>(leaf, "leaf through the base");
+            AssertInterops(leaf, "leaf, every member populated");
+            AssertInterops<RandomBaseShape>(leaf, "leaf through the base");
             AssertIdentical(new RandomLeafShape(), "leaf, all defaults");
             AssertIdentical(
                 new RandomLeafShape { cachedGaussian = null, seed = null },
@@ -346,16 +352,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "both nullables present and zero"
             );
 
+            // The base's own five members, with nothing from a subtype, so a renumbering there
+            // cannot hide behind the subtype's bytes.
+            AssertIdentical(
+                new RandomLeafShape
+                {
+                    cachedGaussian = -0.5,
+                    bitBuffer = 1,
+                    bitCount = 2,
+                    byteBuffer = 3,
+                    byteCount = 4,
+                },
+                "base members only"
+            );
+
             RandomSkippingShape skipping = new RandomSkippingShape
             {
                 bitBuffer = 1,
+                byteBuffer = 2,
+                byteCount = 3,
                 generated = 9,
                 seed = 7,
+                elements = new uint[] { 4, 5 },
+                word = 6,
+                primed = true,
                 pending = new byte[] { 1, 2, 3 },
             };
 
-            AssertIdentical(skipping, "skip-constructor leaf");
-            AssertIdentical<RandomBaseShape>(skipping, "skip-constructor leaf through the base");
+            AssertInterops(skipping, "skip-constructor leaf");
+            AssertInterops<RandomBaseShape>(skipping, "skip-constructor leaf through the base");
             AssertIdentical(
                 new RandomSkippingShape { pending = Array.Empty<byte>() },
                 "an empty blob, which is written where a null one is not"
