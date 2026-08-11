@@ -722,6 +722,34 @@ if ($unityVersions.Count -lt 1) {
     Write-Info "Checked Unity version source of truth includes Unity 6000.5.2f1 as the latest version."
 }
 
+# Every Unity version CI actually tests has to be selectable when someone files a bug against it.
+# The dropdowns are hand-maintained and drifted: 6000.1 and 6000.2 were offered while 6000.3 and
+# 6000.5 -- both in the matrix -- were not, so a report against a tested version had to say "Other"
+# and lost the one field that makes a repro reproducible (#283).
+foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
+    $templatePath = Join-Path $repoRoot ".github/ISSUE_TEMPLATE/$templateName"
+    if (-not (Test-Path -LiteralPath $templatePath)) {
+        Write-Host "::error file=.github/ISSUE_TEMPLATE/$templateName::Issue template is missing."
+        $failed = $true
+        continue
+    }
+
+    $templateText = Get-Content -LiteralPath $templatePath -Raw
+    foreach ($unityVersion in $unityVersions) {
+        # "6000.5.2f1" is offered to users as "Unity 6.5 (6000.5)"; match on the stream, which is
+        # what the label carries, rather than on the patch the matrix pins.
+        $stream = ($unityVersion -split '\.')[0..1] -join '.'
+        if ($templateText -notmatch [regex]::Escape($stream)) {
+            Write-Host "::error file=.github/ISSUE_TEMPLATE/$templateName::Unity $stream is in .github/unity-versions.json but is not selectable in the Unity Version dropdown, so a report against a version CI tests cannot name it."
+            $failed = $true
+        }
+    }
+}
+
+if ($VerboseOutput -and -not $failed) {
+    Write-Info "Checked every Unity version in the source of truth is selectable in both issue templates."
+}
+
 $integrationPackagesNode = $integrationPackagesConfig.PSObject.Properties['packages']
 $reflexVersionNode = $null
 if ($integrationPackagesNode -and $null -ne $integrationPackagesNode.Value) {
