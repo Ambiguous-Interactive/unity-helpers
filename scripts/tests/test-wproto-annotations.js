@@ -20,6 +20,19 @@ const namespaceImport = "using WallstopStudios.UnityHelpers.Core.Serialization.W
 const declaringNamespace =
   "namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
+// Comments are stripped before anything is matched. A file that only MENTIONS `[WProtoContract]`
+// in prose -- Serializer's XML docs describe when the facade serves a type -- needs no import and
+// declares no contract, and demanding one there would add an unused using directive. Only
+// whole-line comments and block comments go: a `//` mid-line can sit inside a string literal
+// (every file's license header carries a URL), and truncating there would delete real code.
+function stripComments(text) {
+  const withoutBlocks = text.replace(/\/\*[\s\S]*?\*\//g, "");
+  return withoutBlocks
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
+}
+
 function sourceFiles(directory) {
   const found = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -38,7 +51,7 @@ const notPartial = [];
 const missingImport = [];
 
 for (const file of files) {
-  const text = fs.readFileSync(file, "utf8");
+  const text = stripComments(fs.readFileSync(file, "utf8"));
   if (!/\[(?:assembly:\s*)?WProto/.test(text)) {
     continue;
   }
@@ -85,7 +98,7 @@ assert.deepEqual(
 );
 
 const annotated = files.filter((file) =>
-  /\[WProtoContract/.test(fs.readFileSync(file, "utf8"))
+  /\[WProtoContract/.test(stripComments(fs.readFileSync(file, "utf8")))
 ).length;
 
 console.log(
