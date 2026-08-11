@@ -55,6 +55,11 @@ jobs:
       # validate:build-lock-action-inputs reads each one's `action.yml` at its own pin. A default
       # depth-1 checkout has only `ref`, so every other pin fails to resolve -- loudly, with the
       # remedy named, but the gate cannot run.
+      #
+      # No token is needed: the policy repository is PUBLIC. That is what lets this job run on a
+      # Dependabot pull request, whose GITHUB_TOKEN is read-only and scoped to this repository --
+      # and a Dependabot pull request is the one place a build-lock bump can be caught before it
+      # merges, because every licensed Unity leg is skipped there for want of secrets.
       - name: Checkout immutable central cleanup policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
