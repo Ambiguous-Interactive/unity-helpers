@@ -1686,7 +1686,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static T ProtoDeserialize<T>(byte[] data)
         {
 #if WALLSTOP_PROTO
-            if (data != null && WallstopProto.WProtoFacade.TryDeserialize(data, out T wproto))
+            if (data != null && TryWallstopProtoDeserialize(data, typeof(T), out T wproto))
             {
                 return wproto;
             }
@@ -1907,11 +1907,66 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
+#if WALLSTOP_PROTO
+        /// <summary>
+        /// Asks WallstopProto for <paramref name="data"/>, reporting a refusal as this package's own
+        /// corrupt-data failure rather than as the facade's.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload.</param>
+        /// <param name="concrete">The type the caller named, or <typeparamref name="T"/>.</param>
+        /// <param name="value">Receives the value when WallstopProto served the request.</param>
+        /// <returns><c>true</c> when WallstopProto served it; <c>false</c> when it is not its type.</returns>
+        /// <remarks>
+        /// <para>
+        /// The facade throws <see cref="InvalidOperationException"/> for a payload its formatter
+        /// refused, deliberately: "no formatter for this type" and "this type's formatter rejected
+        /// these bytes" are different answers, and passing the second on to protobuf-net would give a
+        /// rejected payload a second, differently-implemented decode.
+        /// </para>
+        /// <para>
+        /// This is the boundary where that becomes the wrong exception. <see cref="TryProtoDeserialize
+        /// {T}(byte[], out T)"/> promises <c>false</c> for a corrupt payload and catches only
+        /// <see cref="SerializationFailureException"/>s, so an <see cref="InvalidOperationException"/>
+        /// escaping here turns a Try API into a throwing one -- and a caller handling the documented
+        /// exceptions would miss the failure entirely.
+        /// </para>
+        /// </remarks>
+        private static bool TryWallstopProtoDeserialize<T>(byte[] data, Type concrete, out T value)
+        {
+            try
+            {
+                return WallstopProto.WProtoFacade.TryDeserializeAs(data, concrete, out value);
+            }
+            catch (InvalidOperationException e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "WallstopProto rejected the payload."
+                );
+                value = default;
+                return false;
+            }
+        }
+#endif
+
         /// <summary>
         /// Attempts to deserialize a protobuf payload. Returns <see langword="false"/> and sets
         /// <paramref name="value"/> to <see langword="default"/> for null/empty/corrupt input.
         /// Polymorphic-root resolution failures still throw (programmer error).
         /// </summary>
+        /// <remarks>
+        /// With <c>WALLSTOP_PROTO</c> defined, an <b>empty</b> payload for a type WallstopProto serves
+        /// is not an input failure: a contract whose members all equal their defaults encodes to zero
+        /// bytes, so rejecting it would refuse to read back something this serializer wrote. Such a
+        /// call returns <see langword="true"/> with an all-defaults instance. The same is already true
+        /// of the <c>Serializable*</c> collections, whose wrappers encode an empty collection as zero
+        /// bytes.
+        /// </remarks>
         public static bool TryProtoDeserialize<T>(byte[] data, out T value)
         {
             try
@@ -2060,7 +2115,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (
                 data != null
                 && type != null
-                && WallstopProto.WProtoFacade.TryDeserializeAs(data, type, out T wproto)
+                && TryWallstopProtoDeserialize(data, type, out T wproto)
             )
             {
                 return wproto;

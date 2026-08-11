@@ -1278,6 +1278,17 @@ Three rules decide the rest:
   register a root with `Serializer.RegisterProtobufRoot<TInterface, TConcrete>()` and take
   protobuf-net's path.
 
+Two consequences on the read side are worth knowing:
+
+- **An empty payload is a value, not a failure.** A contract whose members all equal their defaults
+  encodes to zero bytes, so `ProtoDeserialize` returns an all-defaults instance where an unported type
+  would report empty input. Refusing it would mean refusing to read back something this serializer
+  wrote. The `Serializable*` collections already behave this way, for the same reason.
+- **A refused payload is reported as corrupt data, not as "not mine".** WallstopProto does not hand a
+  payload its own formatter rejected on to protobuf-net for a second, differently-implemented decode,
+  so a truncated or malformed buffer raises `SerializationCorruptDataException` — which means
+  `TryProtoDeserialize` still returns `false` rather than throwing.
+
 The define is off by default while the remaining contracts are ported.
 
 ### Hostile payloads

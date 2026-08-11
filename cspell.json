@@ -862,7 +862,8 @@
         "EAGAIN",
         "nologo",
         "cmp",
-        "surrogated"
+        "surrogated",
+        "unported"
       ]
     }
   ],
