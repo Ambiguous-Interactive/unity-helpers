@@ -113,10 +113,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <remarks>
         /// Separate from the fixture that reads <c>Runtime/</c> so each rule can be driven from a
         /// synthetic source below. Whether a rule fires would otherwise depend on whether some
-        /// package contract happens to use the feature -- the include and hook rules have no live
-        /// example at all today, since every contract that declares one is in
-        /// <see cref="NotMirrored"/>, and an unexercised comparison is indistinguishable from one
-        /// that always agrees.
+        /// package contract happens to use the feature, and an unexercised comparison is
+        /// indistinguishable from one that always agrees. That is not hypothetical: the include and
+        /// hook rules had no live example at all until the generator family was ported, so until then
+        /// nothing would have noticed either of them silently passing everything.
         /// </remarks>
         private static IReadOnlyList<string> Mismatches(
             IEnumerable<ContractDeclaration> contracts,
@@ -149,6 +149,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             + $"'{contract.Name}' has [ProtoContract] but no [WProtoContract], and is "
                             + "not listed in NotMirrored with a reason."
                     );
+                    continue;
+                }
+
+                // A contract only WallstopProto knows about has nothing to be a mirror OF, so the
+                // comparison below would report every one of its members as one protobuf-net does not
+                // declare. The shape requirement still applies and is checked separately.
+                if (!contract.HasProtoContract)
+                {
                     continue;
                 }
 
@@ -373,6 +381,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryMirroredContractHasAShapePinnedAgainstTheOracle()
         {
+            // ProtobufUnitySurrogates.cs is exempt because its contracts are ALREADY stand-ins: the
+            // surrogates and the collection wrappers exist only to give another type a wire shape,
+            // and SurrogateDifferentialTests drives that shape against the oracle directly. Asking
+            // for a stand-in for a stand-in would pin the same bytes twice.
             List<string> missing = RuntimeContracts()
                 .Where(contract => !NotMirrored.ContainsKey(contract.Name))
                 .Where(contract => !PackageContractShapeTests.Mirrors.ContainsKey(contract.Name))
@@ -543,6 +555,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             internal string Where { get; private set; }
 
+            internal bool HasProtoContract { get; private set; }
+
             internal bool HasWProtoContract { get; private set; }
 
             internal IReadOnlyDictionary<string, string> ProtoContractArguments
@@ -569,18 +583,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 AttributeSyntax proto = attributes.FirstOrDefault(a =>
                     NameOf(a) == "ProtoContract"
                 );
-                if (proto == null)
+                AttributeSyntax wproto = attributes.FirstOrDefault(a =>
+                    NameOf(a) == "WProtoContract"
+                );
+
+                // Either attribute is enough to be worth inspecting. A WallstopProto-only contract has
+                // nothing to mirror, but it still has bytes, and the shape requirement is the whole
+                // point -- keying this on the protobuf-net attribute alone would let a new contract be
+                // added with no statement of what it encodes to.
+                if (proto == null && wproto == null)
                 {
                     return null;
                 }
 
-                AttributeSyntax wproto = attributes.FirstOrDefault(a =>
-                    NameOf(a) == "WProtoContract"
-                );
                 return new ContractDeclaration
                 {
                     Name = type.Identifier.ValueText,
                     Where = Location(file, type),
+                    HasProtoContract = proto != null,
                     HasWProtoContract = wproto != null,
                     ProtoContractArguments = NamedArguments(proto),
                     WProtoContractArguments = NamedArguments(wproto),

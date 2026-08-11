@@ -328,6 +328,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // then the base's members. Registering the own-members formatter wrote only the subtype's
             // half, which protobuf-net then read as the BASE's fields, silently and with no error.
             INamedTypeSymbol root = RootContract(contract);
+
+            // A subtype is written as its base writes it, so the base has to have a tag to write it
+            // under. Without the declaration there is none: serializing one reaches the base's
+            // dispatch chain, matches no branch, and fails at run time in a shipped player. The
+            // alternative -- writing this type's members alone -- is what protobuf-net would read
+            // back as the BASE's fields, so refusing is the only answer that is not silently wrong.
+            if (root != null && !DeclaresInclude(contract.BaseType, contract))
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.SubtypeNotIncluded,
+                        contract.Locations.FirstOrDefault(),
+                        contract.Name,
+                        contract.BaseType.Name
+                    )
+                );
+                return null;
+            }
+
             string entryPoint =
                 root == null ? ".WProtoFormatter.Instance" : ".WProtoRootFormatter.Instance";
 
@@ -459,6 +478,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Outdent();
             writer.Line("}");
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="baseType"/> declares <paramref name="subType"/> with
+        /// <c>[WProtoInclude]</c>.
+        /// </summary>
+        /// <param name="baseType">The immediate base contract.</param>
+        /// <param name="subType">The contract that derives from it.</param>
+        /// <returns><c>true</c> when the base names it.</returns>
+        /// <remarks>
+        /// The IMMEDIATE base, deliberately. protobuf-net refuses a grandchild declared on the
+        /// grandparent with "Unexpected sub-type" (measured), so each level declares only what
+        /// derives directly from it.
+        /// </remarks>
+        private static bool DeclaresInclude(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            foreach (AttributeData attribute in baseType.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    attribute.ConstructorArguments[1].Value is INamedTypeSymbol declared
+                    && SymbolEqualityComparer.Default.Equals(
+                        declared.OriginalDefinition,
+                        subType.OriginalDefinition
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

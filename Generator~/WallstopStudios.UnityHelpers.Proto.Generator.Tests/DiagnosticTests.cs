@@ -34,6 +34,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A subtype its base does not declare is refused at build time, not at run time.
+        /// </summary>
+        /// <remarks>
+        /// A subtype is written as its base writes it, so without an include there is no tag to
+        /// write it under and the dispatch chain matches no branch. That surfaces as a thrown
+        /// exception from the first save in a shipped player, which is exactly the outcome every
+        /// other diagnostic here exists to prevent.
+        /// </remarks>
+        [Test]
+        public void ASubtypeItsBaseDoesNotDeclareIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO018",
+                "Sub",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+        }
+
+        [Test]
+        public void ASubtypeItsBaseDeclaresIsFine()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] [WProtoInclude(100, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+            );
+        }
+
         [Test]
         public void TwoMembersClaimingOneFieldNumberIsAnError()
         {

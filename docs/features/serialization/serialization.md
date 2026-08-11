@@ -1063,6 +1063,14 @@ other, with no reflection and no `MakeGenericType`.
 An abstract contract must declare at least one include — reading it could otherwise never produce an
 instance — and a payload for one that names no subtype is malformed rather than an empty base.
 
+**A subtype is written as its base writes it**, whichever type you name at the call site.
+`ProtoSerialize<Melee>(melee)` and `ProtoSerialize<Weapon>(melee)` produce the same bytes: the
+include holding `Melee`'s members, then `Weapon`'s. That is what protobuf-net does, so payloads move
+between the two serializers unchanged.
+
+The consequence is that annotating a subtype whose base is a contract, without the base declaring it,
+is a build error (`WPROTO018`) — there would be no tag to write it under.
+
 #### Surrogates
 
 Unity's `Vector3`, `Color` and `Bounds` cannot carry `[WProtoContract]` — they are not yours to

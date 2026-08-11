@@ -170,6 +170,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor SubtypeNotIncluded = new DiagnosticDescriptor(
+            "WPROTO018",
+            "WallstopProto subtype is not declared by its base",
+            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but '{1}' does not declare it with [WProtoInclude]. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without the declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoInclude(tag, typeof({0}))] to '{1}', or remove [WProtoContract] from '{0}' if it is not meant to be serialized on its own.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",
