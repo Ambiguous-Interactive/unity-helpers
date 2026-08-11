@@ -53,6 +53,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>The local the type test binds the narrowed value to.</summary>
         internal string Local => "include" + Tag;
 
-        internal string Formatter => Proto + ".WProtoFormatterProvider.Get<" + Qualified + ">()";
+        /// <summary>
+        /// The subtype's own-members formatter, named directly rather than looked up.
+        /// </summary>
+        /// <remarks>
+        /// It must NOT go through <c>WProtoFormatterProvider</c>. What is registered for a subtype is
+        /// the formatter that writes the whole hierarchy -- include and base members -- because that
+        /// is what protobuf-net writes when the subtype is the declared type. Resolving the include's
+        /// payload through the provider would find that one and recurse forever. Naming the nested
+        /// type is also one static call instead of a registry read.
+        /// </remarks>
+        internal string Formatter => Qualified + ".WProtoFormatter.Instance";
     }
 }

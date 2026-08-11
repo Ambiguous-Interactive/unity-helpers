@@ -361,6 +361,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         internal static bool IgnoresListHandling(ITypeSymbol type)
         {
+            return ContractFlag(type, "IgnoreListHandling");
+        }
+
+        /// <summary>
+        /// Reports whether the contract on <paramref name="type"/> sets <c>SkipConstructor</c>,
+        /// which declares that no constructor the author wrote may run when reading one.
+        /// </summary>
+        /// <param name="type">The contract type.</param>
+        /// <returns><c>true</c> when the flag is set.</returns>
+        /// <remarks>
+        /// Load-bearing rather than an optimization. <c>DotNetRandom</c>'s parameterless constructor
+        /// seeds a live generator from a fresh <c>Guid</c>, and its after-deserialization hook
+        /// returns early when one already exists -- so a formatter that called it would hand back a
+        /// generator on a random stream instead of the saved one, silently, and only for a save the
+        /// player had already made.
+        /// </remarks>
+        internal static bool SkipsConstructor(ITypeSymbol type)
+        {
+            return ContractFlag(type, "SkipConstructor");
+        }
+
+        private static bool ContractFlag(ITypeSymbol type, string name)
+        {
             AttributeData contract = FindContractAttribute(type);
             if (contract == null)
             {
@@ -369,9 +392,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (KeyValuePair<string, TypedConstant> argument in contract.NamedArguments)
             {
-                if (argument.Key == "IgnoreListHandling" && argument.Value.Value is bool ignore)
+                if (argument.Key == name && argument.Value.Value is bool flag)
                 {
-                    return ignore;
+                    return flag;
                 }
             }
 

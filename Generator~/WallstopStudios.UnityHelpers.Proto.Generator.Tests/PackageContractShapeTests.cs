@@ -251,6 +251,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A subtype encodes the same under its own declared type as it does under its base's.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// protobuf-net always writes from the outermost contract in the chain, so
+        /// <c>Serialize&lt;Alpha&gt;</c> and <c>Serialize&lt;Base&gt;</c> produce identical bytes --
+        /// measured, not assumed. Registering the formatter that writes only the subtype's own
+        /// members produced the include payload on its own, which protobuf-net then read as the
+        /// BASE's fields: <c>AlphaOnly</c> arriving as <c>Id</c>, with no error anywhere.
+        /// </para>
+        /// <para>
+        /// This is the shape <c>AbstractRandom</c> and its seventeen generators have, and a saved
+        /// generator that reloads with its fields shuffled is a different game.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void ASubtypeEncodesTheSameUnderItsOwnDeclaredTypeAsUnderItsBase()
+        {
+            IncludeAlpha alpha = new IncludeAlpha
+            {
+                Id = 1,
+                Label = "L",
+                AlphaOnly = 2,
+                AlphaText = "A",
+            };
+
+            Assert.AreEqual(
+                Hex(OracleWriteAs<IncludeBase>(alpha)),
+                Hex(OracleWrite(alpha)),
+                "the oracle's own two spellings disagree, so the premise is wrong"
+            );
+            AssertIdentical(alpha, "leaf subtype as its own root");
+
+            IncludeGamma gamma = new IncludeGamma
+            {
+                Id = 3,
+                BetaOnly = 0.5,
+                GammaOnly = true,
+            };
+
+            AssertIdentical(gamma, "three levels deep");
+            AssertIdentical<IncludeBeta>(gamma, "middle level holding a deeper runtime type");
+        }
+
         [Test]
         public void AGenericContractNestedInANonGenericTypeEncodesAsTheOracleEncodesIt()
         {
@@ -327,6 +372,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             using MemoryStream stream = new MemoryStream();
             ProtoBuf.Serializer.Serialize(stream, value);
+            return stream.ToArray();
+        }
+
+        private static byte[] OracleWriteAs<TDeclared>(TDeclared value)
+        {
+            using MemoryStream stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize<TDeclared>(stream, value);
             return stream.ToArray();
         }
 
