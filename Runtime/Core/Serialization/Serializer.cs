@@ -2052,6 +2052,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <returns>The decoded instance cast to <typeparamref name="T"/>.</returns>
         public static T ProtoDeserialize<T>(byte[] data, Type type)
         {
+#if WALLSTOP_PROTO
+            // The overload a caller reaches for when the declared type is not the type on the wire.
+            // Served only when the formatter registered for T is one that produces `type` -- its own
+            // declared type, or a subtype it declares an include for. Anything else is a payload
+            // this contract did not write, and protobuf-net's answer is the right one.
+            if (
+                data != null
+                && type != null
+                && WallstopProto.WProtoFacade.TryDeserializeAs(data, type, out T wproto)
+            )
+            {
+                return wproto;
+            }
+#endif
+
             if (data == null)
             {
                 SerializationFailureException.ThrowNullInput<T>(
@@ -2149,6 +2164,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <param name="input">The instance to serialize.</param>
         /// <param name="forceRuntimeType">When true, always serialize as the runtime type; otherwise uses declared type unless it is interface/abstract/object.</param>
         /// <returns>Serialized bytes.</returns>
+        /// <remarks>
+        /// With <c>WALLSTOP_PROTO</c> defined, a type carrying <c>[WProtoContract]</c> is served by
+        /// WallstopProto instead, including a value held as a base type the contract declares
+        /// <c>[WProtoInclude]</c> for. The bytes are the same either way.
+        /// <paramref name="forceRuntimeType"/> does not disable that: a generated formatter already
+        /// dispatches on the runtime type.
+        /// </remarks>
         /// <example>
         /// <code>
         /// [ProtoContract]
@@ -2161,13 +2183,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
 #if WALLSTOP_PROTO
             // The facade swap, opt-in per type: a contract with a generated formatter takes the
-            // reflection-free path, everything else falls through to protobuf-net unchanged. Not
-            // taken when the caller asked for runtime-type dispatch, which is protobuf-net's model
-            // rather than a formatter's.
-            if (
-                !forceRuntimeType
-                && WallstopProto.WProtoFacade.TrySerialize(input, out byte[] wproto)
-            )
+            // reflection-free path, everything else falls through to protobuf-net unchanged.
+            //
+            // forceRuntimeType does not turn it off. A generated formatter dispatches on the value's
+            // RUNTIME type and writes the include holding its members followed by the base's, which
+            // is what this flag asks for and byte-for-byte what protobuf-net's non-generic path
+            // produces for the same value. Declining here would send precisely the polymorphic calls
+            // this flag exists for down the reflection path -- the one that cannot run under IL2CPP.
+            if (WallstopProto.WProtoFacade.TrySerialize(input, out byte[] wproto))
             {
                 return wproto;
             }
@@ -2222,6 +2245,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             bool forceRuntimeType = false
         )
         {
+#if WALLSTOP_PROTO
+            // The same swap the allocating overload takes, and it has to be here too: this is the
+            // entry point a caller serializing every frame uses, so leaving it out meant the hot
+            // path was the one still reaching protobuf-net. WProtoFacade.Serialize reuses the
+            // caller's buffer exactly as the code below does, so nothing about the contract changes.
+            WallstopProto.WProtoWriteResult wproto = WallstopProto.WProtoFacade.Serialize(
+                input,
+                ref buffer
+            );
+            if (wproto.Served)
+            {
+                return wproto.Length;
+            }
+#endif
+
             Type declared = typeof(T);
 
             // Intercept serializable collection types to use wrapper-based serialization

@@ -563,7 +563,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Proto
                     + ".IWProtoFormatter<"
                     + qualified
-                    + ">"
+                    + ">, "
+                    + Proto
+                    + ".IWProtoPolymorphicFormatter"
                     + Writer.Open
             );
             writer.Indent();
@@ -573,6 +575,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("public static readonly WProtoFormatter Instance = new WProtoFormatter();");
             writer.Blank();
 
+            EmitCanWrite(writer, qualified, includes);
+            writer.Blank();
             EmitMeasure(writer, contract, qualified, members, includes, hooks);
             writer.Blank();
             EmitWrite(writer, contract, qualified, members, includes, hooks);
@@ -588,6 +592,60 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 skipConstructor
             );
 
+            writer.Outdent();
+            writer.Line("}");
+        }
+
+        /// <summary>
+        /// Emits <c>CanWrite</c>, the question the facade asks before serving a value whose runtime
+        /// type is not its declared one.
+        /// </summary>
+        /// <param name="writer">The destination.</param>
+        /// <param name="qualified">The contract's fully-qualified name.</param>
+        /// <param name="includes">The subtypes this contract declares.</param>
+        /// <remarks>
+        /// <para>
+        /// The shape mirrors <see cref="EmitIncludeDispatch"/> branch for branch, deliberately:
+        /// <c>IsAssignableFrom</c> is what <c>value is Sub</c> compiles to, and each branch recurses
+        /// into the same formatter the dispatch chain would have entered. Answering from a separate
+        /// list of subtypes would be a second description of the same thing, free to drift.
+        /// </para>
+        /// <para>
+        /// A type the chain would refuse therefore answers <c>false</c> here, before any hook runs.
+        /// That ordering is the point: the refusal is an exception thrown from inside
+        /// <c>Measure</c>, whose first statement is the before-serialization hook, so discovering
+        /// the refusal by catching it would leave that hook run with no matching after-serialization
+        /// hook -- the pooled-scratch leak the hook contract exists to prevent.
+        /// </para>
+        /// </remarks>
+        private static void EmitCanWrite(Writer writer, string qualified, List<Include> includes)
+        {
+            writer.Line("/// <inheritdoc />");
+            writer.Line("public bool CanWrite(System.Type runtimeType)" + Writer.Open);
+            writer.Indent();
+            writer.Line("if (runtimeType == typeof(" + qualified + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return true;");
+            writer.Outdent();
+            writer.Line("}");
+
+            foreach (Include include in includes)
+            {
+                writer.Blank();
+                writer.Line(
+                    "if (typeof("
+                        + include.Qualified
+                        + ").IsAssignableFrom(runtimeType))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line("return " + include.Formatter + ".CanWrite(runtimeType);");
+                writer.Outdent();
+                writer.Line("}");
+            }
+
+            writer.Blank();
+            writer.Line("return false;");
             writer.Outdent();
             writer.Line("}");
         }
@@ -709,7 +767,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Proto
                     + ".IWProtoFormatter<"
                     + qualified
-                    + ">"
+                    + ">, "
+                    + Proto
+                    + ".IWProtoPolymorphicFormatter"
                     + Writer.Open
             );
             writer.Indent();
@@ -719,6 +779,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 "public static readonly WProtoRootFormatter Instance = new WProtoRootFormatter();"
             );
+            writer.Blank();
+            writer.Line("/// <inheritdoc />");
+            writer.Line("public bool CanWrite(System.Type runtimeType)" + Writer.Open);
+            writer.Indent();
+            // Both halves are load-bearing. The root's chain covers every type under the ROOT, which
+            // includes this contract's siblings -- values this formatter's declared type could never
+            // hold. The facade only ever asks about a value it already holds as this type, but the
+            // answer has to be right on its own terms rather than because of where it is asked from.
+            writer.Line(
+                "return typeof("
+                    + qualified
+                    + ").IsAssignableFrom(runtimeType) && "
+                    + rootQualified
+                    + ".WProtoFormatter.Instance.CanWrite(runtimeType);"
+            );
+            writer.Outdent();
+            writer.Line("}");
             writer.Blank();
             writer.Line("/// <inheritdoc />");
             writer.Line("public int Measure(in " + qualified + " value)" + Writer.Open);

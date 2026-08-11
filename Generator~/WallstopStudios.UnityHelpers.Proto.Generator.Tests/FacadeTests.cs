@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
+    using System.IO;
     using NUnit.Framework;
     using UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -201,6 +202,161 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 WProtoFormatterProvider.Register<FacadeBrokenContract>(null);
             }
+        }
+
+        [Test]
+        public void AValueHeldAsItsBaseIsServedAndMatchesTheOracle()
+        {
+            // The case the facade used to decline. A generator is almost never held as its concrete
+            // type -- `AbstractRandom` is the declared type this package documents -- so refusing
+            // anything but an exact type match meant every realistic call took the protobuf-net path,
+            // which is the one that cannot run under IL2CPP.
+            AssertServedAndIdentical<IncludeBase>(
+                new IncludeAlpha
+                {
+                    Id = 1,
+                    Label = "a",
+                    AlphaOnly = 7,
+                    AlphaText = "x",
+                }
+            );
+
+            // Two levels down, so the answer is not "the direct subtype happens to work".
+            AssertServedAndIdentical<IncludeBase>(
+                new IncludeGamma
+                {
+                    Id = 1,
+                    Label = "a",
+                    BetaOnly = 1.5,
+                    GammaOnly = true,
+                }
+            );
+
+            // And through the middle of the chain, where the declared type is itself a subtype.
+            AssertServedAndIdentical<IncludeBeta>(new IncludeGamma { BetaOnly = 2.5 });
+        }
+
+        [Test]
+        public void AValueHeldAsItsBaseComesBackAsTheSubtype()
+        {
+            IncludeBase original = new IncludeGamma
+            {
+                Id = 4,
+                Label = "z",
+                BetaOnly = 1.5,
+                GammaOnly = true,
+            };
+
+            Assert.IsTrue(WProtoFacade.TrySerialize(original, out byte[] bytes));
+            Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out IncludeBase restored));
+
+            IncludeGamma gamma = restored as IncludeGamma;
+            Assert.IsNotNull(gamma, "the subtype must survive the round trip");
+            Assert.AreEqual(4, gamma.Id);
+            Assert.AreEqual(1.5, gamma.BetaOnly);
+            Assert.IsTrue(gamma.GammaOnly);
+        }
+
+        [Test]
+        public void AnUndeclaredSubtypeFallsBackInsteadOfThrowing()
+        {
+            // The generated dispatch chain refuses a subtype no include names, by design. The facade
+            // has to read that refusal as "not mine" and let protobuf-net answer -- which is what a
+            // consumer who registered the subtype with protobuf-net's runtime model expects -- rather
+            // than propagating an exception out of a call that used to work.
+            IncludeBase undeclared = new UndeclaredAlpha { AlphaOnly = 7 };
+
+            Assert.IsFalse(WProtoFacade.TrySerialize(undeclared, out byte[] bytes));
+            Assert.IsNull(bytes);
+
+            byte[] buffer = new byte[8];
+            byte[] original = buffer;
+            WProtoWriteResult result = WProtoFacade.Serialize(undeclared, ref buffer);
+
+            Assert.IsFalse(result.Served);
+            Assert.AreSame(original, buffer, "an unserved value must leave the buffer alone");
+        }
+
+        [Test]
+        public void TheBufferOverloadServesASubtypeThroughItsBaseToo()
+        {
+            // Both write entry points share CanServe; this is what stops the allocation-free one
+            // from being the odd one out.
+            byte[] buffer = null;
+            WProtoWriteResult result = WProtoFacade.Serialize<IncludeBase>(
+                new IncludeAlpha { Id = 1, AlphaOnly = 7 },
+                ref buffer
+            );
+
+            Assert.IsTrue(result.Served);
+            Assert.Greater(result.Length, 0);
+        }
+
+        [Test]
+        public void ReadingIntoANamedTypeThisFormatterDoesNotProduceIsNotServed()
+        {
+            // The read mirror of CanServe, and the entry point it guards is the one a caller reaches
+            // for precisely when the declared type is not the type on the wire. Naming a type this
+            // contract's chain never produces means the payload is not this contract's, so the
+            // request belongs to protobuf-net -- decoding it here would hand back the wrong type
+            // from bytes something else wrote.
+            Assert.IsTrue(
+                WProtoFacade.TrySerialize<IncludeBase>(
+                    new IncludeAlpha { Id = 1, AlphaOnly = 7 },
+                    out byte[] bytes
+                )
+            );
+
+            Assert.IsTrue(
+                WProtoFacade.TryDeserializeAs(bytes, typeof(IncludeBase), out IncludeBase _)
+            );
+            Assert.IsTrue(
+                WProtoFacade.TryDeserializeAs(bytes, typeof(IncludeAlpha), out IncludeBase _),
+                "a subtype the chain declares is this formatter's to produce"
+            );
+
+            Assert.IsFalse(
+                WProtoFacade.TryDeserializeAs(bytes, typeof(UndeclaredAlpha), out IncludeBase _),
+                "a subtype no include names is not produced by this chain"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TryDeserializeAs(bytes, typeof(ScalarContract), out IncludeBase _),
+                "an unrelated contract is not produced by this chain"
+            );
+        }
+
+        [Test]
+        public void AFormatterAnswersOnlyForTypesItsDeclaredTypeCanHold()
+        {
+            // A subtype's entry point delegates to the root of its chain, which covers the root's
+            // WHOLE subtree -- including this type's siblings. Without a narrowing test it would
+            // claim a sibling it can never be handed, and the interface's answer would only be
+            // correct because of where the facade happens to ask it from.
+            IWProtoPolymorphicFormatter alpha = IncludeAlpha.WProtoRootFormatter.Instance;
+
+            Assert.IsTrue(alpha.CanWrite(typeof(IncludeAlpha)));
+            Assert.IsFalse(
+                alpha.CanWrite(typeof(IncludeGamma)),
+                "a sibling is not an IncludeAlpha"
+            );
+            Assert.IsFalse(alpha.CanWrite(typeof(UndeclaredAlpha)));
+
+            // The root does hold all of them, which is what makes the case above a narrowing rather
+            // than a missing branch.
+            IWProtoPolymorphicFormatter root = IncludeBase.WProtoFormatter.Instance;
+
+            Assert.IsTrue(root.CanWrite(typeof(IncludeGamma)));
+            Assert.IsFalse(root.CanWrite(typeof(UndeclaredAlpha)));
+        }
+
+        private static void AssertServedAndIdentical<T>(T value)
+        {
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
+
+            using MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize(stream, value);
+
+            CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
         }
 
         private sealed class FacadeBrokenContract { }

@@ -822,9 +822,10 @@ System.Text.Json can require extra care under AOT (e.g., IL2CPP):
 
 `WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree
 protobuf implementation that does no runtime reflection, so it AOT-compiles cleanly under IL2CPP where
-protobuf-net's model builder cannot. It is **not yet wired into `Serializer`** — the facade still uses
-protobuf-net — but the wire layer is public and usable today, and it is public **for your code, not just
-this package's**: a game annotates its own types and gets the same treatment.
+protobuf-net's model builder cannot. `Serializer` routes through it **per annotated type** when
+`WALLSTOP_PROTO` is defined — see [Serving through `Serializer`](#serving-through-serializer) — and the
+wire layer is public and usable today either way. It is public **for your code, not just this
+package's**: a game annotates its own types and gets the same treatment.
 
 The reader and writer are `ref struct`s over spans that allocate nothing and never throw. Every
 operation reports success, and a failure latches so a truncated write cannot look complete and a corrupt
@@ -1239,8 +1240,45 @@ formatter.Write(ref writer, state);
 `InvalidOperationException` that names the type and how to annotate it, which is the whole point: the
 alternative under IL2CPP is an `ExecutionEngineException` from inside the runtime that names nothing.
 
-Formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`. `Serializer` does
-not use them yet; they exist so the wire model is proven against real contracts.
+Hand-written formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`;
+everything else this package serializes through WallstopProto is generated from its annotations.
+
+### Serving through `Serializer`
+
+`Serializer.ProtoSerialize` / `ProtoDeserialize` ask WallstopProto first when the `WALLSTOP_PROTO`
+define is set, and fall back to protobuf-net when it declines. That makes the swap **opt-in per
+type**: annotating a contract moves it, and everything unannotated keeps working exactly as before,
+so contracts can be ported and verified one at a time.
+
+WallstopProto answers when a formatter is registered for the declared type, **and** the value's
+runtime type is one that formatter writes:
+
+```csharp
+AbstractRandom rng = new PcgRandom(seed);
+
+// Served: AbstractRandom has a formatter, and PcgRandom is one of the subtypes it declares
+// with [WProtoInclude]. The bytes are the include holding PcgRandom's members followed by
+// AbstractRandom's -- what protobuf-net writes for the same value.
+byte[] bytes = Serializer.ProtoSerialize(rng);
+
+// Comes back as PcgRandom. The payload's include tag names the subtype; the reader narrows to it.
+AbstractRandom restored = Serializer.ProtoDeserialize<AbstractRandom>(bytes);
+```
+
+Three rules decide the rest:
+
+- **A subtype nothing declares falls back to protobuf-net.** It has no encoding here — written under
+  its nearest declared ancestor's tag it would read back _as_ that ancestor — so the request is
+  declined rather than failed, and protobuf-net's runtime model answers it.
+- **`forceRuntimeType` does not turn the swap off.** A generated formatter already dispatches on the
+  runtime type, which is what that flag asks for.
+- **An `interface`-typed declared type is not served.** There is no formatter for an interface, and
+  nothing says which contract should answer for it. Declare the field as the abstract base — the
+  advice [Protobuf Polymorphism](#protobuf-polymorphism-inheritance--interfaces) already gives — or
+  register a root with `Serializer.RegisterProtobufRoot<TInterface, TConcrete>()` and take
+  protobuf-net's path.
+
+The define is off by default while the remaining contracts are ported.
 
 ### Hostile payloads
 
@@ -1259,14 +1297,6 @@ depth count at zero at every level, which removes the bound entirely for that su
 round-tripping perfectly well. A formatter that must build its own reader should pass the parent —
 `new WProtoReader(payload, in reader)` — which is the only way to name a depth, and therefore cannot
 understate one.
-
-A formatter reading a nested contract should call
-`reader.TryReadMessage(formatter, out T value)`, which descends and decodes in one call and applies
-the bound for free. Reading the payload with `TryReadBytes` and constructing a reader over it with
-the single-argument constructor restarts the depth count at zero at every level, which removes the
-bound entirely for that whole subtree while round-tripping perfectly well. A formatter that must
-build its own reader should pass the parent -- `new WProtoReader(payload, in reader)` -- which is the
-only way to name a depth, and therefore cannot understate one.
 
 ### Wire compatibility
 

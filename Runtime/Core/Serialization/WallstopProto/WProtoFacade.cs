@@ -23,9 +23,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// themselves compile unconditionally so they can be tested without a second compilation.
     /// </para>
     /// <para>
-    /// The type test is <b>exact</b>, not assignable. A subtype served by its base's formatter would
-    /// silently lose everything the subtype declares -- the same failure the generator refuses at
-    /// build time -- so a runtime type that is not the declared one falls back rather than guessing.
+    /// A value whose runtime type is a <b>declared</b> subtype is served too, through its base's
+    /// formatter. That is not a relaxation of the wire contract: a generated formatter dispatches on
+    /// the runtime type and writes the include holding the subtype's members followed by the base's,
+    /// which is byte-for-byte what protobuf-net writes for the same value. A subtype no
+    /// <c>[WProtoInclude]</c> names is still refused, because writing it under its nearest declared
+    /// ancestor's tag would read back as that ancestor. The formatter answers that question through
+    /// <see cref="IWProtoPolymorphicFormatter"/>; one that does not implement it serves its declared
+    /// type only.
     /// </para>
     /// </remarks>
     public static class WProtoFacade
@@ -67,8 +72,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static WProtoWriteResult Serialize<T>(T value, ref byte[] buffer)
         {
             if (
-                !CanServe(value)
-                || !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
+                !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
+                || !CanServe(value, formatter)
             )
             {
                 return new WProtoWriteResult(null, false);
@@ -149,7 +154,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
         public static bool TryDeserialize<T>(ReadOnlySpan<byte> data, out T value)
         {
-            if (!WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter))
+            return TryDeserializeAs(data, typeof(T), out value);
+        }
+
+        /// <summary>
+        /// Deserializes <paramref name="data"/> into <paramref name="concrete"/>, when a formatter
+        /// registered for <typeparamref name="T"/> produces that type.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload.</param>
+        /// <param name="concrete">The type the caller named explicitly.</param>
+        /// <param name="value">Receives the value, or <c>default</c> when unhandled.</param>
+        /// <returns><c>true</c> when WallstopProto served the request.</returns>
+        /// <remarks>
+        /// The read side of the entry point that lets a caller override the declared type. The
+        /// concrete type is not passed on to the formatter, because it does not need it -- the
+        /// payload's include tags already name the subtype and the generated reader narrows to it.
+        /// It is used to decide whether to answer at all: a type this formatter's dispatch chain does
+        /// not produce is one protobuf-net has to serve, and answering anyway would hand back the
+        /// wrong type from a payload that is not this contract's.
+        /// </remarks>
+        public static bool TryDeserializeAs<T>(ReadOnlySpan<byte> data, Type concrete, out T value)
+        {
+            if (
+                !WProtoFormatterProvider.TryGet(out IWProtoFormatter<T> formatter)
+                || !CanRead(formatter, concrete)
+            )
             {
                 value = default;
                 return false;
@@ -174,9 +204,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
-        /// Reports whether <typeparamref name="T"/> can currently be served, formatter aside.
+        /// Reports whether <paramref name="formatter"/> can write <paramref name="value"/>.
         /// </summary>
-        private static bool CanServe<T>(T value)
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="formatter">The formatter registered for <typeparamref name="T"/>.</param>
+        /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
+        private static bool CanServe<T>(T value, IWProtoFormatter<T> formatter)
         {
             // A null reference has no runtime type to compare, and its encoding is the empty payload
             // either way, so it is served.
@@ -185,10 +219,41 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            // Exact match only. protobuf-net resolves a subtype through its base's model; this
-            // package's formatters are per-declared-type, and serving a subtype through the base
-            // would drop everything the subtype declares.
-            return value.GetType() == typeof(T);
+            Type runtimeType = value.GetType();
+            if (runtimeType == typeof(T))
+            {
+                return true;
+            }
+
+            // A subtype is asked about rather than refused. A generated formatter dispatches on the
+            // runtime type and writes the whole chain -- the include holding the subtype's members,
+            // then the base's -- which is byte-for-byte what protobuf-net writes for the same value,
+            // so serving it drops nothing. Only the subtypes the chain actually declares qualify;
+            // anything else falls through, because a value written under its nearest declared
+            // ancestor's tag would read back as that ancestor.
+            return formatter is IWProtoPolymorphicFormatter polymorphic
+                && polymorphic.CanWrite(runtimeType);
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="formatter"/> produces <paramref name="concrete"/>.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="formatter">The formatter registered for <typeparamref name="T"/>.</param>
+        /// <param name="concrete">The type the caller named, or <c>null</c> for none.</param>
+        /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
+        private static bool CanRead<T>(IWProtoFormatter<T> formatter, Type concrete)
+        {
+            if (concrete == null || concrete == typeof(T))
+            {
+                return true;
+            }
+
+            // The same question the write side asks, and deliberately the same answer: a formatter
+            // writes exactly the set of runtime types it reads back, because both travel one
+            // dispatch chain.
+            return formatter is IWProtoPolymorphicFormatter polymorphic
+                && polymorphic.CanWrite(concrete);
         }
     }
 }

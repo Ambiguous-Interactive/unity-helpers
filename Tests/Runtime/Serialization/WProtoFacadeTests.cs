@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.IO;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -14,10 +15,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The swap is opt-in <b>per type</b>: each call asks whether a formatter exists for exactly the
-    /// declared type and falls back when it does not. That is what makes porting the remaining
-    /// contracts incremental and individually verifiable rather than one change that moves
-    /// everything at once.
+    /// The swap is opt-in <b>per type</b>: each call asks whether a formatter exists for the declared
+    /// type -- and, when the value's runtime type is a subtype, whether that formatter's
+    /// <c>[WProtoInclude]</c> chain writes it -- and falls back when it does not. That is what makes
+    /// porting the remaining contracts incremental and individually verifiable rather than one change
+    /// that moves everything at once.
     /// </para>
     /// <para>
     /// These run whether or not <c>WALLSTOP_PROTO</c> is defined, because the seam compiles
@@ -72,14 +74,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void ASubtypeIsNotServedThroughItsBasesFormatter()
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void AGeneratorHeldAsAbstractRandomIsServedAndMatchesProtobufNet()
         {
-            // A formatter is per declared type. Serving a subtype through its base would drop
-            // everything the subtype declares -- the same failure the generator refuses at build
-            // time -- so the seam declines rather than guessing.
-            BaseThing subtype = new DerivedThing { Value = 1, Extra = 2 };
+            // The case that decides whether the seventeen generators take this path at all. A PRNG
+            // is almost never held as its concrete type -- AbstractRandom is the declared type this
+            // package documents -- so an exact-type-only seam served none of them in practice, and
+            // every save went through protobuf-net, which is what cannot run under IL2CPP.
+            AssertServedAndIdentical<AbstractRandom>(new PcgRandom(12345));
+            AssertServedAndIdentical<AbstractRandom>(new SquirrelRandom(999));
+        }
 
-            Assert.IsFalse(WProtoFacade.TrySerialize(subtype, out byte[] _));
+        [Test]
+        public void AGeneratorHeldAsAbstractRandomComesBackAsItsConcreteType()
+        {
+            AbstractRandom original = new PcgRandom(4242);
+
+            // Advanced first, so the saved state is not the one the seed alone would rebuild and a
+            // reader that ignored the payload could not pass by luck.
+            original.NextUint();
+
+            Assert.IsTrue(WProtoFacade.TrySerialize(original, out byte[] bytes));
+            Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out AbstractRandom restored));
+
+            Assert.IsInstanceOf<PcgRandom>(restored, "the subtype must survive the round trip");
+
+            // The state has to survive with the type, or the restored generator is a different
+            // stream wearing the right name.
+            Assert.AreEqual(original.NextUint(), restored.NextUint());
+        }
+
+        [Test]
+        public void AnUndeclaredSubtypeIsNotServedThroughItsBasesFormatter()
+        {
+            // A subtype no [WProtoInclude] names has no encoding here: written under its nearest
+            // declared ancestor's tag it would read back AS that ancestor, losing a level of type
+            // identity in saved data. The seam declines and protobuf-net answers, which is what a
+            // consumer who registered the subtype with protobuf-net's runtime model expects.
+            AbstractRandom undeclared = new UndeclaredRandom();
+
+            Assert.IsFalse(WProtoFacade.TrySerialize(undeclared, out byte[] bytes));
+            Assert.IsTrue(bytes == null);
         }
 
         private static void AssertServedAndIdentical<T>(T value)
@@ -96,14 +131,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             public int Value;
         }
 
-        private class BaseThing
+        /// <summary>
+        /// A generator <see cref="AbstractRandom"/> does not declare, which is the shape a consumer
+        /// writing their own PRNG produces.
+        /// </summary>
+        private sealed class UndeclaredRandom : AbstractRandom
         {
-            public int Value;
-        }
+            private uint _state = 1;
 
-        private sealed class DerivedThing : BaseThing
-        {
-            public int Extra;
+            public override RandomState InternalState => new RandomState(_state);
+
+            public override uint NextUint()
+            {
+                _state = (_state * 1664525) + 1013904223;
+                return _state;
+            }
+
+            public override IRandom Copy()
+            {
+                return new UndeclaredRandom { _state = _state };
+            }
         }
     }
 }
