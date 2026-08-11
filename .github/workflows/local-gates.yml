@@ -2,8 +2,9 @@ name: Local Gates
 
 # The two gates that only ever ran on a developer's machine.
 #
-# `validate:tests` chains 34 contract suites and was referenced by exactly one thing: the local
-# pre-push hook. `--no-verify`, a squash-merge from the web UI, or a push from a different
+# `validate:tests` chains every contract suite in the repository and was referenced by exactly one
+# thing: the local pre-push hook. (The count is deliberately not restated here; it was written as
+# "34" and was 36 within one session.) `--no-verify`, a squash-merge from the web UI, or a push from a different
 # environment all skip it, so a pull request could show a full board of green checks with one of
 # those suites broken -- which has happened (PR #334, 42 green checks, a release-workflow contract
 # failing). `typecheck:unity` compiles the real Runtime sources with the shipped analyzer loaded and
@@ -50,12 +51,17 @@ jobs:
           sha="$(node scripts/resolve-build-lock-pin.js require-confirmed-unity-cleanup)"
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
+      # Full history, because the build-lock actions are NOT all pinned to one commit and
+      # validate:build-lock-action-inputs reads each one's `action.yml` at its own pin. A default
+      # depth-1 checkout has only `ref`, so every other pin fails to resolve -- loudly, with the
+      # remedy named, but the gate cannot run.
       - name: Checkout immutable central cleanup policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Ambiguous-Interactive/ambiguous-organization-build-lock
           ref: ${{ steps.policy_pin.outputs.sha }}
           path: build-lock-policy
+          fetch-depth: 0
           persist-credentials: false
 
       # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
