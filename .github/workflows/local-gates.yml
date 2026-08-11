@@ -33,11 +33,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Setup Node
+      # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
+      # rule and `cache: npm` on its own fails the job outright with "Dependencies lock file is not
+      # found". Same shape as validate-formatting.yml, for the same reason.
+      - name: Setup Node.js (cached)
+        if: ${{ hashFiles('package-lock.json') != '' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
           cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Node.js (no cache)
+        if: ${{ hashFiles('package-lock.json') == '' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -45,7 +56,12 @@ jobs:
           dotnet-version: "9.0.306"
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i --no-audit --no-fund
+          fi
 
       # The pre-commit integration suite drives scripts/format-staged-csharp.ps1, which shells out to
       # CSharpier. Without the restore it would exercise a missing tool rather than the binding.
