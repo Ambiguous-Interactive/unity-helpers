@@ -32,9 +32,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <typeparam name="T">The type being marshalled.</typeparam>
         /// <param name="formatter">The formatter, or <c>null</c> to clear the registration.</param>
         /// <remarks>
-        /// Last registration wins, matching <see cref="WProtoFormatterProvider.Register{T}"/>, so a
-        /// consumer can replace a marshal this package ships. Registration is not thread-safe
-        /// against concurrent resolution and is meant to run once during startup.
+        /// <para>
+        /// Last registration wins, matching <see cref="WProtoFormatterProvider.Register{T}"/>.
+        /// Unlike the built-in contract formatters, though, this package's marshals are registered
+        /// from a <b>generated</b> registrar at
+        /// <c>RuntimeInitializeLoadType.BeforeSceneLoad</c> -- the same phase a consumer's generated
+        /// registrar runs in -- and Unity does not order those across assemblies. So replacing one
+        /// this package ships is not a guarantee: do it from a later phase, or from a
+        /// <c>[RuntimeInitializeOnLoadMethod]</c> of your own, if the override has to hold.
+        /// </para>
+        /// <para>
+        /// Registration is not thread-safe against concurrent resolution and is meant to run once
+        /// during startup, before anything serializes.
+        /// </para>
         /// </remarks>
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {

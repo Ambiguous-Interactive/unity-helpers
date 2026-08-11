@@ -159,6 +159,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A container's own type arguments count as much as the closure's.
+        /// </summary>
+        /// <remarks>
+        /// <c>Outer&lt;Hidden&gt;.Inner</c> is a public type nested in a public generic, and its name
+        /// still cannot be written when <c>Hidden</c> is private. Walking the containers for
+        /// accessibility alone, without their arguments, let exactly this through.
+        /// </remarks>
+        [Test]
+        public void AClosureOverATypeNestedInAPrivatelyClosedGenericIsNotRegistered()
+        {
+            IReadOnlyList<string> registrations = Registrations(
+                Contract
+                    + "public sealed class Outer<T> { public sealed class Inner { } } "
+                    + "public static class Use { private sealed class Hidden { } "
+                    + "public static Box<Outer<Hidden>.Inner> Field; }"
+            );
+
+            Assert.That(
+                registrations,
+                Has.None.Contains("Hidden"),
+                string.Join(" | ", registrations)
+            );
+        }
+
+        /// <summary>
         /// A generic type that is not a contract is left alone, however it is closed.
         /// </summary>
         [Test]

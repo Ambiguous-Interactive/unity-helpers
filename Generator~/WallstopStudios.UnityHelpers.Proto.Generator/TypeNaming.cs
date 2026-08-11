@@ -44,6 +44,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return IsNameable(array.ElementType, compilation);
                 case INamedTypeSymbol named:
                 {
+                    // Each container's OWN arguments count too. `Outer<Hidden>.Inner<int>` has only
+                    // `int` among its own, and the name still cannot be written, so walking the
+                    // containers for accessibility alone let that one through.
                     for (
                         INamedTypeSymbol current = named;
                         current != null;
@@ -54,13 +57,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         {
                             return false;
                         }
-                    }
 
-                    foreach (ITypeSymbol argument in named.TypeArguments)
-                    {
-                        if (!IsNameable(argument, compilation))
+                        foreach (ITypeSymbol argument in current.TypeArguments)
                         {
-                            return false;
+                            if (!IsNameable(argument, compilation))
+                            {
+                                return false;
+                            }
                         }
                     }
 

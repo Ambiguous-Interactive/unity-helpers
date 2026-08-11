@@ -118,8 +118,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
     /// <summary>Writes a <see cref="StandInRing{T}"/> root as its wrapper.</summary>
     /// <typeparam name="T">The element type.</typeparam>
-    public sealed class StandInRingMarshalFormatter<T> : IWProtoFormatter<StandInRing<T>>
+    public sealed class StandInRingMarshalFormatter<T>
+        : IWProtoFormatter<StandInRing<T>>,
+            IWProtoConditionalFormatter
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<T>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in StandInRing<T> value)
         {
@@ -228,6 +236,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Elements = 0 < value.Elements.Count ? value.Elements.ToArray() : null,
             };
         }
+    }
+
+    /// <summary>
+    /// An element type WallstopProto cannot encode: no scalar formatter, no contract.
+    /// </summary>
+    /// <remarks>
+    /// Stands in for two real cases. A type protobuf-net reaches through a <b>surrogate</b> —
+    /// <c>UnityEngine.Vector2</c> — has no runtime formatter of its own, because a surrogate is
+    /// substituted at generate time and a type parameter is not known then. And an <b>enum</b> is
+    /// resolved the same way, so a closure over one has nothing to resolve either. Both appear in
+    /// this package's own sources as <c>Deque&lt;Vector2&gt;</c> and dictionaries keyed by enums.
+    /// </remarks>
+    public struct Unserviceable
+    {
+        /// <summary>Ordinary data; the point is that nothing can encode it.</summary>
+        public int Value;
     }
 
     /// <summary>Holds a marshalled collection as a MEMBER, where the marshal must not apply.</summary>

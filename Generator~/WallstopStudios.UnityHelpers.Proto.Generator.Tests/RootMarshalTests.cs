@@ -189,6 +189,63 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A marshal whose element type WallstopProto cannot encode declines instead of throwing.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A contract formatter is registered only for a type someone annotated. A marshal is
+        /// registered for <b>every</b> closed construction of the collection found in source,
+        /// whatever the element type is — so the facade would claim a request it cannot finish, and
+        /// the throw would land inside <c>Measure</c> where the old code fell through to
+        /// protobuf-net and round-tripped.
+        /// </para>
+        /// <para>
+        /// Not hypothetical: this package's own tests name <c>Deque&lt;Vector2&gt;</c>, and
+        /// <c>Vector2</c> has a protobuf-net <b>surrogate</b> rather than a WallstopProto formatter —
+        /// a surrogate is substituted at generate time, and the element of a generic wrapper is not
+        /// known then. Every enum is the same shape. An empty collection hides it, because the
+        /// element loop never runs, so the first failure would be on real data.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void AMarshalWhoseElementCannotBeEncodedIsNotServed()
+        {
+            StandInRing<Unserviceable> ring = new StandInRing<Unserviceable>();
+            ring.Add(new Unserviceable { Value = 1 });
+
+            Assert.IsTrue(
+                WProtoRootMarshalProvider.IsRegistered<StandInRing<Unserviceable>>(),
+                "the registration is what makes the decline necessary"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TrySerialize(ring, out byte[] _),
+                "the facade claimed a request whose elements it cannot encode"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TryDeserialize(
+                    new byte[] { 0x0A, 0x02, 0x08, 0x01 },
+                    out StandInRing<Unserviceable> _
+                ),
+                "the read half has the same hole as the write half"
+            );
+        }
+
+        /// <summary>
+        /// An empty collection whose element cannot be encoded is refused too.
+        /// </summary>
+        /// <remarks>
+        /// The element loop never runs for an empty one, so a check that only fired on the first
+        /// element would serve this and produce a payload the reader cannot decode back.
+        /// </remarks>
+        [Test]
+        public void AnEmptyMarshalOfAnUnserviceableElementIsNotServedEither()
+        {
+            Assert.IsFalse(
+                WProtoFacade.TrySerialize(new StandInRing<Unserviceable>(), out byte[] _)
+            );
+        }
+
+        /// <summary>
         /// A marshal lives in its own registry, and a member-position lookup cannot see it.
         /// </summary>
         /// <remarks>
@@ -258,19 +315,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + "global::WallstopStudios.UnityHelpers.Proto.Generator.Tests.StandInRing<long>(); } }"
             );
 
-            foreach (string registration in registrations)
-            {
-                if (registration.Contains("StandInRingMarshalFormatter", StringComparison.Ordinal))
-                {
-                    Assert.IsTrue(
-                        registration.Contains(
-                            "WProtoRootMarshalProvider",
-                            StringComparison.Ordinal
-                        ),
-                        registration
-                    );
-                }
-            }
+            // Counted, not filtered: a body that only inspects the registrations it happens to find
+            // passes green when the registration stops being emitted at all, which is the thing this
+            // fixture is most likely to be silently wrong about.
+            List<string> mine = registrations
+                .Where(registration =>
+                    registration.Contains("StandInRingMarshalFormatter", StringComparison.Ordinal)
+                )
+                .ToList();
+
+            Assert.AreEqual(1, mine.Count, string.Join(" | ", registrations));
+            Assert.IsTrue(
+                mine[0].Contains("WProtoRootMarshalProvider", StringComparison.Ordinal),
+                mine[0]
+            );
+            Assert.IsFalse(
+                mine[0].Contains("WProtoFormatterProvider", StringComparison.Ordinal),
+                mine[0]
+            );
         }
 
         /// <summary>
@@ -333,6 +395,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A closure whose argument the formatter's constraints reject is skipped.
+        /// </summary>
+        /// <remarks>
+        /// <c>Construct</c> does not enforce constraints, so a formatter declared with one its
+        /// collection does not have would be closed over an argument it cannot accept and emitted --
+        /// <c>CS0453</c> in the consumer's own build, which is what these diagnostics exist to
+        /// prevent.
+        /// </remarks>
+        [Test]
+        public void AClosureTheFormattersConstraintsRejectIsNotRegistered()
+        {
+            const string source =
+                "[assembly: WProtoRootMarshal(typeof(Consumer.Ring<>), typeof(Consumer.RingFormatter<>))]\n"
+                + "public sealed class Ring<T> { }\n"
+                + "public sealed class RingFormatter<T> : IWProtoFormatter<Consumer.Ring<T>> where T : struct\n"
+                + "{\n"
+                + "    public int Measure(in Consumer.Ring<T> value) => 0;\n"
+                + "    public bool Write(ref WProtoWriter writer, in Consumer.Ring<T> value) => true;\n"
+                + "    public bool TryRead(ref WProtoReader reader, out Consumer.Ring<T> value) { value = null; return true; }\n"
+                + "}\n"
+                + "public static class Use { public static Ring<string> Reference; public static Ring<int> Value; }";
+
+            IReadOnlyList<string> registrations = Registrations(source);
+
+            Assert.That(
+                registrations,
+                Has.None.Contains("RingFormatter<string>"),
+                string.Join(" | ", registrations)
+            );
+            Assert.That(
+                registrations,
+                Has.Some.Contains("RingFormatter<int>"),
+                "the closure the constraint DOES accept still has to be registered: "
+                    + string.Join(" | ", registrations)
+            );
+            Assert.IsEmpty(
+                CompileGenerated(source)
+                    .Where(diagnostic => diagnostic.Id == "CS0453")
+                    .Select(diagnostic => diagnostic.GetMessage())
+            );
+        }
+
         [Test]
         public void AStillOpenClosureOfAMarshalIsNotRegistered()
         {
@@ -353,7 +458,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             AssertDiagnostic(
                 "WPROTO019",
-                "Ring",
+                "Consumer.Ring<T>",
                 @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring<>), typeof(Consumer.RingFormatter))]
                   public sealed class Ring<T> { }
                   public sealed class RingFormatter { }"
@@ -365,7 +470,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             AssertDiagnostic(
                 "WPROTO020",
-                "Ring",
+                "'Consumer.Ring'",
                 @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring), typeof(Consumer.RingFormatter))]
                   public sealed class Ring { }
                   public sealed class RingFormatter { }"
@@ -377,7 +482,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             AssertDiagnostic(
                 "WPROTO020",
-                "Ring",
+                "'Consumer.Ring'",
                 @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring), typeof(Consumer.RingFormatter))]
                   public sealed class Ring { }
                   public sealed class RingFormatter : IWProtoFormatter<Consumer.Ring>
@@ -395,10 +500,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             AssertDiagnostic(
                 "WPROTO021",
-                "Ring",
+                "'Consumer.Ring'",
                 @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring), typeof(Consumer.RingFormatter))]
                   [WProtoContract] public sealed partial class Ring { [WProtoMember(1)] public int Value; }
                   public sealed class RingFormatter : IWProtoFormatter<Consumer.Ring>
+                  {
+                      public int Measure(in Consumer.Ring value) => 0;
+                      public bool Write(ref WProtoWriter writer, in Consumer.Ring value) => true;
+                      public bool TryRead(ref WProtoReader reader, out Consumer.Ring value) { value = null; return true; }
+                  }"
+            );
+        }
+
+        /// <summary>
+        /// Two marshals for one type in one assembly is an error, not a first-wins coin toss.
+        /// </summary>
+        [Test]
+        public void AMarshalDeclaredTwiceIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO022",
+                "'Consumer.Ring'",
+                @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring), typeof(Consumer.RingFormatter))]
+                  [assembly: WProtoRootMarshal(typeof(Consumer.Ring), typeof(Consumer.OtherFormatter))]
+                  public sealed class Ring { }
+                  public sealed class RingFormatter : IWProtoFormatter<Consumer.Ring>
+                  {
+                      public int Measure(in Consumer.Ring value) => 0;
+                      public bool Write(ref WProtoWriter writer, in Consumer.Ring value) => true;
+                      public bool TryRead(ref WProtoReader reader, out Consumer.Ring value) { value = null; return true; }
+                  }
+                  public sealed class OtherFormatter : IWProtoFormatter<Consumer.Ring>
                   {
                       public int Measure(in Consumer.Ring value) => 0;
                       public bool Write(ref WProtoWriter writer, in Consumer.Ring value) => true;

@@ -79,8 +79,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 foreach (Pair pair in Pairs(reference))
                 {
                     // First declaration wins and the compilation's own assembly was read first, so a
-                    // consumer can replace a marshal this package ships -- the build-time spelling of
-                    // WProtoRootMarshalProvider's last-registration-wins rule.
+                    // consumer's pair for a type this package also marshals is the one this
+                    // compilation emits. Which registration survives at RUNTIME is a separate
+                    // question -- both registrars run in the same Unity phase, unordered -- and
+                    // WProtoRootMarshalProvider says so.
                     if (!pairs.ContainsKey(pair.Real))
                     {
                         pairs[pair.Real] = pair.Formatter;
@@ -103,11 +105,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal static void Validate(Compilation compilation, Action<Diagnostic> report)
         {
+            HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
                 Location location =
                     pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? Location.None;
+
+                if (!seen.Add(pair.Real))
+                {
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.DuplicateMarshal,
+                            location,
+                            pair.Real.ToDisplayString(),
+                            pair.Formatter.ToDisplayString()
+                        )
+                    );
+                    continue;
+                }
 
                 if (IsContract(pair.Real))
                 {
@@ -225,6 +244,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     INamedTypeSymbol formatter = Close(definition, closure.TypeArguments);
                     if (
                         formatter == null
+                        || !Satisfies(definition, closure.TypeArguments)
                         || !TypeNaming.IsNameable(formatter, compilation)
                         || !TypeNaming.IsNameable(closure, compilation)
                     )
@@ -265,6 +285,89 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return named;
+        }
+
+        /// <summary>
+        /// Reports whether the formatter's type parameters accept these arguments.
+        /// </summary>
+        /// <param name="definition">The formatter's unbound definition.</param>
+        /// <param name="arguments">The arguments the closure supplies.</param>
+        /// <returns><c>false</c> when closing the formatter would not compile.</returns>
+        /// <remarks>
+        /// <para>
+        /// A formatter may be declared with constraints its collection does not have --
+        /// <c>Formatter&lt;T&gt; where T : struct</c> against an unconstrained <c>Ring&lt;T&gt;</c> --
+        /// and <see cref="INamedTypeSymbol.Construct(ITypeSymbol[])"/> does not enforce them. Emitting
+        /// the registration anyway is <c>CS0453</c> inside generated code the developer never wrote,
+        /// which is exactly what the diagnostics for these pairs exist to prevent.
+        /// </para>
+        /// <para>
+        /// The three constraint <b>kinds</b> are checked against the real argument, which needs no
+        /// substitution and no compilation context. Constraint <b>types</b>
+        /// (<c>where T : IComparable&lt;T&gt;</c>) are not: satisfying them means substituting the
+        /// closure's arguments through the constraint, and getting that subtly wrong would drop
+        /// registrations that do compile. A mismatch there still fails the build, and names the
+        /// formatter while doing so.
+        /// </para>
+        /// </remarks>
+        private static bool Satisfies(
+            INamedTypeSymbol definition,
+            System.Collections.Immutable.ImmutableArray<ITypeSymbol> arguments
+        )
+        {
+            if (definition.TypeParameters.Length != arguments.Length)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < arguments.Length; index++)
+            {
+                ITypeParameterSymbol parameter = definition.TypeParameters[index];
+                ITypeSymbol argument = arguments[index];
+
+                if (parameter.HasReferenceTypeConstraint && !argument.IsReferenceType)
+                {
+                    return false;
+                }
+
+                if (parameter.HasValueTypeConstraint && !argument.IsValueType)
+                {
+                    return false;
+                }
+
+                if (parameter.HasConstructorConstraint && !HasParameterlessConstructor(argument))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasParameterlessConstructor(ITypeSymbol type)
+        {
+            if (type.IsValueType)
+            {
+                return true;
+            }
+
+            if (!(type is INamedTypeSymbol named) || named.IsAbstract)
+            {
+                return false;
+            }
+
+            foreach (IMethodSymbol constructor in named.InstanceConstructors)
+            {
+                if (
+                    constructor.Parameters.Length == 0
+                    && constructor.DeclaredAccessibility == Accessibility.Public
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static INamedTypeSymbol Close<TArgument>(

@@ -1314,6 +1314,11 @@ own `IWProtoFormatter<T>` implementation, and the generator registers one per cl
 finds — `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
 something this package hard-codes.
 
+A marshal **declines** when its element type is one WallstopProto cannot encode — a type
+protobuf-net reaches through a surrogate, or an enum — so the collection falls back to protobuf-net
+exactly as it did before, rather than failing. And a `null` root of one of these collections now
+encodes to an empty payload and reads back as an empty collection, where the reflection path threw.
+
 Nothing about your own contracts changes. A member typed as one of these collections is written
 exactly as it was before — a map for the dictionaries, a repeated field for the sets — and the three
 that implement neither `ICollection<T>` nor `IDictionary<,>` are still refused as members, with the

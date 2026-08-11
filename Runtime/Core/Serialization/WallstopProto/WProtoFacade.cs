@@ -225,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            return WProtoRootMarshalProvider.TryGet(out formatter);
+            return WProtoRootMarshalProvider.TryGet(out formatter) && MarshalCanServe(formatter);
         }
 
         /// <summary>
@@ -253,7 +253,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            return WProtoRootMarshalProvider.TryGet(out formatter);
+            return WProtoRootMarshalProvider.TryGet(out formatter) && MarshalCanServe(formatter);
+        }
+
+        /// <summary>
+        /// Reports whether a marshal can serve the type it is registered for at all.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="formatter">The marshal found for it.</param>
+        /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
+        /// <remarks>
+        /// A marshal is registered for every closed construction of its collection found in source,
+        /// whatever the element type is -- unlike a contract formatter, which exists only for a type
+        /// someone annotated. An element WallstopProto cannot encode (a surrogate's real type, an
+        /// enum) has to be declined HERE, before a hook runs and before a byte is written, because
+        /// the alternative is a throw from inside Measure where the code this replaced fell through
+        /// to protobuf-net and round-tripped.
+        /// </remarks>
+        private static bool MarshalCanServe<T>(IWProtoFormatter<T> formatter)
+        {
+            return !(formatter is IWProtoConditionalFormatter conditional)
+                || conditional.CanServe();
         }
 
         /// <summary>

@@ -208,6 +208,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             isEnabledByDefault: true
         );
 
+        internal static readonly DiagnosticDescriptor DuplicateMarshal = new DiagnosticDescriptor(
+            "WPROTO022",
+            "WallstopProto root marshal is declared twice",
+            "[assembly: WProtoRootMarshal(typeof({0}), typeof({1}))] is the second marshal this assembly declares for '{0}'. Only the first is registered, so the other's wire shape is silently unreachable -- and which one wins is the order the attributes happen to be read in. Delete one.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

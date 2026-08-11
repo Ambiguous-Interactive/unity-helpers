@@ -51,6 +51,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Reports whether a value of this type can be encoded at all.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// False for a type that has neither a scalar formatter nor a registered contract formatter:
+        /// a type protobuf-net reaches through a <b>surrogate</b>, and every <b>enum</b>. Both are
+        /// resolved while a contract is generated, and a generic member's closure is not known then,
+        /// so nothing registers a formatter under the closed type.
+        /// </para>
+        /// <para>
+        /// Exposed so a formatter registered for a type it cannot always serve --
+        /// <see cref="IWProtoConditionalFormatter"/> -- can decline before writing anything, rather
+        /// than throwing from inside <see cref="MeasureField(int, in T)"/> where the caller has
+        /// already committed.
+        /// </para>
+        /// </remarks>
+        public static bool CanEncode
+        {
+            get
+            {
+                Resolve();
+                return _scalar != null || _message != null;
+            }
+        }
+
+        /// <summary>
         /// Reports whether a repeated field of this type can arrive as a packed run.
         /// </summary>
         /// <remarks>

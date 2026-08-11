@@ -26,8 +26,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     public sealed class SerializableHashSetMarshalFormatter<T>
-        : IWProtoFormatter<SerializableHashSet<T>>
+        : IWProtoFormatter<SerializableHashSet<T>>,
+            IWProtoConditionalFormatter
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<T>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in SerializableHashSet<T> value)
         {
@@ -78,9 +85,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     public sealed class SerializableSortedSetMarshalFormatter<T>
-        : IWProtoFormatter<SerializableSortedSet<T>>
+        : IWProtoFormatter<SerializableSortedSet<T>>,
+            IWProtoConditionalFormatter
         where T : IComparable<T>
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<T>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in SerializableSortedSet<T> value)
         {
@@ -134,8 +148,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     public sealed class SerializableDictionaryMarshalFormatter<TKey, TValue>
-        : IWProtoFormatter<SerializableDictionary<TKey, TValue>>
+        : IWProtoFormatter<SerializableDictionary<TKey, TValue>>,
+            IWProtoConditionalFormatter
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<TKey>.CanEncode && WProtoGeneric<TValue>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in SerializableDictionary<TKey, TValue> value)
         {
@@ -199,9 +220,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     public sealed class SerializableSortedDictionaryMarshalFormatter<TKey, TValue>
-        : IWProtoFormatter<SerializableSortedDictionary<TKey, TValue>>
+        : IWProtoFormatter<SerializableSortedDictionary<TKey, TValue>>,
+            IWProtoConditionalFormatter
         where TKey : IComparable<TKey>
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<TKey>.CanEncode && WProtoGeneric<TValue>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in SerializableSortedDictionary<TKey, TValue> value)
         {
@@ -271,8 +299,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Serializes a <see cref="Deque{T}"/> root as its protobuf wrapper.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
-    public sealed class DequeMarshalFormatter<T> : IWProtoFormatter<Deque<T>>
+    public sealed class DequeMarshalFormatter<T>
+        : IWProtoFormatter<Deque<T>>,
+            IWProtoConditionalFormatter
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<T>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in Deque<T> value)
         {
@@ -336,8 +372,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// Serializes a <see cref="CyclicBuffer{T}"/> root as its protobuf wrapper.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
-    public sealed class CyclicBufferMarshalFormatter<T> : IWProtoFormatter<CyclicBuffer<T>>
+    public sealed class CyclicBufferMarshalFormatter<T>
+        : IWProtoFormatter<CyclicBuffer<T>>,
+            IWProtoConditionalFormatter
     {
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return WProtoGeneric<T>.CanEncode;
+        }
+
         /// <inheritdoc />
         public int Measure(in CyclicBuffer<T> value)
         {
