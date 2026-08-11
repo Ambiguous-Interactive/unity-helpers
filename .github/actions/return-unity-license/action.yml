@@ -92,7 +92,7 @@ runs:
     - name: Classify prior exact return evidence
       id: classify_prior
       if: ${{ steps.prior_metadata.outputs.prior-ready == 'true' }}
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@c054699118065984d49b97cce685da090d57ab37
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
         return-command-completed: "true"
@@ -160,7 +160,7 @@ runs:
     - name: Classify redundant return evidence
       id: classify_return
       if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@c054699118065984d49b97cce685da090d57ab37
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.capture_return.outputs.return-log-path }}
         return-command-completed: ${{ steps.capture_return.outputs.return-command-completed }}
