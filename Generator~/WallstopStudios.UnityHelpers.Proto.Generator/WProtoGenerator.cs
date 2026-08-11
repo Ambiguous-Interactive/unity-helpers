@@ -535,7 +535,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 includes,
                 hooks,
                 constructAtEnd,
-                skipConstructor
+                skipConstructor,
+                EncodedTypeParameters(contract)
             );
 
             foreach (INamedTypeSymbol unused in nesting)
@@ -553,6 +554,139 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return writer.ToString();
         }
 
+        /// <summary>
+        /// Names the contract's own type parameters that end up as encoded values.
+        /// </summary>
+        /// <param name="contract">The contract being emitted.</param>
+        /// <returns>Each parameter's name, once, in declaration order.</returns>
+        /// <remarks>
+        /// A member typed as one of these is encoded through <c>WProtoGeneric&lt;T&gt;</c>, which
+        /// resolves at the closure rather than here -- and resolves to NOTHING for a type protobuf-net
+        /// reaches through a surrogate, or for an enum, because both are substituted while a contract
+        /// is generated and a closure's argument is not known then. The formatter is registered for
+        /// every closed construction found in source regardless, so it has to be able to say "not
+        /// mine" for those.
+        /// </remarks>
+        private static List<string> EncodedTypeParameters(INamedTypeSymbol contract)
+        {
+            List<string> found = new List<string>();
+            if (!contract.IsGenericType)
+            {
+                return found;
+            }
+
+            HashSet<string> seen = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (ISymbol member in contract.GetMembers())
+            {
+                if (!HasAttribute(member, MemberAttribute))
+                {
+                    continue;
+                }
+
+                ITypeSymbol type = MemberType(member);
+                if (type == null)
+                {
+                    continue;
+                }
+
+                foreach (ITypeParameterSymbol parameter in TypeParameters(type))
+                {
+                    if (
+                        SymbolEqualityComparer.Default.Equals(
+                            parameter.ContainingType?.OriginalDefinition,
+                            contract.OriginalDefinition
+                        ) && seen.Add(parameter.Name)
+                    )
+                    {
+                        found.Add(parameter.Name);
+                    }
+                }
+            }
+
+            return found;
+        }
+
+        private static ITypeSymbol MemberType(ISymbol member)
+        {
+            switch (member)
+            {
+                case IFieldSymbol field:
+                    return field.Type;
+                case IPropertySymbol property:
+                    return property.Type;
+                default:
+                    return null;
+            }
+        }
+
+        private static IEnumerable<ITypeParameterSymbol> TypeParameters(ITypeSymbol type)
+        {
+            switch (type)
+            {
+                case ITypeParameterSymbol parameter:
+                    yield return parameter;
+                    break;
+                case IArrayTypeSymbol array:
+                    foreach (ITypeParameterSymbol nested in TypeParameters(array.ElementType))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+                case INamedTypeSymbol named:
+                    foreach (ITypeSymbol argument in named.TypeArguments)
+                    {
+                        foreach (ITypeParameterSymbol nested in TypeParameters(argument))
+                        {
+                            yield return nested;
+                        }
+                    }
+
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Emits the answer to "can this formatter encode the closure it was registered for".
+        /// </summary>
+        /// <remarks>
+        /// Asked by <c>WProtoFacade</c> before any hook runs and before a byte is written, so an
+        /// element with no formatter is reported as "not mine" and falls back to protobuf-net --
+        /// rather than throwing from inside <c>Measure</c>, which is where the missing registration
+        /// used to surface, on real data, from a shipped player.
+        /// </remarks>
+        private static void EmitCanServe(Writer writer, List<string> encodedTypeParameters)
+        {
+            if (encodedTypeParameters.Count == 0)
+            {
+                return;
+            }
+
+            writer.Line("/// <inheritdoc />");
+            writer.Line("public bool CanServe()" + Writer.Open);
+            writer.Indent();
+
+            StringBuilder condition = new StringBuilder();
+            for (int index = 0; index < encodedTypeParameters.Count; index++)
+            {
+                if (0 < index)
+                {
+                    condition.Append(" && ");
+                }
+
+                condition
+                    .Append(Proto)
+                    .Append(".WProtoGeneric<")
+                    .Append(encodedTypeParameters[index])
+                    .Append(">.CanEncode");
+            }
+
+            writer.Line("return " + condition + ";");
+            writer.Outdent();
+            writer.Line("}");
+            writer.Blank();
+        }
+
         private static void EmitFormatter(
             Writer writer,
             INamedTypeSymbol contract,
@@ -561,7 +695,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Include> includes,
             Hooks hooks,
             bool constructAtEnd,
-            bool skipConstructor
+            bool skipConstructor,
+            List<string> encodedTypeParameters
         )
         {
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
@@ -573,6 +708,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ">, "
                     + Proto
                     + ".IWProtoPolymorphicFormatter"
+                    + (
+                        0 < encodedTypeParameters.Count
+                            ? ", " + Proto + ".IWProtoConditionalFormatter"
+                            : string.Empty
+                    )
                     + Writer.Open
             );
             writer.Indent();
@@ -582,6 +722,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("public static readonly WProtoFormatter Instance = new WProtoFormatter();");
             writer.Blank();
 
+            EmitCanServe(writer, encodedTypeParameters);
             EmitCanWrite(writer, qualified, includes);
             writer.Blank();
             EmitMeasure(writer, contract, qualified, members, includes, hooks);

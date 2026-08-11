@@ -246,6 +246,50 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A generic CONTRACT closed over an element it cannot encode declines too.
+        /// </summary>
+        /// <remarks>
+        /// The same hole as a marshal's, and the one that was there first: a generic contract's
+        /// formatter is registered for every closure found in source, and a member typed as its
+        /// parameter resolves through <see cref="WProtoGeneric{T}"/> — which finds nothing for an
+        /// enum or a surrogate's real type. <c>SerializableList&lt;Vector2&gt;</c> is the shipped
+        /// shape of this. The generator emits <see cref="IWProtoConditionalFormatter"/> on any
+        /// contract whose members encode one of its own type parameters.
+        /// </remarks>
+        [Test]
+        public void AGenericContractClosedOverAnElementItCannotEncodeIsNotServed()
+        {
+            Assert.IsTrue(
+                WProtoFormatterProvider.IsRegistered<Box<Unserviceable>>(),
+                "the registration is what makes the decline necessary"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TrySerialize(
+                    new Box<Unserviceable> { Value = new Unserviceable { Value = 1 } },
+                    out byte[] _
+                ),
+                "the facade claimed a closure whose element it cannot encode"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TryDeserialize(
+                    new byte[] { 0x0A, 0x02, 0x08, 0x01 },
+                    out Box<Unserviceable> _
+                )
+            );
+        }
+
+        /// <summary>
+        /// A closure it CAN encode is still served, so the decline is not a blanket refusal.
+        /// </summary>
+        [Test]
+        public void AGenericContractClosedOverAnEncodableElementIsStillServed()
+        {
+            Assert.IsTrue(WProtoFacade.TrySerialize(new Box<int> { Value = 7 }, out byte[] bytes));
+            Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out Box<int> restored));
+            Assert.AreEqual(7, restored.Value);
+        }
+
+        /// <summary>
         /// A marshal lives in its own registry, and a member-position lookup cannot see it.
         /// </summary>
         /// <remarks>

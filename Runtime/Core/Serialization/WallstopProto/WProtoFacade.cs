@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (WProtoFormatterProvider.TryGet(out formatter))
             {
-                if (CanServe(value, formatter))
+                if (CanEncode(formatter) && CanServe(value, formatter))
                 {
                     return true;
                 }
@@ -225,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            return WProtoRootMarshalProvider.TryGet(out formatter) && MarshalCanServe(formatter);
+            return WProtoRootMarshalProvider.TryGet(out formatter) && CanEncode(formatter);
         }
 
         /// <summary>
@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (WProtoFormatterProvider.TryGet(out formatter))
             {
-                if (CanRead(formatter, concrete))
+                if (CanEncode(formatter) && CanRead(formatter, concrete))
                 {
                     return true;
                 }
@@ -253,24 +253,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            return WProtoRootMarshalProvider.TryGet(out formatter) && MarshalCanServe(formatter);
+            return WProtoRootMarshalProvider.TryGet(out formatter) && CanEncode(formatter);
         }
 
         /// <summary>
-        /// Reports whether a marshal can serve the type it is registered for at all.
+        /// Reports whether a formatter can encode the type it is registered for at all.
         /// </summary>
         /// <typeparam name="T">The declared type.</typeparam>
-        /// <param name="formatter">The marshal found for it.</param>
+        /// <param name="formatter">The formatter found for it.</param>
         /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
         /// <remarks>
-        /// A marshal is registered for every closed construction of its collection found in source,
-        /// whatever the element type is -- unlike a contract formatter, which exists only for a type
-        /// someone annotated. An element WallstopProto cannot encode (a surrogate's real type, an
-        /// enum) has to be declined HERE, before a hook runs and before a byte is written, because
-        /// the alternative is a throw from inside Measure where the code this replaced fell through
-        /// to protobuf-net and round-tripped.
+        /// <para>
+        /// Two kinds of formatter are registered for closures nobody chose one by one: a root
+        /// marshal, registered for every construction of its collection found in source, and a
+        /// GENERIC CONTRACT's formatter, registered for every closure of itself. Either can be handed
+        /// an element WallstopProto has no formatter for -- a type protobuf-net reaches through a
+        /// surrogate, or an enum, both substituted while a contract is generated and unknown at the
+        /// closure.
+        /// </para>
+        /// <para>
+        /// It has to be declined HERE, before a hook runs and before a byte is written: the
+        /// alternative is a throw from inside <c>Measure</c>, where the reflection path this replaces
+        /// fell through to protobuf-net and round-tripped. An empty collection hides it, because the
+        /// element loop never runs, so the first failure would land on real data.
+        /// </para>
         /// </remarks>
-        private static bool MarshalCanServe<T>(IWProtoFormatter<T> formatter)
+        private static bool CanEncode<T>(IWProtoFormatter<T> formatter)
         {
             return !(formatter is IWProtoConditionalFormatter conditional)
                 || conditional.CanServe();

@@ -1316,7 +1316,10 @@ something this package hard-codes.
 
 A marshal **declines** when its element type is one WallstopProto cannot encode — a type
 protobuf-net reaches through a surrogate, or an enum — so the collection falls back to protobuf-net
-exactly as it did before, rather than failing. And a `null` root of one of these collections now
+exactly as it did before, rather than failing. A **generic contract** declines the same way, for the
+same reason: `SerializableList<Vector2>` is registered for that closure, and `Vector2`'s wire shape
+comes from a surrogate that is substituted while a contract is generated, when a closure's element is
+not yet known. And a `null` root of one of these collections now
 encodes to an empty payload and reads back as an empty collection, where the reflection path threw.
 
 Nothing about your own contracts changes. A member typed as one of these collections is written
