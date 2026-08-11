@@ -30,22 +30,47 @@ jobs:
     name: Contract Suites
     runs-on: ubuntu-latest
     steps:
+      # Checked out into a subdirectory, like pwsh-invocations-lint.yml, because one suite in the
+      # chain compares this repository's cleanup classifier against the central policy repository
+      # and needs both trees side by side.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: unity-helpers
+          persist-credentials: false
+
+      # Read the pin out of the workflows rather than restating it. Dependabot bumps a `uses:` SHA
+      # but never a `ref:` input, so a hand-copied commit checks out the previous policy and the
+      # parity suite then passes against the wrong version.
+      - name: Resolve pinned central cleanup policy commit
+        id: policy_pin
+        working-directory: unity-helpers
+        shell: bash
+        run: |
+          sha="$(node scripts/resolve-build-lock-pin.js require-confirmed-unity-cleanup)"
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout immutable central cleanup policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Ambiguous-Interactive/ambiguous-organization-build-lock
+          ref: ${{ steps.policy_pin.outputs.sha }}
+          path: build-lock-policy
+          persist-credentials: false
 
       # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
       # rule and `cache: npm` on its own fails the job outright with "Dependencies lock file is not
       # found". Same shape as validate-formatting.yml, for the same reason.
       - name: Setup Node.js (cached)
-        if: ${{ hashFiles('package-lock.json') != '' }}
+        if: ${{ hashFiles('unity-helpers/package-lock.json') != '' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: unity-helpers/package-lock.json
 
       - name: Setup Node.js (no cache)
-        if: ${{ hashFiles('package-lock.json') == '' }}
+        if: ${{ hashFiles('unity-helpers/package-lock.json') == '' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
@@ -56,6 +81,7 @@ jobs:
           dotnet-version: "9.0.306"
 
       - name: Install dependencies
+        working-directory: unity-helpers
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -66,12 +92,18 @@ jobs:
       # The pre-commit integration suite drives scripts/format-staged-csharp.ps1, which shells out to
       # CSharpier. Without the restore it would exercise a missing tool rather than the binding.
       - name: Restore .NET tools
+        working-directory: unity-helpers
         run: dotnet tool restore
 
       # The suite's own exit code decides, never a grep of its output: at least one script in this
       # repository once reported success while checking zero files, and a suite that silently does
-      # nothing has to stay distinguishable from one that passes.
+      # nothing has to stay distinguishable from one that passes. The cleanup-classifier suite is
+      # built that way on purpose -- it FAILS under Actions when the policy checkout is missing,
+      # rather than skipping, which is how this job discovered it needed one.
       - name: Run contract suites
+        working-directory: unity-helpers
+        env:
+          BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
         run: npm run validate:tests
 
   typecheck:
