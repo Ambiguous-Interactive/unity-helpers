@@ -1,0 +1,94 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A LOCAL TYPE-CHECKER for the package's PlayMode test sources (#404).
+
+    Why this exists. `typecheck:unity` compiles `Runtime/**` and stops there, so a broken fixture:
+    a call to a constructor that is private, an argument that moved, a helper that was renamed, stays
+    invisible until a Unity leg has spun up, restored a project, and compiled it. That is roughly
+    fifty minutes to learn about a missing overload. It is not hypothetical: this project was written
+    after `new Deque&lt;int&gt;()` reached a fixture, whose parameterless constructor is private.
+
+    The sources are compiled into ONE assembly with the runtime's own name, which is what makes the
+    tests' `internal` access resolve without reproducing the package's InternalsVisibleTo graph. It
+    is a type-checker, not a test runner. Nothing here executes, and a green build says only that the
+    fixtures compile.
+
+    WHAT IT DOES NOT COVER, deliberately:
+
+      1. Everything `typecheck:unity` excludes, for the same reasons (uGUI, the DI integrations),
+         and the four fixtures that drive them: EnhancedImageTests, the two
+         MatchColliderToSprite fixtures and UnityExtensionsComprehensiveTests.
+      2. Editor tests. They need UnityEditor, which the reference assemblies do not carry.
+      3. The test framework's BEHAVIOUR. `UnityEngine.TestTools` ships with Unity's test framework
+         package and has no NuGet equivalent, so `Shims/` declares the handful of members these
+         fixtures use: enough to bind a call, and nothing more.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The runtime's own name: the test sources are `internal`-visible to it by being it. -->
+    <AssemblyName>WallstopStudios.UnityHelpers</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers</RootNamespace>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Unity defines this in every test assembly, and the package gates test-only internals on it
+         (SingletonAutoLoader.ExecuteEntriesForTests, Helpers.LayerNameProvider, the concave-hull
+         diagnostics). Without it the fixtures that drive them do not bind. -->
+    <DefineConstants>$(DefineConstants);UNITY_INCLUDE_TESTS</DefineConstants>
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS0436;CS1701</NoWarn>
+    <DefineConstants Condition="'$(WallstopProto)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
+    <!-- Unity's test framework ships NUnit 3.5; 3.13 is the closest thing on NuGet and binds the
+         same attributes and assertions these fixtures use. -->
+    <PackageReference Include="NUnit" Version="3.13.3" />
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="protobuf-net">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Pipelines">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.IO.Pipelines.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Shims/*.cs" />
+    <Compile Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/*.cs" />
+    <Compile
+      Include="$(RepoRoot)/Runtime/**/*.cs"
+      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Tests/Core/**/*.cs"
+      Exclude="$(RepoRoot)/Tests/Core/TestUtils/CiTestResultStreamLogger.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Tests/Runtime/**/*.cs"
+      Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs"
+    />
+  </ItemGroup>
+</Project>

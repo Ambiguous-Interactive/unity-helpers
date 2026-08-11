@@ -11,3 +11,9 @@ using WallstopStudios.UnityHelpers.Proto.Generator.Tests;
 
 // The one-way pair the WPROTO016 test needs is declared inside that test's own synthetic
 // compilation, so nothing is registered here for it.
+
+// Root marshals, declared here for the same reason and read the same way. A consumer compilation
+// that only REFERENCES this assembly still has to find them, which is what the registrar tests
+// drive through a second, real compilation.
+[assembly: WProtoRootMarshal(typeof(StandInRing<>), typeof(StandInRingMarshalFormatter<>))]
+[assembly: WProtoRootMarshal(typeof(StandInBag), typeof(StandInBagMarshalFormatter))]

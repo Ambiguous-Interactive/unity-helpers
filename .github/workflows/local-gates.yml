@@ -118,7 +118,7 @@ jobs:
         run: npm run validate:tests
 
   typecheck:
-    name: Type-check Runtime
+    name: Type-check Runtime and tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -134,8 +134,10 @@ jobs:
         with:
           node-version: "22"
 
-      # Twice: once as the package ships today, once with WALLSTOP_PROTO defined. That symbol is
-      # defined nowhere in this repository, so until now every line of the facade swap -- the code
-      # that decides which serializer runs -- was unreachable by every gate the package has.
-      - name: Type-check the runtime sources
+      # Twice each, once as the package ships today and once with WALLSTOP_PROTO defined. That
+      # symbol is defined nowhere in this repository, so until now every line of the facade swap --
+      # the code that decides which serializer runs -- was unreachable by every gate the package has.
+      # The PlayMode fixtures are compiled too (#404): a broken fixture used to cost a whole Unity
+      # leg to discover, and this finds it in a minute without an editor or a license.
+      - name: Type-check the runtime and test sources
         run: npm run typecheck:unity

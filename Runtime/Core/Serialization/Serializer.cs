@@ -814,7 +814,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// Serializes a serializable collection to a protobuf wrapper and then to bytes.
         /// Uses cached reflection accessors for performance.
         /// </summary>
-        private static byte[] SerializeCollectionWithWrapper<T>(T input)
+        internal static byte[] SerializeCollectionWithWrapper<T>(T input)
         {
             Type type = typeof(T);
             Type genericDef = type.GetGenericTypeDefinition();
@@ -911,7 +911,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// Deserializes a protobuf wrapper and constructs the serializable collection.
         /// Uses cached reflection accessors for performance.
         /// </summary>
-        private static T DeserializeCollectionFromWrapper<T>(byte[] data)
+        internal static T DeserializeCollectionFromWrapper<T>(byte[] data)
         {
             Type type = typeof(T);
             Type genericDef = type.GetGenericTypeDefinition();
@@ -1067,7 +1067,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 BindingFlags.NonPublic | BindingFlags.Static
             );
 
-        private static byte[] SerializeSpecialCollection<T>(T input)
+        internal static byte[] SerializeSpecialCollection<T>(T input)
         {
             Type type = typeof(T);
             Func<object, byte[]> serializer = SpecialCollectionSerializers.GetOrAdd(
@@ -1077,7 +1077,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return serializer(input);
         }
 
-        private static T DeserializeSpecialCollection<T>(byte[] data)
+        internal static T DeserializeSpecialCollection<T>(byte[] data)
         {
             Type type = typeof(T);
             Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(

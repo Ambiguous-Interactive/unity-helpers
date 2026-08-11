@@ -134,6 +134,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A closure over a type the registrar cannot name is skipped rather than emitted.
+        /// </summary>
+        /// <remarks>
+        /// The registrar is a type of its own, so a <c>private</c> nested type is out of its reach
+        /// however accessible it is to its container. Emitting the name is <c>CS0122</c> in the build
+        /// of the assembly that declared it -- a worse failure than the registration it drops,
+        /// because the developer's code stops compiling over a type they never asked to serialize.
+        /// </remarks>
+        [Test]
+        public void AClosureOverAPrivateTypeIsNotRegistered()
+        {
+            IReadOnlyList<string> registrations = Registrations(
+                Contract
+                    + "public static class Use { private sealed class Hidden { } "
+                    + "public static object Make() { return new Box<Hidden>(); } }"
+            );
+
+            Assert.That(
+                registrations,
+                Has.None.Contains("Hidden"),
+                string.Join(" | ", registrations)
+            );
+        }
+
+        /// <summary>
         /// A generic type that is not a contract is left alone, however it is closed.
         /// </summary>
         [Test]

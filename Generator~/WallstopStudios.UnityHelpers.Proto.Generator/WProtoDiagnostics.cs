@@ -179,6 +179,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             isEnabledByDefault: true
         );
 
+        internal static readonly DiagnosticDescriptor MarshalArityMismatch =
+            new DiagnosticDescriptor(
+                "WPROTO019",
+                "WallstopProto root marshal does not match its type's arity",
+                "[assembly: WProtoRootMarshal(typeof({0}), typeof({1}))] pairs types of different generic arity. The generator closes the formatter with the SAME type arguments it finds on a construction of '{0}', so the two must take the same number of them -- write both unbound, as typeof(Real<>) and typeof(Formatter<>), or both closed.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor MarshalNotAFormatter =
+            new DiagnosticDescriptor(
+                "WPROTO020",
+                "WallstopProto root marshal is not a formatter for its type",
+                "[assembly: WProtoRootMarshal(typeof({0}), typeof({1}))] names '{1}' as the root formatter for '{0}', but '{1}' does not implement IWProtoFormatter<{0}> with a public parameterless constructor. The registrar emits 'new {1}()' and hands it to WProtoRootMarshalProvider.Register, so anything else is a build error inside generated code the developer never wrote.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor MarshalOnContract = new DiagnosticDescriptor(
+            "WPROTO021",
+            "WallstopProto root marshal names a contract",
+            "[assembly: WProtoRootMarshal(typeof({0}), typeof({1}))] names '{0}', which is also a [WProtoContract]. A contract's own formatter answers first at the root, so the marshal would never run and '{0}' would be written as its own members rather than as '{1}' -- two wire shapes for one type, decided by which registration is looked up first. Remove one of the two.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

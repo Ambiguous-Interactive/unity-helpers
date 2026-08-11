@@ -77,8 +77,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Hand-written formatter (RandomStateWProtoFormatter), byte-verified in session 172.",
             ["Deque"] =
                 "Serializer marshals it through DequeProtoWrapper, which carries the WallstopProto "
-                + "annotation. Annotating Deque itself would make WProtoFacade answer first, with "
-                + "message bytes where the wrapper writes items-plus-capacity.",
+                + "annotation, and [assembly: WProtoRootMarshal] serves it at the root. Annotating "
+                + "Deque itself would make its own formatter answer first, with message bytes where "
+                + "the wrapper writes items-plus-capacity. RootMarshalCoverageTests checks the "
+                + "marshal exists rather than trusting this sentence.",
             ["CyclicBuffer"] = "As Deque, through CyclicBufferProtoWrapper.",
             ["SparseSet"] = "As Deque, through SparseSetProtoWrapper.",
             ["SerializableDictionaryBase"] =

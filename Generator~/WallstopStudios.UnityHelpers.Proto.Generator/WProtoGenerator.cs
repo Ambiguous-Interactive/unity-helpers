@@ -93,6 +93,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
             SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
 
+            MarshalMap marshals = MarshalMap.Build(context.Compilation);
+            MarshalMap.Validate(context.Compilation, context.ReportDiagnostic);
+
             List<string> registrations = new List<string>();
             foreach (INamedTypeSymbol contract in contracts)
             {
@@ -123,11 +126,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             registrations.AddRange(ForeignClosures(context.Compilation));
 
-            if (0 < registrations.Count)
+            List<string> rootMarshals = new List<string>(
+                marshals.Registrations(context.Compilation)
+            );
+
+            if (0 < registrations.Count || 0 < rootMarshals.Count)
             {
                 context.AddSource(
                     "WProtoGeneratedRegistrar.g.cs",
-                    SourceText.From(EmitRegistrar(context, registrations), Encoding.UTF8)
+                    SourceText.From(
+                        EmitRegistrar(context, registrations, rootMarshals),
+                        Encoding.UTF8
+                    )
                 );
             }
         }
@@ -200,10 +210,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     }
 
                     string entryPoint = FormatterNameFor(definition);
-                    if (
-                        entryPoint == null
-                        || !compilation.IsSymbolAccessibleWithin(named, compilation.Assembly)
-                    )
+                    if (entryPoint == null || !TypeNaming.IsNameable(named, compilation))
                     {
                         continue;
                     }
@@ -1271,7 +1278,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static string EmitRegistrar(
             GeneratorExecutionContext context,
-            List<string> registrations
+            List<string> registrations,
+            List<string> rootMarshals
         )
         {
             string suffix = Sanitize(context.Compilation.AssemblyName ?? "Assembly");
@@ -1306,6 +1314,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (string registration in registrations)
             {
                 writer.Line(Proto + ".WProtoFormatterProvider.Register(" + registration + ");");
+            }
+
+            // A separate registry, not a second batch into the same one: WProtoGeneric<T> reads the
+            // formatter provider for every member whose type a closure decides, so a marshal
+            // registered there would escape the root and rewrite that member's encoding.
+            foreach (string marshal in rootMarshals)
+            {
+                writer.Line(Proto + ".WProtoRootMarshalProvider.Register(" + marshal + ");");
             }
 
             writer.Outdent();
@@ -1408,7 +1424,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     // still unbound, and a registrar cannot name it. Recording it as closed emitted a
                     // registration that fails the CONSUMER's build, which is a worse failure than the
                     // missing registration it was trying to avoid.
-                    if (!IsOpen(named))
+                    // Nameability is the second half of the same question. `Box<int>` is fine;
+                    // `Box<SomeFixture.PrivatePayload>` is a name the registrar cannot write, and
+                    // emitting it fails the build of the assembly that declared the private type.
+                    if (!IsOpen(named) && TypeNaming.IsNameable(named, compilation))
                     {
                         found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                     }

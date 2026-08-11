@@ -1291,6 +1291,32 @@ Two consequences on the read side are worth knowing:
 
 The define is off by default while the remaining contracts are ported.
 
+### Root marshals: the collections with two encodings
+
+`SerializableHashSet`, `SerializableSortedSet`, `SerializableDictionary`,
+`SerializableSortedDictionary`, `Deque`, `CyclicBuffer` and `SparseSet` are never handed to
+protobuf-net as themselves. Each is copied into a wrapper of items-plus-capacity — or parallel
+key/value arrays — because protobuf-net's repeated provider ignores `IgnoreListHandling`. So these
+types have **two** encodings, chosen by position: the wrapper's when the collection is the root of a
+serialization, and an ordinary repeated field when it is a member of another contract. Both are in
+save files that already exist, and WallstopProto reproduces both.
+
+The root case is a **root marshal**, declared once at assembly level:
+
+```csharp
+[assembly: WProtoRootMarshal(typeof(Deque<>), typeof(DequeMarshalFormatter<>))]
+```
+
+It is deliberately not a surrogate. A surrogate substitutes a type _everywhere_; a marshal applies to
+the root only, and lives in `WProtoRootMarshalProvider` rather than `WProtoFormatterProvider` so a
+member-position lookup cannot reach it. Consumer types work the same way: name your own type and your
+own `IWProtoFormatter<T>` implementation, and the generator registers one per closed construction it
+finds — `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
+something this package hard-codes.
+
+Nothing about your own contracts changes: a member typed as one of these collections is still written
+as a repeated field or a map, exactly as protobuf-net writes it.
+
 ### Hostile payloads
 
 `WProtoReader.MaxNestingDepth` (64) bounds how deep a payload may nest, counting sub-messages and
