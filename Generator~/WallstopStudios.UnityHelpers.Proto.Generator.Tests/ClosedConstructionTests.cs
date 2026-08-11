@@ -99,6 +99,53 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A consumer closing a generic contract from a REFERENCED assembly registers it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the property the whole approach was chosen for, and it was not implemented: the
+        /// generator only scanned for closures of contracts declared in the same compilation, so a
+        /// game writing <c>Deque&lt;TheirStruct&gt;</c> got no registration at all. The struct cannot
+        /// appear in this package's own sources — it does not exist yet — so nothing else could
+        /// register it either, and the type threw on its first serialization in a shipped player.
+        /// </para>
+        /// <para>
+        /// Driven through a real second compilation rather than a synthetic one, because the bug was
+        /// precisely that "declared here" and "referenced from here" are different, and a single
+        /// compilation cannot tell them apart. <c>SerializableList&lt;T&gt;</c> stands in for any
+        /// generic contract a consumer closes.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void AClosureOfAGenericContractFromAReferencedAssemblyIsRegistered()
+        {
+            IReadOnlyList<string> registrations = Registrations(
+                "public static class Use { public static object Make() { return new "
+                    + "global::WallstopStudios.UnityHelpers.Proto.Generator.Tests.Box<long>(); } }"
+            );
+
+            Assert.That(
+                registrations,
+                Has.Some.Contains("Box<long>"),
+                "A closure of a contract this compilation only references was not registered: "
+                    + string.Join(" | ", registrations)
+            );
+        }
+
+        /// <summary>
+        /// A generic type that is not a contract is left alone, however it is closed.
+        /// </summary>
+        [Test]
+        public void AClosureOfANonContractIsNotRegistered()
+        {
+            IReadOnlyList<string> registrations = Registrations(
+                "public static class Use { public static System.Collections.Generic.List<int> Field; }"
+            );
+
+            Assert.That(registrations, Has.None.Contains("List<int>"));
+        }
+
         private static IReadOnlyList<string> Registrations(string body)
         {
             string source =

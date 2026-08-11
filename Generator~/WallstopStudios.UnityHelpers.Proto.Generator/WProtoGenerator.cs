@@ -121,6 +121,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
+            registrations.AddRange(ForeignClosures(context.Compilation));
+
             if (0 < registrations.Count)
             {
                 context.AddSource(
@@ -128,6 +130,116 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     SourceText.From(EmitRegistrar(context, registrations), Encoding.UTF8)
                 );
             }
+        }
+
+        /// <summary>
+        /// Registers closures of generic contracts that another assembly declares.
+        /// </summary>
+        /// <param name="compilation">The compilation being generated for.</param>
+        /// <returns>One registration expression per closure found here and not declared here.</returns>
+        /// <remarks>
+        /// <para>
+        /// This is the consumer story, and without it the story is only half true. A generic
+        /// contract's formatter is emitted once, open, into the assembly that declares it; only a
+        /// <b>closed</b> construction can be registered, and the assembly that declares the contract
+        /// usually never mentions the closure a consumer cares about. <c>Deque&lt;TheirStruct&gt;</c>
+        /// cannot appear in this package's own sources by construction -- the struct does not exist
+        /// yet -- so nothing registered it and it threw on its first serialization.
+        /// </para>
+        /// <para>
+        /// The scan runs from the closures rather than from the references. Walking every namespace
+        /// of every referenced assembly looking for annotations would cost more than the whole
+        /// generator; asking "is the type this construction closes a contract" costs one attribute
+        /// lookup per constructed generic already in the syntax.
+        /// </para>
+        /// <para>
+        /// Two guards keep this from breaking a build it was meant to help. The formatter has to be
+        /// <b>accessible</b> from here, since an internal contract in a reference without
+        /// <c>InternalsVisibleTo</c> cannot be named; and it has to <b>exist</b>, because a
+        /// referenced assembly compiled without this analyzer has the attribute and no formatter, and
+        /// naming one that is not there would fail the consumer's build rather than the absent
+        /// registration it is replacing.
+        /// </para>
+        /// </remarks>
+        private static IEnumerable<string> ForeignClosures(Compilation compilation)
+        {
+            HashSet<string> found = new HashSet<string>();
+            List<string> registrations = new List<string>();
+
+            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            {
+                SemanticModel model = compilation.GetSemanticModel(tree);
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                {
+                    if (!(node is TypeSyntax type))
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !(Resolve(model, type) is INamedTypeSymbol named)
+                        || !named.IsGenericType
+                        || named.IsUnboundGenericType
+                        || IsOpen(named)
+                    )
+                    {
+                        continue;
+                    }
+
+                    INamedTypeSymbol definition = named.ConstructedFrom;
+                    if (
+                        definition == null
+                        || SymbolEqualityComparer.Default.Equals(
+                            definition.ContainingAssembly,
+                            compilation.Assembly
+                        )
+                        || !HasAttribute(definition, ContractAttribute)
+                    )
+                    {
+                        continue;
+                    }
+
+                    string entryPoint = FormatterNameFor(definition);
+                    if (
+                        entryPoint == null
+                        || !compilation.IsSymbolAccessibleWithin(named, compilation.Assembly)
+                    )
+                    {
+                        continue;
+                    }
+
+                    string qualified = named.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat
+                    );
+                    if (found.Add(qualified))
+                    {
+                        registrations.Add(qualified + "." + entryPoint + ".Instance");
+                    }
+                }
+            }
+
+            return registrations;
+        }
+
+        /// <summary>
+        /// Names the nested formatter a referenced contract actually carries, or <c>null</c>.
+        /// </summary>
+        /// <param name="definition">The generic contract's unbound definition.</param>
+        /// <returns>The nested type name to register, or <c>null</c> when there is none.</returns>
+        private static string FormatterNameFor(INamedTypeSymbol definition)
+        {
+            foreach (string candidate in new[] { "WProtoRootFormatter", "WProtoFormatter" })
+            {
+                foreach (INamedTypeSymbol nested in definition.GetTypeMembers(candidate))
+                {
+                    if (nested.DeclaredAccessibility == Accessibility.Public)
+                    {
+                        return candidate;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static void ReportOrphanedHooks(
