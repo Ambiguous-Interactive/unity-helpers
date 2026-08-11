@@ -222,14 +222,8 @@ $PackageName = 'com.wallstop-studios.unity-helpers'
 # *.Tests.Runtime.Performance assembly the unity-benchmarks workflow opts into.
 $TestFrameworkVersion = '1.4.5'
 $PerformanceFrameworkVersion = '3.4.2'
-# TODO(unity-helpers): unity-helpers ships NO analyzers today (no Editor/Analyzers/
-# directory, no RoslynAnalyzer-labeled assets), so this required-DLL roster is
-# EMPTY and the analyzer copy/assert/diagnostic functions are no-ops (see
-# Copy-UnityHelpersAnalyzersToAssets). The .gitignore reserves Editor/Analyzers/
-# *.dll|*.pdb for a future analyzer; when one ships, add its RoslynAnalyzer-labeled
-# DLL names here (and to $RoslynAnalyzerLabeledDllNames) and port DxMessaging's
-# analyzer-copy bodies so the generator is registered at the first compile.
-$RequiredUnityHelpersAnalyzerDllNames = @()
+# (The analyzer-DLL roster that stood here was empty, unreferenced, and carried a premise that
+# stopped being true in session 173. See Write-AnalyzerSetupDiagnostics for what actually ships.)
 
 # Unity Accelerator (cache server) helpers live in a dot-sourceable library so
 # they can be unit-tested with plain pwsh (run-ci-tests.ps1 itself has a
@@ -1698,47 +1692,21 @@ function New-StandaloneTestCallbackAsmdef {
 '@
 }
 
-# TODO(unity-helpers): NO-OP. DxMessaging ships RoslynAnalyzer/source-generator
-# DLLs under Editor/Analyzers/ and the harness pre-copies them into the ephemeral
-# project's Assets/Plugins so the generator is registered at the first compile.
-# unity-helpers ships NO analyzers today: the repo has no Editor/Analyzers/ dir
-# and no RoslynAnalyzer-labeled assets (the .gitignore RESERVES Editor/Analyzers/
-# *.dll|*.pdb for a future analyzer, but none exists yet). The original
-# Assert/Copy/diagnostic functions THREW when those DLLs were absent, which would
-# hard-fail every unity-helpers CI run. They are neutralized to safe no-ops below
-# so the proven harness flow (manifest, configurator, standalone split-build,
-# license, catastrophic-pattern scanning, exit-code handling) is otherwise
-# preserved. If/when unity-helpers ships analyzers under Editor/Analyzers/, port
-# DxMessaging's bodies for these three functions (Assert-/Copy-/Write-AnalyzerSetupDiagnostics)
-# and add the labeled DLL names to $RoslynAnalyzerLabeledDllNames.
-$RoslynAnalyzerLabeledDllNames = @()
-
-function Assert-UnityHelpersAnalyzerDllsPresent {
-    param([Parameter(Mandatory = $true)][string]$Root)
-
-    # NO-OP (see TODO above): unity-helpers ships no analyzer DLLs, so there is
-    # nothing to assert. $Root is accepted to keep the call-site signature stable.
-    $null = $Root
-}
-
-# NO-OP (see TODO above). DxMessaging pre-created the SAME
-# Assets/Plugins/Editor/WallstopStudios.DxMessaging/ analyzer copy that its
-# Editor/SetupCscRsp.cs makes at editor load, BEFORE Unity launched, so the source
-# generator was registered exactly once at the first compile. unity-helpers ships
-# no analyzers, so this copy is skipped entirely.
-function Copy-UnityHelpersAnalyzersToAssets {
-    param(
-        [Parameter(Mandatory = $true)][string]$Root,
-        [Parameter(Mandatory = $true)][string]$Project
-    )
-
-    Assert-UnityHelpersAnalyzerDllsPresent -Root $Root
-
-    # No analyzers to copy. Return immediately; the rest of the original body
-    # (DLL enumeration, .meta authoring, RoslynAnalyzer labeling) is intentionally
-    # not ported because there is no Editor/Analyzers/ source to copy from.
-    $null = $Project
-}
+# This package DOES ship an analyzer, and nothing is pre-copied into the ephemeral project.
+#
+# Session 173 shipped Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll -- the
+# source generator that emits every WallstopProto formatter the package depends on. Note the path:
+# the .gitignore reserves Editor/Analyzers/, and the analyzer did not ship there.
+#
+# Unity registers a RoslynAnalyzer-labeled asset that lives inside a referenced package directly, so
+# the copy-into-Assets dance this section was ported from does not apply. DxMessaging ships its
+# generator outside the package and pre-copies it before the editor launches; here the manifest
+# reference is enough, which the ported contracts' passing tests on all sixteen legs demonstrate.
+#
+# The analyzer's presence, label, platform settings and uniqueness are asserted by
+# scripts/tests/test-analyzer-placement.js, which runs in two workflows. Restating its expected path
+# here would be a second copy of that contract, free to drift, and a wrong path would red every Unity
+# leg at once -- so this stays a diagnostic and the contract stays there.
 
 function Write-AnalyzerSetupDiagnostics {
     param(
@@ -1747,14 +1715,11 @@ function Write-AnalyzerSetupDiagnostics {
         [Parameter(Mandatory = $true)][string]$Label
     )
 
-    # TODO(unity-helpers): NO-OP (see Copy-UnityHelpersAnalyzersToAssets above).
-    # DxMessaging asserted here that the pre-created Assets/Plugins analyzer copy
-    # was RoslynAnalyzer-labeled AND Editor-excluded, THROWING otherwise. With no
-    # analyzers shipped there is nothing to verify, so emit a single notice and
-    # return. When unity-helpers ships analyzers, port DxMessaging's body here.
     $null = $Project
     $null = $LogPath
-    Write-Host "::notice::unity-helpers ships no analyzers; skipping analyzer setup diagnostics ($Label)."
+    Write-Host ("::notice::unity-helpers ships its Roslyn analyzer inside the package at " +
+        "Runtime/Analyzers/ and Unity registers it from there; no analyzer is copied into the CI " +
+        "project. Placement is asserted by scripts/tests/test-analyzer-placement.js ($Label).")
 }
 
 function Initialize-EphemeralProject {
@@ -1811,21 +1776,15 @@ EditorSettings:
     New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration |
         Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
 
-    # Pre-create the Assets/Plugins analyzer copy (NO-OP for unity-helpers, which
-    # ships no analyzers -- see Copy-UnityHelpersAnalyzersToAssets). Kept as a call
-    # so the flow matches DxMessaging's and so the body becomes load-bearing again
-    # the moment unity-helpers ships a RoslynAnalyzer under Editor/Analyzers/.
-    Copy-UnityHelpersAnalyzersToAssets -Root $Root -Project $project
-
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
     # self-hosted runners). The Editor-side build modifier clears the player's
     # outbound-connection BuildOptions and exits the editor after the build; the
     # player-side TestRunCallback writes NUnit XML to -uhTestResults and quits.
-    # Written idempotently (only when missing or changed), exactly like
-    # Copy-UnityHelpersAnalyzersToAssets, so reruns against the cached project do
-    # not needlessly invalidate Unity's import cache. editmode/playmode never emit
-    # these files (the local single -runTests path is untouched).
+    # Written idempotently (only when missing or changed), so reruns against the
+    # cached project do not needlessly invalidate Unity's import cache.
+    # editmode/playmode never emit these files (the local single -runTests path
+    # is untouched).
     if ($Mode -eq 'standalone') {
         $standaloneFiles = @(
             @{ Path = (Join-Path $project 'Assets\Editor\UhCiStandaloneBuildModifier.cs'); Content = (New-StandaloneBuildModifierSource -DevelopmentBuild $DevelopmentBuild) },
