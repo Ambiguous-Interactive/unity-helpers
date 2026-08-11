@@ -49,6 +49,19 @@
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612</NoWarn>
+    <!--
+      The facade swap lives behind `#if WALLSTOP_PROTO`, and that symbol is defined NOWHERE in this
+      repository: not in an asmdef, not in CI, not in any test. So every line inside those blocks was
+      unreachable by every gate the package has, including this one, and a type error in the code
+      that decides which serializer runs would have been discovered by a consumer defining the symbol
+      rather than by us. Verified by breaking a call on purpose: green without the define, CS1501
+      with it.
+
+      `npm run typecheck:unity` therefore builds this project twice, once each way. Both halves ship,
+      so both have to compile.
+    -->
+    <DefineConstants Condition="'$(WallstopProto)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />

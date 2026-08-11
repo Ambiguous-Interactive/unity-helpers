@@ -24,8 +24,11 @@ concurrency:
 
 jobs:
   sync-versions:
-    # Only run on the main repository, not forks
-    if: github.repository == 'wallstop/unity-helpers'
+    # Not a fork. Named the requirement rather than one repository: this was
+    # `github.repository == 'wallstop/unity-helpers'`, and issues for this package moved to
+    # Ambiguous-Interactive/unity-helpers, so the job reported `skipped` on every run in the
+    # repository whose issue forms it edits. A name has to be maintained; a fork test does not.
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

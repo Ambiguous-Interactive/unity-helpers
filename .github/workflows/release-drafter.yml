@@ -16,8 +16,9 @@ concurrency:
 
 jobs:
   update_release_draft:
-    # Only run on the main repository, not forks
-    if: github.repository == 'wallstop/unity-helpers'
+    # Not a fork. See sync-issue-template.yml: a hard-coded owner goes inert the moment the
+    # canonical remote moves, silently and without failing anything.
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

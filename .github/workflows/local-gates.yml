@@ -1,0 +1,82 @@
+name: Local Gates
+
+# The two gates that only ever ran on a developer's machine.
+#
+# `validate:tests` chains 34 contract suites and was referenced by exactly one thing: the local
+# pre-push hook. `--no-verify`, a squash-merge from the web UI, or a push from a different
+# environment all skip it, so a pull request could show a full board of green checks with one of
+# those suites broken -- which has happened (PR #334, 42 green checks, a release-workflow contract
+# failing). `typecheck:unity` compiles the real Runtime sources with the shipped analyzer loaded and
+# was in no workflow at all.
+#
+# Neither needs Unity, a license or a matrix, which is exactly why they were safe to leave in a hook
+# and exactly why leaving them there was invisible.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  contract-suites:
+    name: Contract Suites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.306"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The pre-commit integration suite drives scripts/format-staged-csharp.ps1, which shells out to
+      # CSharpier. Without the restore it would exercise a missing tool rather than the binding.
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      # The suite's own exit code decides, never a grep of its output: at least one script in this
+      # repository once reported success while checking zero files, and a suite that silently does
+      # nothing has to stay distinguishable from one that passes.
+      - name: Run contract suites
+        run: npm run validate:tests
+
+  typecheck:
+    name: Type-check Runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.306"
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+
+      # Twice: once as the package ships today, once with WALLSTOP_PROTO defined. That symbol is
+      # defined nowhere in this repository, so until now every line of the facade swap -- the code
+      # that decides which serializer runs -- was unreachable by every gate the package has.
+      - name: Type-check the runtime sources
+        run: npm run typecheck:unity

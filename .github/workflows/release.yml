@@ -27,7 +27,9 @@ concurrency:
 jobs:
   verify-tag:
     name: Verify release tag
-    if: github.repository == 'wallstop/unity-helpers' || github.repository == 'Ambiguous-Interactive/unity-helpers'
+    # Not a fork. The allowlist this replaces was correct for the two names it knew and would
+    # have gone inert at the next move, which is how sync-issue-template.yml stopped running.
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

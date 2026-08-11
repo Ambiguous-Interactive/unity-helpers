@@ -30,7 +30,8 @@ concurrency:
 jobs:
   prepare:
     name: Prepare release PR
-    if: github.repository == 'wallstop/unity-helpers' || github.repository == 'Ambiguous-Interactive/unity-helpers'
+    # Not a fork. See release.yml.
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
