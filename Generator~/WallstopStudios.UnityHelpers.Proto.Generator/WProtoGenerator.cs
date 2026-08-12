@@ -147,7 +147,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
 
             List<string> declaredRoots = new List<string>(
-                DeclaredRootMap.Registrations(context.Compilation)
+                DeclaredRootMap.Registrations(
+                    context.Compilation,
+                    context.ReportDiagnostic,
+                    announced
+                )
             );
 
             if (0 < registrations.Count || 0 < rootMarshals.Count || 0 < declaredRoots.Count)

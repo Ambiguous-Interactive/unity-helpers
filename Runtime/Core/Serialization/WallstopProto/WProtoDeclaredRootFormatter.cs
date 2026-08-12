@@ -59,10 +59,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// defensive: <c>TRoot : TDeclared</c> makes a longer cycle impossible, because two distinct
         /// types cannot each derive from the other.
         /// </para>
+        /// <para>
+        /// <b>The declared type can be instantiated.</b> The generator refuses that pair
+        /// (<c>WPROTO029</c>), but this provider is public API and a hand-written call can still
+        /// make it, so the answer is a refusal rather than a wrong encoding. A value whose runtime
+        /// type IS the declared type never reaches <see cref="CanWrite"/> --
+        /// <see cref="WProtoFacade"/> short-circuits an exact type match -- and would then be
+        /// narrowed to <typeparamref name="TRoot"/>, fail, and encode to nothing. Measured: a
+        /// concrete declared type wrote zero bytes for a populated value and read back as the root.
+        /// </para>
         /// </remarks>
         public bool CanServe()
         {
-            return Root() != null
+            return NeverARuntimeType
+                && Root() != null
                 && WProtoDeclaredRootProvider.IsRootFor(typeof(TDeclared), typeof(TRoot));
         }
 
@@ -103,9 +113,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             IWProtoFormatter<TRoot> root = Root();
             if (root == null || !(value is TRoot narrowed))
             {
-                // Null encodes to nothing, matching every other root, and a value the chain cannot
-                // write never reaches here -- CanWrite is derived from the same chain, so anything
-                // it admits IS a TRoot. Write agrees, so the two can never disagree about a length.
+                // Null encodes to nothing, matching every other root. Anything else that fails to
+                // narrow is unreachable through the facade -- CanServe refuses a declared type that
+                // can BE a runtime type, and every other value is asked of CanWrite, which is
+                // derived from the same chain -- and Write agrees with this, so the two can never
+                // disagree about a length.
                 return 0;
             }
 
@@ -153,6 +165,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             value = read;
             return true;
         }
+
+        // An interface reports IsAbstract too, so one test would do; both are named because the
+        // property being asserted is "no value's runtime type is ever TDeclared", and that is what
+        // makes the facade's exact-match short-circuit unreachable here.
+        private static readonly bool NeverARuntimeType =
+            typeof(TDeclared).IsInterface || typeof(TDeclared).IsAbstract;
 
         private IWProtoFormatter<TRoot> Root()
         {

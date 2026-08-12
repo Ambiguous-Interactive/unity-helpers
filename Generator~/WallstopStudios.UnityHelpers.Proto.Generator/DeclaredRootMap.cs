@@ -41,9 +41,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="report">Receives one diagnostic per unusable pair.</param>
         internal static void Validate(Compilation compilation, Action<Diagnostic> report)
         {
-            HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
+            HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
@@ -64,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (0 < pair.Declared.Arity || 0 < pair.Root.Arity)
+                if (0 < Arity(pair.Declared) || 0 < Arity(pair.Root))
                 {
                     report(
                         Diagnostic.Create(
@@ -89,11 +87,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (!Assignable(pair.Root, pair.Declared))
+                // Ordered narrowest-cause-first, because more than one of these is true at once for
+                // most mistakes and only the first is reported. A declared type that is already a
+                // contract is also instantiable, and the useful sentence is the one about
+                // [WProtoInclude]; a value type is also unassignable, and the useful sentence is
+                // the one about what a declared root is for.
+                if (IsContract(pair.Declared))
                 {
                     report(
                         Diagnostic.Create(
-                            WProtoDiagnostics.DeclaredRootNotAssignable,
+                            WProtoDiagnostics.DeclaredRootOnContract,
                             location,
                             pair.Declared.ToDisplayString(),
                             pair.Root.ToDisplayString()
@@ -102,11 +105,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (IsContract(pair.Declared))
+                if (Instantiable(pair.Declared))
                 {
                     report(
                         Diagnostic.Create(
-                            WProtoDiagnostics.DeclaredRootOnContract,
+                            WProtoDiagnostics.DeclaredRootOnInstantiableType,
+                            location,
+                            pair.Declared.ToDisplayString(),
+                            pair.Root.ToDisplayString()
+                        )
+                    );
+                    continue;
+                }
+
+                if (!Assignable(pair.Root, pair.Declared))
+                {
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.DeclaredRootNotAssignable,
                             location,
                             pair.Declared.ToDisplayString(),
                             pair.Root.ToDisplayString()
@@ -124,29 +140,56 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Strings of the form <c>&lt;global::Declared, global::Root&gt;</c>, ready to append to the
         /// provider's <c>Register</c> call.
         /// </returns>
-        internal static IEnumerable<string> Registrations(Compilation compilation)
+        internal static IEnumerable<string> Registrations(
+            Compilation compilation,
+            Action<Diagnostic> report,
+            HashSet<string> announced
+        )
         {
-            HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
+            HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
             List<string> registrations = new List<string>();
 
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
                 if (
                     !seen.Add(pair.Declared)
-                    || 0 < pair.Declared.Arity
-                    || 0 < pair.Root.Arity
+                    || 0 < Arity(pair.Declared)
+                    || 0 < Arity(pair.Root)
                     || SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
-                    || !Assignable(pair.Root, pair.Declared)
                     || IsContract(pair.Declared)
-                    || !TypeNaming.IsNameable(pair.Declared, compilation)
-                    || !TypeNaming.IsNameable(pair.Root, compilation)
+                    || Instantiable(pair.Declared)
+                    || !Assignable(pair.Root, pair.Declared)
                 )
                 {
-                    // Every skip here has a diagnostic beside it in Validate. Emitting anyway would
+                    // Each of these has a diagnostic beside it in Validate. Emitting anyway would
                     // turn a message naming the attribute into a compiler error inside generated
                     // code, which is the failure mode these pairs exist to avoid.
+                    continue;
+                }
+
+                // Nameability is the one skip Validate cannot phrase as a refusal, so it is
+                // announced here instead -- the same reporter the closure scans use, so a pair that
+                // silently gets no registration cannot exist in any of the four.
+                Location location =
+                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                    ?? Location.None;
+                if (
+                    TypeNaming.ReportIfUnnameable(
+                        pair.Declared,
+                        compilation,
+                        location,
+                        report,
+                        announced
+                    )
+                    || TypeNaming.ReportIfUnnameable(
+                        pair.Root,
+                        compilation,
+                        location,
+                        report,
+                        announced
+                    )
+                )
+                {
                     continue;
                 }
 
@@ -175,7 +218,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// generated code, and a root that does not derive from it is <c>CS0311</c>. Neither names
         /// the attribute that caused it.
         /// </remarks>
-        private static bool Assignable(INamedTypeSymbol root, INamedTypeSymbol declared)
+        private static bool Assignable(ITypeSymbol root, ITypeSymbol declared)
         {
             if (!declared.IsReferenceType)
             {
@@ -210,7 +253,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        private static bool IsContract(INamedTypeSymbol type)
+        /// <summary>
+        /// Reports whether a value's runtime type can be <paramref name="declared"/> itself.
+        /// </summary>
+        /// <param name="declared">The declared type.</param>
+        /// <returns><c>true</c> when the type is not an interface and not abstract.</returns>
+        /// <remarks>
+        /// A declared root exists for a type with no encoding of its own. Given one that can be
+        /// instantiated, <see cref="WProtoFacade"/> short-circuits its exact-type match before
+        /// asking the adapter whether it can write the value, the adapter fails to narrow it to the
+        /// root, and the value encodes to nothing -- measured as a populated instance writing zero
+        /// bytes and reading back as the root.
+        /// </remarks>
+        private static bool Instantiable(ITypeSymbol declared)
+        {
+            return declared.TypeKind != TypeKind.Interface && !declared.IsAbstract;
+        }
+
+        private static int Arity(ITypeSymbol type)
+        {
+            return type is INamedTypeSymbol named ? named.Arity : 0;
+        }
+
+        private static bool IsContract(ITypeSymbol type)
         {
             foreach (AttributeData attribute in type.GetAttributes())
             {
@@ -236,9 +301,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                // ITypeSymbol rather than INamedTypeSymbol: `typeof(IThing[])` is an array symbol,
+                // and dropping it here would be a pair that neither registers nor reports.
                 if (
-                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol declared)
-                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol root)
+                    !(attribute.ConstructorArguments[0].Value is ITypeSymbol declared)
+                    || !(attribute.ConstructorArguments[1].Value is ITypeSymbol root)
                 )
                 {
                     continue;
@@ -250,16 +317,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private readonly struct Pair
         {
-            internal Pair(INamedTypeSymbol declared, INamedTypeSymbol root, AttributeData attribute)
+            internal Pair(ITypeSymbol declared, ITypeSymbol root, AttributeData attribute)
             {
                 Declared = declared;
                 Root = root;
                 Attribute = attribute;
             }
 
-            internal INamedTypeSymbol Declared { get; }
+            internal ITypeSymbol Declared { get; }
 
-            internal INamedTypeSymbol Root { get; }
+            internal ITypeSymbol Root { get; }
 
             internal AttributeData Attribute { get; }
         }

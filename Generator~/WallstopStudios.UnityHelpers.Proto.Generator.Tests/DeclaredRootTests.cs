@@ -306,8 +306,113 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(stream.ToArray(), mine, value.GetType().Name);
         }
 
+        /// <summary>
+        /// A declared type a value can actually BE is refused rather than encoded as nothing.
+        /// </summary>
+        /// <remarks>
+        /// The generator reports this pair (<c>WPROTO029</c>), but the provider is public API. The
+        /// facade short-circuits an exact runtime-type match before asking <c>CanWrite</c>, so
+        /// without the refusal a populated instance is served, fails to narrow to the root, and
+        /// writes zero bytes -- then reads back as the root, a different type.
+        /// </remarks>
+        [Test]
+        public void ADeclaredTypeAValueCanBeIsNotServed()
+        {
+            // The root needs a real formatter, or "not served" would be the no-root branch instead
+            // and this would pass with the guard deleted -- it did, on the first attempt.
+            WProtoFormatterProvider.Register<ConcreteDerived>(new ConcreteDerivedFormatter());
+            WProtoDeclaredRootProvider.Register<ConcreteDeclared, ConcreteDerived>();
+            try
+            {
+                Assert.IsFalse(
+                    WProtoFacade.TrySerialize(new ConcreteDeclared(), out byte[] bytes),
+                    "a value that IS the declared type narrows to nothing and would write zero bytes"
+                );
+                Assert.IsNull(bytes);
+
+                // The derived value still is served, so the refusal is about the declared type
+                // rather than the pair being broken.
+                Assert.IsTrue(
+                    WProtoFacade.TrySerialize<ConcreteDerived>(
+                        new ConcreteDerived(),
+                        out byte[] derived
+                    )
+                );
+                Assert.AreEqual(1, derived.Length);
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register<ConcreteDeclared>(null);
+                WProtoFormatterProvider.Register<ConcreteDerived>(null);
+            }
+        }
+
+        /// <summary>
+        /// A root formatter that is not polymorphic answers for its own type and nothing else.
+        /// </summary>
+        /// <remarks>
+        /// Every generated formatter implements <see cref="IWProtoPolymorphicFormatter"/>, so this
+        /// branch is reachable only through a hand-written one -- which is a supported shape, and
+        /// was the only part of <c>CanWrite</c> nothing exercised.
+        /// </remarks>
+        [Test]
+        public void AHandWrittenRootAnswersForItsOwnTypeOnly()
+        {
+            WProtoFormatterProvider.Register<UnformattedRoot>(new PlainRootFormatter());
+            WProtoDeclaredRootProvider.Register<IUnformatted, UnformattedRoot>();
+            try
+            {
+                IWProtoPolymorphicFormatter adapter =
+                    WProtoFormatterProvider.Get<IUnformatted>() as IWProtoPolymorphicFormatter;
+
+                Assert.IsNotNull(adapter);
+                Assert.IsTrue(adapter.CanWrite(typeof(UnformattedRoot)));
+                Assert.IsFalse(adapter.CanWrite(typeof(OtherUnformatted)));
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register<IUnformatted>(null);
+                WProtoFormatterProvider.Register<UnformattedRoot>(null);
+            }
+        }
+
         private interface IUnformatted { }
 
         private sealed class UnformattedRoot : IUnformatted { }
+
+        private sealed class OtherUnformatted : IUnformatted { }
+
+        private class ConcreteDeclared { }
+
+        private sealed class ConcreteDerived : ConcreteDeclared { }
+
+        private sealed class ConcreteDerivedFormatter : IWProtoFormatter<ConcreteDerived>
+        {
+            public int Measure(in ConcreteDerived value) => 1;
+
+            public bool Write(ref WProtoWriter writer, in ConcreteDerived value)
+            {
+                return writer.TryWriteVarint32(8);
+            }
+
+            public bool TryRead(ref WProtoReader reader, out ConcreteDerived value)
+            {
+                value = new ConcreteDerived();
+                return true;
+            }
+        }
+
+        private sealed class PlainRootFormatter : IWProtoFormatter<UnformattedRoot>
+        {
+            public int Measure(in UnformattedRoot value) => 0;
+
+            public bool Write(ref WProtoWriter writer, in UnformattedRoot value) => true;
+
+            public bool TryRead(ref WProtoReader reader, out UnformattedRoot value)
+            {
+                value = new UnformattedRoot();
+                return true;
+            }
+        }
     }
 }

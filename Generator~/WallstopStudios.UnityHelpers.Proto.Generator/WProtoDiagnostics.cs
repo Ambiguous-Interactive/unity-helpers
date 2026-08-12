@@ -221,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO023",
                 "WallstopProto declared root is not assignable to its declared type",
-                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{1}' as the contract serving '{0}', but a '{1}' cannot be held as a '{0}'. The registration is emitted as WProtoDeclaredRootProvider.Register<{0}, {1}>(), whose constraints are 'TDeclared : class' and 'TRoot : TDeclared', so a value type as the declared type or a root that does not derive from it is a compiler error inside generated code that never names this attribute.",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{1}' as the contract serving '{0}', but a '{1}' cannot be held as a '{0}'. The registration is emitted as WProtoDeclaredRootProvider.Register<{0}, {1}>(), whose constraint is 'TRoot : TDeclared', so a root that does not derive from its declared type is a compiler error inside generated code that never names this attribute.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
@@ -285,6 +285,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true
         );
+
+        internal static readonly DiagnosticDescriptor DeclaredRootOnInstantiableType =
+            new DiagnosticDescriptor(
+                "WPROTO029",
+                "WallstopProto declared root names a type that can be instantiated",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{0}', which is neither an interface nor abstract. A declared root exists for a type that has no encoding of its own; a '{0}' that is actually a '{0}' would be served by the adapter, fail to narrow to '{1}', and encode to nothing -- measured as a populated value writing zero bytes and reading back as '{1}'. Make '{0}' abstract, or give it its own [WProtoContract].",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
 
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",

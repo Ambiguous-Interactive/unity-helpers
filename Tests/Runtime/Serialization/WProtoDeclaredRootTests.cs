@@ -72,10 +72,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// two rules being conflated later.
         /// </remarks>
         [Test]
-        public void ADeclaredRootIsRegisteredWhereEveryOtherFormatterIs()
+        public void ADeclaredRootIsReachableFromAMemberPosition()
         {
-            Assert.IsFalse(WProtoRootMarshalProvider.IsRegistered<IRandom>());
-            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<IRandom>());
+            // Asserting IsRegistered here would restate the test above; what is actually claimed is
+            // that the MEMBER path can see it, which is where a root marshal deliberately cannot be
+            // seen. WProtoGeneric is the lookup a generic contract's member goes through.
+            Assert.IsTrue(WProtoGeneric<IRandom>.CanEncode);
         }
 
         [Test]

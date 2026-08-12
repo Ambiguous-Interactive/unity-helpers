@@ -42,6 +42,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// order decide. The adapter then declines and protobuf-net serves the call exactly as it does
     /// today.
     /// </para>
+    /// <para>
+    /// <b>A second declaration is not a way to override the first.</b> Only the declaring assembly's
+    /// own attributes are read, so a consumer's pair for a type this package also declares is a
+    /// second registration rather than a replacement -- and both registrars run in the same
+    /// unordered Unity phase, exactly as <see cref="WProtoRootMarshalProvider"/> describes. Which
+    /// one wins is the assembly load order. Use <c>Serializer.RegisterProtobufRoot</c> to override
+    /// one, or register from a later phase of your own.
+    /// </para>
     /// <example>
     /// <code>
     /// [assembly: WProtoDeclaredRoot(typeof(IRandom), typeof(AbstractRandom))]

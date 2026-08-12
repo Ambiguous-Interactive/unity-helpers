@@ -730,7 +730,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ).SetName("ARootThatIsNotAssignableToItsDeclaredTypeIsAnError");
 
             yield return new TestCaseData(
-                "WPROTO023",
+                "WPROTO029",
                 "int",
                 @"[assembly: WProtoDeclaredRoot(typeof(int), typeof(Consumer.Thing))]
                   [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
@@ -758,6 +758,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   public interface IThing<T> { }
                   [WProtoContract] public partial class Thing<T> : IThing<T> { [WProtoMember(1)] public int A; }"
             ).SetName("AGenericDeclaredRootIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO029",
+                "Consumer.Plain",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Plain), typeof(Consumer.Sub))]
+                  public class Plain { }
+                  [WProtoContract] public partial class Sub : Plain { [WProtoMember(1)] public int A; }"
+            ).SetName("ADeclaredTypeAValueCanBeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO029",
+                "Consumer.IThing[]",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing[]), typeof(Consumer.Thing[]))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class Thing : IThing { [WProtoMember(1)] public int A; }"
+            ).SetName("AnArrayAsTheDeclaredTypeIsAnError");
 
             yield return new TestCaseData(
                 "WPROTO027",

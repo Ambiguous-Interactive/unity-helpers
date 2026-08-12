@@ -1358,22 +1358,34 @@ Declare your own the same way, naming any interface — or any abstract type tha
 `[WProtoContract]` — and the `[WProtoContract]` that serves it. The generator emits the registration
 into the declaring assembly and reports the pairs that cannot work: a root that is not assignable to
 the declared type (`WPROTO023`), a type named as its own root (`WPROTO024`), a declared type that is
-already a contract (`WPROTO025`), an open generic (`WPROTO026`), and two roots for one declared type
-(`WPROTO027`).
+already a contract (`WPROTO025`), an open generic (`WPROTO026`), two roots for one declared type
+(`WPROTO027`), and a declared type that is neither an interface nor abstract (`WPROTO029`).
 
 Unlike a root marshal, a declared root lives in `WProtoFormatterProvider` with every other formatter,
 because it has **one** encoding rather than two: a member typed `IRandom` and a root typed `IRandom`
 are both `AbstractRandom`'s message, which is what protobuf-net writes for each.
 
-Two refusals keep it honest, and both matter more on the read side — a formatter that answers and
-then rejects a payload raises `SerializationCorruptDataException` rather than falling back:
+**Declaring a root asserts that this contract owns the declared type**, exactly as
+`Serializer.RegisterProtobufRoot` does — and with the same consequence, because a payload does not
+name the contract that wrote it. What the two serializers do about that is identical, and worth
+stating precisely:
 
-- **An implementation outside the root's chain is not served.** Your own `IRandom` gets its own
-  formatter and its own bytes; decoding one through `AbstractRandom`'s chain would hand back the
-  wrong type.
-- **Your own root wins.** `Serializer.RegisterProtobufRoot<IRandom, YourRandom>()` says this program
-  has a different answer for that declared type, and WallstopProto stops answering for it — on both
-  sides, whichever registration ran first. Releasing the registration restores the declared pair.
+- **Writing** a value whose runtime type is outside the root's chain is declined, and protobuf-net
+  writes it as its own type — the behaviour that shipped. Your own `IRandom` implementation keeps
+  working.
+- **Reading** into the declared type has no such information, so those bytes come back as the root.
+  With `AbstractRandom` that fails loudly, because an abstract root's payload must carry an include
+  tag; with a **concrete** root it is a plausible wrong object. That is what naming a root means, not
+  a WallstopProto behaviour: `RegisterProtobufRoot<IEvent, PlayerJoined>()` decodes any `IEvent`
+  payload as a `PlayerJoined` too. Name the concrete type explicitly —
+  `ProtoDeserialize<IThing>(bytes, typeof(TheirThing))` — when more than one implementation writes.
+
+Your own root still wins over a declaration. `Serializer.RegisterProtobufRoot<IRandom, YourRandom>()`
+says this program has a different answer, and WallstopProto stops answering for that declared type on
+both sides, whichever registration ran first; releasing it restores the declared pair. Declaring a
+**second** `[assembly: WProtoDeclaredRoot]` for a type another package already declares is not the
+way to override one: both registrars run in the same unordered Unity phase, so which wins is the load
+order. Use `RegisterProtobufRoot`, or register from a later phase of your own.
 
 ### Hostile payloads
 
