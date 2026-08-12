@@ -333,18 +333,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void ProtobufNetRefusesANullElementJustAsThisGeneratorDoes()
+        public void NullElementBehaviorIsPinnedToTheSelectedOracle()
         {
-            // The refusal is not this package being stricter than the oracle; it is the oracle's own
-            // behaviour, restated with a message that names the member. Both halves are asserted
-            // because "we throw" is only defensible while "it throws too" holds.
+            // v3 refuses the null element, while v2 silently omits it. WallstopProto preserves the
+            // v3 failure because silently changing a collection is data loss; the isolated runs
+            // pin both oracle behaviors so this difference cannot disappear unnoticed.
             RepeatedContract value = new RepeatedContract { Texts = new[] { "a", null } };
 
             using (MemoryStream stream = new MemoryStream())
             {
+#if PROTOBUF_NET_ORACLE_V2
+                ProtoBuf.Serializer.Serialize(stream, value);
+                Assert.AreEqual(
+                    "1A0161",
+                    ToHex(stream.ToArray()),
+                    "v2 silently omits the null element; v3 rejects it"
+                );
+#else
                 Assert.Throws<NullReferenceException>(() =>
                     ProtoBuf.Serializer.Serialize(stream, value)
                 );
+#endif
             }
 
             InvalidOperationException mine = Assert.Throws<InvalidOperationException>(() =>

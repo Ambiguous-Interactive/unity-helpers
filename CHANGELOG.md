@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WallstopProto now preserves empty string map values written by protobuf-net v2**: v2 omits the value field for `""`, and the generated reader previously turned that missing field into `null`. It now applies protobuf's empty-string default, so old persisted maps migrate without changing their values ([#371](https://github.com/Ambiguous-Interactive/unity-helpers/issues/371)).
 - **`SkipConstructor` no longer leaves initialized collection contents ahead of decoded values**: when a repeated or map field is present, its payload now replaces the field initializer just as protobuf-net's uninitialized allocation does. This restores the serialized state of `PhotonSpinRandom` and `StormDropRandom` under the default WallstopProto path.
 - **Nested WallstopProto generic closures no longer throw when an inner formatter declines**: the outer contract now falls back to protobuf-net before writing anything ([#416](https://github.com/Ambiguous-Interactive/unity-helpers/issues/416)).
 - **Late message and scalar formatter registrations now honor last-registration-wins**: replacing a formatter during startup invalidates `WProtoGeneric<T>`'s prior resolution instead of continuing to use the stale formatter.

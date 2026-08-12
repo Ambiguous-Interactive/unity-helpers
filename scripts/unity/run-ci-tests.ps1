@@ -444,6 +444,35 @@ function Test-UnityPackageManagerTransientFailure {
     )
 }
 
+function Test-UnityConfigurePackageManagerRetryableFailure {
+    param([string]$LogPath)
+
+    if (-not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
+        return $false
+    }
+
+    try {
+        $logText = Get-Content -LiteralPath $LogPath -Raw
+    } catch {
+        return $false
+    }
+
+    # A configure can log an early UPM disconnect and still continue far enough to expose a real
+    # compile/startup defect. Retry only when the UPM signal is the sole known failure class. The
+    # shared catastrophic list keeps this exclusion aligned with the diagnostics that fail CI.
+    foreach ($entry in $script:CatastrophicPatterns) {
+        if ($entry.UseSimple) {
+            if ($logText.IndexOf($entry.Pattern, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                return $false
+            }
+        } elseif ($logText -match $entry.Pattern) {
+            return $false
+        }
+    }
+
+    return $logText -notmatch 'Aborting batchmode'
+}
+
 function Write-UnityPackageManagerTransientFailureWarnings {
     param(
         [string]$LogPath,
@@ -3382,14 +3411,13 @@ function Invoke-UnityConfigurePass {
         [Parameter(Mandatory = $true)][string]$MarkerPath,
         [Parameter(Mandatory = $true)][string]$LogPath,
         [Parameter(Mandatory = $true)][string]$Label,
-        [string[]]$ExtraArguments = @()
+        [string[]]$ExtraArguments = @(),
+        [scriptblock]$ConfigureInvoker
     )
 
     if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
         Remove-Item -LiteralPath $MarkerPath -Force
     }
-    $env:UH_CONFIGURE_MARKER_PATH = $MarkerPath
-    $configureStartedUtc = [DateTime]::UtcNow
     $configureArgs = @(
         '-quit',
         '-batchmode',
@@ -3409,17 +3437,61 @@ function Invoke-UnityConfigurePass {
     # step timeout. There is no completion sentinel (this is -quit/-executeMethod, not
     # -runTests), so the wall-clock + stall guards alone bound it; the durable marker file
     # remains the source of truth for whether Apply() actually ran.
-    $configureExit = Invoke-UnityEditor `
-        -EditorPath $EditorPath `
-        -Arguments $configureArgs `
-        -Label $Label `
-        -LogPath $LogPath `
-        -TimeoutSeconds (Get-EditorTestRunTimeoutSeconds) `
-        -StallSeconds (Get-EditorTestStallSeconds)
-    # The configurator has run; drop the marker-path env var so it cannot be
-    # inherited by later child processes (only Apply reads it).
-    Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
+    $invokeConfigure = {
+        param([string]$AttemptLabel)
+        $env:UH_CONFIGURE_MARKER_PATH = $MarkerPath
+        if ($ConfigureInvoker) {
+            return & $ConfigureInvoker $configureArgs $LogPath $AttemptLabel
+        }
+        return Invoke-UnityEditor `
+            -EditorPath $EditorPath `
+            -Arguments $configureArgs `
+            -Label $AttemptLabel `
+            -LogPath $LogPath `
+            -TimeoutSeconds (Get-EditorTestRunTimeoutSeconds) `
+            -StallSeconds (Get-EditorTestStallSeconds)
+    }
+
+    $configureStartedUtc = [DateTime]::UtcNow
+    try {
+        $configureExit = & $invokeConfigure $Label
+    } finally {
+        # The configurator has run; drop the marker-path env var so it cannot be
+        # inherited by later child processes (only Apply reads it).
+        Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
+    }
     $configureProblem = Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc
+
+    # A fresh marker always wins: Apply completed, and any UPM message in the log predates that
+    # durable proof. Retry only a marker-less exact cancellation/IPC signature, once. Compilation,
+    # test, and arbitrary non-zero failures never reach this branch.
+    if (
+        -not [string]::IsNullOrWhiteSpace($configureProblem) -and
+        (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)
+    ) {
+        Write-CiWarning "Unity Package Manager canceled package resolution before the configure marker existed; clearing UPM state and retrying once."
+        Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
+        $firstAttemptLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
+        try {
+            Copy-Item -LiteralPath $LogPath -Destination $firstAttemptLogPath -Force -ErrorAction Stop
+            Write-CiNotice "Saved first failed Unity configure log before retry: $firstAttemptLogPath"
+        } catch {
+            Write-CiWarning "Could not preserve first failed Unity configure log before retry: $($_.Exception.Message)"
+        }
+        Clear-UnityPackageManagerRetryState -Project $ProjectPath
+        if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
+            Remove-Item -LiteralPath $MarkerPath -Force
+        }
+
+        $configureStartedUtc = [DateTime]::UtcNow
+        try {
+            $configureExit = & $invokeConfigure "$Label (retry 1 after UPM cancellation)"
+        } finally {
+            Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
+        }
+        $configureProblem = Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($configureProblem)) {
         Write-UnityRunFailureDiagnostics `
             -Project $ProjectPath `

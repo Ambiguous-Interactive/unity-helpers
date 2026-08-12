@@ -67,7 +67,12 @@ jobs:
         # type rather than as anything naming the analyzer.
         run: node scripts/tests/test-analyzer-placement.js
 
-      - name: Test the generator
+      - name: Test the generator against protobuf-net 3.2.56
         # The formatters under test are the shipped analyzer's own output, produced the way Unity
         # produces them, rather than a transcription of what it ought to emit.
-        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo
+        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v3
+
+      - name: Test the generator against protobuf-net 2.4.9
+        # The two oracle DLLs share an assembly name. A second process is the only reliable
+        # isolation boundary; side-by-side aliases can silently bind both references to v3.
+        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v2

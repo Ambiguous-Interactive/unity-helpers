@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
-    /// Pins map-shaped members against protobuf-net 3.2.56.
+    /// Pins map-shaped members against protobuf-net 2.4.9 and 3.2.56.
     /// </summary>
     /// <remarks>
     /// A protobuf map is a repeated <b>entry message</b> — key at field 1, value at field 2 — not a
@@ -51,12 +51,47 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             MapContract structDefault = Bare(c =>
                 c.ById = new Dictionary<int, Outer.Point> { { 7, default } }
             );
+#if PROTOBUF_NET_ORACLE_V2
+            // v2 omits the default struct value while v3 writes its empty sub-message. The
+            // migration direction is still compatible: WallstopProto accepts the bytes v2 wrote.
+            // Captured from the isolated v2.4.9 oracle before its RuntimeTypeModel freezes. The v2
+            // compiler cannot reliably prepare this struct-valued map after another path freezes
+            // the same contract, so a literal is the only deterministic regression for this
+            // upstream limitation.
+            const string v2Hex = "12020807";
+            Assert.AreEqual(default(Outer.Point), Decode(v2Hex).ById[7]);
+#else
             Assert.AreEqual(OracleHex(structDefault), Encode(structDefault));
+#endif
         }
 
         [Test]
         public void EveryMapShapeMatchesTheOracleByteForByte()
         {
+#if PROTOBUF_NET_ORACLE_V2
+            V2CompatibleMapContract[] values =
+            {
+                V2Bare(),
+                V2Bare(c => c.Values = new Dictionary<string, int>()),
+                V2Bare(c => c.Values = new Dictionary<string, int> { { "a", 1 } }),
+                V2Bare(c => c.Values = new Dictionary<string, int> { { "a", 0 } }),
+                V2Bare(c =>
+                {
+                    c.Values = new Dictionary<string, int> { { "k", 5 } };
+                    c.Sorted = new SortedDictionary<string, string> { { "a", "x" }, { "b", "y" } };
+                }),
+                new V2CompatibleMapContract
+                {
+                    Overwritten = new Dictionary<string, int> { { "replacement", 1 } },
+                    Merged = new Dictionary<string, int> { { "addition", 2 } },
+                },
+            };
+
+            foreach (V2CompatibleMapContract value in values)
+            {
+                Assert.AreEqual(OracleHex(value), Encode(value));
+            }
+#else
             MapContract[] values =
             {
                 Bare(),
@@ -92,7 +127,56 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 Assert.AreEqual(OracleHex(value), Encode(value), Describe(value));
             }
+#endif
         }
+
+#if PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void V2AndV3MapDefaultRulesDivergeButStringMapsCrossRead()
+        {
+            V2CompatibleMapContract original = V2Bare(c =>
+            {
+                c.Values = new Dictionary<string, int> { { string.Empty, 1 } };
+            });
+
+            string v2Hex = OracleHex(original);
+            string currentHex = Encode(original);
+
+            Assert.AreEqual("0A021001", v2Hex, "v2 omits the default-valued string key");
+            Assert.AreEqual("0A040A001001", currentHex, "v3 writes an explicit empty string key");
+
+            V2CompatibleMapContract migrated = DecodeV2CompatibleMap(v2Hex);
+            Assert.AreEqual(1, migrated.Values[string.Empty]);
+
+            using (MemoryStream stream = new MemoryStream(Parse(currentHex)))
+            {
+                V2CompatibleMapContract readByV2 =
+                    ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
+                Assert.AreEqual(1, readByV2.Values[string.Empty]);
+            }
+
+            V2CompatibleMapContract emptyStringValue = V2Bare(c =>
+            {
+                c.Sorted = new SortedDictionary<string, string> { { "b", string.Empty } };
+            });
+            string v2ValueHex = OracleHex(emptyStringValue);
+            string currentValueHex = Encode(emptyStringValue);
+            Assert.AreEqual("1A030A0162", v2ValueHex, "v2 omits the default string value");
+            Assert.AreEqual(
+                "1A050A01621200",
+                currentValueHex,
+                "v3 writes an explicit empty string value"
+            );
+            Assert.AreEqual(string.Empty, DecodeV2CompatibleMap(v2ValueHex).Sorted["b"]);
+
+            using (MemoryStream stream = new MemoryStream(Parse(currentValueHex)))
+            {
+                V2CompatibleMapContract readByV2 =
+                    ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
+                Assert.AreEqual(string.Empty, readByV2.Sorted["b"]);
+            }
+        }
+#endif
 
         [Test]
         public void AMapRoundTrips()
@@ -170,8 +254,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             using (MemoryStream stream = new MemoryStream(Parse(twice)))
             {
-                MapContract oracle = ProtoBuf.Serializer.Deserialize<MapContract>(stream);
-                Assert.AreEqual(2, oracle.ByName["a"]);
+                V2CompatibleMapContract oracle =
+                    ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
+                Assert.AreEqual(2, oracle.Values["a"]);
             }
 
             Assert.AreEqual(2, Decode(twice).ByName["a"]);
@@ -193,8 +278,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 using (MemoryStream stream = new MemoryStream(Parse(hex)))
                 {
-                    MapContract oracle = ProtoBuf.Serializer.Deserialize<MapContract>(stream);
-                    CollectionAssert.AreEquivalent(oracle.ByName, Decode(hex).ByName, hex);
+                    V2CompatibleMapContract oracle =
+                        ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
+                    CollectionAssert.AreEquivalent(oracle.Values, Decode(hex).ByName, hex);
                 }
             }
         }
@@ -235,6 +321,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             configure?.Invoke(value);
             return value;
         }
+
+#if PROTOBUF_NET_ORACLE_V2
+        private static V2CompatibleMapContract V2Bare(
+            Action<V2CompatibleMapContract> configure = null
+        )
+        {
+            V2CompatibleMapContract value = new V2CompatibleMapContract
+            {
+                Overwritten = null,
+                Merged = null,
+            };
+            configure?.Invoke(value);
+            return value;
+        }
+#endif
 
         private static string Describe(MapContract value)
         {
@@ -284,6 +385,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFormatterProvider
                     .Get<MapContract>()
                     .TryRead(ref reader, out MapContract value),
+                hex
+            );
+            return value;
+        }
+
+        private static V2CompatibleMapContract DecodeV2CompatibleMap(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<V2CompatibleMapContract>()
+                    .TryRead(ref reader, out V2CompatibleMapContract value),
                 hex
             );
             return value;

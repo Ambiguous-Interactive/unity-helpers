@@ -7,6 +7,15 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <!-- Compiled from the repository root so the generator sees the same sources Unity does. -->
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <ProtobufNetOracle Condition="'$(ProtobufNetOracle)' == ''">v3</ProtobufNetOracle>
+    <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'v2'"
+      >$(RepoRoot)/Generator~/ProtobufNetV2Oracle/protobuf-net.dll</ProtobufNetOraclePath>
+    <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'v3'"
+      >$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</ProtobufNetOraclePath>
+    <BaseOutputPath>bin/$(ProtobufNetOracle)/</BaseOutputPath>
+    <IntermediateOutputPath>obj/$(ProtobufNetOracle)/$(Configuration)/</IntermediateOutputPath>
+    <DefineConstants Condition="'$(ProtobufNetOracle)' == 'v2'"
+      >$(DefineConstants);PROTOBUF_NET_ORACLE_V2</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,15 +48,30 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The conformance oracle, the same vendored binary the package ships to Unity. Referencing it
-         here rather than only from the Unity test assembly is what makes byte-compatibility a
-         red-green loop a developer can run in seconds: the Unity differential can only run on the
-         Mono legs anyway, because protobuf-net is what does not work under IL2CPP. -->
-    <Reference Include="protobuf-net">
-      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    <!-- Each process loads exactly one conformance oracle. The assemblies have the same simple
+         name, so aliases in one process could silently bind both references to the same physical
+         assembly. CI runs this project once per version instead. The v3 binary is the one the
+         package ships; the v2 binary lives under Generator~ and never enters a Unity payload. -->
+    <Reference
+      Include="protobuf-net, Version=2.4.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67"
+      Condition="'$(ProtobufNetOracle)' == 'v2'"
+    >
+      <HintPath>$(ProtobufNetOraclePath)</HintPath>
+      <SpecificVersion>true</SpecificVersion>
     </Reference>
-    <Reference Include="protobuf-net.Core">
+    <Reference
+      Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67"
+      Condition="'$(ProtobufNetOracle)' == 'v3'"
+    >
+      <HintPath>$(ProtobufNetOraclePath)</HintPath>
+      <SpecificVersion>true</SpecificVersion>
+    </Reference>
+    <Reference
+      Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67"
+      Condition="'$(ProtobufNetOracle)' == 'v3'"
+    >
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+      <SpecificVersion>true</SpecificVersion>
     </Reference>
   </ItemGroup>
 
@@ -57,4 +81,15 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
   </ItemGroup>
+
+  <Target Name="ValidateProtobufNetOracle" BeforeTargets="ResolveReferences">
+    <Error
+      Condition="'$(ProtobufNetOracle)' != 'v2' and '$(ProtobufNetOracle)' != 'v3'"
+      Text="Unknown ProtobufNetOracle '$(ProtobufNetOracle)'. Expected v2 or v3."
+    />
+    <Error
+      Condition="!Exists('$(ProtobufNetOraclePath)')"
+      Text="The $(ProtobufNetOracle) protobuf-net oracle is missing at '$(ProtobufNetOraclePath)'."
+    />
+  </Target>
 </Project>

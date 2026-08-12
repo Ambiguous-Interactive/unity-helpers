@@ -12,7 +12,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
-    /// Pins surrogates against protobuf-net 3.2.56.
+    /// Pins surrogates against protobuf-net 2.4.9 and 3.2.56.
     /// </summary>
     /// <remarks>
     /// A surrogate is how a type nobody owns gets a wire shape — Unity's <c>Vector3</c>,
@@ -58,6 +58,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EverySurrogatedShapeMatchesTheOracleByteForByte()
         {
+#if PROTOBUF_NET_ORACLE_V2
+            V2CompatibleSurrogateHolder[] values =
+            {
+                new V2CompatibleSurrogateHolder(),
+                new V2CompatibleSurrogateHolder
+                {
+                    Position = new ForeignVector3
+                    {
+                        x = 1,
+                        y = 2,
+                        z = 3,
+                    },
+                },
+                new V2CompatibleSurrogateHolder
+                {
+                    Position = new ForeignVector3 { x = -0f },
+                    Trailer = 5,
+                },
+                new V2CompatibleSurrogateHolder
+                {
+                    Path = new[]
+                    {
+                        default(ForeignVector3),
+                        new ForeignVector3 { z = 2 },
+                    },
+                    Trailer = -1,
+                },
+            };
+#else
             SurrogateHolder[] values =
             {
                 new SurrogateHolder(),
@@ -103,10 +132,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Named = new Dictionary<string, ForeignVector3> { { "b", default } },
                 },
             };
+#endif
 
+#if PROTOBUF_NET_ORACLE_V2
+            foreach (V2CompatibleSurrogateHolder value in values)
+#else
             foreach (SurrogateHolder value in values)
+#endif
             {
-                Assert.AreEqual(OracleHex(value), Encode(value), Describe(value));
+                Assert.AreEqual(OracleHex(value), Encode(value));
             }
         }
 
@@ -152,6 +186,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void TheOracleDecodesWhatThisPackageWrote()
         {
             // Byte equality is not agreement about meaning, so the payload goes the other way too.
+#if PROTOBUF_NET_ORACLE_V2
+            V2CompatibleSurrogateHolder original = new V2CompatibleSurrogateHolder
+            {
+                Position = new ForeignVector3 { x = 1, z = 3 },
+                Path = new[] { new ForeignVector3 { y = 2 } },
+                Trailer = 4,
+            };
+
+            using (MemoryStream stream = new MemoryStream(Parse(Encode(original))))
+            {
+                V2CompatibleSurrogateHolder theirs =
+                    ProtoBuf.Serializer.Deserialize<V2CompatibleSurrogateHolder>(stream);
+                Assert.AreEqual(1, theirs.Position.x);
+                Assert.AreEqual(3, theirs.Position.z);
+                Assert.AreEqual(2, theirs.Path[0].y);
+                Assert.AreEqual(4, theirs.Trailer);
+            }
+#else
             SurrogateHolder original = new SurrogateHolder
             {
                 Position = new ForeignVector3 { x = 1, z = 3 },
@@ -167,6 +219,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.AreEqual(2, theirs.Path[0].y);
                 Assert.AreEqual(4, theirs.Trailer);
             }
+#endif
         }
 
         private static string Describe(SurrogateHolder value)

@@ -745,6 +745,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
     }
 
+    /// <summary>
+    /// The map shape common to both protobuf-net oracle majors.
+    /// </summary>
+    /// <remarks>
+    /// protobuf-net 2.4.9 cannot compile <see cref="MapContract"/> for reading because that contract
+    /// also contains a map whose value is a struct sub-message. Keeping this minimal contract
+    /// separate lets the dual-oracle suite prove string-map migration in both directions without
+    /// mistaking that v2 compiler limitation for a WallstopProto failure.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class V2CompatibleMapContract
+    {
+        /// <summary>A string-keyed map with a scalar value.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public Dictionary<string, int> Values;
+
+        /// <summary>An ordered dictionary, so enumeration order is deterministic.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public SortedDictionary<string, string> Sorted;
+
+        /// <summary>Replaced on read rather than merged into.</summary>
+        [ProtoMember(4, OverwriteList = true)]
+        [WProtoMember(4, OverwriteList = true)]
+        public Dictionary<string, int> Overwritten = new Dictionary<string, int> { { "seed", 9 } };
+
+        /// <summary>Merged into on read.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public Dictionary<string, int> Merged = new Dictionary<string, int> { { "seed", 9 } };
+    }
+
     /// <summary>An enum, so an enum-keyed map has something to name.</summary>
     public enum MapKeyKind
     {
@@ -885,6 +919,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(4)]
         [WProtoMember(4)]
         public System.Collections.Generic.Dictionary<string, ForeignVector3> Named;
+    }
+
+    /// <summary>
+    /// The surrogate shapes protobuf-net 2.4.9 can compile as an oracle.
+    /// </summary>
+    /// <remarks>
+    /// The v2 runtime compiler cannot represent a surrogated struct as a map value's default. This
+    /// contract deliberately omits that one v3-only shape while retaining scalar and repeated
+    /// positions for cross-major byte and read compatibility.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class V2CompatibleSurrogateHolder
+    {
+        /// <summary>A plain surrogated member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public ForeignVector3 Position;
+
+        /// <summary>A repeated surrogated element.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public ForeignVector3[] Path;
+
+        /// <summary>A scalar after them, to pin ordering.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public int Trailer;
     }
 
     /// <summary>

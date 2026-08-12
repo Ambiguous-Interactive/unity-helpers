@@ -1445,11 +1445,20 @@ understate one.
 
 ### Wire compatibility
 
-The writer is byte-for-byte identical to protobuf-net 3.2.56 across 90 differential cases covering
-varints, ZigZag, fixed32/64, strings, byte arrays, nested messages, unpacked repeated fields, and the
-maximum field number, plus 644 whole-message cases across the four contracts above — byte-equal and
-cross-deserialized in both directions. Three protobuf-net behaviors are worth knowing because they
-are easy to trip over:
+The differential suite runs in two isolated processes: one loads protobuf-net 2.4.9 and the other
+loads 3.2.56. Isolation matters because both assemblies have the same name; each run asserts the
+physical version it loaded before testing. The writer is byte-for-byte identical to 3.2.56 across 90
+wire cases covering varints, ZigZag, fixed32/64, strings, byte arrays, nested messages, unpacked
+repeated fields, and the maximum field number, plus 644 whole-message cases across the four contracts
+above. The shared v2/v3 domain is also byte-equal and cross-deserialized in both directions.
+
+The majors themselves diverge at a few edges. protobuf-net 2.4.9 omits empty string map keys/values
+and a default struct map value that 3.2.56 writes, and v2 silently drops a null repeated element that v3
+rejects. WallstopProto follows the safer/current v3 behavior and separately proves it can read the v2
+omissions using protobuf defaults (including `string.Empty`, never `null`) and the v2
+map bytes, so an old save migrates without claiming an impossible three-way byte identity.
+
+Three protobuf-net behaviors are worth knowing because they are easy to trip over:
 
 - An **empty but non-null** `string` or `byte[]` is written as tag plus a zero length. Only `null` is
   omitted.

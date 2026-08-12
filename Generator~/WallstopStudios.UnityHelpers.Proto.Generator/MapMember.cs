@@ -24,9 +24,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// nothing at all, so it reads back as whatever the constructor left behind.
     /// </para>
     /// <para>
-    /// Reading an entry with no key yields the key type's default, and a repeated key is last-wins --
-    /// the entry is applied through the indexer rather than <c>Add</c>, which would throw on the
-    /// second occurrence of a key a hostile payload repeated.
+    /// Reading an entry with no key or value yields that type's protobuf default. In particular,
+    /// a missing string half is <see cref="string.Empty"/> rather than <c>null</c>. A repeated key is
+    /// last-wins -- the entry is applied through the indexer rather than <c>Add</c>, which would throw
+    /// on the second occurrence of a key a hostile payload repeated.
     /// </para>
     /// </remarks>
     internal sealed class MapMember : Member
@@ -44,6 +45,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly bool _overwrite;
         private readonly bool _valueIsReference;
         private readonly bool _keyIsString;
+        private readonly bool _valueIsString;
 
         private MapMember(
             string contractName,
@@ -56,7 +58,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string mapQualified,
             bool overwrite,
             bool valueIsReference,
-            bool keyIsString
+            bool keyIsString,
+            bool valueIsString
         )
             : base(name, tag)
         {
@@ -69,6 +72,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _overwrite = overwrite;
             _valueIsReference = valueIsReference;
             _keyIsString = keyIsString;
+            _valueIsString = valueIsString;
         }
 
         /// <summary>
@@ -176,7 +180,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 overwriteList,
                 value.IsReference,
-                keyIsString
+                keyIsString,
+                valueType.SpecialType == SpecialType.System_String
             );
         }
 
@@ -429,7 +434,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ";"
             );
             writer.Line(
-                _valueQualified + " " + valueLocal + " = default(" + _valueQualified + ");"
+                _valueQualified
+                    + " "
+                    + valueLocal
+                    + " = "
+                    + (_valueIsString ? "string.Empty" : "default(" + _valueQualified + ")")
+                    + ";"
             );
             writer.Blank();
             writer.Line(
