@@ -440,13 +440,123 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
-    /// A contract whose collection is a value type.
+    /// A dictionary implemented as a <b>struct</b>, the map half of the same assumption.
     /// </summary>
     /// <remarks>
-    /// Not annotated for protobuf-net: it cannot serialize this member at all, which is the whole
+    /// Lazy about its backing store for the same reason <see cref="IntBag"/> is: a
+    /// <c>default(IntPairs)</c> has to be a legal empty value, or the copy semantics the emitter
+    /// depends on are never exercised.
+    /// </remarks>
+    public struct IntPairs : IDictionary<int, int>
+    {
+        private Dictionary<int, int> _items;
+
+        private Dictionary<int, int> Items => _items ??= new Dictionary<int, int>();
+
+        /// <inheritdoc />
+        public int this[int key]
+        {
+            get => Items[key];
+            set => Items[key] = value;
+        }
+
+        /// <inheritdoc />
+        public ICollection<int> Keys => Items.Keys;
+
+        /// <inheritdoc />
+        public ICollection<int> Values => Items.Values;
+
+        /// <inheritdoc />
+        public int Count => _items == null ? 0 : _items.Count;
+
+        /// <inheritdoc />
+        public bool IsReadOnly => false;
+
+        /// <inheritdoc />
+        public void Add(int key, int value)
+        {
+            Items.Add(key, value);
+        }
+
+        /// <inheritdoc />
+        public void Add(KeyValuePair<int, int> item)
+        {
+            Items.Add(item.Key, item.Value);
+        }
+
+        /// <inheritdoc />
+        public void Clear()
+        {
+            _items = null;
+        }
+
+        /// <inheritdoc />
+        public bool Contains(KeyValuePair<int, int> item)
+        {
+            return _items != null
+                && _items.TryGetValue(item.Key, out int held)
+                && held == item.Value;
+        }
+
+        /// <inheritdoc />
+        public bool ContainsKey(int key)
+        {
+            return _items != null && _items.ContainsKey(key);
+        }
+
+        /// <inheritdoc />
+        public void CopyTo(KeyValuePair<int, int>[] array, int arrayIndex) { }
+
+        /// <inheritdoc />
+        public bool Remove(int key)
+        {
+            return _items != null && _items.Remove(key);
+        }
+
+        /// <inheritdoc />
+        public bool Remove(KeyValuePair<int, int> item)
+        {
+            return Remove(item.Key);
+        }
+
+        /// <inheritdoc />
+        public bool TryGetValue(int key, out int value)
+        {
+            value = 0;
+            return _items != null && _items.TryGetValue(key, out value);
+        }
+
+        /// <summary>
+        /// Returns a non-boxing enumerator, which is what <c>foreach</c> in generated code binds to.
+        /// </summary>
+        /// <returns>The enumerator.</returns>
+        public Dictionary<int, int>.Enumerator GetEnumerator()
+        {
+            return (_items ?? Empty).GetEnumerator();
+        }
+
+        IEnumerator<KeyValuePair<int, int>> IEnumerable<KeyValuePair<int, int>>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        private static readonly Dictionary<int, int> Empty = new Dictionary<int, int>();
+    }
+
+    /// <summary>
+    /// A contract whose collection and map members are value types.
+    /// </summary>
+    /// <remarks>
+    /// Not annotated for protobuf-net: it cannot serialize these members at all, which is the whole
     /// reason the shape is worth supporting. Its bytes are compared against the oracle's output for
-    /// an <c>int[]</c> at the same field number instead, which is the stronger claim -- a struct
-    /// collection is not a new encoding, it is the same repeated field with a different container.
+    /// an <c>int[]</c> or a <c>Dictionary&lt;int,int&gt;</c> at the same field number instead, which
+    /// is the stronger claim -- a struct container is not a new encoding, it is the same repeated
+    /// field or map with a different container.
     /// </remarks>
     [WProtoContract]
     public sealed partial class ValueTypeCollectionContract
@@ -470,12 +580,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(4, OverwriteList = true)]
         public IntBag SeededOverwritten = Filled();
 
+        /// <summary>The struct dictionary.</summary>
+        [WProtoMember(5)]
+        public IntPairs Pairs;
+
+        /// <summary>
+        /// A struct dictionary the constructor has already filled, which is the only way merging
+        /// into a copy can be told from replacing it.
+        /// </summary>
+        [WProtoMember(6)]
+        public IntPairs SeededPairs = FilledPairs();
+
+        /// <summary>The same, replaced rather than merged into on read.</summary>
+        [WProtoMember(7, OverwriteList = true)]
+        public IntPairs SeededOverwrittenPairs = FilledPairs();
+
         private static IntBag Filled()
         {
             IntBag bag = new IntBag();
             bag.Add(7);
             bag.Add(8);
             return bag;
+        }
+
+        private static IntPairs FilledPairs()
+        {
+            IntPairs pairs = new IntPairs();
+            pairs.Add(7, 70);
+            return pairs;
         }
     }
 
@@ -712,6 +844,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>The subtype's own member.</summary>
         [WProtoMember(1)]
         public int SubOnly;
+    }
+
+    /// <summary>
+    /// The reference encoding for the struct dictionary on <see cref="ValueTypeCollectionContract"/>.
+    /// </summary>
+    /// <remarks>
+    /// protobuf-net cannot serialize a struct dictionary at all, so the claim is made the same way
+    /// the struct collection's is: the oracle is asked for an ordinary <c>Dictionary</c> at the same
+    /// field number, and the bytes must agree. The field numbers therefore have to match
+    /// <see cref="ValueTypeCollectionContract"/>'s.
+    /// </remarks>
+    [ProtoContract]
+    public sealed class IntKeyedMapContract
+    {
+        /// <summary>Mirrors <c>ValueTypeCollectionContract.Pairs</c>.</summary>
+        [ProtoMember(5)]
+        public Dictionary<int, int> Pairs;
     }
 
     /// <summary>Map-shaped members, annotated for both serializers.</summary>

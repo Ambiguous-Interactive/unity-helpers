@@ -92,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ISerializable,
             ISerializableSetInspector,
             ISerializableSetEditorSync
-        where TSet : class, ISet<T>, new()
+        where TSet : ISet<T>, new()
     {
         static SerializableSetBase()
         {
@@ -105,6 +105,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public int Count => _set.Count;
 
         bool ICollection<T>.IsReadOnly => _set.IsReadOnly;
+
+        /// <summary>
+        /// The backing set, for read access from a derived type.
+        /// </summary>
+        /// <remarks>
+        /// <c>TSet</c> is not constrained to a class, so a derived type is free to supply a struct
+        /// set. This property returns that struct by value, which means mutating what it hands back
+        /// mutates a copy; mutate <see cref="_set"/> directly instead.
+        /// </remarks>
         protected TSet Set => _set;
 
         protected internal T[] SerializedItems => _items;
@@ -145,7 +154,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         protected SerializableSetBase(TSet set)
         {
-            _set = set ?? throw new ArgumentNullException(nameof(set));
+            // `is null` rather than `??`: TSet may be a struct, for which the coalescing operator is
+            // CS0019 and the test is a constant false.
+            if (set is null)
+            {
+                throw new ArgumentNullException(nameof(set));
+            }
+
+            _set = set;
         }
 
         protected SerializableSetBase(
@@ -1002,7 +1018,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoAfterDeserialization]
         protected internal void OnProtoAfterDeserialization()
         {
-            if (_set == null)
+            // A struct set is never null, so this is a constant false for one; it exists for the
+            // reference case, where an uninitialized allocation leaves the [ProtoIgnore] field null.
+            if (_set is null)
             {
                 _set = new TSet();
             }

@@ -312,7 +312,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // inline or pooled buffer is a natural struct. A generator that emits `member != null`
             // for every collection does not merely produce redundant code for one -- it produces
             // code that does not compile.
-            AssertNoDiagnostics(
+            //
+            // Which is why the generated code is COMPILED here rather than only scanned for
+            // WPROTO diagnostics: `member != null` on a struct is CS0019, a compiler error inside
+            // emitted source, and the generator reports nothing at all about it.
+            const string source =
                 @"public struct Bag : System.Collections.Generic.ICollection<int>
                   {
                       private System.Collections.Generic.List<int> _items;
@@ -340,8 +344,64 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   [WProtoContract] public sealed partial class Holder
                   {
                       [WProtoMember(1)] public Bag Values;
-                  }"
-            );
+                  }";
+
+            AssertNoDiagnostics(source);
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
+        }
+
+        [Test]
+        public void AMapImplementedAsAStructIsAcceptedLikeAnyOther()
+        {
+            // The other half of the same assumption (#388). The map path accepts a struct
+            // dictionary -- a value type has a parameterless constructor by definition, so
+            // `MapMember.TryCreate` says yes -- and then emitted `value.Members != null` and
+            // `read.Members ?? new Members()` for it. Both are CS0019 on a struct, so a consumer
+            // whose dictionary is an inline buffer got a compiler error inside generated source
+            // they never wrote, naming an operator rather than a serializer.
+            const string source =
+                @"public struct Pairs : System.Collections.Generic.IDictionary<int, int>
+                  {
+                      private System.Collections.Generic.Dictionary<int, int> _items;
+                      private System.Collections.Generic.Dictionary<int, int> Items
+                      {
+                          get
+                          {
+                              if (_items == null) { _items = new System.Collections.Generic.Dictionary<int, int>(); }
+                              return _items;
+                          }
+                      }
+                      public int this[int key] { get { return Items[key]; } set { Items[key] = value; } }
+                      public System.Collections.Generic.ICollection<int> Keys { get { return Items.Keys; } }
+                      public System.Collections.Generic.ICollection<int> Values { get { return Items.Values; } }
+                      public int Count { get { return Items.Count; } }
+                      public bool IsReadOnly { get { return false; } }
+                      public void Add(int key, int value) { Items.Add(key, value); }
+                      public void Add(System.Collections.Generic.KeyValuePair<int, int> item) { Items.Add(item.Key, item.Value); }
+                      public void Clear() { _items = null; }
+                      public bool Contains(System.Collections.Generic.KeyValuePair<int, int> item) { return Items.ContainsKey(item.Key); }
+                      public bool ContainsKey(int key) { return Items.ContainsKey(key); }
+                      public void CopyTo(System.Collections.Generic.KeyValuePair<int, int>[] array, int index) { }
+                      public bool Remove(int key) { return Items.Remove(key); }
+                      public bool Remove(System.Collections.Generic.KeyValuePair<int, int> item) { return Items.Remove(item.Key); }
+                      public bool TryGetValue(int key, out int value) { return Items.TryGetValue(key, out value); }
+                      public System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<int, int>> GetEnumerator()
+                      {
+                          return Items.GetEnumerator();
+                      }
+                      System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+                      {
+                          return GetEnumerator();
+                      }
+                  }
+
+                  [WProtoContract] public sealed partial class Holder
+                  {
+                      [WProtoMember(1)] public Pairs Members;
+                  }";
+
+            AssertNoDiagnostics(source);
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
         }
 
         [TestCase(0)]

@@ -320,6 +320,81 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 1 }, filled.SeededOverwritten);
         }
 
+        [Test]
+        public void AStructDictionaryEncodesAsTheSameMapAsAReferenceOne()
+        {
+            // The map half of the same value-type assumption (#388). The emitter accepted a struct
+            // dictionary and then wrote `member != null` and `read.Member ?? new Member()` for it,
+            // which are both CS0019 -- so this shape did not produce wrong bytes, it produced a
+            // compiler error inside generated source. Now that it compiles, the bytes are the claim:
+            // a struct container is not a new wire shape.
+            Dictionary<int, int>[] variants =
+            {
+                new Dictionary<int, int>(),
+                new Dictionary<int, int> { { 0, 0 } },
+                new Dictionary<int, int> { { 1, 300 } },
+                new Dictionary<int, int> { { int.MaxValue, int.MinValue } },
+            };
+
+            foreach (Dictionary<int, int> entries in variants)
+            {
+                IntPairs pairs = new IntPairs();
+                foreach (KeyValuePair<int, int> entry in entries)
+                {
+                    pairs.Add(entry.Key, entry.Value);
+                }
+
+                string oracle = OracleHex(new IntKeyedMapContract { Pairs = entries });
+                string mine = MineHex(
+                    new ValueTypeCollectionContract
+                    {
+                        Pairs = pairs,
+                        Seeded = default,
+                        SeededOverwritten = default,
+                        SeededPairs = default,
+                        SeededOverwrittenPairs = default,
+                    }
+                );
+
+                Assert.AreEqual(oracle, mine, Describe(entries));
+            }
+        }
+
+        [Test]
+        public void AStructDictionaryMergesAndOverwritesLikeAReferenceOne()
+        {
+            // Same invisible half as the struct collection: every indexer assignment lands on a copy,
+            // so the formatter has to assign it back, and that only shows on a member the constructor
+            // already filled.
+            ValueTypeCollectionContract absent = Decode(string.Empty);
+            Assert.AreEqual(0, absent.Pairs.Count);
+            CollectionAssert.AreEqual(new[] { 7 }, absent.SeededPairs.Keys);
+            CollectionAssert.AreEqual(new[] { 7 }, absent.SeededOverwrittenPairs.Keys);
+
+            // Field 5 {1: 1}, field 6 {1: 1}, field 7 {1: 1}.
+            ValueTypeCollectionContract filled = Decode(
+                "2A04" + "0801" + "1001" + "3204" + "0801" + "1001" + "3A04" + "0801" + "1001"
+            );
+            Assert.AreEqual(1, filled.Pairs[1]);
+            Assert.AreEqual(1, filled.Pairs.Count);
+            Assert.AreEqual(70, filled.SeededPairs[7]);
+            Assert.AreEqual(1, filled.SeededPairs[1]);
+            Assert.AreEqual(2, filled.SeededPairs.Count);
+            Assert.AreEqual(1, filled.SeededOverwrittenPairs.Count);
+            Assert.AreEqual(1, filled.SeededOverwrittenPairs[1]);
+        }
+
+        private static string Describe(Dictionary<int, int> entries)
+        {
+            List<string> parts = new List<string>();
+            foreach (KeyValuePair<int, int> entry in entries)
+            {
+                parts.Add(entry.Key + ":" + entry.Value);
+            }
+
+            return "{" + string.Join(", ", parts) + "}";
+        }
+
         private static ValueTypeCollectionContract Decode(string hex)
         {
             WProtoReader reader = new WProtoReader(Parse(hex));

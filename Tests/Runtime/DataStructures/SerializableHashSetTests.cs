@@ -1551,5 +1551,54 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(0, result.Length);
         }
+
+        [Test]
+        public void AStructBackedSetSerializesLikeAReferenceBackedOne()
+        {
+            // Nothing about ISet<T> requires a class (#388), and the base class used to demand one.
+            // The declaration of StructBackedSerializableSet is half the test -- it did not compile
+            // before -- and this is the other half: a struct backing store has to survive the same
+            // serialize/deserialize cycle a HashSet does, including the round trip through the
+            // serialized item array that Unity actually persists.
+            StructBackedSerializableSet set = new();
+            Assert.IsTrue(set.Add(2));
+            Assert.IsTrue(set.Add(5));
+            Assert.IsFalse(set.Add(2));
+
+            Assert.AreEqual(2, set.Count);
+            Assert.IsTrue(set.Contains(2));
+            Assert.IsFalse(set.Contains(9));
+
+            set.OnBeforeSerialize();
+            CollectionAssert.AreEquivalent(new[] { 2, 5 }, set.SerializedItems);
+
+            StructBackedSerializableSet restored = new();
+            restored._items = set.SerializedItems;
+            restored.OnAfterDeserialize();
+
+            Assert.AreEqual(2, restored.Count);
+            Assert.IsTrue(restored.Contains(2));
+            Assert.IsTrue(restored.Contains(5));
+            CollectionAssert.AreEquivalent(new[] { 2, 5 }, restored.ToArray());
+        }
+
+        [Test]
+        public void AStructBackedSetRebuildsItsItemsAfterProtoDeserialization()
+        {
+            // The one place the removed `class` constraint was load-bearing: the hook that rebuilds
+            // a null backing set. A struct set is never null, so the guard has to be a test the
+            // compiler accepts for a value type rather than `_set == null`, and the rebuild after it
+            // still has to run.
+            StructBackedSerializableSet set = new();
+            Assert.IsTrue(set.Add(11));
+            Assert.IsTrue(set.Add(13));
+
+            set._items = null;
+            set.OnProtoAfterDeserialization();
+
+            Assert.AreEqual(2, set.Count);
+            CollectionAssert.AreEquivalent(new[] { 11, 13 }, set.SerializedItems);
+            Assert.IsTrue(set.PreserveSerializedEntries);
+        }
     }
 }

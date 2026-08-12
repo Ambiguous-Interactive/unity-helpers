@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _mapQualified;
         private readonly string _contractName;
         private readonly bool _overwrite;
-        private readonly bool _valueIsReference;
+        private readonly bool _mapIsValueType;
         private readonly bool _keyIsString;
         private readonly bool _valueIsString;
 
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string valueQualified,
             string mapQualified,
             bool overwrite,
-            bool valueIsReference,
+            bool mapIsValueType,
             bool keyIsString,
             bool valueIsString
         )
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _valueQualified = valueQualified;
             _mapQualified = mapQualified;
             _overwrite = overwrite;
-            _valueIsReference = valueIsReference;
+            _mapIsValueType = mapIsValueType;
             _keyIsString = keyIsString;
             _valueIsString = valueIsString;
         }
@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 valueQualified,
                 named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 overwriteList,
-                value.IsReference,
+                named.IsValueType,
                 keyIsString,
                 valueType.SpecialType == SpecialType.System_String
             );
@@ -249,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
         {
-            OpenLoop(writer);
+            int open = OpenLoop(writer);
             EmitEntrySize(writer);
             writer.Line(
                 "size += "
@@ -262,15 +262,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + EntrySize
                     + ");"
             );
-            Close(writer);
-            Close(writer);
+            CloseAll(writer, open);
             writer.Blank();
         }
 
         /// <inheritdoc />
         internal override void EmitWrite(Writer writer)
         {
-            OpenLoop(writer);
+            int open = OpenLoop(writer);
 
             // The payload is written first and its length back-filled, rather than measured up front
             // as the Measure pass does. A map VALUE may be any contract, hooks included -- the earlier
@@ -302,8 +301,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("return false;");
             Close(writer);
 
-            Close(writer);
-            Close(writer);
+            CloseAll(writer, open);
             writer.Blank();
         }
 
@@ -320,12 +318,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Emits the null guard and the <c>foreach</c> header, leaving two blocks open.
+        /// Emits the presence guard and the <c>foreach</c> header, and returns how many blocks the
+        /// caller has to close.
         /// </summary>
-        private void OpenLoop(Writer writer)
+        /// <remarks>
+        /// <para>
+        /// A struct dictionary is always present, so it gets no guard: <c>member != null</c> on a
+        /// value type is <c>CS0019</c>, a compiler error inside code the consumer never wrote.
+        /// </para>
+        /// <para>
+        /// Unlike a repeated element, a null map <b>value</b> is legal -- protobuf-net omits it and
+        /// the entry carries only its key -- so there is nothing to guard inside the loop.
+        /// </para>
+        /// </remarks>
+        private int OpenLoop(Writer writer)
         {
-            writer.Line("if (" + Access + " != null)" + Writer.Open);
-            writer.Indent();
+            int open = 0;
+            if (!_mapIsValueType)
+            {
+                writer.Line("if (" + Access + " != null)" + Writer.Open);
+                writer.Indent();
+                open++;
+            }
+
             writer.Line(
                 "foreach ("
                     + PairType
@@ -341,11 +356,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Writer.Open
             );
             writer.Indent();
+            return open + 1;
+        }
 
-            if (_valueIsReference)
+        private static void CloseAll(Writer writer, int count)
+        {
+            for (int closed = 0; closed < count; closed++)
             {
-                // Unlike a repeated element, a null VALUE is legal -- protobuf-net omits it and the
-                // entry carries only its key. Nothing to guard.
+                Close(writer);
             }
         }
 
@@ -579,11 +597,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else
             {
-                writer.Line(Accumulator + " = read." + Name + " ?? new " + _mapQualified + "();");
+                writer.Line(Accumulator + " = " + ExistingOrFresh() + ";");
             }
 
             Close(writer);
             writer.Blank();
+        }
+
+        /// <summary>
+        /// The dictionary entries are applied to: the constructor's own, or a fresh one.
+        /// </summary>
+        /// <remarks>
+        /// For a struct dictionary this is a <b>copy</b>, necessarily -- which is why the epilogue
+        /// assigns it back. <c>??</c> has no meaning on a value type (<c>CS0019</c>), and there is
+        /// no null state for it to test: a struct member is always present.
+        /// </remarks>
+        private string ExistingOrFresh()
+        {
+            return _mapIsValueType
+                ? "read." + Name
+                : "read." + Name + " ?? new " + _mapQualified + "()";
         }
 
         /// <inheritdoc />
@@ -603,7 +636,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + (
                             _overwrite || SkipConstructor
                                 ? "new " + _mapQualified + "()"
-                                : "read." + Name + " ?? new " + _mapQualified + "()"
+                                : ExistingOrFresh()
                         )
                         + ";"
                 );
