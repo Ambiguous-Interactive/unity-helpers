@@ -903,7 +903,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Serializable]
         private sealed class IntCache : SerializableDictionary.Cache<int> { }
 
-        private sealed class CaseInsensitiveDictionaryKey : IEquatable<CaseInsensitiveDictionaryKey>
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveDictionaryKey
+            : IEquatable<CaseInsensitiveDictionaryKey>
         {
             public CaseInsensitiveDictionaryKey(string token)
             {

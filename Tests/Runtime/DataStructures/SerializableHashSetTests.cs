@@ -910,7 +910,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        private sealed class SampleValue
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class SampleValue
         {
             public SampleValue(string identifier)
             {

@@ -41,8 +41,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void TheGeneratedRegistrarRegistersTheDeclaredPair()
         {
             Assert.IsTrue(
-                WProtoFormatterProvider.IsRegistered<IIncludeThing>(),
+                WProtoDeclaredRootProvider.TryGetFormatter(out IWProtoFormatter<IIncludeThing> _),
                 "the attribute is the whole registration; nothing else names this interface"
+            );
+            Assert.IsFalse(
+                WProtoFormatterProvider.IsRegistered<IIncludeThing>(),
+                "a declared root is root-only: WProtoGeneric reads that provider for every member "
+                    + "a closure decides, and asks it no CanServe or CanWrite question"
+            );
+            Assert.IsFalse(
+                WProtoGeneric<IIncludeThing>.CanEncode,
+                "so a Box<IIncludeThing> or Deque<IIncludeThing> must still decline, as it did "
+                    + "before this pair existed"
             );
             Assert.IsTrue(
                 WProtoDeclaredRootProvider.TryGetRoot(typeof(IIncludeThing), out Type root)
@@ -234,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoFormatterProvider.Register<IUnformatted>(null);
+                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
             }
         }
 
@@ -256,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoFormatterProvider.Register<IUnformatted>(null);
+                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
             }
         }
 
@@ -264,27 +274,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ARootThatIsItsOwnDeclaredTypeDoesNotRecurse()
         {
             // The generator reports this as WPROTO024, but the provider is public API and a
-            // hand-written call can still make it. The adapter would resolve itself through the
-            // provider and never stop.
-            WProtoDeclaredRootProvider.Register<UnformattedRoot, UnformattedRoot>();
+            // hand-written call can still make it. The adapter would resolve itself and never stop.
+            //
+            // The declared type must be an INTERFACE here. A concrete one is refused earlier, by
+            // the guard against a declared type a value can be, so the version of this test that
+            // used one stayed green with the self-reference guard deleted. Going through the facade
+            // would stack-overflow rather than fail, so CanServe is asked directly.
+            WProtoDeclaredRootProvider.Register<IUnformatted, IUnformatted>();
             try
             {
+                Assert.IsTrue(
+                    WProtoDeclaredRootProvider.TryGetFormatter(
+                        out IWProtoFormatter<IUnformatted> formatter
+                    )
+                );
                 Assert.IsFalse(
-                    WProtoFacade.TrySerialize(new UnformattedRoot(), out byte[] _),
+                    ((IWProtoConditionalFormatter)formatter).CanServe(),
                     "an adapter that finds itself must decline instead of recursing"
                 );
             }
             finally
             {
-                WProtoFormatterProvider.Register<UnformattedRoot>(null);
+                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
             }
         }
 
         [Test]
         public void TheAdapterAnswersOnlyForTypesItsRootChainWrites()
         {
-            IWProtoPolymorphicFormatter adapter =
-                WProtoFormatterProvider.Get<IIncludeThing>() as IWProtoPolymorphicFormatter;
+            Assert.IsTrue(
+                WProtoDeclaredRootProvider.TryGetFormatter(
+                    out IWProtoFormatter<IIncludeThing> registered
+                )
+            );
+            IWProtoPolymorphicFormatter adapter = registered as IWProtoPolymorphicFormatter;
 
             Assert.IsNotNull(adapter, "the facade asks this question of every non-exact match");
             Assert.IsTrue(adapter.CanWrite(typeof(IncludeBase)));
@@ -342,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoFormatterProvider.Register<ConcreteDeclared>(null);
+                WProtoDeclaredRootProvider.Unregister<ConcreteDeclared>();
                 WProtoFormatterProvider.Register<ConcreteDerived>(null);
             }
         }
@@ -362,8 +385,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoDeclaredRootProvider.Register<IUnformatted, UnformattedRoot>();
             try
             {
-                IWProtoPolymorphicFormatter adapter =
-                    WProtoFormatterProvider.Get<IUnformatted>() as IWProtoPolymorphicFormatter;
+                Assert.IsTrue(
+                    WProtoDeclaredRootProvider.TryGetFormatter(
+                        out IWProtoFormatter<IUnformatted> registered
+                    )
+                );
+                IWProtoPolymorphicFormatter adapter = registered as IWProtoPolymorphicFormatter;
 
                 Assert.IsNotNull(adapter);
                 Assert.IsTrue(adapter.CanWrite(typeof(UnformattedRoot)));
@@ -371,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoFormatterProvider.Register<IUnformatted>(null);
+                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
                 WProtoFormatterProvider.Register<UnformattedRoot>(null);
             }
         }

@@ -795,7 +795,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        private sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
         {
             public CaseInsensitiveKey(string token)
             {

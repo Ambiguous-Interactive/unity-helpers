@@ -253,15 +253,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                     // The closure is what a developer wrote and can act on; the formatter is named
                     // by an attribute they may not own, so an unnameable one is skipped quietly.
+                    // The closure is asked FIRST. The formatter is closed over the same arguments,
+                    // so whenever an argument is what makes the closure unnameable -- the only shape
+                    // that happens in practice -- the formatter is unnameable too, and asking it
+                    // first short-circuited the report away. Measured: StandInRing<Hidden> was
+                    // skipped in silence with the two swapped.
                     if (
-                        !TypeNaming.IsNameable(formatter, compilation)
-                        || TypeNaming.ReportIfUnnameable(
+                        TypeNaming.ReportIfUnnameable(
                             closure,
                             compilation,
                             type.GetLocation(),
                             report,
                             announced
-                        )
+                        ) || !TypeNaming.IsNameable(formatter, compilation)
                     )
                     {
                         continue;

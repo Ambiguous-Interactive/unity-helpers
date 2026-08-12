@@ -25,13 +25,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// same answer ahead of time, so the reflection scan is not needed to find it.
     /// </para>
     /// <para>
-    /// <b>Unlike <see cref="WProtoRootMarshalAttribute"/>, this applies in every position.</b> A
-    /// marshal exists because its types have two encodings chosen by position -- a wrapper at the
-    /// root, an ordinary repeated field as a member -- so it lives in a registry the member path
-    /// cannot see. A declared root has one encoding: a member typed <c>IRandom</c> and a root typed
-    /// <c>IRandom</c> are both the root contract's message, which is what protobuf-net writes for
-    /// each. So the adapter is registered in
-    /// <see cref="WProtoFormatterProvider"/> like any other formatter.
+    /// <b>It applies at the root only</b>, like <see cref="WProtoRootMarshalAttribute"/> though for
+    /// a different reason. A marshal hides from the member path because its types have two
+    /// encodings chosen by position; a declared root hides because a member has no encoding for it
+    /// at all -- an interface-typed <c>[WProtoMember]</c> is <c>WPROTO003</c>, and the only member
+    /// positions that could reach the adapter are a generic contract's type argument and a
+    /// marshalled collection's element, where writing the root contract's message would be a shape
+    /// protobuf-net has no counterpart for. Registered in
+    /// <see cref="WProtoDeclaredRootProvider"/>, which <see cref="WProtoGeneric{T}"/> cannot see.
     /// </para>
     /// <para>
     /// <b>A consumer's explicit registration still wins.</b>

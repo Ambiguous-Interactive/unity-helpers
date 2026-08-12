@@ -719,6 +719,92 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A marshalled collection closed over an unnameable type is announced too.
+        /// </summary>
+        /// <remarks>
+        /// It was not, and the reason is worth pinning: the marshal's formatter is closed over the
+        /// SAME arguments as the collection, so whenever an argument is what makes the closure
+        /// unnameable -- the only shape this happens in -- the formatter is unnameable too, and
+        /// asking about it first short-circuited the report away. Seven live cases in this
+        /// repository's own tests were skipped in silence until the two were swapped.
+        /// </remarks>
+        [Test]
+        public void AMarshalledClosureTheRegistrarCannotNameIsAnnounced()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring<>), typeof(Consumer.RingFormatter<>))]
+                  public sealed class Ring<T> { }
+                  public sealed class RingFormatter<T> : IWProtoFormatter<Consumer.Ring<T>>
+                  {
+                      public int Measure(in Consumer.Ring<T> value) => 0;
+                      public bool Write(ref WProtoWriter writer, in Consumer.Ring<T> value) => true;
+                      public bool TryRead(ref WProtoReader reader, out Consumer.Ring<T> value) { value = null; return true; }
+                  }
+                  public sealed class Holder
+                  {
+                      private sealed class Hidden { }
+                      private Ring<Hidden> _ring = new Ring<Hidden>();
+                  }"
+            );
+
+            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
+            Assert.IsNotNull(
+                match,
+                "saw: " + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+            Assert.IsTrue(match.GetMessage().Contains("Hidden"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// Shapes that are unnameable to the compiler's eye but perfectly writable, or the reverse.
+        /// </summary>
+        /// <remarks>
+        /// <c>dynamic</c> is a keyword rather than a declaration, so <c>Box&lt;dynamic&gt;</c> has a
+        /// name and warning about it offered advice ("make 'dynamic' public") nobody can take. A
+        /// <c>file</c> type is the opposite: it reports <c>Internal</c> and satisfies
+        /// <c>IsSymbolAccessibleWithin</c>, so the registrar emitted its name and the consumer's
+        /// build failed <c>CS0234</c> — the failure the skip exists to prevent, one file over.
+        /// </remarks>
+        [Test]
+        public void DynamicIsNameableAndAFileLocalTypeIsNot()
+        {
+            Assert.IsEmpty(
+                Run(
+                        @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
+                          public sealed class Holder { private Box<dynamic> _box = new Box<dynamic>(); }"
+                    )
+                    .Where(d => d.Id == "WPROTO028")
+                    .Select(d => d.GetMessage())
+            );
+
+            const string fileLocal =
+                @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
+                  file sealed class Hid { }
+                  file sealed class FileHolder { private Box<Hid> _box = new Box<Hid>(); }";
+
+            Assert.IsNotEmpty(
+                Run(fileLocal).Where(d => d.Id == "WPROTO028").Select(d => d.GetMessage()),
+                "a file-local type cannot be named from the registrar"
+            );
+            Assert.IsEmpty(
+                CompileGenerated(fileLocal).Select(d => d.Id + " " + d.GetMessage()),
+                "and skipping it is what keeps the consumer's build compiling"
+            );
+        }
+
+        [Test]
+        public void ADeclaredRootWithNoTypesAtAllIsReported()
+        {
+            // `typeof()` cannot be written, but `null` can, and the pair reader used to drop it --
+            // an attribute that neither registered anything nor said why.
+            AssertDiagnostic(
+                "WPROTO023",
+                "<missing>",
+                "[assembly: WProtoDeclaredRoot(null, null)]\npublic interface IThing { }"
+            );
+        }
+
         private static IEnumerable<TestCaseData> BadDeclaredRoots()
         {
             yield return new TestCaseData(

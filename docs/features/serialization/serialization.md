@@ -1361,9 +1361,13 @@ the declared type (`WPROTO023`), a type named as its own root (`WPROTO024`), a d
 already a contract (`WPROTO025`), an open generic (`WPROTO026`), two roots for one declared type
 (`WPROTO027`), and a declared type that is neither an interface nor abstract (`WPROTO029`).
 
-Unlike a root marshal, a declared root lives in `WProtoFormatterProvider` with every other formatter,
-because it has **one** encoding rather than two: a member typed `IRandom` and a root typed `IRandom`
-are both `AbstractRandom`'s message, which is what protobuf-net writes for each.
+Like a root marshal, a declared root applies **at the root only** — though for a different reason. A
+marshal hides from the member path because its types have two encodings chosen by position; a
+declared root hides because a member has no encoding for it at all. An interface-typed
+`[WProtoMember]` is a `WPROTO003` build error, and the only member positions that could reach the
+adapter are a generic contract's type argument and a marshalled collection's element
+(`Deque<IRandom>`), where writing the root contract's message would be a shape protobuf-net has no
+counterpart for. Those decline and fall back exactly as they did before the pair existed.
 
 **Declaring a root asserts that this contract owns the declared type**, exactly as
 `Serializer.RegisterProtobufRoot` does — and with the same consequence, because a payload does not

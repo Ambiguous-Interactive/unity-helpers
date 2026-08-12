@@ -28,11 +28,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// declaration rather than leaving the declared type unserved.
     /// </para>
     /// <para>
-    /// Unlike <see cref="WProtoFormatterProvider"/> this is keyed by <see cref="Type"/> rather than
-    /// by a static generic field, because <c>Serializer.RegisterProtobufRoot(Type, Type)</c> has
-    /// only <see cref="Type"/> objects to offer and closing a generic over them is the
-    /// <c>MakeGenericType</c> call IL2CPP cannot compile. The lookup happens once per root
-    /// serialization of a declared type, never per member.
+    /// Unlike <see cref="WProtoFormatterProvider"/> the declared→root map is keyed by
+    /// <see cref="Type"/> rather than by a static generic field, because
+    /// <c>Serializer.RegisterProtobufRoot(Type, Type)</c> has only <see cref="Type"/> objects to
+    /// offer and closing a generic over them is the <c>MakeGenericType</c> call IL2CPP cannot
+    /// compile. The lookup happens once per root serialization of a declared type, never per member.
+    /// </para>
+    /// <para>
+    /// <b>The adapter lives here rather than in <see cref="WProtoFormatterProvider"/>, and that is
+    /// load-bearing</b> -- the same reason <see cref="WProtoRootMarshalProvider"/> is separate.
+    /// <see cref="WProtoGeneric{T}"/> reads the formatter provider for every member whose type a
+    /// closure decides, and it asks no <c>CanServe</c> or <c>CanWrite</c> question. An adapter
+    /// registered there made <c>Deque&lt;IRandom&gt;</c> and <c>Box&lt;IRandom&gt;</c> suddenly
+    /// encodable -- writing a member as the root contract's message, a shape protobuf-net has no
+    /// counterpart for, and silently writing NOTHING for an element outside the root's chain.
+    /// Measured, before this registry existed: a two-byte field key and length, no payload, and
+    /// success reported. Both shapes declined before and decline again.
     /// </para>
     /// </remarks>
     public static class WProtoDeclaredRootProvider
@@ -64,9 +75,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             Entry entry = Roots.GetOrAdd(typeof(TDeclared), _ => new Entry());
             entry.Declared = typeof(TRoot);
-            WProtoFormatterProvider.Register<TDeclared>(
-                new WProtoDeclaredRootFormatter<TDeclared, TRoot>()
-            );
+            Formatters<TDeclared>.Value = new WProtoDeclaredRootFormatter<TDeclared, TRoot>();
+        }
+
+        /// <summary>
+        /// Gets the adapter serving <typeparamref name="T"/>, without asking whether it may.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="formatter">Receives the adapter, or <c>null</c> when none is declared.</param>
+        /// <returns><c>true</c> when one was found.</returns>
+        public static bool TryGetFormatter<T>(out IWProtoFormatter<T> formatter)
+        {
+            formatter = Formatters<T>.Value;
+            return formatter != null;
+        }
+
+        /// <summary>
+        /// Clears the adapter registered for <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <remarks>Exists for tests; a declaration is otherwise registered once and kept.</remarks>
+        public static void Unregister<T>()
+            where T : class
+        {
+            Formatters<T>.Value = null;
         }
 
         /// <summary>
@@ -148,11 +180,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return false;
         }
 
+        private static class Formatters<T>
+        {
+            internal static IWProtoFormatter<T> Value;
+        }
+
         private sealed class Entry
         {
-            internal Type Declared;
+            // Volatile because a claim is a RUNTIME call about a live process --
+            // Serializer.RegisterProtobufRoot, not a registrar that ran at startup -- so a
+            // serializing thread must not keep reading the declaration it replaced.
+            internal volatile Type Declared;
 
-            internal Type Claimed;
+            internal volatile Type Claimed;
         }
     }
 }

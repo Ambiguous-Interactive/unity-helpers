@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static readonly DiagnosticDescriptor UnnameableClosure = new DiagnosticDescriptor(
             "WPROTO028",
             "WallstopProto cannot register a closed construction it cannot name",
-            "'{0}' is a closed construction WallstopProto would register a formatter for, but the generated registrar cannot write its name: '{1}' is not accessible from outside the type that declares it. It is skipped, so serializing one throws at run time rather than failing this build. Make '{1}' internal or public, or register the formatter yourself from code that can name it.",
+            "'{0}' is a closed construction WallstopProto would register a formatter for, but the generated registrar cannot write its name: '{1}' cannot be named from the generated registrar, which is a type of its own. It is skipped, so serializing one throws at run time rather than failing this build. Widen '{1}' to internal or public -- or, if it is `file`-local or otherwise unnameable, register the formatter yourself from code that can name it.",
             "WallstopProto",
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true
@@ -290,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO029",
                 "WallstopProto declared root names a type that can be instantiated",
-                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{0}', which is neither an interface nor abstract. A declared root exists for a type that has no encoding of its own; a '{0}' that is actually a '{0}' would be served by the adapter, fail to narrow to '{1}', and encode to nothing -- measured as a populated value writing zero bytes and reading back as '{1}'. Make '{0}' abstract, or give it its own [WProtoContract].",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{0}', which is neither an interface nor abstract. A declared root exists for a type that has no encoding of its own; a '{0}' that is actually a '{0}' would be served by the adapter, fail to narrow to '{1}', and encode to nothing -- measured as a populated value writing zero bytes and reading back as '{1}'. Make '{0}' abstract, or give it its own [WProtoContract] -- and if it is a value type or an array, which can be neither, remove the attribute.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true

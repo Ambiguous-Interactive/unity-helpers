@@ -58,26 +58,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "the [assembly: WProtoDeclaredRoot] pair is the whole registration"
             );
             Assert.AreEqual(typeof(AbstractRandom), root);
-            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<IRandom>());
+            Assert.IsTrue(
+                WProtoDeclaredRootProvider.TryGetFormatter(out IWProtoFormatter<IRandom> _)
+            );
         }
 
         /// <summary>
-        /// A declared root IS visible from a member position, unlike a root marshal.
+        /// A declared root is root-only, like a root marshal and for the same kind of reason.
         /// </summary>
         /// <remarks>
-        /// The marshals live in a registry <see cref="WProtoGeneric{T}"/> cannot see, because those
-        /// seven types have two encodings chosen by position. A declared root has one: a member
-        /// typed <c>IRandom</c> and a root typed <c>IRandom</c> are both <c>AbstractRandom</c>'s
-        /// message, which is what protobuf-net writes for each. Asserting it here is what stops the
-        /// two rules being conflated later.
+        /// <see cref="WProtoGeneric{T}"/> resolves a member whose type a closure decides through
+        /// <see cref="WProtoFormatterProvider"/>, and asks it no <c>CanServe</c> or
+        /// <c>CanWrite</c> question. An adapter registered there made <c>Deque&lt;IRandom&gt;</c>
+        /// encodable -- writing a member as <c>AbstractRandom</c>'s message, which protobuf-net has
+        /// no counterpart for, and writing NOTHING for an element outside the include chain while
+        /// reporting success. Both shapes declined before this pair existed and must decline still.
         /// </remarks>
         [Test]
-        public void ADeclaredRootIsReachableFromAMemberPosition()
+        public void ADeclaredRootIsNotReachableFromAMemberPosition()
         {
-            // Asserting IsRegistered here would restate the test above; what is actually claimed is
-            // that the MEMBER path can see it, which is where a root marshal deliberately cannot be
-            // seen. WProtoGeneric is the lookup a generic contract's member goes through.
-            Assert.IsTrue(WProtoGeneric<IRandom>.CanEncode);
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<IRandom>());
+            Assert.IsFalse(WProtoGeneric<IRandom>.CanEncode);
+            Assert.IsFalse(WProtoRootMarshalProvider.IsRegistered<IRandom>());
         }
 
         [Test]

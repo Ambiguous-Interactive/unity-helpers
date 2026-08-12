@@ -824,7 +824,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, roundTrip.SerializedItems);
         }
 
-        private sealed class SortedSample : IComparable<SortedSample>, IComparable
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class SortedSample : IComparable<SortedSample>, IComparable
         {
             public SortedSample(string token)
             {
@@ -874,7 +877,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        private sealed class ScriptableSample
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class ScriptableSample
             : ScriptableObject,
                 IComparable<ScriptableSample>,
                 IComparable
@@ -1025,7 +1031,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEqual(expected, roundTrip.ToArray());
         }
 
-        private sealed class CaseInsensitiveString : IComparable<CaseInsensitiveString>, IComparable
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveString
+            : IComparable<CaseInsensitiveString>,
+                IComparable
         {
             public CaseInsensitiveString(string value)
             {

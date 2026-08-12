@@ -95,6 +95,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     culprit = null;
                     return false;
                 }
+                case IDynamicTypeSymbol _:
+                    // `dynamic` is a keyword, not a declaration, so `Box<dynamic>` is perfectly
+                    // nameable. Falling through said "make 'dynamic' internal or public".
+                    culprit = null;
+                    return false;
                 default:
                     // A type parameter or a pointer has no name the registrar could write.
                     culprit = type;
@@ -188,6 +193,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static bool IsReachable(INamedTypeSymbol type, Compilation compilation)
         {
+            // A `file` type reports Internal and satisfies IsSymbolAccessibleWithin, so the two
+            // checks below both say yes and the registrar emits a name that is CS0234 in the
+            // consumer's build -- the exact failure this class exists to prevent, one file over.
+            // Roslyn 3.8 has no IsFileLocal; the metadata name is `<file>F<hash>__Name`, and no
+            // ordinary type's is spelled with a leading angle bracket.
+            if (type.MetadataName.StartsWith("<", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             switch (type.DeclaredAccessibility)
             {
                 case Accessibility.Public:

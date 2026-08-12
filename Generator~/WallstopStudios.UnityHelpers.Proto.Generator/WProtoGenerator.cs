@@ -1550,10 +1550,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(Proto + ".WProtoRootMarshalProvider.Register(" + marshal + ");");
             }
 
-            // Into the ordinary provider, unlike a marshal, because a declared root has ONE
-            // encoding: a member typed IRandom and a root typed IRandom are both the root
-            // contract's message, which is what protobuf-net writes for each. Last, so that a
-            // contract's own formatter in this same assembly is never the thing being replaced.
+            // Into a registry of its own, like a marshal and for the same reason: WProtoGeneric
+            // reads the formatter provider for every member a closure decides, and asks it no
+            // CanServe or CanWrite question, so an adapter registered there would make
+            // Deque<IRandom> encodable and drop an element outside the root chain in silence.
             foreach (string declaredRoot in declaredRoots)
             {
                 writer.Line(Proto + ".WProtoDeclaredRootProvider.Register" + declaredRoot + "();");

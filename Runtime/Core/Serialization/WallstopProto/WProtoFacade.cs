@@ -214,7 +214,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         private static bool TryResolve<T>(T value, out IWProtoFormatter<T> formatter)
         {
-            if (WProtoFormatterProvider.TryGet(out formatter))
+            // A declared root is asked the SAME subtype question a contract is, unlike a marshal:
+            // it exists precisely because the declared type is not the runtime one, so refusing an
+            // implementation outside the root's chain is the whole point of it.
+            if (
+                WProtoFormatterProvider.TryGet(out formatter)
+                || WProtoDeclaredRootProvider.TryGetFormatter(out formatter)
+            )
             {
                 if (CanEncode(formatter) && CanServe(value, formatter))
                 {
@@ -242,7 +248,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         private static bool TryResolveForRead<T>(Type concrete, out IWProtoFormatter<T> formatter)
         {
-            if (WProtoFormatterProvider.TryGet(out formatter))
+            if (
+                WProtoFormatterProvider.TryGet(out formatter)
+                || WProtoDeclaredRootProvider.TryGetFormatter(out formatter)
+            )
             {
                 if (CanEncode(formatter) && CanRead(formatter, concrete))
                 {

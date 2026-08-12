@@ -49,6 +49,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? Location.None;
 
+                if (pair.Declared == null || pair.Root == null)
+                {
+                    // `typeof()` cannot be written, but `null` can, and dropping the pair here left
+                    // an attribute that neither registered nor reported anything.
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.DeclaredRootNotAssignable,
+                            location,
+                            pair.Declared?.ToDisplayString() ?? "<missing>",
+                            pair.Root?.ToDisplayString() ?? "<missing>"
+                        )
+                    );
+                    continue;
+                }
+
                 if (!seen.Add(pair.Declared))
                 {
                     report(
@@ -152,7 +167,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
                 if (
-                    !seen.Add(pair.Declared)
+                    pair.Declared == null
+                    || pair.Root == null
+                    || !seen.Add(pair.Declared)
                     || 0 < Arity(pair.Declared)
                     || 0 < Arity(pair.Root)
                     || SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
@@ -303,15 +320,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 // ITypeSymbol rather than INamedTypeSymbol: `typeof(IThing[])` is an array symbol,
                 // and dropping it here would be a pair that neither registers nor reports.
-                if (
-                    !(attribute.ConstructorArguments[0].Value is ITypeSymbol declared)
-                    || !(attribute.ConstructorArguments[1].Value is ITypeSymbol root)
-                )
-                {
-                    continue;
-                }
-
-                yield return new Pair(declared, root, attribute);
+                yield return new Pair(
+                    attribute.ConstructorArguments[0].Value as ITypeSymbol,
+                    attribute.ConstructorArguments[1].Value as ITypeSymbol,
+                    attribute
+                );
             }
         }
 
