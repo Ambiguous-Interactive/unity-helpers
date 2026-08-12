@@ -217,6 +217,55 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             isEnabledByDefault: true
         );
 
+        internal static readonly DiagnosticDescriptor DeclaredRootNotAssignable =
+            new DiagnosticDescriptor(
+                "WPROTO023",
+                "WallstopProto declared root is not assignable to its declared type",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{1}' as the contract serving '{0}', but a '{1}' cannot be held as a '{0}'. The registration is emitted as WProtoDeclaredRootProvider.Register<{0}, {1}>(), whose constraints are 'TDeclared : class' and 'TRoot : TDeclared', so a value type as the declared type or a root that does not derive from it is a compiler error inside generated code that never names this attribute.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor SelfDeclaredRoot = new DiagnosticDescriptor(
+            "WPROTO024",
+            "WallstopProto declared root is its own root",
+            "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({0}))] names '{0}' as the contract serving itself. The adapter registered for a declared type resolves its root through the same provider, so it would find itself and recurse. A type that has its own formatter needs no declared root; remove the attribute.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        internal static readonly DiagnosticDescriptor DeclaredRootOnContract =
+            new DiagnosticDescriptor(
+                "WPROTO025",
+                "WallstopProto declared root names a contract as the declared type",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{0}', which is also a [WProtoContract]. Registering the adapter would replace '{0}'s own generated formatter, so every value written as a '{0}' would silently become '{1}'s message instead. A declared root is for a type that has no encoding of its own -- an interface, or an abstract type carrying no contract. Use [WProtoInclude] on '{0}' if '{1}' is meant to be a subtype of it.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor GenericDeclaredRoot =
+            new DiagnosticDescriptor(
+                "WPROTO026",
+                "WallstopProto declared root names a generic type",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names a generic type. Unlike a root marshal, a declared root is registered exactly once for the pair it names and is never closed over a construction found in source, so an open generic has nothing to register. Declare one pair per closed construction you need.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor DuplicateDeclaredRoot =
+            new DiagnosticDescriptor(
+                "WPROTO027",
+                "WallstopProto declared root is declared twice",
+                "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] is the second root this assembly declares for '{0}'. A declared type has exactly one root -- a payload does not name the contract that wrote it, so a reader that had two answers would have to guess -- and only the first is registered. Delete one.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

@@ -627,6 +627,90 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// Every shape of <c>[assembly: WProtoDeclaredRoot]</c> that cannot be registered.
+        /// </summary>
+        /// <remarks>
+        /// The generated registration is <c>WProtoDeclaredRootProvider.Register&lt;D, R&gt;()</c>,
+        /// whose constraints are <c>D : class</c> and <c>R : D</c>. Each case below would otherwise
+        /// be a compiler error inside generated code that names neither the attribute nor the file
+        /// it is written in -- or, for the two that do compile, a silent wire change.
+        /// </remarks>
+        [TestCaseSource(nameof(BadDeclaredRoots))]
+        public void AnUnusableDeclaredRootIsAnError(string id, string mustName, string source)
+        {
+            AssertDiagnostic(id, mustName, source);
+        }
+
+        [Test]
+        public void AWellFormedDeclaredRootReportsNothingAndCompiles()
+        {
+            // The generator reporting no diagnostic is not the same as the registration compiling:
+            // the constraints are checked where the call is emitted, not where the attribute is.
+            const string source =
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Thing))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class Thing : IThing { [WProtoMember(1)] public int A; }";
+
+            Assert.IsEmpty(
+                Run(source)
+                    .Where(d => d.Id.StartsWith("WPROTO0", StringComparison.Ordinal))
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
+        }
+
+        private static IEnumerable<TestCaseData> BadDeclaredRoots()
+        {
+            yield return new TestCaseData(
+                "WPROTO023",
+                "Consumer.Stray",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Stray))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class Stray { [WProtoMember(1)] public int A; }"
+            ).SetName("ARootThatIsNotAssignableToItsDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO023",
+                "int",
+                @"[assembly: WProtoDeclaredRoot(typeof(int), typeof(Consumer.Thing))]
+                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
+            ).SetName("AValueTypeAsTheDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO024",
+                "Consumer.Thing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Thing), typeof(Consumer.Thing))]
+                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
+            ).SetName("ARootThatIsItsOwnDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO025",
+                "Consumer.Base",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Base), typeof(Consumer.Sub))]
+                  [WProtoContract] [WProtoInclude(100, typeof(Consumer.Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            ).SetName("ADeclaredTypeThatIsItselfAContractIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO026",
+                "Consumer.IThing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing<>), typeof(Consumer.Thing<>))]
+                  public interface IThing<T> { }
+                  [WProtoContract] public partial class Thing<T> : IThing<T> { [WProtoMember(1)] public int A; }"
+            ).SetName("AGenericDeclaredRootIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO027",
+                "Consumer.IThing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.First))]
+                  [assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Second))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class First : IThing { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Second : IThing { [WProtoMember(1)] public int B; }"
+            ).SetName("TwoRootsForOneDeclaredTypeIsAnError");
+        }
+
         private static void AssertDiagnostic(string id, string mustName, string source)
         {
             ImmutableArray<Diagnostic> diagnostics = Run(source);

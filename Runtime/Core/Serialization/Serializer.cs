@@ -1322,6 +1322,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             ExplicitProtobufRootCache[declared] = root;
             ProtobufRootCache[declared] = root;
+
+            // A declared type has one root, and both serializers have to agree on which. Without
+            // this, WallstopProto would keep serving IRandom through the root this package declares
+            // while protobuf-net served it through the caller's -- and the read side would decode
+            // their payload against the wrong chain rather than declining, because bytes do not say
+            // which contract wrote them.
+            WallstopProto.WProtoDeclaredRootProvider.Claim(declared, root);
         }
 
         internal static void ClearProtobufRootCacheForTesting(params Type[] declaredTypes)
@@ -1330,6 +1337,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 ProtobufRootCache.Clear();
                 ExplicitProtobufRootCache.Clear();
+                WallstopProto.WProtoDeclaredRootProvider.ReleaseAllClaims();
                 return;
             }
 
@@ -1342,6 +1350,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
                 ProtobufRootCache.TryRemove(declaredType, out _);
                 ExplicitProtobufRootCache.TryRemove(declaredType, out _);
+                WallstopProto.WProtoDeclaredRootProvider.ReleaseClaim(declaredType);
             }
         }
 

@@ -17,3 +17,8 @@ using WallstopStudios.UnityHelpers.Proto.Generator.Tests;
 // drive through a second, real compilation.
 [assembly: WProtoRootMarshal(typeof(StandInRing<>), typeof(StandInRingMarshalFormatter<>))]
 [assembly: WProtoRootMarshal(typeof(StandInBag), typeof(StandInBagMarshalFormatter))]
+
+// The declared root, in the same shape the package ships for IRandom: an interface with no members,
+// served by the contract at the head of an include chain. Read only from the compilation's own
+// assembly, so declaring it here is what makes the generated registration exist at all.
+[assembly: WProtoDeclaredRoot(typeof(IIncludeThing), typeof(IncludeBase))]

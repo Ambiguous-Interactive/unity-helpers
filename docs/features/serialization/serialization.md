@@ -1272,11 +1272,9 @@ Three rules decide the rest:
   declined rather than failed, and protobuf-net's runtime model answers it.
 - **`forceRuntimeType` does not turn the swap off.** A generated formatter already dispatches on the
   runtime type, which is what that flag asks for.
-- **An `interface`-typed declared type is not served.** There is no formatter for an interface, and
-  nothing says which contract should answer for it. Declare the field as the abstract base — the
-  advice [Protobuf Polymorphism](#protobuf-polymorphism-inheritance--interfaces) already gives — or
-  register a root with `Serializer.RegisterProtobufRoot<TInterface, TConcrete>()` and take
-  protobuf-net's path.
+- **An `interface`-typed declared type is served only when a root is declared for it.** An interface
+  has no members, so nothing about it says which contract should answer. Say so once with
+  [a declared root](#declared-roots-serving-an-interface); `IRandom` already has one.
 
 Two consequences on the read side are worth knowing:
 
@@ -1326,6 +1324,49 @@ Nothing about your own contracts changes. A member typed as one of these collect
 exactly as it was before — a map for the dictionaries, a repeated field for the sets — and the three
 that implement neither `ICollection<T>` nor `IDictionary<,>` are still refused as members, with the
 same `WPROTO003` they always produced.
+
+### Declared roots: serving an interface
+
+A generator is almost never held as its concrete type. `IRandom` is the declared type this package's
+own documentation recommends, and an interface has no members to encode — so nothing about it says
+which contract should read a payload written for it. A **declared root** is that missing sentence,
+written once at assembly level:
+
+```csharp
+[assembly: WProtoDeclaredRoot(typeof(IRandom), typeof(AbstractRandom))]
+```
+
+That pair ships, so `IRandom` needs nothing from you:
+
+```csharp
+IRandom rng = new PcgRandom(seed);
+
+// Served through AbstractRandom's include chain -- byte-for-byte what protobuf-net writes, because
+// its own root resolution already picks AbstractRandom for IRandom.
+byte[] bytes = Serializer.ProtoSerialize(rng);
+IRandom restored = Serializer.ProtoDeserialize<IRandom>(bytes); // comes back a PcgRandom
+```
+
+Declare your own the same way, naming any interface — or any abstract type that carries no
+`[WProtoContract]` — and the `[WProtoContract]` that serves it. The generator emits the registration
+into the declaring assembly and reports the pairs that cannot work: a root that is not assignable to
+the declared type (`WPROTO023`), a type named as its own root (`WPROTO024`), a declared type that is
+already a contract (`WPROTO025`), an open generic (`WPROTO026`), and two roots for one declared type
+(`WPROTO027`).
+
+Unlike a root marshal, a declared root lives in `WProtoFormatterProvider` with every other formatter,
+because it has **one** encoding rather than two: a member typed `IRandom` and a root typed `IRandom`
+are both `AbstractRandom`'s message, which is what protobuf-net writes for each.
+
+Two refusals keep it honest, and both matter more on the read side — a formatter that answers and
+then rejects a payload raises `SerializationCorruptDataException` rather than falling back:
+
+- **An implementation outside the root's chain is not served.** Your own `IRandom` gets its own
+  formatter and its own bytes; decoding one through `AbstractRandom`'s chain would hand back the
+  wrong type.
+- **Your own root wins.** `Serializer.RegisterProtobufRoot<IRandom, YourRandom>()` says this program
+  has a different answer for that declared type, and WallstopProto stops answering for it — on both
+  sides, whichever registration ran first. Releasing the registration restores the declared pair.
 
 ### Hostile payloads
 

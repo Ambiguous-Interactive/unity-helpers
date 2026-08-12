@@ -96,6 +96,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             MarshalMap marshals = MarshalMap.Build(context.Compilation);
             MarshalMap.Validate(context.Compilation, context.ReportDiagnostic);
 
+            DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
+
             List<string> registrations = new List<string>();
             foreach (INamedTypeSymbol contract in contracts)
             {
@@ -130,12 +132,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 marshals.Registrations(context.Compilation)
             );
 
-            if (0 < registrations.Count || 0 < rootMarshals.Count)
+            List<string> declaredRoots = new List<string>(
+                DeclaredRootMap.Registrations(context.Compilation)
+            );
+
+            if (0 < registrations.Count || 0 < rootMarshals.Count || 0 < declaredRoots.Count)
             {
                 context.AddSource(
                     "WProtoGeneratedRegistrar.g.cs",
                     SourceText.From(
-                        EmitRegistrar(context, registrations, rootMarshals),
+                        EmitRegistrar(context, registrations, rootMarshals, declaredRoots),
                         Encoding.UTF8
                     )
                 );
@@ -1467,7 +1473,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private static string EmitRegistrar(
             GeneratorExecutionContext context,
             List<string> registrations,
-            List<string> rootMarshals
+            List<string> rootMarshals,
+            List<string> declaredRoots
         )
         {
             string suffix = Sanitize(context.Compilation.AssemblyName ?? "Assembly");
@@ -1510,6 +1517,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (string marshal in rootMarshals)
             {
                 writer.Line(Proto + ".WProtoRootMarshalProvider.Register(" + marshal + ");");
+            }
+
+            // Into the ordinary provider, unlike a marshal, because a declared root has ONE
+            // encoding: a member typed IRandom and a root typed IRandom are both the root
+            // contract's message, which is what protobuf-net writes for each. Last, so that a
+            // contract's own formatter in this same assembly is never the thing being replaced.
+            foreach (string declaredRoot in declaredRoots)
+            {
+                writer.Line(Proto + ".WProtoDeclaredRootProvider.Register" + declaredRoot + "();");
             }
 
             writer.Outdent();

@@ -493,6 +493,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
+    /// The interface a value in this chain is usually held as.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors <c>IRandom</c>: an interface with no members, implemented by the chain's base and
+    /// also by a contract outside the chain, which is the pair of cases a declared root has to tell
+    /// apart.
+    /// </remarks>
+    public interface IIncludeThing { }
+
+    /// <summary>
     /// A polymorphic base, annotated for both serializers so the include encoding can be compared.
     /// </summary>
     /// <remarks>
@@ -505,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     [WProtoInclude(100, typeof(IncludeAlpha))]
     [WProtoInclude(101, typeof(IncludeBeta))]
-    public partial class IncludeBase
+    public partial class IncludeBase : IIncludeThing
     {
         /// <summary>A base member, written after the include.</summary>
         [ProtoMember(1)]
@@ -640,6 +650,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// identity lost from saved data with nothing to report it.
     /// </remarks>
     public sealed class UndeclaredAlpha : IncludeAlpha { }
+
+    /// <summary>
+    /// A contract that implements the declared interface without joining its root's chain.
+    /// </summary>
+    /// <remarks>
+    /// This is a consumer's own implementation of an interface the package declares a root for. It
+    /// has a perfectly good formatter of its own, and the declared root must still refuse it: its
+    /// payload is not <see cref="IncludeBase"/>'s chain, so decoding one as the other hands back
+    /// the wrong type from bytes something else wrote.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class ForeignThing : IIncludeThing
+    {
+        /// <summary>The only member.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int Value;
+    }
 
     /// <summary>
     /// An abstract polymorphic base whose members include a <b>collection</b>.
