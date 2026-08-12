@@ -1015,6 +1015,78 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
+    /// A polymorphic base carrying the collection shapes whose commit is not an assignment.
+    /// </summary>
+    /// <remarks>
+    /// A contract with an include reads every member aside and commits it once the include has
+    /// settled which instance it belongs to. That path builds the accumulator from a different
+    /// place than the ordinary one, so a form whose commit consults the member -- a stack -- or
+    /// constructs a new value -- a read-only collection -- has a second code path nothing else
+    /// exercises.
+    /// </remarks>
+    [WProtoContract]
+    [WProtoInclude(100, typeof(PolyStackSub))]
+    public abstract partial class PolyStackBase
+    {
+        /// <summary>A stack, whose commit pushes the decoded run back in reverse.</summary>
+        [WProtoMember(1)]
+        public Stack<int> Stacked = new Stack<int>(new[] { 7, 8 });
+
+        /// <summary>A read-only collection, whose commit constructs rather than assigns.</summary>
+        [WProtoMember(2)]
+        public System.Collections.ObjectModel.ReadOnlyCollection<int> Frozen;
+
+        /// <summary>An interface, whose accumulator is seeded by copy.</summary>
+        [WProtoMember(3)]
+        public IList<int> Listed = new List<int> { 7, 8 };
+    }
+
+    /// <summary>The subtype, whose constructor seeds different collections from its base's.</summary>
+    [WProtoContract]
+    public partial class PolyStackSub : PolyStackBase
+    {
+        /// <summary>Replaces the base constructor's seeds, so seeding too early is visible.</summary>
+        public PolyStackSub()
+        {
+            Stacked = new Stack<int>(new[] { 5 });
+            Listed = new List<int> { 5 };
+        }
+
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
+    }
+
+    /// <summary>
+    /// An immutable contract whose members are the shapes that cannot simply be assigned.
+    /// </summary>
+    /// <remarks>
+    /// A contract built by a constructor has no instance to seed from, so every collection starts
+    /// empty and the whole value is produced once the last member is read -- a third path through
+    /// the same commit code, and the one that dereferences a null instance if a seed reaches for
+    /// the member.
+    /// </remarks>
+    [WProtoContract]
+    public sealed partial class ImmutableCollectionRecord
+    {
+        /// <summary>A readonly stack, whose commit constructs its own target.</summary>
+        [WProtoMember(1)]
+        public readonly Stack<int> Stacked;
+
+        /// <summary>A readonly read-only collection: constructed twice over.</summary>
+        [WProtoMember(2)]
+        public readonly System.Collections.ObjectModel.ReadOnlyCollection<int> Frozen;
+
+        /// <summary>A get-only interface member.</summary>
+        [WProtoMember(3)]
+        public IList<int> Listed { get; }
+
+        /// <summary>A readonly dictionary interface.</summary>
+        [WProtoMember(4)]
+        public readonly IDictionary<string, int> Mapped;
+    }
+
+    /// <summary>
     /// The reference encoding for the struct dictionary on <see cref="ValueTypeCollectionContract"/>.
     /// </summary>
     /// <remarks>
@@ -1293,6 +1365,50 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(3)]
         [WProtoMember(3)]
         public int Trailer;
+    }
+
+    /// <summary>
+    /// A generic contract whose collection members are the shapes #395 added.
+    /// </summary>
+    /// <remarks>
+    /// WallstopProto-only: protobuf-net 2.4.9 has no serializer for <c>Queue&lt;T&gt;</c> or
+    /// <c>Stack&lt;T&gt;</c> at any closure. The point of the fixture is the intersection of two
+    /// runtime decisions -- whether the element packs is decided by the closure, and how the
+    /// collection is filled is decided by the declared type -- which is where a per-type fill method
+    /// and a per-closure packed branch could disagree.
+    /// </remarks>
+    [WProtoContract]
+    public partial class CollectionBox<T>
+    {
+        /// <summary>Filled through <c>Enqueue</c> whatever the closure.</summary>
+        [WProtoMember(1)]
+        public Queue<T> Queued;
+
+        /// <summary>Pushed back in reverse whatever the closure.</summary>
+        [WProtoMember(2)]
+        public Stack<T> Stacked;
+
+        /// <summary>Constructed as a <c>List&lt;T&gt;</c> whatever the closure.</summary>
+        [WProtoMember(3)]
+        public IList<T> Listed;
+
+        /// <summary>The one supported shape with no <c>Count</c> to test for emptiness.</summary>
+        [WProtoMember(4)]
+        public IEnumerable<T> Enumerated;
+
+        /// <summary>A scalar, to pin ordering against the collection members.</summary>
+        [WProtoMember(5)]
+        public int Trailer;
+    }
+
+    /// <summary>Names the closures of <see cref="CollectionBox{T}"/> this assembly uses.</summary>
+    public static class CollectionBoxClosures
+    {
+        /// <summary>A packable closure, whose runs are written packed.</summary>
+        public static CollectionBox<int> Ints;
+
+        /// <summary>A length-delimited closure, which cannot pack.</summary>
+        public static CollectionBox<string> Texts;
     }
 
     /// <summary>A generic contract whose member is required.</summary>

@@ -519,8 +519,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitReadCases(Writer writer, string qualifiedContract)
         {
             string entry = "entry" + Tag;
-            string keyLocal = "key" + Tag;
-            string valueLocal = "value" + Tag;
+
+            // Not `key`/`value` + Tag: `value` + Tag is what Member.ReadLocal is called, so an
+            // immutable contract -- which holds every member in one of those until it can construct
+            // the instance -- collided with its own map member and failed the consumer's build with
+            // CS0136, naming a local nobody wrote.
+            string keyLocal = "entryKey" + Tag;
+            string valueLocal = "entryValue" + Tag;
             string decodedKey = "decodedKey" + Tag;
             string decodedValue = "decodedValue" + Tag;
 

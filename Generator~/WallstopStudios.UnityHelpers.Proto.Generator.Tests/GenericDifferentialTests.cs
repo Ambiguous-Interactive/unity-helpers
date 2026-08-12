@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text;
     using NUnit.Framework;
@@ -100,6 +101,83 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Box<double> doubles = RoundTrip(new Box<double> { Value = 1.5 });
             Assert.AreEqual(1.5, doubles.Value);
+        }
+
+        [Test]
+        public void EveryNewCollectionShapeRoundTripsAtEveryClosure()
+        {
+            // Two runtime decisions intersect here: whether the element packs is a property of the
+            // closure, and how the collection is filled is a property of the declared type. A packed
+            // branch that assumed List.Add, or a fill method that assumed a packable element, would
+            // pass one of these closures and fail the other.
+            CollectionBox<int> ints = RoundTrip(
+                new CollectionBox<int>
+                {
+                    Queued = new Queue<int>(new[] { 1, 2 }),
+                    Stacked = new Stack<int>(new[] { 3, 4 }),
+                    Listed = new List<int> { 5 },
+                    Enumerated = new List<int> { 6, 7 },
+                    Trailer = 8,
+                }
+            );
+            CollectionAssert.AreEqual(new[] { 1, 2 }, ints.Queued);
+            CollectionAssert.AreEqual(new[] { 4, 3 }, ints.Stacked);
+            CollectionAssert.AreEqual(new[] { 5 }, ints.Listed);
+            CollectionAssert.AreEqual(new[] { 6, 7 }, ints.Enumerated);
+            Assert.AreEqual(8, ints.Trailer);
+
+            CollectionBox<string> texts = RoundTrip(
+                new CollectionBox<string>
+                {
+                    Queued = new Queue<string>(new[] { "a", string.Empty }),
+                    Stacked = new Stack<string>(new[] { "b", "c" }),
+                    Listed = new List<string> { "d" },
+                    Enumerated = new List<string> { "e" },
+                }
+            );
+            CollectionAssert.AreEqual(new[] { "a", string.Empty }, texts.Queued);
+            CollectionAssert.AreEqual(new[] { "c", "b" }, texts.Stacked);
+            CollectionAssert.AreEqual(new[] { "d" }, texts.Listed);
+            CollectionAssert.AreEqual(new[] { "e" }, texts.Enumerated);
+        }
+
+        [Test]
+        public void AnEmptyGenericCollectionWritesNothingAtEveryClosure()
+        {
+            // The count-free IEnumerable path opens its packed run from the first element, so an
+            // empty one has to leave no key behind -- at the packable closure, where the run exists,
+            // and at the length-delimited closure, where it does not.
+            Assert.AreEqual(0, Measure(new CollectionBox<int>()));
+            Assert.AreEqual(0, Measure(new CollectionBox<string>()));
+            Assert.AreEqual(
+                0,
+                Measure(
+                    new CollectionBox<int>
+                    {
+                        Queued = new Queue<int>(),
+                        Stacked = new Stack<int>(),
+                        Listed = new List<int>(),
+                        Enumerated = new List<int>(),
+                    }
+                )
+            );
+            Assert.AreEqual(
+                0,
+                Measure(
+                    new CollectionBox<string>
+                    {
+                        Queued = new Queue<string>(),
+                        Stacked = new Stack<string>(),
+                        Listed = new List<string>(),
+                        Enumerated = new List<string>(),
+                    }
+                )
+            );
+        }
+
+        private static int Measure<T>(T value)
+        {
+            return WProtoFormatterProvider.Get<T>().Measure(value);
         }
 
         [Test]

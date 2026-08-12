@@ -704,6 +704,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void TheNewShapesCommitCorrectlyOnAPolymorphicContract()
+        {
+            // An include makes every member read aside and commit once the instance is final, which
+            // is a second path through the same commit code -- and the forms whose commit is not a
+            // plain assignment are the ones it can get wrong. The subtype seeds different
+            // collections from the base's on purpose: with identical seeds, committing onto the
+            // provisional base and committing onto the final subtype give the same answer.
+            //
+            // Include first (tag 100), then the base's own members, which is the order protobuf-net
+            // writes and the order that makes the aside-commit necessary.
+            PolyStackBase decoded = Read<PolyStackBase>(
+                "A20600" + "0A03030201" + "12020102" + "1A020102"
+            );
+
+            Assert.IsInstanceOf<PolyStackSub>(decoded);
+            CollectionAssert.AreEqual(new[] { 3, 2, 1, 5 }, decoded.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
+            CollectionAssert.AreEqual(new[] { 5, 1, 2 }, decoded.Listed, "Listed");
+        }
+
+        [Test]
+        public void TheNewShapesCommitCorrectlyOnAnImmutableContract()
+        {
+            // The third path: no instance exists until the constructor runs, so nothing may seed
+            // from the member, and every commit has to build its own target.
+            ImmutableCollectionRecord decoded = Read<ImmutableCollectionRecord>(
+                "0A03030201" + "12020102" + "1A020102" + "22050A016B1001"
+            );
+
+            CollectionAssert.AreEqual(new[] { 3, 2, 1 }, decoded.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Listed, "Listed");
+            Assert.AreEqual(1, decoded.Mapped["k"], "Mapped");
+        }
+
+        private static T Read<T>(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
+            return value;
+        }
+
+        [Test]
         public void AnEmptyOrNullNewCollectionShapeWritesNothing()
         {
             // The rule every repeated member obeys, restated for the shapes that reach it through
