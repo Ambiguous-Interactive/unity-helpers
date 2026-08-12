@@ -301,6 +301,174 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
+    /// The standard-library collection shapes both protobuf-net majors round-trip (#395).
+    /// </summary>
+    /// <remarks>
+    /// Annotated for both serializers, at identical field numbers, so the differential can hand the
+    /// same instance to each. The membership of this contract is a measurement rather than a
+    /// grouping: these are exactly the new shapes protobuf-net <b>2.4.9 and 3.2.56 both</b> write
+    /// and read. Everything else #395 asked for lives on <see cref="V3CollectionContract"/> or
+    /// <see cref="ConstructedCollectionContract"/>, because a member v2 cannot serve makes its model
+    /// build throw for the whole contract.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class StdlibCollectionContract
+    {
+        /// <summary>Fills through <c>AddLast</c>; its <c>ICollection&lt;T&gt;.Add</c> is explicit.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public LinkedList<int> Linked;
+
+        /// <summary>An interface with a length-delimited element.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public IList<string> Listed;
+
+        /// <summary>An interface with a packable element.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public ICollection<int> Collected;
+
+        /// <summary>The one supported collection with no <c>Count</c>.</summary>
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        public IEnumerable<int> Enumerated;
+
+        /// <summary>Read-only to the consumer, and still fillable by the formatter.</summary>
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        public IReadOnlyList<int> ReadOnlyListed;
+
+        /// <summary>The other read-only sequence interface.</summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public IReadOnlyCollection<int> ReadOnlyCollected;
+
+        /// <summary>The dictionary interface, which resolves to <c>Dictionary&lt;K,V&gt;</c>.</summary>
+        [ProtoMember(9)]
+        [WProtoMember(9)]
+        public IDictionary<string, int> Mapped;
+    }
+
+    /// <summary>
+    /// The collection shapes only protobuf-net 3.2.56 can serve.
+    /// </summary>
+    /// <remarks>
+    /// Measured against both vendored oracles rather than assumed. 2.4.9 has <b>no serializer at
+    /// all</b> for <c>Queue&lt;T&gt;</c> and <c>Stack&lt;T&gt;</c> -- its model build throws, which
+    /// is why these cannot share <see cref="StdlibCollectionContract"/> -- and it writes
+    /// <c>ISet&lt;T&gt;</c> and <c>IReadOnlyDictionary&lt;K,V&gt;</c> and then throws
+    /// <see cref="System.NullReferenceException"/> reading either back. WallstopProto serves all
+    /// four on both, so the differential over this contract is gated to the v3 process and the
+    /// round trip through WallstopProto is asserted in both.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class V3CollectionContract
+    {
+        /// <summary>Fills through <c>Enqueue</c>; not an <c>ICollection&lt;T&gt;</c> at all.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public Queue<int> Queued;
+
+        /// <summary>
+        /// Written top-first and pushed back in reverse, which is what makes the round trip
+        /// faithful.
+        /// </summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public Stack<int> Stacked;
+
+        /// <summary>The set interface, which resolves to <c>HashSet&lt;T&gt;</c>.</summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public ISet<int> SetOf;
+
+        /// <summary>The read-only dictionary interface, resolving to <c>Dictionary&lt;K,V&gt;</c>.</summary>
+        [ProtoMember(10)]
+        [WProtoMember(10)]
+        public IReadOnlyDictionary<string, int> ReadOnlyMapped;
+
+        /// <summary>A stack of messages, so the reversal is proven for a non-packable element.</summary>
+        [ProtoMember(11)]
+        [WProtoMember(11)]
+        public Stack<Outer.Point> StackedPoints;
+    }
+
+    /// <summary>
+    /// The two collections that can only be built once, never filled.
+    /// </summary>
+    /// <remarks>
+    /// Neither protobuf-net major reads either back: 3.2.56 refuses both with "No parameterless
+    /// constructor found", and 2.4.9 throws a <see cref="System.NullReferenceException"/> on
+    /// <c>ReadOnlyCollection&lt;T&gt;</c> and cannot even build a model containing
+    /// <c>ReadOnlyDictionary&lt;K,V&gt;</c>. The protobuf-net annotations therefore pin the
+    /// <b>write</b> only, and reading these is strictly more than either oracle does with bytes it
+    /// produced itself.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class ConstructedCollectionContract
+    {
+        /// <summary>Accumulated into a list and constructed once.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public System.Collections.ObjectModel.ReadOnlyCollection<int> Frozen;
+
+        /// <summary>The map analogue of the same problem.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public System.Collections.ObjectModel.ReadOnlyDictionary<string, int> FrozenMap;
+    }
+
+    /// <summary>
+    /// The new collection shapes with a constructor value behind them, which is the only way append
+    /// and overwrite can be told apart.
+    /// </summary>
+    /// <remarks>
+    /// WallstopProto-only, deliberately. The shapes worth seeding include the two v2 cannot model at
+    /// all, and splitting them across two seeded contracts would buy an oracle comparison the
+    /// unseeded differentials already make. The append and overwrite answers below are the ones
+    /// measured from protobuf-net 3.2.56 before the emitter was written.
+    /// </remarks>
+    [WProtoContract]
+    public sealed partial class SeededStdlibContract
+    {
+        /// <summary>Appends at the end.</summary>
+        [WProtoMember(1)]
+        public LinkedList<int> Linked = new LinkedList<int>(new[] { 7, 8 });
+
+        /// <summary>Appends at the back.</summary>
+        [WProtoMember(2)]
+        public Queue<int> Queued = new Queue<int>(new[] { 7, 8 });
+
+        /// <summary>Pushes on top, first decoded element ending up topmost.</summary>
+        [WProtoMember(3)]
+        public Stack<int> Stacked = new Stack<int>(new[] { 7, 8 });
+
+        /// <summary>The same, replaced rather than pushed onto.</summary>
+        [WProtoMember(4, OverwriteList = true)]
+        public Stack<int> OverwrittenStack = new Stack<int>(new[] { 7, 8 });
+
+        /// <summary>An interface member whose current elements are copied forward.</summary>
+        [WProtoMember(5)]
+        public IList<int> Listed = new List<int> { 7, 8 };
+
+        /// <summary>The same, replaced.</summary>
+        [WProtoMember(6, OverwriteList = true)]
+        public IList<int> OverwrittenList = new List<int> { 7, 8 };
+
+        /// <summary>A set interface, merged into.</summary>
+        [WProtoMember(7)]
+        public ISet<int> SetOf = new HashSet<int> { 7, 8 };
+
+        /// <summary>A dictionary interface, merged into.</summary>
+        [WProtoMember(8)]
+        public IDictionary<string, int> Mapped = new Dictionary<string, int> { { "seed", 9 } };
+    }
+
+    /// <summary>
     /// Collections the constructor has already filled, which is the only way append and overwrite
     /// can be told apart.
     /// </summary>

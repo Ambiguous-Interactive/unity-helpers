@@ -134,17 +134,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         // Every one of these is a shape a developer would reasonably expect to work, which is why it
         // has to fail the build with a message rather than silently get no formatter.
         //
-        // LinkedList and
-        // ReadOnlyCollection implement ICollection<T> with an explicit Add, so nothing can fill
-        // them; Queue and Stack do not implement it at all. The rest are element-shape refusals: a
-        // jagged array of anything but bytes, a rank-2 array, and a nullable element (protobuf-net
-        // refuses a null element, so Nullable<T>[] is a collection that can only hold values it
-        // cannot write).
-        [TestCase("System.Collections.Generic.LinkedList<int>")]
-        [TestCase("System.Collections.ObjectModel.ReadOnlyCollection<int>")]
-        [TestCase("System.Collections.Generic.Queue<int>")]
-        [TestCase("System.Collections.Generic.Stack<int>")]
-        [TestCase("System.Collections.Generic.IList<int>")]
+        // A CONSUMER'S OWN collection interface is the one worth explaining. protobuf-net writes it
+        // and then throws InvalidCastException on read, because it fills a List<T> and hands it
+        // back for a type that is not one -- measured against 3.2.56. The generator has no
+        // implementation it could pick either, so it refuses at build time instead, which is the
+        // same answer arriving somewhere it can be acted on.
+        //
+        // The rest are element-shape refusals: a jagged array of anything but bytes, a rank-2 array,
+        // and a nullable element (protobuf-net refuses a null element, so Nullable<T>[] is a
+        // collection that can only hold values it cannot write).
+        [TestCase("Consumer.IOwnList<int>")]
         [TestCase("System.Collections.Generic.List<System.Collections.Generic.List<int>>")]
         [TestCase("int[][]")]
         [TestCase("int[,]")]
@@ -155,7 +154,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertDiagnostic(
                 "WPROTO003",
                 "Values",
-                @"[WProtoContract] public sealed partial class Unsupported
+                @"public interface IOwnList<T> : System.Collections.Generic.IList<T> { }
+
+                  [WProtoContract] public sealed partial class Unsupported
                   {
                       [WProtoMember(1)] public "
                     + declaredType
@@ -185,6 +186,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoMember(9)] public System.Collections.Generic.SortedDictionary<string, int> SortedMap;
                   }"
             );
+        }
+
+        [Test]
+        public void EveryStdlibCollectionShapeIsAcceptedAndCompiles()
+        {
+            // The shapes #395 was filed about. Four of them cannot be filled through
+            // ICollection<T>.Add at all -- LinkedList and ReadOnlyCollection implement it
+            // explicitly, Queue and Stack do not implement it -- and the interfaces have nothing to
+            // construct, so each needed a per-type answer rather than the generic one.
+            //
+            // Compiled rather than only scanned for diagnostics: an emitter that names the wrong
+            // fill method (`pending.Enqueue` on a List<T>, `new ReadOnlyCollection<T>()`) reports
+            // nothing and breaks the consumer's build.
+            const string source =
+                @"[WProtoContract] public sealed partial class Stdlib
+                  {
+                      [WProtoMember(1)] public System.Collections.Generic.LinkedList<int> Linked;
+                      [WProtoMember(2)] public System.Collections.Generic.Queue<int> Queued;
+                      [WProtoMember(3)] public System.Collections.Generic.Stack<int> Stacked;
+                      [WProtoMember(4)] public System.Collections.ObjectModel.ReadOnlyCollection<int> Frozen;
+                      [WProtoMember(5)] public System.Collections.Generic.IList<int> Listed;
+                      [WProtoMember(6)] public System.Collections.Generic.ICollection<string> Collected;
+                      [WProtoMember(7)] public System.Collections.Generic.IEnumerable<int> Enumerated;
+                      [WProtoMember(8)] public System.Collections.Generic.IReadOnlyList<int> ReadOnlyListed;
+                      [WProtoMember(9)] public System.Collections.Generic.IReadOnlyCollection<int> ReadOnlyCollected;
+                      [WProtoMember(10)] public System.Collections.Generic.ISet<int> SetOf;
+                      [WProtoMember(11)] public System.Collections.Generic.IDictionary<string, int> Mapped;
+                      [WProtoMember(12)] public System.Collections.Generic.IReadOnlyDictionary<string, int> ReadOnlyMapped;
+                      [WProtoMember(13)] public System.Collections.ObjectModel.ReadOnlyDictionary<string, int> FrozenMap;
+                      [WProtoMember(14, OverwriteList = true)] public System.Collections.Generic.Stack<int> ReplacedStack;
+                      [WProtoMember(15)] public System.Collections.Generic.IReadOnlySet<int> ReadOnlySetOf;
+                  }";
+
+            AssertNoDiagnostics(source);
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
         }
 
         [Test]

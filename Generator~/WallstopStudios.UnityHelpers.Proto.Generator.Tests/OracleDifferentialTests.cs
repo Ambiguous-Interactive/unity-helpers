@@ -265,12 +265,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
 
                 string oracle = OracleHex(new RepeatedContract { Ints = elements });
+
+                // Every OTHER member is cleared, not just the collections: the payload is handed to
+                // protobuf-net as a RepeatedContract, whose field 6 is a bool[]. A constructor-seeded
+                // map at that number decodes as a packed run of booleans under v3 and throws
+                // "Unexpected boolean value" under v2 -- a fixture that quietly reinterprets a field,
+                // rather than anything about the encoding under test.
                 string mine = MineHex(
                     new ValueTypeCollectionContract
                     {
                         Bag = bag,
                         Seeded = default,
                         SeededOverwritten = default,
+                        SeededPairs = default,
+                        SeededOverwrittenPairs = default,
                     }
                 );
 
@@ -382,6 +390,358 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(2, filled.SeededPairs.Count);
             Assert.AreEqual(1, filled.SeededOverwrittenPairs.Count);
             Assert.AreEqual(1, filled.SeededOverwrittenPairs[1]);
+        }
+
+        [Test]
+        public void EveryStdlibCollectionShapeAgreesWithTheOracleBothWays()
+        {
+            // #395's whole point: these are shapes protobuf-net writes, so the bytes are a contract
+            // and not a free choice. Byte equality is asserted only where it is the contract -- the
+            // packable members are written packed here and unpacked by protobuf-net, per the
+            // encoding policy -- so agreement is proven by having each side READ what the other
+            // wrote, which exercises two decoders instead of two encoders.
+            StdlibCollectionContract value = new StdlibCollectionContract
+            {
+                Linked = new LinkedList<int>(new[] { 1, 2, 300 }),
+                Listed = new List<string> { "a", string.Empty },
+                Collected = new List<int> { 0, -1 },
+                Enumerated = new List<int> { 9 },
+                ReadOnlyListed = new List<int> { 10, 11 },
+                ReadOnlyCollected = new List<int> { 12 },
+                Mapped = new Dictionary<string, int> { { "k", 13 } },
+            };
+
+            StdlibCollectionContract theirsFromMine;
+            using (MemoryStream stream = new MemoryStream(Parse(MineHex(value))))
+            {
+                theirsFromMine = ProtoBuf.Serializer.Deserialize<StdlibCollectionContract>(stream);
+            }
+
+            AssertSameShape(value, theirsFromMine, "protobuf-net reading WallstopProto");
+
+            WProtoReader reader = new WProtoReader(Parse(OracleHex(value)));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<StdlibCollectionContract>()
+                    .TryRead(ref reader, out StdlibCollectionContract mineFromTheirs)
+            );
+
+            AssertSameShape(value, mineFromTheirs, "WallstopProto reading protobuf-net");
+        }
+
+        private static void AssertSameShape(
+            StdlibCollectionContract expected,
+            StdlibCollectionContract actual,
+            string context
+        )
+        {
+            CollectionAssert.AreEqual(expected.Linked, actual.Linked, context + " Linked");
+            CollectionAssert.AreEqual(expected.Listed, actual.Listed, context + " Listed");
+            CollectionAssert.AreEqual(expected.Collected, actual.Collected, context + " Collected");
+            CollectionAssert.AreEqual(
+                expected.Enumerated,
+                actual.Enumerated,
+                context + " Enumerated"
+            );
+            CollectionAssert.AreEqual(
+                expected.ReadOnlyListed,
+                actual.ReadOnlyListed,
+                context + " ReadOnlyListed"
+            );
+            CollectionAssert.AreEqual(
+                expected.ReadOnlyCollected,
+                actual.ReadOnlyCollected,
+                context + " ReadOnlyCollected"
+            );
+            CollectionAssert.AreEquivalent(expected.Mapped, actual.Mapped, context + " Mapped");
+        }
+
+        [Test]
+        public void TheStackAndSetShapesRoundTripThroughWallstopProto()
+        {
+            // Runs in both oracle processes because it never touches protobuf-net: 2.4.9 has no
+            // serializer for Queue or Stack at all, and reading its own ISet or IReadOnlyDictionary
+            // bytes throws. The claim here is WallstopProto's own, and the stack ordering is the
+            // half that would have been guessed wrong -- pushing the decoded run back in wire order
+            // inverts a stack, and nothing about the bytes says so.
+            V3CollectionContract value = new V3CollectionContract
+            {
+                Queued = new Queue<int>(new[] { 4, 5 }),
+                Stacked = new Stack<int>(new[] { 6, 7, 8 }),
+                SetOf = new HashSet<int> { 12 },
+                ReadOnlyMapped = new Dictionary<string, int> { { "r", 14 } },
+                StackedPoints = new Stack<Outer.Point>(
+                    new[]
+                    {
+                        new Outer.Point { X = 1 },
+                        new Outer.Point { Y = 2 },
+                    }
+                ),
+            };
+
+            WProtoReader reader = new WProtoReader(Parse(MineHex(value)));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<V3CollectionContract>()
+                    .TryRead(ref reader, out V3CollectionContract decoded)
+            );
+
+            CollectionAssert.AreEqual(value.Queued, decoded.Queued, "Queued");
+            CollectionAssert.AreEqual(value.Stacked, decoded.Stacked, "Stacked");
+            CollectionAssert.AreEquivalent(value.SetOf, decoded.SetOf, "SetOf");
+            CollectionAssert.AreEquivalent(
+                value.ReadOnlyMapped,
+                decoded.ReadOnlyMapped,
+                "ReadOnlyMapped"
+            );
+            CollectionAssert.AreEqual(value.StackedPoints, decoded.StackedPoints, "StackedPoints");
+
+            Assert.AreEqual(typeof(HashSet<int>), decoded.SetOf.GetType());
+            Assert.AreEqual(typeof(Dictionary<string, int>), decoded.ReadOnlyMapped.GetType());
+        }
+
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void TheStackAndSetShapesAgreeWithTheV3Oracle()
+        {
+            // Gated because 2.4.9 cannot serve any of these: Queue and Stack have no serializer, and
+            // ISet and IReadOnlyDictionary write and then throw on read. That divergence is the
+            // measurement, not a gap in coverage -- WallstopProto serves all five on both.
+            V3CollectionContract value = new V3CollectionContract
+            {
+                Queued = new Queue<int>(new[] { 4, 5 }),
+                Stacked = new Stack<int>(new[] { 6, 7, 8 }),
+                SetOf = new HashSet<int> { 12 },
+                ReadOnlyMapped = new Dictionary<string, int> { { "r", 14 } },
+                StackedPoints = new Stack<Outer.Point>(
+                    new[]
+                    {
+                        new Outer.Point { X = 1 },
+                        new Outer.Point { Y = 2 },
+                    }
+                ),
+            };
+
+            V3CollectionContract theirsFromMine;
+            using (MemoryStream stream = new MemoryStream(Parse(MineHex(value))))
+            {
+                theirsFromMine = ProtoBuf.Serializer.Deserialize<V3CollectionContract>(stream);
+            }
+
+            WProtoReader reader = new WProtoReader(Parse(OracleHex(value)));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<V3CollectionContract>()
+                    .TryRead(ref reader, out V3CollectionContract mineFromTheirs)
+            );
+
+            foreach (V3CollectionContract actual in new[] { theirsFromMine, mineFromTheirs })
+            {
+                CollectionAssert.AreEqual(value.Queued, actual.Queued, "Queued");
+                CollectionAssert.AreEqual(value.Stacked, actual.Stacked, "Stacked");
+                CollectionAssert.AreEquivalent(value.SetOf, actual.SetOf, "SetOf");
+                CollectionAssert.AreEquivalent(
+                    value.ReadOnlyMapped,
+                    actual.ReadOnlyMapped,
+                    "ReadOnlyMapped"
+                );
+                CollectionAssert.AreEqual(
+                    value.StackedPoints,
+                    actual.StackedPoints,
+                    "StackedPoints"
+                );
+            }
+        }
+#endif
+
+        [Test]
+        public void AnInterfaceMemberIsLeftHoldingTheImplementationTheOraclePicks()
+        {
+            // Which concrete type a round trip leaves behind is a decision, not an implementation
+            // detail: a consumer's code runs against whatever the member holds afterwards. These are
+            // the types protobuf-net produces, measured on both majors, so a migrating contract
+            // keeps working.
+            WProtoReader reader = new WProtoReader(
+                Parse(
+                    OracleHex(
+                        new StdlibCollectionContract
+                        {
+                            Listed = new List<string> { "a" },
+                            Collected = new List<int> { 1 },
+                            Enumerated = new List<int> { 2 },
+                            ReadOnlyListed = new List<int> { 3 },
+                            ReadOnlyCollected = new List<int> { 4 },
+                            Mapped = new Dictionary<string, int> { { "k", 5 } },
+                        }
+                    )
+                )
+            );
+
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<StdlibCollectionContract>()
+                    .TryRead(ref reader, out StdlibCollectionContract decoded)
+            );
+
+            Assert.AreEqual(typeof(List<string>), decoded.Listed.GetType());
+            Assert.AreEqual(typeof(List<int>), decoded.Collected.GetType());
+            Assert.AreEqual(typeof(List<int>), decoded.Enumerated.GetType());
+            Assert.AreEqual(typeof(List<int>), decoded.ReadOnlyListed.GetType());
+            Assert.AreEqual(typeof(List<int>), decoded.ReadOnlyCollected.GetType());
+            Assert.AreEqual(typeof(Dictionary<string, int>), decoded.Mapped.GetType());
+        }
+
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void ACollectionThatCanOnlyBeConstructedIsWrittenLikeTheOracleAndReadUnlikeIt()
+        {
+            // protobuf-net writes both of these and then refuses to read either back, so this is the
+            // one place the two claims differ. The write is byte-identical -- the members are a
+            // string map and a packable run, and the run is packed here by policy, so the map half
+            // is compared literally and the whole payload is handed to the oracle to decode.
+            ConstructedCollectionContract value = new ConstructedCollectionContract
+            {
+                Frozen = new System.Collections.ObjectModel.ReadOnlyCollection<int>(
+                    new List<int> { 1, 2 }
+                ),
+                FrozenMap = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
+                    new Dictionary<string, int> { { "k", 3 } }
+                ),
+            };
+
+            ConstructedCollectionContract mapOnly = new ConstructedCollectionContract
+            {
+                FrozenMap = value.FrozenMap,
+            };
+            Assert.AreEqual(OracleHex(mapOnly), MineHex(mapOnly), "the map half is byte-identical");
+
+            WProtoReader reader = new WProtoReader(Parse(OracleHex(value)));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<ConstructedCollectionContract>()
+                    .TryRead(ref reader, out ConstructedCollectionContract decoded)
+            );
+
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen);
+            Assert.AreEqual(3, decoded.FrozenMap["k"]);
+
+            // And the oracle cannot do the same with its own bytes, which is why the two contracts
+            // are separate fixtures rather than one.
+            using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
+            {
+                Assert.Throws(
+                    Is.InstanceOf<Exception>(),
+                    () => ProtoBuf.Serializer.Deserialize<ConstructedCollectionContract>(stream)
+                );
+            }
+        }
+#endif
+
+        [Test]
+        public void TheNewCollectionShapesAppendAndOverwriteAsMeasured()
+        {
+            // Every expectation below is protobuf-net 3.2.56's answer to the same payload, measured
+            // before the emitter was written. The stack is the interesting row twice over: the first
+            // decoded element ends up on TOP of the constructor's stack, and OverwriteList replaces
+            // it outright.
+            //
+            // The payload is produced by WallstopProto rather than by the oracle because two of
+            // these members are shapes protobuf-net 2.4.9 has no serializer for, and a payload of
+            // one element per field is not something an oracle is needed to construct.
+            string payload = MineHex(
+                new SeededStdlibContract
+                {
+                    Linked = new LinkedList<int>(new[] { 1 }),
+                    Queued = new Queue<int>(new[] { 1 }),
+                    Stacked = new Stack<int>(new[] { 1 }),
+                    OverwrittenStack = new Stack<int>(new[] { 1 }),
+                    Listed = new List<int> { 1 },
+                    OverwrittenList = new List<int> { 1 },
+                    SetOf = new HashSet<int> { 1 },
+                    Mapped = new Dictionary<string, int> { { "k", 1 } },
+                }
+            );
+
+            WProtoReader reader = new WProtoReader(Parse(payload));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<SeededStdlibContract>()
+                    .TryRead(ref reader, out SeededStdlibContract mine)
+            );
+
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Linked, "Linked");
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Queued, "Queued");
+            CollectionAssert.AreEqual(new[] { 1, 8, 7 }, mine.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenStack, "OverwrittenStack");
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Listed, "Listed");
+            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenList, "OverwrittenList");
+            CollectionAssert.AreEquivalent(new[] { 7, 8, 1 }, mine.SetOf, "SetOf");
+            Assert.AreEqual(9, mine.Mapped["seed"], "Mapped keeps the seed");
+            Assert.AreEqual(1, mine.Mapped["k"], "Mapped takes the payload");
+        }
+
+        [Test]
+        public void AnAbsentFieldLeavesEveryNewCollectionShapeAlone()
+        {
+            // "Absent" and "empty" are the same bytes, so the constructor's value has to survive an
+            // empty payload -- including for a stack, whose commit runs from the epilogue and would
+            // otherwise replace it with a fresh one.
+            WProtoReader reader = new WProtoReader(System.Array.Empty<byte>());
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<SeededStdlibContract>()
+                    .TryRead(ref reader, out SeededStdlibContract mine)
+            );
+
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Linked);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Queued);
+            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.Stacked);
+            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.OverwrittenStack);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Listed);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.OverwrittenList);
+            CollectionAssert.AreEquivalent(new[] { 7, 8 }, mine.SetOf);
+            Assert.AreEqual(9, mine.Mapped["seed"]);
+        }
+
+        [Test]
+        public void AnEmptyOrNullNewCollectionShapeWritesNothing()
+        {
+            // The rule every repeated member obeys, restated for the shapes that reach it through
+            // new code -- in particular the count-free IEnumerable path, whose emptiness test is a
+            // flag set by the first element rather than a Count.
+            Assert.AreEqual(string.Empty, MineHex(new StdlibCollectionContract()));
+            Assert.AreEqual(
+                string.Empty,
+                MineHex(
+                    new StdlibCollectionContract
+                    {
+                        Linked = new LinkedList<int>(),
+                        Listed = new List<string>(),
+                        Collected = new List<int>(),
+                        Enumerated = new List<int>(),
+                        ReadOnlyListed = new List<int>(),
+                        ReadOnlyCollected = new List<int>(),
+                        Mapped = new Dictionary<string, int>(),
+                    }
+                )
+            );
+
+            Assert.AreEqual(string.Empty, MineHex(new V3CollectionContract()));
+            Assert.AreEqual(
+                string.Empty,
+                MineHex(
+                    new V3CollectionContract
+                    {
+                        Queued = new Queue<int>(),
+                        Stacked = new Stack<int>(),
+                        SetOf = new HashSet<int>(),
+                        ReadOnlyMapped = new Dictionary<string, int>(),
+                        StackedPoints = new Stack<Outer.Point>(),
+                    }
+                )
+            );
+
+            Assert.AreEqual(string.Empty, MineHex(new ConstructedCollectionContract()));
         }
 
         private static string Describe(Dictionary<int, int> entries)

@@ -45,11 +45,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string CollectionInterface = "System.Collections.Generic.ICollection<T>";
 
         private readonly Shape _shape;
+        private readonly CollectionForm _form;
         private readonly string _contractName;
         private readonly string _elementQualified;
         private readonly string _elementDisplay;
         private readonly string _collectionQualified;
-        private readonly bool _isArray;
         private readonly bool _collectionIsValueType;
         private readonly bool _overwrite;
         private readonly bool _elementIsReference;
@@ -60,10 +60,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string name,
             int tag,
             Shape shape,
+            CollectionForm form,
             string elementQualified,
             string elementDisplay,
             string collectionQualified,
-            bool isArray,
             bool collectionIsValueType,
             bool overwrite,
             bool elementIsGeneric
@@ -72,10 +72,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             _contractName = contractName;
             _shape = shape;
+            _form = form;
             _elementQualified = elementQualified;
             _elementDisplay = elementDisplay;
             _collectionQualified = collectionQualified;
-            _isArray = isArray;
             _collectionIsValueType = collectionIsValueType;
             _overwrite = overwrite;
             _elementIsGeneric = elementIsGeneric;
@@ -103,17 +103,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             ITypeSymbol element;
-            bool isArray;
+            CollectionForm form;
             if (type is IArrayTypeSymbol array && array.Rank == 1)
             {
                 element = array.ElementType;
-                isArray = true;
+                form = CollectionForm.Array();
             }
-            else if (TryElementOfConstructibleCollection(type, out element))
-            {
-                isArray = false;
-            }
-            else
+            else if (!TryResolveForm(type, out element, out form))
             {
                 return null;
             }
@@ -138,14 +134,55 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 name,
                 tag,
                 shape,
+                form,
                 elementQualified,
                 element.ToDisplayString(),
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                isArray,
                 type.IsValueType,
                 overwriteList,
                 elementIsGeneric
             );
+        }
+
+        /// <summary>
+        /// Resolves how a non-array collection type is filled, or reports that it is not one.
+        /// </summary>
+        /// <param name="type">The member's declared type.</param>
+        /// <param name="element">Receives the element type.</param>
+        /// <param name="form">Receives the fill strategy.</param>
+        /// <returns><c>true</c> when the type is a supported collection.</returns>
+        /// <remarks>
+        /// The well-known types are asked about first, because several of them would answer the
+        /// generic question wrongly: <c>ReadOnlyCollection&lt;T&gt;</c> implements
+        /// <c>ICollection&lt;T&gt;</c> and cannot be filled, and <c>LinkedList&lt;T&gt;</c>
+        /// implements it with an explicit <c>Add</c> nothing can reach.
+        /// </remarks>
+        private static bool TryResolveForm(
+            ITypeSymbol type,
+            out ITypeSymbol element,
+            out CollectionForm form
+        )
+        {
+            element = null;
+            form = null;
+            if (!(type is INamedTypeSymbol named))
+            {
+                return false;
+            }
+
+            form = CollectionForm.TryWellKnown(named, out element);
+            if (form != null)
+            {
+                return true;
+            }
+
+            if (!TryElementOfConstructibleCollection(named, out element))
+            {
+                return false;
+            }
+
+            form = CollectionForm.InPlace("Add");
+            return true;
         }
 
         /// <summary>
@@ -174,16 +211,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </para>
         /// </remarks>
         private static bool TryElementOfConstructibleCollection(
-            ITypeSymbol type,
+            INamedTypeSymbol named,
             out ITypeSymbol element
         )
         {
             element = null;
-            if (!(type is INamedTypeSymbol named))
-            {
-                return false;
-            }
-
             if (named.TypeKind != TypeKind.Class && named.TypeKind != TypeKind.Struct)
             {
                 return false;
@@ -307,7 +339,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         /// <summary>The type the read loop accumulates into before committing it.</summary>
         private string AccumulatorType =>
-            _isArray ? ListType + "<" + _elementQualified + ">" : _collectionQualified;
+            _form.AccumulatorType(_elementQualified, _collectionQualified);
+
+        /// <summary>The statement that appends one decoded element to <paramref name="target"/>.</summary>
+        private string AddTo(string target, string value)
+        {
+            return target + "." + _form.AddMethod + "(" + value + ");";
+        }
+
+        /// <summary>
+        /// The statement that appends one decoded element to whatever this read is collecting into.
+        /// </summary>
+        /// <remarks>
+        /// A deferred read always collects into a plain list, whose method is <c>Add</c> whatever the
+        /// member's own is -- using the member's method there would emit <c>pending.Enqueue(...)</c>
+        /// on a <c>List&lt;T&gt;</c>.
+        /// </remarks>
+        private string AddToTarget(string value)
+        {
+            return DeferSeeding ? Pending + ".Add(" + value + ");" : AddTo(Accumulator, value);
+        }
 
         /// <summary>
         /// Whether this member is written as a single packed run rather than one field per element.
@@ -334,8 +385,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
 
+        /// <summary>Whether the member is walked by index rather than with <c>foreach</c>.</summary>
+        private bool IsArray => _form.IsArray;
+
         /// <summary>The element count, however this collection spells it.</summary>
-        private string CountAccess => Access + (_isArray ? ".Length" : ".Count");
+        private string CountAccess => Access + "." + _form.CountMember;
+
+        /// <summary>
+        /// Whether the packed write can decide emptiness from a count rather than by discovering it.
+        /// </summary>
+        private bool HasCount => _form.CountMember != null;
+
+        private string WroteFlag => "wrotePacked" + Tag;
 
         private string PayloadSize => "packedSize" + Tag;
 
@@ -515,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 open++;
             }
 
-            if (_isArray)
+            if (IsArray)
             {
                 writer.Line(
                     "for (int "
@@ -644,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 EmitReadFailure(writer, qualifiedContract);
                 Close(writer);
                 writer.Blank();
-                writer.Line(Target + ".Add(" + local + ");");
+                writer.Line(AddToTarget(local));
                 writer.Line("break;");
                 Close(writer);
 
@@ -698,7 +759,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 EmitReadFailure(writer, qualifiedContract);
                 Close(writer);
                 writer.Blank();
-                writer.Line(Target + ".Add(" + local + ");");
+                writer.Line(AddToTarget(local));
                 Close(writer);
                 writer.Blank();
                 writer.Line("break;");
@@ -724,7 +785,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line(Target + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
+            writer.Line(AddToTarget(Shape.Fill(_shape.AssignExpression, local)));
             writer.Line("break;");
             Close(writer);
 
@@ -772,7 +833,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line(Target + ".Add(" + Shape.Fill(_shape.AssignExpression, local) + ");");
+            writer.Line(AddToTarget(Shape.Fill(_shape.AssignExpression, local)));
             Close(writer);
             writer.Blank();
             writer.Line("break;");
@@ -784,52 +845,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         private void EmitGenericWrite(Writer writer)
         {
-            string presence = _collectionIsValueType ? string.Empty : Access + " != null && ";
+            EmitPackedRun(
+                writer,
+                Generic + ".Packable",
+                Generic + ".WriteValue(ref writer, " + ElementLocal + ")"
+            );
 
-            writer.Line(
-                "if ("
-                    + Generic
-                    + ".Packable && "
-                    + presence
-                    + "0 < "
-                    + CountAccess
-                    + ")"
-                    + Writer.Open
-            );
-            writer.Indent();
-            writer.Line(
-                // `false`: a packed run holds bare scalars and cannot recurse, so it spends no
-                // nesting level -- matching TryReadPackedRun, which hands its nested reader the same
-                // depth. Charging it would make a deep-but-legal message decodable and not encodable.
-                "if (!writer.TryBeginLengthDelimited("
-                    + Tag
-                    + ", false, out "
-                    + Proto
-                    + ".WProtoLengthToken "
-                    + PackedToken
-                    + "))"
-                    + Writer.Open
-            );
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
-            writer.Blank();
-            int packedOpen = OpenLoop(writer, guarded: false);
-            writer.Line(
-                "if (!" + Generic + ".WriteValue(ref writer, " + ElementLocal + "))" + Writer.Open
-            );
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
-            CloseAll(writer, packedOpen);
-            writer.Blank();
-            writer.Line("if (!writer.TryCloseLengthDelimited(" + PackedToken + "))" + Writer.Open);
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
-            Close(writer);
-
-            writer.Line("else if (!" + Generic + ".Packable)" + Writer.Open);
+            // A second `if` rather than an `else`, because the packed branch closes its own blocks.
+            // The two conditions are mutually exclusive, and `Packable` is a static readonly bool.
+            writer.Line("if (!" + Generic + ".Packable)" + Writer.Open);
             writer.Indent();
             int looseOpen = OpenLoop(writer);
             writer.Line(
@@ -860,24 +884,102 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private void EmitPackedWrite(Writer writer)
         {
-            // The emptiness test is on the COUNT here rather than on a computed payload size,
-            // because the whole point of this path is not to compute that size twice.
-            string guard =
-                (_collectionIsValueType ? string.Empty : Access + " != null && ")
-                + "0 < "
-                + CountAccess;
-            writer.Line("if (" + guard + ")" + Writer.Open);
+            EmitPackedRun(writer, null, _shape.RawWriteCall(ElementLocal));
+        }
+
+        /// <summary>
+        /// Emits one packed run: the key, a back-filled length, and the bare values.
+        /// </summary>
+        /// <param name="writer">The destination.</param>
+        /// <param name="condition">An extra condition to require, or <c>null</c>.</param>
+        /// <param name="writeCall">The boolean call that writes one element.</param>
+        /// <remarks>
+        /// <para>
+        /// Emptiness is decided from the element count rather than from a computed payload size,
+        /// because the whole point of back-filling the length is not to compute that size twice.
+        /// </para>
+        /// <para>
+        /// <c>IEnumerable&lt;T&gt;</c> has no count, and it is the only supported type that does not,
+        /// so the run is opened by the first element instead. Enumerating once to test for emptiness
+        /// and again to write would be the alternative, and a consumer's <c>IEnumerable&lt;T&gt;</c>
+        /// may be a query rather than a container -- <c>Measure</c> already walks it once, and a
+        /// third pass is worse than one flag.
+        /// </para>
+        /// </remarks>
+        private void EmitPackedRun(Writer writer, string condition, string writeCall)
+        {
+            string guard = PackedGuard(condition);
+            int open = 0;
+            if (guard != null)
+            {
+                writer.Line("if (" + guard + ")" + Writer.Open);
+                writer.Indent();
+                open++;
+            }
+
+            // `false`: a packed run holds bare scalars and cannot recurse, so it spends no nesting
+            // level -- matching TryReadPackedRun, which hands its nested reader the same depth.
+            // Charging it would make a deep-but-legal message decodable and not encodable.
+            string begin =
+                "writer.TryBeginLengthDelimited(" + Tag + ", false, out " + PackedToken + ")";
+
+            if (HasCount)
+            {
+                writer.Line(
+                    "if (!writer.TryBeginLengthDelimited("
+                        + Tag
+                        + ", false, out "
+                        + Proto
+                        + ".WProtoLengthToken "
+                        + PackedToken
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line("return false;");
+                Close(writer);
+                writer.Blank();
+            }
+            else
+            {
+                writer.Line("bool " + WroteFlag + " = false;");
+                writer.Line(
+                    Proto
+                        + ".WProtoLengthToken "
+                        + PackedToken
+                        + " = default("
+                        + Proto
+                        + ".WProtoLengthToken);"
+                );
+                writer.Blank();
+            }
+
+            int loop = OpenLoop(writer, guarded: false);
+
+            if (!HasCount)
+            {
+                writer.Line("if (!" + WroteFlag + ")" + Writer.Open);
+                writer.Indent();
+                writer.Line(WroteFlag + " = true;");
+                writer.Line("if (!" + begin + ")" + Writer.Open);
+                writer.Indent();
+                writer.Line("return false;");
+                Close(writer);
+                Close(writer);
+                writer.Blank();
+            }
+
+            writer.Line("if (!" + writeCall + ")" + Writer.Open);
             writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            CloseAll(writer, loop);
+            writer.Blank();
 
             writer.Line(
-                // `false`: a packed run holds bare scalars and cannot recurse, so it spends no
-                // nesting level -- matching TryReadPackedRun, which hands its nested reader the same
-                // depth. Charging it would make a deep-but-legal message decodable and not encodable.
-                "if (!writer.TryBeginLengthDelimited("
-                    + Tag
-                    + ", false, out "
-                    + Proto
-                    + ".WProtoLengthToken "
+                "if ("
+                    + (HasCount ? string.Empty : WroteFlag + " && ")
+                    + "!writer.TryCloseLengthDelimited("
                     + PackedToken
                     + "))"
                     + Writer.Open
@@ -885,23 +987,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Indent();
             writer.Line("return false;");
             Close(writer);
-            writer.Blank();
 
-            int open = OpenLoop(writer, guarded: false);
-            writer.Line("if (!" + _shape.RawWriteCall(ElementLocal) + ")" + Writer.Open);
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
             CloseAll(writer, open);
             writer.Blank();
+        }
 
-            writer.Line("if (!writer.TryCloseLengthDelimited(" + PackedToken + "))" + Writer.Open);
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
+        /// <summary>
+        /// The condition a packed run is written under, or <c>null</c> when there is nothing to test.
+        /// </summary>
+        private string PackedGuard(string condition)
+        {
+            string guard = condition ?? string.Empty;
 
-            Close(writer);
-            writer.Blank();
+            if (!_collectionIsValueType)
+            {
+                guard = Join(guard, Access + " != null");
+            }
+
+            if (HasCount)
+            {
+                guard = Join(guard, "0 < " + CountAccess);
+            }
+
+            return guard.Length == 0 ? null : guard;
+        }
+
+        private static string Join(string left, string right)
+        {
+            return left.Length == 0 ? right : left + " && " + right;
         }
 
         /// <summary>
@@ -925,16 +1038,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             string fresh = "new " + AccumulatorType + "()";
 
-            if (_overwrite || SkipConstructor)
+            // `Fresh` seeding starts empty whatever the member holds, because its commit is what
+            // consults the member -- a stack's elements cannot be pushed until all of them arrived.
+            if (_overwrite || SkipConstructor || _form.Seeding == CollectionSeeding.Fresh)
             {
                 writer.Line(Accumulator + " = " + fresh + ";");
             }
-            else if (_isArray)
+            else if (_form.Seeding == CollectionSeeding.Copy)
             {
+                // The member cannot be filled in place -- it is an array, a read-only collection, or
+                // an interface with no constructor -- so its current elements are copied into an
+                // accumulator the decoded ones are appended to. Every declared type that lands here
+                // is a reference, so the guard is always legal.
                 writer.Line(Accumulator + " = " + fresh + ";");
                 writer.Line("if (read." + Name + " != null)" + Writer.Open);
                 writer.Indent();
-                writer.Line(Accumulator + ".AddRange(read." + Name + ");");
+                writer.Line(Accumulator + "." + _form.BulkAddMethod + "(read." + Name + ");");
                 Close(writer);
             }
             else if (_collectionIsValueType)
@@ -975,9 +1094,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // elements in the other order. It always writes the include first, so no payload it
                 // produces reaches that path; this yields the same answer either way instead.
                 writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
-                if (_isArray)
+                if (_form.AccumulatesAside)
                 {
-                    writer.Line(Accumulator + ".AddRange(" + Pending + ");");
+                    writer.Line(Accumulator + "." + _form.BulkAddMethod + "(" + Pending + ");");
                 }
                 else
                 {
@@ -992,39 +1111,94 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             + Writer.Open
                     );
                     writer.Indent();
-                    writer.Line(Accumulator + ".Add(" + ElementLocal + ");");
+                    writer.Line(AddTo(Accumulator, ElementLocal));
                     Close(writer);
                 }
             }
 
-            writer.Line(
-                (ConstructAtEnd ? ReadLocal : "read." + Name)
-                    + " = "
-                    + Accumulator
-                    + (_isArray ? ".ToArray();" : ";")
-            );
+            EmitCommit(writer);
             Close(writer);
             writer.Blank();
         }
 
         /// <summary>
-        /// The collection a deferred read commits onto, seeded from the final instance.
+        /// Emits the assignment of the finished accumulator onto the member.
+        /// </summary>
+        /// <remarks>
+        /// Every form but one is an expression. <c>Stack&lt;T&gt;</c> is the exception: protobuf-net
+        /// writes a stack top-first and pushes the run back in <b>reverse</b>, which is what makes a
+        /// round trip faithful and cannot be expressed until the whole run has arrived. Pushing in
+        /// wire order instead inverts the stack silently, which is worse than refusing it.
+        /// </remarks>
+        private void EmitCommit(Writer writer)
+        {
+            string destination = ConstructAtEnd ? ReadLocal : "read." + Name;
+
+            if (!_form.PushesInReverse)
+            {
+                writer.Line(
+                    destination + " = " + _form.Commit(Accumulator, _elementQualified) + ";"
+                );
+                return;
+            }
+
+            string target = "target" + Tag;
+            string fresh = "new " + _collectionQualified + "()";
+            writer.Line(
+                _collectionQualified
+                    + " "
+                    + target
+                    + " = "
+                    + (
+                        _overwrite || ConstructAtEnd || SkipConstructor
+                            ? fresh
+                            : "read." + Name + " ?? " + fresh
+                    )
+                    + ";"
+            );
+            writer.Line(
+                "for (int "
+                    + IndexLocal
+                    + " = "
+                    + Accumulator
+                    + ".Count - 1; 0 <= "
+                    + IndexLocal
+                    + "; "
+                    + IndexLocal
+                    + "--)"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line(target + ".Push(" + Accumulator + "[" + IndexLocal + "]);");
+            Close(writer);
+            writer.Line(destination + " = " + target + ";");
+        }
+
+        /// <summary>
+        /// The accumulator a deferred read commits onto, seeded from the final instance.
         /// </summary>
         private string DeferredSeed()
         {
             string fresh = "new " + AccumulatorType + "()";
 
             // A contract built by a constructor has no instance to append onto: the formatter never
-            // runs the author's constructor, so there is no seeded collection to preserve.
-            if (_overwrite || ConstructAtEnd || SkipConstructor)
+            // runs the author's constructor, so there is no seeded collection to preserve. `Fresh`
+            // seeding starts empty for the same reason it does in EmitSeed -- its commit is what
+            // reads the member.
+            if (
+                _overwrite
+                || ConstructAtEnd
+                || SkipConstructor
+                || _form.Seeding == CollectionSeeding.Fresh
+            )
             {
                 return fresh;
             }
 
-            if (_isArray)
+            if (_form.Seeding == CollectionSeeding.Copy)
             {
-                // The pending elements are appended after this, so the constructor's array only has
-                // to be copied in first.
+                // The pending elements are appended after this, so the member's own only has to be
+                // copied in first. Every accumulator type used here takes an IEnumerable<T>.
                 return "read."
                     + Name
                     + " == null ? "
