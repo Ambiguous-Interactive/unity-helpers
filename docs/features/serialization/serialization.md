@@ -1035,10 +1035,29 @@ public sealed partial class Inventory
 }
 ```
 
-**What is accepted.** A single-dimension array, or any type that implements `ICollection<T>` exactly
-once, has a public parameterless constructor, and has a public `Add(T)`. That is `List<T>`,
-`HashSet<T>`, `SortedSet<T>`, `Collection<T>` and your own types. The element may be any scalar
-shape, an enum, a `byte[]`, or another `[WProtoContract]`.
+**What is accepted.** A single-dimension array; the standard-library collections in the table below;
+or any type that implements `ICollection<T>` exactly once, has a public parameterless constructor,
+and has a public `Add(T)` — `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collection<T>`,
+`ObservableCollection<T>` and your own types. The element may be any scalar shape, an enum, a
+`byte[]`, or another `[WProtoContract]`.
+
+| Declared member type                                                                         | Notes                                                                     |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `T[]`, `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collection<T>`, your own                    | Filled in place through `Add`                                             |
+| `LinkedList<T>`                                                                              | Filled through `AddLast`; its `ICollection<T>.Add` is explicit            |
+| `Queue<T>`                                                                                   | Filled through `Enqueue`; front-to-back order round-trips                 |
+| `Stack<T>`                                                                                   | Written top-first and pushed back in reverse, so a round trip is faithful |
+| `ReadOnlyCollection<T>`                                                                      | Accumulated into a list and constructed once                              |
+| `IList<T>`, `ICollection<T>`, `IEnumerable<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>` | Read back as a `List<T>`                                                  |
+| `ISet<T>`, `IReadOnlySet<T>`                                                                 | Read back as a `HashSet<T>`                                               |
+
+**Which type an interface member holds afterwards is part of the contract**, not an implementation
+detail — your code runs against whatever is there after a load. The choices above are protobuf-net's,
+so a contract migrating from it keeps working unchanged.
+
+**Your own collection interface is refused**, with a build error naming the member. There is no
+implementation the generator could pick; protobuf-net guesses `List<T>` and throws
+`InvalidCastException` when it hands the result back. Declare the member as a concrete type.
 
 **A collection may be a `struct`.** Nothing about `ICollection<T>` requires a class, and an inline or
 pooled buffer is a good reason to make one a value type. A struct collection is never null-checked
@@ -1058,13 +1077,37 @@ three of them are the opposite of the rule for a plain member:
   empty value or silently shorten the collection. protobuf-net raises on the same input.
 - **Reading appends** to whatever the constructor left in the member. `OverwriteList = true` replaces
   it instead. An **absent** field leaves the constructor's value alone either way — there is nothing
-  for an overwrite to be triggered by.
-- **Packed payloads are accepted** even though this package always writes unpacked, which is what
-  protobuf-net does. A payload written by a contract that set `IsPacked` decodes here unchanged.
+  for an overwrite to be triggered by. For a `Stack<T>` "appends" means the first decoded element
+  ends up on top, which is what makes writing top-first and pushing back in reverse round-trip.
+- **A run of packable scalars is written packed** — one key and one length for the whole run instead
+  of a key per element, which roughly halves a repeated `int`. protobuf-net writes unpacked and reads
+  either form, so this is a size win rather than a compatibility break, and payloads in both forms
+  are accepted here.
 
-Dictionaries are not supported yet: a protobuf map is a repeated _sub-message_ with the key at field
-1 and the value at field 2, which is a different encoding. `Dictionary<TKey, TValue>` and its
-relatives are a build error naming the member rather than bytes nothing could read back.
+#### Maps
+
+A dictionary member is written as a protobuf **map**: a repeated _entry message_ with the key at
+field 1 and the value at field 2. That is a different shape from a repeated value, which is why a
+dictionary does not simply ride the collection path.
+
+| Declared member type                                                                                 | Notes                            |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `Dictionary<K,V>`, `SortedDictionary<K,V>`, `SortedList<K,V>`, `ConcurrentDictionary<K,V>`, your own | Filled in place                  |
+| `IDictionary<K,V>`, `IReadOnlyDictionary<K,V>`                                                       | Read back as a `Dictionary<K,V>` |
+| `ReadOnlyDictionary<K,V>`                                                                            | Accumulated and constructed once |
+
+A key may be any integral type, `bool`, `string`, a floating-point type or an enum — the same set
+protobuf-net accepts, which is wider than the protobuf specification's. A `byte[]` or message key is
+refused, because neither has a stable identity to key on once round-tripped.
+
+**Three behaviors were measured rather than assumed.** The entry obeys the ordinary omission rules,
+so `{"a": 0}` encodes as key only. A missing key or value decodes to that type's protobuf default,
+and for a string that is `""` rather than a `null` that would throw inside the dictionary. And a
+repeated key is last-wins, applied through the indexer rather than `Add`, which would throw on the
+second occurrence of a key a hostile payload repeated.
+
+**A dictionary may be a `struct`**, on the same terms a collection may: it is never null-checked, and
+it is assigned back to its member after reading because everything in between operated on a copy.
 
 #### Polymorphism
 

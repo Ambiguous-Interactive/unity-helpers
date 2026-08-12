@@ -1137,7 +1137,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (!_form.PushesInReverse)
             {
                 writer.Line(
-                    destination + " = " + _form.Commit(Accumulator, _elementQualified) + ";"
+                    destination
+                        + " = "
+                        + _form.CommitExpression(Accumulator, _elementQualified)
+                        + ";"
                 );
                 return;
             }

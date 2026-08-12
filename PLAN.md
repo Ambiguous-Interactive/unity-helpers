@@ -12,7 +12,7 @@
 - [Shipped and Retired](#shipped-and-retired) — what came out of the plan and why
 - [Test Suite Runtime Reduction](#test-suite-runtime-reduction--goal-met-section-retired) — **GOAL MET** (all 14 legs under 5.3 min; retired)
 - [CI Throughput](#ci-throughput) — **MEASURED OUT, nothing in-repo left** (#279 / #326 / #329 / #330 / #337 / #353 / #363 all closed; the only remaining lever is a third self-hosted runner, which is an org capacity decision)
-- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port landed through session 181 / #420, whose full PR matrix passed. Session 182 adds the isolated protobuf-net 2.4.9 oracle promised by #371. Broader collection support and performance acceptance remain later design milestones.)
+- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port landed through session 181 / #420, whose full PR matrix passed. Session 182 added the isolated protobuf-net 2.4.9 oracle promised by #371; session 183 closed the collection matrix (#395) and the value-type sweep (#388). Performance acceptance and removal of the runtime protobuf-net fallback remain.)
 - [Backlog: Auto-Loading Cache Feature](#backlog-auto-loading-cache-feature) (not started)
 - [DxKit Rebrand: Unity Helpers → DxKit](#dxkit-rebrand-unity-helpers--dxkit) — **NOT STARTED** (brand, docs site, editor UI, assets)
 
@@ -1006,6 +1006,8 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
    a protobuf map is a repeated *sub-message*, a different encoding), collections with no accessible
    `Add` (`LinkedList<T>`, `ReadOnlyCollection<T>`), collections that are not `ICollection<T>`
    (`Queue<T>`, `Stack<T>`), interface-typed members, and generic contracts (#385).
+   *(All of those are served as of session 183 / #395 except a consumer's **own** collection
+   interface, which stays refused because protobuf-net's answer to it is a runtime cast failure.)*
 
    **Review round correction:** a repeated member typed as a **type parameter** silently dropped packed
    runs -- the whole collection came back `null`, which is the "silently short collection" the
@@ -1410,15 +1412,47 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   indicated one; the awkward part is that `LogAssert.Expect` cannot express a nondeterministic
   message, so what has to be argued is the *scope* of `ignoreFailingMessages`, not a pattern.
 
-- **#395** — collection coverage, with a measured support matrix. `HashSet`, `SortedSet`, `Dictionary`,
-  `SortedDictionary`, `SortedList` and `ConcurrentDictionary` work today; `LinkedList`, `Queue`,
-  `Stack`, `ReadOnlyCollection` and every **interface-typed** member do not. Three distinct problems
-  currently share `WPROTO003`: no usable `Add`, cannot be filled after construction, and nothing
-  concrete to construct. `Stack<T>` additionally reverses on a naive round-trip, which is a
-  correctness trap rather than a missing call.
-- **#388** — the value-type sweep. Fixed in the generator's repeated path; the same assumption still
-  sits in `SerializableSetBase<T, TSet> where TSet : class` and is worth auditing in the facade's
-  collection interception, the JSON converters and the drawers.
+- **#395 — implemented in session 183, pending merge.** `LinkedList`, `Queue`, `Stack`,
+  `ReadOnlyCollection`, `ReadOnlyDictionary` and every interface-typed sequence or dictionary member
+  are served. The three problems that shared `WPROTO003` are three fields on a `CollectionForm`
+  rather than three branches: a per-type fill method, an accumulate-and-construct commit, and the
+  concrete implementation an interface resolves to. What a consumer's member **holds** after a round
+  trip is treated as part of the contract and matches protobuf-net -- `List<T>` for the sequence
+  interfaces, `HashSet<T>` for `ISet<T>`, `Dictionary<K,V>` for both dictionary interfaces.
+
+  *The v2/v3 collection matrix is the second measured major-version divergence, after session 182's
+  map defaults.* protobuf-net **2.4.9 has no serializer at all** for `Queue<T>` or `Stack<T>` -- its
+  model build throws, so one such member poisons a whole contract -- and it writes `ISet<T>` and
+  `IReadOnlyDictionary<K,V>` and then throws reading either back. **3.2.56** refuses to read a
+  `ReadOnlyCollection<T>` or `ReadOnlyDictionary<K,V>` it wrote itself. WallstopProto serves all of
+  them on both, so the differential fixtures are split along the measured lines rather than along
+  what looks tidy, and the shapes with no oracle are pinned by golden bytes.
+
+  *A consumer's own collection interface stays refused*, and that is now a measured decision: both
+  majors write it and then throw `InvalidCastException` on read, because they fill a `List<T>` that
+  is not one. A build error naming the member beats a cast failure in a shipped player.
+  `IReadOnlySet<T>` has the same failure in protobuf-net and is **not** refused here, because
+  `HashSet<T>` satisfies it.
+
+  **The gap worth recording:** the fixture that covers a contract with an include and one built by a
+  constructor did not exist for any collection form whose commit is not an assignment. Writing it
+  found an older defect immediately -- the map reader's entry-value local was named `valueN`, which
+  is what an immutable contract calls the local holding member N, so **any** immutable contract with
+  a dictionary member failed the consumer's build with `CS0136`. A second and third path through the
+  same emitted code is worth a fixture even when the first one is thoroughly covered.
+- **#388 — implemented in session 183, pending merge.** The generator's map path made the same
+  reference-type assumption the repeated path had already been fixed for: it accepted a struct
+  dictionary and then emitted `member != null` and `read.Member ?? new Member()` for it, both
+  `CS0019` inside code the consumer never wrote. `SerializableSetBase<T, TSet>`'s `where TSet : class`
+  is relaxed, and the two places it was load-bearing use `is null`, which a value type answers as a
+  constant false. The remaining audit found nothing: the facade's collection interception dispatches
+  on concrete types rather than interface tests, and the JSON converters carry no `class` constraint.
+
+  **The lesson the existing test missed.** `ACollectionImplementedAsAStructIsAcceptedLikeAnyOther`
+  asserted only that the generator reported no diagnostic, while its own comment said the failure
+  mode is "code that does not compile" -- and the generator reports nothing at all about `CS0019`.
+  It compiles the generated source now, which is what the map version was written to do from the
+  start and what caught the defect.
 - **#371 — implemented in session 182, pending merge.** CI runs all generator differentials once
   against protobuf-net 2.4.9 and once against 3.2.56 in isolated processes. The v2 run exposed and now
   pins the three major-version divergences described above instead of silently treating v3 as both oracles,

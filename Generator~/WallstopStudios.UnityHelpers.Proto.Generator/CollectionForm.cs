@@ -30,6 +30,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         Fresh = 3,
     }
 
+    /// <summary>How a finished accumulator becomes the member's value.</summary>
+    internal enum CollectionCommit
+    {
+        /// <summary>The accumulator itself is the value.</summary>
+        Assign = 1,
+
+        /// <summary>The value is <c>accumulator.ToArray()</c>.</summary>
+        ToArray = 2,
+
+        /// <summary>The value is built from the accumulator by a constructor.</summary>
+        Construct = 3,
+
+        /// <summary>The value is a stack the accumulator is pushed onto in reverse.</summary>
+        PushInReverse = 4,
+    }
+
     /// <summary>
     /// The shape of one supported repeated member type: what the read loop fills, how, and what it
     /// commits.
@@ -72,7 +88,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string accumulatorGeneric,
             string addMethod,
             string bulkAddMethod,
-            string commitGeneric,
+            CollectionCommit commit,
+            string constructedGeneric,
             string countMember
         )
         {
@@ -80,12 +97,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _accumulatorGeneric = accumulatorGeneric;
             AddMethod = addMethod;
             BulkAddMethod = bulkAddMethod;
-            _commitGeneric = commitGeneric;
+            Commit = commit;
+            _constructedGeneric = constructedGeneric;
             CountMember = countMember;
         }
 
         private readonly string _accumulatorGeneric;
-        private readonly string _commitGeneric;
+        private readonly string _constructedGeneric;
+
+        /// <summary>How the finished accumulator becomes the member's value.</summary>
+        internal CollectionCommit Commit { get; }
 
         /// <summary>Where the decoded elements land.</summary>
         internal CollectionSeeding Seeding { get; }
@@ -112,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal string CountMember { get; }
 
         /// <summary>Whether the commit pushes the decoded run back in reverse order.</summary>
-        internal bool PushesInReverse => Seeding == CollectionSeeding.Fresh;
+        internal bool PushesInReverse => Commit == CollectionCommit.PushInReverse;
 
         /// <summary>Whether the accumulator is a different type from the member's own.</summary>
         internal bool AccumulatesAside => _accumulatorGeneric != null;
@@ -126,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// type, which binds to the concrete enumerator -- enumerating a struct collection through
         /// <c>IEnumerable&lt;T&gt;</c> would box it on every serialization.
         /// </remarks>
-        internal bool IsArray => _commitGeneric == ArrayCommit;
+        internal bool IsArray => Commit == CollectionCommit.ToArray;
 
         /// <summary>
         /// The type the read loop accumulates into.
@@ -146,20 +167,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         /// <param name="accumulator">The accumulator local.</param>
         /// <param name="element">The fully qualified element type.</param>
-        /// <returns>The commit expression.</returns>
-        internal string Commit(string accumulator, string element)
+        /// <returns>The commit expression, or <c>null</c> when the commit is not an expression.</returns>
+        internal string CommitExpression(string accumulator, string element)
         {
-            if (_commitGeneric == null)
+            switch (Commit)
             {
-                return accumulator;
+                case CollectionCommit.Assign:
+                    return accumulator;
+
+                case CollectionCommit.ToArray:
+                    return accumulator + ".ToArray()";
+
+                case CollectionCommit.Construct:
+                    return "new " + _constructedGeneric + "<" + element + ">(" + accumulator + ")";
+
+                default:
+                    return null;
             }
-
-            return _commitGeneric == ArrayCommit
-                ? accumulator + ".ToArray()"
-                : "new " + _commitGeneric + "<" + element + ">(" + accumulator + ")";
         }
-
-        private const string ArrayCommit = "<array>";
 
         /// <summary>The form for a single-dimension array.</summary>
         internal static CollectionForm Array()
@@ -169,7 +194,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 ListType,
                 "Add",
                 "AddRange",
-                ArrayCommit,
+                CollectionCommit.ToArray,
+                null,
                 "Length"
             );
         }
@@ -184,6 +210,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 null,
                 addMethod,
                 null,
+                CollectionCommit.Assign,
                 null,
                 "Count"
             );
@@ -250,6 +277,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         ListType,
                         "Add",
                         "AddRange",
+                        CollectionCommit.PushInReverse,
                         null,
                         "Count"
                     );
@@ -264,6 +292,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         ListType,
                         "Add",
                         "AddRange",
+                        CollectionCommit.Construct,
                         ReadOnlyCollectionType,
                         "Count"
                     );
@@ -277,6 +306,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         ListType,
                         "Add",
                         "AddRange",
+                        CollectionCommit.Assign,
                         null,
                         "Count"
                     );
@@ -289,6 +319,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         ListType,
                         "Add",
                         "AddRange",
+                        CollectionCommit.Assign,
                         null,
                         null
                     );
@@ -300,6 +331,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         HashSetType,
                         "Add",
                         "UnionWith",
+                        CollectionCommit.Assign,
                         null,
                         "Count"
                     );
