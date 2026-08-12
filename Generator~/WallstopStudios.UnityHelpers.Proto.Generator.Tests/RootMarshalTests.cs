@@ -279,6 +279,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A generic SUBTYPE's own parameter is asked about, not just its base's.
+        /// </summary>
+        /// <remarks>
+        /// The entry point registered for a subtype is its root formatter, which writes the whole
+        /// chain by delegating to the chain root. Asking only the root -- the first version of this
+        /// -- missed the subtype's own encoded parameters, so a subtype closed over an element
+        /// nothing can encode still claimed the request and failed inside <c>Measure</c>. Every
+        /// contract from the declared type up to the root is asked now.
+        /// </remarks>
+        [Test]
+        public void AGenericSubtypeClosedOverAnElementItCannotEncodeIsNotServed()
+        {
+            Assert.IsTrue(
+                WProtoFormatterProvider.IsRegistered<ConditionalSub<Unserviceable>>(),
+                "the registration is what makes the decline necessary"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TrySerialize(
+                    new ConditionalSub<Unserviceable> { Id = 1 },
+                    out byte[] _
+                ),
+                "the entry point asked only the chain root, so the subtype's own parameter was missed"
+            );
+        }
+
+        /// <summary>
         /// A closure it CAN encode is still served, so the decline is not a blanket refusal.
         /// </summary>
         [Test]

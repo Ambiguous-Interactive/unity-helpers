@@ -254,6 +254,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public int Value;
     }
 
+    /// <summary>A contract whose SUBTYPE is the one carrying a type parameter.</summary>
+    /// <remarks>
+    /// The entry point registered for <c>ConditionalSub&lt;T&gt;</c> is its root formatter, which
+    /// delegates to this type. Asking only this type whether it can serve would miss the subtype's
+    /// own parameter entirely.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    [WProtoInclude(100, typeof(ConditionalSub<Unserviceable>))]
+    public partial class ConditionalBase
+    {
+        /// <summary>An ordinary member, always encodable.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int Id;
+    }
+
+    /// <summary>A generic subtype whose own member is the one that may not be encodable.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    [ProtoContract]
+    [WProtoContract]
+    public partial class ConditionalSub<T> : ConditionalBase
+    {
+        /// <summary>The member whose closure decides whether this can be served.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public T Value;
+    }
+
     /// <summary>Holds a marshalled collection as a MEMBER, where the marshal must not apply.</summary>
     [ProtoContract]
     [WProtoContract]

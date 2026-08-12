@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (root != null)
             {
-                EmitRootFormatter(writer, qualified, root);
+                EmitRootFormatter(writer, contract, qualified, root);
                 writer.Blank();
             }
 
@@ -903,6 +903,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static void EmitRootFormatter(
             Writer writer,
+            INamedTypeSymbol contract,
             string qualified,
             INamedTypeSymbol root
         )
@@ -931,22 +932,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Blank();
 
-            // Asked of the ENTRY POINT, answered by the chain root, because the root is what writes
-            // every byte -- including a generic member of ITS OWN whose closure has no formatter.
-            // Deriving the condition here instead would have to re-derive the whole chain's encoded
-            // type parameters, and would drift the first time the chain changed.
+            // Asked of the ENTRY POINT, answered by EVERY contract from this one up to the chain
+            // root, because serializing this declared type writes all of their members: the include
+            // holding this type's, then each ancestor's. Asking only the root missed a generic
+            // SUBTYPE's own parameters, which is the half that fails inside `Measure`.
+            //
+            // Each formatter is asked rather than re-deriving the chain's encoded type parameters
+            // here, which would drift the first time the chain changed.
             writer.Line("/// <inheritdoc />");
             writer.Line("public bool CanServe()" + Writer.Open);
             writer.Indent();
-            // Through `object`: the root's formatter is a SEALED type, so a direct pattern match
-            // against an interface it does not implement is CS8121 rather than a false answer.
-            writer.Line(
-                "return !((object)"
-                    + rootQualified
-                    + ".WProtoFormatter.Instance is "
-                    + Proto
-                    + ".IWProtoConditionalFormatter conditional) || conditional.CanServe();"
-            );
+
+            StringBuilder chain = new StringBuilder();
+            int index = 0;
+            for (
+                INamedTypeSymbol current = contract;
+                current != null;
+                current = Shape.IsContract(current.BaseType) ? current.BaseType : null
+            )
+            {
+                if (0 < index)
+                {
+                    chain.Append(" && ");
+                }
+
+                // Through `object`: each formatter is a SEALED type, so a direct pattern match
+                // against an interface it does not implement is CS8121 rather than a false answer.
+                chain
+                    .Append("(!((object)")
+                    .Append(current.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                    .Append(".WProtoFormatter.Instance is ")
+                    .Append(Proto)
+                    .Append(".IWProtoConditionalFormatter conditional")
+                    .Append(index)
+                    .Append(") || conditional")
+                    .Append(index)
+                    .Append(".CanServe())");
+                index++;
+            }
+
+            writer.Line("return " + chain + ";");
             writer.Outdent();
             writer.Line("}");
             writer.Blank();
