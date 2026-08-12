@@ -32,7 +32,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
     [DataContract]
+#pragma warning disable WPROTO030 // Served by WGuidWProtoFormatter.
     [ProtoContract]
+#pragma warning restore WPROTO030
     public partial struct WGuid
         : IEquatable<WGuid>,
             IEquatable<Guid>,

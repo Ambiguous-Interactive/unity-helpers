@@ -111,6 +111,8 @@ jobs:
       # nothing has to stay distinguishable from one that passes. The cleanup-classifier suite is
       # built that way on purpose -- it FAILS under Actions when the policy checkout is missing,
       # rather than skipping, which is how this job discovered it needed one.
+      # This suite also stages the release .unitypackage payload under Assets and verifies that its
+      # runtime asmdef keeps the same default-on serialization path as a Package Manager install.
       - name: Run contract suites
         working-directory: unity-helpers
         env:
@@ -134,9 +136,8 @@ jobs:
         with:
           node-version: "22"
 
-      # Twice each, once as the package ships today and once with WALLSTOP_PROTO defined. That
-      # symbol is defined nowhere in this repository, so until now every line of the facade swap --
-      # the code that decides which serializer runs -- was unreachable by every gate the package has.
+      # The runtime compiles twice: default-on WALLSTOP_PROTO, matching the package asmdef, and the
+      # legacy define-off fallback. The PlayMode fixtures compile against the shipped default too.
       # The PlayMode fixtures are compiled too (#404): a broken fixture used to cost a whole Unity
       # leg to discover, and this finds it in a minute without an editor or a license.
       - name: Type-check the runtime and test sources

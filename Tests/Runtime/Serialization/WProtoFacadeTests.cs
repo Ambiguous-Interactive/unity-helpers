@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -22,8 +23,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     /// that moves everything at once.
     /// </para>
     /// <para>
-    /// These run whether or not <c>WALLSTOP_PROTO</c> is defined, because the seam compiles
-    /// unconditionally. What the define controls is only whether <c>Serializer</c> calls it.
+    /// Most tests exercise the seam directly. The default-dispatch test calls every public
+    /// <see cref="Serializer"/> shape with a marker formatter, proving the runtime assembly's
+    /// <c>WALLSTOP_PROTO</c> version define actually enters this path.
     /// </para>
     /// <para>
     /// Only the oracle comparison is skipped under IL2CPP, and for the reason the package exists:
@@ -71,6 +73,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(WProtoFacade.TrySerialize(new FastVector3Int(7, 8, 9), out byte[] bytes));
             Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out FastVector3Int restored));
             Assert.AreEqual(new FastVector3Int(7, 8, 9), restored);
+        }
+
+        [Test]
+        public void SerializerUsesWallstopProtoByDefaultForEveryPublicShape()
+        {
+            WProtoFormatterProvider.TryGet(out IWProtoFormatter<DefaultDispatchMarker> original);
+            try
+            {
+                WProtoFormatterProvider.Register<DefaultDispatchMarker>(
+                    new DefaultDispatchMarkerFormatter()
+                );
+                DefaultDispatchMarker value = new DefaultDispatchMarker { Value = 7 };
+
+                CollectionAssert.AreEqual(
+                    new byte[] { 0x08, 0x07 },
+                    Serializer.ProtoSerialize(value)
+                );
+                CollectionAssert.AreEqual(
+                    new byte[] { 0x08, 0x07 },
+                    Serializer.ProtoSerialize(value, forceRuntimeType: true)
+                );
+
+                byte[] buffer = Array.Empty<byte>();
+                Assert.AreEqual(2, Serializer.ProtoSerialize(value, ref buffer));
+                CollectionAssert.AreEqual(new byte[] { 0x08, 0x07 }, buffer);
+
+                byte[] payload = { 0x08, 0x09 };
+                Assert.AreEqual(
+                    9,
+                    Serializer.ProtoDeserialize<DefaultDispatchMarker>(payload).Value
+                );
+                Assert.AreEqual(
+                    9,
+                    Serializer
+                        .ProtoDeserialize<DefaultDispatchMarker>(
+                            payload,
+                            typeof(DefaultDispatchMarker)
+                        )
+                        .Value
+                );
+                Assert.IsTrue(
+                    Serializer.TryProtoDeserialize(payload, out DefaultDispatchMarker restored)
+                );
+                Assert.AreEqual(9, restored.Value);
+                Assert.IsTrue(
+                    Serializer.TryProtoDeserialize(
+                        payload,
+                        typeof(DefaultDispatchMarker),
+                        out DefaultDispatchMarker restoredAs
+                    )
+                );
+                Assert.AreEqual(9, restoredAs.Value);
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
         }
 
         [Test]
@@ -129,6 +188,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private sealed class UnportedThing
         {
             public int Value;
+        }
+
+        private sealed class DefaultDispatchMarker
+        {
+            internal int Value;
+        }
+
+        private sealed class DefaultDispatchMarkerFormatter
+            : IWProtoFormatter<DefaultDispatchMarker>
+        {
+            public int Measure(in DefaultDispatchMarker value)
+            {
+                return WProtoSizes.TagSize(1) + WProtoSizes.Int32Size(value.Value);
+            }
+
+            public bool Write(ref WProtoWriter writer, in DefaultDispatchMarker value)
+            {
+                return writer.TryWriteTag(1, WProtoWireType.Varint)
+                    && writer.TryWriteInt32(value.Value);
+            }
+
+            public bool TryRead(ref WProtoReader reader, out DefaultDispatchMarker value)
+            {
+                value = new DefaultDispatchMarker();
+                while (reader.TryReadTag(out int fieldNumber, out int wireType))
+                {
+                    if (fieldNumber == 1 && reader.TryReadInt32(out int raw))
+                    {
+                        value.Value = raw;
+                    }
+                    else if (!reader.TrySkipField(fieldNumber, wireType))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
         }
 
         /// <summary>

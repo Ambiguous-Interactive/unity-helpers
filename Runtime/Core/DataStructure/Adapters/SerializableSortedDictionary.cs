@@ -54,7 +54,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served through SerializableSortedDictionaryProtoWrapper.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public abstract class SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
         : IDictionary<TKey, TValue>,
             IDictionary,

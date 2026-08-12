@@ -1,8 +1,9 @@
 "use strict";
 
-// Two properties every [WProtoContract] in this package must have, checked without a compiler.
+// Three properties every WallstopProto build in this package must have, checked without a compiler.
 //
-// Both were broken in one session by scripts that annotated contracts in bulk, and neither is
+// The annotation properties were broken in one session by scripts that edited contracts in bulk,
+// and neither is
 // visible to anything that runs locally: the Unity compile gate can wedge for a whole session, and
 // a missing `using` is a SEMANTIC error, so CSharpier parses the file happily. CI was the first
 // thing to notice each of them, at roughly an hour per discovery.
@@ -19,6 +20,9 @@ const root = path.resolve(__dirname, "../..");
 const namespaceImport = "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;";
 const declaringNamespace =
   "namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
+const runtimeAsmdef = JSON.parse(
+  fs.readFileSync(path.join(root, "Runtime/WallstopStudios.UnityHelpers.asmdef"), "utf8")
+);
 
 // Comments are stripped before anything is matched. A file that only MENTIONS `[WProtoContract]`
 // in prose -- Serializer's XML docs describe when the facade serves a type -- needs no import and
@@ -91,6 +95,15 @@ assert.deepEqual(
   `Files use WProto attributes without importing the namespace (CS0246 at compile time):\n  ${missingImport.join("\n  ")}`
 );
 
+assert.equal(
+  runtimeAsmdef.versionDefines.some(
+    (entry) =>
+      entry.name === "Unity" && entry.expression === "2021.3" && entry.define === "WALLSTOP_PROTO"
+  ),
+  true,
+  "Runtime asmdef must enable WALLSTOP_PROTO through Unity's version resource so UPM and Assets installs match."
+);
+
 assert.deepEqual(
   notPartial,
   [],
@@ -102,5 +115,5 @@ const annotated = files.filter((file) =>
 ).length;
 
 console.log(
-  `WallstopProto annotation contract passed (${annotated} annotated files, 2 properties).`
+  `WallstopProto annotation contract passed (${annotated} annotated files, 3 properties).`
 );

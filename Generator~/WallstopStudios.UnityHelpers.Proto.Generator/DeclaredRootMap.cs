@@ -13,12 +13,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// <remarks>
     /// <para>
     /// Built from <c>[assembly: WProtoDeclaredRoot(declared, root)]</c> on the compilation's OWN
-    /// assembly and no other, which is where it differs from <see cref="MarshalMap"/> and
+    /// assembly, which is where it differs from <see cref="MarshalMap"/> and
     /// <see cref="SurrogateMap"/>. Those two are re-read from every reference because a marshal has
     /// to be closed over a consumer's element type and a surrogate has to be substituted while a
     /// consumer's members are emitted. A declared root closes nothing and substitutes nothing: both
     /// types are already closed, so the assembly that declares the pair registers it once and every
-    /// other assembly in the process sees that registration.
+    /// other assembly in the process sees that registration. Referenced assemblies are inspected
+    /// only to warn when this assembly declares a different root for the same type; their
+    /// registrations are never emitted again.
     /// </para>
     /// <para>
     /// The registration names no formatter. <see cref="Register"/> resolves the root's formatter at
@@ -42,6 +44,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static void Validate(Compilation compilation, Action<Diagnostic> report)
         {
             HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            Dictionary<ITypeSymbol, List<ReferencedDeclaration>> referenced =
+                ReferencedDeclarations(compilation, report);
 
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
@@ -143,8 +147,119 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             pair.Root.ToDisplayString()
                         )
                     );
+                    continue;
+                }
+
+                if (
+                    referenced.TryGetValue(
+                        pair.Declared,
+                        out List<ReferencedDeclaration> declarations
+                    )
+                )
+                {
+                    foreach (ReferencedDeclaration declaration in declarations)
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(pair.Root, declaration.Root))
+                        {
+                            continue;
+                        }
+
+                        report(
+                            Diagnostic.Create(
+                                WProtoDiagnostics.ConflictingReferencedDeclaredRoot,
+                                location,
+                                pair.Declared.ToDisplayString(),
+                                pair.Root.ToDisplayString(),
+                                declaration.Root.ToDisplayString(),
+                                compilation.AssemblyName,
+                                declaration.AssemblyName
+                            )
+                        );
+                        break;
+                    }
                 }
             }
+        }
+
+        private static Dictionary<ITypeSymbol, List<ReferencedDeclaration>> ReferencedDeclarations(
+            Compilation compilation,
+            Action<Diagnostic> report
+        )
+        {
+            Dictionary<ITypeSymbol, List<ReferencedDeclaration>> declarations = new Dictionary<
+                ITypeSymbol,
+                List<ReferencedDeclaration>
+            >(SymbolEqualityComparer.Default);
+            HashSet<ITypeSymbol> reported = new HashSet<ITypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+
+            foreach (MetadataReference reference in compilation.References)
+            {
+                if (!(compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly))
+                {
+                    continue;
+                }
+
+                HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(
+                    SymbolEqualityComparer.Default
+                );
+                foreach (Pair pair in Pairs(assembly))
+                {
+                    if (pair.Declared == null || !seen.Add(pair.Declared) || !Usable(pair))
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !declarations.TryGetValue(
+                            pair.Declared,
+                            out List<ReferencedDeclaration> roots
+                        )
+                    )
+                    {
+                        roots = new List<ReferencedDeclaration>();
+                        declarations.Add(pair.Declared, roots);
+                    }
+                    else
+                    {
+                        ReferencedDeclaration existing = roots[0];
+                        if (
+                            !SymbolEqualityComparer.Default.Equals(existing.Root, pair.Root)
+                            && reported.Add(pair.Declared)
+                        )
+                        {
+                            report(
+                                Diagnostic.Create(
+                                    WProtoDiagnostics.ConflictingReferencedDeclaredRoot,
+                                    Location.None,
+                                    pair.Declared.ToDisplayString(),
+                                    existing.Root.ToDisplayString(),
+                                    pair.Root.ToDisplayString(),
+                                    existing.AssemblyName,
+                                    assembly.Identity.Name
+                                )
+                            );
+                        }
+                    }
+
+                    roots.Add(new ReferencedDeclaration(pair.Root, assembly.Identity.Name));
+                }
+            }
+
+            return declarations;
+        }
+
+        private static bool Usable(Pair pair)
+        {
+            return pair.Declared != null
+                && pair.Root != null
+                && !Open(pair.Declared)
+                && !Open(pair.Root)
+                && !SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
+                && !IsContract(pair.Declared)
+                && !Instantiable(pair.Declared)
+                && Assignable(pair.Root, pair.Declared);
         }
 
         /// <summary>
@@ -355,6 +470,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             internal ITypeSymbol Root { get; }
 
             internal AttributeData Attribute { get; }
+        }
+
+        private readonly struct ReferencedDeclaration
+        {
+            internal ReferencedDeclaration(ITypeSymbol root, string assemblyName)
+            {
+                Root = root;
+                AssemblyName = assemblyName;
+            }
+
+            internal ITypeSymbol Root { get; }
+
+            internal string AssemblyName { get; }
         }
     }
 }

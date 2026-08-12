@@ -25,7 +25,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served through ImmutableBitSetSurrogate by both serializers.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public readonly struct ImmutableBitSet : IEquatable<ImmutableBitSet>
     {
         private const int BitsPerLongShift = 6; // log2(64)

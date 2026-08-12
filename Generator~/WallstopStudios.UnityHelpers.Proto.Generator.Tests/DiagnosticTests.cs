@@ -6,13 +6,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.IO;
     using System.Linq;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using NUnit.Framework;
 
     /// <summary>
-    /// Pins the build errors a consumer sees when a contract cannot be serialized.
+    /// Pins the diagnostics a consumer sees when a contract cannot be serialized or migrated.
     /// </summary>
     /// <remarks>
     /// These matter more than the happy path. A generator that silently skips a contract it cannot
@@ -63,6 +64,57 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
                 )
             );
+        }
+
+        [Test]
+        public void AProtobufContractWithoutAWallstopProtoContractReportsMigrationInfo()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[global::ProtoBuf.ProtoContract] public partial class Legacy { [global::ProtoBuf.ProtoMember(1)] public int Value; }"
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO030");
+
+            Assert.AreEqual(DiagnosticSeverity.Info, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("Legacy"));
+            Assert.IsTrue(match.GetMessage().Contains("WProtoContract"));
+            Assert.IsTrue(match.GetMessage().Contains("suppress"));
+        }
+
+        [Test]
+        public void AContractWithBothAnnotationsReportsNoMigrationInfo()
+        {
+            Assert.IsFalse(
+                Run(
+                        @"[global::ProtoBuf.ProtoContract] [WProtoContract] public partial class Ported { [global::ProtoBuf.ProtoMember(1)] [WProtoMember(1)] public int Value; }"
+                    )
+                    .Any(diagnostic => diagnostic.Id == "WPROTO030")
+            );
+        }
+
+        [Test]
+        public void AnAliasedPartialProtobufContractReportsMigrationInfoOnce()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"using LegacyContract = global::ProtoBuf.ProtoContractAttribute;
+                  [LegacyContract] public partial class Legacy { }
+                  public partial class Legacy { public int Value; }"
+            );
+
+            Assert.AreEqual(1, diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO030"));
+        }
+
+        [Test]
+        public void AProtobufContractCanSuppressTheMigrationInfoWithAPragma()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public partial class DeliberatelyLegacy { }
+                  #pragma warning disable WPROTO030
+                  [global::ProtoBuf.ProtoContract] public partial class DeliberatelyLegacy { }
+                  #pragma warning restore WPROTO030"
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO030");
+
+            Assert.IsTrue(match.IsSuppressed);
         }
 
         [Test]
@@ -660,6 +712,86 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
         }
 
+        [Test]
+        public void ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning()
+        {
+            MetadataReference referencedRoots = CompileReference(
+                "ReferencedRoots",
+                @"[assembly: WProtoDeclaredRoot(typeof(Reference.IThing), typeof(Reference.ReferenceRoot))]
+                  namespace Reference
+                  {
+                      public interface IThing { }
+                      [WProtoContract] public partial class ReferenceRoot : IThing { [WProtoMember(1)] public int A; }
+                  }"
+            );
+
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoDeclaredRoot(typeof(Reference.IThing), typeof(Consumer.ConsumerRoot))]
+                  [WProtoContract] public partial class ConsumerRoot : Reference.IThing { [WProtoMember(1)] public int A; }",
+                referencedRoots
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO031");
+
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("Reference.IThing"));
+            Assert.IsTrue(match.GetMessage().Contains("Reference.ReferenceRoot"));
+            Assert.IsTrue(match.GetMessage().Contains("Consumer.ConsumerRoot"));
+            Assert.IsTrue(match.GetMessage().Contains("ReferencedRoots"));
+        }
+
+        [Test]
+        public void TheSameDeclaredRootInAReferencedAssemblyDoesNotConflict()
+        {
+            MetadataReference referencedRoots = CompileReference(
+                "ReferencedRoots",
+                @"[assembly: WProtoDeclaredRoot(typeof(Reference.IThing), typeof(Reference.ReferenceRoot))]
+                  namespace Reference
+                  {
+                      public interface IThing { }
+                      [WProtoContract] public partial class ReferenceRoot : IThing { [WProtoMember(1)] public int A; }
+                  }"
+            );
+
+            Assert.IsFalse(
+                Run(
+                        @"[assembly: WProtoDeclaredRoot(typeof(Reference.IThing), typeof(Reference.ReferenceRoot))]",
+                        referencedRoots
+                    )
+                    .Any(diagnostic => diagnostic.Id == "WPROTO031")
+            );
+        }
+
+        [Test]
+        public void ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning()
+        {
+            MetadataReference shared = CompileReference(
+                "SharedContracts",
+                "namespace Shared { public interface IThing { } }"
+            );
+            MetadataReference first = CompileReference(
+                "FirstRoots",
+                @"[assembly: WProtoDeclaredRoot(typeof(Shared.IThing), typeof(First.Root))]
+                  namespace First { public sealed class Root : Shared.IThing { } }",
+                shared
+            );
+            MetadataReference second = CompileReference(
+                "SecondRoots",
+                @"[assembly: WProtoDeclaredRoot(typeof(Shared.IThing), typeof(Second.Root))]
+                  namespace Second { public sealed class Root : Shared.IThing { } }",
+                shared
+            );
+
+            ImmutableArray<Diagnostic> diagnostics = Run("", shared, first, second);
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO031");
+
+            Assert.AreEqual(Location.None, match.Location);
+            Assert.IsTrue(match.GetMessage().Contains("Shared.IThing"));
+            Assert.IsTrue(match.GetMessage().Contains("First.Root"));
+            Assert.IsTrue(match.GetMessage().Contains("Second.Root"));
+            Assert.IsTrue(match.GetMessage().Contains("FirstRoots"));
+            Assert.IsTrue(match.GetMessage().Contains("SecondRoots"));
+        }
+
         /// <summary>
         /// A closure the registrar cannot name is skipped, and now says so.
         /// </summary>
@@ -683,8 +815,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(source);
             Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
 
-            Assert.IsNotNull(
-                match,
+            Assert.IsTrue(
+                match != null,
                 "saw: " + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
@@ -749,8 +881,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
-            Assert.IsNotNull(
-                match,
+            Assert.IsTrue(
+                match != null,
                 "saw: " + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
             Assert.IsTrue(match.GetMessage().Contains("Hidden"), match.GetMessage());
@@ -901,8 +1033,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(source);
             Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == id);
 
-            Assert.IsNotNull(
-                match,
+            Assert.IsTrue(
+                match != null,
                 "expected "
                     + id
                     + ", saw: "
@@ -917,10 +1049,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static ImmutableArray<Diagnostic> Run(string body)
         {
-            return Run(body, out Compilation _);
+            return Run(body, Array.Empty<MetadataReference>(), out Compilation _);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            params MetadataReference[] additionalReferences
+        )
+        {
+            return Run(body, additionalReferences, out Compilation _);
         }
 
         private static ImmutableArray<Diagnostic> Run(string body, out Compilation generated)
+        {
+            return Run(body, Array.Empty<MetadataReference>(), out generated);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            IReadOnlyCollection<MetadataReference> additionalReferences,
+            out Compilation generated
+        )
         {
             // An [assembly:] attribute must precede every namespace, so a fixture that needs one
             // writes it at the top of its body and it is hoisted out here rather than ending up
@@ -951,6 +1100,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     references.Add(MetadataReference.CreateFromFile(assembly.Location));
                 }
             }
+            references.AddRange(additionalReferences);
 
             CSharpCompilation compilation = CSharpCompilation.Create(
                 "ConsumerAssembly",
@@ -969,6 +1119,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             generated = updated;
             return diagnostics;
+        }
+
+        private static MetadataReference CompileReference(
+            string assemblyName,
+            string body,
+            params MetadataReference[] additionalReferences
+        )
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+            references.AddRange(additionalReferences);
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                            + body
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
+                Assert.IsTrue(
+                    result.Success,
+                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+                );
+                return MetadataReference.CreateFromImage(stream.ToArray());
+            }
         }
 
         /// <summary>

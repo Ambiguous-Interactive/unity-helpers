@@ -28,7 +28,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served at the root through SparseSetProtoWrapper.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public sealed class SparseSet : IReadOnlyList<int>
     {
         public struct SparseSetEnumerator : IEnumerator<int>

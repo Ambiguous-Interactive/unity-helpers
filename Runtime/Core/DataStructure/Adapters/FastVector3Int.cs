@@ -24,7 +24,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served by a hand-written formatter and protobuf-net surrogate.
     [ProtoContract]
+#pragma warning restore WPROTO030
     public readonly partial struct FastVector3Int
         : IEquatable<FastVector3Int>,
             IEquatable<FastVector2Int>,

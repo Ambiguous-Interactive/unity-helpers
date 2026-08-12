@@ -6,13 +6,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using Microsoft.CodeAnalysis;
 
     /// <summary>
-    /// The build errors this generator reports instead of skipping a contract it cannot serialize.
+    /// The diagnostics this generator reports instead of silently skipping serialization work.
     /// </summary>
     /// <remarks>
-    /// Every one of these is an error rather than a warning, and every message names the type, the
-    /// member and the fix. The failure mode being avoided is a contract that silently gets no
-    /// formatter and surfaces as an <c>InvalidOperationException</c> -- or, before this serializer
-    /// existed, an opaque <c>ExecutionEngineException</c> -- from inside a shipped player.
+    /// Refused contracts are errors and name the type, member, and fix. Migration and skipped-
+    /// registration diagnostics use lower severities when existing consumer code can remain valid.
+    /// The failure mode being avoided is a contract that silently gets no formatter and surfaces as
+    /// an <c>InvalidOperationException</c> -- or, before this serializer existed, an opaque
+    /// <c>ExecutionEngineException</c> -- from inside a shipped player.
     /// </remarks>
     internal static class WProtoDiagnostics
     {
@@ -267,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
 
         /// <summary>
-        /// The one warning here, and the only diagnostic that reports a SKIP rather than a refusal.
+        /// The warning that reports a skipped registration rather than a refused declaration.
         /// </summary>
         /// <remarks>
         /// Skipping is the right behaviour: naming a consumer's private nested type from the
@@ -293,6 +294,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 "[assembly: WProtoDeclaredRoot(typeof({0}), typeof({1}))] names '{0}', which is neither an interface nor abstract. A declared root exists for a type that has no encoding of its own; a '{0}' that is actually a '{0}' would be served by the adapter, fail to narrow to '{1}', and encode to nothing -- measured as a populated value writing zero bytes and reading back as '{1}'. Make '{0}' abstract, or give it its own [WProtoContract] -- and if it is a value type or an array, which can be neither, remove the attribute.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor UnportedProtobufContract =
+            new DiagnosticDescriptor(
+                "WPROTO030",
+                "protobuf-net contract has not been ported to WallstopProto",
+                "'{0}' is a [ProtoContract] with no [WProtoContract], so it has no generated WallstopProto formatter. Unless it is deliberately served through a surrogate, root marshal, or hand-written formatter, Serializer falls back to protobuf-net's reflection path, which does not work under IL2CPP. Add [WProtoContract] and a [WProtoMember] beside each [ProtoMember] with matching field numbers, or suppress WPROTO030 at the [ProtoContract] declaration when another formatter serves it.",
+                "WallstopProto",
+                DiagnosticSeverity.Info,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor ConflictingReferencedDeclaredRoot =
+            new DiagnosticDescriptor(
+                "WPROTO031",
+                "WallstopProto declared root conflicts with a referenced assembly",
+                "Assembly '{3}' declares '{1}' as the root serving '{0}', while referenced assembly '{4}' declares '{2}'. Both generated registrars run in Unity's unordered startup phase, so assembly load order would choose the WallstopProto adapter and wire shape. Remove one declaration; if the conflict is deliberate, suppress WPROTO031 only after ensuring every build registers the intended adapter.",
+                "WallstopProto",
+                DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
 

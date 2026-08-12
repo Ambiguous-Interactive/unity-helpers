@@ -61,6 +61,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// so nothing registers a formatter under the closed type.
         /// </para>
         /// <para>
+        /// A registered message formatter can also decline its particular closure through
+        /// <see cref="IWProtoConditionalFormatter"/>. That answer is consulted here rather than
+        /// cached, because a nested generic contract must propagate the service decision of its own
+        /// type arguments and registrations can change during startup.
+        /// </para>
+        /// <para>
         /// Exposed so a formatter registered for a type it cannot always serve --
         /// <see cref="IWProtoConditionalFormatter"/> -- can decline before writing anything, rather
         /// than throwing from inside <see cref="MeasureField(int, in T)"/> where the caller has
@@ -72,7 +78,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             get
             {
                 Resolve();
-                return _scalar != null || _message != null;
+                return _scalar != null
+                    || (
+                        _message != null
+                        && !(
+                            _message is IWProtoConditionalFormatter conditional
+                            && !conditional.CanServe()
+                        )
+                    );
             }
         }
 

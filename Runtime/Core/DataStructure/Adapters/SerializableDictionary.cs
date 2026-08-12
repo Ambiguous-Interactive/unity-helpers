@@ -209,7 +209,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <typeparam name="TValue">Dictionary value type.</typeparam>
     /// <typeparam name="TValueCache">Serialized value cache type.</typeparam>
     [Serializable]
+#pragma warning disable WPROTO030 // Served through SerializableDictionaryProtoWrapper.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public abstract class SerializableDictionaryBase<TKey, TValue, TValueCache>
         : SerializableDictionaryBase,
             IDictionary<TKey, TValue>,

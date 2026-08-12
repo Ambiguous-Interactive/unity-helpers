@@ -21,7 +21,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     /// </example>
     [DataContract]
     [Serializable]
+#pragma warning disable WPROTO030 // Served through ParabolaSurrogate by both serializers.
     [ProtoContract]
+#pragma warning restore WPROTO030
     public readonly struct Parabola : IEquatable<Parabola>
     {
         /// <summary>

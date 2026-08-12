@@ -22,9 +22,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <typeparam name="T">The value type.</typeparam>
         /// <param name="formatter">The formatter, or <c>null</c> to clear the registration.</param>
+        /// <remarks>
+        /// Last registration wins. Registration is not thread-safe against concurrent resolution
+        /// and is meant to run once during startup, before anything serializes.
+        /// </remarks>
         public static void Register<T>(IWProtoScalarFormatter<T> formatter)
         {
             Cache<T>.Formatter = formatter;
+            WProtoGeneric<T>.Reset();
         }
 
         /// <summary>

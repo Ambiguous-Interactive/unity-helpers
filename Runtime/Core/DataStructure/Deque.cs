@@ -27,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">The type of elements in the deque.</typeparam>
     [Serializable]
+#pragma warning disable WPROTO030 // Served at the root through DequeProtoWrapper.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public sealed class Deque<T> : IReadOnlyList<T>
     {
         public const int DefaultCapacity = 16;

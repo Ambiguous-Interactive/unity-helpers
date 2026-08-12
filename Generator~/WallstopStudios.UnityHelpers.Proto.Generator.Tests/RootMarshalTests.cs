@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(
                 WProtoFacade.TryDeserialize(Array.Empty<byte>(), out StandInRing<int> restored)
             );
-            Assert.IsNotNull(restored);
+            Assert.IsTrue(restored != null);
             Assert.AreEqual(0, restored.Count);
         }
 
@@ -276,6 +276,119 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     out Box<Unserviceable> _
                 )
             );
+        }
+
+        /// <summary>
+        /// A generic contract closed over another generic contract that declines is refused too.
+        /// </summary>
+        /// <remarks>
+        /// The outer closure resolves a registered message formatter, but registration alone does
+        /// not prove the nested closure can serve its own type argument. Treating every registered
+        /// message as encodable makes the facade claim this value and throw only after measurement
+        /// reaches the unserviceable leaf.
+        /// </remarks>
+        [Test]
+        public void AGenericContractClosedOverADecliningGenericContractIsNotServed()
+        {
+            Box<Box<Unserviceable>> value = new Box<Box<Unserviceable>>
+            {
+                Value = new Box<Unserviceable> { Value = new Unserviceable { Value = 1 } },
+            };
+
+            Assert.IsTrue(
+                WProtoFormatterProvider.IsRegistered<Box<Box<Unserviceable>>>(),
+                "the outer registration is what makes the nested service check necessary"
+            );
+            Assert.IsTrue(
+                WProtoFormatterProvider.TryGet(
+                    out IWProtoFormatter<Box<Unserviceable>> innerFormatter
+                ),
+                "the inner formatter must exist, or absence alone makes the outer closure decline"
+            );
+            Assert.IsTrue(
+                innerFormatter is IWProtoConditionalFormatter,
+                "the regression must exercise a registered formatter's conditional decision"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TrySerialize(value, out byte[] _),
+                "the facade claimed an outer closure whose nested formatter declines"
+            );
+            Assert.IsFalse(
+                WProtoFacade.TryDeserialize(
+                    new byte[] { 0x0A, 0x02, 0x08, 0x01 },
+                    out Box<Box<Unserviceable>> _
+                ),
+                "the read half must consult the same nested service predicate"
+            );
+        }
+
+        /// <summary>A later registration replaces the formatter a generic closure cached.</summary>
+        [Test]
+        public void RegisterAfterGenericResolutionReplacesTheCachedFormatter()
+        {
+            WProtoFormatterProvider.TryGet(out IWProtoFormatter<Unserviceable> originalFormatter);
+            try
+            {
+                ConditionalUnserviceableFormatter declining = new ConditionalUnserviceableFormatter(
+                    false
+                );
+                ConditionalUnserviceableFormatter serving = new ConditionalUnserviceableFormatter(
+                    true
+                );
+
+                WProtoFormatterProvider.Register<Unserviceable>(declining);
+                Assert.IsFalse(WProtoGeneric<Unserviceable>.CanEncode);
+
+                WProtoFormatterProvider.Register<Unserviceable>(serving);
+                Assert.IsTrue(WProtoGeneric<Unserviceable>.CanEncode);
+                Assert.AreSame(serving, WProtoFormatterProvider.Get<Unserviceable>());
+                Assert.AreEqual(
+                    2,
+                    WProtoGeneric<Unserviceable>.MeasureField(1, new Unserviceable { Value = 7 })
+                );
+                Assert.AreEqual(1, serving.MeasureCount);
+                Assert.AreEqual(0, declining.MeasureCount);
+
+                WProtoFormatterProvider.Register<Unserviceable>(declining);
+                Assert.IsFalse(WProtoGeneric<Unserviceable>.CanEncode);
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(originalFormatter);
+            }
+        }
+
+        /// <summary>Scalar registrations invalidate the same closed generic cache.</summary>
+        [Test]
+        public void ScalarRegisterAfterGenericResolutionReplacesTheCachedFormatter()
+        {
+            WProtoScalarFormatterProvider.TryGet(
+                out IWProtoScalarFormatter<Unserviceable> originalFormatter
+            );
+            try
+            {
+                CountingUnserviceableScalarFormatter first =
+                    new CountingUnserviceableScalarFormatter();
+                CountingUnserviceableScalarFormatter second =
+                    new CountingUnserviceableScalarFormatter();
+
+                WProtoScalarFormatterProvider.Register<Unserviceable>(null);
+                Assert.IsFalse(WProtoGeneric<Unserviceable>.CanEncode);
+
+                WProtoScalarFormatterProvider.Register(first);
+                Assert.IsTrue(WProtoGeneric<Unserviceable>.CanEncode);
+                WProtoGeneric<Unserviceable>.MeasureField(1, new Unserviceable { Value = 7 });
+                Assert.AreEqual(1, first.MeasureCount);
+
+                WProtoScalarFormatterProvider.Register(second);
+                WProtoGeneric<Unserviceable>.MeasureField(1, new Unserviceable { Value = 8 });
+                Assert.AreEqual(1, first.MeasureCount);
+                Assert.AreEqual(1, second.MeasureCount);
+            }
+            finally
+            {
+                WProtoScalarFormatterProvider.Register(originalFormatter);
+            }
         }
 
         /// <summary>
@@ -715,8 +828,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(source);
             Diagnostic match = diagnostics.FirstOrDefault(diagnostic => diagnostic.Id == id);
 
-            Assert.IsNotNull(
-                match,
+            Assert.IsTrue(
+                match != null,
                 "expected "
                     + id
                     + ", saw: "
@@ -822,6 +935,73 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
 
             return diagnostics;
+        }
+
+        private sealed class ConditionalUnserviceableFormatter
+            : IWProtoFormatter<Unserviceable>,
+                IWProtoConditionalFormatter
+        {
+            private readonly bool _canServe;
+
+            internal int MeasureCount { get; private set; }
+
+            internal ConditionalUnserviceableFormatter(bool canServe)
+            {
+                _canServe = canServe;
+            }
+
+            public bool CanServe()
+            {
+                return _canServe;
+            }
+
+            public int Measure(in Unserviceable value)
+            {
+                MeasureCount++;
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in Unserviceable value)
+            {
+                return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out Unserviceable value)
+            {
+                value = default;
+                return true;
+            }
+        }
+
+        private sealed class CountingUnserviceableScalarFormatter
+            : IWProtoScalarFormatter<Unserviceable>
+        {
+            public int WireType => WProtoWireType.Varint;
+
+            internal int MeasureCount { get; private set; }
+
+            public bool IsDefault(in Unserviceable value)
+            {
+                return false;
+            }
+
+            public int MeasureValue(in Unserviceable value)
+            {
+                MeasureCount++;
+                return WProtoSizes.Int32Size(value.Value);
+            }
+
+            public bool WriteValue(ref WProtoWriter writer, in Unserviceable value)
+            {
+                return writer.TryWriteInt32(value.Value);
+            }
+
+            public bool TryReadValue(ref WProtoReader reader, out Unserviceable value)
+            {
+                bool read = reader.TryReadInt32(out int raw);
+                value = new Unserviceable { Value = raw };
+                return read;
+            }
         }
     }
 }

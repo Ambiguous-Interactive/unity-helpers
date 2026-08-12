@@ -47,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {
             Cache<T>.Formatter = formatter;
+            WProtoGeneric<T>.Reset();
         }
 
         /// <summary>

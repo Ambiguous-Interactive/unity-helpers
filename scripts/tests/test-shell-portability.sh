@@ -318,6 +318,20 @@ if bash "$unity_export_package" --stage-only --project-dir "$stage_project" >"$s
         fail "Unity package export stage is missing package roots" \
             "Missing entries: ${missing_stage_entries[*]}"
     fi
+
+    echo ""
+    echo "--- B6: Unity package source layout enables WallstopProto by default ---"
+
+    run_test
+    staged_runtime_asmdef="$staged_root/Runtime/WallstopStudios.UnityHelpers.asmdef"
+    if staged_default_define="$(jq -er \
+        '.versionDefines | any(.name == "Unity" and .expression == "2021.3" and .define == "WALLSTOP_PROTO")' \
+        "$staged_runtime_asmdef")" && [[ "$staged_default_define" == "true" ]]; then
+        pass "Unity package source layout enables WALLSTOP_PROTO for every supported Unity version"
+    else
+        fail "Unity package source layout leaves WALLSTOP_PROTO disabled" \
+            "Expected a Unity 2021.3 WALLSTOP_PROTO version define in ${staged_runtime_asmdef}"
+    fi
 else
     stage_tail="$(tail -n 40 "$stage_log" 2>/dev/null || true)"
     fail "Unity package export stage-only command failed" "$stage_tail"
@@ -326,7 +340,7 @@ rm -rf "$stage_project"
 rm -f "$stage_log"
 
 echo ""
-echo "--- B6: Unity package export rejects incomplete package metadata ---"
+echo "--- B7: Unity package export rejects incomplete package metadata ---"
 
 run_test
 metadata_fixture="$(mktemp -d)"

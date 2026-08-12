@@ -141,7 +141,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         );
                     }
 
+                    if (!contract.HasMigrationSuppression)
+                    {
+                        failures.Add(
+                            contract.Where
+                                + $"'{contract.Name}' is intentionally not mirrored but does not "
+                                + "suppress WPROTO030 at its [ProtoContract]."
+                        );
+                    }
+
                     continue;
+                }
+
+                if (contract.HasMigrationSuppression)
+                {
+                    failures.Add(
+                        contract.Where
+                            + $"'{contract.Name}' is mirrored but still suppresses WPROTO030."
+                    );
                 }
 
                 if (!contract.HasWProtoContract)
@@ -368,6 +385,68 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             Assert.That(failures, Has.Exactly(1).Contains("'Departed' is listed as not mirrored"));
+        }
+
+        [Test]
+        public void ANotMirroredContractWithoutAMigrationSuppressionIsReported()
+        {
+            IReadOnlyList<string> failures = Mismatches(
+                Parse("[ProtoContract] partial class Legacy { }"),
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["Legacy"] = "because" }
+            );
+
+            Assert.That(failures, Has.Exactly(1).Contains("does not suppress WPROTO030"));
+        }
+
+        [Test]
+        public void AMirroredContractWithAStaleMigrationSuppressionIsReported()
+        {
+            IReadOnlyList<string> failures = Mismatches(
+                Parse(
+                    @"#pragma warning disable WPROTO030
+                      [ProtoContract]
+                      #pragma warning restore WPROTO030
+                      [WProtoContract]
+                      partial class Ported { }"
+                ),
+                new Dictionary<string, string>(StringComparer.Ordinal)
+            );
+
+            Assert.That(failures, Has.Exactly(1).Contains("still suppresses WPROTO030"));
+        }
+
+        [Test]
+        public void APragmaInsideTheTypeDoesNotSuppressItsProtoContract()
+        {
+            IReadOnlyList<string> failures = Mismatches(
+                Parse(
+                    @"[ProtoContract]
+                      partial class Legacy
+                      {
+                          #pragma warning disable WPROTO030
+                          int Value;
+                          #pragma warning restore WPROTO030
+                      }"
+                ),
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["Legacy"] = "because" }
+            );
+
+            Assert.That(failures, Has.Exactly(1).Contains("does not suppress WPROTO030"));
+        }
+
+        [Test]
+        public void ACommentedPragmaDoesNotSuppressTheMigrationDiagnostic()
+        {
+            IReadOnlyList<string> failures = Mismatches(
+                Parse(
+                    @"// #pragma warning disable WPROTO030
+                      [ProtoContract]
+                      partial class Legacy { }"
+                ),
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["Legacy"] = "because" }
+            );
+
+            Assert.That(failures, Has.Exactly(1).Contains("does not suppress WPROTO030"));
         }
 
         /// <summary>
@@ -655,6 +734,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             internal bool HasWProtoContract { get; private set; }
 
+            internal bool HasMigrationSuppression { get; private set; }
+
             internal IReadOnlyDictionary<string, string> ProtoContractArguments
             {
                 get;
@@ -698,12 +779,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Where = Location(file, type),
                     HasProtoContract = proto != null,
                     HasWProtoContract = wproto != null,
+                    HasMigrationSuppression = IsMigrationSuppressed(type, proto),
                     ProtoContractArguments = NamedArguments(proto),
                     WProtoContractArguments = NamedArguments(wproto),
                     ProtoIncludes = Includes(attributes, "ProtoInclude"),
                     WProtoIncludes = Includes(attributes, "WProtoInclude"),
                     Members = MemberDeclaration.From(file, type),
                 };
+            }
+
+            private static bool IsMigrationSuppressed(
+                TypeDeclarationSyntax type,
+                AttributeSyntax proto
+            )
+            {
+                if (proto == null)
+                {
+                    return false;
+                }
+
+                bool suppressed = false;
+                foreach (
+                    PragmaWarningDirectiveTriviaSyntax directive in type
+                        .SyntaxTree.GetRoot()
+                        .DescendantTrivia(descendIntoTrivia: true)
+                        .Where(trivia => trivia.SpanStart < proto.SpanStart)
+                        .Select(trivia => trivia.GetStructure())
+                        .OfType<PragmaWarningDirectiveTriviaSyntax>()
+                        .Where(directive => directive.IsActive)
+                        .OrderBy(directive => directive.SpanStart)
+                )
+                {
+                    if (
+                        0 < directive.ErrorCodes.Count
+                        && !directive.ErrorCodes.Any(code => code.ToString() == "WPROTO030")
+                    )
+                    {
+                        continue;
+                    }
+
+                    suppressed = directive.DisableOrRestoreKeyword.IsKind(
+                        SyntaxKind.DisableKeyword
+                    );
+                }
+
+                return suppressed;
             }
 
             private static IReadOnlyCollection<string> Includes(

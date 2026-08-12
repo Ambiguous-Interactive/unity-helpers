@@ -81,7 +81,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served through the set root wrappers.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public abstract class SerializableSetBase<T, TSet>
         : ISet<T>,
             IReadOnlyCollection<T>,

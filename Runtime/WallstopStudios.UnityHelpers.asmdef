@@ -14,6 +14,11 @@
       "name": "odininspector",
       "expression": "0.0.1",
       "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
+    },
+    {
+      "name": "Unity",
+      "expression": "2021.3",
+      "define": "WALLSTOP_PROTO"
     }
   ],
   "noEngineReferences": false

@@ -14,7 +14,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
     [Serializable]
     [DataContract]
+#pragma warning disable WPROTO030 // Served by RandomStateWProtoFormatter.
     [ProtoContract]
+#pragma warning restore WPROTO030
     public readonly partial struct RandomState : IEquatable<RandomState>
     {
         [JsonInclude]

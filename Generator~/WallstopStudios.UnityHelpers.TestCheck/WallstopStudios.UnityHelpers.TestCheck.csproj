@@ -33,6 +33,7 @@
     <AssemblyName>WallstopStudios.UnityHelpers</AssemblyName>
     <RootNamespace>WallstopStudios.UnityHelpers</RootNamespace>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Unity defines this in every test assembly, and the package gates test-only internals on it
          (SingletonAutoLoader.ExecuteEntriesForTests, Helpers.LayerNameProvider, the concave-hull

@@ -547,55 +547,35 @@ Unity automatically defines `UNITY_WEBGL` for WebGL builds. To enable SINGLE_THR
 
 **Performance impact:** 10-20% faster hot path operations on single-threaded platforms by avoiding unnecessary synchronization overhead.
 
-### IL2CPP and Code Stripping Considerations
+### IL2CPP and AOT Serialization
 
-⚠️ **Important for IL2CPP builds (WebGL, Mobile, Consoles):**
+Unity Helpers enables WallstopProto for its runtime assembly by default in Package Manager,
+`.unitypackage`, and source installs. Types annotated with `[WProtoContract]` and matching
+`[WProtoMember]` field numbers use generated, reflection-free code; types it cannot serve fall back
+to protobuf-net for compatibility.
 
-Some features in Unity Helpers use reflection internally (particularly **Protobuf serialization** and **ReflectionHelpers**). IL2CPP's managed code stripping may remove types/members that are only accessed via reflection, causing runtime errors.
+For every consumer `[ProtoContract]`, add `[WProtoContract]` beside it and a `[WProtoMember(n)]`
+beside each `[ProtoMember(n)]`, preserving field numbers. `WPROTO030` identifies contracts that still
+lack a generated formatter. In Unity, promote it from Info to Warning in `Assets/Default.ruleset` to
+turn the remaining work into a Console-visible migration list. Suppress it only when the type is
+deliberately served through a surrogate, root marshal, or hand-written formatter.
 
-**Symptoms of stripping issues:**
-
-- `NullReferenceException` or `TypeLoadException` during deserialization
-- Missing fields after Protobuf deserialization
-- Reflection helpers failing to find types at runtime
-
-#### Solution: Use link.xml to preserve required types
-
-Create a `link.xml` file in your `Assets` folder to prevent stripping:
-
-```xml
-<linker>
-  <!-- Preserve your serialized types -->
-  <assembly fullname="Assembly-CSharp">
-    <type fullname="MyNamespace.PlayerSave" preserve="all"/>
-    <type fullname="MyNamespace.InventoryData" preserve="all"/>
-    <!-- Add all Protobuf-serialized types here -->
-  </assembly>
-
-  <!-- Preserve Unity Helpers if needed -->
-  <assembly fullname="WallstopStudios.UnityHelpers.Runtime" preserve="all"/>
-</linker>
-```
+`link.xml` can preserve reflection targets, but it does not make protobuf-net's runtime model or
+closed generic reflection AOT-safe. Treat every protobuf-net fallback as needing explicit IL2CPP
+testing rather than assuming preservation solves it.
 
 **Best practices:**
 
-- ✅ **Always test IL2CPP builds** - Development builds don't use stripping, so bugs only appear in release builds
-- ✅ **Test on target platform** - WebGL stripping behaves differently than iOS/Android
-- ✅ **Use link.xml for all Protobuf types** - Any type with `[ProtoContract]` should be preserved
-- ✅ **Verify after every schema change** - Adding new serialized types requires updating link.xml
-- ✅ **Check logs for stripping warnings** - Unity logs which types are stripped during build
-
-**When you don't need link.xml:**
-
-- JSON serialization (uses source-generated converters, not reflection)
-- Spatial trees and data structures (no reflection used)
-- Most helper methods (compiled ahead-of-time)
+- ✅ **Port every protobuf contract** or document and suppress its alternative formatter
+- ✅ **Promote `WPROTO030` during migration** so new fallback types cannot arrive silently
+- ✅ **Run target-platform IL2CPP tests** after schema or formatter changes
+- ✅ **Keep field numbers identical** between protobuf-net and WallstopProto annotations
 
 **Related documentation:**
 
 - [Unity Manual: Managed Code Stripping](https://docs.unity3d.com/Manual/managed-code-stripping.html)
 - [protobuf-net documentation](https://protobuf-net.github.io/protobuf-net/)
-- [Serialization Guide: IL2CPP Warning](./features/serialization/serialization.md#il2cpp-and-code-stripping-warning)
+- [Serialization Guide: WallstopProto](./features/serialization/serialization.md#wallstopproto-the-reflection-free-wire-layer-preview)
 - [Reflection Helpers: IL2CPP Warning](./features/utilities/reflection-helpers.md#il2cpp-code-stripping-considerations)
 
 ---

@@ -922,10 +922,10 @@ The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset
 nothing needs registering: a `[WProtoContract]` in your code gets a nested `WProtoFormatter` and an
 entry in a generated registrar that runs at `RuntimeInitializeLoadType.BeforeSceneLoad`.
 
-Supported member types today are the integer and floating-point primitives, `bool`, `string`,
-`byte[]`, enums, another `[WProtoContract]` type, and `Nullable<T>` of any of those. Anything else is
-a **build error naming the type, the member and the remedy**, never a silent skip — a contract that
-quietly got no formatter would surface as an exception from the first save in a shipped player:
+Supported member types include scalar values, enums, nested contracts, nullable values, collections,
+maps, surrogates, and a generic contract's closed type parameters. An unsupported shape is a **build
+error naming the type, the member and the remedy**, never a silent skip — a contract that quietly got
+no formatter would surface as an exception from the first save in a shipped player:
 
 | Code        | Meaning                                                                              |
 | ----------- | ------------------------------------------------------------------------------------ |
@@ -937,18 +937,46 @@ quietly got no formatter would surface as an exception from the first save in a 
 | `WPROTO006` | Two methods carry the same lifecycle attribute                                       |
 | `WPROTO007` | A member is read-only, so a decoded value cannot be assigned to it                   |
 | `WPROTO008` | A lifecycle hook is static, or takes parameters                                      |
-| `WPROTO009` | The contract is generic (not implemented yet)                                        |
+| `WPROTO009` | A contract is nested inside a generic type and cannot be registered                  |
 | `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
 | `WPROTO011` | A class contract has no parameterless constructor to read into                       |
 
-A generic contract is still out of scope and reports `WPROTO009` rather than guessing.
-
-There is one **warning**, and it reports a skip rather than a refusal. `WPROTO028` fires when a
+`WPROTO028` is a **warning** that reports a skip rather than a refusal. It fires when a
 closed construction found in your source cannot be named by the generated registrar — most often a
 generic contract or a marshalled collection closed over a `private` nested type. Naming one from the
 registrar would be `CS0122` in your own build, so it is skipped instead; the warning is there because
 the skip is otherwise invisible until that type is serialized in a shipped player. Widen the offending
 type to `internal`, or register the formatter yourself from code that can name it.
+
+`WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
+roots and both assemblies, including conflicts that exist entirely between referenced packages.
+Generated registrars run in Unity's unordered startup phase, so leaving the conflict unresolved
+makes assembly load order choose the adapter and wire shape. Remove one declaration. A
+`Serializer.RegisterProtobufRoot` claim fixes protobuf-net's root choice but cannot repair which
+WallstopProto adapter an unordered registrar replaced.
+
+There is also one **informational migration diagnostic**. `WPROTO030` marks a protobuf-net
+`[ProtoContract]` that has no `[WProtoContract]`, because that type has no generated formatter and,
+unless served another way, follows the reflective fallback path that does not work under IL2CPP. It
+is informational so upgrading the package does not break an existing consumer or a
+warnings-as-errors build. In Unity, promote it to a warning in `Assets/Default.ruleset` when you want
+a migration worklist:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RuleSet Name="Project analyzer rules" ToolsVersion="15.0">
+  <Rules AnalyzerId="WallstopStudios.UnityHelpers.Proto.Generator"
+    RuleNamespace="WallstopStudios.UnityHelpers.Proto.Generator">
+    <Rule Id="WPROTO030" Action="Warning" />
+  </Rules>
+</RuleSet>
+```
+
+An IDE or standalone .NET build can set
+`dotnet_diagnostic.WPROTO030.severity = warning` in `.editorconfig` instead. Add `[WProtoContract]`
+and matching `[WProtoMember]` field numbers to port the type. If a contract is deliberately served
+through a surrogate, root marshal, or hand-written formatter, suppress `WPROTO030` around its
+`[ProtoContract]` declaration.
 
 #### Contracts that hold other contracts
 
@@ -1294,7 +1322,10 @@ Two consequences on the read side are worth knowing:
   so a truncated or malformed buffer raises `SerializationCorruptDataException` — which means
   `TryProtoDeserialize` still returns `false` rather than throwing.
 
-The define is off by default while the remaining contracts are ported.
+The runtime assembly enables `WALLSTOP_PROTO` for every supported Unity version, so this hybrid
+dispatch is the default for UPM, `.unitypackage`, and source installs. A type WallstopProto cannot
+serve still follows the existing protobuf-net path; `WPROTO030` identifies protobuf-net contracts
+that have not gained a generated formatter.
 
 ### Root marshals: the collections with two encodings
 
@@ -1324,7 +1355,8 @@ protobuf-net reaches through a surrogate, or an enum — so the collection falls
 exactly as it did before, rather than failing. A **generic contract** declines the same way, for the
 same reason: `SerializableList<Vector2>` is registered for that closure, and `Vector2`'s wire shape
 comes from a surrogate that is substituted while a contract is generated, when a closure's element is
-not yet known. And a `null` root of one of these collections now
+not yet known. That decision propagates through nested closures, so an outer generic contract also
+declines when its inner contract cannot serve its own type argument. And a `null` root of one of these collections now
 encodes to an empty payload and reads back as an empty collection, where the reflection path threw.
 
 Nothing about your own contracts changes. A member typed as one of these collections is written
@@ -1359,7 +1391,8 @@ Declare your own the same way, naming any interface — or any abstract type tha
 into the declaring assembly and reports the pairs that cannot work: a root that is not assignable to
 the declared type (`WPROTO023`), a type named as its own root (`WPROTO024`), a declared type that is
 already a contract (`WPROTO025`), an open generic (`WPROTO026`), two roots for one declared type
-(`WPROTO027`), and a declared type that is neither an interface nor abstract (`WPROTO029`).
+inside one assembly (`WPROTO027`), a declared type that is neither an interface nor abstract
+(`WPROTO029`), and conflicting roots across assemblies (`WPROTO031`).
 
 Like a root marshal, a declared root applies **at the root only** — though for a different reason. A
 marshal hides from the member path because its types have two encodings chosen by position; a
@@ -1389,7 +1422,8 @@ says this program has a different answer, and WallstopProto stops answering for 
 both sides, whichever registration ran first; releasing it restores the declared pair. Declaring a
 **second** `[assembly: WProtoDeclaredRoot]` for a type another package already declares is not the
 way to override one: both registrars run in the same unordered Unity phase, so which wins is the load
-order. Use `RegisterProtobufRoot`, or register from a later phase of your own.
+order. `WPROTO031` reports that conflict even when it exists between two referenced packages. Remove
+one declaration; a runtime claim alone cannot make the generated-adapter registration deterministic.
 
 ### Hostile payloads
 

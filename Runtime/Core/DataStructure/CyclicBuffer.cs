@@ -27,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
+#pragma warning disable WPROTO030 // Served at the root through CyclicBufferProtoWrapper.
     [ProtoContract(IgnoreListHandling = true)]
+#pragma warning restore WPROTO030
     public sealed class CyclicBuffer<T> : IReadOnlyList<T>
     {
         [ProtoIgnore]
