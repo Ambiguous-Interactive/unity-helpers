@@ -563,7 +563,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line(Accumulator + " = new " + PendingType + "();");
             }
-            else if (_overwrite)
+            else if (_overwrite || SkipConstructor)
             {
                 writer.Line(Accumulator + " = new " + _mapQualified + "();");
             }
@@ -591,7 +591,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + target
                         + " = "
                         + (
-                            _overwrite
+                            _overwrite || SkipConstructor
                                 ? "new " + _mapQualified + "()"
                                 : "read." + Name + " ?? new " + _mapQualified + "()"
                         )

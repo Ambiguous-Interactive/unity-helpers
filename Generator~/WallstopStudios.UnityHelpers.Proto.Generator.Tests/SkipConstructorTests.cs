@@ -73,6 +73,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void APresentRepeatedMemberReplacesItsInitializer()
+        {
+            SkippingContract read = Read<SkippingContract>("080710011002");
+
+            CollectionAssert.AreEqual(
+                new[] { 1, 2 },
+                read.Values,
+                "SkipConstructor must match protobuf-net's uninitialized collection seed."
+            );
+        }
+
+        [Test]
         public void WithoutTheFlagTheConstructorsDerivedStateSurvivesTheHook()
         {
             ConstructingContract read = Read<ConstructingContract>("0807");

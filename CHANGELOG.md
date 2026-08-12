@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`SkipConstructor` no longer leaves initialized collection contents ahead of decoded values**: when a repeated or map field is present, its payload now replaces the field initializer just as protobuf-net's uninitialized allocation does. This restores the serialized state of `PhotonSpinRandom` and `StormDropRandom` under the default WallstopProto path.
 - **Nested WallstopProto generic closures no longer throw when an inner formatter declines**: the outer contract now falls back to protobuf-net before writing anything ([#416](https://github.com/Ambiguous-Interactive/unity-helpers/issues/416)).
 - **Late message and scalar formatter registrations now honor last-registration-wins**: replacing a formatter during startup invalidates `WProtoGeneric<T>`'s prior resolution instead of continuing to use the stale formatter.
 - **A value held as its base type never took the WallstopProto path**: with `WALLSTOP_PROTO` defined, `Serializer.ProtoSerialize` served a value only when its runtime type was exactly the declared one. A generator is normally held as `AbstractRandom`, so all seventeen of them still went through protobuf-net — the path that does not work under IL2CPP. A declared subtype is now served, byte-identically; one no `[WProtoInclude]` names still falls back ([#403](https://github.com/Ambiguous-Interactive/unity-helpers/issues/403)).

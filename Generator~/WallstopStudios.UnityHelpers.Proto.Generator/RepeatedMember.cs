@@ -925,7 +925,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             string fresh = "new " + AccumulatorType + "()";
 
-            if (_overwrite)
+            if (_overwrite || SkipConstructor)
             {
                 writer.Line(Accumulator + " = " + fresh + ";");
             }
@@ -1016,7 +1016,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             // A contract built by a constructor has no instance to append onto: the formatter never
             // runs the author's constructor, so there is no seeded collection to preserve.
-            if (_overwrite || ConstructAtEnd)
+            if (_overwrite || ConstructAtEnd || SkipConstructor)
             {
                 return fresh;
             }

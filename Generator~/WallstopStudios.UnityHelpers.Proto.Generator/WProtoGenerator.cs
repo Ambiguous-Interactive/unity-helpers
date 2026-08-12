@@ -464,6 +464,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 && !constructAtEnd
                 && DeclaresAConstructor(contract);
 
+            foreach (Member member in members)
+            {
+                member.SkipConstructor = skipConstructor;
+            }
+
             // Not asked of a contract that builds itself. The diagnostic exists because the formatter
             // normally calls `new T()` to have something to read into; a contract with a member that
             // cannot be assigned after construction never takes that path, holding every value in a

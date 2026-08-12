@@ -75,6 +75,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         internal bool ConstructAtEnd { get; set; }
 
+        /// <summary>
+        /// Whether the generated read constructor is standing in for protobuf-net's uninitialized
+        /// allocation because the contract declares <c>SkipConstructor</c>.
+        /// </summary>
+        /// <remarks>
+        /// The generated constructor necessarily runs field initializers. A present repeated or map
+        /// member must nevertheless replace an initialized collection rather than append to it,
+        /// because protobuf-net's uninitialized instance has no constructor seed to preserve.
+        /// Members that are absent from the payload still retain the initializer, which is the
+        /// documented, safer difference of this AOT implementation.
+        /// </remarks>
+        internal bool SkipConstructor { get; set; }
+
         /// <summary>The member access on the value being written.</summary>
         protected string Access => "value." + Name;
 
