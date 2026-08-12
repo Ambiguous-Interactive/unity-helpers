@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (0 < Arity(pair.Declared) || 0 < Arity(pair.Root))
+                if (Open(pair.Declared) || Open(pair.Root))
                 {
                     report(
                         Diagnostic.Create(
@@ -170,8 +170,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     pair.Declared == null
                     || pair.Root == null
                     || !seen.Add(pair.Declared)
-                    || 0 < Arity(pair.Declared)
-                    || 0 < Arity(pair.Root)
+                    || Open(pair.Declared)
+                    || Open(pair.Root)
                     || SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
                     || IsContract(pair.Declared)
                     || Instantiable(pair.Declared)
@@ -287,9 +287,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return declared.TypeKind != TypeKind.Interface && !declared.IsAbstract;
         }
 
-        private static int Arity(ITypeSymbol type)
+        /// <summary>
+        /// Reports whether <paramref name="type"/> is a construction with nothing to register.
+        /// </summary>
+        /// <param name="type">The declared or root type.</param>
+        /// <returns><c>true</c> when it is unbound or still holds a type parameter.</returns>
+        /// <remarks>
+        /// Arity is the wrong question and asking it was a bug: <c>IThing&lt;int&gt;</c> has arity
+        /// one exactly as <c>IThing&lt;&gt;</c> does, so the check rejected the closed pair
+        /// <c>WPROTO026</c>'s own message offers as the remedy. Only an unbound construction --
+        /// <c>typeof(IThing&lt;&gt;)</c>, the only open form an attribute argument can spell -- has
+        /// nothing to register.
+        /// </remarks>
+        private static bool Open(ITypeSymbol type)
         {
-            return type is INamedTypeSymbol named ? named.Arity : 0;
+            return TypeNaming.IsOpen(type)
+                || (type is INamedTypeSymbol named && named.IsUnboundGenericType);
         }
 
         private static bool IsContract(ITypeSymbol type)

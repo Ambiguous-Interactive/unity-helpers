@@ -793,6 +793,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A CLOSED generic pair is the shape WPROTO026's own message tells consumers to write.
+        /// </summary>
+        /// <remarks>
+        /// The check was `0 &lt; Arity`, and arity is the number of type parameters -- one for
+        /// `IThing&lt;int&gt;` just as much as for `IThing&lt;&gt;`. So the diagnostic rejected the
+        /// only form it offers as the remedy.
+        /// </remarks>
+        [Test]
+        public void AClosedGenericDeclaredRootIsAccepted()
+        {
+            const string source =
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing<int>), typeof(Consumer.Thing<int>))]
+                  public interface IThing<T> { }
+                  [WProtoContract] public partial class Thing<T> : IThing<T> { [WProtoMember(1)] public int A; }";
+
+            Assert.IsEmpty(
+                Run(source)
+                    .Where(d => d.Id.StartsWith("WPROTO0", StringComparison.Ordinal))
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
+        }
+
         [Test]
         public void ADeclaredRootWithNoTypesAtAllIsReported()
         {
