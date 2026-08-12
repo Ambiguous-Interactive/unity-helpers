@@ -917,7 +917,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + qualified
                     + ">, "
                     + Proto
-                    + ".IWProtoPolymorphicFormatter"
+                    + ".IWProtoPolymorphicFormatter, "
+                    + Proto
+                    + ".IWProtoConditionalFormatter"
                     + Writer.Open
             );
             writer.Indent();
@@ -927,6 +929,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 "public static readonly WProtoRootFormatter Instance = new WProtoRootFormatter();"
             );
+            writer.Blank();
+
+            // Asked of the ENTRY POINT, answered by the chain root, because the root is what writes
+            // every byte -- including a generic member of ITS OWN whose closure has no formatter.
+            // Deriving the condition here instead would have to re-derive the whole chain's encoded
+            // type parameters, and would drift the first time the chain changed.
+            writer.Line("/// <inheritdoc />");
+            writer.Line("public bool CanServe()" + Writer.Open);
+            writer.Indent();
+            // Through `object`: the root's formatter is a SEALED type, so a direct pattern match
+            // against an interface it does not implement is CS8121 rather than a false answer.
+            writer.Line(
+                "return !((object)"
+                    + rootQualified
+                    + ".WProtoFormatter.Instance is "
+                    + Proto
+                    + ".IWProtoConditionalFormatter conditional) || conditional.CanServe();"
+            );
+            writer.Outdent();
+            writer.Line("}");
             writer.Blank();
             writer.Line("/// <inheritdoc />");
             writer.Line("public bool CanWrite(System.Type runtimeType)" + Writer.Open);
