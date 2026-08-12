@@ -36,14 +36,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(1)]
         public int Seed;
 
-        /// <summary>
-        /// A repeated field whose initializer must not be treated as protobuf payload state when
-        /// the field is present.
-        /// </summary>
-        [ProtoMember(2)]
-        [WProtoMember(2)]
-        public int[] Values = { 99 };
-
         /// <summary>Proves a field initializer ran.</summary>
         public string FromInitializer = "initialized";
 
@@ -73,6 +65,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Derived = "rebuilt-from-" + Seed;
         }
+    }
+
+    /// <summary>
+    /// A skipped-constructor contract whose repeated initializer must not become payload state.
+    /// </summary>
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class SkippingCollectionContract
+    {
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public int[] Values = { 99 };
+
+        public SkippingCollectionContract() { }
     }
 
     /// <summary>

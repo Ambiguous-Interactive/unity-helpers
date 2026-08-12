@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APresentRepeatedMemberReplacesItsInitializer()
         {
-            SkippingContract read = Read<SkippingContract>("080710011002");
+            SkippingCollectionContract read = Read<SkippingCollectionContract>("08010802");
 
             CollectionAssert.AreEqual(
                 new[] { 1, 2 },
