@@ -660,6 +660,65 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsEmpty(CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()));
         }
 
+        /// <summary>
+        /// A closure the registrar cannot name is skipped, and now says so.
+        /// </summary>
+        /// <remarks>
+        /// Skipping is right -- naming a private nested type from the registrar is <c>CS0122</c> in
+        /// the build of the assembly that declared it, which is worse than a missing registration.
+        /// But until now it was invisible: the type simply threw on its first serialization, in a
+        /// shipped player, naming nothing that would lead back here.
+        /// </remarks>
+        [Test]
+        public void AClosureTheRegistrarCannotNameIsAnnounced()
+        {
+            const string source =
+                @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
+                  public sealed class Holder
+                  {
+                      private sealed class Hidden { }
+                      private Box<Hidden> _box = new Box<Hidden>();
+                  }";
+
+            ImmutableArray<Diagnostic> diagnostics = Run(source);
+            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
+
+            Assert.IsNotNull(
+                match,
+                "saw: " + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
+            Assert.IsTrue(
+                match.GetMessage().Contains("Hidden"),
+                "the message must name the part that cannot be written: " + match.GetMessage()
+            );
+            Assert.IsEmpty(
+                CompileGenerated(source).Select(d => d.Id + " " + d.GetMessage()),
+                "the point of skipping is that the consumer's build still succeeds"
+            );
+        }
+
+        /// <summary>
+        /// A generic contract's own declaration is unnameable too, and must stay silent.
+        /// </summary>
+        /// <remarks>
+        /// <c>Box&lt;T&gt;</c> has no name a registrar can write either, for the same reason a
+        /// private type does not. Warning about it would fire on every generic contract in the
+        /// source that declares it, which is noise nobody can act on.
+        /// </remarks>
+        [Test]
+        public void AnOpenConstructionIsNotAnnounced()
+        {
+            Assert.IsEmpty(
+                Run(
+                        @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
+                          public sealed class Holder<T> { private Box<T> _box; }"
+                    )
+                    .Where(d => d.Id == "WPROTO028")
+                    .Select(d => d.GetMessage())
+            );
+        }
+
         private static IEnumerable<TestCaseData> BadDeclaredRoots()
         {
             yield return new TestCaseData(

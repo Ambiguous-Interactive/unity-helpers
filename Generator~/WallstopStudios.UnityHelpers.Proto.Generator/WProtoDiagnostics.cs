@@ -266,6 +266,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        /// <summary>
+        /// The one warning here, and the only diagnostic that reports a SKIP rather than a refusal.
+        /// </summary>
+        /// <remarks>
+        /// Skipping is the right behaviour: naming a consumer's private nested type from the
+        /// registrar is <c>CS0122</c> in their own build, which is worse than the missing
+        /// registration. But the skip is otherwise invisible until the type is serialized in a
+        /// shipped player, so it is announced. A warning rather than an error because the developer
+        /// may never serialize that closure, and failing their build over a type they declared
+        /// privately would be the very outcome the skip exists to avoid.
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor UnnameableClosure = new DiagnosticDescriptor(
+            "WPROTO028",
+            "WallstopProto cannot register a closed construction it cannot name",
+            "'{0}' is a closed construction WallstopProto would register a formatter for, but the generated registrar cannot write its name: '{1}' is not accessible from outside the type that declares it. It is skipped, so serializing one throws at run time rather than failing this build. Make '{1}' internal or public, or register the formatter yourself from code that can name it.",
+            "WallstopProto",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

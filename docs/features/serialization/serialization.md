@@ -943,6 +943,13 @@ quietly got no formatter would surface as an exception from the first save in a 
 
 A generic contract is still out of scope and reports `WPROTO009` rather than guessing.
 
+There is one **warning**, and it reports a skip rather than a refusal. `WPROTO028` fires when a
+closed construction found in your source cannot be named by the generated registrar — most often a
+generic contract or a marshalled collection closed over a `private` nested type. Naming one from the
+registrar would be `CS0122` in your own build, so it is skipped instead; the warning is there because
+the skip is otherwise invisible until that type is serialized in a shipped player. Widen the offending
+type to `internal`, or register the formatter yourself from code that can name it.
+
 #### Contracts that hold other contracts
 
 A `[WProtoMember]` whose type is another contract is written as a nested message, and a contract may

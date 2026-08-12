@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
@@ -98,6 +99,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
 
+            // Shared across every scan below: a closure the registrar cannot name is one missing
+            // registration however many scans trip over it.
+            HashSet<string> announced = new HashSet<string>();
+
             List<string> registrations = new List<string>();
             foreach (INamedTypeSymbol contract in contracts)
             {
@@ -119,17 +124,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         RootContract(contract) == null
                             ? ".WProtoFormatter.Instance"
                             : ".WProtoRootFormatter.Instance";
-                    foreach (string closed in ClosedConstructions(context.Compilation, contract))
+                    foreach (
+                        string closed in ClosedConstructions(
+                            context.Compilation,
+                            contract,
+                            context.ReportDiagnostic,
+                            announced
+                        )
+                    )
                     {
                         registrations.Add(closed + entryPoint);
                     }
                 }
             }
 
-            registrations.AddRange(ForeignClosures(context.Compilation));
+            registrations.AddRange(
+                ForeignClosures(context.Compilation, context.ReportDiagnostic, announced)
+            );
 
             List<string> rootMarshals = new List<string>(
-                marshals.Registrations(context.Compilation)
+                marshals.Registrations(context.Compilation, context.ReportDiagnostic, announced)
             );
 
             List<string> declaredRoots = new List<string>(
@@ -177,7 +191,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// registration it is replacing.
         /// </para>
         /// </remarks>
-        private static IEnumerable<string> ForeignClosures(Compilation compilation)
+        private static IEnumerable<string> ForeignClosures(
+            Compilation compilation,
+            Action<Diagnostic> report,
+            HashSet<string> announced
+        )
         {
             HashSet<string> found = new HashSet<string>();
             List<string> registrations = new List<string>();
@@ -216,7 +234,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     }
 
                     string entryPoint = FormatterNameFor(definition);
-                    if (entryPoint == null || !TypeNaming.IsNameable(named, compilation))
+                    if (
+                        entryPoint == null
+                        || TypeNaming.ReportIfUnnameable(
+                            named,
+                            compilation,
+                            type.GetLocation(),
+                            report,
+                            announced
+                        )
+                    )
                     {
                         continue;
                     }
@@ -1589,7 +1616,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> ClosedConstructions(
             Compilation compilation,
-            INamedTypeSymbol contract
+            INamedTypeSymbol contract,
+            Action<Diagnostic> report,
+            HashSet<string> announced
         )
         {
             HashSet<string> found = new HashSet<string>();
@@ -1631,7 +1660,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     // Nameability is the second half of the same question. `Box<int>` is fine;
                     // `Box<SomeFixture.PrivatePayload>` is a name the registrar cannot write, and
                     // emitting it fails the build of the assembly that declared the private type.
-                    if (!IsOpen(named) && TypeNaming.IsNameable(named, compilation))
+                    if (
+                        !TypeNaming.ReportIfUnnameable(
+                            named,
+                            compilation,
+                            type.GetLocation(),
+                            report,
+                            announced
+                        )
+                    )
                     {
                         found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                     }
@@ -1668,34 +1705,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns><c>true</c> when the type cannot be named as a closed construction.</returns>
         private static bool IsOpen(ITypeSymbol type)
         {
-            switch (type)
-            {
-                case ITypeParameterSymbol _:
-                    return true;
-                case IArrayTypeSymbol array:
-                    return IsOpen(array.ElementType);
-                case IPointerTypeSymbol pointer:
-                    return IsOpen(pointer.PointedAtType);
-                case INamedTypeSymbol named:
-                    // The containing type matters as much as the arguments: `Outer<T>.Inner<int>` has
-                    // only closed arguments of its own and still cannot be named.
-                    if (named.ContainingType != null && IsOpen(named.ContainingType))
-                    {
-                        return true;
-                    }
-
-                    foreach (ITypeSymbol argument in named.TypeArguments)
-                    {
-                        if (IsOpen(argument))
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                default:
-                    return false;
-            }
+            // Beside IsNameable rather than duplicated here: the two answer halves of one question
+            // -- can the registrar write this name -- and the marshal and declared-root maps ask
+            // both as well.
+            return TypeNaming.IsOpen(type);
         }
 
         private static List<Include> CollectIncludes(

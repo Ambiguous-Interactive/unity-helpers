@@ -346,8 +346,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.That(finalRoundTrip["extra"].Name, Is.EqualTo("Extra"));
         }
 
+        // Internal rather than private so the generated registrar can name
+        // SerializableDictionary.Cache<SerializablePayload>. A private nested type is skipped with
+        // WPROTO028 and would throw on its first WallstopProto serialization.
         [ProtoContract]
-        private sealed class SerializablePayload
+        internal sealed class SerializablePayload
         {
             [ProtoMember(1)]
             public int Id { get; set; }
