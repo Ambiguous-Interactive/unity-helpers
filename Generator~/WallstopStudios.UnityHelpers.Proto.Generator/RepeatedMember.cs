@@ -341,6 +341,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private string AccumulatorType =>
             _form.AccumulatorType(_elementQualified, _collectionQualified);
 
+        /// <summary>
+        /// The statement that sizes what this read fills for a whole packed run at once, or
+        /// <c>null</c> when the form has no way to be sized.
+        /// </summary>
+        /// <param name="packed">The reader scoped to the run.</param>
+        /// <param name="wireType">The expression naming one element's wire type.</param>
+        /// <remarks>
+        /// Only the packed spelling gets this. An unpacked run is a sequence of separate fields that
+        /// may be interleaved with other members, so its length is not knowable until it ends --
+        /// which is exactly the case that has to keep growing, and does.
+        /// </remarks>
+        private string ReserveFor(string packed, string wireType)
+        {
+            string count = packed + ".CountPackedElements(" + wireType + ")";
+            return DeferSeeding
+                ? CollectionForm.ReservePendingStatement(Pending, count)
+                : _form.ReserveStatement(Accumulator, count);
+        }
+
         /// <summary>The statement that appends one decoded element to <paramref name="target"/>.</summary>
         private string AddTo(string target, string value)
         {
@@ -641,6 +660,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return open;
         }
 
+        private static void EmitReserve(Writer writer, string statement)
+        {
+            if (statement == null)
+            {
+                return;
+            }
+
+            writer.Line(statement);
+            writer.Blank();
+        }
+
         private static void CloseAll(Writer writer, int count)
         {
             for (int closed = 0; closed < count; closed++)
@@ -741,6 +771,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 EmitReadFailure(writer, qualifiedContract);
                 Close(writer);
                 writer.Blank();
+                EmitReserve(writer, ReserveFor(genericPacked, Generic + ".WireType"));
                 writer.Line("while (!" + genericPacked + ".End)" + Writer.Open);
                 writer.Indent();
                 writer.Line(
@@ -813,6 +844,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
+            EmitReserve(writer, ReserveFor(packed, _shape.WireType));
             writer.Line("while (!" + packed + ".End)" + Writer.Open);
             writer.Indent();
             writer.Line(

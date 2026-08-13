@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
+    using System.Text;
     using NUnit.Framework;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -18,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const int WarmupIterations = 100;
         private const int MeasuredIterations = 10_000;
         private const int MeasurementRounds = 5;
+        private const int ShapeIterations = 2_000;
 
         [Test]
         public void RepresentativeContractAllocationAndThroughputBaseline()
@@ -104,11 +106,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 protobufNetSerialize.AllocatedBytes,
                 "WallstopProto should not regress to protobuf-net's per-call write allocation."
             );
+            // The oracle rather than a constant, because both implementations return the same object
+            // graph from the same contract: whatever protobuf-net allocates is the graph, and
+            // anything above it is overhead this package chose. A hand-written ceiling would also
+            // have to be re-tuned whenever a runtime changes what a Dictionary costs.
             Assert.LessOrEqual(
                 wallstopProtoDeserialize.BytesPerOperation,
-                5_272d,
-                "The read baseline includes the returned strings, array, dictionary, and nested object; "
-                    + "lower the ceiling when those allocations are reduced."
+                protobufNetDeserialize.BytesPerOperation,
+                "Deserializing the representative contract must not allocate more than protobuf-net "
+                    + "does for the same object graph."
             );
 #if !PROTOBUF_NET_ORACLE_V2
             Assert.LessOrEqual(
@@ -122,6 +128,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Warm WallstopProto deserialization must be at least as fast as protobuf-net v3."
             );
 #endif
+        }
+
+        /// <summary>
+        /// Attributes read allocation to the member shape that causes it, against the oracle
+        /// decoding the same graph.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The aggregate above says WallstopProto reads allocate more than protobuf-net without
+        /// saying which member is responsible, and "reduce read allocation" cannot be gated on a
+        /// number that mixes five shapes together. Each contract here holds exactly one member, so
+        /// the object graph both serializers must produce is identical and the difference between
+        /// them is the serializer's own overhead rather than the payload's.
+        /// </para>
+        /// <para>
+        /// The bar is the oracle, not a hand-written constant: a decoded value both implementations
+        /// have to materialize is not overhead, so allocating more than protobuf-net does for the
+        /// same result is the definition of a read this package pays for and could stop paying for.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void NoMemberShapeReadsAllocateMoreThanProtobufNet()
+        {
+            ShapeCase[] cases =
+            {
+                new ShapeCase<ArrayShape>("int[128]", ArrayShape.Representative()),
+                new ShapeCase<ListShape>("List<int>[128]", ListShape.Representative()),
+                new ShapeCase<StringShape>("string", StringShape.Representative()),
+                new ShapeCase<MapShape>("Dictionary<string, int>[32]", MapShape.Representative()),
+                new ShapeCase<NestedShape>("nested contract", NestedShape.Representative()),
+            };
+
+            StringBuilder report = new StringBuilder("Read allocation by member shape, ");
+            report
+                .Append(ShapeIterations.ToString("N0"))
+                .AppendLine(" operations each:")
+                .AppendLine("  shape                        WallstopProto    protobuf-net");
+            List<string> regressions = new List<string>();
+            foreach (ShapeCase shape in cases)
+            {
+                ShapeComparison comparison = shape.Measure();
+                report.AppendLine(
+                    $"  {shape.Name, -28}{comparison.WallstopProtoBytesPerOperation, 10:N2} B/op{comparison.ProtobufNetBytesPerOperation, 12:N2} B/op"
+                );
+                if (
+                    comparison.ProtobufNetBytesPerOperation
+                    < comparison.WallstopProtoBytesPerOperation
+                )
+                {
+                    regressions.Add(
+                        $"{shape.Name}: {comparison.WallstopProtoBytesPerOperation:N2} B/op against the oracle's {comparison.ProtobufNetBytesPerOperation:N2} B/op"
+                    );
+                }
+            }
+
+            TestContext.WriteLine(report.ToString());
+            Assert.IsEmpty(
+                regressions,
+                "Decoding one member into the same object graph allocated more than protobuf-net: "
+                    + string.Join("; ", regressions)
+            );
         }
 
         private static Measurement Summarize(Measurement[] measurements)
@@ -266,6 +333,198 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             public double BytesPerOperation { get; }
 
             public double NanosecondsPerOperation { get; }
+        }
+
+        /// <summary>One member shape, measured on both serializers.</summary>
+        /// <remarks>
+        /// Abstract so the fixture can iterate shapes of different contract types in one loop
+        /// instead of repeating the same twelve lines per shape.
+        /// </remarks>
+        private abstract class ShapeCase
+        {
+            protected ShapeCase(string name)
+            {
+                Name = name;
+            }
+
+            internal string Name { get; }
+
+            internal abstract ShapeComparison Measure();
+        }
+
+        private sealed class ShapeCase<T> : ShapeCase
+            where T : class
+        {
+            private readonly T _value;
+
+            internal ShapeCase(string name, T value)
+                : base(name)
+            {
+                _value = value;
+            }
+
+            /// <summary>
+            /// Measures both readers on the payload each writer produces.
+            /// </summary>
+            /// <returns>The comparison.</returns>
+            /// <remarks>
+            /// Each serializer reads its own bytes, because that is what a consumer's save file
+            /// holds and because the two forms are not the same bytes: repeated scalars are written
+            /// packed here and unpacked by protobuf-net, by the encoding policy. The decoded graph
+            /// is identical either way, which is what makes the two allocation figures comparable.
+            /// </remarks>
+            internal override ShapeComparison Measure()
+            {
+                byte[] wallstopProtoPayload = null;
+                WProtoWriteResult written = WProtoFacade.Serialize(
+                    _value,
+                    ref wallstopProtoPayload
+                );
+                Assert.IsTrue(written.Served, "The shape contract is not served by WallstopProto.");
+                byte[] exact = new byte[written.Length];
+                Array.Copy(wallstopProtoPayload, exact, written.Length);
+                using MemoryStream protobufNetPayload = new MemoryStream();
+                ProtoBuf.Serializer.Serialize(protobufNetPayload, _value);
+
+                for (int iteration = 0; iteration < WarmupIterations; iteration++)
+                {
+                    Assert.IsTrue(WProtoFacade.TryDeserialize(exact, out T _));
+                    protobufNetPayload.Position = 0;
+                    _ = ProtoBuf.Serializer.Deserialize<T>(protobufNetPayload);
+                }
+
+                T restored = null;
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int iteration = 0; iteration < ShapeIterations; iteration++)
+                {
+                    if (!WProtoFacade.TryDeserialize(exact, out restored))
+                    {
+                        Assert.Fail("The shape contract stopped using WallstopProto.");
+                    }
+                }
+
+                long wallstopProtoBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                before = GC.GetAllocatedBytesForCurrentThread();
+                for (int iteration = 0; iteration < ShapeIterations; iteration++)
+                {
+                    protobufNetPayload.Position = 0;
+                    restored = ProtoBuf.Serializer.Deserialize<T>(protobufNetPayload);
+                }
+
+                long protobufNetBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                GC.KeepAlive(restored);
+                return new ShapeComparison(
+                    wallstopProtoBytes / (double)ShapeIterations,
+                    protobufNetBytes / (double)ShapeIterations
+                );
+            }
+        }
+
+        private readonly struct ShapeComparison
+        {
+            internal ShapeComparison(
+                double wallstopProtoBytesPerOperation,
+                double protobufNetBytesPerOperation
+            )
+            {
+                WallstopProtoBytesPerOperation = wallstopProtoBytesPerOperation;
+                ProtobufNetBytesPerOperation = protobufNetBytesPerOperation;
+            }
+
+            internal double WallstopProtoBytesPerOperation { get; }
+
+            internal double ProtobufNetBytesPerOperation { get; }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class ArrayShape
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public int[] Values;
+
+            internal static ArrayShape Representative()
+            {
+                int[] values = new int[128];
+                for (int index = 0; index < values.Length; index++)
+                {
+                    values[index] = index * 17 + 3;
+                }
+
+                return new ArrayShape { Values = values };
+            }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class ListShape
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public List<int> Values;
+
+            internal static ListShape Representative()
+            {
+                List<int> values = new List<int>(128);
+                for (int index = 0; index < 128; index++)
+                {
+                    values.Add(index * 17 + 3);
+                }
+
+                return new ListShape { Values = values };
+            }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class StringShape
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public string Text;
+
+            internal static StringShape Representative()
+            {
+                return new StringShape { Text = "allocation-baseline" };
+            }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class MapShape
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public Dictionary<string, int> Scores;
+
+            internal static MapShape Representative()
+            {
+                Dictionary<string, int> scores = new Dictionary<string, int>(32);
+                for (int index = 0; index < 32; index++)
+                {
+                    scores.Add($"score-{index:D2}", index * 23 + 11);
+                }
+
+                return new MapShape { Scores = scores };
+            }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class NestedShape
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public AllocationChild Child;
+
+            internal static NestedShape Representative()
+            {
+                return new NestedShape
+                {
+                    Child = new AllocationChild { Sequence = 987_654_321L, Name = "nested" },
+                };
+            }
         }
 
         [ProtoContract]

@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// The pieces of repeated-field handling that would otherwise be duplicated into every generated
@@ -19,6 +20,43 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public static class WProtoRepeated
     {
+        /// <summary>
+        /// Makes room in <paramref name="destination"/> for <paramref name="additional"/> more
+        /// elements in one allocation.
+        /// </summary>
+        /// <typeparam name="T">The element type.</typeparam>
+        /// <param name="destination">The list about to be filled; <c>null</c> is ignored.</param>
+        /// <param name="additional">
+        /// How many elements are about to be added, from
+        /// <see cref="WProtoReader.CountPackedElements"/>.
+        /// </param>
+        /// <remarks>
+        /// <para>
+        /// A list that grows from empty leaves every intermediate buffer behind: decoding 128
+        /// <c>int</c>s into one allocated 1,208 bytes to produce a 592-byte graph. Sizing it once
+        /// from the count already encoded in the packed run removes all of it.
+        /// </para>
+        /// <para>
+        /// A hint rather than a requirement -- a count of zero, or a run whose count is unknown
+        /// because protobuf-net wrote it unpacked, leaves the list to grow exactly as it did before.
+        /// The capacity is only ever raised, so a caller's list that is already large enough is left
+        /// alone rather than reallocated smaller.
+        /// </para>
+        /// </remarks>
+        public static void Reserve<T>(List<T> destination, int additional)
+        {
+            if (destination == null || additional <= 0)
+            {
+                return;
+            }
+
+            int required = destination.Count + additional;
+            if (destination.Capacity < required)
+            {
+                destination.Capacity = required;
+            }
+        }
+
         /// <summary>
         /// Builds the exception thrown when a repeated member holds a <c>null</c> element.
         /// </summary>
