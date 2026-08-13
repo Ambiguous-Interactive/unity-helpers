@@ -66,6 +66,7 @@ Invoke these skills for specific tasks.
 | [test-parallelization-rules](./test-parallelization-rules.md) | Unity Editor test threading constraints |
 | [test-performance](./test-performance.md) | Keep the main test suite fast: categorize/exclude perf tests, size samples statistically, batch asset I/O |
 | [test-unity-lifecycle](./test-unity-lifecycle.md) | Track(), DestroyImmediate, object cleanup |
+| [untrusted-payload-limits](./untrusted-payload-limits.md) | Never allocate from a number a payload states |
 | [update-documentation](./update-documentation.md) | After ANY feature/bug fix/API change |
 | [validate-before-commit](./validate-before-commit.md) | Before completing any task (run linters!) |
 | [validation-troubleshooting](./validation-troubleshooting.md) | Common validation errors, CI failures, fixes |

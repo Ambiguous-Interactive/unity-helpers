@@ -1151,16 +1151,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             int itemCount = wrapper.Items?.Length ?? 0;
             // Mirror Deque's own [ProtoAfterDeserialization] capacity reconciliation so empty
-            // deques keep their serialized capacity and non-empty deques never under-allocate.
+            // deques keep their serialized capacity and non-empty deques never under-allocate --
+            // including its refusal to allocate a capacity the payload only claims.
             int capacity = wrapper.Capacity;
             if (capacity <= 0)
             {
                 capacity = itemCount > 0 ? itemCount : Deque<T>.DefaultCapacity;
             }
-            if (itemCount > capacity)
-            {
-                capacity = itemCount;
-            }
+
+            capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             Deque<T> result = new(capacity);
             for (int i = 0; i < itemCount; i++)
@@ -1243,6 +1242,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         capacity = candidate;
                     }
                 }
+            }
+
+            // Refused rather than clamped: the universe size decides which elements the restored set
+            // will accept, so shrinking it silently would change behavior instead of allocation.
+            if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
+            {
+                throw new InvalidOperationException(
+                    SerializationCapacityLimits.Refusal(nameof(SparseSet), wrapper.Capacity)
+                );
             }
 
             SparseSet result = new(capacity);

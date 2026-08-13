@@ -37,22 +37,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
                 {
-                    int finalCapacity = capacity;
+                    // What the indices themselves require, which is data rather than a claim: a
+                    // set bit has to be representable or it would be lost silently.
+                    int required = 0;
                     if (indices is { Count: > 0 })
                     {
-                        int maxIndex = 0;
                         for (int i = 0; i < indices.Count; i++)
                         {
-                            if (indices[i] > maxIndex)
+                            if (required < indices[i] + 1)
                             {
-                                maxIndex = indices[i];
+                                required = indices[i] + 1;
                             }
                         }
-                        if (finalCapacity < maxIndex + 1)
-                        {
-                            finalCapacity = maxIndex + 1;
-                        }
                     }
+
+                    // A dense bit set costs index/8 bytes to hold one high index, so a document of a
+                    // few bytes can ask for hundreds of megabytes either by claiming a capacity or
+                    // by naming an index. The claim is clamped; the index is refused out loud,
+                    // because dropping it would change the set the caller gets back.
+                    if (!SerializationCapacityLimits.TryAccept(required, 0, out int _))
+                    {
+                        throw new JsonException(
+                            SerializationCapacityLimits.Refusal(nameof(ImmutableBitSet), required)
+                        );
+                    }
+
+                    int finalCapacity = SerializationCapacityLimits.Clamp(capacity, required);
 
                     BitSet bitset = new(finalCapacity > 0 ? finalCapacity : 64);
                     if (indices != null)

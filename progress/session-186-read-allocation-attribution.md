@@ -109,6 +109,41 @@ signature to recognize it by (no analysis produced, sub-minute duration, HTTP 40
 repository-owned checks are what "all green" means. Restoring the quota or dropping the reviewer from
 the required set stays an owner action in organization settings.
 
+## The review question that found a shipped defect
+
+The owner asked on the pull request whether a wire-stated size could be trusted -- "if someone sent a
+malicious payload that says there are 1 billion elements... here and anywhere else?"
+
+For this change the answer is no: `CountPackedElements` counts bytes that are present, and
+`TryReadLength` already refuses a length prefix longer than the buffer, so a billion elements costs a
+billion bytes and the worst amplification is the element width (8x for 1-byte varints into `long`).
+It is strictly better than the growth-doubling it replaced.
+
+**The sweep it prompted found the real thing, and it is shipped.** A *capacity* is not a length: it
+has nothing behind it. Six bytes -- field 2 of the collection wrappers, holding `int.MaxValue`, no
+elements -- reached `new T[2147483647]`:
+
+| Site | Effect |
+| --- | --- |
+| `Deque`'s `[ProtoAfterDeserialization]` hook | 8 GB, on any consumer using protobuf-net directly |
+| Both deque readers (wrapper and marshal) | 8 GB |
+| Both sparse-set readers | 16 GB, two index arrays |
+| `BitSet` / `ImmutableBitSet` JSON | a claimed capacity, or one huge index, buys hundreds of MB |
+
+`CyclicBuffer` was the only one safe, and by accident: it keeps its capacity as a number and
+allocates its `List<T>` lazily.
+
+The remedy is one rule with two verbs, because the consequence of ignoring a claim differs. Where the
+capacity is a growth hint the structure re-derives, `SerializationCapacityLimits.Clamp` keeps every
+delivered element and starts smaller. Where it is semantic -- a sparse set's universe decides what it
+accepts later -- `TryAccept` refuses, because clamping would change behavior rather than allocation.
+The delivered count is always the floor, and the ceiling is a knob the game sets for its own data.
+
+Verified in the editor with the attacker's own six bytes: 16 cases confirmed by name, and 410 across
+the surrounding `Deque`, `SparseSet`, `BitSet` and marshal suites, all green. The rule is recorded as
+[untrusted-payload-limits](../.llm/skills/untrusted-payload-limits.md) and as critical rule 17, so it
+is applied by construction rather than remembered.
+
 ## What #398 has left, and why it is not this session's work
 
 The string interner and "merge into the caller's existing collection" both change what a read hands
