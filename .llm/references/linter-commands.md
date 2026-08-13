@@ -388,7 +388,7 @@ npm run eol:fix
 ### Pre-Push Validation (MANDATORY)
 
 ```bash
-# Run ALL validations before completing any task
+# Run repository-wide lint and fast contract validation before pushing
 npm run validate:prepush
 ```
 
@@ -396,8 +396,11 @@ This runs:
 
 1. **validate:content** — Documentation and formatting checks
 2. **eol:check** — Line ending validation
-3. **validate:tests** — Test lifecycle lint
+3. **validate:tests:fast** — Fast repository contract suites
 4. **lint:csharp-naming** — C# naming conventions
+
+CI additionally runs `validate:tests:hook-regressions` through the complete `validate:tests`
+aggregate. Run that exhaustive subset locally when hook or agent-preflight behavior changes.
 
 ### Full Formatting Workflow
 

@@ -30,7 +30,7 @@
  *     | Small   |                        12 |                       45 |   3.75x |
  *
  *   ProtoSerializationPerformanceTests.CompareSerializeSmallMediumLarge:
- *     | Payload | Pooled Serialize (ms) | Classic Serialize (ms) | Speedup | Size (bytes) |
+ *     | Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup | Size (bytes) |
  *     | ...
  *
  *   SpatialTree2DPerformanceTests.Benchmark (per-dataset tables):
@@ -45,7 +45,7 @@
  * perf numbers live in `<test-case><output><![CDATA[ ...markdown tables... ]]>`.
  *
  * Because the column schema differs per test family (Optimized/Classic/Speedup
- * vs Pooled/Classic/Size vs per-tree columns), we do NOT hardcode any family.
+ * vs WallstopProto/protobuf-net/Size vs per-tree columns), we do NOT hardcode any family.
  * The extractor is FORMAT-AGNOSTIC over Markdown tables: for every detected
  * table it emits one metric per numeric data cell, keyed as
  *

@@ -5,14 +5,14 @@
 > sessions 134-156) have been removed from the active plan and condensed into
 > [Foundation already in place](#foundation-already-in-place). Released work is summarized in
 > [Shipped and Retired](#shipped-and-retired); older historical sections keep their original
-> branch/run context where relevant. Baseline: `main` at `f3b63b64`, package `3.5.1`.
+> branch/run context where relevant. Baseline: `main` at `a1bf3195`, package `3.5.1`.
 
 ## Contents
 
 - [Shipped and Retired](#shipped-and-retired) — what came out of the plan and why
 - [Test Suite Runtime Reduction](#test-suite-runtime-reduction--goal-met-section-retired) — **GOAL MET** (all 14 legs under 5.3 min; retired)
-- [CI Throughput](#ci-throughput) — **MEASURED OUT, nothing in-repo left** (#279 / #326 / #329 / #330 / #337 / #353 / #363 all closed; the only remaining lever is a third self-hosted runner, which is an org capacity decision)
-- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port landed through session 181 / #420, whose full PR matrix passed. Session 182 added the isolated protobuf-net 2.4.9 oracle promised by #371; session 183 closed the collection matrix (#395) and the value-type sweep (#388). Performance acceptance and removal of the runtime protobuf-net fallback remain.)
+- [CI Throughput](#ci-throughput) — the main matrix is already dominated by Unity work rather than wrapper setup; low-risk dependency and duplicate-launch reductions remain appropriate, while grouping all modes by editor requires new measurements that justify its license/failure-gating complexity.
+- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port have landed. Session 182 added the isolated protobuf-net 2.4.9 oracle promised by #371; session 183 closed the collection matrix (#395) and the value-type sweep (#388). Performance acceptance and one hybrid release remain before removal of the runtime protobuf-net fallback.)
 - [Backlog: Auto-Loading Cache Feature](#backlog-auto-loading-cache-feature) (not started)
 - [DxKit Rebrand: Unity Helpers → DxKit](#dxkit-rebrand-unity-helpers--dxkit) — **NOT STARTED** (brand, docs site, editor UI, assets)
 
@@ -242,13 +242,24 @@ DoxReloaded, IshoBoy, qora-redux) touched the self-hosted runners while ours sat
   live at `C:\Unity\Editors\`). Closer than it reads: `ensure-editor.ps1` already implements the
   `_ci-managed-editors` sub-root under that exact name, and `UNITY_EDITOR_INSTALL_ROOT` is already a
   single knob honored by all five scripts that resolve, install, maintain or bootstrap an editor.
-- **Most contract tests never run in CI, session 167.** `test-sync-script-contracts.ps1` is reachable
-  only via `validate:tests` → `validate:prepush`, a local pre-push hook, so #334 was green while
-  breaking `release publish tag preparation sets up Node before npm publication checks`. Added to
-  `test-lint.yml`; the rest of the `validate:tests` chain is still hook-only. Two defects fixed in that
-  suite: a **restated** `actions/setup-node` SHA (now derived from `release.yml`, the same lesson #351
-  applied to the build-lock pins), and five ordering assertions whose `IndexOf(a) -lt IndexOf(b)` form
-  passed **vacuously** when `a` was absent — proven by renaming a step and watching 132/132 stay green.
+- **Contract coverage is mandatory in CI without making every push locally expensive.** Session 167
+  found `test-sync-script-contracts.ps1` reachable only through a local aggregate, so #334 was green
+  while breaking a release contract. `Local Gates` now runs the full `validate:tests` suite on every
+  pull request. Session 184 split its three exhaustive synthetic-hook harnesses (42+ temporary Git
+  repositories and 46+ child PowerShell launches) into `validate:tests:hook-regressions`: CI retains
+  them unconditionally, while developer `validate:prepush` runs `validate:tests:fast`. Hook authors
+  run the exhaustive subset locally when `.githooks/**`, agent-preflight, or their helpers change.
+  This addresses #425's multi-minute manual gate without weakening the actual hooks or CI coverage.
+
+- **Assembly discovery belongs on the hosted matrix job, not every licensed leg.** Session 184
+  computes the five mode/integration profiles once with the shared `asmdef-discovery.js` module and
+  attaches `assemblies` plus `is-empty` to the fast, standalone, and SINGLE_THREADED matrix entries.
+  The self-hosted Unity test jobs no longer install Node or repeat the same repository walk for each
+  Unity version. Direct discovery produced 33/6/6 integration assemblies for
+  EditMode/PlayMode/standalone. The SINGLE_THREADED split is deliberately disjoint: 24 editor-only
+  assemblies in EditMode retain the editor scheduling/race coverage, while three platform-neutral
+  runtime/core assemblies run in PlayMode. A workflow contract pins the centralized source, the
+  editor-only split, and the absence of per-leg setup.
 
 - **`max-parallel: 2` was the idle time, session 166.** It gates matrix *eligibility*, not execution
   — a self-hosted runner takes one job at a time regardless — so every completion needed a fresh
@@ -709,8 +720,9 @@ Reproduce protobuf-net v3 *exactly* for:
 - **Scalars (DataFormat.Default — the package sets no `DataFormat`):** int32/int64/uint32/uint64/bool/enum →
   varint; float → fixed32; double → fixed64; string/bytes → length-delimited. (No ZigZag/FixedSize/TwosComp
   observed; confirm in inventory and emit accordingly if any appear.)
-- **Repeated fields:** protobuf-net default is **unpacked** (repeated `tag+value`) unless `IsPacked=true`
-  (none found). Match this — do **not** pack by default (differs from proto3).
+- **Repeated packable scalars:** write the proto3 **packed** form and accept both packed and unpacked
+  input. Measured protobuf-net v2/v3 readers accept the packed form even when their own default writer
+  emits repeated `tag+value`. Strings, byte arrays, and messages remain individually length-delimited.
 - **`[ProtoInclude(tag, subType)]` inheritance** (AbstractRandom, tags 100–116): the concrete subtype is
   written as a length-delimited field at its include tag on the base message, containing the subtype's own
   members; base members written at their tags. **The include comes FIRST, before the base's own members,
@@ -953,9 +965,9 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
    consumer types. That closes ~28 of the 192 `[ProtoMember]`s in the inventory, every one of which
    the generator previously refused.
 
-   *Five encoding rules, all measured against the vendored oracle before any code was written, and
-   three of them the opposite of the scalar rule.* A repeated field is **unpacked** -- one key per
-   element, protobuf-net's default and the reverse of proto3's. **Every element is written**,
+   *Five encoding rules, all measured against the vendored oracle before any code was written.* A
+   repeated packable scalar field is written in the proto3 **packed** form; the protobuf-net v2/v3
+   readers accept it even though their default writers emit one key per element. **Every element is written**,
    defaults included: a member holding `0` is omitted, an element holding `0` encodes as `08 00`.
    **Null and empty are the same bytes**, so an empty collection with no constructor value behind it
    reads back as `null` -- a silent data change, reproduced deliberately. **Reading appends** to the
@@ -965,8 +977,8 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
    raises too, naming the contract and the member.
 
    *Reading is deliberately more permissive than the oracle, in the one direction that is safe.*
-   Every reader accepts the **packed** form for a member it writes unpacked, because protobuf-net
-   does. It also accepts unpacked-then-packed for one field, which protobuf-net **refuses** with
+   Every reader accepts both the generator's packed form and protobuf-net's unpacked form. It also
+   accepts unpacked-then-packed for one field, which protobuf-net **refuses** with
    `Invalid wire-type (String)` -- the encoding allows either order, and leniency on read never
    loses data. `WProtoReader.TryReadPackedRun` spends no nesting level: a packed run holds
    primitives with no field keys, so it cannot recurse, and charging it would refuse an array at the
@@ -1412,7 +1424,7 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   indicated one; the awkward part is that `LogAssert.Expect` cannot express a nondeterministic
   message, so what has to be argued is the *scope* of `ignoreFailingMessages`, not a pattern.
 
-- **#395 — implemented in session 183, pending merge.** `LinkedList`, `Queue`, `Stack`,
+- **#395 — merged in session 183.** `LinkedList`, `Queue`, `Stack`,
   `ReadOnlyCollection`, `ReadOnlyDictionary` and every interface-typed sequence or dictionary member
   are served. The three problems that shared `WPROTO003` are three fields on a `CollectionForm`
   rather than three branches: a per-type fill method, an accumulate-and-construct commit, and the
@@ -1440,7 +1452,7 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   is what an immutable contract calls the local holding member N, so **any** immutable contract with
   a dictionary member failed the consumer's build with `CS0136`. A second and third path through the
   same emitted code is worth a fixture even when the first one is thoroughly covered.
-- **#388 — implemented in session 183, pending merge.** The generator's map path made the same
+- **#388 — merged in session 183.** The generator's map path made the same
   reference-type assumption the repeated path had already been fixed for: it accepted a struct
   dictionary and then emitted `member != null` and `read.Member ?? new Member()` for it, both
   `CS0019` inside code the consumer never wrote. `SerializableSetBase<T, TSet>`'s `where TSet : class`
@@ -1476,24 +1488,30 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   **What #399 needs next is a decision, not code:** whether this package owns an encoding protobuf-net
   cannot read. The rest of the issue (every stdlib type, and the contract surveys of the wallstop and
   Ambiguous-Interactive repositories) is independent of that decision and can proceed either way.
-- **#371 — implemented in session 182, pending merge.** CI runs all generator differentials once
+- **#371 — merged in session 182.** CI runs all generator differentials once
   against protobuf-net 2.4.9 and once against 3.2.56 in isolated processes. The v2 run exposed and now
   pins the three major-version divergences described above instead of silently treating v3 as both oracles,
   and fixed WallstopProto's `null` result for v2's omitted empty string map value.
-- **#392 — configure-pass mitigation implemented in session 182, pending merge.** A configure invocation
+- **#392 — configure-pass mitigation merged in session 182.** A configure invocation
   with no fresh success marker retries once only when its log carries the known UPM cancellation/IPC
   signature. It attempts to preserve the first log and clears UPM state; a fresh marker wins, and ordinary compile
   failures remain single-attempt failures.
 
 ### Performance goals
 
-These remain release-level acceptance work, not evidence claimed by the default-on or dual-oracle
-sessions. Measure them through the performance asmdef and Unity Profiler MCP in a licensed editor.
+These remain release-level acceptance work. The Release generator benchmark now runs a
+representative scalar/string/repeated/map/nested contract against both supported protobuf-net
+oracles. The local protobuf-net v3 baseline measured serialization into a warmed reusable buffer at
+**0 B/op** for WallstopProto versus **40 B/op** for protobuf-net, while deserialization was **5,272
+B/op** versus **4,112 B/op** because both materialize the returned object graph. The existing Unity
+benchmark contract is now dual-annotated, so its weekly Release lane measures WallstopProto rather
+than silently falling back to protobuf-net. Collect Unity-editor throughput and cold-start evidence
+before declaring the milestone complete.
 
 - Warm throughput ≥ protobuf-net v3 (generated code, no per-call model lookup beyond a static field read).
 - Cold start ≫ better (no model build / no ref-emit).
-- Zero allocations on the write path for `Span`/`IBufferWriter` overloads; pooled scratch for length
-  back-patching. Validate with the existing performance test asmdef + the Unity Profiler MCP.
+- Zero allocations on the warmed reusable-buffer write path is now a tested Release contract. Retain
+  it while adding Unity Profiler evidence for the editor/player path.
 
 ### Risks & mitigations
 

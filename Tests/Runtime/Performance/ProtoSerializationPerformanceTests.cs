@@ -8,50 +8,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.IO;
     using NUnit.Framework;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using SerializerAlias = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
     [Category("Performance")]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class ProtoSerializationPerformanceTests
+    public sealed partial class ProtoSerializationPerformanceTests
     {
         [ProtoContract]
-        private sealed class SmallMsg
+        [WProtoContract]
+        internal sealed partial class SmallMsg
         {
             [ProtoMember(1)]
+            [WProtoMember(1)]
             public int Id { get; set; }
 
             [ProtoMember(2)]
+            [WProtoMember(2)]
             public string Name { get; set; }
         }
 
         [ProtoContract]
-        private sealed class MediumMsg
+        [WProtoContract]
+        internal sealed partial class MediumMsg
         {
             [ProtoMember(1)]
+            [WProtoMember(1)]
             public int Id { get; set; }
 
             [ProtoMember(2)]
+            [WProtoMember(2)]
             public string Name { get; set; }
 
             [ProtoMember(3)]
+            [WProtoMember(3)]
             public int[] Values { get; set; }
         }
 
         [ProtoContract]
-        private sealed class LargeMsg
+        [WProtoContract]
+        internal sealed partial class LargeMsg
         {
             [ProtoMember(1)]
-            public Guid Guid { get; set; }
+            [WProtoMember(1)]
+            public string Identifier { get; set; }
 
             [ProtoMember(2)]
+            [WProtoMember(2)]
             public string Description { get; set; }
 
             [ProtoMember(3)]
+            [WProtoMember(3)]
             public byte[] Blob { get; set; }
 
             [ProtoMember(4)]
+            [WProtoMember(4)]
             public MediumMsg Nested { get; set; }
         }
 
@@ -68,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static LargeMsg MakeLarge(int i, int blobSize, int nestedLen) =>
             new()
             {
-                Guid = Guid.NewGuid(),
+                Identifier = "2f3a9b4c-8d1f-4cba-8df7-2af00f5c6c1e",
                 Description = new string('d', (i % 31) + 64),
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
@@ -80,10 +93,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         public void CompareSerializeSmallMediumLarge()
         {
             UnityEngine.Debug.Log(
-                "| Payload | Pooled Serialize (ms) | Classic Serialize (ms) | Speedup | Size (bytes) |"
+                "| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup | Size (bytes) |"
             );
             UnityEngine.Debug.Log(
-                "| ------- | ---------------------:| ---------------------:| -------:| ------------:|"
+                "| ------- | ------------------:| ----------------:| -------:| ------------:|"
             );
 
             RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
@@ -94,12 +107,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test, Timeout(0)]
         public void CompareDeserializeSmallMediumLarge()
         {
-            UnityEngine.Debug.Log(
-                "| Payload | Pooled Deserialize (ms) | Classic Deserialize (ms) | Speedup |"
-            );
-            UnityEngine.Debug.Log(
-                "| ------- | -----------------------:| -----------------------:| -------:|"
-            );
+            UnityEngine.Debug.Log("| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup |");
+            UnityEngine.Debug.Log("| ------- | ------------------:| ----------------:| -------:|");
 
             RunDeserializeBenchmark("Small", MakeSmall(123));
             RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
@@ -114,74 +123,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             T sample = factory();
             byte[] buffer = null;
+            using MemoryStream protobufNetBuffer = new();
 
             // Warmup
             _ = SerializerAlias.ProtoSerialize(sample, ref buffer);
-            using (MemoryStream warm = new())
-            {
-                Serializer.Serialize(warm, sample);
-            }
+            Serializer.Serialize(protobufNetBuffer, sample);
 
-            // Measure pooled
+            // The alias uses WallstopProto for these dual-annotated contracts; calling
+            // ProtoBuf.Serializer directly below is the reflection-based comparison.
             Stopwatch sw = Stopwatch.StartNew();
+            int written = 0;
             for (int i = 0; i < Iterations; ++i)
             {
-                _ = SerializerAlias.ProtoSerialize(sample, ref buffer);
+                written = SerializerAlias.ProtoSerialize(sample, ref buffer);
             }
             sw.Stop();
-            long pooledMs = sw.ElapsedMilliseconds;
-            payloadSize = buffer?.Length ?? 0;
+            long wallstopProtoMs = sw.ElapsedMilliseconds;
+            payloadSize = written;
 
-            // Measure classic
             sw.Restart();
             for (int i = 0; i < Iterations; ++i)
             {
-                using MemoryStream ms = new();
-                Serializer.Serialize(ms, sample);
-                _ = ms.ToArray();
+                protobufNetBuffer.Position = 0;
+                protobufNetBuffer.SetLength(0);
+                Serializer.Serialize(protobufNetBuffer, sample);
             }
             sw.Stop();
-            long classicMs = sw.ElapsedMilliseconds;
+            long protobufNetMs = sw.ElapsedMilliseconds;
 
-            double speedup = classicMs > 0 ? (double)classicMs / pooledMs : double.PositiveInfinity;
+            double speedup =
+                wallstopProtoMs > 0
+                    ? (double)protobufNetMs / wallstopProtoMs
+                    : double.PositiveInfinity;
             UnityEngine.Debug.Log(
-                $"| {label} | {pooledMs, 23:N0} | {classicMs, 23:N0} | {speedup, 7:0.00}x | {payloadSize, 12:N0} |"
+                $"| {label} | {wallstopProtoMs, 18:N0} | {protobufNetMs, 16:N0} | {speedup, 7:0.00}x | {payloadSize, 12:N0} |"
             );
         }
 
         private static void RunDeserializeBenchmark<T>(string label, T payload)
         {
             byte[] data = SerializerAlias.ProtoSerialize(payload);
+            using MemoryStream protobufNetBuffer = new(data, writable: false);
 
             // Warmup
             _ = SerializerAlias.ProtoDeserialize<T>(data);
-            using (MemoryStream warm = new(data, writable: false))
-            {
-                _ = (T)Serializer.Deserialize(typeof(T), warm);
-            }
+            _ = (T)Serializer.Deserialize(typeof(T), protobufNetBuffer);
 
-            // Measure pooled
             Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < Iterations; ++i)
             {
                 _ = SerializerAlias.ProtoDeserialize<T>(data);
             }
             sw.Stop();
-            long pooledMs = sw.ElapsedMilliseconds;
+            long wallstopProtoMs = sw.ElapsedMilliseconds;
 
-            // Measure classic
             sw.Restart();
             for (int i = 0; i < Iterations; ++i)
             {
-                using MemoryStream ms = new(data, writable: false);
-                _ = (T)Serializer.Deserialize(typeof(T), ms);
+                protobufNetBuffer.Position = 0;
+                _ = (T)Serializer.Deserialize(typeof(T), protobufNetBuffer);
             }
             sw.Stop();
-            long classicMs = sw.ElapsedMilliseconds;
+            long protobufNetMs = sw.ElapsedMilliseconds;
 
-            double speedup = classicMs > 0 ? (double)classicMs / pooledMs : double.PositiveInfinity;
+            double speedup =
+                wallstopProtoMs > 0
+                    ? (double)protobufNetMs / wallstopProtoMs
+                    : double.PositiveInfinity;
             UnityEngine.Debug.Log(
-                $"| {label} | {pooledMs, 25:N0} | {classicMs, 25:N0} | {speedup, 7:0.00}x |"
+                $"| {label} | {wallstopProtoMs, 18:N0} | {protobufNetMs, 16:N0} | {speedup, 7:0.00}x |"
             );
         }
 

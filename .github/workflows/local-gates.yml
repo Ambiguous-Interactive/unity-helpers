@@ -1,17 +1,15 @@
 name: Local Gates
 
-# The two gates that only ever ran on a developer's machine.
+# Two gates that once ran only on a developer's machine.
 #
-# `validate:tests` chains every contract suite in the repository and was referenced by exactly one
-# thing: the local pre-push hook. (The count is deliberately not restated here; it was written as
-# "34" and was 36 within one session.) `--no-verify`, a squash-merge from the web UI, or a push from a different
-# environment all skip it, so a pull request could show a full board of green checks with one of
-# those suites broken -- which has happened (PR #334, 42 green checks, a release-workflow contract
-# failing). `typecheck:unity` compiles the real Runtime sources with the shipped analyzer loaded and
-# was in no workflow at all.
+# `validate:tests` composes the fast contract suite with exhaustive synthetic hook regressions.
+# Developer `validate:prepush` intentionally runs only the fast subset; this job remains the
+# authoritative unconditional home for both. Before this job existed, `--no-verify`, a squash merge
+# from the web UI, or a push from another environment could leave a pull request fully green with a
+# broken suite -- which happened in PR #334. `typecheck:unity` compiles the real Runtime sources with
+# the shipped analyzer loaded and likewise had no workflow coverage.
 #
-# Neither needs Unity, a license or a matrix, which is exactly why they were safe to leave in a hook
-# and exactly why leaving them there was invisible.
+# Neither needs Unity, a license, or a matrix.
 
 on:
   push:

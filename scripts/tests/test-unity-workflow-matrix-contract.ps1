@@ -618,6 +618,42 @@ $benchmarksJobTexts = Get-WorkflowJobTexts -WorkflowLines $benchmarksWorkflowLin
 $releaseJobTexts = Get-WorkflowJobTexts -WorkflowLines $releaseWorkflowLines
 $runnerBootstrapJobTexts = Get-WorkflowJobTexts -WorkflowLines $runnerBootstrapLines
 
+$unityTestWorkflowsAvoidUnusedDependencies = (
+    -not $workflowContent.Contains('lfs: true') -and
+    -not $benchmarksWorkflowContent.Contains('lfs: true') -and
+    -not $runCiTestsContent.Contains('com.unity.test-framework.performance') -and
+    -not $runCiTestsContent.Contains('PerformanceFrameworkVersion')
+)
+if (-not $unityTestWorkflowsAvoidUnusedDependencies) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::Unity test workflows must not fetch absent Git LFS objects or install the unused Unity performance-testing package; benchmarks use raw Stopwatch measurements.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked Unity test workflows avoid unused Git LFS and performance-package dependencies.'
+}
+
+$benchmarkJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { [string]$benchmarksJobTexts['benchmarks'] } else { '' }
+$benchmarkInvocationCount = [regex]::Matches(
+    $benchmarkJob,
+    [regex]::Escape('./scripts/unity/run-ci-tests.ps1')
+).Count
+$benchmarkRunsThoroughRandomInSharedInvocation = (
+    $benchmarkInvocationCount -eq 1 -and
+    -not $benchmarkJob.Contains('Run Random suite at full sample count') -and
+    -not $benchmarkJob.Contains('benchmarks-random') -and
+    $benchmarkJob.Contains('WallstopStudios.UnityHelpers.Tests.Runtime.Performance;WallstopStudios.UnityHelpers.Tests.Runtime.Random') -and
+    $benchmarkJob.Contains("'Performance;Stress;Fast'") -and
+    $benchmarkJob.Contains("UH_RANDOM_SAMPLE_COUNT: `${{ matrix.test-mode == 'editmode' && '12750000' || '' }}") -and
+    $benchmarkJob.Contains("UH_RANDOM_NOISE_MAP_ITERATIONS: `${{ matrix.test-mode == 'editmode' && '1000' || '' }}") -and
+    $benchmarkJob.Contains("UH_EDITOR_TEST_TIMEOUT_SECONDS: `${{ matrix.test-mode == 'editmode' && '6600' || '' }}") -and
+    $benchmarkJob.Contains('-AssemblyNames $env:UH_BENCHMARK_ASSEMBLIES')
+)
+if (-not $benchmarkRunsThoroughRandomInSharedInvocation) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The EditMode benchmark leg must run Performance/Stress and the full-sample Random assembly in one Unity invocation with explicit assembly scoping.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked weekly EditMode performance and thorough Random coverage share one Unity invocation.'
+}
+
 $maintenanceTokens = $null
 $maintenanceParseErrors = $null
 $windowsRunnerMaintenanceAst = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -1340,7 +1376,10 @@ function Test-UnityWorkflowStepHasEmptyAssemblyGate {
     )
 
     $stepText = Get-UnityWorkflowStepText -JobText $JobText -StepName $StepName
-    return $stepText -match 'if:\s*\$\{\{\s*steps\.compute\.outputs\.is-empty\s*!=\s*''true''\s*\}\}'
+    return (
+        $stepText -match 'if:\s*\$\{\{\s*steps\.compute\.outputs\.is-empty\s*!=\s*''true''\s*\}\}' -or
+        $stepText -match 'if:\s*\$\{\{\s*matrix\.is-empty\s*!=\s*true\s*\}\}'
+    )
 }
 
 $computeUnityAssembliesActionPath = Join-Path $repoRoot '.github/actions/compute-unity-assemblies/action.yml'
@@ -1388,6 +1427,17 @@ function Test-UnityJobMaintainsSelectedRunner {
         $setupNodeIndex -lt $computeIndex -and
         $computeIndex -lt $maintenanceIndex
     )
+    $assemblySelectionComesFromHostedMatrix = (
+        $setupNodeIndex -lt 0 -and
+        $computeIndex -lt 0 -and
+        $JobText.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include') -and
+        $JobText.Contains('UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}') -and
+        $JobText.Contains('matrix.is-empty')
+    )
+    $assemblySelectionReadyBeforeMaintenance = (
+        $setupNodeAndAssemblyComputeRunBeforeMaintenance -or
+        $assemblySelectionComesFromHostedMatrix
+    )
     $unityExpensiveStepsSkipEmptyAssemblyLegs = (
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Maintain Unity editor on selected runner') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Print runner diagnostics') -and
@@ -1427,7 +1477,7 @@ function Test-UnityJobMaintainsSelectedRunner {
         $maintenanceIndex -ge 0 -and
         $provisionIndex -ge 0 -and
         $maintenanceIndex -lt $provisionIndex -and
-        $setupNodeAndAssemblyComputeRunBeforeMaintenance -and
+        $assemblySelectionReadyBeforeMaintenance -and
         $unityExpensiveStepsSkipEmptyAssemblyLegs -and
         ($firstPwshShellIndex -lt 0 -or $maintenanceIndex -lt $firstPwshShellIndex) -and
         ($runnerDiagnosticsIndex -lt 0 -or $maintenanceIndex -lt $runnerDiagnosticsIndex) -and
@@ -1450,6 +1500,31 @@ $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['un
 $unityTestsStandaloneJob = if ($jobTexts.ContainsKey('unity-tests-standalone')) { $jobTexts['unity-tests-standalone'] } else { '' }
 $unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
+$matrixConfigAssemblyDiscoveryIsCentralized = (
+    $jobTexts.ContainsKey('matrix-config') -and
+    $jobTexts['matrix-config'].Contains('- name: Setup Node.js for assembly discovery') -and
+    $jobTexts['matrix-config'].Contains('- name: Resolve Unity test assembly lists') -and
+    $jobTexts['matrix-config'].Contains('require("./scripts/unity/lib/asmdef-discovery.js")') -and
+    $jobTexts['matrix-config'].Contains('editmode_integrations') -and
+    $jobTexts['matrix-config'].Contains('playmode_integrations') -and
+    $jobTexts['matrix-config'].Contains('standalone_integrations') -and
+    $jobTexts['matrix-config'].Contains('editmode_core: { target: "editmode", editorOnly: true }') -and
+    $jobTexts['matrix-config'].Contains('playmode_core') -and
+    $workflowContent.Contains('matrix-include-single-threaded: ${{ steps.resolve.outputs.matrix-include-single-threaded }}') -and
+    -not $unityTestsMatrixJob.Contains('actions/setup-node@') -and
+    -not $unityTestsStandaloneJob.Contains('actions/setup-node@') -and
+    -not $unityTestsSingleThreadedJob.Contains('actions/setup-node@') -and
+    -not $unityTestsMatrixJob.Contains('./.github/actions/compute-unity-assemblies') -and
+    -not $unityTestsStandaloneJob.Contains('./.github/actions/compute-unity-assemblies') -and
+    -not $unityTestsSingleThreadedJob.Contains('./.github/actions/compute-unity-assemblies')
+)
+if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Compute the integration and core assembly profiles once in the hosted matrix-config job, pass assemblies/is-empty through every Unity matrix include, and do not install Node or run asmdef discovery again on self-hosted Unity test legs."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
+}
+
 $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
@@ -1459,7 +1534,7 @@ $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning = (
     (Test-UnityJobMaintainsSelectedRunner -JobText $benchmarksMatrixJob)
 )
 if (-not $unityWorkflowsMaintainSelectedRunnerBeforeProvisioning) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must compute the test assembly list before runner maintenance; skip maintenance, diagnostics, license validation, provisioning, lock acquisition, and Unity test execution when the selected leg is empty; and still run scripts/unity/maintain-windows-runner.ps1 inside each non-empty self-hosted Unity job before Provision Unity Editor. Maintenance must use Windows PowerShell, publish the discovered PowerShell 7 directory through GITHUB_PATH, and remain the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflows must resolve the test assembly list before runner maintenance (from the hosted matrix or the benchmark's local compute step); skip maintenance, diagnostics, license validation, provisioning, lock acquisition, and Unity test execution when the selected leg is empty; and still run scripts/unity/maintain-windows-runner.ps1 inside each non-empty self-hosted Unity job before Provision Unity Editor. Maintenance must use Windows PowerShell, publish the discovered PowerShell 7 directory through GITHUB_PATH, and remain the repair path. Job timeouts must also cover the in-job maintenance/provisioning/lock/test budget. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity workflows skip empty legs before runner maintenance and maintain editors before provisioning."
@@ -3067,12 +3142,7 @@ $unityLockCleanupIsGated = (
     (Test-UnityLockCleanupIsGated `
             -Jobs $benchmarksJobTexts `
             -WorkflowFile '.github/workflows/unity-benchmarks.yml' `
-            -LicensedWorkStepNames @{
-                benchmarks = @(
-                    'Run Unity Test Runner'
-                    'Run Random suite at full sample count'
-                )
-            }) -and
+            -LicensedWorkStepNames @{ benchmarks = 'Run Unity Test Runner' }) -and
     (Test-UnityLockCleanupIsGated `
             -Jobs $releaseJobTexts `
             -WorkflowFile '.github/workflows/release.yml' `

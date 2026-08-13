@@ -26,12 +26,13 @@ For troubleshooting common errors, see [validation-troubleshooting](./validation
 # Fast changed-file preflight (MANDATORY before marking task complete)
 npm run agent:preflight:fix
 
-# Run all validations before pushing
+# Run repository-wide lint plus fast contract validation before pushing
 npm run validate:prepush
 ```
 
 Use `agent:preflight:fix` continuously while working to catch hook-class failures early on changed files.
-Use `validate:prepush` for full CI parity before push.
+Use `validate:prepush` before push. CI additionally runs the exhaustive synthetic hook fixtures;
+run `npm run validate:tests:hook-regressions` locally when hook or agent-preflight behavior changes.
 
 **C#/tests/JSON/YAML/skill/CHANGELOG edits: run `npm run lint:spelling`** — cspell covers every file matching its `files` glob, not just Markdown. See [Rule 4: Spell-Check EVERY Change cspell Covers](#rule-4-spell-check-every-change-cspell-covers) for the failure-recovery decision tree. To add a new word: `npm run lint:spelling:add -- <bucket> <word>`.
 
@@ -301,7 +302,7 @@ The `npm run validate:prepush` command runs these checks:
 
 3. **eol:check** — Line endings (CRLF, no BOM)
 
-4. **validate:tests** — Test lifecycle lint (Track() usage) and cspell lint-error-code contract regression test
+4. **validate:tests:fast** — Fast repository contract tests; exhaustive synthetic hook fixtures stay in CI
 
 5. **lint:csharp-naming** — C# naming conventions
 

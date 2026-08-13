@@ -69,6 +69,7 @@ jobs:
       # resolve step for how the matrix is split.
       matrix-include: ${{ steps.resolve.outputs.matrix-include }}
       matrix-include-standalone: ${{ steps.resolve.outputs.matrix-include-standalone }}
+      matrix-include-single-threaded: ${{ steps.resolve.outputs.matrix-include-single-threaded }}
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
       superseded: ${{ steps.superseded.outputs.superseded }}
     steps:
@@ -76,6 +77,40 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+
+      - name: Setup Node.js for assembly discovery
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
+
+      # Assembly compatibility depends on target mode and integration opt-in,
+      # never on Unity version. Compute each distinct list once on this hosted
+      # job instead of installing Node and walking every asmdef again inside
+      # each self-hosted Unity leg.
+      - name: Resolve Unity test assembly lists
+        id: assemblies
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const discovery = require("./scripts/unity/lib/asmdef-discovery.js");
+
+          const profiles = {
+            editmode_integrations: { target: "editmode", includeIntegrations: true },
+            playmode_integrations: { target: "playmode", includeIntegrations: true },
+            standalone_integrations: {
+              target: "standalone",
+              runtimeOnly: true,
+              includeIntegrations: true
+            },
+            editmode_core: { target: "editmode", editorOnly: true },
+            playmode_core: { target: "playmode" }
+          };
+          const lines = Object.entries(profiles).map(([name, options]) => {
+            const assemblies = discovery.defaultIncludeAssemblies(process.cwd(), options).join(";");
+            return `${name}=${assemblies}`;
+          });
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
+          NODE
 
       # Resolve "has this PR moved on?" ONCE, here, on a hosted runner.
       #
@@ -161,6 +196,11 @@ jobs:
         env:
           INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
           INPUT_TEST_MODE: ${{ inputs.test-mode }}
+          EDITMODE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.editmode_integrations }}
+          PLAYMODE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.playmode_integrations }}
+          STANDALONE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.standalone_integrations }}
+          EDITMODE_CORE_ASSEMBLIES: ${{ steps.assemblies.outputs.editmode_core }}
+          PLAYMODE_CORE_ASSEMBLIES: ${{ steps.assemblies.outputs.playmode_core }}
         run: |
           set -euo pipefail
           if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
@@ -192,7 +232,16 @@ jobs:
           }
           build_include() {
             jq -cn --argjson versions "${versions}" --argjson m "$1" \
-              '[ $m[] | . as $mode | $versions[] | { "unity-version": ., "test-mode": $mode } ]'
+              --arg editmode "${EDITMODE_INTEGRATION_ASSEMBLIES}" \
+              --arg playmode "${PLAYMODE_INTEGRATION_ASSEMBLIES}" \
+              --arg standalone "${STANDALONE_INTEGRATION_ASSEMBLIES}" \
+              '[ $m[] | . as $mode |
+                (if $mode == "editmode" then $editmode
+                 elif $mode == "playmode" then $playmode
+                 else $standalone end) as $assemblies |
+                $versions[] |
+                { "unity-version": ., "test-mode": $mode, assemblies: $assemblies,
+                  "is-empty": ($assemblies == "") } ]'
           }
           split="$(jq -cn --argjson modes "${modes}" \
             '(($modes | index("standalone")) != null)
@@ -206,11 +255,21 @@ jobs:
           fi
           include_fast="$(build_include "${fast_modes}")"
           include_std="$(build_include "${std_modes}")"
+          include_single_threaded="$(jq -cn \
+            --arg editmode "${EDITMODE_CORE_ASSEMBLIES}" \
+            --arg playmode "${PLAYMODE_CORE_ASSEMBLIES}" \
+            '[
+              { "unity-version": "6000.3.16f1", "test-mode": "editmode",
+                assemblies: $editmode, "is-empty": ($editmode == "") },
+              { "unity-version": "6000.3.16f1", "test-mode": "playmode",
+                assemblies: $playmode, "is-empty": ($playmode == "") }
+            ]')"
           {
             echo "unity-versions=${versions}"
             echo "test-modes=${modes}"
             echo "matrix-include=${include_fast}"
             echo "matrix-include-standalone=${include_std}"
+            echo "matrix-include-single-threaded=${include_single_threaded}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check for required licensed workflow secrets
@@ -349,33 +408,10 @@ jobs:
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
-          lfs: true
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.18.0"
-
-      # Single source of truth for the assembly include list: the same
-      # asmdef-discovery.js module the local discovery uses. Extracted into a
-      # composite action so all Unity workflows share one implementation.
-      # Uses Windows PowerShell inside the composite so empty legs can be skipped
-      # before runner maintenance installs or repairs PowerShell 7 / Unity.
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
-          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
-          # alongside core on EVERY version x mode leg. The matching run step passes
-          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
-          # manifest; without that the integration assemblies would not compile.
-          include-integrations: "true"
-
       - name: Maintain Unity editor on selected runner
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -421,7 +457,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub at
         # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
@@ -432,23 +468,19 @@ jobs:
           matrix-note: "default (organization lock wraps the Unity section)"
 
       - name: Validate Unity license secrets
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
-      # Skip provisioning, the org lock, and the run when no unity-helpers test
-      # assembly matched this target (compute step resolved an empty list). The
-      # verify step runs only after compute succeeds and is told the run was an
-      # expected skip via the expected-empty input. This never triggers for the
-      # current asmdef set; it is the robustness path for a target with no
-      # matching assemblies. If checkout/cache/setup fails before compute, let
-      # that setup failure stand on its own instead of adding a misleading
-      # "tests did not run" annotation for a Unity run that never started.
+      # Skip provisioning, the org lock, and the run when the hosted matrix job
+      # found no unity-helpers test assembly for this target. The verify step is
+      # told that the skip was expected. This never triggers for the current
+      # asmdef set; it is the robustness path for a future empty target.
       - name: Provision Unity Editor
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 180
         shell: pwsh
         run: |
@@ -479,7 +511,7 @@ jobs:
           retention-days: 14
 
       - name: Require current PR head before lock acquisition
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@a00614ace745152a659c5c2654f7cefb68a5a628
         with:
           github-token: ${{ github.token }}
@@ -488,7 +520,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           lock-name: wallstop-organization-builds
@@ -504,7 +536,7 @@ jobs:
 
       - name: Run Unity Test Runner
         id: run_tests
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # Per-mode timeout, sized from measurement rather than fear. Across the 60
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
         # has EVER been is 9.1 min (editmode), with standalone topping out at
@@ -522,6 +554,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
           # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
@@ -552,7 +585,7 @@ jobs:
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
       # budget is tight enough to enforce as a hard wall-clock gate.
       - name: Report slowest tests
-        if: ${{ always() && steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ always() && matrix.is-empty != true }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
@@ -652,14 +685,13 @@ jobs:
         if: >-
           ${{
             !cancelled() &&
-            steps.compute.outcome == 'success' &&
-            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+            (matrix.is-empty == true || steps.run_tests.outcome != 'skipped')
           }}
         uses: ./.github/actions/verify-unity-results
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
-          expected-empty: ${{ steps.compute.outputs.is-empty }}
+          expected-empty: ${{ matrix.is-empty }}
 
       - name: Upload Unity test artifacts
         if: always()
@@ -731,33 +763,10 @@ jobs:
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
-          lfs: true
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.18.0"
-
-      # Single source of truth for the assembly include list: the same
-      # asmdef-discovery.js module the local discovery uses. Extracted into a
-      # composite action so all Unity workflows share one implementation.
-      # Uses Windows PowerShell inside the composite so empty legs can be skipped
-      # before runner maintenance installs or repairs PowerShell 7 / Unity.
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "${{ matrix.test-mode == 'standalone' && 'true' || 'false' }}"
-          # Run the DI-container integration suites (Reflex / VContainer / Zenject)
-          # alongside core on EVERY version x mode leg. The matching run step passes
-          # -IncludeIntegrations so the 3 packages are installed into the ephemeral
-          # manifest; without that the integration assemblies would not compile.
-          include-integrations: "true"
-
       - name: Maintain Unity editor on selected runner
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -803,7 +812,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub at
         # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
@@ -814,23 +823,19 @@ jobs:
           matrix-note: "gated standalone (organization lock wraps the Unity section)"
 
       - name: Validate Unity license secrets
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
-      # Skip provisioning, the org lock, and the run when no unity-helpers test
-      # assembly matched this target (compute step resolved an empty list). The
-      # verify step runs only after compute succeeds and is told the run was an
-      # expected skip via the expected-empty input. This never triggers for the
-      # current asmdef set; it is the robustness path for a target with no
-      # matching assemblies. If checkout/cache/setup fails before compute, let
-      # that setup failure stand on its own instead of adding a misleading
-      # "tests did not run" annotation for a Unity run that never started.
+      # Skip provisioning, the org lock, and the run when the hosted matrix job
+      # found no unity-helpers test assembly for this target. The verify step is
+      # told that the skip was expected. This never triggers for the current
+      # asmdef set; it is the robustness path for a future empty target.
       - name: Provision Unity Editor
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 180
         shell: pwsh
         run: |
@@ -861,7 +866,7 @@ jobs:
           retention-days: 14
 
       - name: Require current PR head before lock acquisition
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@a00614ace745152a659c5c2654f7cefb68a5a628
         with:
           github-token: ${{ github.token }}
@@ -870,7 +875,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           lock-name: wallstop-organization-builds
@@ -886,7 +891,7 @@ jobs:
 
       - name: Run Unity Test Runner
         id: run_tests
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # Per-mode timeout, sized from measurement rather than fear. Across the 60
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
         # has EVER been is 9.1 min (editmode), with standalone topping out at
@@ -904,6 +909,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
           # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
@@ -926,7 +932,7 @@ jobs:
       # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
       # budget is tight enough to enforce as a hard wall-clock gate.
       - name: Report slowest tests
-        if: ${{ always() && steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ always() && matrix.is-empty != true }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
@@ -1026,14 +1032,13 @@ jobs:
         if: >-
           ${{
             !cancelled() &&
-            steps.compute.outcome == 'success' &&
-            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+            (matrix.is-empty == true || steps.run_tests.outcome != 'skipped')
           }}
         uses: ./.github/actions/verify-unity-results
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
-          expected-empty: ${{ steps.compute.outputs.is-empty }}
+          expected-empty: ${{ matrix.is-empty }}
 
       - name: Upload Unity test artifacts
         if: always()
@@ -1088,11 +1093,12 @@ jobs:
       fail-fast: false
       # No max-parallel, for the reason recorded on the fast tier above.
       matrix:
-        # Unity 6 ONLY (6000.3.16f1) to keep the extra leg cheap. editmode + playmode
-        # only -- both are fast in-editor runs; the SINGLE_THREADED path does not need
-        # a standalone IL2CPP player build to be exercised.
-        unity-version: ["6000.3.16f1"]
-        test-mode: ["editmode", "playmode"]
+        # Unity 6 ONLY (6000.3.16f1), editmode + playmode. PlayMode owns the
+        # platform-neutral runtime/core assemblies; EditMode keeps the editor-only
+        # assemblies that caught editor scheduling races. The hosted matrix job
+        # attaches both disjoint lists, so these self-hosted legs neither repeat
+        # runtime tests nor need Node/asmdef discovery.
+        include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-single-threaded) }}
     steps:
       - name: Require current PR head before setup
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@a00614ace745152a659c5c2654f7cefb68a5a628
@@ -1112,23 +1118,10 @@ jobs:
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
-          lfs: true
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.18.0"
-
-      - name: Compute test assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          target: "${{ matrix.test-mode }}"
-          runtime-only: "false"
-
       - name: Maintain Unity editor on selected runner
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -1170,7 +1163,7 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub and fail. Never
         # use plain `shell: bash` on self-hosted Windows runners.
@@ -1179,7 +1172,7 @@ jobs:
           matrix-note: "single-threaded (organization lock wraps the Unity section)"
 
       - name: Validate Unity license secrets
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -1187,7 +1180,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Provision Unity Editor
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         timeout-minutes: 180
         shell: pwsh
         run: |
@@ -1213,7 +1206,7 @@ jobs:
           retention-days: 14
 
       - name: Require current PR head before lock acquisition
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@a00614ace745152a659c5c2654f7cefb68a5a628
         with:
           github-token: ${{ github.token }}
@@ -1222,7 +1215,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           lock-name: wallstop-organization-builds
@@ -1238,7 +1231,7 @@ jobs:
 
       - name: Run Unity Test Runner
         id: run_tests
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ matrix.is-empty != true }}
         # editmode + playmode ONLY (no standalone IL2CPP build). Measured worst case
         # for this leg across the 60 most recent runs is 7.8 min, so 40 keeps >5x
         # headroom while failing a hang 50 min sooner than the old 90 -- the
@@ -1252,6 +1245,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
           # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
@@ -1273,7 +1267,7 @@ jobs:
       # Surface the slowest fixtures/cases for the SINGLE_THREADED leg (the 40-min
       # leg the optimization targets). Warn-only; see the main job's note.
       - name: Report slowest tests
-        if: ${{ always() && steps.compute.outputs.is-empty != 'true' }}
+        if: ${{ always() && matrix.is-empty != true }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/results.xml'
@@ -1355,14 +1349,13 @@ jobs:
         if: >-
           ${{
             !cancelled() &&
-            steps.compute.outcome == 'success' &&
-            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+            (matrix.is-empty == true || steps.run_tests.outcome != 'skipped')
           }}
         uses: ./.github/actions/verify-unity-results
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
           label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
-          expected-empty: ${{ steps.compute.outputs.is-empty }}
+          expected-empty: ${{ matrix.is-empty }}
 
       - name: Upload Unity test artifacts
         if: always()

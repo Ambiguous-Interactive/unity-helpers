@@ -261,6 +261,83 @@ function Run-AgentValidationContractTests {
 
   $packageJson = Get-Content -Path $packageJsonPath -Raw | ConvertFrom-Json
   $validatePrepushScript = [string]$packageJson.scripts.'validate:prepush'
+  $fastTestScript = [string]$packageJson.scripts.'validate:tests:fast'
+  $hookRegressionScript = [string]$packageJson.scripts.'validate:tests:hook-regressions'
+  $fullTestScript = [string]$packageJson.scripts.'validate:tests'
+
+  $heavyHookTests = @(
+    'test:agent-preflight',
+    'test:precommit-integration',
+    'test:pre-push-changed-files'
+  )
+  $expectedHookRegressionScript = @($heavyHookTests | ForEach-Object { "npm run $_" }) -join ' && '
+  $hookTestsAreSplit =
+    $hookRegressionScript -ceq $expectedHookRegressionScript -and
+    @($heavyHookTests | Where-Object {
+        $fastTestScript -match "npm run $([regex]::Escape($_))(?:\s|$)"
+      }).Count -eq 0
+  Write-TestResult `
+    -TestName 'Heavy synthetic hook regressions are split out of the fast test aggregate' `
+    -Passed $hookTestsAreSplit `
+    -Message "fast = $fastTestScript; hook regressions = $hookRegressionScript"
+
+  $expectedFullTestScript = 'npm run validate:tests:fast && npm run validate:tests:hook-regressions'
+  $fullTestsComposeBothAggregates = $fullTestScript -ceq $expectedFullTestScript
+  Write-TestResult `
+    -TestName 'Full CI test aggregate retains fast and exhaustive hook suites' `
+    -Passed $fullTestsComposeBothAggregates `
+    -Message "validate:tests = $fullTestScript"
+
+  $expectedPrepushScript = @(
+    'npm run validate:git-push-config',
+    'npm run validate:content',
+    'npm run lint:spelling',
+    'npm run eol:check',
+    'npm run validate:tests:fast',
+    'npm run format:csharp:check',
+    'npm run lint:csharp-naming',
+    'npm run lint:duplicate-usings',
+    'npm run lint:spelling:config',
+    'npm run validate:devcontainer',
+    'npm run validate:hook-sync',
+    'npm run validate:hook-perms',
+    'npm run validate:hook-spell-parity',
+    'npm run validate:cspell-files-parity'
+  ) -join ' && '
+  $prepushUsesOnlyFastTests = $validatePrepushScript -ceq $expectedPrepushScript
+  Write-TestResult `
+    -TestName 'Developer pre-push validation excludes exhaustive synthetic hook fixtures' `
+    -Passed $prepushUsesOnlyFastTests `
+    -Message "validate:prepush = $validatePrepushScript"
+
+  $localGatesPath = Join-Path $repoRoot '.github/workflows/local-gates.yml'
+  $localGatesContent = if (Test-Path $localGatesPath) {
+    Get-Content -Path $localGatesPath -Raw
+  }
+  else {
+    ''
+  }
+  $localGatesContractJob = [regex]::Match(
+    $localGatesContent,
+    '(?ms)^  contract-suites:\r?\n(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\r?\n|\z)'
+  ).Groups['body'].Value
+  $localGatesContractJobPreamble = [regex]::Match(
+    $localGatesContractJob,
+    '(?ms)\A(?<body>.*?)(?=^    steps:\s*$)'
+  ).Groups['body'].Value
+  $localGatesContractStep = [regex]::Match(
+    $localGatesContractJob,
+    '(?ms)^      - name: Run contract suites\s*$(?<body>.*?)(?=^      - name:|\z)'
+  ).Groups['body'].Value
+  Write-TestResult `
+    -TestName 'Local Gates keeps the full test aggregate including hook regressions' `
+    -Passed (
+      -not [string]::IsNullOrWhiteSpace($localGatesContractStep) -and
+      $localGatesContractStep -match '(?m)^        run: npm run validate:tests\s*$' -and
+      $localGatesContractStep -notmatch '(?m)^\s+(if|continue-on-error):' -and
+      $localGatesContractJobPreamble -notmatch '(?m)^\s+(if|continue-on-error):'
+    ) `
+    -Message 'Expected .github/workflows/local-gates.yml to run the full validate:tests aggregate.'
 
   $includesLintSpelling = $validatePrepushScript -match 'npm run lint:spelling(?!:config)'
   Write-TestResult `

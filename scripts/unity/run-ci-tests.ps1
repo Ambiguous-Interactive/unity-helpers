@@ -218,10 +218,9 @@ $PackageName = 'com.wallstop-studios.unity-helpers'
 # value is the version Unity resolves for the ephemeral CI project. Kept at 1.4.5
 # (the harness-proven value) -- a maintainer should confirm whether unity-helpers
 # requires 1.1.33 (to match create-test-project.sh) or 1.4.5 before the first
-# self-hosted run. The performance package (3.4.2) is required by the
-# *.Tests.Runtime.Performance assembly the unity-benchmarks workflow opts into.
+# self-hosted run. Performance tests intentionally use raw Stopwatch measurements,
+# so the ephemeral project does not need Unity's performance-testing package.
 $TestFrameworkVersion = '1.4.5'
-$PerformanceFrameworkVersion = '3.4.2'
 # (The analyzer-DLL roster that stood here was empty, unreferenced, and carried a premise that
 # stopped being true in session 173. See Write-AnalyzerSetupDiagnostics for what actually ships.)
 
@@ -1215,7 +1214,6 @@ function New-ManifestJson {
     $packagePath = ConvertTo-UnityFileUriPath -Path $Root
     $dependencies = [ordered]@{
         'com.unity.test-framework' = $TestFrameworkVersion
-        'com.unity.test-framework.performance' = $PerformanceFrameworkVersion
     }
 
     # UNCONDITIONAL (every leg -- editmode/playmode/standalone, single-threaded,

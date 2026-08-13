@@ -105,7 +105,11 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
-- **Pre-push parity**: run `npm run validate:prepush` (includes full `lint:spelling`) before push; treat git hooks as last-resort only. For the push step itself (setup, redirection, rejection handling) follow [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote)
+- **Pre-push validation**: run `npm run validate:prepush` (includes full `lint:spelling`) before push;
+  when hook or agent-preflight behavior changes, also run `npm run validate:tests:hook-regressions`.
+  CI always runs the combined `validate:tests` aggregate. Treat git hooks as last-resort only. For
+  the push step itself (setup, redirection, rejection handling) follow
+  [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote)
 
 See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/validate-before-commit.md) for details.
 
@@ -218,7 +222,14 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
 - Follow `.editorconfig` formatting rules strictly
 - NEVER pipe output to `/dev/null`; NEVER hard-code machine-specific absolute paths
-- NEVER use `git add` or `git commit` -- user handles all staging/committing
+- Agents may stage, commit, and push completed work when the task calls for publication. Use the
+  repository's git staging retry helpers, keep commits focused, and never rewrite or discard user
+  history without explicit authorization.
+- NEVER invoke the local GitHub CLI (`gh`) for agent work. Use the VS Code GitHub extension/connector
+  first for GitHub reads and mutations, then plain `git` for repository operations the connector
+  cannot perform. If neither path can complete the task, report the blocker instead of falling back
+  to `gh`. This restriction applies to agent tooling, not tracked GitHub Actions steps that invoke
+  `gh` inside CI.
 - For git-interacting scripts, use retry helpers from `scripts/git-staging-helpers.sh` (see [git-safe-operations](./skills/git-safe-operations.md))
 - Write exhaustive tests for every change (see [create-test](./skills/create-test.md))
 - Use high-performance search tools: `rg` not `grep`, `fd` not `find`, `bat --paging=never` not `cat` (see [search-codebase](./skills/search-codebase.md))
@@ -243,7 +254,8 @@ deliberate act, not the tail of every commit.
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
     against protobuf-net 3.2.56 and 2.4.9 in isolated processes.
   - `npm run agent:preflight:fix` then `npm run agent:preflight`.
-  - `npm run validate:prepush` for the wider contract suites.
+  - `npm run validate:prepush` for repository-wide lint and fast contract suites. Exhaustive
+    synthetic hook regressions remain in CI and run locally only when their implementation changes.
   - The Unity MCP bridge for a real editor compile (see the Unity MCP notes).
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in

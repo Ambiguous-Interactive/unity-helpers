@@ -290,6 +290,10 @@ function enumerateTestAsmdefs(repoRoot) {
  * @property {"editmode" | "playmode" | "standalone"} [target=editmode]
  *                     Select assemblies compatible with the Unity test target.
  *                     PlayMode and standalone omit editor-only asmdefs.
+ * @property {boolean} [editorOnly=false]          Keep only asmdefs whose
+ *                     includePlatforms is exactly ["Editor"]. Intended for an
+ *                     EditMode leg paired with a PlayMode leg that owns the
+ *                     platform-neutral runtime assemblies.
  * @property {boolean} [runtimeOnly=false]         Back-compat alias for
  *                     target: "standalone". Applied before the perf/integration
  *                     gating so it composes.
@@ -327,6 +331,9 @@ function defaultIncludeAssemblies(repoRoot, options) {
       if (!isAsmdefCompatibleWithTarget(entry.includePlatforms, entry.excludePlatforms, target)) {
         return false;
       }
+      if (opts.editorOnly === true && !entry.isEditorOnly) {
+        return false;
+      }
       if (entry.isPerf) {
         return includePerf;
       }
@@ -362,6 +369,9 @@ function defaultExcludeAssemblies(repoRoot, options) {
         return true;
       }
       if (!isAsmdefCompatibleWithTarget(entry.includePlatforms, entry.excludePlatforms, target)) {
+        return true;
+      }
+      if (opts.editorOnly === true && !entry.isEditorOnly) {
         return true;
       }
       if (entry.isPerf) {
@@ -415,6 +425,17 @@ if (require.main === module) {
     `\nruntime-only include (${runtimeInclude.length}, drops editor-only asmdefs):\n`
   );
   for (const name of runtimeInclude) {
+    process.stdout.write(`  * ${name}\n`);
+  }
+
+  const editorOnlyInclude = defaultIncludeAssemblies(repoRoot, {
+    target: "editmode",
+    editorOnly: true
+  });
+  process.stdout.write(
+    `\neditor-only include (${editorOnlyInclude.length}, drops platform-neutral asmdefs):\n`
+  );
+  for (const name of editorOnlyInclude) {
     process.stdout.write(`  * ${name}\n`);
   }
 }

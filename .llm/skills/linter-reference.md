@@ -45,7 +45,10 @@ npm run validate:prepush
 | `npm run format:json:check`                     | Check JSON/ASMDEF formatting (Prettier)      |
 | `npm run format:yaml:check`                     | Check YAML formatting (Prettier)             |
 | `npm run eol:check`                             | Line endings (CRLF) and BOM check            |
-| `npm run validate:tests`                        | Test lifecycle lint (Track() usage)          |
+| `npm run lint:tests`                            | Test lifecycle lint (Track() usage)          |
+| `npm run validate:tests:fast`                   | Fast repository contract suites              |
+| `npm run validate:tests:hook-regressions`       | Exhaustive synthetic hook fixtures           |
+| `npm run validate:tests`                        | Complete CI contract suite                   |
 | `npm run test:sync-script-contracts`            | Sync newline + cspell contract regressions   |
 | `bash scripts/audit-license-years.sh --summary` | License year header audit                    |
 
@@ -296,8 +299,7 @@ actionlint
 ### Command
 
 ```bash
-npm run validate:tests
-pwsh -NoProfile -File scripts/lint-tests.ps1
+npm run lint:tests
 ```
 
 ### What It Checks
@@ -429,7 +431,7 @@ Runs these in sequence:
 
 1. `validate:content` (docs + formatting)
 2. `eol:check`
-3. `validate:tests`
+3. `validate:tests:fast` (CI's full `validate:tests` also runs synthetic hook regressions)
 4. `lint:csharp-naming`
 
 ### validate:content

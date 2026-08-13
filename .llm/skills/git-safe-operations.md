@@ -94,29 +94,15 @@ if (-not (Invoke-EnsureNoIndexLock)) {
 }
 ```
 
-### 5. Agent-Specific: No Staging or Committing
+### 5. Agent-Specific: Publish Completed Work Safely
 
-**AI agents must NEVER stage or commit changes.** All git state modifications are the user's responsibility.
+AI agents may stage, commit, and push completed work when publication is part of the task. Use the
+staging retry helpers below, inspect the exact staged diff before committing, and keep commits
+focused. Do not rewrite history, discard user changes, force-push, reset, merge, rebase, or stash
+without explicit authorization.
 
-Allowed commands:
-
-- `git status`
-- `git log`
-- `git diff`
-- `git show`
-- `git blame`
-- `git ls-files`
-
-Forbidden commands:
-
-- `git add`
-- `git commit`
-- `git push`
-- `git reset`
-- `git checkout` (for file modifications)
-- `git stash`
-- `git merge`
-- `git rebase`
+Read-only commands such as `git status`, `git log`, `git diff`, `git show`, `git blame`, and
+`git ls-files` remain safe for routine inspection.
 
 ---
 

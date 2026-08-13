@@ -28,19 +28,25 @@ Execute these steps in order. Each step must pass before proceeding.
 
 ### Step 1: Pre-Flight Checks
 
-Run the full validation suite:
+Run the developer validation suite:
 
 ```bash
 npm run validate:prepush
 ```
 
-This executes all linting, formatting, and convention checks (including `lint:spelling` over C#, markdown, CHANGELOG, and JSON). **All must pass.**
+This executes the repository-wide linting, formatting, convention, and fast contract checks
+(including `lint:spelling` over C#, markdown, CHANGELOG, and JSON). Exhaustive synthetic Git-hook
+fixtures remain mandatory in CI but are excluded here because they create dozens of temporary
+repositories and child PowerShell processes. If hook or agent-preflight behavior changed, also run
+`npm run validate:tests:hook-regressions`. **All applicable checks must pass.**
 
 **Blocker rule — do NOT push if any of these fail:**
 
 - `lint:spelling` — a spelling failure blocks `agent:preflight`, `validate:prepush`, and CI. Fix at Step 1, never at push time.
 - `lint:spelling:config` — cspell.json itself must be clean.
-- `eol:check`, `validate:content`, `validate:tests`, `lint:csharp-naming` — all mandatory.
+- `eol:check`, `validate:content`, `validate:tests:fast`, `lint:csharp-naming` — all mandatory.
+- `validate:tests:hook-regressions` — mandatory when `.githooks/**`, `scripts/agent-preflight.ps1`,
+  or their helpers/tests change.
 
 If any check fails:
 
