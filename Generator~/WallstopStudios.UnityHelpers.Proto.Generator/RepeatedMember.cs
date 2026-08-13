@@ -917,12 +917,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 open++;
             }
 
-            // `false`: a packed run holds bare scalars and cannot recurse, so it spends no nesting
-            // level -- matching TryReadPackedRun, which hands its nested reader the same depth.
-            // Charging it would make a deep-but-legal message decodable and not encodable.
-            string begin =
-                "writer.TryBeginLengthDelimited(" + Tag + ", false, out " + PackedToken + ")";
-
+            // `false` on every TryBeginLengthDelimited below: a packed run holds bare scalars and
+            // cannot recurse, so it spends no nesting level -- matching TryReadPackedRun, which
+            // hands its nested reader the same depth. Charging it would make a deep-but-legal
+            // message decodable and not encodable.
             if (HasCount)
             {
                 writer.Line(
@@ -953,6 +951,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 writer.Blank();
             }
+
+            string begin =
+                "writer.TryBeginLengthDelimited(" + Tag + ", false, out " + PackedToken + ")";
 
             int loop = OpenLoop(writer, guarded: false);
 
