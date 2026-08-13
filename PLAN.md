@@ -5,14 +5,14 @@
 > sessions 134-156) have been removed from the active plan and condensed into
 > [Foundation already in place](#foundation-already-in-place). Released work is summarized in
 > [Shipped and Retired](#shipped-and-retired); older historical sections keep their original
-> branch/run context where relevant. Baseline: `main` at `a1bf3195`, package `3.5.1`.
+> branch/run context where relevant. Baseline: `main` at `654e0719`, package `3.5.1`.
 
 ## Contents
 
 - [Shipped and Retired](#shipped-and-retired) — what came out of the plan and why
 - [Test Suite Runtime Reduction](#test-suite-runtime-reduction--goal-met-section-retired) — **GOAL MET** (all 14 legs under 5.3 min; retired)
 - [CI Throughput](#ci-throughput) — the main matrix is already dominated by Unity work rather than wrapper setup; low-risk dependency and duplicate-launch reductions remain appropriate, while grouping all modes by editor requires new measurements that justify its license/failure-gating complexity.
-- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port have landed. Session 182 added the isolated protobuf-net 2.4.9 oracle promised by #371; session 183 closed the collection matrix (#395) and the value-type sweep (#388). Performance acceptance and one hybrid release remain before removal of the runtime protobuf-net fallback.)
+- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port have landed. Sessions 184-185 added the Release allocation contract, a real Unity benchmark path, and one-time generated-registration plus first-use evidence. A licensed EditMode/PlayMode run and one hybrid release remain before removal of the runtime protobuf-net fallback.)
 - [Backlog: Auto-Loading Cache Feature](#backlog-auto-loading-cache-feature) (not started)
 - [DxKit Rebrand: Unity Helpers → DxKit](#dxkit-rebrand-unity-helpers--dxkit) — **NOT STARTED** (brand, docs site, editor UI, assets)
 
@@ -247,9 +247,17 @@ DoxReloaded, IshoBoy, qora-redux) touched the self-hosted runners while ours sat
   while breaking a release contract. `Local Gates` now runs the full `validate:tests` suite on every
   pull request. Session 184 split its three exhaustive synthetic-hook harnesses (42+ temporary Git
   repositories and 46+ child PowerShell launches) into `validate:tests:hook-regressions`: CI retains
-  them unconditionally, while developer `validate:prepush` runs `validate:tests:fast`. Hook authors
-  run the exhaustive subset locally when `.githooks/**`, agent-preflight, or their helpers change.
-  This addresses #425's multi-minute manual gate without weakening the actual hooks or CI coverage.
+  them unconditionally. Session 185 measured that even the reduced `validate:prepush` still took
+  minutes because `validate:tests:fast` itself contains dozens of repository-wide synthetic suites.
+  `validate:prepush` is now the roughly one-second last-resort Git/config safety check, while the former
+  complete aggregate remains explicitly available as `validate:local`. Hook authors run the
+  exhaustive subset locally when `.githooks/**`, agent-preflight, or their helpers change. This
+  closes #425's latency contract without weakening the actual hooks or CI coverage. Five consecutive
+  npm-wrapper measurements completed in 0.787-1.441 seconds; five actual new-branch pre-push hook
+  runs, including the full pushed C# tree guard, completed in 0.804-1.500 seconds (30-second ceiling).
+  The final changed-file preflight also exposed that a force-added ignored progress log could make
+  one bulk formatter restage fail. Already-staged paths now use `git add --update`, while genuinely
+  new companion files retain the normal explicit-add path; all 143 preflight behavior checks pass.
 
 - **Assembly discovery belongs on the hosted matrix job, not every licensed leg.** Session 184
   computes the five mode/integration profiles once with the shared `asmdef-discovery.js` module and
@@ -260,6 +268,16 @@ DoxReloaded, IshoBoy, qora-redux) touched the self-hosted runners while ours sat
   assemblies in EditMode retain the editor scheduling/race coverage, while three platform-neutral
   runtime/core assemblies run in PlayMode. A workflow contract pins the centralized source, the
   editor-only split, and the absence of per-leg setup.
+
+- **The benchmark matrix follows the same hosted-discovery rule, session 185.** Its hosted job now
+  resolves the exact Performance/Random EditMode profile and Performance-only PlayMode profile once,
+  then carries those assembly lists into every Unity-version entry. Licensed benchmark legs no longer
+  install Node or walk asmdefs. Result assembly validates a temporary candidate before touching the
+  canonical artifacts: only a successful full scheduled matrix with every exact identity, metrics in
+  every file, and no removed baseline key may replace the report or advance the baseline. Pinned and
+  failed runs retain separately named diagnostic XML; a successful canonical run with missing or empty
+  results fails closed. The unitypackage exporter now also passes `-releaseCodeOptimization`, so export
+  smoke compiles the same optimized release payload that the benchmark claims to measure.
 
 - **`max-parallel: 2` was the idle time, session 166.** It gates matrix *eligibility*, not execution
   — a self-hosted runner takes one job at a time regardless — so every completion needed a fresh
@@ -1503,15 +1521,36 @@ These remain release-level acceptance work. The Release generator benchmark now 
 representative scalar/string/repeated/map/nested contract against both supported protobuf-net
 oracles. The local protobuf-net v3 baseline measured serialization into a warmed reusable buffer at
 **0 B/op** for WallstopProto versus **40 B/op** for protobuf-net, while deserialization was **5,272
-B/op** versus **4,112 B/op** because both materialize the returned object graph. The existing Unity
-benchmark contract is now dual-annotated, so its weekly Release lane measures WallstopProto rather
-than silently falling back to protobuf-net. Collect Unity-editor throughput and cold-start evidence
-before declaring the milestone complete.
+B/op** versus **4,112 B/op** because both materialize the returned object graph. The Unity benchmark
+contract is dual-annotated, so its weekly Release lane measures WallstopProto rather than silently
+falling back to protobuf-net.
+
+Session 185 added a controlled registration-inclusive comparison: nine rounds use 27 API-specific
+generic closures of the same representative contract, plus one warmup closure. The Unity 6000.4.6f1
+editor loaded the Release-optimized performance assembly and measured these local medians:
+
+| Operation | WallstopProto | protobuf-net | Speedup |
+| --- | ---: | ---: | ---: |
+| One-time assembly registration + median first serialize | 4,243.2 us | 7,575.2 us | 1.79x |
+| One-time assembly registration + median first deserialize | 4,325.2 us | 7,522.6 us | 1.74x |
+
+The generated registrar records its own first invocation before any fixture code can repeat it. The
+report exposes that single measurement separately, then adds it once to the median first-API cost
+across nine API-specific closures for each comparison. Input preparation uses the opposite
+serializer's closure, so neither measured
+implementation is accidentally warmed by its own fixture. One shared generic/JIT warmup happens before
+the API samples, full-shape round trips are asserted outside the clock, and serializer order alternates
+by round. This isolates eager generated registration versus protobuf-net's per-contract model
+construction from unrelated Unity import cost. The licensed Release workflow's EditMode/PlayMode output
+remains the merge evidence.
 
 - Warm throughput ≥ protobuf-net v3 (generated code, no per-call model lookup beyond a static field read).
-- Cold start ≫ better (no model build / no ref-emit).
+- Cold start ≫ better (no model build / no ref-emit). The controlled optimized-editor evidence includes
+  the actual one-time eager generated registration and is 1.79x faster on first serialize and 1.74x
+  faster on first deserialize. It excludes shared JIT and unrelated Unity process/import work; retain
+  that boundary in reports.
 - Zero allocations on the warmed reusable-buffer write path is now a tested Release contract. Retain
-  it while adding Unity Profiler evidence for the editor/player path.
+  it while adding Unity Profiler evidence for the EditMode/PlayMode path.
 
 ### Risks & mitigations
 

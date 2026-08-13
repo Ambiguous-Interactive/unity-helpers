@@ -10,7 +10,7 @@ const configuredPolicyRoot = process.env.BUILD_LOCK_POLICY_ROOT || "";
 
 // This test runs against a separate checkout of the central build-lock policy, which only CI
 // provides (see the "Test central Unity cleanup policy parity" step). Hard-failing without it
-// made `npm run validate:prepush` -- the documented pre-push gate -- impossible to pass on a
+// made the former `npm run validate:prepush` aggregate impossible to pass on a
 // developer machine. Skip when the checkout is absent, but never when running in Actions: there
 // its absence means the CI wiring broke, and silently skipping would drop the contract.
 if (!configuredPolicyRoot) {

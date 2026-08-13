@@ -230,6 +230,7 @@ UNITY_VERSION="${UNITY_VERSION}" \
 UNITY_TIMEOUT="${UNITY_TIMEOUT:-7200}" \
 "${SCRIPT_DIR}/run-unity-docker.sh" \
     -batchmode -nographics -quit \
+    -releaseCodeOptimization \
     -projectPath /project \
     -executeMethod UnityHelpersPackageExporter.Export \
     -exportOutput "/project/unitypackage-output/$(basename "${OUTPUT_PATH}")" \

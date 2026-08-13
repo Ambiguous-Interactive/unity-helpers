@@ -28,7 +28,7 @@
 
 ## CSharpier (C# Files)
 
-> **CRITICAL**: `npm run agent:preflight`, `npm run validate:prepush`, and CI/CD will REJECT commits with CSharpier formatting issues. The local pre-push hook stays fast and does not run formatters.
+> **CRITICAL**: `npm run agent:preflight`, `npm run validate:local`, and CI/CD will REJECT commits with CSharpier formatting issues. The local pre-push hook stays fast and does not run formatters.
 
 ### When to Run
 
@@ -57,7 +57,7 @@ dotnet tool run csharpier format Runtime/Core/Helper/Buffers.cs
 dotnet tool run csharpier check .
 
 # The same check, wired into the local gates (fails with remediation if tools are not restored)
-npm run format:csharp:check   # whole repo; also runs inside npm run validate:prepush
+npm run format:csharp:check   # whole repo; also runs inside npm run validate:local
 npm run format:csharp         # whole repo, formatting in place
 ```
 
@@ -76,7 +76,7 @@ dotnet tool restore
 
 ## Prettier (Non-C# Files)
 
-> **CRITICAL**: `npm run agent:preflight`, `npm run validate:prepush`, and CI/CD REJECT commits with Prettier issues. The local pre-push hook stays fast and does not run formatters. Run Prettier IMMEDIATELY after editing ANY non-C# file.
+> **CRITICAL**: `npm run agent:preflight`, `npm run validate:local`, and CI/CD REJECT commits with Prettier issues. The local pre-push hook stays fast and does not run formatters. Run Prettier IMMEDIATELY after editing ANY non-C# file.
 
 ### When to Run
 
@@ -229,7 +229,7 @@ npm run eol:fix
 npm run lint:spelling
 
 # 6. Run all validations
-npm run validate:prepush
+npm run validate:local
 ```
 
 See [Rule 4: Spell-Check Every Change cspell Covers](./validate-before-commit.md#rule-4-spell-check-every-change-cspell-covers) for the spell-check failure-recovery decision tree.
@@ -286,7 +286,7 @@ Always verify with `--check` to confirm formatting succeeded.
 
 ## Push-Prep Enforcement
 
-`npm run agent:preflight`, `npm run validate:prepush`, and CI enforce formatting. The local pre-push hook intentionally stays fast and does not run formatters.
+`npm run agent:preflight`, `npm run validate:local`, and CI enforce formatting. The local pre-push hook intentionally stays fast and does not run formatters.
 
 If validation fails:
 

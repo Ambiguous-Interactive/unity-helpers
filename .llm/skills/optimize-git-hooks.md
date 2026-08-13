@@ -19,7 +19,7 @@ detection, caching, batching, and incremental checking.
 ## Core Principle: CI Catches Repo-Wide, Hooks Catch Change-Local
 
 Hooks should be **fast** and last-resort. Agent workflows, `agent:preflight`,
-`validate:prepush`, and CI should catch normal lint/test/doc/spelling failures
+targeted checks, `validate:local`, and CI should catch normal lint/test/doc/spelling failures
 before Git invokes a hook. Local hooks validate only the files being
 committed/pushed and only the tiny set of checks that are cheap and safety
 critical.
@@ -31,8 +31,8 @@ This means:
 - Hooks cache expensive computations
 - CI runs the same lint scripts without `--paths` for full coverage
 - Pre-push must not start Node or child PowerShell processes for ordinary
-  linting; route those checks through `npm run agent:preflight`,
-  `npm run validate:prepush`, and CI
+  linting; route those checks through `npm run agent:preflight`, targeted checks,
+  `npm run validate:local` when a repository-wide aggregate is warranted, and CI
 
 ---
 
@@ -161,7 +161,7 @@ function Get-TrackedFiles {
 
 When adding a new check to the pre-push hook:
 
-1. First prove the check cannot live in `agent:preflight`, `validate:prepush`,
+1. First prove the check cannot live in `agent:preflight`, targeted validation, `validate:local`,
    pre-commit, or CI. That is the default home for formatting, spelling, docs,
    EOL, meta, and regression-suite validation.
 2. Measure the hook before and after. Any total pre-push time above 1 second is

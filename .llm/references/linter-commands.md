@@ -389,7 +389,7 @@ npm run eol:fix
 
 ```bash
 # Run repository-wide lint and fast contract validation before pushing
-npm run validate:prepush
+npm run validate:local
 ```
 
 This runs:
@@ -418,7 +418,7 @@ npm run format:json
 npm run format:yaml
 
 # 5. Run full validation
-npm run validate:prepush
+npm run validate:local
 ```
 
 ---
@@ -427,7 +427,8 @@ npm run validate:prepush
 
 | Script                       | Description                           |
 | ---------------------------- | ------------------------------------- |
-| `npm run validate:prepush`   | Run all pre-push validations          |
+| `npm run validate:prepush`   | Run the fast last-resort push check   |
+| `npm run validate:local`     | Run the complete local validation set |
 | `npm run validate:content`   | Validate documentation and formatting |
 | `npm run lint:markdown`      | Run markdownlint                      |
 | `npm run lint:docs`          | Validate documentation links          |

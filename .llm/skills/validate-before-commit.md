@@ -26,13 +26,15 @@ For troubleshooting common errors, see [validation-troubleshooting](./validation
 # Fast changed-file preflight (MANDATORY before marking task complete)
 npm run agent:preflight:fix
 
-# Run repository-wide lint plus fast contract validation before pushing
+# Final fast Git/config safety check before pushing
 npm run validate:prepush
 ```
 
 Use `agent:preflight:fix` continuously while working to catch hook-class failures early on changed files.
-Use `validate:prepush` before push. CI additionally runs the exhaustive synthetic hook fixtures;
-run `npm run validate:tests:hook-regressions` locally when hook or agent-preflight behavior changes.
+Run targeted lint/test commands for the changed files, then `validate:prepush` before push. Use
+`validate:local` only when a complete repository-wide aggregate is warranted. CI additionally runs
+the exhaustive synthetic hook fixtures; run `npm run validate:tests:hook-regressions` locally when
+hook or agent-preflight behavior changes.
 
 **C#/tests/JSON/YAML/skill/CHANGELOG edits: run `npm run lint:spelling`** — cspell covers every file matching its `files` glob, not just Markdown. See [Rule 4: Spell-Check EVERY Change cspell Covers](#rule-4-spell-check-every-change-cspell-covers) for the failure-recovery decision tree. To add a new word: `npm run lint:spelling:add -- <bucket> <word>`.
 
@@ -127,7 +129,7 @@ For detailed workflow patterns and more examples, see [formatting](./formatting.
 
 The `cspell.json` `files` glob and agent-preflight's pass-through list are kept in lock-step by `scripts/tests/test-cspell-hook-files-parity.sh` (run via `npm run validate:cspell-files-parity`). If you see drift, fix `cspell.json`'s `files` glob -- never narrow agent-preflight's pass-through.
 
-If you modified ANY file in that set -- C# sources, tests, CHANGELOG, skill files, docs, YAML, JSON, `.asmdef`/`.asmref`, `.js` scripts -- you MUST run `npm run lint:spelling` before declaring work complete. `npm run agent:preflight` checks the same changed-file set before hooks are involved, and `npm run validate:prepush`/CI run full spelling validation. Do NOT mentally gate "this is a code change, no spelling matters" -- cspell lints identifiers in comments, XML docs, and log strings, which is where most typos actually land.
+If you modified ANY file in that set -- C# sources, tests, CHANGELOG, skill files, docs, YAML, JSON, `.asmdef`/`.asmref`, `.js` scripts -- you MUST run `npm run lint:spelling` before declaring work complete. `npm run agent:preflight` checks the same changed-file set before hooks are involved, and `npm run validate:local`/CI run full spelling validation. Do NOT mentally gate "this is a code change, no spelling matters" -- cspell lints identifiers in comments, XML docs, and log strings, which is where most typos actually land.
 
 A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../../.claude/settings.json)) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit. The hook ships with the repo via `$CLAUDE_PROJECT_DIR`, so teammates and fresh clones inherit it automatically -- there is no per-dev setup to forget. If you skip running `npm run lint:spelling` manually, the PostToolUse hook surfaces the feedback immediately instead of waiting for validation at push prep.
 
@@ -198,7 +200,7 @@ npm run lint:markdown     # Structural rules
 ```bash
 # After EVERY CHANGELOG.md / package.json / asmdef / asmref edit:
 node scripts/run-prettier.js --write -- <file>
-npm run lint:spelling    # 🚨 validate:prepush/CI spell-check CHANGELOG + JSON
+npm run lint:spelling    # 🚨 validate:local/CI spell-check CHANGELOG + JSON
 ```
 
 ### YAML Changes
@@ -229,7 +231,7 @@ npm run lint:spelling    # 🚨 MANDATORY — cspell lints test comments + strin
 
 **CRITICAL**: The test linter is **MANDATORY** for any test file changes (files in `Tests/` directory). You **MUST** run it **IMMEDIATELY** after each test file modification — do NOT batch these checks at the end of your task.
 
-**Why this matters**: Test lifecycle lint failures block `agent:preflight`, `validate:prepush`, and CI. Catching and fixing these issues early (after each file change) prevents frustrating failures when you prepare to push.
+**Why this matters**: Test lifecycle lint failures block `agent:preflight`, `validate:local`, and CI. Catching and fixing these issues early (after each file change) prevents frustrating failures when you prepare to push.
 
 ### Assembly Definition Changes (`.asmdef`)
 
@@ -288,7 +290,7 @@ pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
 
 ## What Gets Validated
 
-The `npm run validate:prepush` command runs these checks:
+The `npm run validate:local` command runs these checks:
 
 1. **validate:content** — Documentation and formatting
    - `lint:docs` — Markdown links (no backtick `.md` refs)

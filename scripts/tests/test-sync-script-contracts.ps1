@@ -261,6 +261,7 @@ function Run-AgentValidationContractTests {
 
   $packageJson = Get-Content -Path $packageJsonPath -Raw | ConvertFrom-Json
   $validatePrepushScript = [string]$packageJson.scripts.'validate:prepush'
+  $validateLocalScript = [string]$packageJson.scripts.'validate:local'
   $fastTestScript = [string]$packageJson.scripts.'validate:tests:fast'
   $hookRegressionScript = [string]$packageJson.scripts.'validate:tests:hook-regressions'
   $fullTestScript = [string]$packageJson.scripts.'validate:tests'
@@ -288,7 +289,7 @@ function Run-AgentValidationContractTests {
     -Passed $fullTestsComposeBothAggregates `
     -Message "validate:tests = $fullTestScript"
 
-  $expectedPrepushScript = @(
+  $expectedLocalScript = @(
     'npm run validate:git-push-config',
     'npm run validate:content',
     'npm run lint:spelling',
@@ -304,11 +305,17 @@ function Run-AgentValidationContractTests {
     'npm run validate:hook-spell-parity',
     'npm run validate:cspell-files-parity'
   ) -join ' && '
-  $prepushUsesOnlyFastTests = $validatePrepushScript -ceq $expectedPrepushScript
+  $prepushIsLastResortOnly = $validatePrepushScript -ceq 'npm run validate:git-push-config'
   Write-TestResult `
-    -TestName 'Developer pre-push validation excludes exhaustive synthetic hook fixtures' `
-    -Passed $prepushUsesOnlyFastTests `
+    -TestName 'Developer pre-push validation is a bounded last-resort safety check' `
+    -Passed $prepushIsLastResortOnly `
     -Message "validate:prepush = $validatePrepushScript"
+
+  $localValidationRetainsFullAggregate = $validateLocalScript -ceq $expectedLocalScript
+  Write-TestResult `
+    -TestName 'Explicit local validation retains the former complete developer aggregate' `
+    -Passed $localValidationRetainsFullAggregate `
+    -Message "validate:local = $validateLocalScript"
 
   $localGatesPath = Join-Path $repoRoot '.github/workflows/local-gates.yml'
   $localGatesContent = if (Test-Path $localGatesPath) {
@@ -339,17 +346,17 @@ function Run-AgentValidationContractTests {
     ) `
     -Message 'Expected .github/workflows/local-gates.yml to run the full validate:tests aggregate.'
 
-  $includesLintSpelling = $validatePrepushScript -match 'npm run lint:spelling(?!:config)'
+  $includesLintSpelling = $validateLocalScript -match 'npm run lint:spelling(?!:config)'
   Write-TestResult `
-    -TestName 'validate:prepush includes npm run lint:spelling' `
+    -TestName 'validate:local includes npm run lint:spelling' `
     -Passed $includesLintSpelling `
-    -Message "Current validate:prepush script: $validatePrepushScript"
+    -Message "Current validate:local script: $validateLocalScript"
 
-  $includesLintSpellingConfig = $validatePrepushScript -match 'npm run lint:spelling:config'
+  $includesLintSpellingConfig = $validateLocalScript -match 'npm run lint:spelling:config'
   Write-TestResult `
-    -TestName 'validate:prepush includes npm run lint:spelling:config' `
+    -TestName 'validate:local includes npm run lint:spelling:config' `
     -Passed $includesLintSpellingConfig `
-    -Message "Current validate:prepush script: $validatePrepushScript"
+    -Message "Current validate:local script: $validateLocalScript"
 
   $agentPreflightContent = Get-Content -Path $agentPreflightPath -Raw
 
@@ -2412,7 +2419,7 @@ function Run-GeneratedMetaLineEndingContractTests {
 
   # .gitattributes declares '*.meta text eol=crlf' and check-eol.ps1 enforces that in the WORKING
   # TREE, but a freshly generated file never passes through git's smudge filter. A generator that
-  # writes LF therefore leaves validate:prepush failing on a file the developer did not hand-write --
+  # writes LF therefore leaves validate:local failing on a file the developer did not hand-write --
   # and agent:preflight:fix cannot clear it, because its EOL normalization runs before the step that
   # creates the .meta. Observed twice: session 173 committed one and session 174 produced two more.
   $attributesPath = Join-Path $repoRoot '.gitattributes'
@@ -2752,12 +2759,12 @@ function Run-CSharpierFormatGateContractTests {
     -Message "format:csharp = $fixScript"
 
   # The whole point of #373: a C# formatting break must be reachable locally, before a push. The
-  # gate lives in validate:prepush because that is the documented pre-push parity command.
-  $prepushScript = [string]$packageJson.scripts.PSObject.Properties['validate:prepush'].Value
+  # whole-repository gate lives in validate:local; changed files remain covered by agent-preflight.
+  $localScript = [string]$packageJson.scripts.PSObject.Properties['validate:local'].Value
   Write-TestResult `
-    -TestName 'validate:prepush runs the CSharpier check' `
-    -Passed ($prepushScript -match 'npm run format:csharp:check') `
-    -Message "validate:prepush = $prepushScript"
+    -TestName 'validate:local runs the CSharpier check' `
+    -Passed ($localScript -match 'npm run format:csharp:check') `
+    -Message "validate:local = $localScript"
 
   if (-not (Test-Path $agentPreflightPath)) {
     Write-TestResult `

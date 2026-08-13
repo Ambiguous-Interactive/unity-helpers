@@ -51,7 +51,7 @@ Pre-commit intentionally does not run Prettier, CSharpier, cspell,
 markdownlint, documentation link lint, EOL normalization, test lint,
 duplicate-using lint, or broad license audits. Those checks belong in
 `npm run agent:preflight:fix`,
-`npm run validate:prepush`, and CI so the hook stays fast and reliable on native
+`npm run validate:local`, and CI so the hook stays fast and reliable on native
 Linux, macOS, and Windows hosts.
 
 The repository also installs a `pre-merge-commit` hook that delegates to `pre-commit`. Git does NOT run `pre-commit` on merge commits by default, so without this delegation any file introduced through a merge (including manual conflict resolution) would bypass every validation. The April 2026 `PWS001` regression is the concrete incident this guards against.
@@ -70,7 +70,7 @@ If a commit bypassed the hook (e.g., `--no-verify`, hook not installed), fix loc
 npm run format:fix
 
 # Run full validation
-npm run validate:prepush
+npm run validate:local
 ```
 
 ---
@@ -170,16 +170,16 @@ Markdown tables don't support multi-line cells. If you need complex content, con
 
 ## Verification Commands
 
-| What to Check         | Command                               |
-| --------------------- | ------------------------------------- |
-| All formatting        | `npm run format:check`                |
-| Markdown only         | `npm run format:md:check`             |
-| JSON/asmdef only      | `npm run format:json:check`           |
-| YAML only             | `npm run format:yaml:check`           |
-| JavaScript only       | `npm run format:js:check`             |
-| Full CI-like check    | `npm run validate:content`            |
-| Everything (pre-push) | `npm run validate:prepush`            |
-| Standalone script     | `bash scripts/validate-formatting.sh` |
+| What to Check            | Command                               |
+| ------------------------ | ------------------------------------- |
+| All formatting           | `npm run format:check`                |
+| Markdown only            | `npm run format:md:check`             |
+| JSON/asmdef only         | `npm run format:json:check`           |
+| YAML only                | `npm run format:yaml:check`           |
+| JavaScript only          | `npm run format:js:check`             |
+| Full CI-like check       | `npm run validate:content`            |
+| Complete local aggregate | `npm run validate:local`              |
+| Standalone script        | `bash scripts/validate-formatting.sh` |
 
 ---
 

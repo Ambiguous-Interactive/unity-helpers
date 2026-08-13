@@ -217,8 +217,9 @@ jobs:
           # STANDALONE tier. The unity-tests-standalone job `needs:` unity-tests,
           # so a fast-tier failure SKIPS the ~30-min-each IL2CPP standalone legs --
           # a fundamental break costs minutes, not ~90 min of player builds. Because
-          # the org build-lock serializes every leg onto one seat, standalone always
-          # ran last anyway, so gating it adds zero wall-clock to a green run.
+          # measured green runs hand off from the fast tier to standalone in about
+          # one second, so gating adds negligible wall-clock while preserving the
+          # early failure cutoff.
           #
           # Each tier's include is mode-major, version-minor, ordered explicitly
           # (GitHub's bare cartesian expansion order is not contractually
@@ -541,10 +542,10 @@ jobs:
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
         # has EVER been is 9.1 min (editmode), with standalone topping out at
         # 8.7 min. 40/60 keeps >4x headroom over that worst case -- enough for a
-        # cold import on a fresh runner -- while cutting what a HANG costs: every
-        # leg serializes on the one organization Unity seat, and a lock wait of
-        # 91 min has been measured behind a stuck leg, so an oversized step clock
-        # turns one hang into org-wide starvation. Standalone keeps the larger
+        # cold import on a fresh runner -- while cutting what a HANG costs: a
+        # 91-minute wait has been measured behind a stuck licensed leg, so an
+        # oversized step clock strands one runner and delays queued organization
+        # work. Standalone keeps the larger
         # budget because it also builds an IL2CPP player. Both stay under the job
         # timeout (1200) so the step clock fires first and releases the seat.
         timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
@@ -567,8 +568,8 @@ jobs:
           # every job and `-x` means gitignored, so while the project lived under
           # .artifacts/ every job deleted the Library the previous job had just built
           # on that same disk -- and the repo paid an actions/cache round trip to put
-          # it back (measured across the 60 most recent runs: 109 min of restore,
-          # 119 min of save, all on the single serialized organization Unity seat).
+          # it back (measured across the 60 most recent runs: 109 min of restore
+          # and 119 min of save on licensed self-hosted runner time).
           # RUNNER_WORKSPACE is the checkout's parent, which git clean cannot reach.
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -706,9 +707,8 @@ jobs:
   # means any failure in the fast tier (a compile error in an editmode leg, a mass
   # runtime failure in any editmode/playmode leg) SKIPS this whole job -- the
   # ~30-min-each standalone builds never start on a fundamentally-broken PR. On a
-  # green fast tier this runs exactly as before; because the org build-lock
-  # serializes every leg onto the one Unity seat, standalone already ran last, so
-  # gating it costs zero wall-clock. The steps are intentionally identical to
+  # green fast tier this runs exactly as before; measured tier handoff is about one
+  # second, so the failure gate costs negligible wall-clock. The steps are intentionally identical to
   # unity-tests -- the `matrix.test-mode == 'standalone'` inline conditionals select
   # the IL2CPP provisioning profile, the Debug C++ config (Release ICEs MSVC
   # 14.51.36231 on the generated test C++ -- see run-ci-tests.ps1 for the
@@ -896,10 +896,10 @@ jobs:
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
         # has EVER been is 9.1 min (editmode), with standalone topping out at
         # 8.7 min. 40/60 keeps >4x headroom over that worst case -- enough for a
-        # cold import on a fresh runner -- while cutting what a HANG costs: every
-        # leg serializes on the one organization Unity seat, and a lock wait of
-        # 91 min has been measured behind a stuck leg, so an oversized step clock
-        # turns one hang into org-wide starvation. Standalone keeps the larger
+        # cold import on a fresh runner -- while cutting what a HANG costs: a
+        # 91-minute wait has been measured behind a stuck licensed leg, so an
+        # oversized step clock strands one runner and delays queued organization
+        # work. Standalone keeps the larger
         # budget because it also builds an IL2CPP player. Both stay under the job
         # timeout (1200) so the step clock fires first and releases the seat.
         timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
@@ -1234,9 +1234,9 @@ jobs:
         if: ${{ matrix.is-empty != true }}
         # editmode + playmode ONLY (no standalone IL2CPP build). Measured worst case
         # for this leg across the 60 most recent runs is 7.8 min, so 40 keeps >5x
-        # headroom while failing a hang 50 min sooner than the old 90 -- the
-        # organization Unity seat is a single serialized resource, and a stuck leg
-        # holds it for exactly this long. See the default matrix job for the full
+        # headroom while failing a hang 50 min sooner than the old 90 -- a stuck
+        # licensed leg strands its runner and delays queued organization work for
+        # exactly this long. See the default matrix job for the full
         # measurement note. Stays under the job timeout (1200).
         timeout-minutes: 40
         shell: pwsh

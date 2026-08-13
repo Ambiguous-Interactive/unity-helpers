@@ -374,7 +374,7 @@ if (require.main === module) {
   const configuredPolicyRoot = process.env.BUILD_LOCK_POLICY_ROOT || "";
 
   // Same rule as test-portable-cleanup-classifier.js: a developer machine has no central policy
-  // checkout and `npm run validate:prepush` has to stay runnable there, but under Actions the
+  // checkout and `npm run validate:local` has to stay runnable there, but under Actions the
   // checkout's absence means the CI wiring broke. Skipping there would drop the contract silently,
   // which is exactly the shape of failure this gate exists to end.
   if (!configuredPolicyRoot) {

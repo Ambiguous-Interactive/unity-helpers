@@ -363,9 +363,9 @@ There is no implicit reference conversion from 'X' to 'UnityEngine.MonoBehaviour
    - `eol:check` — Line endings
    - `validate:tests` — Test lifecycle
 
-2. **Reproduce locally**: `npm run validate:prepush`
+2. **Reproduce locally**: `npm run validate:local`
 
-3. **Fix and verify**: Fix the issue, run the specific command, then run `npm run validate:prepush`
+3. **Fix and verify**: Fix the issue, run the specific command, then run `npm run validate:local`
 
 ---
 
@@ -398,7 +398,7 @@ Several `scripts/*.ps1` files end without an explicit `exit 0` on their success 
 ## Quick Recovery Commands
 
 See [`quick_recovery`](../code-samples/patterns/ValidationFixPatterns.sh) for the full script, or run individually:
-`node scripts/run-prettier.js --write -- .` | `npm run eol:fix` | `dotnet tool run csharpier format .` | `npm run validate:prepush`
+`node scripts/run-prettier.js --write -- .` | `npm run eol:fix` | `dotnet tool run csharpier format .` | `npm run validate:local`
 
 ---
 

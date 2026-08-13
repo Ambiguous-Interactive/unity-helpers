@@ -147,7 +147,7 @@ pwsh -NoProfile -File scripts/unity/setup-license.ps1 -Check
 ```
 
 - **Exit code 0**: License files exist. Proceed to Step 2.
-- **Exit code 1**: No license configured. Inform the user: "Unity license is not configured. Run `npm run unity:setup-license` to set up." Skip Unity compilation/testing but continue with other validations (`npm run validate:prepush`).
+- **Exit code 1**: No license configured. Inform the user: "Unity license is not configured. Run `npm run unity:setup-license` to set up." Skip Unity compilation/testing but continue with relevant targeted non-Unity checks.
 
 **Important**: `-Check` only verifies that license FILES exist, not that the license will activate successfully. Personal licenses (`.ulf` files) are bound to a specific machine — a license generated on a different machine will fail activation with `Machine bindings don't match`. This is detected in Step 2.
 
@@ -180,7 +180,8 @@ bash scripts/unity/run-tests.sh --filter "GradualPurgingTests"
 
 #### Step 4: Continue with other validations
 
-Regardless of whether Unity compilation/testing succeeded or was skipped due to license issues, always run:
+Regardless of whether Unity compilation/testing succeeded or was skipped due to license issues, run
+relevant targeted non-Unity checks and the final fast safety check:
 
 ```bash
 npm run validate:prepush
@@ -194,7 +195,7 @@ npm run validate:prepush
 | License files exist but activation fails | Warn user (machine mismatch), skip Unity, run other validations |
 | Compilation fails (non-license)          | Fix code, re-compile                                            |
 | Compilation succeeds                     | Run tests, fix failures                                         |
-| All Unity tests pass                     | Run `npm run validate:prepush`                                  |
+| All Unity tests pass                     | Run targeted checks, then `npm run validate:prepush`            |
 
 Do NOT attempt to create `.unity-secrets/` files programmatically — use the wizard.
 

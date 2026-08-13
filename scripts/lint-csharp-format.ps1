@@ -3,7 +3,7 @@ Param(
   [switch]$Fix,
   # Report a missing tool manifest or a missing dotnet as a skip rather than a failure. Only the
   # changed-file pass uses this, so it can run inside a scratch repository that has neither; the
-  # whole-repository check in validate:prepush never sets it, which is what keeps the gate real.
+  # whole-repository check in validate:local never sets it, which is what keeps the gate real.
   [switch]$SkipWhenUnavailable,
   [string[]]$Paths
 )

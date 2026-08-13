@@ -274,6 +274,7 @@ function Invoke-GitAddWithRetry {
         [int]$MaxAttempts = $script:GitLockMaxAttempts,
         [int]$InitialDelayMilliseconds = $script:GitLockInitialDelayMs,
         [int]$MaxDelayMilliseconds = $script:GitLockMaxDelayMs,
+        [switch]$UpdateOnly,
         [switch]$Quiet
     )
 
@@ -284,7 +285,11 @@ function Invoke-GitAddWithRetry {
 
     Write-GitStagingVerbose "git_add_with_retry: staging $($Items.Count) file(s)"
 
-    $gitArgs = @('add', '--')
+    $gitArgs = @('add')
+    if ($UpdateOnly) {
+        $gitArgs += '--update'
+    }
+    $gitArgs += '--'
     $gitArgs += $Items
 
     $mutex = Get-GitOperationMutex

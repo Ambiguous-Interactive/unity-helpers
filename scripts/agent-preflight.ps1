@@ -414,7 +414,10 @@ function Add-PathsToGitIndexWithRetry {
 
     Push-Location $RepoRoot
     try {
-        $exitCode = Invoke-GitAddWithRetry -Items $uniquePaths -IndexLockPath $indexLockPath
+        $exitCode = Invoke-GitAddWithRetry `
+            -Items $uniquePaths `
+            -IndexLockPath $indexLockPath `
+            -UpdateOnly:(-not $AllowInitiallyUnstaged)
         return ($exitCode -eq 0)
     }
     finally {
@@ -1026,7 +1029,7 @@ function New-UnityMetaFile {
     $guid = [guid]::NewGuid().ToString('N')
 
     # CRLF, because .gitattributes declares '*.meta text eol=crlf' and check-eol.ps1 -- which
-    # validate:prepush runs -- enforces that in the WORKING TREE. A file written here never passes
+    # validate:local runs -- enforces that in the WORKING TREE. A file written here never passes
     # through git's smudge filter, so writing LF leaves a failure that agent:preflight:fix cannot
     # clear: its EOL normalization runs before this step, so the file it just created is not in the
     # set it already normalized.

@@ -91,7 +91,7 @@ async function main() {
   );
 
   // 3. The runner passes the descriptor through instead of draining it. This is the regression that
-  //    reddened validate:prepush: the runner exited 1 while the lint it wrapped found nothing.
+  //    reddened the former validate:prepush aggregate: the runner exited 1 while the lint it wrapped found nothing.
   const runner = await runWithLateStdin(
     [path.join("scripts", "run-node-bin.js"), "prettier", "--version"],
     ""

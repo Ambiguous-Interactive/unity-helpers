@@ -212,6 +212,7 @@ $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-wind
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 $runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 $runUnityDockerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
+$exportUnityPackagePath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
@@ -267,6 +268,10 @@ if (-not (Test-Path -LiteralPath $ensureEditorPath)) {
 }
 if (-not (Test-Path -LiteralPath $runCiTestsPath)) {
     Write-Host "::error::Unity run-ci-tests script not found: $runCiTestsPath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $exportUnityPackagePath)) {
+    Write-Host "::error::Unity package export script not found: $exportUnityPackagePath"
     exit 1
 }
 
@@ -604,6 +609,7 @@ function Test-UnityLockAppConfiguration {
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 [string]$runCiTestsContent = Get-Content -LiteralPath $runCiTestsPath -Raw
 [string]$runUnityDockerContent = Get-Content -LiteralPath $runUnityDockerPath -Raw
+[string]$exportUnityPackageContent = Get-Content -LiteralPath $exportUnityPackagePath -Raw
 $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
 $integrationPackagesConfig = Get-Content -LiteralPath $integrationPackagesPath -Raw | ConvertFrom-Json
 [string[]]$unityVersions = @(
@@ -640,7 +646,7 @@ $benchmarkRunsThoroughRandomInSharedInvocation = (
     $benchmarkInvocationCount -eq 1 -and
     -not $benchmarkJob.Contains('Run Random suite at full sample count') -and
     -not $benchmarkJob.Contains('benchmarks-random') -and
-    $benchmarkJob.Contains('WallstopStudios.UnityHelpers.Tests.Runtime.Performance;WallstopStudios.UnityHelpers.Tests.Runtime.Random') -and
+    $benchmarkJob.Contains('UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}') -and
     $benchmarkJob.Contains("'Performance;Stress;Fast'") -and
     $benchmarkJob.Contains("UH_RANDOM_SAMPLE_COUNT: `${{ matrix.test-mode == 'editmode' && '12750000' || '' }}") -and
     $benchmarkJob.Contains("UH_RANDOM_NOISE_MAP_ITERATIONS: `${{ matrix.test-mode == 'editmode' && '1000' || '' }}") -and
@@ -652,6 +658,64 @@ if (-not $benchmarkRunsThoroughRandomInSharedInvocation) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked weekly EditMode performance and thorough Random coverage share one Unity invocation.'
+}
+
+$benchmarkAssemblyDiscoveryIsCentralized = (
+    $benchmarksJobTexts.ContainsKey('matrix-config') -and
+    $benchmarksJobTexts['matrix-config'].Contains('- name: Setup Node.js for assembly discovery') -and
+    $benchmarksJobTexts['matrix-config'].Contains('require("./scripts/unity/lib/asmdef-discovery.js")') -and
+    $benchmarksJobTexts['matrix-config'].Contains('const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance"') -and
+    $benchmarksJobTexts['matrix-config'].Contains('const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random"') -and
+    $benchmarksJobTexts['matrix-config'].Contains('if (target === "editmode" && !discovered.includes(randomAssembly))') -and
+    $benchmarksWorkflowContent.Contains('matrix-include: ${{ steps.resolve.outputs.matrix-include }}') -and
+    $benchmarksWorkflowContent.Contains('expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}') -and
+    $benchmarksWorkflowContent.Contains('allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}') -and
+    $benchmarkJob.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}') -and
+    $benchmarkJob.Contains('expected-empty: false') -and
+    -not $benchmarkJob.Contains('actions/setup-node@') -and
+    -not $benchmarkJob.Contains('./.github/actions/compute-unity-assemblies') -and
+    -not $benchmarkJob.Contains('steps.compute')
+)
+if (-not $benchmarkAssemblyDiscoveryIsCentralized) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Resolve the exact non-empty Performance and Random benchmark assembly profiles once in hosted matrix-config, pass assemblies/result identity through every matrix entry, and do not install Node or rediscover asmdefs on self-hosted legs.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked benchmark assembly discovery is authoritative and centralized.'
+}
+
+$benchmarkBaselineRequiresCompleteFreshMatrix = (
+    $benchmarksWorkflowContent.Contains('expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}') -and
+    $benchmarksWorkflowContent.Contains('BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}') -and
+    $benchmarksWorkflowContent.Contains('ALLOW_BASELINE_REFRESH: ${{ needs.matrix-config.outputs.allow-baseline-refresh }}') -and
+    $benchmarksWorkflowContent.Contains('EXPECTED_RESULT_FILES: ${{ needs.matrix-config.outputs.expected-result-files }}') -and
+    $benchmarksWorkflowContent.Contains('scripts/unity/lib/evaluate-perf-refresh.js') -and
+    $benchmarksWorkflowContent.Contains('--benchmark-result "${BENCHMARKS_RESULT}"') -and
+    $benchmarksWorkflowContent.Contains('--allow-baseline-refresh "${ALLOW_BASELINE_REFRESH}"') -and
+    $benchmarksWorkflowContent.Contains('--expected-files "${EXPECTED_RESULT_FILES}"') -and
+    $benchmarksWorkflowContent.Contains('complete_matrix="$(jq -r ''.complete'' "${decision}")"') -and
+    $benchmarksWorkflowContent.Contains('complete-matrix=true') -and
+    $benchmarksWorkflowContent.Contains('complete-matrix=false') -and
+    $benchmarksWorkflowContent.Contains('partial-${result_file}') -and
+    $benchmarksWorkflowContent.Contains('invalid_successful_matrix') -and
+    $benchmarksWorkflowContent.Contains('- name: Upload invalid matrix diagnostics') -and
+    $benchmarksWorkflowContent.Contains("if: `${{ always() && steps.assemble.outcome == 'failure' }}") -and
+    $benchmarksWorkflowContent.Contains('path: perf-results/partial-results-*.xml') -and
+    $benchmarksWorkflowContent.Contains("if: `${{ steps.assemble.outputs.complete-matrix == 'true' }}") -and
+    $benchmarksWorkflowContent.Contains('--require-complete-baseline') -and
+    $benchmarksWorkflowContent.Contains('--update-baseline perf-results/baseline.json')
+)
+if (-not $benchmarkBaselineRequiresCompleteFreshMatrix) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Advance the canonical result/report/baseline only after a successful benchmark aggregate with every exact expected result identity, per-file metrics, and no removed baseline keys; retain failures separately as partial diagnostics.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked partial benchmark runs cannot mix stale XML into a new rolling baseline.'
+}
+
+if ($exportUnityPackageContent -notmatch '(?m)^\s+-releaseCodeOptimization\s+\\\s*$') {
+    Write-Host '::error file=scripts/unity/export-unitypackage.sh::The release payload compile must pass -releaseCodeOptimization so the unitypackage smoke covers the same optimized assembly contract as Unity CI.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked unitypackage export compiles optimized release assemblies.'
 }
 
 $maintenanceTokens = $null
@@ -1431,14 +1495,27 @@ function Test-UnityJobMaintainsSelectedRunner {
         $setupNodeIndex -lt 0 -and
         $computeIndex -lt 0 -and
         $JobText.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include') -and
-        $JobText.Contains('UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}') -and
-        $JobText.Contains('matrix.is-empty')
+        (
+            $JobText.Contains('UH_TEST_ASSEMBLIES: ${{ matrix.assemblies }}') -or
+            $JobText.Contains('UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}')
+        ) -and
+        (
+            $JobText.Contains('matrix.is-empty') -or
+            (
+                $JobText.Contains('UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}') -and
+                $JobText.Contains('expected-empty: false')
+            )
+        )
     )
     $assemblySelectionReadyBeforeMaintenance = (
         $setupNodeAndAssemblyComputeRunBeforeMaintenance -or
         $assemblySelectionComesFromHostedMatrix
     )
-    $unityExpensiveStepsSkipEmptyAssemblyLegs = (
+    $benchmarkProfilesAreFailClosed = (
+        $JobText.Contains('UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}') -and
+        $JobText.Contains('expected-empty: false')
+    )
+    $unityExpensiveStepsSkipEmptyAssemblyLegs = $benchmarkProfilesAreFailClosed -or (
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Maintain Unity editor on selected runner') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Print runner diagnostics') -and
         (Test-UnityWorkflowStepHasEmptyAssemblyGate -JobText $JobText -StepName 'Validate Unity license secrets') -and
@@ -2631,8 +2708,8 @@ $licensedJobIds = @(
 # means gitignored. While the project lived under .artifacts/, every job deleted
 # the Library the previous job had just built on that same disk, and the repo
 # paid an actions/cache round trip to put it back: measured across the 60 most
-# recent Unity Tests runs, 109 min of restore and 119 min of save, all of it on
-# the single serialized organization Unity seat.
+# recent Unity Tests runs, 109 min of restore and 119 min of licensed self-hosted
+# runner time.
 #
 # Two halves, both easy to undo by accident, so both are pinned:
 #   1. Every leg that runs run-ci-tests.ps1 passes -ProjectRoot under
@@ -2707,15 +2784,14 @@ foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
 # Across the 60 most recent Unity Tests runs (~430 leg instances) the slowest
 # 'Run Unity Test Runner' has been 9.1 min, standalone topping out at 8.7 min.
 # The caps below keep >4x headroom over that. The reason they must not drift
-# back up: every leg serializes on ONE organization Unity seat, and a 91-minute
-# lock wait has been measured behind a stuck leg -- an oversized step clock
-# converts a single hang into org-wide starvation.
+# back up: a 91-minute wait has been measured behind a stuck licensed leg, so an
+# oversized step clock strands its runner and delays queued organization work.
 # ---------------------------------------------------------------------------
 $unityRunTimeoutContracts = @(
     @{
         Name = 'default matrix + standalone run timeout'
         Pattern = 'timeout-minutes:\s*\$\{\{\s*\(matrix\.test-mode\s*==\s*''standalone''\s*&&\s*60\)\s*\|\|\s*40\s*\}\}'
-        Message = "The default and standalone 'Run Unity Test Runner' steps must cap at 60 min (standalone) / 40 min (editmode, playmode). Measured worst case is 8.7-9.1 min; a larger cap only lengthens how long a hang holds the single organization Unity seat."
+        Message = "The default and standalone 'Run Unity Test Runner' steps must cap at 60 min (standalone) / 40 min (editmode, playmode). Measured worst case is 8.7-9.1 min; a larger cap only lengthens how long a hang strands a licensed runner and delays queued organization work."
     },
     @{
         Name = 'single-threaded run timeout'
@@ -2788,7 +2864,7 @@ $oversizedRunTimeouts = @([regex]::Matches(
 foreach ($match in $oversizedRunTimeouts) {
     $declaredTimeout = [int]$match.Groups[1].Value
     if ($declaredTimeout -gt 60) {
-        Write-Host "::error file=.github/workflows/unity-tests.yml::A 'Run Unity Test Runner' step declares timeout-minutes: $declaredTimeout. The measured worst case is 9.1 min; anything above 60 hands a hung leg more than an hour of the single organization Unity seat."
+        Write-Host "::error file=.github/workflows/unity-tests.yml::A 'Run Unity Test Runner' step declares timeout-minutes: $declaredTimeout. The measured worst case is 9.1 min; anything above 60 lets a hung leg strand a licensed runner and delay queued organization work for more than an hour."
         $failed = $true
     }
 }

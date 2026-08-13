@@ -344,7 +344,7 @@ test_original_failing_command() {
 # -----------------------------------------------------------------------------
 # Test (P1-4): Pre-commit spell-check speed boundary.
 #
-# Spelling belongs in agent-preflight, validate:prepush, and CI. The local
+# Spelling belongs in agent-preflight, validate:local, and CI. The local
 # pre-commit hook is now a last-resort fast guard and must not reintroduce
 # cspell process startup or pipeline-exit fragility.
 # -----------------------------------------------------------------------------

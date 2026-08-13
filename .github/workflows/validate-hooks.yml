@@ -83,6 +83,6 @@ jobs:
 
       - name: Validate pre-commit / pre-push spell-check parity
         # Guards against --no-verify drift between the two hooks. Local contributors
-        # get this check through validate:prepush; CI needs it too because
+        # get this check through validate:local or its targeted command; CI needs it too because
         # --no-verify bypasses the local gate entirely.
         run: bash scripts/tests/test-hook-spell-parity.sh

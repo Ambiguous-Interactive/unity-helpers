@@ -28,23 +28,25 @@ Execute these steps in order. Each step must pass before proceeding.
 
 ### Step 1: Pre-Flight Checks
 
-Run the developer validation suite:
+Run changed-file preflight, all checks relevant to the change, and the fast push safety check:
 
 ```bash
+npm run agent:preflight
 npm run validate:prepush
 ```
 
-This executes the repository-wide linting, formatting, convention, and fast contract checks
-(including `lint:spelling` over C#, markdown, CHANGELOG, and JSON). Exhaustive synthetic Git-hook
-fixtures remain mandatory in CI but are excluded here because they create dozens of temporary
-repositories and child PowerShell processes. If hook or agent-preflight behavior changed, also run
-`npm run validate:tests:hook-regressions`. **All applicable checks must pass.**
+`validate:prepush` is deliberately a roughly one-second last-resort Git/config check. Do not expand it with
+repository-wide lint or test suites. Run targeted lint/test commands for the files changed; use
+`npm run validate:local` only when a complete repository-wide aggregate is warranted. Exhaustive
+synthetic Git-hook fixtures remain mandatory in CI; if hook or agent-preflight behavior changed,
+also run `npm run validate:tests:hook-regressions`. **All applicable checks must pass.**
 
 **Blocker rule — do NOT push if any of these fail:**
 
-- `lint:spelling` — a spelling failure blocks `agent:preflight`, `validate:prepush`, and CI. Fix at Step 1, never at push time.
-- `lint:spelling:config` — cspell.json itself must be clean.
-- `eol:check`, `validate:content`, `validate:tests:fast`, `lint:csharp-naming` — all mandatory.
+- Any applicable targeted lint, formatting, typecheck, or test command — a failure must be fixed at
+  Step 1, never deferred to push-time or CI.
+- `validate:local` — mandatory only when the change's risk or breadth warrants the complete
+  repository-wide aggregate.
 - `validate:tests:hook-regressions` — mandatory when `.githooks/**`, `scripts/agent-preflight.ps1`,
   or their helpers/tests change.
 
@@ -52,7 +54,7 @@ If any check fails:
 
 1. Fix the issue (see [validate-before-commit](./validate-before-commit.md#rule-4-spell-check-every-change-cspell-covers) for the spelling decision tree)
 2. Re-run the failing check in isolation
-3. When all pass, re-run `npm run validate:prepush` end-to-end
+3. When all pass, re-run the relevant targeted command, then the fast `npm run validate:prepush`
 4. Only then proceed
 
 ### Step 2: Test Verification

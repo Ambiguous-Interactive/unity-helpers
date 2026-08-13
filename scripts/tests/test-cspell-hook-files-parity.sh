@@ -5,7 +5,7 @@
 # Ensures that every file extension spell-checked by scripts/agent-preflight.ps1
 # ($spellingTargets) is ALSO covered by cspell.json's top-level `files` glob.
 # pre-push intentionally does not run cspell; spelling belongs in agent
-# preflight, validate:prepush, and CI.
+# preflight, validate:local, and CI.
 #
 # Run: bash scripts/tests/test-cspell-hook-files-parity.sh
 # Exit codes: 0 = parity, 1 = drift detected

@@ -4,8 +4,6 @@
 
 **Trigger**: When you need detailed linter commands, configurations, or to understand what each linter checks.
 
----
-
 ## When to Use
 
 Use this reference when you need:
@@ -16,15 +14,13 @@ Use this reference when you need:
 
 For the quick validation workflow, see [validate-before-commit](./validate-before-commit.md).
 
----
-
 ## All Linter Commands
 
 ### Master Validation Command
 
 ```bash
 # Run ALL checks at once (recommended before commit/push)
-npm run validate:prepush
+npm run validate:local
 ```
 
 ### Individual Commands
@@ -51,8 +47,6 @@ npm run validate:prepush
 | `npm run validate:tests`                        | Complete CI contract suite                   |
 | `npm run test:sync-script-contracts`            | Sync newline + cspell contract regressions   |
 | `bash scripts/audit-license-years.sh --summary` | License year header audit                    |
-
----
 
 ## CSpell Spell Checker
 
@@ -113,8 +107,6 @@ Or in code:
 // cspell:ignore someword
 ```
 
----
-
 ## Markdownlint
 
 ### Command
@@ -148,8 +140,6 @@ These rules are disabled in this project:
 | `MD022` | Headings should be surrounded by blanks | Add blank lines around headings |
 | `MD032` | Lists should be surrounded by blanks    | Add blank lines around lists    |
 
----
-
 ## Link Linter (lint:docs)
 
 ### Command
@@ -176,8 +166,6 @@ npm run lint:docs # full scan; use scripts/lint-doc-links.ps1 -Paths <files> for
 
 [create-test](create-test.md)
 ```
-
----
 
 ## Prettier
 
@@ -219,8 +207,6 @@ Prettier handles these file types:
 
 See `.prettierignore` for files excluded from formatting.
 
----
-
 ## CSharpier
 
 ### Command
@@ -247,8 +233,6 @@ Located at `.csharpierrc.json`:
 - Always run after ANY `.cs` file modification
 - Cannot fix naming convention violations (use manual fixes)
 
----
-
 ## C# Naming Linter
 
 ### Command
@@ -268,8 +252,6 @@ npm run lint:csharp-naming
 | Constants         | PascalCase or UPPER_CASE | `MaxValue`      |
 | Parameters        | camelCase                | `itemCount`     |
 | Type parameters   | `T` or `T` + PascalCase  | `T`, `TValue`   |
-
----
 
 ## YAML Linter
 
@@ -291,8 +273,6 @@ npm run lint:yaml
 # Additional check for workflow files
 actionlint
 ```
-
----
 
 ## Test Lifecycle Linter
 
@@ -344,8 +324,6 @@ pwsh -NoProfile -File scripts/tests/test-lint-tests.ps1
 
 Tests cover allowlist path existence, UNH error detection, clean file acceptance, and helper file allowlisting.
 
----
-
 ## Line Ending Linter
 
 ### Command
@@ -364,8 +342,6 @@ npm run eol:check
 ```bash
 npm run eol:fix
 ```
-
----
 
 ## Meta File Linter
 
@@ -421,11 +397,9 @@ bash scripts/tests/test-lint-meta-exclusions.sh
 
 Tests cover all exclusion categories: tooling cache dirs, OS metadata, git placeholders, compiled bytecode, and editor temp files.
 
----
-
 ## NPM Script Breakdown
 
-### validate:prepush
+### validate:local
 
 Runs these in sequence:
 
@@ -433,6 +407,11 @@ Runs these in sequence:
 2. `eol:check`
 3. `validate:tests:fast` (CI's full `validate:tests` also runs synthetic hook regressions)
 4. `lint:csharp-naming`
+
+### validate:prepush
+
+Runs only the fast `validate:git-push-config` safety check. Repository-wide lint and contract
+suites belong in targeted developer commands, `validate:local`, and CI—not in the push path.
 
 ### validate:content
 
@@ -444,8 +423,6 @@ Runs these in sequence:
 4. `format:json:check`
 5. `format:yaml:check`
 
----
-
 ## Shared Helpers
 
 | Helper                          | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -454,8 +431,6 @@ Runs these in sequence:
 | `scripts/git-path-helpers.ps1`  | Normalizes filesystem paths to repo-relative POSIX form for safe use with `git check-ignore` and related plumbing.                                                                                                                                                                                                                                                                                                                               |
 
 When adding a new lint script that scans source-code text, prefer dot-sourcing `comment-stripping.ps1` over hand-rolling a comment scrubber.
-
----
 
 ## Configuration File Locations
 
@@ -468,8 +443,6 @@ When adding a new lint script that scans source-code text, prefer dot-sourcing `
 | CSharpier    | `.csharpierrc.json`  | C# formatting options  |
 | ESLint       | `.eslintrc.json`     | JavaScript linting     |
 | EditorConfig | `.editorconfig`      | Editor settings        |
-
----
 
 ## Related Skills
 

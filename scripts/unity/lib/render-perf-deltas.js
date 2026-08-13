@@ -59,6 +59,7 @@
  *        [--out-md <report.md>] [--out-json <payload.json>] \
  *        [--update-baseline <path>] [--tolerance 0.05] \
  *        [--regression-threshold 0.10] [--stddev-multiplier 1] \
+ *        [--require-complete-baseline] \
  *        [--fail-on-regression]
  *   node render-perf-deltas.js --self-test
  *
@@ -102,6 +103,7 @@ function parseArgs(argv) {
     outMd: null,
     outJson: null,
     updateBaseline: null,
+    requireCompleteBaseline: false,
     tolerance: numFromEnv(env.PERF_TOLERANCE, DEFAULT_TOLERANCE),
     regressionThreshold: numFromEnv(env.PERF_REGRESSION_THRESHOLD, DEFAULT_REGRESSION_THRESHOLD),
     stddevMultiplier: numFromEnv(env.PERF_STDDEV_MULTIPLIER, DEFAULT_STDDEV_MULTIPLIER),
@@ -126,6 +128,9 @@ function parseArgs(argv) {
         break;
       case "--update-baseline":
         options.updateBaseline = requireValue(argv, ++index, arg);
+        break;
+      case "--require-complete-baseline":
+        options.requireCompleteBaseline = true;
         break;
       case "--tolerance":
         options.tolerance = parseNonNegative(requireValue(argv, ++index, arg), arg);
@@ -189,7 +194,7 @@ function usage() {
     "Usage: node scripts/unity/lib/render-perf-deltas.js --current <metrics.json> \\",
     "         --baseline <baseline.json> [--out-md <report.md>] [--out-json <payload.json>] \\",
     "         [--update-baseline <path>] [--tolerance 0.05] [--regression-threshold 0.10] \\",
-    "         [--stddev-multiplier 1] [--fail-on-regression]",
+    "         [--stddev-multiplier 1] [--require-complete-baseline] [--fail-on-regression]",
     "       node scripts/unity/lib/render-perf-deltas.js --self-test",
     "",
     "Compares current perf metrics with a committed baseline, renders a Markdown",
@@ -238,7 +243,8 @@ function metricKey(metric) {
     metric.test ?? "",
     metric.sampleGroup ?? "",
     metric.unityVersion ?? "",
-    metric.testMode ?? ""
+    metric.testMode ?? "",
+    metric.unit ?? ""
   ].join("");
 }
 
@@ -580,6 +586,23 @@ function run(options, nowIso) {
   };
 }
 
+function requireCompleteBaseline(outcome) {
+  if (!outcome.meta.noBaseline && outcome.result.removedMetrics.length > 0) {
+    const examples = outcome.result.removedMetrics
+      .slice(0, 3)
+      .map(
+        (metric) =>
+          `${metric.test ?? ""} :: ${metric.sampleGroup ?? ""} ` +
+          `(${metric.unityVersion ?? "unknown"}/${metric.testMode ?? "unknown"}, ${metric.unit ?? "unitless"})`
+      )
+      .join(", ");
+    throw new Error(
+      `Current performance results omit ${outcome.result.removedMetrics.length} baseline metric(s); ` +
+        `refusing to replace the rolling baseline. Missing: ${examples}`
+    );
+  }
+}
+
 function main(argv = process.argv) {
   const options = parseArgs(argv);
   if (options.help) {
@@ -595,6 +618,9 @@ function main(argv = process.argv) {
   }
 
   const outcome = run(options);
+  if (options.requireCompleteBaseline) {
+    requireCompleteBaseline(outcome);
+  }
 
   if (options.outMd) {
     writeFileClean(options.outMd, outcome.markdown);
@@ -762,6 +788,29 @@ function runSelfTest() {
     result.removedMetrics.length === 1 && result.removedMetrics[0].sampleGroup === "Gone",
     "Removed metric should be detected"
   );
+  let incompleteRejected = false;
+  try {
+    requireCompleteBaseline({
+      meta: { noBaseline: false },
+      result
+    });
+  } catch (error) {
+    incompleteRejected = /omit 1 baseline metric/.test(error.message);
+  }
+  assert(incompleteRejected, "complete-baseline mode must reject a removed metric");
+  requireCompleteBaseline({
+    meta: { noBaseline: true },
+    result
+  });
+  const unitChanged = compareMetrics(
+    [{ ...current[0], median: 120_000, unit: "us" }],
+    [baseline[0]],
+    options
+  );
+  assert(
+    unitChanged.newMetrics.length === 1 && unitChanged.removedMetrics.length === 1,
+    "a unit change must be treated as a removed baseline metric plus a new metric"
+  );
 
   const speedup = result.comparisons.find((c) => c.sampleGroup === "Small / Speedup");
   assert(
@@ -867,6 +916,7 @@ module.exports = {
   buildJsonPayload,
   alignTable,
   writeBaseline,
+  requireCompleteBaseline,
   run,
   LOWER_IS_BETTER_UNITS
 };

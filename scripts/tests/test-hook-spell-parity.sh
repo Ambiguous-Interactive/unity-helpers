@@ -5,7 +5,7 @@
 # Ensures spelling stays out of last-resort hooks and that
 # scripts/agent-preflight.ps1 ($spellingTargets) still covers every file
 # extension that hooks used to spell-check. pre-commit and pre-push must stay
-# fast; agent-preflight, validate:prepush, and CI catch spelling.
+# fast; agent-preflight, validate:local, and CI catch spelling.
 #
 # Run: bash scripts/tests/test-hook-spell-parity.sh
 # Exit codes: 0 = parity, 1 = drift detected
@@ -57,7 +57,7 @@ echo "agent-preflight spell-check extensions:"
 printf '  %s\n' $AGENT_PREFLIGHT_EXTS
 
 if grep -Eq 'CHANGED_SPELL=|SPELL_FILES_ARRAY|cspell[[:space:]]+(lint|--no-progress)' "$PRE_COMMIT" "$PRE_COMMIT_IMPL" "$PRE_PUSH"; then
-    echo "FAIL: last-resort hooks must not run cspell; keep spelling in agent-preflight/validate:prepush." >&2
+    echo "FAIL: last-resort hooks must not run cspell; keep spelling in agent-preflight/validate:local." >&2
     exit 1
 fi
 

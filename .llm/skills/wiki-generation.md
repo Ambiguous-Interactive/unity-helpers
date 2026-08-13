@@ -43,7 +43,7 @@ python scripts/wiki/prepare_wiki.py \
 
 ### Validation Integration
 
-`npm run validate:prepush` runs the bash wiki test, and CI runs the full wiki test set when wiki-related files change:
+`npm run validate:local` runs the bash wiki test, and CI runs the full wiki test set when wiki-related files change:
 
 - `scripts/wiki/*.py` — Python wiki scripts
 - `scripts/tests/test-wiki-generation.sh` — Bash validation tests

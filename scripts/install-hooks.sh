@@ -302,7 +302,7 @@ install_hooks() {
         [[ -f "$hook_file" ]] || continue
         hook_name="${hook_file##*/}"
         case "$hook_name" in
-            *.*|*.sample|*.txt|*.log|*.out|*.err|*.tmp) continue ;;
+            *.*) continue ;;
         esac
         chmod +x "$hook_file"
     done
@@ -446,7 +446,8 @@ main() {
     echo "  npm run lint:spelling     - Check spelling"
     echo "  npm run format:md         - Format markdown files"
     echo "  npm run format:json       - Format JSON files"
-    echo "  npm run validate:prepush  - Run all pre-push validations"
+    echo "  npm run validate:prepush  - Run the fast last-resort pre-push check"
+    echo "  npm run validate:local    - Run the complete local validation aggregate"
 }
 
 main "$@"

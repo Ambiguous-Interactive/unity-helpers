@@ -53,5 +53,5 @@ quick_recovery() {
     node scripts/run-prettier.js --write -- .           # Fix all formatting
     npm run eol:fix                     # Fix line endings
     dotnet tool run csharpier format .  # Format C#
-    npm run validate:prepush            # Full validation
+    npm run validate:local            # Full validation
 }

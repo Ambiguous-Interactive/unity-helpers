@@ -97,7 +97,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 
 Run formatters/linters **immediately after each file change**, not batched at task end:
 
-- **C#**: `dotnet tool run csharpier format .` (or `npm run format:csharp`). `npm run agent:preflight:fix` formats changed C# files and `npm run agent:preflight` / `validate:prepush` fail on unformatted C#, so a later edit that undoes the formatting is caught locally rather than by CI
+- **C#**: `dotnet tool run csharpier format .` (or `npm run format:csharp`). `npm run agent:preflight:fix` formats changed C# files and `npm run agent:preflight` / `validate:local` fail on unformatted C#, so a later edit that undoes the formatting is caught locally rather than by CI
 - **Non-C#** (`.md`, `.json`, `.yaml`, `.yml`): `node scripts/run-prettier.js --write -- <file>` (repo-local launcher; run `npm install` first on the host that runs hooks)
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
@@ -105,9 +105,12 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
-- **Pre-push validation**: run `npm run validate:prepush` (includes full `lint:spelling`) before push;
-  when hook or agent-preflight behavior changes, also run `npm run validate:tests:hook-regressions`.
-  CI always runs the combined `validate:tests` aggregate. Treat git hooks as last-resort only. For
+- **Pre-push validation**: run `npm run validate:prepush` before push; it is a roughly one-second
+  last-resort Git/config safety check. Run relevant changed-file checks through
+  `npm run agent:preflight`; use `npm run validate:local` only when a complete repository-wide
+  aggregate is warranted. When hook or agent-preflight behavior changes, also run
+  `npm run validate:tests:hook-regressions`. CI always runs the combined `validate:tests`
+  aggregate. Treat git hooks as last-resort only. For
   the push step itself (setup, redirection, rejection handling) follow
   [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote)
 
@@ -254,8 +257,9 @@ deliberate act, not the tail of every commit.
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
     against protobuf-net 3.2.56 and 2.4.9 in isolated processes.
   - `npm run agent:preflight:fix` then `npm run agent:preflight`.
-  - `npm run validate:prepush` for repository-wide lint and fast contract suites. Exhaustive
-    synthetic hook regressions remain in CI and run locally only when their implementation changes.
+  - Relevant targeted checks for the files changed; `npm run validate:local` is the explicit
+    repository-wide lint and contract aggregate when that broader evidence is warranted.
+  - `npm run validate:prepush` as the final fast Git/config safety check.
   - The Unity MCP bridge for a real editor compile (see the Unity MCP notes).
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
@@ -270,12 +274,12 @@ deliberate act, not the tail of every commit.
 Run Unity tests directly via Docker-in-Docker:
 
 1. Check license: `pwsh -NoProfile -File scripts/unity/setup-license.ps1 -Check`
-   - If exit code 1: warn user to run `npm run unity:setup-license`, skip Unity steps, continue with `npm run validate:prepush`
+   - If exit code 1: warn user to run `npm run unity:setup-license`, skip Unity steps, continue with relevant non-Unity checks
 2. Compile: `bash scripts/unity/compile.sh`
-   - If output contains `Machine bindings don't match` or `No valid Unity Editor license found`: license issue, not code issue. Warn user, skip Unity tests, continue with `npm run validate:prepush`
+   - If output contains `Machine bindings don't match` or `No valid Unity Editor license found`: license issue, not code issue. Warn user, skip Unity tests, continue with relevant non-Unity checks
    - If compilation fails for other reasons: fix the code
 3. Run `bash scripts/unity/run-tests.sh` (EditMode) and `bash scripts/unity/run-tests.sh --mode playmode` (PlayMode)
 4. Parse test results and fix any failures before marking work complete
-5. Always run `npm run validate:prepush` regardless of Unity license availability
+5. Always run the relevant targeted non-Unity checks and the fast `npm run validate:prepush` safety check regardless of Unity license availability
 
 See [unity-devcontainer-testing](./skills/unity-devcontainer-testing.md) for targeted test filters and troubleshooting.

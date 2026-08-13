@@ -587,7 +587,8 @@ function Main {
     Write-Host "  npm run lint:spelling     - Check spelling"
     Write-Host "  npm run format:md         - Format markdown files"
     Write-Host "  npm run format:json       - Format JSON files"
-    Write-Host "  npm run validate:prepush  - Run all pre-push validations"
+    Write-Host "  npm run validate:prepush  - Run the fast last-resort pre-push check"
+    Write-Host "  npm run validate:local    - Run the complete local validation aggregate"
 }
 
 Main

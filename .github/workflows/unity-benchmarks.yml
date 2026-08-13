@@ -32,12 +32,20 @@ jobs:
     outputs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
       latest-version: ${{ steps.resolve.outputs.latest-version }}
+      matrix-include: ${{ steps.resolve.outputs.matrix-include }}
+      expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}
+      expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}
+      allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Setup Node.js for assembly discovery
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
       - name: Resolve dispatch overrides
         id: resolve
         env:
@@ -56,9 +64,58 @@ jobs:
             versions="$(jq -c '.all' .github/unity-versions.json)"
             latest="$(jq -r '.all[-1]' .github/unity-versions.json)"
           fi
+          matrix_include="$(VERSIONS="${versions}" node <<'NODE'
+          const discovery = require("./scripts/unity/lib/asmdef-discovery.js");
+          const versions = JSON.parse(process.env.VERSIONS);
+          const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance";
+          const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random";
+
+          function benchmarkProfile(target) {
+            const discovered = discovery.defaultIncludeAssemblies(process.cwd(), {
+              includePerf: true,
+              target
+            });
+            if (!discovered.includes(performanceAssembly)) {
+              throw new Error(`The ${target} benchmark profile did not discover ${performanceAssembly}.`);
+            }
+            if (target === "editmode" && !discovered.includes(randomAssembly)) {
+              throw new Error(`The editmode benchmark profile did not discover ${randomAssembly}.`);
+            }
+            const assemblies = target === "editmode"
+              ? [performanceAssembly, randomAssembly]
+              : [performanceAssembly];
+            return assemblies.join(";");
+          }
+
+          const profiles = {
+            editmode: benchmarkProfile("editmode"),
+            playmode: benchmarkProfile("playmode")
+          };
+          const include = [];
+          for (const version of versions) {
+            for (const mode of ["editmode", "playmode"]) {
+              include.push({
+                "unity-version": version,
+                "test-mode": mode,
+                assemblies: profiles[mode],
+                "result-file": `results-${version}-${mode}.xml`
+              });
+            }
+          }
+          process.stdout.write(JSON.stringify(include));
+          NODE
+          )"
           {
             echo "unity-versions=${versions}"
             echo "latest-version=${latest}"
+            echo "matrix-include=${matrix_include}"
+            echo "expected-result-count=$(jq 'length' <<< "${matrix_include}")"
+            echo "expected-result-files=$(jq -c '[.[].\"result-file\"] | sort' <<< "${matrix_include}")"
+            if [ -z "${INPUT_UNITY_VERSION:-}" ]; then
+              echo "allow-baseline-refresh=true"
+            else
+              echo "allow-baseline-refresh=false"
+            fi
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check for required licensed workflow secrets
@@ -116,10 +173,7 @@ jobs:
       # count makes every completion a fresh self-hosted dispatch transition, and
       # that transition is what leaves both runners idle with legs queued.
       matrix:
-        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
-        test-mode:
-          - editmode
-          - playmode
+        include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
       - name: Enable Git long paths
         shell: powershell
@@ -134,24 +188,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.18.0"
-
-      # Discover the opt-in performance assembly and retain the same fail-closed
-      # empty-list gate as the main Unity workflow. The run step narrows this
-      # result to Performance plus Random because adding the Fast category for
-      # the thorough Random sweep must not select every Fast test assembly.
-      - name: Compute benchmark assembly list
-        id: compute
-        uses: ./.github/actions/compute-unity-assemblies
-        with:
-          include-perf: "true"
-          target: "${{ matrix.test-mode }}"
-
       - name: Maintain Unity editor on selected runner
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 360
         shell: powershell
         run: |
@@ -193,7 +230,6 @@ jobs:
           Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         # Never use plain `shell: bash` on self-hosted Windows runners (the WSL
         # stub at C:\Windows\System32\bash.exe can win PATH resolution and fail).
         uses: ./.github/actions/print-self-hosted-runner-diagnostics
@@ -201,18 +237,13 @@ jobs:
           matrix-note: "default (organization lock wraps the Unity section)"
 
       - name: Validate Unity license secrets
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: ./.github/actions/validate-unity-license
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
-      # Skip provisioning, the org lock, and the run when the compute step
-      # resolved an empty assembly list. Mirrors unity-tests.yml. The benchmark
-      # list is structurally non-empty, so this is defense-in-depth.
       - name: Provision Unity Editor
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 180
         shell: pwsh
         run: |
@@ -239,7 +270,6 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@a00614ace745152a659c5c2654f7cefb68a5a628 # v1.9.1
         with:
           lock-name: wallstop-organization-builds
@@ -252,7 +282,6 @@ jobs:
 
       - name: Run Unity Test Runner
         id: run_tests
-        if: ${{ steps.compute.outputs.is-empty != 'true' }}
         timeout-minutes: 120
         shell: pwsh
         env:
@@ -264,10 +293,7 @@ jobs:
           # assembly and Fast category folds that sweep into this one Unity
           # launch while the explicit assembly list prevents unrelated Fast
           # tests from entering the benchmark lane.
-          UH_BENCHMARK_ASSEMBLIES: >-
-            ${{ matrix.test-mode == 'editmode' &&
-            'WallstopStudios.UnityHelpers.Tests.Runtime.Performance;WallstopStudios.UnityHelpers.Tests.Runtime.Random' ||
-            'WallstopStudios.UnityHelpers.Tests.Runtime.Performance' }}
+          UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}
           UH_UNITY_TEST_CATEGORY: >-
             ${{ matrix.test-mode == 'editmode' && 'Performance;Stress;Fast' || 'Performance;Stress' }}
           UH_RANDOM_SAMPLE_COUNT: ${{ matrix.test-mode == 'editmode' && '12750000' || '' }}
@@ -371,14 +397,13 @@ jobs:
         if: >-
           ${{
             !cancelled() &&
-            steps.compute.outcome == 'success' &&
-            (steps.compute.outputs.is-empty == 'true' || steps.run_tests.outcome != 'skipped')
+            steps.run_tests.outcome != 'skipped'
           }}
         uses: ./.github/actions/verify-unity-results
         with:
           results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           label: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
-          expected-empty: ${{ steps.compute.outputs.is-empty }}
+          expected-empty: false
 
       # Stage the raw NUnit results for this leg into a deterministic path so
       # the downstream commit job can collect every leg's results via
@@ -396,7 +421,7 @@ jobs:
           $stageDir = 'perf-staging'
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
           if (Test-Path -LiteralPath $src -PathType Leaf) {
-            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir 'results-${{ matrix.unity-version }}-${{ matrix.test-mode }}.xml') -Force
+            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir '${{ matrix.result-file }}') -Force
             Write-Host "::notice::Staged perf results for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
           } else {
             Write-Host "::warning::No results.xml to stage for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
@@ -422,7 +447,9 @@ jobs:
 
   commit-perf-results:
     name: Commit refreshed perf results
-    needs: benchmarks
+    needs:
+      - matrix-config
+      - benchmarks
     # schedule + workflow_dispatch only ever run on the canonical repo (scheduled
     # runs fire only from the default branch; a dispatch requires write access),
     # so no repo-slug guard is needed (avoids hardcoding a slug that breaks after
@@ -448,8 +475,19 @@ jobs:
           path: perf-download
           merge-multiple: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
+
       - name: Assemble perf-results
+        id: assemble
         shell: bash
+        env:
+          EXPECTED_RESULT_COUNT: ${{ needs.matrix-config.outputs.expected-result-count }}
+          EXPECTED_RESULT_FILES: ${{ needs.matrix-config.outputs.expected-result-files }}
+          BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
+          ALLOW_BASELINE_REFRESH: ${{ needs.matrix-config.outputs.allow-baseline-refresh }}
         run: |
           set -euo pipefail
           # Commit raw NUnit results to a TOP-LEVEL perf-results/ dir (NOT under
@@ -459,20 +497,58 @@ jobs:
           # meta-file-lint (every tracked docs file/dir requires a .meta) on the
           # next push; perf-results/ sidesteps that entirely.
           dest="perf-results"
+          candidate="$(mktemp -d)"
           mkdir -p "${dest}"
-          if [ -d perf-download ] && [ -n "$(ls -A perf-download 2>/dev/null || true)" ]; then
-            find perf-download -type f -name '*.xml' -exec cp -f {} "${dest}/" \;
-            echo "Assembled $(find "${dest}" -name '*.xml' | wc -l) result file(s) under ${dest}."
+          find perf-download -type f -name 'results-*.xml' -exec cp -f {} "${candidate}/" \; 2>/dev/null || true
+          decision="${candidate}/decision.json"
+          node scripts/unity/lib/evaluate-perf-refresh.js \
+            --benchmark-result "${BENCHMARKS_RESULT}" \
+            --allow-baseline-refresh "${ALLOW_BASELINE_REFRESH}" \
+            --expected-files "${EXPECTED_RESULT_FILES}" \
+            --candidate-dir "${candidate}" \
+            --output "${decision}"
+          complete_matrix="$(jq -r '.complete' "${decision}")"
+          actual_count="$(jq -r '.actualCount' "${decision}")"
+          mapfile -t actual_files < <(jq -r '.actualFiles[]' "${decision}")
+          echo "Downloaded ${actual_count} result file(s); expected ${EXPECTED_RESULT_COUNT}."
+          if [ "${complete_matrix}" != "true" ]; then
+            jq -r '.reasons[] | "::warning::" + .' "${decision}"
+          fi
+          invalid_successful_matrix="$(jq -r '.invalidSuccessfulMatrix' "${decision}")"
+
+          if [ "${complete_matrix}" = "true" ]; then
+            rm -f "${dest}"/results-*.xml "${dest}"/partial-results-*.xml
+            find "${candidate}" -maxdepth 1 -type f -name 'results-*.xml' -exec cp -f {} "${dest}/" \;
+            echo "complete-matrix=true" >> "${GITHUB_OUTPUT}"
+            echo "Assembled a fresh, successful benchmark matrix."
+          elif [ "${actual_count}" -gt 0 ]; then
+            rm -f "${dest}"/partial-results-*.xml
+            for result_file in "${actual_files[@]}"; do
+              cp -f "${candidate}/${result_file}" "${dest}/partial-${result_file}"
+            done
+            echo "complete-matrix=false" >> "${GITHUB_OUTPUT}"
+            echo "::warning::Benchmark matrix is incomplete or failed; diagnostic XML is retained separately and the canonical baseline/report will not change."
           else
-            echo "::notice::No staged perf results were downloaded; nothing to commit."
+            echo "complete-matrix=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::No staged perf results were downloaded; existing results remain untouched."
+          fi
+          if [ "${invalid_successful_matrix}" = "true" ]; then
+            echo "::error::A successful canonical benchmark matrix produced invalid result identities or missing metrics."
+            exit 1
           fi
 
-      # Node 22 (matches the benchmarks job's setup-node) to run the pure-Node,
-      # zero-dependency perf-delta tooling under scripts/unity/lib/.
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      # A canonical run with malformed output deliberately fails above. Preserve
+      # its XML as an artifact even though normal commit steps are then skipped,
+      # so the failed collector remains diagnosable without changing the last
+      # known-complete committed report.
+      - name: Upload invalid matrix diagnostics
+        if: ${{ always() && steps.assemble.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          node-version: "22.18.0"
+          name: invalid-perf-matrix-diagnostics
+          path: perf-results/partial-results-*.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       # Extract normalized perf metrics from the assembled NUnit results, diff
       # them against the committed rolling baseline (perf-results/baseline.json),
@@ -486,6 +562,7 @@ jobs:
       # PERF_FAIL_ON_REGRESSION=1 on the render step (and gate on its outcome).
       - name: Compute perf deltas vs baseline
         id: perf_deltas
+        if: ${{ steps.assemble.outputs.complete-matrix == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -500,14 +577,21 @@ jobs:
             --output perf-results/perf-current.json
           metric_count="$(node -e 'const m=require("./perf-results/perf-current.json");process.stdout.write(String(m.length))')"
           echo "Extracted ${metric_count} perf metric(s) from ${#results[@]} result file(s)."
+          if [ "${metric_count}" -eq 0 ]; then
+            echo "::error::Benchmark results contained no extractable performance metrics."
+            exit 1
+          fi
           # render-perf-deltas.js always exits 0 in report-only mode and prints
           # changed=/regressed= on stdout; capture regressed for the annotation.
-          render_output="$(node scripts/unity/lib/render-perf-deltas.js \
-            --current perf-results/perf-current.json \
-            --baseline perf-results/baseline.json \
-            --out-md perf-results/perf-deltas.md \
-            --out-json perf-results/perf-deltas.json \
-            --update-baseline perf-results/baseline.json)"
+          render_args=(
+            --current perf-results/perf-current.json
+            --baseline perf-results/baseline.json
+            --out-md perf-results/perf-deltas.md
+            --out-json perf-results/perf-deltas.json
+            --require-complete-baseline
+            --update-baseline perf-results/baseline.json
+          )
+          render_output="$(node scripts/unity/lib/render-perf-deltas.js "${render_args[@]}")"
           echo "${render_output}"
           regressed="$(printf '%s\n' "${render_output}" | sed -n 's/^regressed=//p' | tail -n1)"
           regressed="${regressed:-false}"

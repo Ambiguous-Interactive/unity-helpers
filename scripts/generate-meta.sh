@@ -621,7 +621,7 @@ main() {
     guid=$(generate_guid)
     
     # Write meta file with CRLF endings. .gitattributes declares '*.meta text eol=crlf' and
-    # check-eol.ps1 -- which validate:prepush runs -- enforces that in the working tree, but a file
+    # check-eol.ps1 -- which validate:local runs -- enforces that in the working tree, but a file
     # written here never passes through git's smudge filter. The awk form is POSIX; sed's \r in a
     # replacement is not portable.
     get_meta_content "$filepath" "$guid" |

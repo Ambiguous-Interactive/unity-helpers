@@ -808,6 +808,44 @@ finally {
     Remove-Item -Path $repo8b -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test 8bb: -Fix must update an intentionally force-added, ignored staged file
+# without making that path poison the formatter's complete staging batch.
+Write-Host "`nTest group: ignored staged file auto-fix" -ForegroundColor Magenta
+$repo8bb = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('progress/')
+try {
+    $progressDir = Join-Path $repo8bb 'progress'
+    New-Item -ItemType Directory -Path $progressDir -Force | Out-Null
+    $progressPath = Join-Path $progressDir 'session.md'
+    Set-Content -Path $progressPath -Value '# Session evidence' -Encoding UTF8
+    Add-FakePrettierPackage -RepoPath $repo8bb
+    Add-FakeMarkdownlintPackage -RepoPath $repo8bb
+
+    Push-Location $repo8bb
+    try {
+        git add -f progress/session.md
+    }
+    finally {
+        Pop-Location
+    }
+
+    $result8bb = Invoke-Preflight `
+        -RepoPath $repo8bb `
+        -Arguments @('-Fix', '-Paths', 'progress/session.md')
+    Write-TestResult 'IgnoredStagedFix_ExitCode0' ($result8bb.ExitCode -eq 0) "Expected exit code 0, got $($result8bb.ExitCode). Output: $($result8bb.Output)"
+
+    Push-Location $repo8bb
+    try {
+        $stagedPaths = @(git diff --cached --name-only --diff-filter=ACMR)
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'IgnoredStagedFix_RemainsStaged' ($stagedPaths -contains 'progress/session.md') 'Expected ignored progress log to remain staged after auto-fix'
+}
+finally {
+    Remove-Item -Path $repo8bb -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 8c: lint-staged-markdown.ps1 should share the same fence-language recovery
 Write-Host "`nTest group: staged markdown helper fence recovery" -ForegroundColor Magenta
 $repo8c = New-TestRepo -ConfigurePushDefaults
