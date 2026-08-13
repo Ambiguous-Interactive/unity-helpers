@@ -62,6 +62,9 @@ The optimized-editor medians were:
   optimized release payload assumed by the performance acceptance work.
 - The workflow contract pins centralized benchmark discovery, absence of per-leg discovery, fresh
   complete-matrix baseline updates, non-empty metrics, and the exporter optimization flag.
+- Cursor's PR review caught an over-escaped jq key in the expected-result identity output. The filter
+  now uses valid single-quoted jq syntax, and the workflow contract extracts and executes that exact
+  program against a hyphenated-key fixture instead of accepting disconnected string tokens.
 - Stale Unity workflow comments that still claimed one permanently serialized organization seat
   now match the measured evidence: tier handoff is about one second, while a hang can strand a runner
   and delay queued licensed work.

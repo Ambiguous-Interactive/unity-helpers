@@ -110,7 +110,7 @@ jobs:
             echo "latest-version=${latest}"
             echo "matrix-include=${matrix_include}"
             echo "expected-result-count=$(jq 'length' <<< "${matrix_include}")"
-            echo "expected-result-files=$(jq -c '[.[].\"result-file\"] | sort' <<< "${matrix_include}")"
+            echo "expected-result-files=$(jq -c 'map(."result-file") | sort' <<< "${matrix_include}")"
             if [ -z "${INPUT_UNITY_VERSION:-}" ]; then
               echo "allow-baseline-refresh=true"
             else

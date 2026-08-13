@@ -683,6 +683,45 @@ if (-not $benchmarkAssemblyDiscoveryIsCentralized) {
     Write-Info 'Checked benchmark assembly discovery is authoritative and centralized.'
 }
 
+$expectedResultFilesLines = @(
+    $benchmarksWorkflowContent -split "`r?`n" |
+        Where-Object { $_.Contains('echo "expected-result-files=') }
+)
+$expectedResultFilesFilter = ''
+if ($expectedResultFilesLines.Count -eq 1) {
+    $expectedResultFilesFilterMatch = [regex]::Match(
+        $expectedResultFilesLines[0],
+        "jq -c '([^']+)'"
+    )
+    if ($expectedResultFilesFilterMatch.Success) {
+        $expectedResultFilesFilter = $expectedResultFilesFilterMatch.Groups[1].Value
+    }
+}
+$expectedResultFilesFixture = '[{"result-file":"results-b.xml"},{"result-file":"results-a.xml"}]'
+$expectedResultFilesOutput = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
+    @()
+}
+else {
+    @($expectedResultFilesFixture | & jq -c $expectedResultFilesFilter 2>&1)
+}
+$expectedResultFilesFilterExitCode = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
+    -1
+}
+else {
+    $LASTEXITCODE
+}
+$benchmarkExpectedResultFilesFilterIsExecutable = (
+    $expectedResultFilesFilter -eq 'map(."result-file") | sort' -and
+    $expectedResultFilesFilterExitCode -eq 0 -and
+    ($expectedResultFilesOutput -join "`n").Trim() -eq '["results-a.xml","results-b.xml"]'
+)
+if (-not $benchmarkExpectedResultFilesFilterIsExecutable) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The expected-result-files jq program must be extracted exactly once, execute successfully with a hyphenated result-file key, and return sorted identities. Do not backslash-escape double quotes inside its single-quoted jq program.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Executed the benchmark expected-result-files jq program against a hyphenated-key fixture.'
+}
+
 $benchmarkBaselineRequiresCompleteFreshMatrix = (
     $benchmarksWorkflowContent.Contains('expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}') -and
     $benchmarksWorkflowContent.Contains('BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}') -and
