@@ -140,12 +140,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         // implementation it could pick either, so it refuses at build time instead, which is the
         // same answer arriving somewhere it can be acted on.
         //
-        // The rest are element-shape refusals: a jagged array of anything but bytes, a rank-2 array,
-        // and a nullable element (protobuf-net refuses a null element, so Nullable<T>[] is a
-        // collection that can only hold values it cannot write).
+        // The nested and jagged shapes are refusals worth stating rather than gaps. protobuf-net
+        // refuses every one of them too, at WRITE, on both 2.4.9 and 3.2.56 ("Nested or jagged
+        // lists, arrays and maps are not supported"), so there is no wire form to be compatible
+        // with -- measured, not assumed. `byte[][]` is the exception and is accepted above, because
+        // a byte[] is one length-delimited value rather than a repeated field.
+        //
+        // The last two are element-shape refusals: a nullable element (protobuf-net refuses a null
+        // element, so Nullable<T>[] is a collection that can only hold values it cannot write), and
+        // a BCL type with no mapping.
         [TestCase("Consumer.IOwnList<int>")]
         [TestCase("System.Collections.Generic.List<System.Collections.Generic.List<int>>")]
+        [TestCase("System.Collections.Generic.List<int[]>")]
         [TestCase("int[][]")]
+        [TestCase("int[][][]")]
         [TestCase("int[,]")]
         [TestCase("int?[]")]
         [TestCase("System.DateTime")]

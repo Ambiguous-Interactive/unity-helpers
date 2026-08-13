@@ -1059,6 +1059,14 @@ so a contract migrating from it keeps working unchanged.
 implementation the generator could pick; protobuf-net guesses `List<T>` and throws
 `InvalidCastException` when it hands the result back. Declare the member as a concrete type.
 
+**Nested and jagged collections are refused** — `int[][]`, `int[,]`, `List<int[]>`,
+`List<List<int>>`. This is not an omission: protobuf-net refuses all of them too, at write, on both
+2.4.9 and 3.2.56 (`Nested or jagged lists, arrays and maps are not supported`), so there is no
+wire form to be compatible with. Wrap the inner collection in a `[WProtoContract]` of its own and
+make the member a collection of that — which is what a `.proto` schema does, and what makes the
+shape expressible at all. `byte[][]` and `List<byte[]>` are the exception and work everywhere,
+because a `byte[]` is a single length-delimited value rather than a repeated field.
+
 **A collection may be a `struct`.** Nothing about `ICollection<T>` requires a class, and an inline or
 pooled buffer is a good reason to make one a value type. A struct collection is never null-checked
 and is assigned back to its member after reading, because everything in between operated on a copy.

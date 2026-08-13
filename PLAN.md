@@ -1453,6 +1453,29 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   mode is "code that does not compile" -- and the generator reports nothing at all about `CS0019`.
   It compiles the generated source now, which is what the map version was written to do from the
   start and what caught the defect.
+- **#399 — measured in session 183, and it is an owner decision rather than an implementation.**
+  The issue asks for arbitrary-dimension arrays, jagged arrays and nested collections
+  (`int[][]`, `int[,]`, `List<int[]>`, `List<List<int>>`). **Neither protobuf-net major supports any
+  of them**, measured against both vendored oracles: 3.2.56 refuses with
+  `NotSupportedException: Nested or jagged lists, arrays and maps are not supported`, 2.4.9 with the
+  same message plus a separate one for multi-dimensional arrays. Both refuse at *write*, so there is
+  no payload either can produce and none it could be asked to read.
+
+  That matters because it takes the question out of the encoding-policy rule above. The directive is
+  "interoperate with protobuf-net, do not imitate it", and it is enforced by requiring that any
+  divergence be measured to *read* on the other side. **That check cannot be satisfied here at all**:
+  supporting these shapes means inventing a wire contract this package alone owns, most naturally a
+  repeated *wrapper sub-message* per inner collection, which is what a proto3 schema would use. So
+  `WPROTO003` on `int[][]` and `List<List<int>>` is currently the **correct** answer rather than a
+  gap, and it is pinned by `AnUnsupportedMemberTypeIsAnError`.
+
+  `byte[][]` and `List<byte[]>` are the exception and already work on both sides, because `byte[]` is
+  a length-delimited scalar rather than a repeated field -- which is exactly why the generator tests
+  `Shape.IsByteArray` before anything else.
+
+  **What #399 needs next is a decision, not code:** whether this package owns an encoding protobuf-net
+  cannot read. The rest of the issue (every stdlib type, and the contract surveys of the wallstop and
+  Ambiguous-Interactive repositories) is independent of that decision and can proceed either way.
 - **#371 — implemented in session 182, pending merge.** CI runs all generator differentials once
   against protobuf-net 2.4.9 and once against 3.2.56 in isolated processes. The v2 run exposed and now
   pins the three major-version divergences described above instead of silently treating v3 as both oracles,
