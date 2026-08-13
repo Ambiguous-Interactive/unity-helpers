@@ -12,7 +12,7 @@
 - [Shipped and Retired](#shipped-and-retired) — what came out of the plan and why
 - [Test Suite Runtime Reduction](#test-suite-runtime-reduction--goal-met-section-retired) — **GOAL MET** (all 14 legs under 5.3 min; retired)
 - [CI Throughput](#ci-throughput) — the main matrix is already dominated by Unity work rather than wrapper setup; low-risk dependency and duplicate-launch reductions remain appropriate, while grouping all modes by editor requires new measurements that justify its license/failure-gating complexity.
-- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port have landed. Sessions 184-185 added the Release allocation contract, a real Unity benchmark path, and one-time generated-registration plus first-use evidence. A licensed EditMode/PlayMode run and one hybrid release remain before removal of the runtime protobuf-net fallback.)
+- [Design Item: In-tree v2/v3-wire-compatible AOT-native serializer (WallstopProto)](#design-item-in-tree-v2v3-wire-compatible-aot-native-serializer-wallstopproto) — **HIGH PRIORITY, IN PROGRESS** (steps 1-5 and the package-contract port have landed. Sessions 184-185 added the Release allocation contract, a real Unity benchmark path, and one-time generated-registration plus first-use evidence. Session 186 attributed the read path's allocation per member shape and removed all of it, so a read now allocates no more than the graph it returns. A licensed EditMode/PlayMode run and one hybrid release remain before removal of the runtime protobuf-net fallback.)
 - [Backlog: Auto-Loading Cache Feature](#backlog-auto-loading-cache-feature) (not started)
 - [DxKit Rebrand: Unity Helpers → DxKit](#dxkit-rebrand-unity-helpers--dxkit) — **NOT STARTED** (brand, docs site, editor UI, assets)
 
@@ -192,6 +192,16 @@ Sibling contention was ruled out for that window: no Ambiguous-Interactive repo 
 DoxReloaded, IshoBoy, qora-redux) touched the self-hosted runners while ours sat idle.
 
 ### Done
+
+- **#428 — one red check on a green pull request is not ours, session 186.** The automatic
+  `copilot-pull-request-reviewer` fails with HTTP 402 (`exceeded your monthly quota`) before reading
+  any code, twice on #427, and re-pushing re-requests it and reproduces it. Nothing in the repository
+  can turn it green: restoring the quota or dropping the reviewer from the required set is an
+  organization-settings act. The acceptance policy is therefore written down where a landing session
+  reads it ([ship-changes Step 10](./.llm/skills/ship-changes.md)) — repository-owned checks are what
+  "all green" means, the reviewer's quota failure is recorded in the pull request summary rather than
+  chased, and bot reviews are never requested by hand. The tell is the pair "no analysis produced"
+  and a sub-minute duration; anything else red is ours until the annotations say otherwise.
 
 - **A runner OS-kill strands the Unity seat, session 167.** Two standalone IL2CPP legs on
   `ELI-MACHINE` were killed by the OS mid-`Run Unity Test Runner` (`Out of memory.`), 5.8 and 6.5 min
@@ -1506,6 +1516,38 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   **What #399 needs next is a decision, not code:** whether this package owns an encoding protobuf-net
   cannot read. The rest of the issue (every stdlib type, and the contract surveys of the wallstop and
   Ambiguous-Interactive repositories) is independent of that decision and can proceed either way.
+- **#398 — the read path's own allocation is closed, session 186.** The issue asked for a benchmark
+  before any pooling, and session 184's aggregate delivered one: 5,272 B/op against protobuf-net's
+  4,112 for the same object graph. **An aggregate cannot say which member is responsible**, so the
+  first change was a per-shape one — one contract per member shape, each measured against the oracle
+  decoding the identical graph — and it attributed the entire 1,160 B gap to two shapes and
+  exonerated the other three:
+
+  | Shape | Before | After | protobuf-net |
+  | --- | ---: | ---: | ---: |
+  | `int[128]` | 1,744 B/op | **560** | 560 |
+  | `List<int>[128]` | 1,208 B/op | **592** | 624 |
+  | `string` | 88 B/op | 88 | 88 |
+  | `Dictionary<string,int>[32]` | 3,384 B/op | 3,384 | 3,384 |
+  | nested contract | 96 B/op | 96 | 96 |
+
+  **The cause was the accumulator, not the reader.** An array member decoded into a `List<T>` that
+  doubled from empty and was then copied out of, so 128 `int`s cost six abandoned buffers plus the
+  copy. A packed run already carries the answer: `WProtoReader.CountPackedElements` counts elements
+  off the encoded bytes -- exactly, since a varint element ends at the byte whose continuation bit is
+  clear -- and the generator spends it, into `WProtoArrayBuilder<T>` (which hands its buffer over
+  when it comes out exactly full) for arrays and `WProtoRepeated.Reserve` for every `List<T>`-backed
+  accumulator. Aggregate: **5,272 to 4,088 B/op, below the oracle, with throughput unchanged**
+  (2,153-2,237 ns/op against a 2,213 baseline).
+
+  *The bar is the oracle rather than a constant*, in both the aggregate and the per-shape gate: two
+  implementations returning the same graph must allocate the same, so anything above it is overhead
+  this package chose, and no ceiling needs re-tuning when a runtime changes what a `Dictionary`
+  costs.
+
+  **What remains of #398 is the string interner and the merge-into-existing-collection read**, both
+  of which change public semantics rather than an internal accumulator, and neither of which the
+  measurement now indicts: `string` and the map path already match protobuf-net byte for byte.
 - **#371 — merged in session 182.** CI runs all generator differentials once
   against protobuf-net 2.4.9 and once against 3.2.56 in isolated processes. The v2 run exposed and now
   pins the three major-version divergences described above instead of silently treating v3 as both oracles,
@@ -1520,10 +1562,12 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
 These remain release-level acceptance work. The Release generator benchmark now runs a
 representative scalar/string/repeated/map/nested contract against both supported protobuf-net
 oracles. The local protobuf-net v3 baseline measured serialization into a warmed reusable buffer at
-**0 B/op** for WallstopProto versus **40 B/op** for protobuf-net, while deserialization was **5,272
-B/op** versus **4,112 B/op** because both materialize the returned object graph. The Unity benchmark
-contract is dual-annotated, so its weekly Release lane measures WallstopProto rather than silently
-falling back to protobuf-net.
+**0 B/op** for WallstopProto versus **40 B/op** for protobuf-net. Deserialization was **5,272 B/op**
+versus **4,112 B/op** — both materialize the returned object graph, but the gap was ours, and
+session 186 closed it: **4,088 B/op**, below the oracle, with a per-shape gate that now fails when
+any member shape allocates more than protobuf-net does for the same graph (see #398 above). The
+Unity benchmark contract is dual-annotated, so its weekly Release lane measures WallstopProto rather
+than silently falling back to protobuf-net.
 
 Session 185 added a controlled registration-inclusive comparison: nine rounds use 27 API-specific
 generic closures of the same representative contract, plus one warmup closure. The Unity 6000.4.6f1
@@ -1551,6 +1595,10 @@ remains the merge evidence.
   that boundary in reports.
 - Zero allocations on the warmed reusable-buffer write path is now a tested Release contract. Retain
   it while adding Unity Profiler evidence for the EditMode/PlayMode path.
+- **The read path allocates no more than the object graph it returns**, gated per member shape
+  against protobuf-net decoding the same graph. The remaining read allocation is the graph itself,
+  and lowering it further means changing what a read hands back (interned strings, merging into an
+  existing collection) rather than tuning an accumulator.
 
 ### Risks & mitigations
 

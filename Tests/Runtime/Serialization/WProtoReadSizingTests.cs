@@ -30,6 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     public sealed class WProtoReadSizingTests
     {
         private const int ScratchSize = 4096;
+        private const int MaximumVarint32Bytes = 10;
 
         [TestCase(0)]
         [TestCase(1)]
@@ -246,7 +247,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static WProtoReader PackedVarints(int[] values)
         {
-            byte[] scratch = new byte[ScratchSize];
+            // Sized from the widest encoding a negative int32 has rather than from a constant: a
+            // thousand of them is 10 KB, and a fixed scratch is what made the 1000-element case fail
+            // in the editor while every smaller one passed.
+            byte[] scratch = new byte[(values.Length * MaximumVarint32Bytes) + 1];
             WProtoWriter writer = new(scratch);
             for (int index = 0; index < values.Length; index++)
             {

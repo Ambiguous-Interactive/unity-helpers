@@ -1092,6 +1092,19 @@ three of them are the opposite of the rule for a plain member:
   either form, so this is a size win rather than a compatibility break, and payloads in both forms
   are accepted here.
 
+**Reading a packed run allocates the collection once.** The run's length prefix already says how
+many elements follow, so the generated reader sizes its destination up front instead of doubling it
+and leaving each previous buffer to the collector. Decoding 128 `int`s into an `int[]` allocates 560
+bytes — the array and the contract, and nothing else — against 1,744 before, and against
+protobuf-net's 560 for the same graph. An **unpacked** run, which is what protobuf-net writes, is a
+sequence of separate fields whose length is not knowable until it ends, and still grows as it did.
+
+The same three pieces are public, for a formatter you write yourself:
+`WProtoReader.CountPackedElements(wireType)` returns the exact element count of a packed run without
+consuming it, `WProtoArrayBuilder<T>` collects into an exactly-sized array, and
+`WProtoRepeated.Reserve(list, additional)` sizes a `List<T>` in one allocation. All three are hints:
+a run with no count behaves exactly as it did.
+
 #### Maps
 
 A dictionary member is written as a protobuf **map**: a repeated _entry message_ with the key at

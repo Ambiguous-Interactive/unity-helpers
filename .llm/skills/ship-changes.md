@@ -161,6 +161,33 @@ If a push is rejected for non-fast-forward reasons, prefer
 `git pull --rebase`. Stash any unrelated local changes manually first; never
 silently clobber history with `--force` without explicit user consent.
 
+### Step 10: Read the checks, and know which ones are ours
+
+"All checks green" means **every repository-owned check**: the workflows in
+`.github/workflows/`, which this repository can fix. A pull request also carries
+checks from GitHub Apps whose success depends on an account entitlement rather
+than on the code, and those cannot be driven green from a branch.
+
+The known case is the automatic Copilot reviewer (#428). Its signature:
+
+| Signal                                      | Reading                           |
+| ------------------------------------------- | --------------------------------- |
+| `copilot-pull-request-reviewer` fails       | Not a repository workflow         |
+| HTTP 402 / `exceeded your monthly quota`    | Account entitlement, not the diff |
+| No review comments and no analysis produced | It never read the code            |
+| Sub-minute duration                         | It failed before reviewing        |
+
+**Policy: that failure does not block landing, and re-pushing cannot clear it.**
+Every push re-requests the review and reproduces it. Record it in the pull
+request summary as an external check, keep the repository's own checks green,
+and rely on the Cursor review plus CI. Restoring the quota, or dropping the
+reviewer from the required set, is an organization-settings action for the
+owner — never work around it by requesting bot reviews by hand.
+
+Anything else red is ours until proven otherwise. Read the annotations before
+concluding a leg is infrastructure: a `Stale pull request run for <sha>` marks a
+run the head moved past, not breakage.
+
 ---
 
 ## Related Skills
