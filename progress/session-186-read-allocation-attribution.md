@@ -11,8 +11,8 @@ is #398: the write path reuses a caller's buffer and allocates nothing, while th
 **5,272 B/op against protobuf-net's 4,112** for the same object graph. Garbage on a per-frame or
 per-save read is a frame-time spike, not a micro-optimization.
 
-#398's own instruction was to measure before pooling anything. Session 184 had already built the
-aggregate benchmark it asked for, so the open work started one step later.
+The issue's own instruction was to measure before pooling anything. Session 184 had already built
+the aggregate benchmark it asked for, so the open work started one step later.
 
 ## The aggregate could not say what to fix
 
@@ -80,6 +80,25 @@ carried a comment asking for exactly this when the allocations came down.
 - No Unity license is configured in this devcontainer (`setup-license.ps1 -Check` reports it), so the
   Docker EditMode/PlayMode legs are CI's; the MCP editor is the local substitute.
 
+## Mutations
+
+Three, all caught, and the second is the one worth keeping.
+
+1. **Emit no reservation at all** — the state this session started in. The per-shape gate reports
+   1,744 B/op against the oracle's 560. Caught by construction, which is what makes the gate a
+   red-green one rather than a description.
+2. **Hand over the buffer even when it is not exactly full** (`_count <= _items.Length` in
+   `ToArray`): 17 of 318 generator tests fail. Correctness, not allocation — the trailing default
+   elements show up wherever the reserved count and the final size differ (a seeded array, an
+   interleaved run).
+3. **Over-count the packed run** (`return remaining` for varints): **every correctness test still
+   passes**, and only the allocation gates fail — 1,576 B/op per array and 5,104 aggregate against
+   the oracle's 4,112. An inexact count is a silent performance regression with no behavioral
+   symptom, which is exactly the class of defect a measured gate exists to catch.
+
+The shipped analyzer was confirmed byte-identical to a fresh Release build afterwards, on the same
+SDK CI pins (9.0.306), so the restore left nothing behind.
+
 ## Folded-in CI work
 
 **#428 — the Copilot reviewer's quota failure is not a repository failure.** It fails with HTTP 402
@@ -99,6 +118,11 @@ not on the reasoning in the issue.
 
 ## Session limitation to hand back
 
-This session had no GitHub connector and no token: the branch pushes over the `pr` SSH remote, but
-**opening the pull request and filing follow-up issues need the VS Code GitHub extension**. Nothing
-else in the session depended on it.
+The branch pushes cleanly over the `pr` SSH remote, which needs no credential broker. Everything
+that needs the **GitHub API** — opening the pull request, filing follow-up issues — does not work
+from a headless session: no token exists inside the container, `origin`'s HTTPS remote goes through
+the VS Code credential helper, and that helper answers by prompting on the host. So the pull request
+itself is opened from the VS Code GitHub extension, against
+`dev/wallstop/session-186-read-allocation`. Nothing else in the session depended on it, and only the
+push-triggered `Spelling Check` (green) runs until the pull request exists — the Unity matrix is
+`pull_request`-triggered.
