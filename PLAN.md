@@ -151,6 +151,27 @@ only open work.
   nested drawer that leaked one of its own; and **`using` declarations**, which let a nineteen-site
   sweep land without re-indenting a single existing block.
 
+- **#284 — a constant whose only effect was the bug, session 188.** A `SerializableDictionary`'s
+  pending "Add entry" section draws Key and Value as one column stacked twice — same origin, same
+  width, same label width, and for `<string,string>` literally the same `EditorGUI.TextField` call.
+  It then shifted the Value rect left by `Min(8.5f, valueRect.x - sectionPadding)`, and that clamp
+  measures its headroom from the **indent**: 0 at indent 0, 8.5 everywhere else. So
+  `PendingValueContentLeftShift` was inert exactly where it looked deliberate and misaligned
+  everywhere else — *its entire observable effect anywhere in the drawer was to produce the defect*.
+  For a foldout value it and `PendingFoldoutValueRightShift` cancel at every indent, so deleting
+  both left that path unchanged.
+
+  *Three lessons, two of them repeats.* **A suite can assert the bug as the contract** (#358 said
+  this; third session running) — four assertions across three tests pinned the 8.5px gap, one of
+  them named `PendingEntryKeyAndValueAlignedWithWGroupPaddingAndIndent`, which is the reporter's
+  exact configuration asserting a misalignment while calling itself *Aligned*. **A loose tolerance
+  is how a re-baseline hides**: those assertions used `Within(1f)` on an 8.5px quantity, wide enough
+  to accept either answer, so the re-baseline had to *tighten* to `0.01f` rather than just flip the
+  number. And **"in some scenarios" in a bug report is a hypothesis to resolve, not a caveat to
+  accept**: it meant "whenever a WGroup is anywhere above it", because `WGroup` renders any member
+  with visible children at indent 1 while outdenting leaves, and `WGroupAutoIncludeMode` defaults to
+  `Infinite` — so the reporter's un-annotated dictionary was swallowed into the group above it.
+
 - **CI Failure Remediation: Standalone IL2CPP + PlayMode** — closed as a gate. Every Unity leg has been
   green since PR `272`. Its one still-open thread, the protobuf-net AOT failure under IL2CPP, is the
   subject of the WallstopProto design item below; the rest was root-cause history for fixes that have
@@ -192,6 +213,34 @@ Sibling contention was ruled out for that window: no Ambiguous-Interactive repo 
 DoxReloaded, IshoBoy, qora-redux) touched the self-hosted runners while ours sat idle.
 
 ### Done
+
+- **#347 — the Odin branch was compiled by nothing, session 188.** Not the 16 files the issue
+  records: **192**, once the ~176 test files behind the same define are counted. The define comes
+  from a `versionDefines` entry keyed on the `odininspector` package, which no CI project declares —
+  and the MCP editor does not have Odin either, so there was no local fallback. The part that makes
+  it a shipping risk rather than a coverage statistic: **Odin changes the base class** of
+  `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and `AttributeEffect` through a `using`
+  alias, so three public types had an entirely uncompiled second form. #275 is that shipping to
+  consumers.
+
+  The surface was measured before anything was built, and it is two types
+  (`SerializedMonoBehaviour`, `SerializedScriptableObject`) for the whole runtime assembly. A shim
+  declaring exactly those, plus a third configuration on `TypeCheck`/`TestCheck`, closes the runtime
+  half for ~15 s of the `typecheck:unity` chain, which `Local Gates` already runs.
+
+  *Proven discriminating, which is the only thing that makes a new gate worth having.* Retyping the
+  alias to a nonexistent Sirenix type leaves the **default** configuration green and fails the
+  **Odin** one — a defect that lives only in the branch nothing compiled, caught by the thing built
+  to compile it.
+
+  **Still open on #347: the editor-side half** (nine drawers, three inspectors). It cannot be
+  reached from a `Generator~` project, because `WButtonOdinInspectorHelper` pulls in
+  `Editor/Utils/WButton/**` and therefore the whole Editor assembly, which needs a `UnityEditor`
+  reference the community assemblies do not carry. Shimming `UnityEditor` would be a large fake
+  surface guarding a small real one. The vehicle is a Unity leg with a stub `odininspector` UPM
+  package injected into the generated project — the `versionDefines` entry then sets the define with
+  no asmdef change at all — modelled on `unitypackage-smoke` (hosted runner, org lock, no
+  self-hosted slot). Compile-only: the ~176 Odin fixtures would *run* against a no-op stub and fail.
 
 - **#428 — one red check on a green pull request is not ours, session 186.** The automatic
   `copilot-pull-request-reviewer` fails with HTTP 402 (`exceeded your monthly quota`) before reading
@@ -1529,7 +1578,31 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   **What is left on #399**, each independent of the above:
   - **Rectangular arrays (`int[,]`)** are still `WPROTO003`, and they are a different question rather
     than the same one unfinished: there is no per-row structure to wrap, so reconstructing one needs
-    its dimensions carried in the payload. Tracked separately.
+    its dimensions carried in the payload. Tracked on **#434**, and scoped in session 188:
+
+    *There is no oracle, confirmed rather than assumed.* protobuf-net refuses `int[,]` at **write**
+    on both majors -- 2.4.9 with a dedicated multi-dimensional message, 3.2.56 through its generic
+    repeated refusal -- so no payload with this shape exists for either side to read. The encoding
+    is ours to define, under the owner's 2026-08-13 condition that it map to a concrete proto3 type.
+    A `TheOracleRefusesEveryRectangularShape` fixture must assert **both** oracle legs, because the
+    two majors throw different messages and the existing `Contains("Nested or jagged")` assertion
+    would not survive.
+
+    *The blocking question is not code.* A `dims` header is a **capacity claim**, not a length
+    prefix, which is critical rule 17 exactly: six bytes can state `[46341, 46341]` and ask for 8 GB.
+    It must be refused with `SerializationCapacityLimits.TryAccept` unless the product of `dims`,
+    computed in `long` so it cannot overflow into something plausible, equals the delivered element
+    count. Two more decisions before anything is written: a zero-length dimension (`new int[0,5]`)
+    has real shape and no elements, so `dims` must be written even when `values` is empty -- the
+    opposite of the omit-empty rule everywhere else -- and rank is a **compile-time** property of
+    the member's declared type, so the generator can emit `new T[a, b]` directly and never needs
+    `Array.CreateInstance` or a runtime rank at all.
+
+    *The insertion points are small and known*: `RepeatedMember.cs:111` (the `array.Rank == 1`
+    gate), `Shape.cs:374` (the last-resort hook that already routes an unwrappable collection to a
+    generated message), `NestedCollections.TryShape` (which currently drops anything that is not a
+    `RepeatedMember`/`MapMember`), and the `WPROTO003` message text. Three `DiagnosticTests` cases
+    pin the refusal today and must invert; there is no `int[,,]` or `T[,]`-in-a-generic case yet.
   - **The contract surveys** of the wallstop and Ambiguous-Interactive repositories, and the
     remaining stdlib types, which the wrapper encoding does not change either way.
 - **#398 — the read path's own allocation is closed, session 186.** The issue asked for a benchmark
