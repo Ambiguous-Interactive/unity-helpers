@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The asset-change watcher no longer deserializes test assets during Unity's import phase**: resolving whether a candidate path holds a watched type asked for the main asset's type by loading it, and loading an asset runs its `OnValidate` -- which is where `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate` came from. The same decision is now made from asset metadata, with nothing loaded ([#439](https://github.com/Ambiguous-Interactive/unity-helpers/issues/439)).
+
 - **A `SerializableDictionary`'s "Add entry" Key field is no longer offset from its Value field**: inside a `WGroup` — or anywhere else the inspector indents it — the Value column was drawn 8.5px to the left of the Key column ([#284](https://github.com/Ambiguous-Interactive/unity-helpers/issues/284)).
 - **A WallstopProto contract with a `struct` dictionary member no longer breaks your build**: the generator accepted the member and then emitted a null check and a `??` for a value type, both of which are compiler errors in code you never wrote ([#388](https://github.com/Ambiguous-Interactive/unity-helpers/issues/388)).
 - **An immutable WallstopProto contract with a dictionary member no longer breaks your build**: two generated locals shared a name, which surfaced as `CS0136` inside generated source ([#395](https://github.com/Ambiguous-Interactive/unity-helpers/issues/395)).

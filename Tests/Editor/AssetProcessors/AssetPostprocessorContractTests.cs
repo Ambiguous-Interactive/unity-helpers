@@ -26,6 +26,15 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// <c>.cs</c> source file and scans each override's body for forbidden tokens. If a
     /// processor needs to call one of these APIs, wrap the call in a drain lambda
     /// scheduled via <c>AssetPostprocessorDeferral.Schedule</c>.
+    ///
+    /// <b>This scan covers the callback's own body only, and that is not the whole rule.</b> A
+    /// forbidden call reached through a helper is invisible here, and one was: #439 found
+    /// <c>OnPostprocessAllAssets</c> reaching <c>AssetDatabase.LoadAssetAtPath</c> four frames
+    /// down through <c>EnsureInitialized</c> while this test passed. The transitive contract lives
+    /// in <c>scripts/tests/test-asset-postprocessor-reachability.js</c>
+    /// (<c>npm run test:asset-postprocessor-reachability</c>), which walks the call graph within
+    /// the declaring type and runs on every pull request in seconds. Treat this test as its
+    /// shallow subset rather than as the guarantee.
     /// </summary>
     [TestFixture]
     [Category("Unit")]

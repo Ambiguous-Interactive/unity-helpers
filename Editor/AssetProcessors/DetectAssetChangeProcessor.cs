@@ -1366,10 +1366,16 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         continue;
                     }
 
-                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
-                        path
-                    );
-                    if (asset != null && watcher.AssetType.IsInstanceOfType(asset))
+                    // The main asset's type, not the loaded object's. LoadAssetAtPath<Object>
+                    // returns the main asset, so IsInstanceOfType over it asked exactly the
+                    // question GetMainAssetTypeAtPath answers -- and answered it by deserializing
+                    // the file, which runs consumer OnValidate code. This method is reachable
+                    // synchronously from OnPostprocessAllAssets through EnsureInitialized, so that
+                    // deserialization happened inside Unity's import phase, which is where
+                    // "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate"
+                    // comes from. Same decision, same result, nothing loaded.
+                    Type testAssetType = AssetDatabase.GetMainAssetTypeAtPath(path);
+                    if (testAssetType != null && watcher.AssetType.IsAssignableFrom(testAssetType))
                     {
                         watcher.KnownAssetPaths.Add(path);
                     }
