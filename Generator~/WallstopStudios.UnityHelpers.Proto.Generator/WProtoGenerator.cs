@@ -375,7 +375,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            List<Member> members = CollectMembers(context, contract, surrogates);
+            NestedCollections nested = new NestedCollections(contract.Name, surrogates);
+            List<Member> members = CollectMembers(context, contract, surrogates, nested);
             if (members == null)
             {
                 return null;
@@ -594,7 +595,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 hooks,
                 constructAtEnd,
                 skipConstructor,
-                EncodedTypeParameters(contract)
+                EncodedTypeParameters(contract),
+                nested
             );
 
             foreach (INamedTypeSymbol unused in nesting)
@@ -754,7 +756,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Hooks hooks,
             bool constructAtEnd,
             bool skipConstructor,
-            List<string> encodedTypeParameters
+            List<string> encodedTypeParameters,
+            NestedCollections nested
         )
         {
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
@@ -797,6 +800,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 constructAtEnd,
                 skipConstructor
             );
+
+            // Last, and nested inside this formatter rather than beside it: a wrapper message exists
+            // only to give one of this contract's members an encoding, it is never looked up by
+            // type, and keeping it here is what lets two contracts each hold a List<int[]> without
+            // colliding over a generated name.
+            nested.Emit(writer);
 
             writer.Outdent();
             writer.Line("}");
@@ -1934,7 +1943,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private static List<Member> CollectMembers(
             GeneratorExecutionContext context,
             INamedTypeSymbol contract,
-            SurrogateMap surrogates
+            SurrogateMap surrogates,
+            NestedCollections nested
         )
         {
             List<Member> members = new List<Member>();
@@ -1999,6 +2009,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                int depthRefusals = nested.DepthRefusals;
                 Member member = Member.Create(
                     contract.Name,
                     symbol.Name,
@@ -2007,14 +2018,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     NamedFlag(attribute, "IsRequired"),
                     NamedFlag(attribute, "OverwriteList"),
                     surrogates,
+                    nested,
                     out bool ambiguous
                 );
                 if (member == null)
                 {
+                    // "Unsupported" would be true but unhelpful for a member whose only problem is
+                    // how far its collections nest: the shape IS supported, up to the depth the
+                    // reader can read back, and the fix is a different one.
                     Report(
                         context,
-                        ambiguous
-                            ? WProtoDiagnostics.AmbiguousListContract
+                        ambiguous ? WProtoDiagnostics.AmbiguousListContract
+                            : depthRefusals < nested.DepthRefusals
+                                ? WProtoDiagnostics.NestedCollectionTooDeep
                             : WProtoDiagnostics.UnsupportedMemberType,
                         symbol,
                         contract.Name,

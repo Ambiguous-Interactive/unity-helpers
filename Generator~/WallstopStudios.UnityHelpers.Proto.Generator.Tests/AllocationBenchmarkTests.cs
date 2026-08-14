@@ -116,7 +116,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Deserializing the representative contract must not allocate more than protobuf-net "
                     + "does for the same object graph."
             );
-#if !PROTOBUF_NET_ORACLE_V2
+#if PROTOBUF_NET_ORACLE_V2
+            TestContext.WriteLine(
+                "Throughput not asserted: the v2 oracle is a different implementation and its speed "
+                    + "is not this package's bar."
+            );
+#elif DEBUG
+            // Not a skip worth hiding. This side is generated C# compiled in THIS configuration
+            // while the oracle is a precompiled release assembly whatever the configuration says, so
+            // an unoptimized run compares one implementation's debug build against another's
+            // release build and reports a 4x "regression" on green code. `npm run agent:preflight`
+            // and CI both run -c Release, where the comparison is real; a developer running the
+            // documented `dotnet test -p:ProtobufNetOracle=v3` gets the allocation gates, which are
+            // configuration-independent, and this line instead of a false red.
+            TestContext.WriteLine(
+                "Throughput not asserted: this is an unoptimized build, and the oracle is "
+                    + "precompiled. Run with -c Release to assert it."
+            );
+#else
             // The FASTEST round on each side, not the median. Noise on a shared runner only ever
             // adds time, so the minimum is the closest either implementation gets to its own cost,
             // and comparing minima is what makes this a claim about the code rather than about the

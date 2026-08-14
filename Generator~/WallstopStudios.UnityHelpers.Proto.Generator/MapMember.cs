@@ -113,7 +113,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             int tag,
             ITypeSymbol type,
             bool overwriteList,
-            SurrogateMap surrogates
+            SurrogateMap surrogates,
+            NestedCollections nested
         )
         {
             if (!(type is INamedTypeSymbol named))
@@ -175,8 +176,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
+            // No registry for the key, deliberately. A proto3 map key is a scalar, and unlike the
+            // permissive cases below there is no protobuf-net behaviour to be at parity with -- it
+            // refuses a nested collection anywhere -- so a wrapped run has nothing to recommend it
+            // in a position where a key also has to have a stable identity to hash on.
             Shape key = Shape.For(keyType, keyQualified, surrogates);
-            Shape value = Shape.For(valueType, valueQualified, surrogates);
+            Shape value = Shape.For(valueType, valueQualified, surrogates, nested, name);
             if (key == null || value == null)
             {
                 return null;
@@ -758,6 +763,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return _mapIsValueType
                 ? "read." + Name
                 : "read." + Name + " ?? new " + _accumulatorQualified + "()";
+        }
+
+        /// <inheritdoc />
+        internal override void EmitPresentSeed(Writer writer)
+        {
+            EmitSeed(writer);
         }
 
         /// <inheritdoc />

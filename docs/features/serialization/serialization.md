@@ -1059,13 +1059,36 @@ so a contract migrating from it keeps working unchanged.
 implementation the generator could pick; protobuf-net guesses `List<T>` and throws
 `InvalidCastException` when it hands the result back. Declare the member as a concrete type.
 
-**Nested and jagged collections are refused** — `int[][]`, `int[,]`, `List<int[]>`,
-`List<List<int>>`. This is not an omission: protobuf-net refuses all of them too, at write, on both
-2.4.9 and 3.2.56 (`Nested or jagged lists, arrays and maps are not supported`), so there is no
-wire form to be compatible with. Wrap the inner collection in a `[WProtoContract]` of its own and
-make the member a collection of that — which is what a `.proto` schema does, and what makes the
-shape expressible at all. `byte[][]` and `List<byte[]>` are the exception and work everywhere,
-because a `byte[]` is a single length-delimited value rather than a repeated field.
+**Nested and jagged collections work, to any depth** — `int[][]`, `List<int[]>`,
+`List<List<int>>`, `int[][][]`, `HashSet<int>[]`, `List<Dictionary<string, int>>` and
+`Dictionary<string, List<int>>` all serialize. `repeated repeated` has no protobuf spelling, so each
+inner collection is encoded as a wrapper message holding it at field 1 — exactly the
+`message Wrapper { repeated T values = 1; }` idiom `protoc` generates for the equivalent schema.
+Nothing is asked of you: declare the member and it works.
+
+> **These members do not round-trip through protobuf-net.** It refuses every nested shape at write,
+> on both 2.4.9 and 3.2.56 (`Nested or jagged lists, arrays and maps are not supported`), so no
+> payload of this shape exists anywhere for either side to read. This is the one place WallstopProto
+> is deliberately a superset rather than a match. If a contract must stay readable by protobuf-net,
+> wrap the inner collection in a `[WProtoContract]` of its own and make the member a collection of
+> that instead.
+
+`byte[][]` and `List<byte[]>` are not nested collections and never were: a `byte[]` is a single
+length-delimited value rather than a repeated field, so they are ordinary repeated members and their
+bytes are unchanged.
+
+Two refusals remain, and neither is a nested-collection gap. A **rectangular** array (`int[,]`) has
+no per-row structure to wrap — reconstructing one needs its dimensions carried in the payload, which
+is a wire-format decision rather than a missing case. And a chain of collections nested more than
+**64** deep is a build error (`WPROTO032`): each level is a real sub-message, and the reader refuses
+to read past 64 levels of nesting, so a deeper member could be written and never read back.
+
+**An empty inner collection survives a round trip; an empty outer one does not.** That looks like an
+inconsistency and is the opposite. A top-level repeated field that is absent and one that is empty
+are the same bytes, so an empty outer collection cannot be told from a missing one — but an inner
+collection has a wrapper message on the wire saying it was there, so `{{1}, {}, {2}}` comes back
+with its empty middle intact. A `null` inner collection is refused for the same reason any null
+element is: a run has no encoding for an absent value.
 
 **A collection may be a `struct`.** Nothing about `ICollection<T>` requires a class, and an inline or
 pooled buffer is a good reason to make one a value type. A struct collection is never null-checked

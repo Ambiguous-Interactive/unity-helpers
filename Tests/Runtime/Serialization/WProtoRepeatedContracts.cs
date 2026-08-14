@@ -85,7 +85,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoMember(9)]
         public WProtoRepeatedEmpty[] Messages;
 
-        /// <summary>The one array that is a scalar, repeated -- so this member is jagged.</summary>
+        /// <summary>
+        /// The one array that is a scalar, repeated. It looks jagged and is not: a <c>byte[]</c> is
+        /// a single length-delimited value, so this is an ordinary repeated member and gets none of
+        /// the wrapper-message encoding a real nested collection does -- which
+        /// <c>WProtoNestedCollectionTests</c> pins by asserting these exact bytes.
+        /// </summary>
         [WProtoMember(10)]
         public byte[][] Blobs;
 

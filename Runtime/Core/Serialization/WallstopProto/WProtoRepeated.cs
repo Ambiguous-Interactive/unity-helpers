@@ -87,5 +87,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     + "with its own presence flag."
             );
         }
+
+        /// <summary>
+        /// Builds the exception thrown when a <b>nested</b> collection holds a <c>null</c> element.
+        /// </summary>
+        /// <param name="contract">The contract type's name, for the message.</param>
+        /// <param name="collectionType">The nested collection's type name, for the message.</param>
+        /// <param name="elementType">The element type's name, for the message.</param>
+        /// <returns>The exception to throw.</returns>
+        /// <remarks>
+        /// The same refusal as <see cref="NullElement"/>, for the same reason, and separate only
+        /// because of what it can truthfully name. A nested collection is encoded by one wrapper
+        /// message per inner type, and one wrapper serves every member of the contract that holds
+        /// that type -- so naming a member here would name whichever one the generator happened to
+        /// resolve first. The type is what all of them share.
+        /// </remarks>
+        public static Exception NullNestedElement(
+            string contract,
+            string collectionType,
+            string elementType
+        )
+        {
+            return new InvalidOperationException(
+                $"A nested '{collectionType}' inside '{contract}' holds a null '{elementType}' "
+                    + "element. A repeated field is a run of same-numbered fields on the wire, and "
+                    + "there is no encoding for an absent value inside one -- writing it would "
+                    + "either invent an empty value or silently shorten the collection. Remove the "
+                    + "null element, or make the element a message with its own presence flag."
+            );
+        }
     }
 }

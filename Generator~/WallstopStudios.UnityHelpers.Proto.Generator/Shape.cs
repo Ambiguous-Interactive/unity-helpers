@@ -126,9 +126,59 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
+        /// The shape of a value encoded as a length-delimited sub-message.
+        /// </summary>
+        /// <param name="formatter">The expression naming the formatter that serves it.</param>
+        /// <param name="qualified">The value's fully qualified type.</param>
+        /// <param name="isValueType">Whether the type is a struct.</param>
+        /// <returns>The shape.</returns>
+        /// <remarks>
+        /// Shared by a contract member and a nested collection's wrapper so the two are the same
+        /// bytes by construction. The presence rule is the one that was measured rather than
+        /// assumed, and its two halves disagree: a null reference sub-message is omitted, but a
+        /// struct one is written even when every member equals its default -- <c>default(Point)</c>
+        /// emits <c>12 00</c>, a zero-length payload, where a null <c>Point</c> reference emits
+        /// nothing at all.
+        /// </remarks>
+        internal static Shape Message(string formatter, string qualified, bool isValueType)
+        {
+            return new Shape
+            {
+                WireType = Proto + ".WProtoWireType.LengthDelimited",
+                PresenceTest = isValueType ? "true" : Placeholder + " != null",
+                SizeExpression =
+                    Proto + ".WProtoSizes.MessageSize(" + formatter + ", " + Placeholder + ")",
+                WriteMethod = "TryWriteMessage",
+                WriteCast = formatter + ", ",
+                WritesOwnTag = true,
+                ReadMethod = "TryReadMessage",
+                ReadArguments = formatter + ", ",
+                ReadLocalType = qualified,
+                AssignExpression = Placeholder,
+                IsReference = !isValueType,
+            };
+        }
+
+        /// <summary>
         /// Builds the shape for <paramref name="type"/>, or <c>null</c> when it is not supported.
         /// </summary>
-        internal static Shape For(ITypeSymbol type, string qualified, SurrogateMap surrogates)
+        /// <param name="type">The value's type.</param>
+        /// <param name="qualified">Its fully qualified name.</param>
+        /// <param name="surrogates">The assembly's surrogate registrations.</param>
+        /// <param name="nested">
+        /// The contract's wrapper-message registry, or <c>null</c> where a collection has no
+        /// encoding in this position. Passing it is what makes a collection of collections
+        /// expressible; a map <b>key</b> is the one position that passes <c>null</c>, because a
+        /// proto3 map key is a scalar and a collection has no scalar spelling to offer.
+        /// </param>
+        /// <param name="memberName">The declaring member, for a null element's runtime message.</param>
+        internal static Shape For(
+            ITypeSymbol type,
+            string qualified,
+            SurrogateMap surrogates,
+            NestedCollections nested = null,
+            string memberName = null
+        )
         {
             // Before anything else: a surrogated type has no wire shape of its own, and its values
             // are converted at the boundary. Measured against protobuf-net -- a surrogated member is
@@ -304,32 +354,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 };
             }
 
+            // Deliberately ahead of the nested-collection question below. A type that is both a
+            // contract and a collection -- Deque, CyclicBuffer, the four Serializable* collections --
+            // already answers as a message here and has done since session 172, and reading it as a
+            // wrapped run instead would silently discard its [WProtoMember]s and change bytes
+            // already on disk.
             if (IsContract(type))
             {
-                string formatter = Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()";
-                return new Shape
-                {
-                    WireType = Proto + ".WProtoWireType.LengthDelimited",
-
-                    // Measured against protobuf-net 3.2.56 rather than assumed, because the two
-                    // halves disagree: a null reference sub-message is omitted, but a struct one is
-                    // written even when every member equals its default -- `default(Point)` emits
-                    // `12 00`, a zero-length payload, where a null `Point` reference emits nothing.
-                    PresenceTest = type.IsValueType ? "true" : Placeholder + " != null",
-                    SizeExpression =
-                        Proto + ".WProtoSizes.MessageSize(" + formatter + ", " + Placeholder + ")",
-                    WriteMethod = "TryWriteMessage",
-                    WriteCast = formatter + ", ",
-                    WritesOwnTag = true,
-                    ReadMethod = "TryReadMessage",
-                    ReadArguments = formatter + ", ",
-                    ReadLocalType = qualified,
-                    AssignExpression = Placeholder,
-                    IsReference = !type.IsValueType,
-                };
+                return Message(
+                    Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                    qualified,
+                    type.IsValueType
+                );
             }
 
-            return null;
+            // Last, because every shape above is a value protobuf itself has a form for. A
+            // collection reaching this point is one protobuf cannot express in this position at all,
+            // and a wrapper message is what gives it one.
+            return nested?.TryShape(type, qualified, memberName);
         }
 
         /// <summary>

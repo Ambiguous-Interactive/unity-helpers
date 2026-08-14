@@ -317,6 +317,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor NestedCollectionTooDeep =
+            new DiagnosticDescriptor(
+                "WPROTO032",
+                "WallstopProto nested collection is too deeply nested",
+                "'{0}.{1}' has type '{2}', whose collections nest more than 64 deep. Each level is encoded as a wrapper message, and WProtoReader refuses to read past 64 levels of nesting, so a deeper member could be written and never read back. Reduce the nesting, or hold the inner levels in a [WProtoContract] of their own.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

@@ -88,8 +88,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal bool SkipConstructor { get; set; }
 
+        /// <summary>
+        /// Whether this member <b>is</b> the value being encoded rather than a field of one.
+        /// </summary>
+        /// <remarks>
+        /// Set only on the single member of a generated wrapper message, which exists so a
+        /// collection can hold another collection. Everything else about the member stays as it is,
+        /// which is the point: a nested run is packed, seeded, ordered and refused for a null
+        /// element by the same emitter that handles a top-level one, rather than by a second
+        /// implementation free to drift from it.
+        /// </remarks>
+        internal bool WrapsWholeValue { get; set; }
+
         /// <summary>The member access on the value being written.</summary>
-        protected string Access => "value." + Name;
+        protected string Access => WrapsWholeValue ? "value" : "value." + Name;
 
         /// <summary>
         /// Builds the member for <paramref name="type"/>, or <c>null</c> when it is not supported.
@@ -100,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="type">The member's declared type.</param>
         /// <param name="isRequired">Whether <c>IsRequired</c> was set.</param>
         /// <param name="overwriteList">Whether <c>OverwriteList</c> was set.</param>
+        /// <param name="nested">The contract's wrapper-message registry, for a nested collection.</param>
         /// <param name="ambiguous">
         /// Set when the type is both a contract and a collection and nothing says which it is, so
         /// the caller reports <c>WPROTO012</c> rather than "unsupported".
@@ -121,6 +134,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool isRequired,
             bool overwriteList,
             SurrogateMap surrogates,
+            NestedCollections nested,
             out bool ambiguous
         )
         {
@@ -152,7 +166,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 tag,
                 type,
                 overwriteList,
-                surrogates
+                surrogates,
+                nested
             );
             if (map != null)
             {
@@ -171,7 +186,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 tag,
                 type,
                 overwriteList,
-                surrogates
+                surrogates,
+                nested
             );
             if (repeated == null)
             {
@@ -197,6 +213,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Appends any locals the read loop needs, declared before it starts.
         /// </summary>
         internal virtual void EmitReadLocals(Writer writer) { }
+
+        /// <summary>
+        /// Appends whatever makes this member exist when the message carrying it was read but the
+        /// member's own field never appeared.
+        /// </summary>
+        /// <remarks>
+        /// Emitted only by a wrapper message, and it is the one thing a wrapper knows that a
+        /// top-level member cannot. A repeated field that is absent and one that is empty are the
+        /// same bytes, so a top-level member has to leave the constructor's value alone; a wrapper
+        /// that was read at all was <b>present</b>, so a run with no elements in it means an empty
+        /// collection rather than an unknown one. Without this an empty inner collection would come
+        /// back null, and <c>{{1}, {}, {2}}</c> would not round trip.
+        /// </remarks>
+        internal virtual void EmitPresentSeed(Writer writer) { }
 
         /// <summary>
         /// Appends the <c>case</c> sections that decode this member.

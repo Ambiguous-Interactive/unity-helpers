@@ -50,6 +50,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _elementQualified;
         private readonly string _elementDisplay;
         private readonly string _collectionQualified;
+        private readonly string _collectionDisplay;
         private readonly bool _collectionIsValueType;
         private readonly bool _overwrite;
         private readonly bool _elementIsReference;
@@ -64,6 +65,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string elementQualified,
             string elementDisplay,
             string collectionQualified,
+            string collectionDisplay,
             bool collectionIsValueType,
             bool overwrite,
             bool elementIsGeneric
@@ -76,6 +78,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _elementQualified = elementQualified;
             _elementDisplay = elementDisplay;
             _collectionQualified = collectionQualified;
+            _collectionDisplay = collectionDisplay;
             _collectionIsValueType = collectionIsValueType;
             _overwrite = overwrite;
             _elementIsGeneric = elementIsGeneric;
@@ -92,7 +95,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             int tag,
             ITypeSymbol type,
             bool overwriteList,
-            SurrogateMap surrogates
+            SurrogateMap surrogates,
+            NestedCollections nested
         )
         {
             // byte[] first: it is the one array protobuf-net treats as a single length-delimited
@@ -123,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool elementIsGeneric = element is ITypeParameterSymbol;
             Shape shape = elementIsGeneric
                 ? null
-                : Shape.For(element, elementQualified, surrogates);
+                : Shape.For(element, elementQualified, surrogates, nested, name);
             if (shape == null && !elementIsGeneric)
             {
                 return null;
@@ -138,6 +142,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 elementQualified,
                 element.ToDisplayString(),
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                type.ToDisplayString(),
                 type.IsValueType,
                 overwriteList,
                 elementIsGeneric
@@ -642,13 +647,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (" + ElementLocal + " == null)" + Writer.Open);
                 writer.Indent();
+
+                // A wrapper message is shared by every member of the contract holding its type, so
+                // naming one of them would name whichever the generator resolved first. The
+                // collection type is the thing all of them actually have in common.
                 writer.Line(
                     "throw "
                         + Proto
-                        + ".WProtoRepeated.NullElement(\""
-                        + _contractName
-                        + "\", \""
-                        + Name
+                        + (
+                            WrapsWholeValue
+                                ? ".WProtoRepeated.NullNestedElement(\""
+                                    + _contractName
+                                    + "\", \""
+                                    + _collectionDisplay
+                                : ".WProtoRepeated.NullElement(\"" + _contractName + "\", \"" + Name
+                        )
                         + "\", \""
                         + _elementDisplay
                         + "\");"
@@ -1106,6 +1119,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             Close(writer);
             writer.Blank();
+        }
+
+        /// <inheritdoc />
+        internal override void EmitPresentSeed(Writer writer)
+        {
+            EmitSeed(writer);
         }
 
         /// <inheritdoc />
