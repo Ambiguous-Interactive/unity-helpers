@@ -140,14 +140,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(unset);
         }
 
-        [Test]
-        public void ABitSetIndexBeyondTheLimitIsRefusedRatherThanAllocated()
+        [TestCase(2000000000)]
+        [TestCase(int.MaxValue)]
+        public void ABitSetIndexBeyondTheLimitIsRefusedRatherThanAllocated(int index)
         {
             // An index is data rather than a claim, so it cannot be dropped -- but a dense bit set
             // holding index two billion is 250 MB, which a document of a few bytes must not buy.
-            Assert.Catch<Exception>(() =>
-                Serializer.JsonDeserialize<BitSet>("{\"capacity\":0,\"setIndices\":[2000000000]}")
+            //
+            // int.MaxValue is the case review caught: the capacity an index implies is index + 1,
+            // which wraps to int.MinValue for the largest index there is. The refusal reported zero
+            // required, waved the document through, and left TrySet to throw -- the same red for the
+            // wrong reason, which is why this asserts the message rather than merely that it threw.
+            Exception refusal = Assert.Catch<Exception>(() =>
+                Serializer.JsonDeserialize<BitSet>(
+                    "{\"capacity\":0,\"setIndices\":[" + index + "]}"
+                )
             );
+
+            // The whole chain, because the facade wraps a converter's exception in its own -- and the
+            // point of the assertion is WHICH failure this is, not that one happened.
+            Assert.IsTrue(
+                refusal.ToString().Contains("capacity of"),
+                "The payload must be refused by the capacity limit, not by whatever throws first: "
+                    + refusal
+            );
+        }
+
+        [Test]
+        public void ANegativeBitSetIndexIsIgnoredRatherThanCountedAsARequirement()
+        {
+            BitSet restored = Serializer.JsonDeserialize<BitSet>(
+                "{\"capacity\":8,\"setIndices\":[-5,3]}"
+            );
+
+            Assert.IsTrue(restored != null);
+            Assert.IsTrue(restored.TryGet(3, out bool set));
+            Assert.IsTrue(set);
         }
 
         [TestCase(0, 0, 0)]

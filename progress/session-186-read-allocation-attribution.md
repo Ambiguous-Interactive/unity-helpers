@@ -144,6 +144,19 @@ the surrounding `Deque`, `SparseSet`, `BitSet` and marshal suites, all green. Th
 [untrusted-payload-limits](../.llm/skills/untrusted-payload-limits.md) and as critical rule 17, so it
 is applied by construction rather than remembered.
 
+### The review round on the fix itself
+
+Cursor caught a real defect in the new check, and it is the kind worth recording: the capacity an
+index implies is `index + 1`, so an index of `int.MaxValue` wrapped to `int.MinValue`, left
+`required` at zero, and waved the document straight past the refusal into `TrySet` -- which threw.
+The payload was still rejected, so a test asserting only "it threw" would have passed while the guard
+did nothing. The arithmetic is `long` now, and the regression test asserts **which** failure happened
+by matching the refusal text through the exception chain, because the facade wraps a converter's
+exception in its own.
+
+Confirmed in the editor: 18 of 18, including `int.MaxValue`, 2,000,000,000, and a negative index
+(ignored rather than counted, since a negative index cannot be set at all).
+
 ## What #398 has left, and why it is not this session's work
 
 The string interner and "merge into the caller's existing collection" both change what a read hands

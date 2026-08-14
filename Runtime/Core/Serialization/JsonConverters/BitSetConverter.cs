@@ -38,15 +38,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 if (reader.TokenType == JsonTokenType.EndObject)
                 {
                     // What the indices themselves require, which is data rather than a claim: a
-                    // set bit has to be representable or it would be lost silently.
-                    int required = 0;
+                    // set bit has to be representable or it would be lost silently. Widened to
+                    // long because the capacity an index implies is one MORE than the index, and
+                    // int.MaxValue + 1 wraps to int.MinValue -- which would report a requirement of
+                    // zero for the largest index there is, wave the document through, and leave
+                    // TrySet to throw on it instead of refusing it here.
+                    long required = 0;
                     if (indices is { Count: > 0 })
                     {
                         for (int i = 0; i < indices.Count; i++)
                         {
-                            if (required < indices[i] + 1)
+                            int index = indices[i];
+                            if (index < 0)
                             {
-                                required = indices[i] + 1;
+                                continue;
+                            }
+
+                            if (required < (long)index + 1)
+                            {
+                                required = (long)index + 1;
                             }
                         }
                     }
@@ -55,14 +65,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     // few bytes can ask for hundreds of megabytes either by claiming a capacity or
                     // by naming an index. The claim is clamped; the index is refused out loud,
                     // because dropping it would change the set the caller gets back.
-                    if (!SerializationCapacityLimits.TryAccept(required, 0, out int _))
+                    if (
+                        required > int.MaxValue
+                        || !SerializationCapacityLimits.TryAccept((int)required, 0, out int _)
+                    )
                     {
                         throw new JsonException(
-                            SerializationCapacityLimits.Refusal(nameof(BitSet), required)
+                            SerializationCapacityLimits.Refusal(
+                                nameof(BitSet),
+                                required > int.MaxValue ? int.MaxValue : (int)required
+                            )
                         );
                     }
 
-                    int finalCapacity = SerializationCapacityLimits.Clamp(capacity, required);
+                    int finalCapacity = SerializationCapacityLimits.Clamp(capacity, (int)required);
 
                     BitSet bitset = new(finalCapacity > 0 ? finalCapacity : 64);
                     if (indices != null)
