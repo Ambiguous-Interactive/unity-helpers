@@ -406,6 +406,26 @@ $result6c = Invoke-Linter -RepoDir $repo6c
 Write-TestResult "NegatedPatternKeepsTrackedFile_Passes" ($result6c.ExitCode -eq 0) "Expected exit code 0, got $($result6c.ExitCode)"
 Remove-TestRepo $repo6c
 
+# Test 6d: a developer's GLOBAL gitignore must not make check 4 fail. core.excludesFile and
+# .git/info/exclude are per-machine and invisible to this repository, so a contributor whose global
+# rules happen to name a tracked file would get a hard failure with nothing to fix here.
+$repo6d = New-TestRepo -DocsFiles @('index.md')
+$globalIgnore = Join-Path ([System.IO.Path]::GetTempPath()) "global-ignore-$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
+'tracked.md' | Set-Content -Path $globalIgnore -Encoding UTF8
+Push-Location $repo6d
+try {
+  'content' | Set-Content -Path 'tracked.md' -Encoding UTF8
+  & git add -A 2>&1 | Out-Null
+  & git commit -q -m 'Track a file the global ignore names' 2>&1 | Out-Null
+  & git config core.excludesFile $globalIgnore 2>&1 | Out-Null
+} finally {
+  Pop-Location
+}
+$result6d = Invoke-Linter -RepoDir $repo6d
+Write-TestResult "GlobalGitignoreDoesNotFailCheckFour" ($result6d.ExitCode -eq 0) "Expected exit code 0, got $($result6d.ExitCode); output: $($result6d.Output)"
+Remove-Item -Path $globalIgnore -Force -ErrorAction SilentlyContinue
+Remove-TestRepo $repo6d
+
 # ---- Summary ----
 
 Write-Host ""

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Collections.Immutable;
     using System.IO;
     using System.Linq;
+    using System.Text;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using NUnit.Framework;
@@ -219,6 +220,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoMember(8)] public System.Collections.Generic.Queue<System.Collections.Generic.Stack<string>> Pipelines;
                   }"
             );
+        }
+
+        [Test]
+        public void TheNestingBoundDoesNotDependOnWhichMemberIsDeclaredFirst()
+        {
+            // Wrappers are shared across a contract's members, so a shallow member declared first
+            // seeds the cache -- and reusing that entry deep inside a longer chain assembles
+            // something past the reader's limit without the bound being consulted. Both orders have
+            // to answer the same, or the diagnostic is a statement about declaration order.
+            const int shallow = 3;
+            const int deep = 66;
+
+            AssertDiagnostic("WPROTO032", "Deep", Chain(("Shallow", shallow), ("Deep", deep)));
+            AssertDiagnostic("WPROTO032", "Deep", Chain(("Deep", deep), ("Shallow", shallow)));
+        }
+
+        [Test]
+        public void ADepthRefusalDoesNotMakeAServiceableMemberLookUnsupported()
+        {
+            // The other half of the same cache. A failed lookup used to stay behind as a negative
+            // entry, so every wrapper above a depth refusal was poisoned -- and a shape this suite
+            // serializes elsewhere was reported as WPROTO003 purely because a deeper member was
+            // declared before it. The deep member must be the ONLY one named.
+            ImmutableArray<Diagnostic> diagnostics = Run(Chain(("Deep", 66), ("Shallow", 3)));
+
+            Assert.IsEmpty(
+                diagnostics.Where(d => d.Id == "WPROTO003"),
+                string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+        }
+
+        /// <summary>
+        /// Builds a contract whose members are <c>List</c> chains of the given depths.
+        /// </summary>
+        /// <param name="members">Each member's name and how many <c>List</c> levels it has.</param>
+        /// <returns>The contract source.</returns>
+        private static string Chain(params (string Name, int Levels)[] members)
+        {
+            StringBuilder source = new StringBuilder(
+                "[WProtoContract] public sealed partial class Ordered\n{\n"
+            );
+
+            int tag = 0;
+            foreach ((string name, int levels) in members)
+            {
+                tag++;
+                source.Append("    [WProtoMember(").Append(tag).Append(")] public ");
+                source.Append(
+                    string.Concat(Enumerable.Repeat("System.Collections.Generic.List<", levels))
+                );
+                source.Append("int").Append(new string('>', levels));
+                source.Append(' ').Append(name).Append(";\n");
+            }
+
+            return source.Append('}').ToString();
         }
 
         [Test]

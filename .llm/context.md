@@ -254,9 +254,14 @@ deliberate act, not the tail of every commit.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
   - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
     assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
-  - `dotnet test -p:ProtobufNetOracle=v3` and then `dotnet test -p:ProtobufNetOracle=v2` in
+  - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then
+    `dotnet test -c Release -p:ProtobufNetOracle=v2` in
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
-    against protobuf-net 3.2.56 and 2.4.9 in isolated processes.
+    against protobuf-net 3.2.56 and 2.4.9 in isolated processes. **`-c Release` is what CI runs and
+    what the throughput gate needs**: the oracle is a precompiled release assembly whatever the
+    configuration says, so an unoptimized run would be comparing one implementation's debug build
+    against another's release build. Those assertions are skipped, loudly, outside Release; the
+    allocation gates are configuration-independent and run either way.
   - `npm run agent:preflight:fix` then `npm run agent:preflight`.
   - Relevant targeted checks for the files changed; `npm run validate:local` is the explicit
     repository-wide lint and contract aggregate when that broader evidence is warranted.

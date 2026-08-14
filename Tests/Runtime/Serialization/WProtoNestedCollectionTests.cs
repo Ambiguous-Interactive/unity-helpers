@@ -246,6 +246,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ANullMapValueIsOmittedRatherThanRefused()
+        {
+            // A different rule from the one above rather than an exception to it. A repeated element
+            // has nowhere to put an absence; a map entry has a field it can leave out, so a null
+            // value is omitted and reads back null, exactly as a null message value does.
+            Assert.AreEqual(
+                "4A030A016B",
+                Encode(Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } }))
+            );
+
+            WProtoNestedCollectionContract restored = RoundTrip(
+                Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } })
+            );
+
+            Assert.AreEqual(1, restored.Lookup.Count);
+            Assert.IsTrue(restored.Lookup["k"] == null, "a null map value came back non-null");
+        }
+
+        [Test]
         public void AWrapperCarryingAnUnknownFieldIsSteppedOverRatherThanRefused()
         {
             // Forward compatibility one level down: a wrapper is a real message, so a payload from a

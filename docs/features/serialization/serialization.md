@@ -1059,9 +1059,10 @@ so a contract migrating from it keeps working unchanged.
 implementation the generator could pick; protobuf-net guesses `List<T>` and throws
 `InvalidCastException` when it hands the result back. Declare the member as a concrete type.
 
-**Nested and jagged collections work, to any depth** — `int[][]`, `List<int[]>`,
-`List<List<int>>`, `int[][][]`, `HashSet<int>[]`, `List<Dictionary<string, int>>` and
-`Dictionary<string, List<int>>` all serialize. `repeated repeated` has no protobuf spelling, so each
+**Nested and jagged collections work** — `int[][]`, `List<int[]>`, `List<List<int>>`, `int[][][]`,
+`HashSet<int>[]`, `List<Dictionary<string, int>>` and
+`Dictionary<string, List<int>>` all serialize, nested as deeply as the reader can read them back
+(64 levels; see below). `repeated repeated` has no protobuf spelling, so each
 inner collection is encoded as a wrapper message holding it at field 1 — exactly the
 `message Wrapper { repeated T values = 1; }` idiom `protoc` generates for the equivalent schema.
 Nothing is asked of you: declare the member and it works.
@@ -1087,8 +1088,12 @@ to read past 64 levels of nesting, so a deeper member could be written and never
 inconsistency and is the opposite. A top-level repeated field that is absent and one that is empty
 are the same bytes, so an empty outer collection cannot be told from a missing one — but an inner
 collection has a wrapper message on the wire saying it was there, so `{{1}, {}, {2}}` comes back
-with its empty middle intact. A `null` inner collection is refused for the same reason any null
-element is: a run has no encoding for an absent value.
+with its empty middle intact.
+
+A `null` inner collection follows the rule for its position, which differs. As a repeated **element**
+it is refused — a run has no encoding for an absent value, exactly as for any null element. As a map
+**value** it is omitted and reads back as `null`, exactly as a null message value does, because a map
+entry has a field to leave out.
 
 **A collection may be a `struct`.** Nothing about `ICollection<T>` requires a class, and an inline or
 pooled buffer is a good reason to make one a value type. A struct collection is never null-checked

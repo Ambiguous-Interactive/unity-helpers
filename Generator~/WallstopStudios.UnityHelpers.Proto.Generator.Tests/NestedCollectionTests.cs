@@ -276,6 +276,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ANullMapValueIsOmittedRatherThanRefused()
+        {
+            // The counterpart to the rule above, and it is a different rule rather than an exception
+            // to it. A repeated ELEMENT has nowhere to put an absence, so a null one is refused. A
+            // map entry has a field it can leave out, so a null value is omitted and reads back
+            // null -- which is what a null message value already does, and what protobuf-net does.
+            Assert.AreEqual(
+                "4A030A016B",
+                Encode(Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } }))
+            );
+
+            NestedCollectionContract restored = RoundTrip(
+                Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } })
+            );
+
+            Assert.AreEqual(1, restored.Lookup.Count);
+            Assert.IsTrue(restored.Lookup["k"] == null, "a null map value came back non-null");
+        }
+
+        [Test]
         public void MeasurePredictsWriteExactlyForEveryNestedShape()
         {
             // Encode asserts it for each of these; the point of running them as a table is that a

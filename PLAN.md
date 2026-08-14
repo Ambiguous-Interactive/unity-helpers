@@ -1506,7 +1506,7 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   way — a wrapper message per inner collection, `message Wrapper { repeated T values = 1; }`, which
   is what `protoc` emits for the equivalent schema. `int[][]`, `List<int[]>`, `List<List<int>>`,
   `int[][][]`, `HashSet<int>[]`, `List<Dictionary<K,V>>` and a map whose value is a collection all
-  serialize now, to any depth.
+  serialize now, to any depth the reader can read back (`WPROTO032` refuses more).
 
   **The wrapper's own member is built by the same `Member` emitter that encodes a top-level
   collection**, so packing, seeding, ordering, reservation and null-element refusal are inherited

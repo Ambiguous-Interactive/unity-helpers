@@ -31,6 +31,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>The inner collection, encoded exactly as a top-level member of it would be.</summary>
         internal Member Inner { get; set; }
 
+        /// <summary>
+        /// How many sub-message levels this wrapper and everything under it occupy.
+        /// </summary>
+        /// <remarks>
+        /// One for itself plus the deepest chain beneath it, so a wrapper reused from the cache can
+        /// be asked whether it still fits where it is being used. Without it the depth bound is
+        /// order-dependent: a shallow member resolved first seeds the cache, and a deep member
+        /// reusing that entry assembles a chain past the reader's limit without the bound ever being
+        /// consulted.
+        /// </remarks>
+        internal int Depth { get; set; }
+
         /// <summary>The expression naming this wrapper's shared instance.</summary>
         internal string Instance => FormatterName + ".Instance";
 
@@ -256,6 +268,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly SurrogateMap _surrogates;
         private int _depth;
 
+        /// <summary>
+        /// How many wrapper names have been handed out.
+        /// </summary>
+        /// <remarks>
+        /// Its own counter rather than <c>_ordered.Count</c>, because a wrapper is <b>named</b> when
+        /// it is registered and <b>added</b> when its member finishes resolving -- and resolving one
+        /// wrapper is what discovers the next. A contract holding only <c>int[][][]</c> registers the
+        /// wrapper for <c>int[][]</c>, and the wrapper for <c>int[]</c> while that one is still in
+        /// flight, so both saw a finished count of zero and both were called
+        /// <c>NestedFormatter1</c>: <c>CS0102</c> in the consumer's build, and no generator
+        /// diagnostic at all.
+        /// </remarks>
+        private int _names;
+
+        /// <summary>The deepest wrapper chain the frame currently being resolved has discovered.</summary>
+        private int _childDepth;
+
         internal NestedCollections(string contractName, SurrogateMap surrogates)
         {
             _contractName = contractName;
@@ -288,7 +317,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (_byType.TryGetValue(qualified, out NestedCollection existing))
             {
-                return existing.Inner == null ? null : ShapeFor(existing, type);
+                if (existing.Inner == null)
+                {
+                    return null;
+                }
+
+                // A cache hit still has to answer the depth question, and it is the ENTIRE chain
+                // beneath the hit that matters rather than this one level. A member declared earlier
+                // can seed the cache with a three-deep wrapper; reusing it 63 levels down would
+                // assemble a 66-level chain that the reader refuses, without the bound below ever
+                // being consulted. Which is why a wrapper records how deep it goes.
+                if (MaxDepth < _depth + existing.Depth)
+                {
+                    DepthRefusals++;
+                    return null;
+                }
+
+                _childDepth = existing.Depth < _childDepth ? _childDepth : existing.Depth;
+                return ShapeFor(existing, type);
             }
 
             if (MaxDepth <= _depth)
@@ -298,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             NestedCollection wrapper = new NestedCollection(
-                "NestedFormatter" + (_ordered.Count + 1),
+                "NestedFormatter" + ++_names,
                 qualified,
                 type.ToDisplayString()
             );
@@ -309,6 +355,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // unsupported inner shape a refusal rather than a half-built wrapper.
             _byType[qualified] = wrapper;
 
+            int enclosingChildDepth = _childDepth;
+            _childDepth = 0;
             _depth++;
             Member inner;
             try
@@ -338,16 +386,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 _depth--;
             }
 
+            int depth = _childDepth + 1;
+            _childDepth = enclosingChildDepth < depth ? depth : enclosingChildDepth;
+
             // Only a collection or a map earns a wrapper. Anything else either already had a shape
             // of its own -- a scalar, a contract, a surrogated type -- or has none at all, and
             // wrapping it would invent an encoding for a member that is simply unsupported.
             if (!(inner is RepeatedMember) && !(inner is MapMember))
             {
-                // The cached entry stays, with no member behind it, so a second element of the same
-                // unsupported type answers from here instead of resolving it again.
+                // Removed rather than left behind as a negative cache. A failure can be about this
+                // type -- an element nothing can encode -- or about where it was asked for, since a
+                // depth refusal deeper down fails everything above it. Only the first is a property
+                // of the type, and keeping both would report a member the generator serves elsewhere
+                // as unsupported purely because a deeper member was declared before it. The entry
+                // still exists for the whole of the resolution above, which is what stops a
+                // self-referential collection from recursing.
+                _byType.Remove(qualified);
                 return null;
             }
 
+            wrapper.Depth = depth;
             inner.WrapsWholeValue = true;
             inner.ConstructAtEnd = true;
             inner.DeclaredType = qualified;

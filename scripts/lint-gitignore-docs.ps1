@@ -354,7 +354,11 @@ if (Test-Path 'mkdocs.yml') {
 # been committed, and `PLAN.md`, which should never have been ignored.
 Write-Info 'Check 4: Verifying no tracked file is gitignored...'
 
-$trackedIgnored = & git ls-files --cached --ignored --exclude-standard
+# --exclude-per-directory rather than --exclude-standard, deliberately. The latter also honours
+# core.excludesFile and .git/info/exclude, which are per-developer and invisible to this repository
+# -- a contributor whose global gitignore names CHANGELOG.md would get a hard failure here with no
+# repository-level cause and nothing to fix. This check is about the rules the repository ships.
+$trackedIgnored = & git ls-files --cached --ignored --exclude-per-directory=.gitignore
 if ($LASTEXITCODE -ne 0) {
   throw "git ls-files failed with exit code $LASTEXITCODE"
 }
