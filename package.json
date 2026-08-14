@@ -46,52 +46,52 @@
   "licensesUrl": "https://ambiguous-interactive.github.io/unity-helpers/project/license/",
   "samples": [
     {
-      "displayName": "DI \u2013 VContainer",
+      "displayName": "DI – VContainer",
       "description": "LifetimeScope registration, scene-wide assignment, and runtime BuildUpWithRelations.",
       "path": "Samples~/DI - VContainer"
     },
     {
-      "displayName": "DI \u2013 Zenject",
+      "displayName": "DI – Zenject",
       "description": "SceneContext installer, scene-wide assignment, and prefab instantiation with relations.",
       "path": "Samples~/DI - Zenject"
     },
     {
-      "displayName": "DI \u2013 Reflex",
+      "displayName": "DI – Reflex",
       "description": "SceneScope installer, scene scan, and runtime Container helpers.",
       "path": "Samples~/DI - Reflex"
     },
     {
-      "displayName": "Relational Components \u2013 Basic",
+      "displayName": "Relational Components – Basic",
       "description": "Attribute-based auto-wiring without DI; parent/sibling/child examples.",
       "path": "Samples~/Relational Components - Basic"
     },
     {
-      "displayName": "Serialization \u2013 JSON",
+      "displayName": "Serialization – JSON",
       "description": "System.Text.Json with Unity converters; pretty and fast options.",
       "path": "Samples~/Serialization - JSON"
     },
     {
-      "displayName": "Random \u2013 PRNG",
+      "displayName": "Random – PRNG",
       "description": "PCG seeds, floats, Gaussian, and list sampling.",
       "path": "Samples~/Random - PRNG"
     },
     {
-      "displayName": "Logging \u2013 Tag Formatter",
+      "displayName": "Logging – Tag Formatter",
       "description": "UnityLogTagFormatter decorators, runtime toggles, and logging extension demos.",
       "path": "Samples~/Logging - Tag Formatter"
     },
     {
-      "displayName": "Spatial Structures \u2013 2D and 3D",
+      "displayName": "Spatial Structures – 2D and 3D",
       "description": "QuadTree2D, KdTree2D nearest neighbors, SpatialHash2D queries.",
       "path": "Samples~/Spatial Structures - 2D and 3D"
     },
     {
-      "displayName": "UI Toolkit \u2013 MultiFile Selector (Editor)",
+      "displayName": "UI Toolkit – MultiFile Selector (Editor)",
       "description": "EditorWindow using MultiFileSelectorElement for multi-file picking.",
       "path": "Samples~/UI Toolkit - MultiFile Selector (Editor)"
     },
     {
-      "displayName": "UGUI \u2013 EnhancedImage",
+      "displayName": "UGUI – EnhancedImage",
       "description": "Programmatic Canvas setup and HDR-tinted EnhancedImage.",
       "path": "Samples~/UGUI - EnhancedImage"
     }
@@ -194,12 +194,14 @@
     "test:analyzer-placement": "node scripts/tests/test-analyzer-placement.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
-    "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:tests",
+    "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:tests",
     "typecheck:unity:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v quiet",
     "typecheck:unity:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v quiet -p:WallstopProto=false",
-    "typecheck:tests": "npm run typecheck:tests:default && npm run typecheck:tests:legacy",
+    "typecheck:unity:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v quiet -p:WallstopOdin=true",
+    "typecheck:tests": "npm run typecheck:tests:default && npm run typecheck:tests:legacy && npm run typecheck:tests:odin",
     "typecheck:tests:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v quiet",
     "typecheck:tests:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v quiet -p:WallstopProto=false",
+    "typecheck:tests:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v quiet -p:WallstopOdin=true",
     "test:validate-git-push-config": "pwsh -NoProfile -File scripts/tests/test-validate-git-push-config.ps1 -VerboseOutput",
     "test:validate-lint-error-codes": "pwsh -NoProfile -File scripts/tests/test-validate-lint-error-codes.ps1 -VerboseOutput",
     "test:precommit-integration": "bash scripts/tests/test-precommit-integration.sh",

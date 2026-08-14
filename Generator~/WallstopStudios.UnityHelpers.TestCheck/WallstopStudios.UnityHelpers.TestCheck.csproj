@@ -42,6 +42,12 @@
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS0436;CS1701</NoWarn>
     <DefineConstants Condition="'$(WallstopProto)' == 'true'"
       >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
+    <!-- See the TypeCheck project for why this exists (#347). The PlayMode fixtures behind the Odin
+         define derive from the same two base classes the runtime aliases, so the same shim serves
+         them; only the editor-side drawer surface is out of reach here. -->
+    <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
+    <DefineConstants Condition="'$(WallstopOdin)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />

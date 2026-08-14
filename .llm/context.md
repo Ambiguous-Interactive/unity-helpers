@@ -278,6 +278,17 @@ deliberate act, not the tail of every commit.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
   - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
     assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
+    It builds each source tree three ways, because three different branches ship: the
+    `WALLSTOP_PROTO` default, the legacy define-off fallback, and
+    `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`typecheck:unity:odin` / `typecheck:tests:odin`).
+    The Odin configuration exists because Odin changes the **base class** of
+    `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and `AttributeEffect`, and that branch
+    compiled nowhere in automation until #347 -- which is how #275 shipped a compile break to
+    consumers. Odin is paid and has no NuGet package, so `Shims/OdinInspectorShim.cs` declares the
+    two base classes the runtime aliases and nothing else. The **editor-side** Odin surface (nine
+    drawers, three inspectors) still compiles nowhere: reaching it means compiling the whole Editor
+    assembly, which needs a `UnityEditor` reference the community reference assemblies do not
+    carry. That half is tracked on #347.
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then
     `dotnet test -c Release -p:ProtobufNetOracle=v2` in
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
