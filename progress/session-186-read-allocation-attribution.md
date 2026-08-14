@@ -177,6 +177,30 @@ real regression -- which is present in every round -- still fails. Measured afte
 machine deliberately kept busy: medians of 4,725 against 8,269 ns/op, minima of 1,700 against 2,538,
 where the minima are the stable pair.
 
+### The hot-path round, and a claim withdrawn
+
+Review asked whether `Array.Resize` was the official spelling for the builder's grow, and for a pass
+over the new hot path. Three answers, each measured:
+
+- **`Array.Resize` is idiomatic, not faster.** With the allocation held outside the loop the copy
+  primitives are the same memmove -- `Array.Copy` 2.85 ns/op against `Span.CopyTo` 2.60 at 64
+  elements, 80.12 against 79.55 at 4096. The first attempt timed the whole grow including two
+  allocations and reported `Array.Resize` 1.25x faster at 64 and 1.76x *slower* at 4096; a
+  contradiction that size is allocator noise, not a result. With the primitive a wash the deciding
+  factor is how much each copies, and `Array.Resize` takes the whole old buffer where this takes the
+  live prefix. Kept, with the reasoning in the file.
+- **`List.CopyTo` for the pending list: 11.06 ns/op against 76.33** on 256 elements. One memmove
+  against a bounds-checked read and write per element. Shipped.
+- **A slice of the packed-run scan was measured, believed, and then withdrawn.** Slicing into a
+  zero-based local looked 1.39x faster -- but that comparison called through a freshly constructed
+  reader on one side and an inlined loop on the other, so it was timing the construction. Held fair,
+  the slice is **302.97 ns/op against 285.88**: slower. The loop is unchanged and the file records
+  the failed experiment.
+
+The lesson is the same one the benchmark estimator taught an hour earlier, from the other direction:
+**a measurement that does not hold everything else constant measures the thing you forgot.** One
+produced a false red on green code; the other nearly produced a false claim in a code comment.
+
 ## What #398 has left, and why it is not this session's work
 
 The string interner and "merge into the caller's existing collection" both change what a read hands
