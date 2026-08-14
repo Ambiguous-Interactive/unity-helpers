@@ -387,13 +387,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             int depth = _childDepth + 1;
-            _childDepth = enclosingChildDepth < depth ? depth : enclosingChildDepth;
 
             // Only a collection or a map earns a wrapper. Anything else either already had a shape
             // of its own -- a scalar, a contract, a surrogated type -- or has none at all, and
             // wrapping it would invent an encoding for a member that is simply unsupported.
             if (!(inner is RepeatedMember) && !(inner is MapMember))
             {
+                // The enclosing frame is told nothing about a wrapper that does not exist. It is
+                // failing too -- a refusal here propagates all the way up -- but leaving a depth
+                // behind for a chain that was never built is the kind of bookkeeping that is only
+                // harmless until something else starts reading it.
+                _childDepth = enclosingChildDepth;
+
                 // Removed rather than left behind as a negative cache. A failure can be about this
                 // type -- an element nothing can encode -- or about where it was asked for, since a
                 // depth refusal deeper down fails everything above it. Only the first is a property
@@ -405,6 +410,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
+            _childDepth = enclosingChildDepth < depth ? depth : enclosingChildDepth;
             wrapper.Depth = depth;
             inner.WrapsWholeValue = true;
             inner.ConstructAtEnd = true;
