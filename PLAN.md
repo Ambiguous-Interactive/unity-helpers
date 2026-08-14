@@ -1632,7 +1632,16 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   `Repeated data of type System.Int32[,] is not supported` -- so the refusal fixture pins each one
   exactly under `PROTOBUF_NET_ORACLE_V2` rather than accepting either message on either leg.
 
-  *Verified*: 360 `Generator~` cases against protobuf-net 3.2.56 and 359 against 2.4.9, all six
+  **The standalone legs earned their cost on the first run.** The non-zero-lower-bound refusal was
+  emitted into `Write` alone, and all four IL2CPP legs failed on it while every desktop run, every
+  `typecheck` configuration and the MCP editor passed: `Measure` runs first, and its `foreach` over
+  the array throws `IndexOutOfRangeException` on the player for an array whose axes do not start at
+  zero, so the guard never ran and the failure was an opaque index error out of generated code. The
+  refusal is in both rank loops now, before anything enumerates the array. The rule worth keeping is
+  that **a guard belongs at the first entry point that touches the value**, not at the one where it
+  is easiest to state.
+
+  *Verified*: 361 `Generator~` cases against protobuf-net 3.2.56 and 360 against 2.4.9, all six
   `typecheck:unity`/`typecheck:tests` configurations, and a real Unity 6000.4.6f1 editor reporting
   39 of 39 package assemblies fresh with an empty console.
 - **#398 — the read path's own allocation is closed, session 186.** The issue asked for a benchmark

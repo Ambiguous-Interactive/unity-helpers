@@ -164,11 +164,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Emits the dimension header's contribution to <c>Measure</c>, then the element run's.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// The header is a fixed-length run -- one <c>int32</c> per dimension, and the rank is at
         /// least two -- so it is never empty and needs none of the omit-when-empty reasoning a
         /// collection's run carries. It is written even for <c>new int[0, 5]</c>, which is the whole
         /// point: that array has a real shape and no elements, and dropping the header would restore
         /// it as <c>int[0, 0]</c>.
+        /// </para>
+        /// <para>
+        /// The lower-bound refusal lives in this loop as well as in <c>Write</c>'s, and that
+        /// placement is a measurement rather than caution. <c>Measure</c> is what runs first, and its
+        /// element loop <b>throws <c>IndexOutOfRangeException</c> on the IL2CPP player</b> for an
+        /// array whose axes do not start at zero -- so a guard only in <c>Write</c> never ran, and
+        /// the four standalone legs failed with an opaque index error out of generated code where
+        /// desktop Mono had passed. Refusing before anything enumerates the array is what makes the
+        /// named refusal the answer on every runtime.
+        /// </para>
         /// </remarks>
         private void EmitMeasure(Writer writer)
         {
@@ -185,6 +196,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Indent();
             writer.Line("int headerSize = 0;");
             EmitRankLoop(writer);
+            EmitLowerBoundRefusal(writer);
             writer.Line(
                 "headerSize += "
                     + NestedCollections.Proto
@@ -242,24 +254,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
 
             EmitRankLoop(writer);
-
-            // Refused here rather than on read because only a writer can produce one: nothing on the
-            // wire can express a lower bound, and rebuilding with `new T[...]` starts every axis at
-            // zero. Folded into the loop that already asks each axis for its length.
-            writer.Line("if (value.GetLowerBound(rank) != 0)" + Writer.Open);
-            writer.Indent();
-            writer.Line(
-                "throw "
-                    + NestedCollections.Proto
-                    + ".WProtoRectangular.NonZeroLowerBound(\""
-                    + _contractName
-                    + "\", \""
-                    + Display
-                    + "\", rank, value.GetLowerBound(rank));"
-            );
-            writer.Outdent();
-            writer.Line("}");
-            writer.Blank();
+            EmitLowerBoundRefusal(writer);
             writer.Line("if (!writer.TryWriteInt32(value.GetLength(rank)))" + Writer.Open);
             writer.Indent();
             writer.Line("return false;");
@@ -289,6 +284,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             writer.Line("for (int rank = 0; rank < " + _rank + "; rank++)" + Writer.Open);
             writer.Indent();
+        }
+
+        /// <summary>
+        /// Emits the refusal of an axis that does not start at index zero, inside an open rank loop.
+        /// </summary>
+        /// <remarks>
+        /// Refused on the write side because only a writer can hold one: nothing on the wire carries
+        /// a lower bound, and reading rebuilds with <c>new T[...]</c>, whose axes all start at zero.
+        /// Emitted into both <c>Measure</c> and <c>Write</c> -- each is a public entry point, and
+        /// <c>Measure</c> is the one that runs first, so a guard in only the other never fires.
+        /// </remarks>
+        private void EmitLowerBoundRefusal(Writer writer)
+        {
+            writer.Line("if (value.GetLowerBound(rank) != 0)" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "throw "
+                    + NestedCollections.Proto
+                    + ".WProtoRectangular.NonZeroLowerBound(\""
+                    + _contractName
+                    + "\", \""
+                    + Display
+                    + "\", rank, value.GetLowerBound(rank));"
+            );
+            writer.Outdent();
+            writer.Line("}");
+            writer.Blank();
         }
 
         private void EmitRead(Writer writer)
