@@ -113,7 +113,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             CollectionCommit commit,
             string constructedGeneric,
             string countMember,
-            CollectionReserve reserve
+            CollectionReserve reserve,
+            bool walksByIndex = false
         )
         {
             Seeding = seeding;
@@ -124,6 +125,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _constructedGeneric = constructedGeneric;
             CountMember = countMember;
             _reserve = reserve;
+            WalksByIndex = walksByIndex;
         }
 
         private readonly string _accumulatorGeneric;
@@ -167,12 +169,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Whether the member is walked by index rather than with <c>foreach</c>.
         /// </summary>
         /// <remarks>
-        /// Only an array is, because that is what the compiler would do anyway and it keeps the
-        /// bounds check visible. Everything else is walked with <c>foreach</c> over its declared
-        /// type, which binds to the concrete enumerator -- enumerating a struct collection through
-        /// <c>IEnumerable&lt;T&gt;</c> would box it on every serialization.
+        /// <para>
+        /// Only a single-dimension array is, because that is what the compiler would do anyway and it
+        /// keeps the bounds check visible. Everything else is walked with <c>foreach</c> over its
+        /// declared type, which binds to the concrete enumerator -- enumerating a struct collection
+        /// through <c>IEnumerable&lt;T&gt;</c> would box it on every serialization.
+        /// </para>
+        /// <para>
+        /// Stored rather than derived from <see cref="Commit"/>, which is what it used to be. A
+        /// <b>rectangular</b> array commits through <c>ToArray</c> exactly as a vector does and yet
+        /// cannot be indexed with one subscript, so the two questions -- "how does the accumulator
+        /// become the value" and "how is the value walked" -- are no longer the same question.
+        /// </para>
         /// </remarks>
-        internal bool IsArray => Commit == CollectionCommit.ToArray;
+        internal bool WalksByIndex { get; }
 
         /// <summary>
         /// The type the read loop accumulates into.
@@ -259,6 +269,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <c>int[128]</c>: 1,744 B/op against protobuf-net's 560 before, 560 after.
         /// </remarks>
         internal static CollectionForm Array()
+        {
+            return new CollectionForm(
+                CollectionSeeding.Copy,
+                BuilderType,
+                "Add",
+                "AddRange",
+                CollectionCommit.ToArray,
+                null,
+                "Length",
+                CollectionReserve.Builder,
+                walksByIndex: true
+            );
+        }
+
+        /// <summary>The form for the element run of a rectangular array.</summary>
+        /// <remarks>
+        /// <para>
+        /// Identical to <see cref="Array()"/> in every respect but one: a rectangular array is walked
+        /// with <c>foreach</c>, because <c>value[index]</c> does not compile for one and the
+        /// alternative is a nested loop per rank emitted twice over. C# expands <c>foreach</c> over an
+        /// array of <b>any</b> rank into exactly that nested loop, in row-major order and with no
+        /// enumerator and no boxing, so the shared emitter gets the right code for free.
+        /// </para>
+        /// <para>
+        /// The accumulator is still a flat <c>WProtoArrayBuilder&lt;T&gt;</c>: the elements arrive as
+        /// one run whatever shape they came from, and the wrapper's own read is what folds them back
+        /// into the declared rank once the dimension header has been checked against them.
+        /// </para>
+        /// </remarks>
+        internal static CollectionForm Rectangular()
         {
             return new CollectionForm(
                 CollectionSeeding.Copy,

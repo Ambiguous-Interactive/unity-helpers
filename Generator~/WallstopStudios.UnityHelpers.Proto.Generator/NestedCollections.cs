@@ -7,29 +7,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using Microsoft.CodeAnalysis;
 
     /// <summary>
-    /// One generated wrapper message: a formatter whose whole payload is a single repeated or map
-    /// field at tag 1.
+    /// One generated wrapper message: a formatter emitted inside a contract's own so that a value
+    /// protobuf cannot express in place gets a message it can.
     /// </summary>
-    internal sealed class NestedCollection
+    /// <remarks>
+    /// Two shapes need one. A collection whose element is another collection becomes
+    /// <see cref="NestedCollection"/>, whose whole payload is a single repeated or map field. A
+    /// rectangular array becomes <see cref="RectangularArray"/>, which carries a dimension header
+    /// alongside its run because its elements alone cannot say what shape they came from.
+    /// </remarks>
+    internal interface IGeneratedMessage
     {
-        internal NestedCollection(string formatterName, string qualified, string display)
-        {
-            FormatterName = formatterName;
-            Qualified = qualified;
-            Display = display;
-        }
-
         /// <summary>The nested type's name inside the contract's generated formatter.</summary>
-        internal string FormatterName { get; }
+        string FormatterName { get; }
 
-        /// <summary>The collection type this wrapper carries, fully qualified.</summary>
-        internal string Qualified { get; }
+        /// <summary>The type this wrapper carries, fully qualified.</summary>
+        string Qualified { get; }
 
-        /// <summary>The collection type as a developer wrote it, for the generated comment.</summary>
-        internal string Display { get; }
-
-        /// <summary>The inner collection, encoded exactly as a top-level member of it would be.</summary>
-        internal Member Inner { get; set; }
+        /// <summary>The type as a developer wrote it, for the generated comment.</summary>
+        string Display { get; }
 
         /// <summary>
         /// How many sub-message levels this wrapper and everything under it occupy.
@@ -41,10 +37,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// reusing that entry assembles a chain past the reader's limit without the bound ever being
         /// consulted.
         /// </remarks>
-        internal int Depth { get; set; }
+        int Depth { get; set; }
+
+        /// <summary>The wrapped value's run, encoded exactly as a top-level member of it would be.</summary>
+        Member Inner { get; set; }
 
         /// <summary>The expression naming this wrapper's shared instance.</summary>
-        internal string Instance => FormatterName + ".Instance";
+        string Instance { get; }
+
+        /// <summary>Emits the wrapper as a nested formatter inside the contract's own.</summary>
+        /// <param name="writer">The destination.</param>
+        void Emit(Writer writer);
+    }
+
+    /// <summary>The pieces every generated wrapper message shares.</summary>
+    internal static class GeneratedMessages
+    {
+        /// <summary>Escapes a type name for the XML doc comment the wrapper carries.</summary>
+        /// <param name="display">The type as a developer wrote it.</param>
+        /// <returns>The escaped name.</returns>
+        internal static string Escape(string display)
+        {
+            return display.Replace("<", "&lt;").Replace(">", "&gt;");
+        }
+    }
+
+    /// <summary>
+    /// One generated wrapper message: a formatter whose whole payload is a single repeated or map
+    /// field at tag 1.
+    /// </summary>
+    internal sealed class NestedCollection : IGeneratedMessage
+    {
+        internal NestedCollection(string formatterName, string qualified, string display)
+        {
+            FormatterName = formatterName;
+            Qualified = qualified;
+            Display = display;
+        }
+
+        /// <inheritdoc />
+        public string FormatterName { get; }
+
+        /// <inheritdoc />
+        public string Qualified { get; }
+
+        /// <inheritdoc />
+        public string Display { get; }
+
+        /// <inheritdoc />
+        public Member Inner { get; set; }
+
+        /// <inheritdoc />
+        public int Depth { get; set; }
+
+        /// <inheritdoc />
+        public string Instance => FormatterName + ".Instance";
 
         /// <summary>
         /// Emits the wrapper as a nested formatter inside the contract's own.
@@ -56,11 +103,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// keeping it here means two contracts that both hold a <c>List&lt;int[]&gt;</c> cannot
         /// collide over a generated name.
         /// </remarks>
-        internal void Emit(Writer writer)
+        public void Emit(Writer writer)
         {
             writer.Line(
                 "/// <summary>Generated WallstopProto wrapper message for the nested collection <c>",
-                Escape(Display),
+                GeneratedMessages.Escape(Display),
                 "</c>. Do not edit.</summary>"
             );
             writer.Line(
@@ -198,11 +245,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Outdent();
             writer.Line("}");
         }
-
-        private static string Escape(string display)
-        {
-            return display.Replace("<", "&lt;").Replace(">", "&gt;");
-        }
     }
 
     /// <summary>
@@ -259,10 +301,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal const int MaxDepth = 64;
 
-        private readonly Dictionary<string, NestedCollection> _byType =
-            new Dictionary<string, NestedCollection>();
+        private readonly Dictionary<string, IGeneratedMessage> _byType =
+            new Dictionary<string, IGeneratedMessage>();
 
-        private readonly List<NestedCollection> _ordered = new List<NestedCollection>();
+        private readonly List<IGeneratedMessage> _ordered = new List<IGeneratedMessage>();
 
         private readonly string _contractName;
         private readonly SurrogateMap _surrogates;
@@ -292,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>The wrappers this contract needs, in the order they were discovered.</summary>
-        internal IReadOnlyList<NestedCollection> All => _ordered;
+        internal IReadOnlyList<IGeneratedMessage> All => _ordered;
 
         /// <summary>
         /// How many times resolution has refused a type for being nested past
@@ -315,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns>The wrapper's shape, or <c>null</c>.</returns>
         internal Shape TryShape(ITypeSymbol type, string qualified, string memberName)
         {
-            if (_byType.TryGetValue(qualified, out NestedCollection existing))
+            if (_byType.TryGetValue(qualified, out IGeneratedMessage existing))
             {
                 if (existing.Inner == null)
                 {
@@ -343,11 +385,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            NestedCollection wrapper = new NestedCollection(
-                "NestedFormatter" + ++_names,
-                qualified,
-                type.ToDisplayString()
-            );
+            // A rectangular array is the one wrapped shape whose elements cannot say what shape they
+            // came from, so it gets a message carrying a dimension header beside its run rather than
+            // the bare run every other wrapper holds.
+            IArrayTypeSymbol rectangular =
+                type is IArrayTypeSymbol array && 2 <= array.Rank ? array : null;
+
+            IGeneratedMessage wrapper =
+                rectangular == null
+                    ? (IGeneratedMessage)
+                        new NestedCollection(
+                            "NestedFormatter" + ++_names,
+                            qualified,
+                            TypeNaming.Display(type)
+                        )
+                    : new RectangularArray(
+                        "NestedFormatter" + ++_names,
+                        qualified,
+                        rectangular,
+                        _contractName
+                    );
 
             // Registered before its member is resolved, so a self-referential collection type finds
             // itself here on the way down instead of recursing until the depth bound stops it. The
@@ -361,24 +418,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Member inner;
             try
             {
-                inner = Member.Create(
-                    _contractName,
-                    memberName,
-                    1,
-                    type,
-                    false,
-                    // There is no constructor value behind a wrapper -- the message IS the
-                    // collection -- so the read replaces rather than appends. That is also what
-                    // keeps the emitted read free of any reference to an enclosing instance.
-                    true,
-                    _surrogates,
-                    this,
-                    out bool ambiguous
-                );
-
-                if (ambiguous)
+                if (rectangular != null)
                 {
-                    inner = null;
+                    inner = RepeatedMember.CreateRectangular(
+                        _contractName,
+                        memberName,
+                        RectangularArray.ValuesTag,
+                        rectangular,
+                        _surrogates,
+                        this
+                    );
+                }
+                else
+                {
+                    inner = Member.Create(
+                        _contractName,
+                        memberName,
+                        1,
+                        type,
+                        false,
+                        // There is no constructor value behind a wrapper -- the message IS the
+                        // collection -- so the read replaces rather than appends. That is also what
+                        // keeps the emitted read free of any reference to an enclosing instance.
+                        true,
+                        _surrogates,
+                        this,
+                        out bool ambiguous
+                    );
+
+                    if (ambiguous)
+                    {
+                        inner = null;
+                    }
                 }
             }
             finally
@@ -426,14 +497,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="writer">The destination.</param>
         internal void Emit(Writer writer)
         {
-            foreach (NestedCollection wrapper in _ordered)
+            foreach (IGeneratedMessage wrapper in _ordered)
             {
                 writer.Blank();
                 wrapper.Emit(writer);
             }
         }
 
-        private static Shape ShapeFor(NestedCollection wrapper, ITypeSymbol type)
+        private static Shape ShapeFor(IGeneratedMessage wrapper, ITypeSymbol type)
         {
             return Shape.Message(wrapper.Instance, wrapper.Qualified, type.IsValueType);
         }

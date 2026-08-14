@@ -1575,36 +1575,66 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   is a length-delimited scalar rather than a repeated field — which is exactly why the generator
   tests `Shape.IsByteArray` before anything else.
 
-  **What is left on #399**, each independent of the above:
-  - **Rectangular arrays (`int[,]`)** are still `WPROTO003`, and they are a different question rather
-    than the same one unfinished: there is no per-row structure to wrap, so reconstructing one needs
-    its dimensions carried in the payload. Tracked on **#434**, and scoped in session 188:
+  **What is left on #399**: the contract surveys of the wallstop and Ambiguous-Interactive
+  repositories, and the remaining stdlib types, which the wrapper encoding does not change either
+  way.
 
-    *There is no oracle, confirmed rather than assumed.* protobuf-net refuses `int[,]` at **write**
-    on both majors -- 2.4.9 with a dedicated multi-dimensional message, 3.2.56 through its generic
-    repeated refusal -- so no payload with this shape exists for either side to read. The encoding
-    is ours to define, under the owner's 2026-08-13 condition that it map to a concrete proto3 type.
-    A `TheOracleRefusesEveryRectangularShape` fixture must assert **both** oracle legs, because the
-    two majors throw different messages and the existing `Contains("Nested or jagged")` assertion
-    would not survive.
+- **#434 — rectangular arrays, session 189.** `int[,]`, `int[,,]`, `string[,]`, a grid of contracts,
+  and a rectangular array in every position a collection can occupy (`List<int[,]>`,
+  `Dictionary<string, int[,]>`, `int[][,]`, `int[,][]`) all serialize. The wrapper is
+  `message Rect { repeated int32 dims = 1; repeated T values = 2; }`, which satisfies the owner's
+  2026-08-13 condition that a superset map to a concrete proto3 type.
 
-    *The blocking question is not code.* A `dims` header is a **capacity claim**, not a length
-    prefix, which is critical rule 17 exactly: six bytes can state `[46341, 46341]` and ask for 8 GB.
-    It must be refused with `SerializationCapacityLimits.TryAccept` unless the product of `dims`,
-    computed in `long` so it cannot overflow into something plausible, equals the delivered element
-    count. Two more decisions before anything is written: a zero-length dimension (`new int[0,5]`)
-    has real shape and no elements, so `dims` must be written even when `values` is empty -- the
-    opposite of the omit-empty rule everywhere else -- and rank is a **compile-time** property of
-    the member's declared type, so the generator can emit `new T[a, b]` directly and never needs
-    `Array.CreateInstance` or a runtime rank at all.
+  *The elements alone cannot say what shape they came from*, which is what makes this a different
+  question from #399 rather than the same one unfinished: `int[2,3]` and `int[3,2]` deliver the same
+  six values in the same order, and a jagged array never had that problem because each row carries
+  its own length.
 
-    *The insertion points are small and known*: `RepeatedMember.cs:111` (the `array.Rank == 1`
-    gate), `Shape.cs:374` (the last-resort hook that already routes an unwrappable collection to a
-    generated message), `NestedCollections.TryShape` (which currently drops anything that is not a
-    `RepeatedMember`/`MapMember`), and the `WPROTO003` message text. Three `DiagnosticTests` cases
-    pin the refusal today and must invert; there is no `int[,,]` or `T[,]`-in-a-generic case yet.
-  - **The contract surveys** of the wallstop and Ambiguous-Interactive repositories, and the
-    remaining stdlib types, which the wrapper encoding does not change either way.
+  **The header is a capacity claim, and the plan's own remedy was the weaker one.** This section
+  specified `SerializationCapacityLimits.TryAccept`. Requiring the product of `dims` -- in `long`, so
+  an overflow cannot land on something plausible -- to **equal** the delivered element count is
+  strictly stronger and makes `TryAccept` unreachable: with equality the claim *is* the delivered
+  count, which is what `TryAccept` would have clamped it to, so calling it could only ever return
+  true. Equality also catches the case a ceiling cannot -- a header that under-states its run, which
+  would silently drop elements -- and it needs no configurable bound, because the allocation is
+  backed one-for-one by bytes the sender already paid for. Rule 17's verb is right for a growth hint
+  and for a semantic capacity; a shape header is a third thing, and it can be **reconciled** rather
+  than bounded.
+
+  **And the equality rule then had a hole of its own, at rank three.** The first implementation
+  computed the product as `(long)d0 * (long)d1 * (long)d2`, and widening to `long` is not enough:
+  three `int` dimensions reach 2^93, C# wraps silently, and the attacker picks the wrap.
+  `[2^22, 2^21, 2^21]` is exactly 2^64, so the wrapped product is **zero**, which matches an empty
+  element run and reaches `new int[4194304, 2097152, 2097152]` — sixteen bytes to an
+  `OutOfMemoryException`, written as a red test and confirmed red before
+  `WProtoRectangular.MultiplyDimensions` saturated the accumulation. The lesson is not "use a wider
+  type": widening turns a definitely-wrong answer into a **silently plausible** one, which is what a
+  hostile payload steers toward, and the check belongs at each multiply rather than at the end. The
+  rank-two case never overflows, so the only test that catches this is one for a rank the issue did
+  not ask about.
+
+  *Three things fell out of reusing the existing emitter rather than writing a second one.* The
+  element run is an ordinary `RepeatedMember`, so packing, null-element refusal, surrogates,
+  contracts, reservation from a packed count and nested collections are inherited by construction --
+  the whole rectangular emitter is the header plus the fold back into rank. C# expands `foreach` over
+  an array of **any** rank into nested loops with no enumerator and no boxing, so the one thing that
+  had to change was `CollectionForm.WalksByIndex`, which used to be derived from `Commit == ToArray`
+  and is now stored: a rectangular array commits through `ToArray` exactly as a vector does and
+  cannot be indexed with one subscript. And `new T[a, b]` is not the creation syntax when `T` is
+  itself an array -- `int[,][]` is `new int[a, b][]` -- which the type-driven prefix/suffix split
+  handles and a string concatenation of the element name does not.
+
+  **Two smaller corrections came out of measuring rather than reading.** Roslyn spells a rectangular
+  array `int[*,*]`, so every diagnostic and runtime refusal naming one was about to print a form
+  nobody typed; `TypeNaming.Display` normalizes it, and the repeated/nested emitters route through it
+  too. And the two oracle majors refuse for genuinely different reasons -- 2.4.9 with
+  `Multi-dimensional arrays are not supported`, 3.2.56 with
+  `Repeated data of type System.Int32[,] is not supported` -- so the refusal fixture pins each one
+  exactly under `PROTOBUF_NET_ORACLE_V2` rather than accepting either message on either leg.
+
+  *Verified*: 360 `Generator~` cases against protobuf-net 3.2.56 and 359 against 2.4.9, all six
+  `typecheck:unity`/`typecheck:tests` configurations, and a real Unity 6000.4.6f1 editor reporting
+  39 of 39 package assemblies fresh with an empty console.
 - **#398 — the read path's own allocation is closed, session 186.** The issue asked for a benchmark
   before any pooling, and session 184's aggregate delivered one: 5,272 B/op against protobuf-net's
   4,112 for the same object graph. **An aggregate cannot say which member is responsible**, so the

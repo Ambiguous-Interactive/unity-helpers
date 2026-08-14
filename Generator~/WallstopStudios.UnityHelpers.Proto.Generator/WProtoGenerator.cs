@@ -2035,7 +2035,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         symbol,
                         contract.Name,
                         symbol.Name,
-                        type.ToDisplayString()
+                        TypeNaming.Display(type)
                     );
                     failed = true;
                     continue;

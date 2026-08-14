@@ -28,6 +28,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     internal static class TypeNaming
     {
         /// <summary>
+        /// The name of <paramref name="type"/> as a developer would have written it.
+        /// </summary>
+        /// <param name="type">The type to name.</param>
+        /// <returns>The name, for a message a human reads.</returns>
+        /// <remarks>
+        /// Roslyn spells a rectangular array <c>int[*,*]</c>, which is the C# compiler's own
+        /// disambiguating form rather than anything anybody typed. A diagnostic or a runtime refusal
+        /// that names a member's type has to name it the way its declaration does, or the reader has
+        /// to translate the message before they can search for what it is about.
+        /// </remarks>
+        internal static string Display(ITypeSymbol type)
+        {
+            return type.ToDisplayString().Replace("[*", "[").Replace(",*", ",");
+        }
+
+        /// <summary>
         /// Reports whether <paramref name="type"/> can be named from anywhere in the compilation.
         /// </summary>
         /// <param name="type">The type to name.</param>

@@ -1078,11 +1078,29 @@ Nothing is asked of you: declare the member and it works.
 length-delimited value rather than a repeated field, so they are ordinary repeated members and their
 bytes are unchanged.
 
-Two refusals remain, and neither is a nested-collection gap. A **rectangular** array (`int[,]`) has
-no per-row structure to wrap — reconstructing one needs its dimensions carried in the payload, which
-is a wire-format decision rather than a missing case. And a chain of collections nested more than
-**64** deep is a build error (`WPROTO032`): each level is a real sub-message, and the reader refuses
+**Rectangular arrays work too** — `int[,]`, `int[,,]`, `string[,]`, a grid of contracts, and a
+rectangular array in any position a collection can occupy (`List<int[,]>`,
+`Dictionary<string, int[,]>`, `int[][,]`, `int[,][]`). This one needs more than a wrapper around its
+run, because its elements cannot say what shape they came from: six values are a two-by-three or a
+three-by-two, and nothing in a repeated field distinguishes them. So the wrapper carries a dimension
+header beside them —
+`message Rect { repeated int32 dims = 1; repeated T values = 2; }` — with the elements in row-major
+order. `new int[0, 5]` keeps its shape, which is why the header is written even when the run is
+empty.
+
+> **A payload whose header disagrees with its elements is refused, not repaired.** Dimensions are a
+> capacity claim rather than a length prefix: `[46341, 46341]` costs six bytes and would ask for
+> 8 GB. The product of the dimensions must equal the number of elements actually delivered, so an
+> allocation is always backed one-for-one by data the sender paid for in bytes. A rank the member
+> does not have, a negative dimension, or a run that outruns its header is refused the same way.
+
+One refusal remains, and it is not a nested-collection gap: a chain of collections nested more than
+**64** deep is a build error (`WPROTO032`). Each level is a real sub-message, and the reader refuses
 to read past 64 levels of nesting, so a deeper member could be written and never read back.
+
+An array created with `Array.CreateInstance` and a non-zero lower bound is refused when written. The
+header carries lengths, reading rebuilds the array with `new T[a, b]`, and every index would come
+back shifted — a refusal beats handing your data back under different indices.
 
 **An empty inner collection survives a round trip; an empty outer one does not.** That looks like an
 inconsistency and is the opposite. A top-level repeated field that is absent and one that is empty

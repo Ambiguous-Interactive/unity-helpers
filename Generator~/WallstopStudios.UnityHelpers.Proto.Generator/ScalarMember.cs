@@ -40,12 +40,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string SeenFlag => "seen" + Tag;
 
+        /// <summary>
+        /// Builds the member when <paramref name="type"/> has a single-value shape, and returns
+        /// <c>null</c> otherwise.
+        /// </summary>
+        /// <param name="name">The member's name.</param>
+        /// <param name="tag">The wire field number.</param>
+        /// <param name="type">The member's declared type.</param>
+        /// <param name="isRequired">Whether <c>IsRequired</c> was set.</param>
+        /// <param name="surrogates">The assembly's surrogate registrations.</param>
+        /// <param name="nested">The contract's wrapper-message registry.</param>
+        /// <remarks>
+        /// The registry reaches this last of the three member kinds, and only a <b>rectangular</b>
+        /// array ever takes it up. Every collection that earns a wrapper answers the repeated or map
+        /// question before this one, so a type arriving here has already been refused by both and the
+        /// registry would refuse it too -- except for <c>T[a,b]</c>, whose message is not the run it
+        /// declined to be.
+        /// </remarks>
         internal static ScalarMember TryCreate(
             string name,
             int tag,
             ITypeSymbol type,
             bool isRequired,
-            SurrogateMap surrogates
+            SurrogateMap surrogates,
+            NestedCollections nested
         )
         {
             ITypeSymbol underlying = type;
@@ -67,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            Shape shape = Shape.For(underlying, qualifiedUnderlying, surrogates);
+            Shape shape = Shape.For(underlying, qualifiedUnderlying, surrogates, nested, name);
             if (shape == null)
             {
                 return null;

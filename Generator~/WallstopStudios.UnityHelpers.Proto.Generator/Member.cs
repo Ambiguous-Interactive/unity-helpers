@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (isContract && Shape.IgnoresListHandling(type))
             {
                 // Explicitly a message, whatever interfaces it implements.
-                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates);
+                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates, nested);
             }
 
             // Maps first: a dictionary also implements ICollection<KeyValuePair<K,V>>, and the
@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             if (repeated == null)
             {
-                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates);
+                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates, nested);
             }
 
             if (isContract)

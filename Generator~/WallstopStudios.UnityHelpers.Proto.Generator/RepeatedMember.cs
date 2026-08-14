@@ -140,11 +140,73 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 shape,
                 form,
                 elementQualified,
-                element.ToDisplayString(),
+                TypeNaming.Display(element),
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                type.ToDisplayString(),
+                TypeNaming.Display(type),
                 type.IsValueType,
                 overwriteList,
+                elementIsGeneric
+            );
+        }
+
+        /// <summary>
+        /// Builds the element run of a rectangular array, or <c>null</c> when its element type has no
+        /// encoding.
+        /// </summary>
+        /// <param name="contractName">The declaring contract's name, for diagnostics at runtime.</param>
+        /// <param name="name">The declaring member's name, for diagnostics at runtime.</param>
+        /// <param name="tag">The field number the run occupies inside the wrapper message.</param>
+        /// <param name="array">The rectangular array type.</param>
+        /// <param name="surrogates">The assembly's surrogate registrations.</param>
+        /// <param name="nested">The contract's wrapper-message registry.</param>
+        /// <returns>The run, or <c>null</c>.</returns>
+        /// <remarks>
+        /// Separate from <see cref="TryCreate"/> because the two answer opposite questions about the
+        /// same type. A rectangular array reaching <c>TryCreate</c> must be refused -- it has no
+        /// repeated encoding of its own, and taking it there would write the elements with no way to
+        /// recover their shape -- while this is the wrapper deliberately asking for the run that goes
+        /// <b>inside</b> the message carrying that shape. Everything else about the run is the
+        /// ordinary emitter: packing, null-element refusal, reservation from a packed count, and an
+        /// element that is itself a collection, a contract or a surrogated type.
+        /// </remarks>
+        internal static RepeatedMember CreateRectangular(
+            string contractName,
+            string name,
+            int tag,
+            IArrayTypeSymbol array,
+            SurrogateMap surrogates,
+            NestedCollections nested
+        )
+        {
+            ITypeSymbol element = array.ElementType;
+            string elementQualified = element.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat
+            );
+
+            bool elementIsGeneric = element is ITypeParameterSymbol;
+            Shape shape = elementIsGeneric
+                ? null
+                : Shape.For(element, elementQualified, surrogates, nested, name);
+            if (shape == null && !elementIsGeneric)
+            {
+                return null;
+            }
+
+            return new RepeatedMember(
+                contractName,
+                name,
+                tag,
+                shape,
+                CollectionForm.Rectangular(),
+                elementQualified,
+                TypeNaming.Display(element),
+                array.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                TypeNaming.Display(array),
+                false,
+                // The wrapper message IS the array, so there is no constructor value behind it to
+                // append onto: the run replaces rather than accumulates, exactly as the nested
+                // collection wrapper's own member does.
+                true,
                 elementIsGeneric
             );
         }
@@ -410,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
 
         /// <summary>Whether the member is walked by index rather than with <c>foreach</c>.</summary>
-        private bool IsArray => _form.IsArray;
+        private bool IsArray => _form.WalksByIndex;
 
         /// <summary>The element count, however this collection spells it.</summary>
         private string CountAccess => Access + "." + _form.CountMember;

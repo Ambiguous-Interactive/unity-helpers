@@ -143,25 +143,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         //
         // The nested and jagged shapes moved OFF this list in session 187 -- they are served by a
         // wrapper message per inner collection now, and NestedCollectionTests pins their bytes.
-        // What is left here nests nothing.
+        // Rectangular arrays followed in session 189, through a wrapper that carries a dimension
+        // header beside its run, and RectangularArrayTests pins those. What is left here has no
+        // encoding at all rather than one that had not been written yet.
         //
-        // A rectangular array stays refused, and it is not the same question: `int[,]` has no
-        // per-row structure to wrap, so reconstructing one needs a shape header in the payload,
-        // which is a wire decision rather than a missing case.
-        //
-        // The last two are element-shape refusals: a nullable element (protobuf-net refuses a null
-        // element, so Nullable<T>[] is a collection that can only hold values it cannot write), and
-        // a BCL type with no mapping. The nested spellings of both are here too, because a wrapper
-        // must not launder an element its own member would have refused.
+        // The remaining entries are element-shape refusals: a consumer's own collection interface
+        // (protobuf-net writes it and throws InvalidCastException reading it back -- measured), a
+        // nullable element (protobuf-net refuses a null element, so Nullable<T>[] is a collection
+        // that can only hold values it cannot write), and a BCL type with no mapping. The nested and
+        // rectangular spellings of each are here too, because a wrapper must not launder an element
+        // its own member would have refused.
         [TestCase("Consumer.IOwnList<int>")]
         [TestCase("System.Collections.Generic.List<Consumer.IOwnList<int>>")]
-        [TestCase("int[,]")]
-        [TestCase("int[,][]")]
-        [TestCase("System.Collections.Generic.List<int[,]>")]
+        [TestCase("Consumer.IOwnList<int>[,]")]
         [TestCase("int?[]")]
         [TestCase("int?[][]")]
+        [TestCase("int?[,]")]
         [TestCase("System.DateTime")]
         [TestCase("System.Collections.Generic.List<System.DateTime[]>")]
+        [TestCase("System.DateTime[,]")]
         public void AnUnsupportedMemberTypeIsAnError(string declaredType)
         {
             AssertDiagnostic(
