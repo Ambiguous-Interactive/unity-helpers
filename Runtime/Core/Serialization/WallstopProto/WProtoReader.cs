@@ -551,6 +551,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return 0;
             }
 
+            // Indexed from the offset rather than sliced into a local first. Slicing was tried,
+            // on the theory that a zero-based loop lets the JIT drop its bounds check, and measured
+            // 302.97 ns/op against this loop's 285.88 over a 1,089-byte run of 512 varints -- the
+            // slice is a few percent SLOWER, not faster. (The first measurement said otherwise and
+            // was wrong: it compared a call through a freshly constructed reader against an inlined
+            // loop, so it was timing the construction.)
             int count = 0;
             for (int index = _position; index < _buffer.Length; index++)
             {
