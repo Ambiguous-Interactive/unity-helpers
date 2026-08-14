@@ -157,6 +157,26 @@ exception in its own.
 Confirmed in the editor: 18 of 18, including `int.MaxValue`, 2,000,000,000, and a negative index
 (ignored rather than counted, since a negative index cannot be set at all).
 
+### The one red that was neither ours nor a regression
+
+CI then failed the benchmark's **throughput** assertion on the hosted runner:
+
+```text
+WallstopProto serialize: 0.00 B/op, 17,710.78 ns/op   (800 ns/op locally)
+protobuf-net serialize:  40.00 B/op,  7,314.44 ns/op
+```
+
+Allocation was identical to a green run, and deserialize was still 1.8x faster. A 22x stall on one
+round is the machine, not the code -- and it also explains the single unattributed failure seen
+locally earlier in this session, which had looked like a rare flake with no cause.
+
+**The estimator was the defect.** A median of five rounds does not survive one descheduled round, and
+this assertion had been comparing medians. It compares the **fastest** round on each side now: noise
+only ever adds time, so the minimum is the closest either implementation gets to its own cost, and a
+real regression -- which is present in every round -- still fails. Measured after the change, on a
+machine deliberately kept busy: medians of 4,725 against 8,269 ns/op, minima of 1,700 against 2,538,
+where the minima are the stable pair.
+
 ## What #398 has left, and why it is not this session's work
 
 The string interner and "merge into the caller's existing collection" both change what a read hands
