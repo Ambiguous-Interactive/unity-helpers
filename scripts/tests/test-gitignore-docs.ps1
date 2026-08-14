@@ -357,6 +357,55 @@ $result5d = Invoke-Linter -RepoDir $repo5d
 Write-TestResult "LlmOnly_NoDocs_Fails" ($result5d.ExitCode -eq 1) "Expected exit code 1, got $($result5d.ExitCode)"
 Remove-TestRepo $repo5d
 
+# ==== Test Group 6: Check 4 -- a tracked file that is also gitignored ====
+# The state that produced this check: a file force-added past its own ignore rule stays in the
+# repository forever, `git status` never mentions it, and re-adding it after a delete silently does
+# nothing. Which side is wrong differs per file, so the linter reports rather than guesses.
+
+# Test 6a: a file committed BEFORE its ignore rule existed is still tracked, and is reported.
+$repo6a = New-TestRepo -DocsFiles @('index.md')
+Push-Location $repo6a
+try {
+  'note' | Set-Content -Path 'progress.md' -Encoding UTF8
+  & git add -f 'progress.md' 2>&1 | Out-Null
+  'progress.md' | Set-Content -Path '.gitignore' -Encoding UTF8
+  & git add -A 2>&1 | Out-Null
+  & git commit -q -m 'Track then ignore' 2>&1 | Out-Null
+} finally {
+  Pop-Location
+}
+$result6a = Invoke-Linter -RepoDir $repo6a
+Write-TestResult "TrackedAndIgnoredFile_Fails" ($result6a.ExitCode -eq 1) "Expected exit code 1, got $($result6a.ExitCode)"
+Write-TestResult "TrackedAndIgnoredFile_NamesThePath" ($result6a.Output -match 'progress\.md') "Expected the message to name progress.md"
+Remove-TestRepo $repo6a
+
+# Test 6b: the same file untracked -- on disk, ignored, not in the index -- passes.
+$repo6b = New-TestRepo -GitignoreContent 'progress.md' -DocsFiles @('index.md')
+Push-Location $repo6b
+try {
+  'note' | Set-Content -Path 'progress.md' -Encoding UTF8
+} finally {
+  Pop-Location
+}
+$result6b = Invoke-Linter -RepoDir $repo6b
+Write-TestResult "IgnoredButUntrackedFile_Passes" ($result6b.ExitCode -eq 0) "Expected exit code 0, got $($result6b.ExitCode)"
+Remove-TestRepo $repo6b
+
+# Test 6c: a negation resolves it the other way -- the file is meant to be tracked, so the pattern
+# is what gets narrowed. This is what PLAN.md needed.
+$repo6c = New-TestRepo -GitignoreContent "PLAN.md*`n!PLAN.md" -DocsFiles @('index.md')
+Push-Location $repo6c
+try {
+  '# Plan' | Set-Content -Path 'PLAN.md' -Encoding UTF8
+  & git add -A 2>&1 | Out-Null
+  & git commit -q -m 'Track the plan' 2>&1 | Out-Null
+} finally {
+  Pop-Location
+}
+$result6c = Invoke-Linter -RepoDir $repo6c
+Write-TestResult "NegatedPatternKeepsTrackedFile_Passes" ($result6c.ExitCode -eq 0) "Expected exit code 0, got $($result6c.ExitCode)"
+Remove-TestRepo $repo6c
+
 # ---- Summary ----
 
 Write-Host ""

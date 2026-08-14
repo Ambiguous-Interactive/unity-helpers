@@ -7,7 +7,7 @@ Param(
     Validates that .gitignore patterns do not accidentally exclude documentation or LLM files.
 
 .DESCRIPTION
-    This linter checks for three categories of .gitignore safety issues:
+    This linter checks for four categories of .gitignore safety issues:
 
     1. No files under docs/ or .llm/ are gitignored - verifies that all tracked and untracked
        documentation and LLM configuration files are not excluded by .gitignore patterns.
@@ -15,9 +15,14 @@ Param(
        accidentally match files in the docs/ or .llm/ directories.
     3. mkdocs.yml nav integrity - verifies that every file referenced in the mkdocs.yml
        nav section exists on disk and is not gitignored.
+    4. No tracked file is gitignored - a file that is both is a contradiction git will not
+       resolve: it stays in the repository forever, `git status` never mentions it, and
+       re-adding it after a delete silently does nothing.
 
-    These checks prevent the category of CI failure where a .gitignore pattern like
+    Checks 1-3 prevent the category of CI failure where a .gitignore pattern like
     "failed-tests-*" accidentally matches "docs/features/editor-tools/failed-tests-exporter.md".
+    Check 4 prevents the opposite one, where a file force-added past its own ignore rule ships
+    in the package and nothing ever reports it.
 
 .PARAMETER VerboseOutput
     Show detailed output during validation
@@ -339,6 +344,45 @@ if (Test-Path 'mkdocs.yml') {
   }
 } else {
   Write-Info "  No mkdocs.yml found, skipping nav validation."
+}
+
+# ---- Check 4: No tracked file is gitignored ----
+# A file that is both tracked and ignored is a contradiction git will not resolve for you: it stays
+# in the repository forever, `git status` never mentions it, and re-adding it after a delete
+# silently does nothing. Every instance found when this check was written was a bug in one direction
+# or the other -- ten agent session logs and eight `.github/**.meta` files that should never have
+# been committed, and `PLAN.md`, which should never have been ignored.
+Write-Info 'Check 4: Verifying no tracked file is gitignored...'
+
+$trackedIgnored = & git ls-files --cached --ignored --exclude-standard
+if ($LASTEXITCODE -ne 0) {
+  throw "git ls-files failed with exit code $LASTEXITCODE"
+}
+
+$trackedIgnoredPaths = @()
+if ($null -ne $trackedIgnored) {
+  $lines = if ($trackedIgnored -is [array]) { $trackedIgnored } else { @($trackedIgnored) }
+  foreach ($line in $lines) {
+    $trimmed = $line.Trim()
+    if ($trimmed) { $trackedIgnoredPaths += $trimmed }
+  }
+}
+
+if ($trackedIgnoredPaths.Count -gt 0) {
+  $hasErrors = $true
+  $errorCount += $trackedIgnoredPaths.Count
+  Write-Host ''
+  Write-Host "ERROR: $($trackedIgnoredPaths.Count) tracked file(s) are also gitignored:" -ForegroundColor Red
+  foreach ($path in $trackedIgnoredPaths) {
+    Write-Host "  $path" -ForegroundColor Yellow
+  }
+  Write-Host ''
+  Write-Host 'Fix: decide which one is wrong.' -ForegroundColor Cyan
+  Write-Host '  - The file belongs in the repository: narrow the pattern, or add a negation (!PLAN.md).' -ForegroundColor Cyan
+  Write-Host '  - The file does not: git rm --cached <path> to untrack it while keeping it on disk.' -ForegroundColor Cyan
+  Write-Host ''
+} else {
+  Write-Info '  No tracked file is gitignored.'
 }
 
 # ---- Summary ----

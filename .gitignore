@@ -370,7 +370,12 @@ Samples~/**/*.rsp.meta
 Generator~/**/bin/**
 Generator~/**/obj/**
 
+# The plan itself is tracked; the pattern exists for the scratch copies beside it
+# (PLAN.md.bak, PLAN.md.orig). Without these negations `PLAN.md` is a tracked file that
+# git says should not exist, which is what `lint-gitignore-docs.ps1` check 4 refuses.
 PLAN.md*
+!PLAN.md
+!PLAN.md.meta
 BACKUP_PLAN.md*
 
 artifacts*/
