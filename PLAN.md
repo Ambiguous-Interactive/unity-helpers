@@ -1493,29 +1493,45 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   mode is "code that does not compile" -- and the generator reports nothing at all about `CS0019`.
   It compiles the generated source now, which is what the map version was written to do from the
   start and what caught the defect.
-- **#399 — measured in session 183, and it is an owner decision rather than an implementation.**
-  The issue asks for arbitrary-dimension arrays, jagged arrays and nested collections
-  (`int[][]`, `int[,]`, `List<int[]>`, `List<List<int>>`). **Neither protobuf-net major supports any
-  of them**, measured against both vendored oracles: 3.2.56 refuses with
+- **#399 — the decision was taken, and the nested half shipped in session 187.**
+  Session 183 measured that **neither protobuf-net major supports any** of the shapes the issue
+  asks for: 3.2.56 refuses with
   `NotSupportedException: Nested or jagged lists, arrays and maps are not supported`, 2.4.9 with the
   same message plus a separate one for multi-dimensional arrays. Both refuse at *write*, so there is
-  no payload either can produce and none it could be asked to read.
+  no payload either can produce and none it could be asked to read — which took the question out of
+  the encoding-policy rule above and made it an owner decision. The owner took it on 2026-08-13:
+  a superset is acceptable **provided what is generated maps to a concrete proto3 type**.
 
-  That matters because it takes the question out of the encoding-policy rule above. The directive is
-  "interoperate with protobuf-net, do not imitate it", and it is enforced by requiring that any
-  divergence be measured to *read* on the other side. **That check cannot be satisfied here at all**:
-  supporting these shapes means inventing a wire contract this package alone owns, most naturally a
-  repeated *wrapper sub-message* per inner collection, which is what a proto3 schema would use. So
-  `WPROTO003` on `int[][]` and `List<List<int>>` is currently the **correct** answer rather than a
-  gap, and it is pinned by `AnUnsupportedMemberTypeIsAnError`.
+  It does. `repeated repeated` has no protobuf spelling, and every implementation answers the same
+  way — a wrapper message per inner collection, `message Wrapper { repeated T values = 1; }`, which
+  is what `protoc` emits for the equivalent schema. `int[][]`, `List<int[]>`, `List<List<int>>`,
+  `int[][][]`, `HashSet<int>[]`, `List<Dictionary<K,V>>` and a map whose value is a collection all
+  serialize now, to any depth.
 
-  `byte[][]` and `List<byte[]>` are the exception and already work on both sides, because `byte[]` is
-  a length-delimited scalar rather than a repeated field -- which is exactly why the generator tests
-  `Shape.IsByteArray` before anything else.
+  **The wrapper's own member is built by the same `Member` emitter that encodes a top-level
+  collection**, so packing, seeding, ordering, reservation and null-element refusal are inherited
+  rather than reimplemented, and arbitrary depth falls out of recursion rather than out of a depth
+  parameter. The bound that does exist is the reader's: a chain past `WProtoReader.MaxNestingDepth`
+  is `WPROTO032`, because each wrapper level is a real sub-message and a deeper member could be
+  written and never read back.
 
-  **What #399 needs next is a decision, not code:** whether this package owns an encoding protobuf-net
-  cannot read. The rest of the issue (every stdlib type, and the contract surveys of the wallstop and
-  Ambiguous-Interactive repositories) is independent of that decision and can proceed either way.
+  *One asymmetry is deliberate and documented rather than hidden.* These members do not round-trip
+  through protobuf-net, by construction — `TheOracleRefusesEveryNestedShape` keeps that premise a
+  measurement, so a protobuf-net release that starts writing them turns the test red instead of
+  leaving a silent divergence. And an **empty inner** collection survives a round trip where an empty
+  outer one cannot: a present wrapper says its run was empty, while absent and empty are the same
+  bytes at the top level.
+
+  `byte[][]` and `List<byte[]>` were never nested and are byte-identical to before, because `byte[]`
+  is a length-delimited scalar rather than a repeated field — which is exactly why the generator
+  tests `Shape.IsByteArray` before anything else.
+
+  **What is left on #399**, each independent of the above:
+  - **Rectangular arrays (`int[,]`)** are still `WPROTO003`, and they are a different question rather
+    than the same one unfinished: there is no per-row structure to wrap, so reconstructing one needs
+    its dimensions carried in the payload. Tracked separately.
+  - **The contract surveys** of the wallstop and Ambiguous-Interactive repositories, and the
+    remaining stdlib types, which the wrapper encoding does not change either way.
 - **#398 — the read path's own allocation is closed, session 186.** The issue asked for a benchmark
   before any pooling, and session 184's aggregate delivered one: 5,272 B/op against protobuf-net's
   4,112 for the same object graph. **An aggregate cannot say which member is responsible**, so the
