@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `SerializableDictionary`'s "Add entry" Key field is no longer offset from its Value field**: inside a `WGroup` — or anywhere else the inspector indents it — the Value column was drawn 8.5px to the left of the Key column ([#284](https://github.com/Ambiguous-Interactive/unity-helpers/issues/284)).
 - **A WallstopProto contract with a `struct` dictionary member no longer breaks your build**: the generator accepted the member and then emitted a null check and a `??` for a value type, both of which are compiler errors in code you never wrote ([#388](https://github.com/Ambiguous-Interactive/unity-helpers/issues/388)).
 - **An immutable WallstopProto contract with a dictionary member no longer breaks your build**: two generated locals shared a name, which surfaced as `CS0136` inside generated source ([#395](https://github.com/Ambiguous-Interactive/unity-helpers/issues/395)).
 - **WallstopProto now preserves empty string map values written by protobuf-net v2**: v2 omits the value field for `""`, and the generated reader previously turned that missing field into `null`. It now applies protobuf's empty-string default, so old persisted maps migrate without changing their values ([#371](https://github.com/Ambiguous-Interactive/unity-helpers/issues/371)).

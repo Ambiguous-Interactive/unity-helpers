@@ -697,9 +697,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const float DictionaryRowChildHorizontalPadding = 2f;
         private const float DictionaryRowChildLabelTextPadding = 6f;
         internal const float PendingFieldLabelWidth = 72f;
-        internal const float PendingValueContentLeftShift = 8.5f;
-        internal const float PendingFoldoutValueLeftShiftReduction = 3f;
-        internal const float PendingFoldoutValueRightShift = 5.5f;
         internal const float RowValueFoldoutLabelWidth = 2f;
         internal const float ExpandableValueFoldoutLabelWidth = 16f;
         internal const float PendingExpandableValueFoldoutGutter = 7f;
@@ -4454,6 +4451,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Rect absoluteKeyRect = ConvertGroupRectToAbsolute(keyRect, containerRect);
 
                 float valueHeight = pendingMetrics.ValueHeight;
+                // Key and Value are one column stacked twice, so their rects are identical: same
+                // origin, same width, same label width, and for a foldout-capable value the same
+                // gutter. They are drawn by the same routine, so anything that moves one and not
+                // the other is a misalignment rather than a correction (#284).
                 Rect valueRect = new(
                     resolvedSectionPadding + indentOffset,
                     innerY,
@@ -4466,33 +4467,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     valueRect.x += pendingValueFoldoutOffset;
                     valueRect.width = Mathf.Max(0f, valueRect.width - pendingValueFoldoutOffset);
-                }
-                if (PendingValueContentLeftShift > 0f)
-                {
-                    float effectiveShift = PendingValueContentLeftShift;
-                    if (pendingValueSupportsFoldout && PendingFoldoutValueLeftShiftReduction > 0f)
-                    {
-                        effectiveShift = Mathf.Max(
-                            0f,
-                            effectiveShift - PendingFoldoutValueLeftShiftReduction
-                        );
-                    }
-
-                    if (effectiveShift > 0f)
-                    {
-                        float shift = Mathf.Min(
-                            effectiveShift,
-                            Mathf.Max(0f, valueRect.x - resolvedSectionPadding)
-                        );
-                        valueRect.x -= shift;
-                        valueRect.width += shift;
-                    }
-                }
-                if (pendingValueSupportsFoldout && PendingFoldoutValueRightShift > 0f)
-                {
-                    float shift = Mathf.Min(PendingFoldoutValueRightShift, valueRect.width);
-                    valueRect.x += shift;
-                    valueRect.width = Mathf.Max(0f, valueRect.width - shift);
                 }
                 using (new LabelWidthScope(PendingFieldLabelWidth))
                 {

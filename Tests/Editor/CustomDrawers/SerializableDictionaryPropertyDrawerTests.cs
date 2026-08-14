@@ -3175,10 +3175,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
             Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
 
-            // At indent level 0, there's no room to shift the value field left because
-            // valueRect.x is already at the minimum position (PendingSectionPadding).
-            // The shift is calculated as Min(PendingValueContentLeftShift, valueRect.x - resolvedSectionPadding),
-            // which equals 0 at indent level 0. Both fields should start at the same xMin.
+            // Both fields start at the same xMin, at this and every other indent level.
             float actualShift = keyRect.xMin - valueRect.xMin;
 
             TestContext.WriteLine(
@@ -3414,27 +3411,25 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
                 Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
 
-                float expectedShift =
-                    SerializableDictionaryPropertyDrawer.PendingValueContentLeftShift;
                 float actualShift = keyRect.xMin - valueRect.xMin;
 
                 TestContext.WriteLine(
                     $"[PendingEntryKeyAndValueAlignedAtIndentLevel{indentLevel}] "
                         + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
                         + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
-                        + $"expectedShift={expectedShift:F3}, actualShift={actualShift:F3}"
+                        + $"actualShift={actualShift:F3}"
                 );
 
                 Assert.That(
                     actualShift,
-                    Is.EqualTo(expectedShift).Within(1f),
-                    $"Value field should be shifted left by PendingValueContentLeftShift ({expectedShift}px) at indent level {indentLevel}."
+                    Is.EqualTo(0f).Within(0.01f),
+                    $"Key and Value are one column stacked twice, so they must share an origin at indent level {indentLevel} (#284)."
                 );
 
                 Assert.That(
                     valueRect.width - keyRect.width,
-                    Is.EqualTo(expectedShift).Within(1f),
-                    $"Value field should be wider than key field by PendingValueContentLeftShift ({expectedShift}px) at indent level {indentLevel}."
+                    Is.EqualTo(0f).Within(0.01f),
+                    $"Key and Value must share a width at indent level {indentLevel} (#284)."
                 );
             }
         }
@@ -3503,29 +3498,23 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
                     Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
-                    float pendingShift =
-                        SerializableDictionaryPropertyDrawer.PendingValueContentLeftShift;
                     float sectionPadding =
                         SerializableDictionaryPropertyDrawer.GetPendingSectionPaddingForTests();
                     float actualShift = keyRect.xMin - valueRect.xMin;
 
                     TestContext.WriteLine($"  keyRect           = {keyRect}");
                     TestContext.WriteLine($"  valueRect         = {valueRect}");
-                    TestContext.WriteLine($"  PendingValueContentLeftShift = {pendingShift:F3}px");
                     TestContext.WriteLine($"  SectionPadding    = {sectionPadding:F3}px");
                     TestContext.WriteLine($"  actualShift       = {actualShift:F3}px");
 
-                    // At indent level 0, expect no shift (fields aligned at same xMin)
-                    // At indent level 1+, expect shift of PendingValueContentLeftShift
-                    float expectedShift = indentLevel == 0 ? 0f : pendingShift;
-                    TestContext.WriteLine(
-                        $"  expectedShift     = {expectedShift:F3}px (indent={indentLevel})"
-                    );
-
+                    // The columns share an origin at every indent level. This used to expect
+                    // 8.5px at indent 1+, which was the defect in #284 written down as the
+                    // contract: the shift's clamp measured its headroom from the indent, so it
+                    // was inert at indent 0 and moved only the Value column everywhere else.
                     Assert.That(
                         actualShift,
-                        Is.EqualTo(expectedShift).Within(1f),
-                        $"At indent level {indentLevel}, expected shift of {expectedShift:F3}px but got {actualShift:F3}px."
+                        Is.EqualTo(0f).Within(0.01f),
+                        $"At indent level {indentLevel}, Key and Value must share an origin but differed by {actualShift:F3}px."
                     );
                 }
                 else
@@ -3713,7 +3702,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
             Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
 
-            float expectedShift = SerializableDictionaryPropertyDrawer.PendingValueContentLeftShift;
             float actualShift = keyRect.xMin - valueRect.xMin;
 
             TestContext.WriteLine(
@@ -3721,19 +3709,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
                     + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
                     + $"LeftPadding={LeftPadding}, IndentLevel={IndentLevel}, "
-                    + $"expectedShift={expectedShift:F3}, actualShift={actualShift:F3}"
+                    + $"actualShift={actualShift:F3}"
             );
 
+            // This is the reporter's configuration in #284 -- a dictionary inside a WGroup, which
+            // draws its members at indent 1 -- and it is the case this fixture asserted an 8.5px
+            // offset for while calling itself "Aligned".
             Assert.That(
                 actualShift,
-                Is.EqualTo(expectedShift).Within(1f),
-                $"Value field should be shifted left by PendingValueContentLeftShift ({expectedShift}px) with WGroup padding and indent."
+                Is.EqualTo(0f).Within(0.01f),
+                "Key and Value must share an origin with WGroup padding and indent (#284)."
             );
 
             Assert.That(
                 valueRect.width - keyRect.width,
-                Is.EqualTo(expectedShift).Within(1f),
-                $"Value field should be wider than key field by PendingValueContentLeftShift ({expectedShift}px) with WGroup padding and indent."
+                Is.EqualTo(0f).Within(0.01f),
+                "Key and Value must share a width with WGroup padding and indent (#284)."
             );
         }
 
@@ -3985,20 +3976,18 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
             Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
 
-            float expectedShift = SerializableDictionaryPropertyDrawer.PendingValueContentLeftShift;
             float actualShift = keyRect.xMin - valueRect.xMin;
 
             TestContext.WriteLine(
                 $"[PendingEntryKeyAndValueAlignedWithSortedDictionary] "
                     + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
-                    + $"IndentLevel={IndentLevel}, "
-                    + $"expectedShift={expectedShift:F3}, actualShift={actualShift:F3}"
+                    + $"IndentLevel={IndentLevel}, actualShift={actualShift:F3}"
             );
 
             Assert.That(
                 actualShift,
-                Is.EqualTo(expectedShift).Within(1f),
-                $"Value field should be shifted left by PendingValueContentLeftShift ({expectedShift}px) for sorted dictionary."
+                Is.EqualTo(0f).Within(0.01f),
+                "Key and Value must share an origin for a sorted dictionary (#284)."
             );
         }
 
