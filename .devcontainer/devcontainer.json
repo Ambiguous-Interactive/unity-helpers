@@ -38,6 +38,16 @@
     "UNITY_VERSION": "2021.3.45f1",
     "UNITY_IMAGE_VERSION": "3"
   },
+  // Host-side values captured at attach time. GITHUB_TOKEN and GH_TOKEN are what let work inside
+  // the container reach the GitHub API without going through the Dev Containers credential helper,
+  // which asks the HOST and pops a dialog there -- invisible and unanswerable from a headless
+  // session. DxMessaging forwards exactly this pair for the same reason. An unset host variable
+  // forwards as an empty string, so this is inert rather than broken when neither is set, and the
+  // credential helper remains the fallback (see the GitHub access notes in .llm/context.md).
+  "remoteEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+  },
   // Run any post-create commands (see post-create.sh for details)
   // 1. Fix volume mount permissions (Docker named volumes are root-owned)
   // 2. Restore .NET tools (CSharpier, etc.)

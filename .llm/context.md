@@ -234,6 +234,30 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   cannot perform. If neither path can complete the task, report the blocker instead of falling back
   to `gh`. This restriction applies to agent tooling, not tracked GitHub Actions steps that invoke
   `gh` inside CI.
+- **The GitHub API IS reachable from inside the devcontainer, including headless.** Two sessions in a
+  row reported "no token exists in the container" and handed the pull request back to the owner, and
+  both were wrong. Opening a pull request or filing an issue is an agent step, not a hand-back.
+
+  In order of preference:
+
+  1. **`$GITHUB_TOKEN` / `$GH_TOKEN`**, forwarded from the host by `remoteEnv` in
+     `.devcontainer/devcontainer.json`. Nothing to ask for; use it directly.
+  2. **The Dev Containers credential helper**, which is what `origin`'s HTTPS remote already uses:
+
+     ```bash
+     TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' \
+       | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null | sed -n 's/^password=//p')
+     ```
+
+     `GIT_TERMINAL_PROMPT=0` is load-bearing. Without it, git falls back to its own terminal prompt
+     when the helper returns nothing and the command **hangs until it is killed** -- which is the
+     symptom that was misread as "no credential exists". The helper itself asks the host, so the
+     first call in a fresh host session can raise a dialog **on the owner's desktop**; it is answered
+     once and cached, and every later call is silent.
+
+  Never echo the token, never write it to a file in the working tree, and pass it to a subprocess
+  through the environment rather than on a command line.
+
 - For git-interacting scripts, use retry helpers from `scripts/git-staging-helpers.sh` (see [git-safe-operations](./skills/git-safe-operations.md))
 - Write exhaustive tests for every change (see [create-test](./skills/create-test.md))
 - Use high-performance search tools: `rg` not `grep`, `fd` not `find`, `bat --paging=never` not `cat` (see [search-codebase](./skills/search-codebase.md))

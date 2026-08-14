@@ -161,6 +161,46 @@ If a push is rejected for non-fast-forward reasons, prefer
 `git pull --rebase`. Stash any unrelated local changes manually first; never
 silently clobber history with `--force` without explicit user consent.
 
+### Step 9b: Open the pull request yourself
+
+A push alone runs almost nothing. The Unity matrix, the lint workflows and the
+review bots are **`pull_request`-triggered**, so a branch sitting on the remote
+with no pull request has proven only that `Spelling Check` passes. Opening it is
+part of shipping, not a hand-back.
+
+The API is reachable from inside the devcontainer — see the GitHub access notes
+in [context](../context.md) for how to obtain the credential and the
+`GIT_TERMINAL_PROMPT=0` detail that decides whether the call answers or hangs.
+
+```bash
+TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' \
+  | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null | sed -n 's/^password=//p')
+GH_TOKEN="$TOKEN" python3 - <<'PY'
+import json, os, pathlib, urllib.request
+payload = {
+    "title": "<summary line>",
+    "head": "<branch>",
+    "base": "main",
+    "body": pathlib.Path("<body file>").read_text(),
+}
+req = urllib.request.Request(
+    "https://api.github.com/repos/Ambiguous-Interactive/unity-helpers/pulls",
+    data=json.dumps(payload).encode(),
+    headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+             "Accept": "application/vnd.github+json",
+             "Content-Type": "application/json",
+             "User-Agent": "claude-code"},
+    method="POST")
+with urllib.request.urlopen(req, timeout=60) as r:
+    print(json.load(r)["html_url"])
+PY
+```
+
+Write the body to a file first rather than inlining it — a heredoc carrying
+backticks and `$` through two layers of quoting is how a body arrives mangled.
+The same call with `/issues` instead of `/pulls`, and `{"title", "body"}`, files
+a follow-up issue.
+
 ### Step 10: Read the checks, and know which ones are ours
 
 "All checks green" means **every repository-owned check**: the workflows in
