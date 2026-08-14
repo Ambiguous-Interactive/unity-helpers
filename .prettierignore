@@ -26,6 +26,13 @@ perf-results/**
 # linter enforces (UTF-8 no BOM, LF, ordinal order, unpadded table cells).
 .llm/skills/index.md
 
+# Agent planning scaffolding, exempt from the markdown gates by the same decision that put it in
+# .markdownlintignore and cspell's ignorePaths. Prettier used to exempt it as a side effect of
+# `PLAN.md*` in .gitignore -- which was a bug in that file, since PLAN.md is tracked -- so the
+# exemption is written here now rather than inherited from a rule that had to be removed.
+PLAN.md
+BACKUP_PLAN.md
+
 # Only format supported text/assets; Prettier globbing will still be constrained by scripts
 **/*.meta
 **/*.unity
