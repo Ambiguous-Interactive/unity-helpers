@@ -63,8 +63,9 @@
       nowhere in automation until #347. Odin is paid and has no NuGet package, so `Shims/
       OdinInspectorShim.cs` declares the two base classes the runtime aliases and nothing else.
       `npm run typecheck:unity` builds this project a third time with it on. The editor-side Odin
-      surface is out of reach here (it needs UnityEditor) and is covered by the Unity `odin-compile`
-      leg instead.
+      surface (nine drawers, three inspectors) is out of reach here and is therefore STILL COMPILED
+      BY NOTHING: reaching it means compiling the whole Editor assembly, which needs a UnityEditor
+      reference the community assemblies do not carry. Tracked on #347.
     -->
     <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
     <DefineConstants Condition="'$(WallstopOdin)' == 'true'"

@@ -84,7 +84,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Shims/*.cs" />
-    <Compile Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/*.cs" />
+    <!-- Same split as the TypeCheck project, and it is load-bearing rather than tidy: an
+         unconditional glob compiles the Odin base classes into the define-off configurations,
+         where an UNGUARDED `Sirenix.OdinInspector` reference in a fixture would then bind and
+         pass. That is CS0246 in a real no-Odin Unity project, which is #275 one level down: the
+         gate masking the very class it was added to catch. -->
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/*.cs"
+      Exclude="../WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+    />
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+      Condition="'$(WallstopOdin)' == 'true'"
+    />
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"

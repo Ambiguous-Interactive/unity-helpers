@@ -97,8 +97,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const float ManualEntryFoldoutLabelContentOffset = 0f;
         private const float ManualEntryButtonWidth = 110f;
         private const float ManualEntryResetWidth = 70f;
-        private const float ManualEntryValueContentLeftShift = 8.5f;
-        private const float ManualEntryFoldoutValueLeftShiftReduction = 6f;
+        private const float ManualEntryFoldoutValueLeftShift = 2.5f;
         private const float ManualEntryFoldoutValueRightShift = 3f;
         private const float ManualEntryExpandableValueFoldoutGutter = 7f;
 
@@ -2665,25 +2664,27 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         valueRect.width - ManualEntryExpandableValueFoldoutGutter
                     );
                 }
-                float valueLeftShift = ManualEntryValueContentLeftShift;
+                // Only a foldout-capable value is nudged, and the arithmetic below is unchanged.
+                // It used to be spelled as an 8.5px left shift reduced by 6, applied unconditionally
+                // and then clamped by how far the rect had already moved past innerX. For a
+                // NON-foldout value that headroom is exactly zero, so the 8.5 could never apply:
+                // dead, under a name that read deliberate. The dictionary drawer had the same idiom
+                // with an indent term feeding the clamp, and there it was #284 itself.
                 if (valueSupportsFoldout)
                 {
-                    valueLeftShift = Mathf.Max(
-                        0f,
-                        valueLeftShift - ManualEntryFoldoutValueLeftShiftReduction
+                    float leftShift = Mathf.Min(
+                        ManualEntryFoldoutValueLeftShift,
+                        Mathf.Max(0f, valueRect.x - innerX)
                     );
-                }
-                if (valueLeftShift > 0f)
-                {
-                    float shift = Mathf.Min(valueLeftShift, Mathf.Max(0f, valueRect.x - innerX));
-                    valueRect.x -= shift;
-                    valueRect.width += shift;
-                }
-                if (valueSupportsFoldout && ManualEntryFoldoutValueRightShift > 0f)
-                {
-                    float shift = Mathf.Min(ManualEntryFoldoutValueRightShift, valueRect.width);
-                    valueRect.x += shift;
-                    valueRect.width = Mathf.Max(0f, valueRect.width - shift);
+                    valueRect.x -= leftShift;
+                    valueRect.width += leftShift;
+
+                    float rightShift = Mathf.Min(
+                        ManualEntryFoldoutValueRightShift,
+                        valueRect.width
+                    );
+                    valueRect.x += rightShift;
+                    valueRect.width = Mathf.Max(0f, valueRect.width - rightShift);
                 }
 
                 HasLastManualEntryValueRect = true;
