@@ -45,6 +45,12 @@
 //    `deferProcessing` is true and runs the drain inline when it is false, and no textual walk can
 //    know which argument the callback passed. It passes true -- that is the whole point of the
 //    parameter -- and the inline branch belongs to callers that are not in the import phase.
+// 5. **Methods, not properties.** A property whose getter reaches a forbidden API is invisible here.
+//    Taking property bodies too means matching members with no parameter list, and the same relaxed
+//    pattern then matches a nested type declaration -- whose whole body would be attributed to a
+//    `new Foo(` call, turning one constructor into a hundred false reachable lines. The hole is
+//    stated rather than closed badly; the shape that has actually bitten this package is a private
+//    helper method, twice.
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

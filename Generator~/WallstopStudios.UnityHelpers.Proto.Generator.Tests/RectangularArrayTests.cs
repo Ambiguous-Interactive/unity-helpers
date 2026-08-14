@@ -257,23 +257,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(0, empty.Grid.GetLength(1));
         }
 
-        [TestCase("0A060A0202021200", "a header claiming four elements with an empty run")]
-        [TestCase("0A0A0A02B681B60112020102", "a header claiming 46341x46341 with two elements")]
-        [TestCase("0A080A0402020202120401020304", "a rank-four header on a rank-two member")]
-        [TestCase("0A040A0102120401020304", "a rank-one header on a rank-two member")]
-        [TestCase("0A0A0A0202021206010203040506", "a run longer than the header allows")]
-        [TestCase("0A080A047EFF7F02120401020304", "a negative dimension")]
-        [TestCase("0A06120401020304", "elements with no header at all")]
-        public void AHeaderThatDisagreesWithItsElementsIsRefused(string payload, string why)
+        [TestCase(1, "0202", "", "a header claiming four elements with an empty run")]
+        [TestCase(1, "85EA0285EA02", "0102", "a header claiming 46341x46341 with two elements")]
+        [TestCase(
+            2,
+            "808080028080800180808001",
+            null,
+            "a rank-three header whose product wraps to 0"
+        )]
+        [TestCase(1, "02020202", "01020304", "a rank-four header on a rank-two member")]
+        [TestCase(1, "02", "01020304", "a rank-one header on a rank-two member")]
+        [TestCase(1, "0202", "010203040506", "a run longer than the header allows")]
+        [TestCase(1, "FFFFFFFF0F02", "01020304", "a negative dimension")]
+        [TestCase(1, null, "01020304", "elements with no header at all")]
+        public void AHeaderThatDisagreesWithItsElementsIsRefused(
+            int tag,
+            string dimensions,
+            string values,
+            string why
+        )
         {
             // A dimension header is a CAPACITY CLAIM rather than a length prefix: nothing about the
             // bytes that carry it bounds what it asks for, and `[46341, 46341]` costs six bytes and
             // would ask for 8 GB. Requiring the product to equal the delivered count is what turns
             // the claim back into a number the sender already paid for -- so every one of these is
             // refused rather than allocated, clamped, or silently zero-filled.
+            //
+            // Every length prefix is COMPUTED. Four of these payloads were hand-written hex whose
+            // prefixes disagreed with their contents, so the reader refused them for being
+            // malformed and the property under test was never reached -- they passed, and proved
+            // nothing. AWellFormedHeaderIsAcceptedByTheSameBuilder is the control that keeps this
+            // honest.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
-            WProtoReader reader = new WProtoReader(Bytes(payload));
+            WProtoReader reader = new WProtoReader(Wrapper(tag, dimensions, values));
 
             Assert.IsFalse(
                 formatter.TryRead(ref reader, out RectangularArrayContract _),
@@ -282,18 +299,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void AHeaderWhoseProductOverflowsIsRefusedRatherThanWrapped()
+        public void AWellFormedHeaderIsAcceptedByTheSameBuilder()
         {
-            // Three int dimensions multiply to as much as 2^93, and long arithmetic wraps silently
-            // in C#. [2^22, 2^21, 2^21] is exactly 2^64, so a wrapped product is ZERO -- which
-            // matches an empty element run and would be accepted, then allocated as an
-            // eight-exabyte array. The saturating multiply is what stands between those sixteen
-            // bytes and an out-of-memory failure in a shipped player.
+            // The control for the table above. Without it, a builder that produced malformed bytes
+            // would make every hostile case pass for the wrong reason -- which is exactly what the
+            // hand-written version of that table did.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
-            WProtoReader reader = new WProtoReader(Bytes("120E0A0C808080028080800180808001"));
+            WProtoReader reader = new WProtoReader(Wrapper(1, "0202", "01020304"));
 
-            Assert.IsFalse(formatter.TryRead(ref reader, out RectangularArrayContract _));
+            Assert.IsTrue(formatter.TryRead(ref reader, out RectangularArrayContract restored));
+            Assert.AreEqual(2, restored.Grid.GetLength(0));
+            Assert.AreEqual(2, restored.Grid.GetLength(1));
+            Assert.AreEqual(4, restored.Grid[1, 1]);
         }
 
         [Test]
@@ -532,6 +550,43 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds a wrapper message for the contract member at <paramref name="tag"/>, from the
+        /// dimension header's bytes and the element run's bytes.
+        /// </summary>
+        /// <remarks>
+        /// Every length prefix is computed rather than typed. A prefix that disagrees with its
+        /// content makes the reader refuse the payload for being malformed, which is a different
+        /// answer from the one these tests are about -- and a test that gets the right verdict for
+        /// the wrong reason proves nothing.
+        /// </remarks>
+        private static byte[] Wrapper(int tag, string dimensionsHex, string valuesHex)
+        {
+            List<byte> payload = new List<byte>();
+            Append(payload, 1, dimensionsHex);
+            Append(payload, 2, valuesHex);
+
+            Assert.Less(payload.Count, 128, "the builder writes single-byte length prefixes");
+
+            List<byte> message = new List<byte> { (byte)((tag << 3) | 2), (byte)payload.Count };
+            message.AddRange(payload);
+            return message.ToArray();
+        }
+
+        private static void Append(List<byte> payload, int field, string hex)
+        {
+            if (hex == null)
+            {
+                return;
+            }
+
+            byte[] content = Bytes(hex);
+            Assert.Less(content.Length, 128, "the builder writes single-byte length prefixes");
+            payload.Add((byte)((field << 3) | 2));
+            payload.Add((byte)content.Length);
+            payload.AddRange(content);
         }
 
         private static byte[] Bytes(string hex)
