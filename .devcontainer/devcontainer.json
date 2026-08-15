@@ -46,7 +46,12 @@
   // credential helper remains the fallback (see the GitHub access notes in .llm/context.md).
   "remoteEnv": {
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
-    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    // Credentials resolve from a 0600 cache; an EMPTY cache used to fall through to the editor's
+    // askpass, which raises a dialog on the owner's desktop that no credential helper can suppress
+    // (#450). This makes the fallback an error naming the fix instead. The Git extension sets its
+    // own GIT_ASKPASS for the git processes it launches, so the editor's UI is unaffected.
+    "GIT_ASKPASS": "${containerWorkspaceFolder}/scripts/git-askpass-refuse.sh"
   },
   // Run any post-create commands (see post-create.sh for details)
   // 1. Fix volume mount permissions (Docker named volumes are root-owned)

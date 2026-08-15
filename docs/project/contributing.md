@@ -16,8 +16,12 @@ The container resolves github.com credentials from a cached token. The Dev Conta
 helper is out of the path entirely — that helper raises a dialog on the host desktop on **every**
 invocation, and `git push`, `git fetch` and every API call invoke it.
 
-With a token cached, nothing prompts. With an **empty** cache, git falls back to the editor's own
-askpass dialog, which is the signal to run one of the commands below rather than to answer it.
+With a token cached, nothing prompts. With an **empty** cache, git used to fall back to the editor's
+own askpass dialog — another window on the host desktop, from a different mechanism. The container
+points `GIT_ASKPASS` at [`scripts/git-askpass-refuse.sh`](../../scripts/git-askpass-refuse.sh)
+instead, so that path now ends in an error naming the commands below rather than in a dialog.
+(The editor's own Git UI is unaffected: the Git extension sets `GIT_ASKPASS` explicitly for the
+processes it launches.)
 
 Supply the token once per container, either way:
 

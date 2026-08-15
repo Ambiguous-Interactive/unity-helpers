@@ -386,6 +386,55 @@ for entry in github:token github:token:bootstrap github:token:store; do
     fi
 done
 
+# ── The empty-cache path does not reach a dialog either (#450) ──────────────
+#
+# The helper covers "a credential exists". With the cache EMPTY git falls through to GIT_ASKPASS,
+# which the editor sets to its own dialog and which no credential helper can override -- so the only
+# way to close that path is to be the askpass.
+ASKPASS="$REPO_ROOT/scripts/git-askpass-refuse.sh"
+
+# STDOUT is the answer git uses. A single character here is handed to the remote as a credential,
+# so "prints nothing on stdout" is the security property, not a tidiness one.
+askpass_stdout="$(bash "$ASKPASS" "Password for 'https://github.com': " 2>/dev/null)"
+askpass_status=$?
+if [ -z "$askpass_stdout" ]; then
+    pass "the askpass refusal answers git with nothing on stdout"
+else
+    fail "the askpass refusal answers git with nothing on stdout" \
+        "it printed: $askpass_stdout"
+fi
+
+if [ "$askpass_status" -ne 0 ]; then
+    pass "the askpass refusal exits non-zero so git reports failure"
+else
+    fail "the askpass refusal exits non-zero so git reports failure" \
+        "it exited 0, which git reads as a successful empty answer"
+fi
+
+askpass_stderr="$(bash "$ASKPASS" "Username for 'https://github.com': " 2>&1 >/dev/null)"
+if printf '%s' "$askpass_stderr" | grep -q 'github:token:bootstrap' \
+    && printf '%s' "$askpass_stderr" | grep -q 'github:token:store'; then
+    pass "the askpass refusal names both commands that fix it"
+else
+    fail "the askpass refusal names both commands that fix it" \
+        "stderr was: $askpass_stderr"
+fi
+
+# Wiring, not just the script: an askpass nothing points at closes nothing.
+if node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('$REPO_ROOT/.devcontainer/devcontainer.json', 'utf8');
+const stripped = raw.replace(/^\s*\/\/.*$/gm, '');
+const config = JSON.parse(stripped);
+const value = (config.remoteEnv || {}).GIT_ASKPASS || '';
+process.exit(value.includes('scripts/git-askpass-refuse.sh') ? 0 : 1);
+"; then
+    pass "devcontainer.json points GIT_ASKPASS at the refusal"
+else
+    fail "devcontainer.json points GIT_ASKPASS at the refusal" \
+        "remoteEnv.GIT_ASKPASS does not name scripts/git-askpass-refuse.sh"
+fi
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 if [ "$failed" -gt 0 ]; then
     printf 'Failed: %s\n' "${failed_names[*]}"

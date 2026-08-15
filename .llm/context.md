@@ -270,9 +270,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   dialog at all. If the script exits 3, report that and ask — do not go looking for another way to
   ask the desktop.
 
-  With the cache populated nothing prompts at all. With it **empty**, git falls back to the editor's
-  own `GIT_ASKPASS` dialog, which a helper cannot suppress — so an exit 3 is a request for a human,
-  not an invitation to retry the operation until something answers.
+  With the cache populated nothing prompts at all. With it **empty**, git falls back to
+  `GIT_ASKPASS`, which no credential helper can override — so the container **is** the askpass:
+  `remoteEnv` points it at `scripts/git-askpass-refuse.sh`, which prints the fix to stderr and exits
+  non-zero. An exit 3 is therefore a request for a human, not an invitation to retry the operation
+  until something answers.
 
   When it does prompt: **hang versus immediate answer is the only discriminator**, never empty
   output. A blocked helper is a dialog nobody has answered yet, and reading its truncated empty read
