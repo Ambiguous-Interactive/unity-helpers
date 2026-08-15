@@ -199,9 +199,9 @@ npm run lint:markdown     # Structural rules
 `lint:docs` walks markdown-to-markdown links and passes a link to a `.sh`, `.ps1` or any other repo
 file — while `Validate Documentation` fails the whole run on it, because `mkdocs build --strict`
 turns "target not found among documentation files" into an error. Reference such a file in
-backticks, or link the GitHub blob URL the way `docs/project/llms-txt.md` does. The strict build is
-runnable in this devcontainer and takes about 40 seconds, which is far cheaper than finding out on a
-pull request:
+backticks, or link the GitHub blob URL the way
+[the llms.txt page](../../docs/project/llms-txt.md) does. The strict build is runnable in this
+devcontainer and takes about 40 seconds, which is far cheaper than finding out on a pull request:
 
 ```bash
 .venv/bin/mkdocs build --strict    # writes to the gitignored site/
