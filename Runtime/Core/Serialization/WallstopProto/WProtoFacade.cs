@@ -149,6 +149,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="data">The payload.</param>
         /// <param name="value">Receives the value, or <c>default</c> when unhandled.</param>
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// <typeparamref name="T"/> has a formatter and that formatter refused
+        /// <paramref name="data"/>. This is the <b>only</b> exception this method raises for a
+        /// malformed, truncated or hostile payload, and the fuzz suite asserts it: a corrupt save
+        /// file has to arrive as one catchable error rather than as whatever the byte that broke
+        /// happened to break. See <see cref="TryDeserializeAs{T}"/> for why it is not reported as
+        /// <c>false</c>.
+        /// </exception>
         public static bool TryDeserialize<T>(ReadOnlySpan<byte> data, out T value)
         {
             return TryDeserializeAs(data, typeof(T), out value);
@@ -163,6 +171,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="concrete">The type the caller named explicitly.</param>
         /// <param name="value">Receives the value, or <c>default</c> when unhandled.</param>
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// A formatter answers for this type and refused the payload. The only exception this method
+        /// raises for malformed input, asserted against every strategy in the fuzz suite.
+        /// </exception>
         /// <remarks>
         /// The read side of the entry point that lets a caller override the declared type. The
         /// concrete type is not passed on to the formatter, because it does not need it -- the
