@@ -30,9 +30,23 @@ Use this skill when:
 
 > `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate (<Object>: <Method>)`
 
-Any call we make that forces deserialization, component inspection, or user-callback invocation while we are still inside the callback can trigger this warning. The fix is to **defer the work one editor tick** via `EditorApplication.delayCall`, which lands after the import phase completes.
+Any call we make that forces deserialization, component inspection, or user-callback invocation while we are still inside the callback can trigger this warning. The first fix is to **defer the work one editor tick** via `EditorApplication.delayCall`, which lands after the import phase completes.
 
 See [#234](https://github.com/wallstop/unity-helpers/pull/234) for the motivating bug.
+
+### Deferral is necessary, not sufficient
+
+**A deferred load is still a load, and a load still runs the consumer's `OnValidate`.** Unity raises the `Awake / CheckConsistency / OnValidate` guard around _every_ `OnValidate` invocation, at any time — not only during import. So `AssetDatabase.LoadAllAssetsAtPath` inside a drain produces the identical warning one tick later, from the consumer's own code, with our frames underneath it.
+
+This is [#280](https://github.com/Ambiguous-Interactive/unity-helpers/issues/280), and it stayed open across three sessions because the code was **compliant with the rule above** — the offending call was already inside the drain, so nothing flagged it and the deferral was blamed for not working.
+
+The rule that closes it:
+
+> **Never answer a metadata question with a load.** If the decision is a `Type` predicate, a path test, or an importer setting, use `AssetDatabase.GetMainAssetTypeAtPath`, `AssetDatabase.GetMainAssetTypeOrNullAtPath` or `AssetImporter.GetAtPath`. Load an asset only when the loaded **instance data** is what you return.
+
+`HasMatchingSubAsset` was the worst case of it: it loaded every object in a file, tested `assetType.IsInstanceOfType`, and discarded all of them — a full deserialization of every imported prefab to evaluate a type test.
+
+Note the machine gate cannot see this class: `scripts/tests/test-asset-postprocessor-reachability.js` deliberately stops its call-graph walk at the deferral boundary, so everything drain-side is yours to check by reading.
 
 ---
 

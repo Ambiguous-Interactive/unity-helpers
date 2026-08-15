@@ -500,6 +500,17 @@ using (AssetChangeDetectionUtility.EnabledScope(false))
   - Use `SearchSceneObjects` if the handler is on a GameObject in a scene
   - Instance methods without these options only work for ScriptableObjects saved as assets
 
+### A Watcher Does Not Fire for a Prefab
+
+A prefab is matched by the type of its **main asset**, which Unity reports as `GameObject`. It is never
+opened to see what components it contains, and a watcher on some other type will not fire for it.
+
+That is deliberate. Opening a prefab deserializes every component in it, which runs each one's
+`OnValidate` — so your own code runs, on every prefab, on every import, and Unity logs
+`SendMessage cannot be called during Awake, CheckConsistency, or OnValidate` for any `OnValidate`
+that touches an API it relays. Use `SearchPrefabs` on the handler when you want prefab contents
+inspected; it is opt-in precisely because it carries that cost.
+
 ### MonoBehaviour Instance Methods Not Working
 
 If your instance method on a MonoBehaviour isn't being called:

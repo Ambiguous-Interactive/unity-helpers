@@ -399,10 +399,17 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (deferProcessing)
             {
-                // Defer out of the asset-import phase: AssetDatabase.LoadAllAssetsAtPath
-                // and GetComponentsInChildren (used during callback resolution) trigger
-                // Unity's internal sprite/renderer lifecycle relays, which emit
-                // "SendMessage cannot be called..." warnings while the import is active.
+                // Defer out of the asset-import phase: work done inside OnPostprocessAllAssets
+                // runs while Unity's import guard is up, and reentering the AssetDatabase there
+                // is what the deferral exists to avoid.
+                //
+                // It does NOT make loading an asset safe, and reading it that way was wrong for
+                // three sessions (#280). Unity raises "SendMessage cannot be called during Awake,
+                // CheckConsistency, or OnValidate" around every OnValidate it runs, at any time --
+                // and loading an asset deserializes it, which runs the consumer's OnValidate right
+                // there inside the drain. A load whose answer is a Type predicate belongs on asset
+                // metadata (GetMainAssetTypeAtPath, AssetImporter.GetAtPath) instead, deferred or
+                // not.
                 AssetPostprocessorDeferral.Schedule(DrainPendingChangesAction);
                 return;
             }
@@ -1087,6 +1094,23 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return false;
             }
 
+            // A prefab is never asked this question, because answering it costs the consumer a
+            // console warning on every import (#280). GetMainAssetTypeAtPath reports `GameObject`
+            // for a prefab, so a watcher on any other type falls through to here -- and
+            // LoadAllAssetsAtPath deserializes every component in the prefab, which runs each
+            // OnValidate. A consumer's OnValidate legitimately touches APIs that SendMessage, and
+            // Unity raises "SendMessage cannot be called during Awake, CheckConsistency, or
+            // OnValidate" around every one of them, at any time -- so deferring the drain does not
+            // help and never could. The load is also pure waste here: the whole decision is a Type
+            // predicate, and every loaded object is discarded.
+            //
+            // Watching prefabs by the components they contain is not supported behavior (owner
+            // decision, #280); `SearchPrefabs` on the handler is the deliberate, opt-in route for it.
+            if (IsPrefabPath(path))
+            {
+                return false;
+            }
+
             UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(path);
             if (allAssets == null || allAssets.Length <= 1)
             {
@@ -1660,6 +1684,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     assetPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase)
                     || assetPath.EndsWith(".scenetemplate", StringComparison.OrdinalIgnoreCase)
                 );
+        }
+
+        private static bool IsPrefabPath(string assetPath)
+        {
+            return assetPath != null
+                && assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

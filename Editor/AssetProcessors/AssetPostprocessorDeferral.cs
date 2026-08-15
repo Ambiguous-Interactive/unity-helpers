@@ -12,11 +12,19 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
     /// <summary>
     /// Shared deferral primitive for <see cref="AssetPostprocessor"/> callbacks.
-    /// Routes work out of Unity's asset-import phase via <c>EditorApplication.delayCall</c>
-    /// so that APIs like <c>AssetDatabase.LoadAllAssetsAtPath</c> and component queries do
-    /// not trigger Unity's "SendMessage cannot be called during Awake, CheckConsistency, or
-    /// OnValidate" warnings relayed from internal sprite/renderer lifecycle notifications.
+    /// Routes work out of Unity's asset-import phase via <c>EditorApplication.delayCall</c>, so
+    /// that reentering the <c>AssetDatabase</c> happens on an editor tick of its own rather than
+    /// while Unity is still importing.
     /// </summary>
+    /// <remarks>
+    /// <b>Deferral is necessary and not sufficient, and this summary claimed otherwise for three
+    /// sessions (#280).</b> It does not make <c>AssetDatabase.LoadAllAssetsAtPath</c> safe. Unity
+    /// raises "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate" around
+    /// every <c>OnValidate</c> it runs, at any time -- and loading an asset deserializes it, which
+    /// runs the consumer's <c>OnValidate</c> inside the drain, one tick later, exactly as it would
+    /// have inside the callback. A question that asset metadata can answer must never be answered
+    /// by a load.
+    /// </remarks>
     internal static class AssetPostprocessorDeferral
     {
         private static readonly List<Action> PendingDrains = new();
