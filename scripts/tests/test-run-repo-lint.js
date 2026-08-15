@@ -124,11 +124,22 @@ runTest("every check resolves to a real npm script or an existing file", () => {
 runTest("a failing check does not stop the ones after it", () => {
   // The whole reason the runner exists rather than an `&&` chain. Asserted on the real function,
   // with synthetic checks, so it cannot pass by coincidence of the registry currently being green.
-  const results = runChecks([
-    { id: "synthetic-pass-first", name: "synthetic pass", run: "true" },
-    { id: "synthetic-fail", name: "synthetic fail", run: "exit 3" },
-    { id: "synthetic-pass-after-failure", name: "synthetic pass after failure", run: "true" }
-  ]);
+  //
+  // Output is swallowed for the duration: the synthetic failure makes the runner emit a real
+  // `::error::` line, and GitHub turns that into an annotation on this job -- a green run that
+  // reports an error it deliberately caused. Only the return value is under test.
+  const realWrite = process.stdout.write.bind(process.stdout);
+  let results;
+  try {
+    process.stdout.write = () => true;
+    results = runChecks([
+      { id: "synthetic-pass-first", name: "synthetic pass", run: "true" },
+      { id: "synthetic-fail", name: "synthetic fail", run: "exit 3" },
+      { id: "synthetic-pass-after-failure", name: "synthetic pass after failure", run: "true" }
+    ]);
+  } finally {
+    process.stdout.write = realWrite;
+  }
 
   assert.strictEqual(results.length, 3, "every supplied check must produce a result");
   assert.strictEqual(results[0].ok, true);

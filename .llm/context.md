@@ -137,6 +137,14 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 - When adding new script calls to git hooks, update the hook's step comments AND the "What the Hook Does" list in [formatting-and-linting](./skills/formatting-and-linting.md)
 - Never run `pwsh -File .githooks/<hook>` for extensionless hook launchers. Run the hook directly through Git/shell, or invoke `.githooks/<hook>.ps1` when debugging the PowerShell implementation.
 - Never redirect git command output to files in the working tree (e.g. `git push 2> pre-push.txt`) — creates gitignored pollution. Let errors stream to stderr; pre-push and `npm run agent:preflight:fix` auto-remove gitignored hook artifacts before validation
+- **A new `.sh` needs `git update-index --chmod=+x <path>` after staging.** `.git` is bind-mounted
+  from the host (`devcontainer.json` `mounts`), so `.git/config` carries Git-for-Windows'
+  `filemode = false` and `chmod +x` in the container never reaches the index — the file stays
+  `100644` there while the filesystem shows `755`. Do NOT "fix" this by setting `core.fileMode true`:
+  the host shares that config and would then see every file as modified. `test:shell-portability`
+  catches the mismatch, but only for **tracked** files, so stage first and validate second (the
+  order [validate-before-commit](./skills/validate-before-commit.md) already prescribes) or the
+  check passes locally and fails in CI
 
 ---
 
