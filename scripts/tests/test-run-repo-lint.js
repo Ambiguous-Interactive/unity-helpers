@@ -98,6 +98,67 @@ function registryLeafCommands() {
   });
 }
 
+/**
+ * A file's text with comments and bare YAML list entries removed.
+ *
+ * Both removals are load-bearing. `llm-instructions-lint.yml` names
+ * `scripts/lint-llm-instructions.ps1` twice in `paths:` filters before it ever runs it, so a plain
+ * substring search cannot tell "this workflow re-runs when the linter changes" from "this workflow
+ * runs the linter" -- and the first is true of workflows that do not run it at all.
+ *
+ * @param {string} relativePath Repo-relative file.
+ * @returns {string} Text with comments and path-filter entries dropped.
+ */
+function invocationText(relativePath) {
+  const full = path.join(repoRoot, relativePath);
+  if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+    return "";
+  }
+  return fs
+    .readFileSync(full, "utf8")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*#/.test(line))
+    .filter((line) => !/^\s*-\s*["']?!?[^:\s"']+["']?\s*$/.test(line))
+    .join("\n");
+}
+
+/**
+ * @param {string} containerRelativePath The file that might run it.
+ * @param {string} file Repo-relative script path.
+ * @returns {boolean} True when the container invokes it, directly or via an npm script.
+ */
+function fileInvokes(containerRelativePath, file) {
+  const text = invocationText(containerRelativePath);
+  if (!text) {
+    return false;
+  }
+  if (text.includes(file)) {
+    return true;
+  }
+  for (const match of text.matchAll(/npm run ([\w:.-]+)/g)) {
+    if (scriptPathsIn(expandNpmScript(match[1])).has(file)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {string} dir Repo-relative directory to scan, one level deep.
+ * @param {string} file Repo-relative script path.
+ * @returns {string[]} The files in `dir` that invoke it.
+ */
+function filesInvoking(dir, file) {
+  const full = path.join(repoRoot, dir);
+  if (!fs.existsSync(full)) {
+    return [];
+  }
+  return fs
+    .readdirSync(full)
+    .map((name) => `${dir}/${name}`)
+    .filter((candidate) => fileInvokes(candidate, file));
+}
+
 console.log("Testing scripts/run-repo-lint.js...\n");
 
 runTest("every check has a unique, non-empty id and name", () => {
@@ -351,16 +412,31 @@ runTest("--list prints every registered id", () => {
 });
 
 runTest("no linter in scripts/ has been left unreachable", () => {
-  // Linters that legitimately do not belong in Repo Lint, each with the thing that does run it.
-  // An entry here is a claim that must stay true; anything else new in scripts/ has to be wired up.
+  // Linters that legitimately do not belong in Repo Lint. The value is the KIND of owner that runs
+  // it, and every kind is a PREDICATE evaluated below.
+  //
+  // It used to be free text naming a workflow, and nothing ever read it (#445). Three of the seven
+  // claims were false when that was checked: one named a workflow that runs CSharpier directly and
+  // never touches the linter, one named pre-push for a script only an npm aggregate runs, and two
+  // said "git hooks" when the hook that runs them is the pre-commit FRAMEWORK's config rather than
+  // anything in .githooks/. An allowlist whose entries are prose excuses whatever is put in it --
+  // the quiet half of #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
-    ["scripts/lint-llm-instructions.ps1", ".github/workflows/llm-instructions-lint.yml (cross-OS)"],
-    ["scripts/lint-skill-sizes.ps1", ".github/workflows/llm-instructions-lint.yml (cross-OS)"],
-    ["scripts/lint-unity-test-modules.ps1", ".github/workflows/unity-tests.yml"],
-    ["scripts/lint-csharp-format.ps1", ".github/workflows/csharpier-autofix.yml gates C# format"],
-    ["scripts/lint-staged-links.ps1", "git hooks: staged files only, nothing to check in CI"],
-    ["scripts/lint-staged-markdown.ps1", "git hooks: staged files only, nothing to check in CI"],
-    ["scripts/validate-git-push-config.ps1", "pre-push: inspects local git config, not the tree"]
+    ["scripts/lint-llm-instructions.ps1", "workflow"],
+    ["scripts/lint-skill-sizes.ps1", "workflow"],
+    ["scripts/lint-unity-test-modules.ps1", "workflow"],
+    ["scripts/lint-csharp-format.ps1", "preflight"],
+    ["scripts/lint-staged-links.ps1", "precommit-config"],
+    ["scripts/lint-staged-markdown.ps1", "precommit-config"],
+    ["scripts/validate-git-push-config.ps1", "prepush"]
+  ]);
+
+  const owners = new Map([
+    ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
+    ["hook", (file) => filesInvoking(".githooks", file).length > 0],
+    ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
+    ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)],
+    ["precommit-config", (file) => fileInvokes(".pre-commit-config.yaml", file)]
   ]);
 
   const reachable = new Set([
@@ -381,7 +457,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     orphans,
     [],
     `these linters exist but nothing runs them -- add them to CHECKS in scripts/run-repo-lint.js, ` +
-      `or to runElsewhere here with the workflow that does: ${orphans.join(", ")}`
+      `or to runElsewhere here with the kind of owner that does: ${orphans.join(", ")}`
   );
 
   // The allowlist must not outlive the files it names, or it silently excuses nothing.
@@ -392,6 +468,20 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     stale,
     [],
     `allowlist names files that no longer exist: ${stale.join(", ")}`
+  );
+
+  // And every excuse must be true. This is the assertion the free-text version could not make.
+  const unfounded = [...runElsewhere.entries()]
+    .filter(([file, kind]) => {
+      const owner = owners.get(kind);
+      return !owner || !owner(file);
+    })
+    .map(([file, kind]) => `${file} (claimed: ${kind})`);
+  assert.deepStrictEqual(
+    unfounded,
+    [],
+    `these linters are excused from Repo Lint by an owner that does not run them -- either wire ` +
+      `them up, correct the kind, or delete the linter: ${unfounded.join(", ")}`
   );
 });
 

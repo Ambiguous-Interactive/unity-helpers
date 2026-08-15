@@ -81,6 +81,36 @@ function Test-RunnerBootstrapPassesMaintenanceForce {
     return $maintenanceArgsHasForceKey -or $maintenanceArgsDirectForceAssignment
 }
 
+function Test-WatchdogCadenceFitsRecoveryWindow {
+    <#
+    .SYNOPSIS
+        Asserts the watchdog is delivered often enough to still repair what it repairs.
+    .DESCRIPTION
+        The #342 recovery -- a run GitHub reported cancelled with every step green -- is only
+        available inside MAX_RERUN_AGE_SECONDS of the run finishing. The cron is a REQUEST, not a
+        cadence: measured over 300 runs (#448), GitHub delivered 65.5 of 288 requested triggers a
+        day, a median gap of 21.3 minutes against a five-minute cron. So the interval that matters
+        is the requested one multiplied by the throttle factor, and comparing the cron alone to the
+        window would pass a schedule whose real gaps swallow it.
+
+        Fails closed on a schedule this cannot read, because an unparsed cron is an unchecked one.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][int]$ThrottleFactor
+    )
+
+    $cronMatch = [regex]::Match($Content, '(?m)^\s*-\s*cron:\s*"\*/(?<minutes>\d+) \* \* \* \*"\s*$')
+    $windowMatch = [regex]::Match($Content, '(?m)^\s*MAX_RERUN_AGE_SECONDS:\s*"(?<seconds>\d+)"\s*$')
+    if (-not $cronMatch.Success -or -not $windowMatch.Success) {
+        return $false
+    }
+
+    $requestedSeconds = [int]$cronMatch.Groups['minutes'].Value * 60
+    $windowSeconds = [int]$windowMatch.Groups['seconds'].Value
+    return ($requestedSeconds * $ThrottleFactor) -lt $windowSeconds
+}
+
 function Get-BuildLockActionPins {
     param(
         [Parameter(Mandatory = $true)][string]$GitHubRoot,
@@ -3146,7 +3176,18 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
                 $watchdogContent.Contains('(.run_attempt // 1) <= $maxAttempt') -and
                 $watchdogContent.Contains('rerun-${run_id}.json')
             )
-            Message = 'Automatic re-runs must be bounded twice: by run_attempt (a re-run that lands in the same cancelled state escalates to a human instead of looping every five minutes) and by a per-run daily cap in its own state file. The cap file must be distinct from the cancel state file, whose reader falls back to a .reruns key and would otherwise consume the cancel budget.'
+            Message = 'Automatic re-runs must be bounded twice: by run_attempt (a re-run that lands in the same cancelled state escalates to a human instead of looping on every delivered tick) and by a per-run daily cap in its own state file. The cap file must be distinct from the cancel state file, whose reader falls back to a .reruns key and would otherwise consume the cancel budget.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            # Measured over 300 runs (#448): 288 cron requests a day produce 65.5
+            # delivered runs, a median gap of 21.3 min and a maximum of 58.5. So the
+            # requested interval understates the real one by roughly four times, and a
+            # cadence chosen against the cron alone would silently exceed the only
+            # window in which an all-green cancelled run (#342) can still be recovered.
+            Name = 'watchdog cadence leaves room inside the re-run recovery window'
+            Ok = (Test-WatchdogCadenceFitsRecoveryWindow -Content $watchdogContent -ThrottleFactor 4)
+            Message = 'The watchdog schedule must satisfy (cron interval x 4) < MAX_RERUN_AGE_SECONDS. GitHub delivers roughly one run per four requested ticks, so a cron of 15 minutes is already an hour of real latency -- and at an hour a run cancelled with every step green ages out of the recovery window between two ticks, which is the one failure this workflow exists to repair automatically. Express the schedule as "*/N * * * *" so this contract can read it.'
             File = '.github/workflows/stuck-job-watchdog.yml'
         }
     )

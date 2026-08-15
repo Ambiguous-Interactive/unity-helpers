@@ -12,9 +12,12 @@ name: Stuck Job Watchdog
 #   * The workflow run is `status: queued` AND its CURRENT ATTEMPT (`run_started_at`,
 #     which resets on re-run, falling back to `created_at`) is older than
 #     MIN_QUEUE_AGE_SECONDS
-#     (default 300s / 5 min; round-2 false-positive guards below -- zero
+#     (default 300s; round-2 false-positive guards below -- zero
 #     in-progress jobs, self-run exclusion, excluded-workflow list -- make
 #     the previous conservative 600s buffer unnecessary).
+#     300s is a floor on how long a run must have been WAITING to be a
+#     candidate. It is not the detection latency, which is set by how often
+#     GitHub actually delivers this schedule -- see the note on `on: schedule`.
 #   * No job in the run is `status: in_progress` - a run with even one
 #     in-progress job is by definition holding/using a runner, not
 #     dispatcher-stuck. This is what prevents false positives for matrix cells
@@ -52,7 +55,8 @@ name: Stuck Job Watchdog
 #   * The run is completed with `conclusion: cancelled`, and finished within
 #     MAX_RERUN_AGE_SECONDS.
 #   * Its `run_attempt` is at most MAX_RERUN_ATTEMPT, so a re-run that lands in
-#     the same state is escalated to a human instead of looping every 5 min.
+#     the same state is escalated to a human instead of looping on every
+#     delivered tick.
 #   * At least one of its jobs has `conclusion: cancelled` with a non-empty
 #     step list whose every step is `conclusion: success`. A deliberate cancel
 #     never matches: its in-flight step is itself cancelled, not successful.
@@ -71,6 +75,28 @@ name: Stuck Job Watchdog
 # newer schedules must not cancel an in-flight audit after it has cancelled a
 # stuck run but before it persists the state-branch counter.
 
+# WHAT THIS SCHEDULE ACTUALLY DELIVERS, measured over 300 runs (2026-08-11 to
+# 08-15, #448). GitHub drops most scheduled triggers on a busy shard, so the
+# cron below is a REQUEST rather than a cadence, and every latency budget
+# written in terms of it is 3-4x optimistic:
+#
+#   Cron requests            288/day
+#   Runs actually delivered  65.5/day (23%)
+#   Median gap               21.3 min (p25 14.6, p75 26.1, p90 34.0, max 58.5)
+#   Job duration             p50 13 s, p95 49 s
+#   Cost                     $0.00 -- the repository is public
+#
+# Two consequences worth keeping. Making this cheaper is not available: billing
+# rounds every job up to a whole minute and the job takes thirteen seconds, so
+# deleting a step saves exactly nothing. And making it slower buys nothing
+# either, because delivery is already throttled below the request rate.
+#
+# DO NOT raise the interval towards MAX_RERUN_AGE_SECONDS. A run cancelled with
+# every step green (#342) is only recoverable inside that window, and the gap
+# GitHub delivers is several times the gap requested -- so a cron of 15 minutes
+# is already an hour of real latency, which is the whole window. The contract in
+# scripts/tests/test-unity-workflow-matrix-contract.ps1 pins that relationship
+# against the measured throttle factor rather than leaving it to this comment.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -124,6 +150,9 @@ jobs:
           MAX_RERUNS_PER_DAY: "1"
           MAX_RERUN_AGE_SECONDS: "3600"
           MAX_RERUN_ATTEMPT: "1"
+          # How long a run must have been QUEUED to be a candidate, not how
+          # quickly one is noticed: this workflow is delivered every ~21 min
+          # (see the note on `on: schedule`), so anything under that is free.
           MIN_QUEUE_AGE_SECONDS: "300"
           DEFAULT_EXCLUDED_WORKFLOWS: "release.yml"
           EXTRA_EXCLUDED_WORKFLOWS: ${{ vars.WATCHDOG_EXCLUDED_WORKFLOWS }}
