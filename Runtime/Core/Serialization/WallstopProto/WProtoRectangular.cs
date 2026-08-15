@@ -121,7 +121,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// divides the product, so each is at most the delivered count and
         /// <see cref="SerializationCapacityLimits.TryAccept"/> raises its ceiling to exactly that.
         /// This check is therefore <b>unreachable for any array that carries data</b>, and applies
-        /// only to the empty shapes whose axes nothing pays for.
+        /// only to the empty shapes whose axes nothing pays for. That holds however low
+        /// <see cref="SerializationCapacityLimits.MaximumRestoredCapacity"/> is set, because the
+        /// delivered count is the floor rather than the cap.
+        /// </para>
+        /// <para>
+        /// The consequence, stated rather than hidden: an <b>empty</b> array whose other axis
+        /// exceeds <see cref="SerializationCapacityLimits.MaximumRestoredCapacity"/> -- a
+        /// <c>new int[2000000, 0]</c> at the default of 1,048,576 -- no longer round-trips, and a
+        /// game that genuinely persists one raises that limit, which is a decision its own code
+        /// makes rather than one a payload makes.
         /// </para>
         /// </remarks>
         public static bool TryAcceptShape(
