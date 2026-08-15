@@ -27,8 +27,8 @@
   <a href="https://www.npmjs.com/package/com.wallstop-studios.unity-helpers"><img alt="npm version" src="https://img.shields.io/npm/v/com.wallstop-studios.unity-helpers" /></a>
   <a href="https://github.com/wallstop/unity-helpers/releases"><img alt="GitHub release version" src="https://img.shields.io/github/v/release/wallstop/unity-helpers" /></a><br/>
   <a href="https://github.com/wallstop/unity-helpers/actions/workflows/csharpier-autofix.yml"><img alt="CSharpier" src="https://github.com/wallstop/unity-helpers/actions/workflows/csharpier-autofix.yml/badge.svg" /></a>
-  <a href="https://github.com/wallstop/unity-helpers/actions/workflows/markdown-json.yml"><img alt="Markdown &amp; JSON Lint/Format" src="https://github.com/wallstop/unity-helpers/actions/workflows/markdown-json.yml/badge.svg" /></a>
-  <a href="https://github.com/wallstop/unity-helpers/actions/workflows/lint-doc-links.yml"><img alt="Lint Docs Links" src="https://github.com/wallstop/unity-helpers/actions/workflows/lint-doc-links.yml/badge.svg" /></a><br/>
+  <a href="https://github.com/wallstop/unity-helpers/actions/workflows/repo-lint.yml"><img alt="Repo Lint" src="https://github.com/wallstop/unity-helpers/actions/workflows/repo-lint.yml/badge.svg" /></a>
+  <a href="https://github.com/wallstop/unity-helpers/actions/workflows/lint-doc-links.yml"><img alt="External Link Rot Sweep" src="https://github.com/wallstop/unity-helpers/actions/workflows/lint-doc-links.yml/badge.svg" /></a><br/>
   <a href="https://www.npmjs.com/package/com.wallstop-studios.unity-helpers"><img alt="npm downloads" src="https://img.shields.io/npm/dw/com.wallstop-studios.unity-helpers" /></a>
   <a href="https://github.com/wallstop/unity-helpers/releases"><img alt="GitHub downloads" src="https://img.shields.io/github/downloads/wallstop/unity-helpers/total" /></a>
 </p>

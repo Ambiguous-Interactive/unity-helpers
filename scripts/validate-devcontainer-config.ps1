@@ -24,7 +24,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $devcontainerPath = Join-Path $repoRoot '.devcontainer' 'devcontainer.json'
 $preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit'
 $publishWorkflowPath = Join-Path $repoRoot '.github' 'workflows' 'build-publish-devcontainer.yml'
-$validateWorkflowPath = Join-Path $repoRoot '.github' 'workflows' 'validate-devcontainer.yml'
+$workflowDir = Join-Path $repoRoot '.github' 'workflows'
 
 # ── Validate files exist ────────────────────────────────────────────────────
 
@@ -43,8 +43,8 @@ if (-not (Test-Path $publishWorkflowPath)) {
     exit 1
 }
 
-if (-not (Test-Path $validateWorkflowPath)) {
-    Write-Error "Devcontainer validation workflow not found at: $validateWorkflowPath"
+if (-not (Test-Path $workflowDir)) {
+    Write-Error "Workflow directory not found at: $workflowDir"
     exit 1
 }
 
@@ -52,7 +52,6 @@ if (-not (Test-Path $validateWorkflowPath)) {
 
 $devcontainerContent = Get-Content $devcontainerPath -Raw
 $publishWorkflowContent = Get-Content $publishWorkflowPath -Raw
-$validateWorkflowContent = Get-Content $validateWorkflowPath -Raw
 
 $expectedImageName = 'ambiguous-interactive/unity-helpers/devcontainer'
 $expectedImageReference = "ghcr.io/$expectedImageName"
@@ -96,9 +95,35 @@ if (-not $publishWorkflowRunsConfigValidation) {
     exit 1
 }
 
-$validateWorkflowWatchesPublishWorkflow = $validateWorkflowContent.Contains('.github/workflows/build-publish-devcontainer.yml')
-if (-not $validateWorkflowWatchesPublishWorkflow) {
-    Write-Error "validate-devcontainer.yml must run when build-publish-devcontainer.yml changes."
+# A devcontainer change that lands without this validator running is the failure being prevented,
+# so SOME workflow must run it on a change to the publish workflow. Which one is not the contract:
+# this check used to name validate-devcontainer.yml, and consolidating that workflow into
+# repo-lint.yml broke the assertion without changing anything it was protecting.
+#
+# A workflow qualifies if it invokes the validator -- directly, or through the repo-lint runner
+# whose registry carries it -- and is not path-filtered away from the publish workflow. An
+# unfiltered workflow runs on every change, which covers the publish workflow by definition.
+$devcontainerValidationIsWired = $false
+foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.yml' -File | Sort-Object Name)) {
+    if ($workflowFile.FullName -eq $publishWorkflowPath) {
+        continue
+    }
+    [string]$workflowContent = Get-Content -LiteralPath $workflowFile.FullName -Raw
+    $runsValidator = (
+        $workflowContent.Contains('validate-devcontainer-config.ps1') -or
+        $workflowContent.Contains('run-repo-lint.js')
+    )
+    if (-not $runsValidator) {
+        continue
+    }
+    $isUnfiltered = $workflowContent -notmatch '(?m)^\s+paths:\s*$'
+    if ($isUnfiltered -or $workflowContent.Contains('.github/workflows/build-publish-devcontainer.yml')) {
+        $devcontainerValidationIsWired = $true
+        break
+    }
+}
+if (-not $devcontainerValidationIsWired) {
+    Write-Error "A workflow must run validate-devcontainer-config.ps1 (directly or via scripts/run-repo-lint.js) on changes to build-publish-devcontainer.yml."
     exit 1
 }
 

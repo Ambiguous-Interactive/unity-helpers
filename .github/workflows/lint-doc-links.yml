@@ -3,19 +3,17 @@ name: Lint Docs Links
 # Link checking is split by reliability, NOT by file:
 #   * INTERNAL / relative links (do the linked files and anchors exist?) are
 #     deterministic and entirely within this repo's control, so they gate every
-#     PR via the PowerShell linters below.
+#     PR -- as the `doc-links`, `doc-links-targets` and `doc-links-format`
+#     checks in scripts/run-repo-lint.js, which is where that job moved.
 #   * EXTERNAL links (third-party sites, GitHub issue/PR pages) fail for reasons
 #     OUTSIDE a contributor's control -- rate limits (HTTP 429), org/repo
 #     transfers, and ordinary link rot. Gating PRs on them punishes contributors
 #     for the internet's flakiness and grows an endless manual exclude list, so
 #     the lychee external sweep runs on a SCHEDULE instead. A failing scheduled
 #     run notifies the maintainers about rot without ever blocking a PR.
+#
+# Only the scheduled half lives here now, so this workflow costs a PR nothing.
 on:
-  push:
-    branches:
-      - main
-  # Run on every PR: doc-link rot can be introduced by changes to any file type.
-  pull_request:
   schedule:
     # Weekly external-link rot sweep (Mondays 12:00 UTC). Offset from the Unity
     # Tests cron so the two do not contend for scheduler capacity.
@@ -30,38 +28,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ── INTERNAL links + linter self-tests: gates every PR ──────────────────────
-  internal-links:
-    name: Internal doc links
-    # Skip on the scheduled trigger; the external sweep is the only thing the
-    # cron needs to run.
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Test comment stripping
-        shell: pwsh
-        run: ./scripts/tests/test-comment-stripping.ps1 -VerboseOutput
-
-      - name: Test doc-link linter
-        shell: pwsh
-        run: ./scripts/tests/test-lint-doc-links.ps1 -VerboseOutput
-
-      - name: Test deprecated external link rules
-        shell: pwsh
-        run: ./scripts/tests/test-deprecated-external-links.ps1 -VerboseOutput
-
-      - name: Run Markdown link linter
-        shell: pwsh
-        run: ./scripts/lint-doc-links.ps1 -VerboseOutput
-
-  # ── EXTERNAL links: scheduled rot sweep, never blocks a PR ──────────────────
   external-links:
     name: External link rot sweep (scheduled)
-    # Run only on the weekly cron or an explicit manual dispatch -- never on a PR.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

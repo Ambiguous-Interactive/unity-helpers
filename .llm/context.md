@@ -149,6 +149,9 @@ dotnet tool restore                                     # Restore .NET tools (CS
 
 # Formatting & Linting
 npm run agent:preflight:fix                            # Fast changed-file preflight with safe auto-fixes
+npm run lint:repo                                       # Every check the Repo Lint workflow runs
+npm run lint:repo -- --list                             # List the check ids
+npm run lint:repo -- --only doc-links,spelling          # Re-run just the checks that failed
 dotnet tool run csharpier format .                      # Format C#
 npm run lint:spelling                                   # Spell check
 npm run lint:docs                                       # Lint documentation links

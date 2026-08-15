@@ -1,0 +1,106 @@
+name: Repo Lint
+
+# Every fast lint and contract check in one job.
+#
+# This replaces 24 single-purpose workflows. Each of them booted its own runner and did its own
+# checkout to run a script that finished in seconds: measured on `main` at e94d04d5, ~810 s of
+# billable runner time for well under two minutes of work, and five separate workflows each ran
+# scripts/tests/test-comment-stripping.ps1. One boot, one checkout, one `npm install` now serve all
+# of it.
+#
+# The registry lives in scripts/run-repo-lint.js so it is data rather than YAML: the runner keeps
+# going after a failure and reports every failing check at once, and
+# scripts/tests/test-run-repo-lint.js asserts no linter in scripts/ has been left unreachable.
+#
+# Deliberately NOT folded in:
+#   * LLM Instructions Lint runs the skills-index generator on Windows as well, to catch a
+#     Windows-only BOM or sort order. An Ubuntu-only job cannot do that.
+#   * The MkDocs strict build needs Python, and the lychee external-link sweep is cron-only and
+#     network-dependent, so neither belongs on the per-push path.
+#   * Local Gates already runs `validate:tests`, so the twelve self-tests the retired workflows
+#     duplicated from it are not repeated here.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  repo-lint:
+    name: Repo Lint
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: scripts/audit-license-years.sh compares committed years against the dates the
+      # files were actually touched, and a depth-1 checkout makes every file look new.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      # package-lock.json is GITIGNORED here, so `cache: npm` on its own fails the job outright with
+      # "Dependencies lock file is not found". Same split as local-gates.yml, for the same reason.
+      - name: Setup Node.js (cached)
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Node.js (no cache)
+        if: ${{ hashFiles('package-lock.json') == '' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i --no-audit --no-fund
+          fi
+
+      # The three check groups each record an outcome instead of ending the job, so one failure
+      # never hides the other two. The gate at the end is what actually reds the run.
+      - name: actionlint
+        id: actionlint
+        continue-on-error: true
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
+
+      - name: yamllint
+        id: yamllint
+        continue-on-error: true
+        uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
+        with:
+          config_file: .yamllint.yaml
+
+      - name: Repository checks
+        id: checks
+        continue-on-error: true
+        run: node scripts/run-repo-lint.js
+
+      - name: Gate
+        if: always()
+        env:
+          ACTIONLINT: ${{ steps.actionlint.outcome }}
+          YAMLLINT: ${{ steps.yamllint.outcome }}
+          CHECKS: ${{ steps.checks.outcome }}
+        run: |
+          failed=""
+          [ "$ACTIONLINT" = "failure" ] && failed="$failed actionlint"
+          [ "$YAMLLINT" = "failure" ] && failed="$failed yamllint"
+          [ "$CHECKS" = "failure" ] && failed="$failed repository-checks"
+          if [ -n "$failed" ]; then
+            echo "::error::Repo Lint failed:$failed"
+            exit 1
+          fi
+          echo "Repo Lint passed."

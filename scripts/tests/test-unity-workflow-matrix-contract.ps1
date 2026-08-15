@@ -3409,22 +3409,37 @@ if ($sharedDiagnosticEvidenceFailures.Count -gt 0) {
 # ref is a `with:` input, which Dependabot never bumps, so a literal SHA there survives a bump and
 # quietly makes the parity test validate the version we stopped using -- a silent pass, not a red
 # check. Both the workflow and scripts/tests/test-portable-cleanup-classifier.js must derive it.
-$policyCheckoutWorkflowPath = Join-Path $repoRoot '.github/workflows/pwsh-invocations-lint.yml'
-if (-not (Test-Path -LiteralPath $policyCheckoutWorkflowPath)) {
-    Write-Host "::error::PowerShell invocations lint workflow not found: $policyCheckoutWorkflowPath"
-    exit 1
-}
-$policyCheckoutWorkflowContent = Get-Content -LiteralPath $policyCheckoutWorkflowPath -Raw
-$policyPinIsDerived = (
-    $policyCheckoutWorkflowContent -match '(?m)^\s+run:\s*\|\s*$[\s\S]*?node scripts/resolve-build-lock-pin\.js require-confirmed-unity-cleanup' -and
-    $policyCheckoutWorkflowContent -match '(?m)^\s+ref:\s+\$\{\{ steps\.policy_pin\.outputs\.sha \}\}\s*$' -and
-    $policyCheckoutWorkflowContent -notmatch '(?m)^\s+ref:\s+[0-9a-f]{40}\s*$'
+#
+# The workflow that owns the checkout is FOUND, not named. Naming it is the same defect this file
+# exists to prevent one level up: the checkout used to live in pwsh-invocations-lint.yml, that
+# workflow was consolidated away, and a hard-coded path would have failed on the filename rather
+# than on the thing being asserted.
+$policyCheckoutWorkflows = @(
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot '.github/workflows') -Filter '*.yml' -File |
+        Sort-Object Name |
+        Where-Object {
+            (Get-Content -LiteralPath $_.FullName -Raw) -match
+                '(?m)^\s+repository:\s+Ambiguous-Interactive/ambiguous-organization-build-lock\s*$'
+        }
 )
-if (-not $policyPinIsDerived) {
-    Write-Host "::error file=.github/workflows/pwsh-invocations-lint.yml::The central cleanup policy checkout must take its ref from scripts/resolve-build-lock-pin.js via steps.policy_pin.outputs.sha, never a literal commit SHA."
+if ($policyCheckoutWorkflows.Count -eq 0) {
+    Write-Host '::error::No workflow checks out the central cleanup policy, so the parity gate cannot run anywhere.'
     $failed = $true
-} elseif ($VerboseOutput) {
-    Write-Info 'Checked the central cleanup policy checkout derives its commit from the workflow pins.'
+}
+foreach ($policyCheckoutWorkflow in $policyCheckoutWorkflows) {
+    $relativePolicyPath = ".github/workflows/$($policyCheckoutWorkflow.Name)"
+    $policyCheckoutWorkflowContent = Get-Content -LiteralPath $policyCheckoutWorkflow.FullName -Raw
+    $policyPinIsDerived = (
+        $policyCheckoutWorkflowContent -match '(?m)^\s+run:\s*\|\s*$[\s\S]*?node scripts/resolve-build-lock-pin\.js require-confirmed-unity-cleanup' -and
+        $policyCheckoutWorkflowContent -match '(?m)^\s+ref:\s+\$\{\{ steps\.policy_pin\.outputs\.sha \}\}\s*$' -and
+        $policyCheckoutWorkflowContent -notmatch '(?m)^\s+ref:\s+[0-9a-f]{40}\s*$'
+    )
+    if (-not $policyPinIsDerived) {
+        Write-Host "::error file=$relativePolicyPath::The central cleanup policy checkout must take its ref from scripts/resolve-build-lock-pin.js via steps.policy_pin.outputs.sha, never a literal commit SHA."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked $relativePolicyPath derives its central cleanup policy commit from the workflow pins."
+    }
 }
 
 $classifierParityTestPath = Join-Path $repoRoot 'scripts/tests/test-portable-cleanup-classifier.js'

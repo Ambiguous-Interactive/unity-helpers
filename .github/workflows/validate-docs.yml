@@ -1,5 +1,12 @@
 name: Validate Documentation
 
+# Only the strict MkDocs build remains here: it is the one documentation check that needs a Python
+# toolchain, so it cannot ride along in Repo Lint without adding pip to every push.
+#
+# The other five jobs this workflow used to run -- internal link targets, link format, GitHub Pages
+# CSS, code fence syntax and gitignore-docs safety -- are checks in scripts/run-repo-lint.js now.
+# They were five more runner boots for scripts that finish in seconds.
+
 on:
   push:
     branches:
@@ -9,15 +16,6 @@ on:
       - "*.md"
       - "mkdocs.yml"
       - "requirements-docs.txt"
-      - ".gitignore"
-      - "scripts/comment-stripping.ps1"
-      - "scripts/lint-doc-links.ps1"
-      - "scripts/run-doc-link-lint.js"
-      - "scripts/tests/test-lint-doc-links.ps1"
-      - "scripts/lint-gitignore-docs.ps1"
-      - "scripts/tests/test-gitignore-docs.ps1"
-      - "scripts/validate-github-pages-css.sh"
-      - "scripts/check-code-fence-syntax.sh"
       - ".github/workflows/validate-docs.yml"
   pull_request:
     paths:
@@ -25,15 +23,6 @@ on:
       - "*.md"
       - "mkdocs.yml"
       - "requirements-docs.txt"
-      - ".gitignore"
-      - "scripts/comment-stripping.ps1"
-      - "scripts/lint-doc-links.ps1"
-      - "scripts/run-doc-link-lint.js"
-      - "scripts/tests/test-lint-doc-links.ps1"
-      - "scripts/lint-gitignore-docs.ps1"
-      - "scripts/tests/test-gitignore-docs.ps1"
-      - "scripts/validate-github-pages-css.sh"
-      - "scripts/check-code-fence-syntax.sh"
       - ".github/workflows/validate-docs.yml"
   workflow_dispatch:
 
@@ -45,30 +34,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  validate-links:
-    name: Validate Internal Links
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Check internal markdown links exist
-        shell: pwsh
-        run: ./scripts/lint-doc-links.ps1 -Mode Targets -VerboseOutput
-
-  validate-link-format:
-    name: Validate Link Format
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Check markdown link format
-        shell: pwsh
-        run: ./scripts/lint-doc-links.ps1 -Mode Format -VerboseOutput
-
   build-mkdocs-test:
     name: Build MkDocs Site
     runs-on: ubuntu-latest
@@ -101,68 +66,3 @@ jobs:
             echo "MkDocs build did not produce site directory"
             exit 1
           fi
-
-  validate-css-layout:
-    name: Validate CSS Layout
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Validate GitHub Pages CSS
-        run: bash scripts/validate-github-pages-css.sh
-
-  code-fence-syntax:
-    name: Code Fence Syntax
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Check code fence syntax
-        id: check-fences
-        shell: bash
-        run: |
-          if bash scripts/check-code-fence-syntax.sh 2>&1 | tee /tmp/fence-output.txt; then
-            echo "status=success" >> "$GITHUB_OUTPUT"
-          else
-            echo "status=failure" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Report to GitHub Step Summary
-        if: always()
-        run: |
-          {
-            echo "## Code Fence Syntax Check"
-            echo ""
-            if [ "${{ steps.check-fences.outputs.status }}" = "success" ]; then
-              echo ":white_check_mark: **All code fences have valid syntax**"
-            else
-              echo ":x: **Code fence syntax issues found**"
-              echo ""
-              echo "MkDocs/GitHub Pages does not support comma-separated attributes in code fences."
-              echo ""
-              echo "\`\`\`"
-              cat /tmp/fence-output.txt
-              echo "\`\`\`"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Fail if issues found
-        if: steps.check-fences.outputs.status == 'failure'
-        run: exit 1
-
-  gitignore-docs-safety:
-    name: Gitignore Docs Safety
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Test gitignore docs linter
-        shell: pwsh
-        run: ./scripts/tests/test-gitignore-docs.ps1 -VerboseOutput
-
-      - name: Validate no docs files are gitignored
-        shell: pwsh
-        run: ./scripts/lint-gitignore-docs.ps1 -VerboseOutput
