@@ -49,13 +49,30 @@ host_from_url() {
     printf '%s' "$remainder"
 }
 
-# github.com and its siblings (gist., www., raw.) share one credential; anything else is not ours.
+# The URLs this cache is registered for. normalize-container-git-config.sh reads them from here
+# rather than keeping its own copy, because a URL one file claims and the other declines is a
+# LOCKOUT rather than a gap: claiming a URL RESETS the inherited helper for it, so nothing is left
+# to answer. That is what happened to raw.githubusercontent.com when the two lists were separate.
+github_credential_urls() {
+    cat <<'EOF'
+https://github.com
+http://github.com
+https://www.github.com
+https://gist.github.com
+https://raw.githubusercontent.com
+https://codeload.github.com
+EOF
+}
+
+# github.com and githubusercontent.com, with their subdomains, share one credential; anything else
+# is not ours. Kept a superset of the URLs above, and a test asserts that it is.
 is_github_host() {
     local candidate
     candidate="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
     candidate="${candidate%%:*}"
     case "$candidate" in
         github.com | *.github.com) return 0 ;;
+        githubusercontent.com | *.githubusercontent.com) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -67,6 +84,7 @@ Usage: scripts/github-token.sh [command]
   (no command)     Print the cached token on stdout. Exit 3 when there is none.
   --check          Exit 0 when a token is available, 1 when not. Prints nothing.
   --path           Print the cache file path.
+  --hosts          Print the URLs this cache is registered for, one per line.
   --store-stdin    Read a token from stdin and cache it. The prompt-free way to
                    supply a personal access token.
   --bootstrap      Ask the Dev Containers credential helper ONCE and cache the
@@ -138,6 +156,11 @@ case "$command" in
         ;;
     --path)
         printf '%s\n' "$CACHE_FILE"
+        exit 0
+        ;;
+    --hosts)
+        # The single source of truth for which URLs resolve through this cache.
+        github_credential_urls
         exit 0
         ;;
     --check)

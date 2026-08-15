@@ -175,6 +175,39 @@ else
     fail "credential-helper 'get' serves github.com subdomains" "gist.github.com was declined"
 fi
 
+# The drift that a reviewer caught rather than a test: raw.githubusercontent.com was REGISTERED by
+# the normalizer and DECLINED here, and a registered URL whose helper declines is worse than one
+# that was never registered -- the registration resets the inherited helper, so nothing is left to
+# answer it. Every URL the helper claims must therefore be one it serves.
+unserved=''
+while IFS= read -r registered_url; do
+    [ -n "$registered_url" ] || continue
+    registered_host="${registered_url#*://}"
+    registered_host="${registered_host%%/*}"
+    if ! printf 'protocol=https\nhost=%s\n\n' "$registered_host" | token_script get 2>/dev/null \
+        | grep -q '^password='; then
+        unserved="$unserved $registered_url"
+    fi
+done <<EOF
+$(token_script --hosts)
+EOF
+
+if [ -z "$unserved" ]; then
+    pass "every URL --hosts claims is a host the helper actually serves"
+else
+    fail "every URL --hosts claims is a host the helper actually serves" \
+        "registered but declined:$unserved"
+fi
+
+# And the normalizer must take that list from here rather than keeping a second copy, because two
+# copies is how they came to disagree in the first place.
+if grep -q 'github-token.sh" --hosts' "$REPO_ROOT/scripts/normalize-container-git-config.sh"; then
+    pass "the normalizer reads the URL list from the helper instead of repeating it"
+else
+    fail "the normalizer reads the URL list from the helper instead of repeating it" \
+        "the list is duplicated, so the two can drift apart again"
+fi
+
 printf 'protocol=https\nhost=github.com\nusername=x\npassword=ghp_STORED\n\n' | token_script store > /dev/null 2>&1
 if [ "$(token_script)" = "ghp_STORED" ]; then
     pass "credential-helper 'store' caches what git obtained elsewhere"

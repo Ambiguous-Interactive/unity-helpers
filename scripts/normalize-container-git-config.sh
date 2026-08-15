@@ -78,14 +78,13 @@ expected_github_helpers="$(printf '\n%s' "$TOKEN_HELPER")"
 
 # A URL-scoped entry matches that URL and its paths, NOT its siblings: registering github.com alone
 # leaves gist.github.com and an http:// remote reaching the Dev Containers helper, which is the
-# dialog this exists to remove. Each is claimed explicitly; the script itself serves github.com and
-# its subdomains and declines everything else.
-for github_url in \
-    'https://github.com' \
-    'http://github.com' \
-    'https://www.github.com' \
-    'https://gist.github.com' \
-    'https://raw.githubusercontent.com'; do
+# dialog this exists to remove.
+#
+# The list comes FROM the helper rather than being repeated here. A URL this file claims and that
+# script declines is a lockout rather than a gap -- the claim resets the inherited helper, so
+# nothing is left to answer it -- and keeping two copies is how the two disagree.
+while IFS= read -r github_url; do
+    [ -n "$github_url" ] || continue
     helper_key="credential.${github_url}.helper"
     current_github_helpers="$(git config --global --get-all "$helper_key" 2>/dev/null || true)"
     if [ "$current_github_helpers" = "$expected_github_helpers" ]; then
@@ -96,6 +95,8 @@ for github_url in \
     git config --global --add "$helper_key" '' 2>/dev/null || true
     git config --global --add "$helper_key" "$TOKEN_HELPER" 2>/dev/null || true
     log "$github_url credentials now come from the cache only (scripts/github-token.sh)."
-done
+done <<EOF
+$(bash "${SCRIPT_DIR}/github-token.sh" --hosts)
+EOF
 
 log "Container git config normalized."

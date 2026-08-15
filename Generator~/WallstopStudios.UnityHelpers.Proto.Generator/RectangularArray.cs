@@ -531,8 +531,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private void EmitShapeCheck(Writer writer)
         {
-            string product = "(long)" + Dimension(0);
-            string largest = Dimension(0);
+            string firstDimension = Dimension(0);
+            string product = "(long)" + firstDimension;
+            string largest = firstDimension;
             for (int axis = 1; axis < _rank; axis++)
             {
                 product =
