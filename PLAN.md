@@ -1632,6 +1632,16 @@ byte-diff oracle has to expect that asymmetry rather than flag it.
   `Repeated data of type System.Int32[,] is not supported` -- so the refusal fixture pins each one
   exactly under `PROTOBUF_NET_ORACLE_V2` rather than accepting either message on either leg.
 
+  **Four of the refusal vectors passed for the wrong reason**, found by re-reading the hex after the
+  suite was green. Hand-written length prefixes disagreed with their contents, so the reader refused
+  those payloads as **malformed** and never reached the shape check each is named after -- and since
+  every assertion is `IsFalse`, all four passed. The 46341x46341 case was the worst of them: its
+  dimension run was two bytes of a three-byte varint, so it pinned varint truncation rather than an
+  8 GB claim. The table computes its prefixes now and carries a control that **accepts** a
+  well-formed payload, so each case differs from an accepted one only in the property it names. The
+  general rule: **a passing `IsFalse` is the weakest evidence there is**, because every mistake in
+  the input produces it; a refusal test needs a control that accepts.
+
   **The standalone legs earned their cost on the first run.** The non-zero-lower-bound refusal was
   emitted into `Write` alone, and all four IL2CPP legs failed on it while every desktop run, every
   `typecheck` configuration and the MCP editor passed: `Measure` runs first, and its `foreach` over
