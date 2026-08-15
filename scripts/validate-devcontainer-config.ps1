@@ -108,7 +108,17 @@ foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.ym
     if ($workflowFile.FullName -eq $publishWorkflowPath) {
         continue
     }
-    [string]$workflowContent = Get-Content -LiteralPath $workflowFile.FullName -Raw
+
+    # Comments are stripped before matching. lint-doc-links.yml explains in prose that its link jobs
+    # became scripts/run-repo-lint.js checks, and matching that prose made a schedule-only workflow
+    # satisfy this contract -- alphabetically first, so it short-circuited before the workflow that
+    # really runs the validator was ever considered. Same rule as
+    # scripts/tests/test-workflow-repository-guard.ps1, for the same reason.
+    $strippedLines = foreach ($line in (Get-Content -LiteralPath $workflowFile.FullName)) {
+        $line -replace '#.*$', ''
+    }
+    [string]$workflowContent = ($strippedLines -join "`n")
+
     $runsValidator = (
         $workflowContent.Contains('validate-devcontainer-config.ps1') -or
         $workflowContent.Contains('run-repo-lint.js')
@@ -116,6 +126,17 @@ foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.ym
     if (-not $runsValidator) {
         continue
     }
+
+    # A schedule-only or dispatch-only workflow never sees a publish-workflow change, so it cannot
+    # be what keeps this validated no matter what its path filters say.
+    $runsOnRepositoryChanges = (
+        $workflowContent -match '(?m)^\s*push:\s*$' -or
+        $workflowContent -match '(?m)^\s*pull_request:\s*$'
+    )
+    if (-not $runsOnRepositoryChanges) {
+        continue
+    }
+
     $isUnfiltered = $workflowContent -notmatch '(?m)^\s+paths:\s*$'
     if ($isUnfiltered -or $workflowContent.Contains('.github/workflows/build-publish-devcontainer.yml')) {
         $devcontainerValidationIsWired = $true

@@ -140,20 +140,14 @@ const CHECKS = [
     name: "Deprecated external link rules",
     run: "pwsh -NoProfile -File scripts/tests/test-deprecated-external-links.ps1 -VerboseOutput"
   },
+  // One invocation, not three. `-Mode All` is the default and sets both `checkTargets` and
+  // `checkFormat`, so the separate `-Mode Targets` and `-Mode Format` runs were re-walking every
+  // Markdown file to redo work this one already did. Two workflows each ran their own half before,
+  // which is why the redundancy was invisible until they landed in one serial job.
   {
     id: "doc-links",
-    name: "Markdown links",
-    run: "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -VerboseOutput"
-  },
-  {
-    id: "doc-links-targets",
-    name: "Markdown link targets exist",
-    run: "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Mode Targets -VerboseOutput"
-  },
-  {
-    id: "doc-links-format",
-    name: "Markdown link format",
-    run: "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Mode Format -VerboseOutput"
+    name: "Markdown links (targets and format)",
+    run: "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Mode All -VerboseOutput"
   },
   {
     id: "gitignore-docs",

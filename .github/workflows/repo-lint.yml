@@ -79,12 +79,17 @@ jobs:
         continue-on-error: true
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
 
+      # strict: true and file_or_dir carried over verbatim from the retired yaml-format-lint.yml.
+      # Without strict, yamllint's warning-level findings stop failing the job, which would have
+      # quietly loosened the gate while the check still looked present.
       - name: yamllint
         id: yamllint
         continue-on-error: true
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
         with:
+          file_or_dir: .
           config_file: .yamllint.yaml
+          strict: true
 
       - name: Repository checks
         id: checks

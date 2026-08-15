@@ -94,6 +94,15 @@ record_failure_and_backoff() {
     log_warn "Codex verification failed (consecutive failures: ${failure_count}). Next retry in ${backoff}s."
 }
 
+# Runs on EVERY start, and deliberately before the Codex block: Dev Containers copies the host's
+# git config in at attach time, so the duplicate credential.helper and the host's Windows
+# safe.directory entries come back on every attach, not just at create. It is also above the
+# `retry_is_deferred` early exit below -- placed after it, a deferred Codex retry would skip this
+# and leave the container prompting twice for every credential.
+log_step "Normalizing container git config"
+bash "$SCRIPT_DIR/../scripts/normalize-container-git-config.sh" \
+    || log_warn "Could not normalize container git config (non-fatal)"
+
 log_step "Verifying OpenAI Codex CLI"
 
 mkdir -p "$STATE_DIR"

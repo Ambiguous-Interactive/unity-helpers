@@ -180,6 +180,12 @@ fi
 git config --global --add safe.directory "$WORKSPACE_DIR"
 log_ok "Marked $WORKSPACE_DIR as safe directory"
 
+# Creating ~/.gitconfig above is what makes the next part necessary: Dev Containers copies the
+# host's git config into that now-existing file at attach time, bringing a SECOND credential.helper
+# (git runs every one of them, so two means two host dialogs per request) and the host's Windows
+# safe.directory entries (a "not absolute" warning per entry on every git command).
+bash "$WORKSPACE_DIR/scripts/normalize-container-git-config.sh" || log_warn "Could not normalize container git config"
+
 # ── Step 7: Pre-pull Unity Docker image (background) ─────────────────────────
 # Pre-pulls the GameCI Unity Editor Docker image so that unity test/compile
 # scripts can run immediately without waiting for the image download.

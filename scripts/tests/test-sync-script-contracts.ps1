@@ -1486,21 +1486,47 @@ function Run-DocumentationWorkflowContractTests {
       Sort-Object Name |
       Where-Object {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
-        $candidateText.Contains('lint-doc-links.ps1') -or $candidateText.Contains('run-repo-lint.js')
+        # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
+        ($candidateText -match '(?<![\w-])lint-doc-links\.ps1') -or
+        $candidateText.Contains('run-repo-lint.js')
       }
   )
 
-  # Both modes must be reachable, wherever they live: `Targets` proves linked files exist, `Format`
-  # proves the link syntax is right. Losing either silently halves the check.
-  [string]$docLinkSources = $runnerContent
+  # Both halves of the link check must actually run: target existence proves linked files are there,
+  # format proves the link syntax is right. Losing either silently halves the check.
+  #
+  # The registry counts ONLY if some workflow invokes the runner. Seeding coverage from the registry
+  # unconditionally let an uninvoked file satisfy the contract while CI ran something else -- the
+  # modes would be present in a script nothing called.
+  $runnerIsInvoked = $false
+  [string]$docLinkSources = ''
   foreach ($workflowFile in $docLinkWorkflows) {
-    $docLinkSources += (Get-Content -LiteralPath $workflowFile.FullName -Raw)
+    $ownerText = Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
+    $docLinkSources += $ownerText
+    if ($ownerText.Contains('run-repo-lint.js')) {
+      $runnerIsInvoked = $true
+    }
   }
-  $usesCanonicalDocLinkLinter = (
-    $docLinkWorkflows.Count -gt 0 -and
-    $docLinkSources.Contains('lint-doc-links.ps1 -Mode Targets') -and
-    $docLinkSources.Contains('lint-doc-links.ps1 -Mode Format')
+  if ($runnerIsInvoked) {
+    $docLinkSources += $runnerContent
+  }
+
+  # `-Mode All` is the linter's default and enables both halves, so it satisfies this on its own;
+  # otherwise both explicit modes must appear. Spelling it out this way means the contract tracks
+  # the coverage rather than a particular command line.
+  #
+  # The lookbehind is load-bearing: `test-lint-doc-links.ps1` CONTAINS `lint-doc-links.ps1`, so an
+  # unanchored match let the linter's own self-test stand in for the linter. Deleting the real check
+  # from the registry then left this passing.
+  $linterCall = '(?<![\w-])lint-doc-links\.ps1'
+  $coversBothModes = (
+    $docLinkSources -match "$linterCall(?![^\r\n]*-Mode\s+(?:Targets|Format))" -or
+    (
+      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Targets" -and
+      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Format"
+    )
   )
+  $usesCanonicalDocLinkLinter = ($docLinkWorkflows.Count -gt 0 -and $coversBothModes)
 
   # A link walk that hangs should fail its job, not hold a runner to the six-hour ceiling.
   [string[]]$unboundedDocLinkJobs = @()
