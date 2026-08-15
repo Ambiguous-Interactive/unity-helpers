@@ -492,6 +492,7 @@ Edge Cases Gallery
 - Rect/Bounds conversions, RectTransform world bounds
 - Camera `OrthographicBounds`
 - Bounds aggregation from collections
+- Sprites referenced by an `AnimationClip`, with or without their curve bindings (editor-only)
 
 Example:
 
@@ -499,6 +500,42 @@ Example:
 Rect r = rectTransform.GetWorldRect();
 Bounds view = Camera.main.OrthographicBounds();
 ```
+
+<a id="sprites-from-an-animationclip"></a>
+
+### Sprites from an AnimationClip
+
+Editor-only. `GetSpritesFromClip()` yields every sprite a clip references, in binding then keyframe
+order. That is the right answer when a clip drives one renderer, and the wrong one when it drives
+several: a clip animating a **child's** `SpriteRenderer` is indistinguishable from one animating the
+root's, so measuring the returned sprites in the root's local space produces a plausible, wrong
+result rather than an empty one.
+
+`GetSpriteFramesFromClip()` keeps the binding, so the caller can tell them apart:
+
+```csharp
+foreach ((EditorCurveBinding binding, Sprite sprite) in clip.GetSpriteFramesFromClip())
+{
+    Debug.Log($"{binding.path}/{binding.propertyName} -> {sprite.name}");
+}
+```
+
+When you only want one object's frames, filter at the call instead:
+
+```csharp
+// The root's SpriteRenderer, which is what UnityExtensions.SpriteBindingProperty names.
+IEnumerable<Sprite> frames = clip.GetSpritesFromClip(
+    string.Empty,
+    UnityExtensions.SpriteBindingProperty,
+    typeof(SpriteRenderer)
+);
+
+// A child, by its transform path relative to the animated root.
+IEnumerable<Sprite> childFrames = clip.GetSpritesFromClip("Shadow");
+```
+
+A `null` filter matches anything, so `GetSpritesFromClip(null, null, null)` is the unfiltered walk.
+`type` is matched exactly — a subclass of the type you name does not match.
 
 Diagrams:
 

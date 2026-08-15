@@ -38,32 +38,85 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// Iterations per target per strategy. Raise it locally with <c>WPROTO_FUZZ_ITERATIONS</c>;
         /// CI pays a fixed, small cost every run rather than an occasional large one.
         /// </summary>
-        private static readonly int Iterations = ResolveIterations();
+        private static readonly int Iterations = ResolveIterations(
+            Environment.GetEnvironmentVariable("WPROTO_FUZZ_ITERATIONS")
+        );
+
+        private const int DefaultIterations = 1500;
 
         /// <summary>
-        /// A decode may allocate the graph it returns and nothing else of consequence. The multiple
-        /// is deliberately loose -- a dictionary slot costs many times the bytes that describe it --
-        /// because the failure this catches is not overhead, it is a payload that names a size
-        /// nothing in it pays for. The header that wrapped to zero asked for 8 GB from sixteen
-        /// bytes, which is five hundred million times its own length.
+        /// The smallest corpus the coverage gates below can be asked about. Under it they report a
+        /// defect that does not exist -- a member unreached because nothing has generated a payload
+        /// for it yet is a statement about the sample size, not about the fuzzer.
         /// </summary>
-        private const long AllocationSlackBytes = 128 * 1024;
+        /// <remarks>
+        /// The environment variable exists to <b>raise</b> the count, so flooring it costs nothing a
+        /// caller asked for. Measured on the mutation corpus, which is the gated one: at three
+        /// iterations not one mutated payload survived and the suite reported that as a defect.
+        /// </remarks>
+        private const int MinimumIterations = 200;
+
+        /// <summary>
+        /// A decode may allocate the graph it returns and nothing else of consequence.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Both numbers are measured</b>, and the teardown below prints the measurement every run
+        /// so the next person to tighten them does not have to trust this sentence. Across every
+        /// strategy here, with the readers warmed: the worst allocation is <b>160 KB</b>, by the
+        /// 20,000-level nesting bomb on its own 74 KB payload, which is 2.2x its length; and the
+        /// worst <b>per-byte</b> cost is <b>152x</b> -- 304 bytes from two, which is one contract
+        /// object and nothing else. The fixed term covers the second and the multiple covers the
+        /// first, with roughly an order of magnitude over each.
+        /// </para>
+        /// <para>
+        /// The previous 128 KB + 256x was inert: it accepted a 1,300x amplification on a 96-byte
+        /// payload, so the only defect it could catch is one that asks for gigabytes. Both that have
+        /// actually happened here did -- but a bug that tops out at a megabyte is a denial of
+        /// service on a console all the same.
+        /// <see cref="TheAllocationCeilingCatchesABoundedAmplification"/> is the proof that the
+        /// replacement is not inert either, and it is an assertion rather than an argument.
+        /// </para>
+        /// </remarks>
+        private const long AllocationSlackBytes = 4 * 1024;
 
         private const long AllocationMultiple = 256;
 
-        private static int ResolveIterations()
+        /// <summary>
+        /// Resolves the iteration count from the environment, never below
+        /// <see cref="MinimumIterations"/>.
+        /// </summary>
+        /// <param name="configured">The raw environment value, which may be absent or nonsense.</param>
+        /// <returns>The iteration count every strategy runs.</returns>
+        internal static int ResolveIterations(string configured)
         {
-            string configured = Environment.GetEnvironmentVariable("WPROTO_FUZZ_ITERATIONS");
             if (
                 !string.IsNullOrEmpty(configured)
                 && int.TryParse(configured, out int parsed)
                 && parsed > 0
             )
             {
-                return parsed;
+                return parsed < MinimumIterations ? MinimumIterations : parsed;
             }
 
-            return 1500;
+            return DefaultIterations;
+        }
+
+        [TestCase(null, ExpectedResult = DefaultIterations)]
+        [TestCase("", ExpectedResult = DefaultIterations)]
+        [TestCase("0", ExpectedResult = DefaultIterations)]
+        [TestCase("-1", ExpectedResult = DefaultIterations)]
+        [TestCase("2.5", ExpectedResult = DefaultIterations)]
+        [TestCase("many", ExpectedResult = DefaultIterations)]
+        [TestCase("3", ExpectedResult = MinimumIterations)]
+        [TestCase("200", ExpectedResult = MinimumIterations)]
+        [TestCase("5000", ExpectedResult = 5000)]
+        public int TheIterationCountNeverFallsBelowWhatTheGatesCanBeAskedAbout(string configured)
+        {
+            // A count of 3 turned this suite red on a coverage gate, naming a defect that does not
+            // exist -- the corpus had not had a chance to reach the member, and the assertion said
+            // the fuzzer had stopped covering it.
+            return ResolveIterations(configured);
         }
 
         /// <summary>
@@ -79,6 +132,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private delegate bool ReEncodePayload(byte[] payload, out byte[] first, out byte[] second);
 
         /// <summary>
+        /// Decodes through <see cref="WProtoFacade"/> -- the entry point a shipped game reaches
+        /// through <c>Serializer.ProtoDeserialize</c>. Unlike <see cref="ReadPayload"/> this one is
+        /// expected to <b>throw</b> on a payload it refuses, deliberately, so what it throws is the
+        /// contract under test.
+        /// </summary>
+        private delegate bool FacadeReadPayload(byte[] payload);
+
+        /// <summary>
+        /// Builds a random value of the contract's type. The counterpart to a mutator: the read
+        /// strategies cover payloads an attacker constructs, this covers values a <b>game</b>
+        /// constructs, which is the only way a <c>Measure</c>/<c>Write</c> disagreement on a shape
+        /// no decode produces can be seen.
+        /// </summary>
+        private delegate T ValueFactory<out T>(ref FuzzRandom random);
+
+        /// <summary>
+        /// Builds a random value, measures it, and writes it into a buffer of exactly that many
+        /// bytes. Reports what <c>Measure</c> promised, what <c>Write</c> consumed, and the bytes.
+        /// </summary>
+        private delegate bool WriteGeneratedValue(
+            ref FuzzRandom random,
+            out int measured,
+            out int written,
+            out byte[] encoded
+        );
+
+        /// <summary>
         /// A decode target: the seeds a mutator starts from, and the reads under test.
         /// </summary>
         private sealed class Target
@@ -86,23 +166,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal Target(
                 string name,
                 IReadOnlyList<byte[]> seeds,
+                IReadOnlyList<int> members,
                 ReadPayload read,
-                ReEncodePayload reEncode
+                ReEncodePayload reEncode,
+                FacadeReadPayload facadeRead,
+                WriteGeneratedValue writeGenerated
             )
             {
                 Name = name;
                 Seeds = seeds;
+                Members = members;
                 Read = read;
                 ReEncode = reEncode;
+                FacadeRead = facadeRead;
+                WriteGenerated = writeGenerated;
             }
 
             internal string Name { get; }
 
             internal IReadOnlyList<byte[]> Seeds { get; }
 
+            /// <summary>
+            /// The field numbers this contract's members occupy, read out of the seeds rather than
+            /// declared here. A member added to a contract and set in its sample is covered by the
+            /// gate automatically; a list written down beside it would have to be remembered.
+            /// </summary>
+            internal IReadOnlyList<int> Members { get; }
+
             internal ReadPayload Read { get; }
 
             internal ReEncodePayload ReEncode { get; }
+
+            internal FacadeReadPayload FacadeRead { get; }
+
+            internal WriteGeneratedValue WriteGenerated { get; }
         }
 
         private static byte[] Encode<T>(IWProtoFormatter<T> formatter, T value)
@@ -119,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return encoded;
         }
 
-        private static Target For<T>(string name, params T[] samples)
+        private static Target For<T>(string name, ValueFactory<T> factory, params T[] samples)
         {
             // An all-default contract encodes to ZERO bytes, because every member equals its
             // default and protobuf omits those. Such a seed is not a mutation seed at all -- there
@@ -142,10 +239,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 $"{name}: every sample encoded to nothing, so this target has no mutation corpus."
             );
 
+            SortedSet<int> members = new SortedSet<int>();
+            foreach (byte[] seed in seeds)
+            {
+                ScanTopLevelFields(seed, seed.Length, members);
+            }
+
+            Assert.IsNotEmpty(
+                members,
+                $"{name}: no member field was found in any seed, so the per-member coverage gate "
+                    + "would be vacuous."
+            );
+
             IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+
+            // The facade answers only for a type it has a formatter for, and that is a property of
+            // the target rather than of a payload -- so it is asked once, here, where "the facade
+            // does not serve this contract at all" reads as itself instead of as every hostile
+            // payload mysteriously declining.
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(new ReadOnlySpan<byte>(seeds[0]), out T _),
+                $"{name}: the facade does not serve this contract, so driving hostile bytes through "
+                    + "it would prove nothing."
+            );
+
             return new Target(
                 name,
                 seeds,
+                new List<int>(members),
                 (byte[] payload, out int consumed) =>
                 {
                     WProtoReader reader = new WProtoReader(payload);
@@ -177,8 +298,116 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                     second = Encode(formatter, reDecoded);
                     return second != null;
+                },
+                payload => WProtoFacade.TryDeserialize(new ReadOnlySpan<byte>(payload), out T _),
+                (ref FuzzRandom random, out int measured, out int written, out byte[] encoded) =>
+                {
+                    T value = factory(ref random);
+                    measured = formatter.Measure(value);
+                    encoded = new byte[measured];
+                    WProtoWriter writer = new WProtoWriter(encoded);
+                    bool wrote = formatter.Write(ref writer, value);
+                    written = writer.Position;
+                    return wrote && !writer.Faulted;
                 }
             );
+        }
+
+        /// <summary>
+        /// Records the field numbers a payload presents at its top level, up to
+        /// <paramref name="limit"/> bytes in.
+        /// </summary>
+        /// <param name="payload">The bytes to walk.</param>
+        /// <param name="limit">
+        /// How far the reader got. A key that ends at or before this offset is one the reader
+        /// dispatched on, which is the question a per-member coverage claim is really asking.
+        /// </param>
+        /// <param name="fields">Receives the field numbers found.</param>
+        /// <remarks>
+        /// A deliberately independent walk rather than a hook inside the reader: instrumenting the
+        /// thing under test to report on itself would let a reader that silently skipped a member
+        /// look covered.
+        /// </remarks>
+        private static void ScanTopLevelFields(byte[] payload, int limit, ISet<int> fields)
+        {
+            int offset = 0;
+            while (offset < payload.Length)
+            {
+                if (!TryScanVarint(payload, ref offset, out ulong key))
+                {
+                    return;
+                }
+
+                int field = (int)(key >> 3);
+                int wireType = (int)(key & 7);
+                if (field <= 0)
+                {
+                    return;
+                }
+
+                if (offset <= limit)
+                {
+                    fields.Add(field);
+                }
+
+                switch (wireType)
+                {
+                    case 0:
+                        if (!TryScanVarint(payload, ref offset, out ulong _))
+                        {
+                            return;
+                        }
+
+                        break;
+                    case 1:
+                        offset += 8;
+                        break;
+                    case 5:
+                        offset += 4;
+                        break;
+                    case 2:
+                        if (!TryScanVarint(payload, ref offset, out ulong length))
+                        {
+                            return;
+                        }
+
+                        if (length > (ulong)(payload.Length - offset))
+                        {
+                            return;
+                        }
+
+                        offset += (int)length;
+                        break;
+                    default:
+                        return;
+                }
+
+                if (offset > payload.Length)
+                {
+                    return;
+                }
+            }
+        }
+
+        private static bool TryScanVarint(byte[] payload, ref int offset, out ulong value)
+        {
+            value = 0;
+            for (int shift = 0; shift < 64; shift += 7)
+            {
+                if (offset >= payload.Length)
+                {
+                    return false;
+                }
+
+                byte current = payload[offset++];
+                value |= (ulong)(current & 0x7F) << shift;
+                if ((current & 0x80) == 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -192,24 +421,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 For(
                     "scalars",
+                    RandomScalar,
                     new ScalarContract(),
+                    // Every member is set, because the seeds are what the per-member coverage gate
+                    // reads its expectations out of: a member left at its default is omitted from
+                    // the wire, so leaving one unset here quietly excuses the corpus from covering
+                    // it.
                     new ScalarContract
                     {
                         Int32 = -1,
                         Int64 = long.MinValue,
+                        UInt32 = 11,
                         UInt64 = ulong.MaxValue,
                         Flag = true,
                         Single = 1.5f,
                         Double = -2.5,
                         Text = "seed",
                         Bytes = new byte[] { 1, 2, 3 },
+                        Enum = Mode.Careful,
                         MaybeDouble = 0.25,
                         Int16 = -300,
+                        Hidden = 5,
                         Counted = 7,
                     }
                 ),
                 For(
                     "nested",
+                    RandomNesting,
                     new NestingContract(),
                     new NestingContract
                     {
@@ -221,6 +459,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ),
                 For(
                     "repeated",
+                    RandomRepeated,
                     new RepeatedContract(),
                     new RepeatedContract
                     {
@@ -230,6 +469,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         Doubles = new[] { 0.5, -1.5 },
                         Longs = new ulong[] { 1, ulong.MaxValue },
                         Flags = new[] { true, false },
+                        Modes = new[] { Mode.Fast, Mode.Careful },
                         Points = new[]
                         {
                             new Outer.Point { X = 1, Y = 2 },
@@ -245,6 +485,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ),
                 For(
                     "polymorphic",
+                    RandomInclude,
                     new IncludeHolder(),
                     new IncludeHolder
                     {
@@ -254,6 +495,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ),
                 For(
                     "rectangular",
+                    RandomRectangular,
                     new RectangularArrayContract(),
                     new RectangularArrayContract
                     {
@@ -273,6 +515,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                                 new Outer.Point { X = 1, Y = 1 },
                             },
                         },
+                        Layers = new[]
+                        {
+                            new[,]
+                            {
+                                { 1, 2 },
+                            },
+                        },
                         Frames = new List<int[,]>
                         {
                             new[,]
@@ -280,9 +529,347 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                                 { 5 },
                             },
                         },
+                        Named = new Dictionary<string, int[,]>
+                        {
+                            {
+                                "k",
+                                new[,]
+                                {
+                                    { 7 },
+                                }
+                            },
+                        },
+                        Rows = new int[,][]
+                        {
+                            { new[] { 1, 2 } },
+                        },
+                        Blobs = new byte[,]
+                        {
+                            { 1, 2 },
+                        },
                     }
                 ),
             };
+        }
+
+        /// <summary>
+        /// A string with every UTF-8 width in it, plus the one shape an encoder can disagree with
+        /// itself about: a <b>lone surrogate</b>, which has no encoding and is replaced. That is the
+        /// case where <c>Measure</c> (<c>GetByteCount</c>) and <c>Write</c> (<c>GetBytes</c>) could
+        /// promise different lengths, which is half the reason to fuzz the writer at all.
+        /// </summary>
+        private static string RandomText(ref FuzzRandom random)
+        {
+            switch (random.Next(6))
+            {
+                case 0:
+                    return null;
+                case 1:
+                    return string.Empty;
+                default:
+                    int length = random.Next(12);
+                    char[] text = new char[length];
+                    for (int index = 0; index < length; ++index)
+                    {
+                        switch (random.Next(4))
+                        {
+                            case 0:
+                                text[index] = (char)(0x20 + random.Next(0x5F));
+                                break;
+                            case 1:
+                                text[index] = (char)(0x80 + random.Next(0x700));
+                                break;
+                            case 2:
+                                text[index] = (char)(0x0800 + random.Next(0x800));
+                                break;
+                            default:
+                                text[index] = (char)(0xD800 + random.Next(0x800));
+                                break;
+                        }
+                    }
+
+                    return new string(text);
+            }
+        }
+
+        private static byte[] RandomBytes(ref FuzzRandom random)
+        {
+            switch (random.Next(6))
+            {
+                case 0:
+                    return null;
+                case 1:
+                    return Array.Empty<byte>();
+                default:
+                    byte[] value = new byte[random.Next(16)];
+                    for (int index = 0; index < value.Length; ++index)
+                    {
+                        value[index] = random.NextByte();
+                    }
+
+                    return value;
+            }
+        }
+
+        /// <summary>
+        /// Null, empty, or one to four elements -- but never a <b>null element</b>, which has no
+        /// encoding at all and is a documented throw rather than a decode failure.
+        /// </summary>
+        private static T[] RandomArray<T>(ref FuzzRandom random, ValueFactory<T> element)
+        {
+            switch (random.Next(6))
+            {
+                case 0:
+                    return null;
+                case 1:
+                    return Array.Empty<T>();
+                default:
+                    T[] values = new T[1 + random.Next(4)];
+                    for (int index = 0; index < values.Length; ++index)
+                    {
+                        values[index] = element(ref random);
+                    }
+
+                    return values;
+            }
+        }
+
+        private static List<T> RandomList<T>(ref FuzzRandom random, ValueFactory<T> element)
+        {
+            T[] values = RandomArray(ref random, element);
+            return values == null ? null : new List<T>(values);
+        }
+
+        private static int RandomInt32(ref FuzzRandom random)
+        {
+            return (int)random.Next();
+        }
+
+        private static double RandomDouble(ref FuzzRandom random)
+        {
+            return BitConverter.Int64BitsToDouble((long)random.Next());
+        }
+
+        private static Mode RandomMode(ref FuzzRandom random)
+        {
+            switch (random.Next(3))
+            {
+                case 0:
+                    return Mode.None;
+                case 1:
+                    return Mode.Fast;
+                default:
+                    return Mode.Careful;
+            }
+        }
+
+        private static Outer.Point RandomPoint(ref FuzzRandom random)
+        {
+            return new Outer.Point { X = (int)random.Next(), Y = (int)random.Next() };
+        }
+
+        private static string RandomNonNullText(ref FuzzRandom random)
+        {
+            return RandomText(ref random) ?? string.Empty;
+        }
+
+        private static byte[] RandomNonNullBytes(ref FuzzRandom random)
+        {
+            return RandomBytes(ref random) ?? Array.Empty<byte>();
+        }
+
+        private static EmptyContract RandomEmpty(ref FuzzRandom random)
+        {
+            _ = random.Next();
+            return new EmptyContract();
+        }
+
+        private static ulong RandomUInt64(ref FuzzRandom random)
+        {
+            return random.Next();
+        }
+
+        private static bool RandomBool(ref FuzzRandom random)
+        {
+            return random.Next(2) == 0;
+        }
+
+        private static short RandomInt16(ref FuzzRandom random)
+        {
+            return (short)random.Next();
+        }
+
+        private static ScalarContract RandomScalar(ref FuzzRandom random)
+        {
+            return new ScalarContract
+            {
+                Int32 = (int)random.Next(),
+                Int64 = (long)random.Next(),
+                UInt32 = (uint)random.Next(),
+                UInt64 = random.Next(),
+                Flag = random.Next(2) == 0,
+                // Reconstituted from bits rather than sampled from a range, so NaN, the infinities
+                // and every subnormal are in the corpus.
+                Single = BitConverter.Int32BitsToSingle((int)random.Next()),
+                Double = RandomDouble(ref random),
+                Text = RandomText(ref random),
+                Bytes = RandomBytes(ref random),
+                Enum = RandomMode(ref random),
+                MaybeDouble = random.Next(4) == 0 ? (double?)null : RandomDouble(ref random),
+                Int16 = (short)random.Next(),
+                Hidden = (int)random.Next(),
+                Counted = (int)random.Next(),
+            };
+        }
+
+        private static NestingContract RandomNesting(ref FuzzRandom random)
+        {
+            return new NestingContract
+            {
+                Id = (int)random.Next(),
+                Child =
+                    random.Next(4) == 0 ? null : new HookedContract { Value = (int)random.Next() },
+                Where = RandomPoint(ref random),
+                MaybeWhere = random.Next(4) == 0 ? (Outer.Point?)null : RandomPoint(ref random),
+            };
+        }
+
+        private static RepeatedContract RandomRepeated(ref FuzzRandom random)
+        {
+            return new RepeatedContract
+            {
+                Ints = RandomArray<int>(ref random, RandomInt32),
+                IntList = RandomList<int>(ref random, RandomInt32),
+                Texts = RandomArray<string>(ref random, RandomNonNullText),
+                Doubles = RandomArray<double>(ref random, RandomDouble),
+                Longs = RandomArray<ulong>(ref random, RandomUInt64),
+                Flags = RandomArray<bool>(ref random, RandomBool),
+                Modes = RandomArray<Mode>(ref random, RandomMode),
+                Points = RandomArray<Outer.Point>(ref random, RandomPoint),
+                Messages = RandomArray<EmptyContract>(ref random, RandomEmpty),
+                Blobs = RandomArray<byte[]>(ref random, RandomNonNullBytes),
+                PointList = RandomList<Outer.Point>(ref random, RandomPoint),
+                Shorts = RandomArray<short>(ref random, RandomInt16),
+            };
+        }
+
+        private static IncludeHolder RandomInclude(ref FuzzRandom random)
+        {
+            IncludeBase value;
+            switch (random.Next(5))
+            {
+                case 0:
+                    value = null;
+                    break;
+                case 1:
+                    value = new IncludeBase();
+                    break;
+                case 2:
+                    value = new IncludeAlpha { AlphaOnly = (int)random.Next() };
+                    break;
+                case 3:
+                    value = new IncludeBeta { BetaOnly = RandomDouble(ref random) };
+                    break;
+                default:
+                    value = new IncludeGamma { GammaOnly = random.Next(2) == 0 };
+                    break;
+            }
+
+            if (value != null)
+            {
+                value.Id = (int)random.Next();
+                value.Label = RandomText(ref random);
+            }
+
+            return new IncludeHolder { Value = value, Trailer = (int)random.Next() };
+        }
+
+        /// <summary>
+        /// Axes are kept to 0-2 deliberately: a zero axis is the shape whose product annihilates
+        /// every other axis, and it is legal to <b>write</b>, so it belongs in the generated corpus
+        /// that has to survive its own encoding.
+        /// </summary>
+        private static int[,] RandomGrid(ref FuzzRandom random)
+        {
+            if (random.Next(5) == 0)
+            {
+                return null;
+            }
+
+            int[,] grid = new int[random.Next(3), random.Next(3)];
+            for (int row = 0; row < grid.GetLength(0); ++row)
+            {
+                for (int column = 0; column < grid.GetLength(1); ++column)
+                {
+                    grid[row, column] = (int)random.Next();
+                }
+            }
+
+            return grid;
+        }
+
+        private static int[,] RandomNonNullGrid(ref FuzzRandom random)
+        {
+            return RandomGrid(ref random) ?? new int[0, 0];
+        }
+
+        private static RectangularArrayContract RandomRectangular(ref FuzzRandom random)
+        {
+            RectangularArrayContract value = new RectangularArrayContract
+            {
+                Grid = RandomGrid(ref random),
+                Labels = random.Next(4) == 0 ? null : new string[random.Next(3), random.Next(3)],
+                Layers = RandomArray<int[,]>(ref random, RandomNonNullGrid),
+                Frames = RandomList<int[,]>(ref random, RandomNonNullGrid),
+            };
+
+            if (random.Next(4) != 0)
+            {
+                value.Volume = new int[random.Next(3), random.Next(3), random.Next(3)];
+            }
+
+            if (random.Next(4) != 0)
+            {
+                value.Points = new Outer.Point[random.Next(3), random.Next(3)];
+            }
+
+            if (random.Next(4) != 0)
+            {
+                value.Blobs = new byte[random.Next(3), random.Next(3)];
+            }
+
+            if (random.Next(4) != 0)
+            {
+                value.Rows = new int[random.Next(2), random.Next(2)][];
+                for (int row = 0; row < value.Rows.GetLength(0); ++row)
+                {
+                    for (int column = 0; column < value.Rows.GetLength(1); ++column)
+                    {
+                        value.Rows[row, column] = new int[random.Next(3)];
+                    }
+                }
+            }
+
+            if (random.Next(4) != 0)
+            {
+                value.Named = new Dictionary<string, int[,]>
+                {
+                    { "k", RandomNonNullGrid(ref random) },
+                };
+            }
+
+            if (value.Labels != null)
+            {
+                for (int row = 0; row < value.Labels.GetLength(0); ++row)
+                {
+                    for (int column = 0; column < value.Labels.GetLength(1); ++column)
+                    {
+                        value.Labels[row, column] = RandomNonNullText(ref random);
+                    }
+                }
+            }
+
+            return value;
         }
 
         private static string Hex(byte[] payload)
@@ -363,11 +950,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             internal int Reached;
 
-            internal void Record(bool accepted, int consumed)
+            /// <summary>
+            /// How many payloads got as far as dispatching on each field number. The corpus-wide
+            /// reach rate cannot answer this: a strategy that reaches the tag reader on every
+            /// payload and then always dies on field 1 scores 100% while nine members are untouched.
+            /// </summary>
+            private readonly Dictionary<int, int> _byMember = new Dictionary<int, int>();
+
+            internal void Record(bool accepted, int consumed, byte[] payload)
             {
                 Payloads += 1;
                 Accepted += accepted ? 1 : 0;
                 Reached += accepted || consumed >= PastTheFirstKey ? 1 : 0;
+
+                SortedSet<int> fields = new SortedSet<int>();
+                ScanTopLevelFields(payload, accepted ? payload.Length : consumed, fields);
+                foreach (int field in fields)
+                {
+                    _byMember.TryGetValue(field, out int hits);
+                    _byMember[field] = hits + 1;
+                }
+            }
+
+            internal int HitsFor(int member)
+            {
+                _byMember.TryGetValue(member, out int hits);
+                return hits;
             }
 
             internal double AcceptanceRate => Payloads == 0 ? 0 : (double)Accepted / Payloads;
@@ -379,6 +987,72 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return $"{target}: {Payloads} payloads, {Accepted} accepted, {Reached} reaching a "
                     + "member reader";
             }
+
+            internal string DescribeMembers(string target, IReadOnlyList<int> members)
+            {
+                StringBuilder text = new StringBuilder(Describe(target));
+                text.Append("; per member:");
+                foreach (int member in members)
+                {
+                    text.Append(' ').Append(member).Append('=').Append(HitsFor(member));
+                }
+
+                return text.ToString();
+            }
+        }
+
+        /// <summary>
+        /// The largest allocation any decode in this run charged, and the payload that charged it.
+        /// Printed once at the end so the next person to tighten <see cref="AllocationSlackBytes"/>
+        /// starts from a measurement rather than from a sentence.
+        /// </summary>
+        private static long _worstAllocation;
+
+        private static int _worstAllocationPayloadLength;
+
+        private static string _worstAllocationTarget = "none";
+
+        private static double _worstAllocationRatio;
+
+        private static long _worstRatioAllocation;
+
+        private static int _worstRatioPayloadLength;
+
+        private static string _worstRatioTarget = "none";
+
+        [OneTimeSetUp]
+        public void WarmEveryReaderBeforeAnythingIsMeasured()
+        {
+            // A first decode pays for type initialization, cached lookups and whatever else the
+            // runtime builds on the way -- none of which is the amplification this suite exists to
+            // catch, and all of which lands on iteration zero. Warming here is what lets the ceiling
+            // above be tight enough to mean something instead of loose enough to swallow the first
+            // call.
+            foreach (Target target in Targets())
+            {
+                foreach (byte[] seed in target.Seeds)
+                {
+                    target.Read(seed, out int _);
+                    target.ReEncode(seed, out byte[] _, out byte[] _);
+                    target.FacadeRead(seed);
+                }
+
+                target.Read(Array.Empty<byte>(), out int _);
+                FuzzRandom random = new FuzzRandom(1);
+                target.WriteGenerated(ref random, out int _, out int _, out byte[] _);
+            }
+        }
+
+        [OneTimeTearDown]
+        public void ReportTheWorstAllocationObserved()
+        {
+            TestContext.Progress.WriteLine(
+                $"WallstopProto fuzz: worst decode allocation {_worstAllocation} B on a "
+                    + $"{_worstAllocationPayloadLength} byte {_worstAllocationTarget} payload; "
+                    + $"worst ratio {_worstAllocationRatio:F1}x ({_worstRatioAllocation} B on "
+                    + $"{_worstRatioPayloadLength} bytes, {_worstRatioTarget}). Ceiling is "
+                    + $"{AllocationSlackBytes} + {AllocationMultiple} x length."
+            );
         }
 
         /// <summary>
@@ -420,7 +1094,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + $"{Environment.NewLine}payload: {Hex(payload)}"
             );
 
-            coverage?.Record(accepted, consumed);
+            // Recorded AFTER the ceiling, so the figure the teardown prints is the worst cost the
+            // ceiling ACCEPTED. Recording first would let the deliberate amplifier in
+            // TheAllocationCeilingCatchesABoundedAmplification set the high-water mark, and the next
+            // person to tune the constants would be reading this suite's own counter-example.
+            if (allocated > _worstAllocation)
+            {
+                _worstAllocation = allocated;
+                _worstAllocationPayloadLength = payload.Length;
+                _worstAllocationTarget = target.Name;
+            }
+
+            if (payload.Length > 0 && (double)allocated / payload.Length > _worstAllocationRatio)
+            {
+                _worstAllocationRatio = (double)allocated / payload.Length;
+                _worstRatioAllocation = allocated;
+                _worstRatioPayloadLength = payload.Length;
+                _worstRatioTarget = target.Name;
+            }
+
+            coverage?.Record(accepted, consumed, payload);
+
+            AssertTheFacadeAnswersTheSameWay(target, payload, accepted, origin);
 
             if (!accepted)
             {
@@ -463,6 +1158,78 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 $"{target.Name}: encoding is not a fixed point -- the value decoded from an "
                     + $"accepted payload does not survive its own encoding.{Environment.NewLine}"
                     + $"{origin}{Environment.NewLine}payload: {Hex(payload)}"
+            );
+        }
+
+        /// <summary>
+        /// Drives the same payload through <see cref="WProtoFacade"/> -- the entry point
+        /// <c>Serializer.ProtoDeserialize</c> reaches, and the one a corrupt save file actually
+        /// meets -- and pins what a refusal looks like from there.
+        /// </summary>
+        /// <param name="target">The contract under test.</param>
+        /// <param name="payload">The hostile bytes.</param>
+        /// <param name="accepted">What the formatter itself answered.</param>
+        /// <param name="origin">The strategy, seed and iteration, for a reproducible failure.</param>
+        /// <remarks>
+        /// <para>
+        /// The facade deliberately <b>throws</b> where the formatter returns <c>false</c>: "no
+        /// formatter for this type" and "this type's formatter refused the payload" are different
+        /// answers, and reporting both as <c>false</c> sent a rejected payload on to protobuf-net,
+        /// which is the path IL2CPP cannot run. That decision is in tension with the
+        /// <c>TryXxx</c>-never-throws rule, so what may escape is asserted here rather than left to
+        /// the reader of the source: exactly <see cref="InvalidOperationException"/>, and only where
+        /// the formatter also refused.
+        /// </para>
+        /// <para>
+        /// Allocation is measured on the formatter's own read rather than here, because a throw
+        /// allocates an exception and a stack trace -- charging that to the payload would say a
+        /// refusal is more expensive than an acceptance, which is true and irrelevant.
+        /// </para>
+        /// </remarks>
+        private static void AssertTheFacadeAnswersTheSameWay(
+            Target target,
+            byte[] payload,
+            bool accepted,
+            string origin
+        )
+        {
+            bool served;
+            try
+            {
+                served = target.FacadeRead(payload);
+            }
+            catch (InvalidOperationException)
+            {
+                Assert.IsFalse(
+                    accepted,
+                    $"{target.Name}: the facade threw for a payload its own formatter ACCEPTED, so "
+                        + $"a legitimate save would fail to load.{Environment.NewLine}{origin}"
+                        + $"{Environment.NewLine}payload: {Hex(payload)}"
+                );
+                return;
+            }
+            catch (Exception failure)
+            {
+                Assert.Fail(
+                    $"{target.Name}: the facade raised {failure.GetType().Name}. The only exception "
+                        + "it may raise on a refusal is InvalidOperationException -- anything else "
+                        + "reaches a game as an unhandled crash rather than as a corrupt save."
+                        + $"{Environment.NewLine}{origin}{Environment.NewLine}"
+                        + $"payload: {Hex(payload)}{Environment.NewLine}{failure}"
+                );
+                return;
+            }
+
+            Assert.IsTrue(
+                served,
+                $"{target.Name}: the facade declined a contract it is registered for, which sends "
+                    + $"the payload on to protobuf-net.{Environment.NewLine}{origin}"
+                    + $"{Environment.NewLine}payload: {Hex(payload)}"
+            );
+            Assert.IsTrue(
+                accepted,
+                $"{target.Name}: the facade accepted a payload its own formatter refused."
+                    + $"{Environment.NewLine}{origin}{Environment.NewLine}payload: {Hex(payload)}"
             );
         }
 
@@ -540,6 +1307,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     coverage.Describe(target.Name)
                         + " -- the mutations are barely changing anything."
                 );
+
+                // The claim "every member shape is fuzzed", made checkable. The corpus-wide reach
+                // rate above cannot support it: a strategy that dies on field 1 every time scores
+                // 100% reach while every other member is untouched, which is exactly how the
+                // capacity-claim strategy shipped covering one field of seven. The expected members
+                // are read out of the seeds, so adding a member to a contract and setting it in the
+                // sample extends this gate with no second list to remember.
+                int minimumHits = Math.Max(1, Iterations / 100);
+                foreach (int member in target.Members)
+                {
+                    Assert.GreaterOrEqual(
+                        coverage.HitsFor(member),
+                        minimumHits,
+                        coverage.DescribeMembers(target.Name, target.Members)
+                            + $" -- field {member} was dispatched on fewer than {minimumHits} "
+                            + "times, so this suite does not fuzz that member's reader."
+                    );
+                }
             }
         }
 
@@ -862,6 +1647,141 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     );
                 }
             }
+        }
+
+        [Test]
+        public void AGeneratedValueWritesExactlyWhatItMeasures()
+        {
+            // The write path's whole failure class, and one the read strategies cannot see. The
+            // fixed-point check above only compares encodings of values a DECODE produced, so a
+            // shape no payload decodes to -- a lone surrogate in a string, a rectangular array with
+            // a zero axis, a NaN -- could have Measure and Write disagreeing and nothing would say
+            // so until a game saved one. Measure sizes the buffer and Write gets exactly that many
+            // bytes, so a disagreement is a failed write or a short one rather than a silent
+            // overrun: the buffer is the assertion.
+            foreach (Target target in Targets())
+            {
+                FuzzRandom random = new FuzzRandom(0x217E5);
+                for (int iteration = 0; iteration < Iterations; ++iteration)
+                {
+                    string origin = $"strategy=generated-value seed=0x217E5 iteration={iteration}";
+                    int measured;
+                    int written;
+                    byte[] encoded;
+                    bool wrote;
+                    try
+                    {
+                        wrote = target.WriteGenerated(
+                            ref random,
+                            out measured,
+                            out written,
+                            out encoded
+                        );
+                    }
+                    catch (Exception failure)
+                    {
+                        Assert.Fail(
+                            $"{target.Name}: measuring or writing a generated value threw "
+                                + $"{failure.GetType().Name}.{Environment.NewLine}{origin}"
+                                + $"{Environment.NewLine}{failure}"
+                        );
+                        return;
+                    }
+
+                    Assert.IsTrue(
+                        wrote,
+                        $"{target.Name}: Write failed into a buffer of exactly the {measured} bytes "
+                            + $"Measure asked for.{Environment.NewLine}{origin}"
+                    );
+                    Assert.AreEqual(
+                        measured,
+                        written,
+                        $"{target.Name}: Measure promised {measured} bytes and Write produced "
+                            + $"{written}. A value serialized into a pooled buffer would carry the "
+                            + $"previous message's tail.{Environment.NewLine}{origin}"
+                    );
+
+                    // Its own encoding is a payload like any other, so it has to survive every
+                    // property the hostile corpus is held to -- including reading back into
+                    // something that re-encodes to the same bytes.
+                    AssertDecodeIsSafe(target, encoded, origin);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The per-member coverage gate reads both what it expects and what it observed through
+        /// <see cref="ScanTopLevelFields"/>, so a scanner that quietly stopped early would shrink
+        /// both sides and stay green. That makes the scanner the one thing in this file that has to
+        /// be pinned on its own rather than through the property it serves.
+        /// </summary>
+        /// <param name="hex">The payload.</param>
+        /// <param name="limit">How far the reader is claimed to have got.</param>
+        /// <returns>The field numbers found, comma separated.</returns>
+        [TestCase("0801", 2, ExpectedResult = "1")]
+        [TestCase("08011002", 4, ExpectedResult = "1,2")]
+        [TestCase("08011002", 1, ExpectedResult = "1")]
+        [TestCase("08011002", 0, ExpectedResult = "")]
+        [TestCase("0A026162 1003", 6, ExpectedResult = "1,2")]
+        [TestCase("0A05", 2, ExpectedResult = "1")]
+        [TestCase("0D0000803F 1103000000000000 00", 14, ExpectedResult = "1,2")]
+        [TestCase("1B 0801", 3, ExpectedResult = "3")]
+        [TestCase("00", 1, ExpectedResult = "")]
+        [TestCase("FFFFFFFFFFFFFFFFFFFF7F", 11, ExpectedResult = "")]
+        [TestCase("", 0, ExpectedResult = "")]
+        public string TheFieldScannerReportsWhatTheReaderWouldHaveDispatchedOn(
+            string hex,
+            int limit
+        )
+        {
+            SortedSet<int> fields = new SortedSet<int>();
+            ScanTopLevelFields(FromHex(hex.Replace(" ", string.Empty)), limit, fields);
+            return string.Join(",", fields);
+        }
+
+        [Test]
+        public void TheAllocationCeilingCatchesABoundedAmplification()
+        {
+            // The proof that tightening the ceiling bought something. The old 128 KB + 256x accepted
+            // a decode that allocated 32 KB from ten bytes -- 3,300x -- which is every amplification
+            // bug that happens to top out below a megabyte. This is that bug, synthesized: a reader
+            // that allocates a fixed 32 KB whatever it was handed.
+            Target amplifier = new Target(
+                "synthetic-amplifier",
+                new List<byte[]> { new byte[] { 0x08, 0x01 } },
+                new List<int> { 1 },
+                (byte[] payload, out int consumed) =>
+                {
+                    consumed = payload.Length;
+                    GC.KeepAlive(new byte[32 * 1024]);
+                    return false;
+                },
+                (byte[] payload, out byte[] first, out byte[] second) =>
+                {
+                    first = null;
+                    second = null;
+                    return false;
+                },
+                payload => throw new InvalidOperationException("refused"),
+                (ref FuzzRandom random, out int measured, out int written, out byte[] encoded) =>
+                {
+                    measured = 0;
+                    written = 0;
+                    encoded = Array.Empty<byte>();
+                    return true;
+                }
+            );
+
+            Assert.Throws<AssertionException>(
+                () =>
+                    AssertDecodeIsSafe(
+                        amplifier,
+                        new byte[] { 0x08, 0x01, 0x10, 0x02, 0x18, 0x03, 0x20, 0x04, 0x28, 0x05 },
+                        "strategy=ceiling-discrimination"
+                    ),
+                "the allocation ceiling accepted 32 KB from a ten-byte payload, so it is inert "
+                    + "against every amplification that stops short of it."
+            );
         }
 
         /// <summary>

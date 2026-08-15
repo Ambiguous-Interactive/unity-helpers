@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`AnimationClip.GetSpriteFramesFromClip()`**: every sprite a clip references, paired with the curve binding that supplies it, so a caller can tell which object each sprite is animated onto. `GetSpritesFromClip(path, propertyName, type)` filters on that binding, and `UnityExtensions.SpriteBindingProperty` names the property a sprite is normally bound to. Editor-only, like the existing `GetSpritesFromClip()`. See [Sprites from an AnimationClip](./docs/features/utilities/math-and-extensions.md#sprites-from-an-animationclip) ([#451](https://github.com/Ambiguous-Interactive/unity-helpers/issues/451)).
+
 - **`AssetChangeDetectionUtility.Enabled`**: turn the `[DetectAssetChanged]` watcher on or off, with `ResetEnabledToDefault()` and `EnabledScope(bool)` ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
 - **`AssetChangeDetectionEnabledScope`**: an `IDisposable` that restores the watcher's previous enablement on dispose.
 - **`SingleThreadedThreadPool.DrainAsync()`**: closes the pool and waits for already-queued work to finish, for queues you cannot afford to drop. Disposal still cancels. `IsAcceptingWork` reports whether `Enqueue` still does anything ([#318](https://github.com/Ambiguous-Interactive/unity-helpers/issues/318)).
