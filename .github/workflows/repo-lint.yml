@@ -13,16 +13,23 @@ name: Repo Lint
 # scripts/tests/test-run-repo-lint.js asserts no linter in scripts/ has been left unreachable.
 #
 # The checks run concurrently, one worker per core, which is why this is still one job rather than
-# the balanced matrix the plan proposed. Measured on `main`:
+# the balanced matrix the plan proposed. All three rows measured, none projected:
 #
 #   20 workflows (before #444)   128 s wall clock   ~730 s billable
 #   1 serial job (#444)          317 s wall clock    317 s billable
-#   1 concurrent job (this)      ~110 s wall clock  ~110 s billable
+#   1 concurrent job (this)      179 s wall clock    179 s billable   (147 s in Repository checks)
 #
-# A 3-leg matrix would have reached roughly the same wall clock at three times the billable cost,
-# because each leg pays its own boot, checkout and npm install. Concurrency inside the job pays none
-# of that: the checks are independent processes that only read the tree. The runner takes `--jobs`
-# and defaults to the core count, so nothing here needs to know how large the runner is.
+# Concurrency inside the job pays the boot, checkout and npm install once, where a 3-leg matrix pays
+# them three times: the checks are independent processes that only read the tree. The runner takes
+# `--jobs` and defaults to the core count, so nothing here needs to know how large the runner is.
+#
+# The speedup on this runner is 1.93x (284 s -> 147 s), NOT the ~3x that four cores suggests and
+# eight real cores deliver locally (5.12x). Hosted vCPUs are shared, and the tail is bounded by the
+# slowest single check. Wall clock is therefore still ~40% above the twenty-workflow fan-out while
+# billable is 4.1x better than it -- a deliberate trade, and the honest numbers for anyone revisiting
+# it. Sharding on top of this would buy roughly 179 s -> 70 s for about +30 s billable; it has not
+# been done because a three-minute lint signal is nowhere near the critical path behind a 40-minute
+# Unity matrix.
 #
 # Deliberately NOT folded in:
 #   * LLM Instructions Lint runs the skills-index generator on Windows as well, to catch a
