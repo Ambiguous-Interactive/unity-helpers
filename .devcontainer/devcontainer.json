@@ -59,6 +59,12 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   // Runs on every container start to verify/repair Codex CLI availability.
   "postStartCommand": "bash .devcontainer/post-start.sh",
+  // Runs after the Dev Containers extension finishes attaching, which is the ONLY point guaranteed
+  // to be after it copies the host's git config in. That copy is what re-adds a second
+  // credential.helper (git runs every one, so two means two desktop dialogs per request) and the
+  // host's Windows safe.directory entries. post-start.sh normalizes too, but nothing documents
+  // whether it runs before or after the copy, and running before it is a no-op.
+  "postAttachCommand": "bash scripts/normalize-container-git-config.sh",
   // VS Code customizations
   "customizations": {
     "vscode": {

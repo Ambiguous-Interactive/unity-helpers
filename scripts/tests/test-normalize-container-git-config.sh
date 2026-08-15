@@ -141,6 +141,25 @@ else
     fail "post-create.sh normalizes git config after creating ~/.gitconfig" "no call found"
 fi
 
+# The load-bearing one for durability. Dev Containers copies the host git config in at attach, and
+# nothing documents whether that lands before or after postStartCommand -- so post-start alone may
+# normalize a config that is about to be re-broken. postAttachCommand is the only hook guaranteed to
+# run after the copy, which makes it the one that survives a restart.
+if grep -q '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
+    && grep -A1 '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
+        | grep -q 'normalize-container-git-config.sh'; then
+    pass "devcontainer.json normalizes git config on every attach"
+else
+    # Also accept the call on the same line as the key, which is how it is written today.
+    if grep '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
+        | grep -q 'normalize-container-git-config.sh'; then
+        pass "devcontainer.json normalizes git config on every attach"
+    else
+        fail "devcontainer.json normalizes git config on every attach" \
+            "postAttachCommand does not run the normalizer; the duplicate helper returns on restart"
+    fi
+fi
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 if [ "$failed" -gt 0 ]; then
     printf 'Failed: %s\n' "${failed_names[*]}"
