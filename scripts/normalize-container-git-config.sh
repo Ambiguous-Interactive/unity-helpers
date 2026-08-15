@@ -61,4 +61,29 @@ if [ "$removed_directories" -gt 0 ]; then
     log "Removed $removed_directories non-absolute safe.directory entr(ies) copied from the host."
 fi
 
+# Point github.com at the cached-token helper, and at nothing else.
+#
+# Dev Containers' helper answers by raising a dialog on the OWNER'S DESKTOP, and `git push` /
+# `git fetch` invoke it on every operation -- so a container that authenticates through it
+# interrupts a human for work nobody is watching. `credential.helper` is multi-valued and git runs
+# EVERY value, so adding this script is not enough: an EMPTY value RESETS the accumulated list, and
+# writing the reset before the script is what discards the inherited /etc/gitconfig helper for this
+# host. Other hosts keep it untouched, because this is not a claim about them.
+#
+# The one deliberate prompt lives behind `scripts/github-token.sh --bootstrap`, which a human runs
+# once and which resets this list again to reach the Dev Containers helper directly.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOKEN_HELPER="!${SCRIPT_DIR}/github-token.sh"
+GITHUB_HELPER_KEY='credential.https://github.com.helper'
+
+current_github_helpers="$(git config --global --get-all "$GITHUB_HELPER_KEY" 2>/dev/null || true)"
+expected_github_helpers="$(printf '\n%s' "$TOKEN_HELPER")"
+
+if [ "$current_github_helpers" != "$expected_github_helpers" ]; then
+    git config --global --unset-all "$GITHUB_HELPER_KEY" 2>/dev/null || true
+    git config --global --add "$GITHUB_HELPER_KEY" '' 2>/dev/null || true
+    git config --global --add "$GITHUB_HELPER_KEY" "$TOKEN_HELPER" 2>/dev/null || true
+    log "github.com credentials now come from the cache only (scripts/github-token.sh)."
+fi
+
 log "Container git config normalized."

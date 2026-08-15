@@ -250,22 +250,30 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   row reported "no token exists in the container" and handed the pull request back to the owner, and
   both were wrong. Opening a pull request or filing an issue is an agent step, not a hand-back.
 
-  In order of preference:
+  **There is exactly one way to get the credential, and it never prompts:**
 
-  1. **`$GITHUB_TOKEN` / `$GH_TOKEN`**, forwarded from the host by `remoteEnv` in
-     `.devcontainer/devcontainer.json`. Nothing to ask for; use it directly.
-  2. **The Dev Containers credential helper**, which is what `origin`'s HTTPS remote already uses:
+  ```bash
+  TOKEN="$(bash scripts/github-token.sh)"    # exit 3 and an actionable message when there is none
+  ```
 
-     ```bash
-     TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' \
-       | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null | sed -n 's/^password=//p')
-     ```
+  It reads `$GITHUB_TOKEN` / `$GH_TOKEN` when they are non-empty (in this container they are exported
+  and **empty**, which is why emptiness rather than definedness is the test) and otherwise a 0600
+  cache file. `git push` and `git fetch` read the same cache, because
+  `scripts/normalize-container-git-config.sh` installs the script as the **only** credential helper
+  for github.com in the container's `~/.gitconfig`.
 
-     `GIT_TERMINAL_PROMPT=0` is load-bearing. Without it, git falls back to its own terminal prompt
-     when the helper returns nothing and the command **hangs until it is killed** -- which is the
-     symptom that was misread as "no credential exists". The helper itself asks the host, so the
-     first call in a fresh host session can raise a dialog **on the owner's desktop**; it is answered
-     once and cached, and every later call is silent.
+  **NEVER run `git credential fill`, and never invoke the Dev Containers helper directly.** That
+  helper answers by raising a dialog **on the owner's desktop**, one per invocation — a session that
+  probes it, then pushes, then retries has interrupted a human three times for work nobody was
+  watching. The single deliberate prompt lives behind `npm run github:token:bootstrap`, which **a
+  human** runs once per container; `npm run github:token:store` takes a pasted token on stdin with no
+  dialog at all. If the script exits 3, report that and ask — do not go looking for another way to
+  ask the desktop.
+
+  When it does prompt: **hang versus immediate answer is the only discriminator**, never empty
+  output. A blocked helper is a dialog nobody has answered yet, and reading its truncated empty read
+  as "no credential exists" is how three sessions concluded the container had none and handed a
+  finished branch back without pushing it.
 
   Never echo the token, never write it to a file in the working tree, and pass it to a subprocess
   through the environment rather than on a command line.

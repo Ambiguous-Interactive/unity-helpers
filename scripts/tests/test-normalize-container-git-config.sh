@@ -117,6 +117,60 @@ else
 fi
 rm -rf "$sandbox"
 
+# ── github.com resolves through the cache, and nothing else ─────────────────
+# Asked through `git credential fill`, not through `git config`: `--get-urlmatch` reports the
+# URL-scoped section alone, so it answers "only our helper is configured here" for a config where
+# git would still run the inherited generic one. The question is which helpers git INVOKES, and the
+# fake helper records that by writing a marker file. (Proven necessary: with the empty reset
+# removed, the config-shaped assertion still passed and this one fails.)
+sandbox="$(new_sandbox)"
+invocations="$sandbox/helper-invocations"
+cat > "$sandbox/fake-helper.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$invocations"
+cat > /dev/null
+printf 'username=x-access-token\npassword=ghp_FROMDIALOG\n'
+EOF
+chmod +x "$sandbox/fake-helper.sh"
+cfg "$sandbox" --system --add credential.helper "!$sandbox/fake-helper.sh"
+run_normalizer "$sandbox"
+
+ask_credential() {
+    printf 'protocol=https\nhost=%s\n\n' "$1" \
+        | GIT_CONFIG_GLOBAL="$sandbox/global" GIT_CONFIG_SYSTEM="$sandbox/system" \
+            UNITY_HELPERS_GITHUB_TOKEN_CACHE="$sandbox/token" GITHUB_TOKEN='' GH_TOKEN='' \
+            GIT_TERMINAL_PROMPT=0 timeout 30 git credential fill 2>/dev/null
+}
+
+printf 'ghp_FROMCACHE\n' | UNITY_HELPERS_GITHUB_TOKEN_CACHE="$sandbox/token" \
+    bash "$REPO_ROOT/scripts/github-token.sh" --store-stdin > /dev/null 2>&1
+
+answer="$(ask_credential github.com)"
+if printf '%s' "$answer" | grep -q '^password=ghp_FROMCACHE$' && [ ! -f "$invocations" ]; then
+    pass "a github.com credential comes from the cache and the desktop helper is never invoked"
+else
+    fail "a github.com credential comes from the cache and the desktop helper is never invoked" \
+        "answer='$(printf '%s' "$answer" | tr '\n' '|')' invocations='$(cat "$invocations" 2>/dev/null)'"
+fi
+
+# This is a claim about github.com, not about every host the container talks to.
+ask_credential gitlab.com > /dev/null 2>&1
+if [ -f "$invocations" ]; then
+    pass "other hosts still reach the Dev Containers helper"
+else
+    fail "other hosts still reach the Dev Containers helper" "gitlab.com invoked no helper"
+fi
+
+run_normalizer "$sandbox"
+values="$(cfg "$sandbox" --global --get-all 'credential.https://github.com.helper' | wc -l | tr -d ' ')"
+if [ "$values" = "2" ]; then
+    pass "the helper install is idempotent across attaches"
+else
+    fail "the helper install is idempotent across attaches" \
+        "expected the reset plus one helper, found $values values"
+fi
+rm -rf "$sandbox"
+
 # ── The lifecycle wiring ────────────────────────────────────────────────────
 # post-start runs on every attach, which is when Dev Containers re-copies the host config. The
 # ordering assertion is the substantive one: post-start exits early when the Codex retry is

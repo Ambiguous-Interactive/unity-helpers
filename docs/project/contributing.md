@@ -10,6 +10,22 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+### GitHub Credentials in the Container
+
+The container resolves github.com credentials from a cached token and **never prompts**. Nothing
+inside it may raise the Dev Containers credential dialog, because that dialog appears on the host
+desktop and every `git push`, `git fetch` or API call would raise another one.
+
+Supply the token once per container, either way:
+
+```bash
+npm run github:token:bootstrap   # asks the Dev Containers helper once; answer the dialog
+npm run github:token:store       # paste a personal access token on stdin; no dialog at all
+```
+
+`git push`, `git fetch` and `scripts/github-token.sh` then read the same 0600 cache. A missing
+credential is reported with the command that fixes it, never prompted for.
+
 ### Pre-installed CI/CD Tools (Container Only)
 
 The dev container includes these additional tools that are **not required** on your host machine. Git hooks gracefully skip them if not present—CI will catch any issues:

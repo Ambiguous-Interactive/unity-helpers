@@ -144,11 +144,12 @@ locally during `npm run hooks:install` (and the devcontainer post-create), so
 
 Rules when pushing:
 
-| Rule                           | Why                                                                          |
-| ------------------------------ | ---------------------------------------------------------------------------- |
-| **Never redirect output**      | `git push 2> pre-push.txt` creates gitignored pollution that confuses agents |
-| **Never use `--no-verify`**    | Bypassing the pre-push hook skips the last-resort local safety gate          |
-| **Let stderr stream normally** | Errors must be visible in the live output, not hidden in files               |
+| Rule                           | Why                                                                                                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Never redirect output**      | `git push 2> pre-push.txt` creates gitignored pollution that confuses agents                                                                                    |
+| **Never use `--no-verify`**    | Bypassing the pre-push hook skips the last-resort local safety gate                                                                                             |
+| **Let stderr stream normally** | Errors must be visible in the live output, not hidden in files                                                                                                  |
+| **Never pass a credential**    | github.com resolves through the cached-only helper; a push that reports no credential means the cache is empty, not that the push needs one on the command line |
 
 If `fatal: The current branch <x> has no upstream branch` appears, the local
 config is missing. Remediation: `npm run agent:preflight:fix` (restores
@@ -168,14 +169,19 @@ review bots are **`pull_request`-triggered**, so a branch sitting on the remote
 with no pull request has proven only that `Spelling Check` passes. Opening it is
 part of shipping, not a hand-back.
 
-The API is reachable from inside the devcontainer — see the GitHub access notes
-in [context](../context.md) for how to obtain the credential and the
-`GIT_TERMINAL_PROMPT=0` detail that decides whether the call answers or hangs.
+The API is reachable from inside the devcontainer. `scripts/github-token.sh` is
+the only supported source of the credential and it **never prompts**: it reads a
+non-empty `$GITHUB_TOKEN` / `$GH_TOKEN` or a 0600 cache, and exits 3 with the
+command that fixes it when there is neither. Never run the credential helper
+directly — Dev Containers answers by raising a dialog on the owner's desktop on
+every invocation, and the one deliberate prompt is a human running
+`npm run github:token:bootstrap`. See the GitHub access notes in
+[context](../context.md).
 
 ```bash
-TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' \
-  | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null | sed -n 's/^password=//p')
-GH_TOKEN="$TOKEN" python3 - <<'PY'
+GH_TOKEN="$(bash scripts/github-token.sh)" # exits 3, loudly, when there is none
+export GH_TOKEN
+python3 - <<'PY'
 import json, os, pathlib, urllib.request
 payload = {
     "title": "<summary line>",
