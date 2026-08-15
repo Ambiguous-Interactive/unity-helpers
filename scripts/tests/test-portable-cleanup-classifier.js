@@ -289,34 +289,64 @@ for (const deprecatedPolicyFile of [
   );
 }
 
-const workflowFiles = [
-  ".github/workflows/unity-tests.yml",
-  ".github/workflows/unity-benchmarks.yml",
-  ".github/workflows/release.yml"
-];
-const workflow = workflowFiles
-  .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
-  .join("\n");
+// Discovered, not named. Listing `unity-tests.yml`, `unity-benchmarks.yml` and `release.yml` here
+// stated where the requirement currently lives rather than what it is, and the quiet failure that
+// invites is a FOURTH workflow that returns a Unity license and is checked by nothing (#445). The
+// requirement is that every workflow returning a license passes through the central cleanup gate.
+//
+// Comments are stripped before matching, because a workflow that explains in prose where its Unity
+// job went would otherwise be discovered as one that has a Unity job.
+const workflowDir = path.join(root, ".github/workflows");
+const withoutComments = (content) =>
+  content
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+
+const licenseReturningWorkflows = fs
+  .readdirSync(workflowDir)
+  .filter((name) => /\.ya?ml$/.test(name))
+  .map((name) => ({
+    name,
+    body: withoutComments(fs.readFileSync(path.join(workflowDir, name), "utf8"))
+  }))
+  .filter((entry) => entry.body.includes("id: return_unity_license"));
+
+assert.ok(
+  licenseReturningWorkflows.length > 0,
+  "no workflow returns a Unity license; this contract has nothing to protect and has silently " +
+    "stopped checking anything"
+);
+
+const workflow = licenseReturningWorkflows.map((entry) => entry.body).join("\n");
+// The expected count is the number of license returns that exist, not a number typed here: a leg
+// added to or removed from the matrix must not have to remember to update this file.
+const occurrences = (haystack, needle) => haystack.split(needle).length - 1;
+const licenseReturns = occurrences(workflow, "id: return_unity_license");
 const centralGateUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@${policyCommit}`;
-assert.equal(workflow.split(`uses: ${centralGateUse}`).length - 1, 6);
-assert.equal(workflow.split("id: release_unity_lock").length - 1, 6);
-assert.equal(
-  workflow.split(
+
+for (const [description, needle] of [
+  ["the pinned central cleanup gate", `uses: ${centralGateUse}`],
+  ["a lock release", "id: release_unity_lock"],
+  [
+    "a forwarded resource-cleanup-status",
     "resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}"
-  ).length - 1,
-  6
-);
-assert.equal(
-  workflow.split(
+  ],
+  [
+    "a forwarded classification-complete",
     "classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}"
-  ).length - 1,
-  6
-);
-assert.equal(
-  workflow.split("release-outcome: ${{ steps.release_unity_lock.outcome }}").length - 1,
-  6
-);
-assert.equal(workflow.split("- name: Delete private Unity cleanup evidence").length - 1, 6);
+  ],
+  ["a forwarded release outcome", "release-outcome: ${{ steps.release_unity_lock.outcome }}"],
+  ["an evidence deletion step", "- name: Delete private Unity cleanup evidence"]
+]) {
+  assert.equal(
+    occurrences(workflow, needle),
+    licenseReturns,
+    `${licenseReturns} license return(s) across ` +
+      `${licenseReturningWorkflows.map((entry) => entry.name).join(", ")} but ` +
+      `${occurrences(workflow, needle)} instance(s) of ${description}`
+  );
+}
 
 process.stdout.write(
   `Central Unity cleanup policy parity passed (${classificationCases.length} classifier cases, ${gateCases.length} gate cases).\n`

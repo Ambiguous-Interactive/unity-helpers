@@ -358,21 +358,53 @@ if [ -f "$SIDEBAR_SCRIPT" ]; then
         fail "No MediaWiki [[...]] syntax in echo statements" "(none)" "$mediawiki_links"
     fi
 
-    run_test
-    # Check workflow validation regex includes underscores (in deploy-wiki.yml)
-    WORKFLOW_FILE=".github/workflows/deploy-wiki.yml"
-    if [ -f "$WORKFLOW_FILE" ] && grep -q '\[A-Za-z0-9_\.-\]' "$WORKFLOW_FILE"; then
-        pass "Validation regex includes underscores"
-    else
-        # Fall back to just checking the test file has the correct regex
-        if grep -q '\[A-Za-z0-9_\.-\]' "$0"; then
-            pass "Validation regex includes underscores"
-        else
-            fail "Validation regex includes underscores" "[A-Za-z0-9_.-]" "(not found or incomplete)"
-        fi
-    fi
 else
     echo -e "${YELLOW}⚠${NC} Python script not found: $SIDEBAR_SCRIPT (skipping script tests)"
+fi
+
+# =============================================================================
+# Test: the workflow that extracts wiki page names accepts underscores in them
+#
+# Discovered rather than named (#445). This used to read `.github/workflows/deploy-wiki.yml` by
+# path, with a fallback that checked THIS FILE for the same regex when the workflow was absent --
+# and this file contains that regex in its own fixtures, so the fallback could not fail. The
+# assertion passed whether or not any workflow validated anything.
+#
+# It also used to sit inside the `generate_wiki_sidebar.py` branch above, so deleting that Python
+# script would have silently stopped checking the workflow too. It is its own test now.
+# =============================================================================
+echo ""
+echo "=== Testing wiki page-name extraction regex ==="
+
+run_test
+sidebar_workflows=$(grep -rl '_Sidebar\.md' .github/workflows/ 2>/dev/null || true)
+if [ -z "$sidebar_workflows" ]; then
+    fail "Page-name extraction regex accepts underscores" \
+        "a workflow that reads _Sidebar.md" "(no workflow does)"
+else
+    found_classes=0
+    narrow_classes=""
+    for wf in $sidebar_workflows; do
+        for page_class in $(grep -oE '\\\]\\\(\[[^]]+\]\+\\\)' "$wf" || true); do
+            found_classes=$((found_classes + 1))
+            case "$page_class" in
+                *_*) ;;
+                *) narrow_classes="$narrow_classes $wf:$page_class" ;;
+            esac
+        done
+    done
+    if [ "$found_classes" -eq 0 ]; then
+        # Without this the test passes vacuously the moment the extraction is rewritten in a shape
+        # the pattern above does not recognize, which is the failure this rewrite exists to close.
+        fail "Page-name extraction regex accepts underscores" \
+            "at least one page-name character class" \
+            "(none found in: $sidebar_workflows)"
+    elif [ -n "$narrow_classes" ]; then
+        fail "Page-name extraction regex accepts underscores" \
+            "every class to contain _" "$narrow_classes"
+    else
+        pass "Page-name extraction regex accepts underscores ($found_classes class(es) checked)"
+    fi
 fi
 
 # =============================================================================

@@ -2754,11 +2754,30 @@ $licensedJobIds = @(
 #   1. Every leg that runs run-ci-tests.ps1 passes -ProjectRoot under
 #      RUNNER_WORKSPACE -- the checkout's PARENT, which `git clean` cannot reach.
 #   2. No Unity workflow caches a workspace-relative Library again.
+#
+# The workflows are DISCOVERED, not listed (#445). Naming unity-tests.yml and
+# unity-benchmarks.yml stated where the requirement lives rather than what it is,
+# and the quiet failure that invites is a THIRD workflow generating a Unity
+# project that nothing checks. Comments are stripped first, because the slimmed
+# workflows now explain in prose where their jobs went, and a workflow that
+# mentions run-ci-tests.ps1 in a comment does not run it.
 # ---------------------------------------------------------------------------
 $unityWorkflowFilesWithProjects = @(
-    '.github/workflows/unity-tests.yml',
-    '.github/workflows/unity-benchmarks.yml'
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot '.github/workflows') -Filter '*.yml' -File |
+        Sort-Object -Property Name |
+        Where-Object {
+            $uncommented = ((Get-Content -LiteralPath $_.FullName) |
+                    Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+            $uncommented.Contains('./scripts/unity/run-ci-tests.ps1')
+        } |
+        ForEach-Object { ".github/workflows/$($_.Name)" }
 )
+if ($unityWorkflowFilesWithProjects.Count -eq 0) {
+    # Without this the contract passes by protecting nothing the moment the invocation is spelled
+    # differently, which is the failure mode discovery is supposed to close rather than introduce.
+    Write-Host '::error file=.github/workflows/unity-tests.yml::No workflow invokes ./scripts/unity/run-ci-tests.ps1, so the persistent-project-root contract is checking nothing. If the invocation was renamed, update this discovery.'
+    $failed = $true
+}
 $persistentProjectRootArgument = "-ProjectRoot (Join-Path `$env:RUNNER_WORKSPACE 'unity-workspace')"
 foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
     $unityWorkflowPath = Join-Path $repoRoot $unityWorkflowFile
