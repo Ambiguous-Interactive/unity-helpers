@@ -37,6 +37,9 @@ jobs:
   repo-lint:
     name: Repo Lint
     runs-on: ubuntu-latest
+    # Bounded because the doc-link checks this job absorbed were bounded before it: a link walk that
+    # hangs should fail the job, not hold a runner for six hours. The first real run was 331s.
+    timeout-minutes: 20
     steps:
       # Full history: scripts/audit-license-years.sh compares committed years against the dates the
       # files were actually touched, and a depth-1 checkout makes every file look new.
