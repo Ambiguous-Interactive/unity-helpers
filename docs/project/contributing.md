@@ -18,10 +18,9 @@ invocation, and `git push`, `git fetch` and every API call invoke it.
 
 With a token cached, nothing prompts. With an **empty** cache, git used to fall back to the editor's
 own askpass dialog — another window on the host desktop, from a different mechanism. The container
-points `GIT_ASKPASS` at [`scripts/git-askpass-refuse.sh`](../../scripts/git-askpass-refuse.sh)
-instead, so that path now ends in an error naming the commands below rather than in a dialog.
-(The editor's own Git UI is unaffected: the Git extension sets `GIT_ASKPASS` explicitly for the
-processes it launches.)
+points `GIT_ASKPASS` at `scripts/git-askpass-refuse.sh` instead, so that path now ends in an error
+naming the commands below rather than in a dialog. (The editor's own Git UI is unaffected: the Git
+extension sets `GIT_ASKPASS` explicitly for the processes it launches.)
 
 Supply the token once per container, either way:
 
