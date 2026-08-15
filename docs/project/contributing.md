@@ -12,9 +12,12 @@ The easiest way to contribute is using the included dev container, which has all
 
 ### GitHub Credentials in the Container
 
-The container resolves github.com credentials from a cached token and **never prompts**. Nothing
-inside it may raise the Dev Containers credential dialog, because that dialog appears on the host
-desktop and every `git push`, `git fetch` or API call would raise another one.
+The container resolves github.com credentials from a cached token. The Dev Containers credential
+helper is out of the path entirely — that helper raises a dialog on the host desktop on **every**
+invocation, and `git push`, `git fetch` and every API call invoke it.
+
+With a token cached, nothing prompts. With an **empty** cache, git falls back to the editor's own
+askpass dialog, which is the signal to run one of the commands below rather than to answer it.
 
 Supply the token once per container, either way:
 

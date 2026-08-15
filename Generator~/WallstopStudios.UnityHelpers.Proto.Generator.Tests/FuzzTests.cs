@@ -124,8 +124,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // An all-default contract encodes to ZERO bytes, because every member equals its
             // default and protobuf omits those. Such a seed is not a mutation seed at all -- there
             // is nothing to corrupt, so every "mutation" of it is a handful of random bytes, which
-            // is the strategy above wearing this one's name. Measured: keeping them held the
-            // scalar corpus at 49.7% reaching a member reader, and dropping them takes it past 90%.
+            // is the strategy above wearing this one's name. Measured: keeping them held the scalar
+            // corpus at 49.7% reaching a member reader -- below the gate below, which is how it was
+            // found -- and dropping them clears it comfortably.
             List<byte[]> seeds = new List<byte[]>(samples.Length);
             foreach (T sample in samples)
             {
@@ -349,7 +350,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             /// <summary>
             /// A payload dying at its first key consumes one or two bytes. Past that, a member
-            /// reader ran.
+            /// reader ran. Read from the reader's Position AFTER a failure, which is where it
+            /// stopped rather than what it successfully decoded -- that is the question here, and
+            /// an unknown field skipped along the way counts as reached because the skip is code
+            /// under test too.
             /// </summary>
             private const int PastTheFirstKey = 4;
 
@@ -513,9 +517,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 // The evidence that the corpus reaches past the tag reader, measured directly from
                 // how far the reader got rather than inferred from acceptance. Acceptance is the
                 // wrong proxy here and measuring proved it: a mutated rectangular payload is usually
-                // REFUSED, deep, by the dimension header's equality check -- 8% accepted against 96%
-                // reaching a member reader. A threshold on acceptance would have demanded the
-                // corpus stop exercising the very check #434 added.
+                // REFUSED, deep, by the dimension header's equality check, so its acceptance rate
+                // sits near the floor while nearly all of its payloads reach a member reader. A
+                // threshold on acceptance would have demanded the corpus stop exercising the very
+                // check #434 added. Both live figures are in the failure message below.
                 Assert.Greater(
                     coverage.ReachRate,
                     0.5,
@@ -560,10 +565,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     );
                 }
 
-                // These are well-formed KEYS carrying hostile CLAIMS, so a real share has to be
-                // accepted -- a message of unknown fields is a valid message -- and most must reach
-                // past the first key. Zero of either would mean the generator emits garbage that
-                // dies at the first byte and the claims inside it are never evaluated.
+                // A CORPUS-QUALITY gate, not a coverage one, and the distinction is worth stating
+                // because the numbers barely move between targets: these payloads are mostly
+                // unknown fields, which every contract skips the same way, so a contract with no
+                // members at all scores about the same. What it proves is that the generator emits
+                // well-formed keys rather than garbage that dies at the first byte -- which is a
+                // precondition for the claims inside them ever being evaluated, and nothing more.
+                // Per-member coverage is the named regression cases' job.
                 Assert.Greater(
                     coverage.ReachRate,
                     0.5,
@@ -801,6 +809,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // generated exactly, across ranks one to four and every dimension that straddles a
             // boundary. A header is a CAPACITY CLAIM: the reader may believe it only to the extent
             // the sender paid for it in bytes.
+            // Every field a rectangular member occupies, not just field 1. Emitting one key put
+            // 6,000 of 7,500 decodes into targets with no header at all and left the rank-three
+            // member -- the shape #434's wrap-to-zero defect actually had -- unreachable, so the
+            // axis fix this strategy exists for was pinned by a single iteration of a single seed.
+            int[] rectangularFields = { 1, 2, 3, 4, 5, 6, 7 };
             IReadOnlyList<Target> targets = Targets();
             FuzzRandom random = new FuzzRandom(0xD13E5);
             for (int iteration = 0; iteration < Iterations; ++iteration)
@@ -832,8 +845,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     wrapper.AddRange(elements);
                 }
 
-                // Field 1 of the contract, holding that wrapper.
-                List<byte> payload = new List<byte> { 0x0A };
+                int field = rectangularFields[random.Next(rectangularFields.Length)];
+                List<byte> payload = new List<byte>();
+                WriteVarint(payload, (ulong)((field << 3) | 2));
                 WriteVarint(payload, (ulong)wrapper.Count);
                 payload.AddRange(wrapper);
 
@@ -843,16 +857,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     AssertDecodeIsSafe(
                         target,
                         bytes,
-                        $"strategy=capacity-claim seed=0xD13E5 iteration={iteration} rank={rank}"
+                        $"strategy=capacity-claim seed=0xD13E5 iteration={iteration} rank={rank} "
+                            + $"field={field}"
                     );
                 }
             }
         }
 
         /// <summary>
-        /// Findings live here, as the hex the fuzzer printed. An empty list is not a placeholder --
-        /// it is the record that every strategy above has run clean.
+        /// Findings live here, as the hex the fuzzer printed, so each one is pinned by a named case
+        /// rather than by one iteration of one seed -- a corpus that drifts must not be able to stop
+        /// covering a defect that has actually happened.
         /// </summary>
+        [TestCase(
+            "0A080A06FFFFFFFF0700",
+            TestName = "AKnownHostilePayloadIsStillRefusedCleanlyForAnAxisNothingPaysFor"
+        )]
         [TestCase("0A", TestName = "AKnownHostilePayloadIsStillRefusedCleanlyForATruncatedPrefix")]
         [TestCase(
             "0AFFFFFFFF0F",

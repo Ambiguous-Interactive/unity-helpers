@@ -277,6 +277,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             null,
             "a zero axis first, so the product is zero before the large axis is even read"
         )]
+        [TestCase(
+            2,
+            "808080020200",
+            null,
+            "a rank-three header whose zero axis hides an unbacked one, the shape #434 had"
+        )]
         [TestCase(1, "02020202", "01020304", "a rank-four header on a rank-two member")]
         [TestCase(1, "02", "01020304", "a rank-one header on a rank-two member")]
         [TestCase(1, "0202", "010203040506", "a run longer than the header allows")]

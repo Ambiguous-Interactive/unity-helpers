@@ -123,6 +123,58 @@ else
     fail "credential-helper 'get' declines hosts other than github.com" "output='$other_host'"
 fi
 
+# A `url=` line instead of a decomposed host. The parse order is a CREDENTIAL LEAK when it is wrong:
+# stripping userinfo before the path treats an `@` anywhere -- including in a path or a query -- as
+# a userinfo delimiter, so `https://evil.example/@github.com` reads as host `github.com`. Every row
+# here was measured against an implementation that did exactly that.
+served_url=0
+declined_url=0
+for hostile in \
+    'https://evil.example.com/@github.com' \
+    'https://evil.example.com/x?a=@github.com' \
+    'https://evil.example.com@notgithub.test/x' \
+    'https://gitlab.com/github.com'; do
+    if printf 'url=%s\n\n' "$hostile" | token_script get 2>/dev/null | grep -q '^password='; then
+        served_url=$((served_url + 1))
+        fail "credential-helper 'get' declines a hostile url= line" "served: $hostile"
+    fi
+done
+if [ "$served_url" = "0" ]; then
+    pass "credential-helper 'get' declines every hostile url= line"
+fi
+
+for friendly in \
+    'https://github.com/a@b/c' \
+    'https://x-access-token@github.com/owner/repo' \
+    'https://GitHub.com/owner/repo' \
+    'https://gist.github.com/owner/id'; do
+    if ! printf 'url=%s\n\n' "$friendly" | token_script get 2>/dev/null | grep -q '^password='; then
+        declined_url=$((declined_url + 1))
+        fail "credential-helper 'get' serves a legitimate url= line" "declined: $friendly"
+    fi
+done
+if [ "$declined_url" = "0" ]; then
+    pass "credential-helper 'get' serves every legitimate url= line"
+fi
+
+# Git normalizes the host in CONFIG matching but hands the helper whatever the remote said, so a
+# case-sensitive comparison declines a request our own config already claimed -- and with the
+# Dev Containers helper reset away there is nothing behind us to answer it.
+if printf 'protocol=https\nhost=GitHub.com\n\n' | token_script get 2>/dev/null \
+    | grep -q '^password='; then
+    pass "credential-helper 'get' matches the host case-insensitively"
+else
+    fail "credential-helper 'get' matches the host case-insensitively" "GitHub.com was declined"
+fi
+
+# A GitHub token authenticates gist.github.com too, and that host is a plausible remote.
+if printf 'protocol=https\nhost=gist.github.com\n\n' | token_script get 2>/dev/null \
+    | grep -q '^password='; then
+    pass "credential-helper 'get' serves github.com subdomains"
+else
+    fail "credential-helper 'get' serves github.com subdomains" "gist.github.com was declined"
+fi
+
 printf 'protocol=https\nhost=github.com\nusername=x\npassword=ghp_STORED\n\n' | token_script store > /dev/null 2>&1
 if [ "$(token_script)" = "ghp_STORED" ]; then
     pass "credential-helper 'store' caches what git obtained elsewhere"
@@ -130,12 +182,46 @@ else
     fail "credential-helper 'store' caches what git obtained elsewhere" "got '$(token_script)'"
 fi
 
+# Git calls `erase` on any REJECTED credential, for whatever host was being reached. Discarding the
+# cache on another host's 401 sends a human back through --bootstrap for a failure that had nothing
+# to do with this token.
+printf 'protocol=https\nhost=example.com\nusername=x\npassword=y\n\n' \
+    | token_script erase > /dev/null 2>&1
+if [ "$(token_script)" = "ghp_STORED" ]; then
+    pass "credential-helper 'erase' for another host leaves the cache alone"
+else
+    fail "credential-helper 'erase' for another host leaves the cache alone" "the cache was wiped"
+fi
+
+printf 'protocol=https\nhost=github.com\nusername=x\npassword=y\n\n' \
+    | token_script erase > /dev/null 2>&1
+if [ ! -f "$sandbox/token" ]; then
+    pass "credential-helper 'erase' for github.com discards a rejected credential"
+else
+    fail "credential-helper 'erase' for github.com discards a rejected credential" "cache survived"
+fi
+
+printf 'ghp_AGAIN\n' | token_script --store-stdin > /dev/null 2>&1
 token_script --erase > /dev/null 2>&1
 token_script > /dev/null 2>&1
 if [ "$?" = "3" ] && [ ! -f "$sandbox/token" ]; then
     pass "--erase removes the cache"
 else
     fail "--erase removes the cache" "the cache file survived"
+fi
+
+# `>` follows a symlink, so truncating rather than removing would write the token into the link's
+# target and chmod THAT to 600 -- putting a secret somewhere nobody looked, possibly in the tree.
+target="$sandbox/symlink-target"
+: > "$target"
+chmod 644 "$target"
+ln -sf "$target" "$sandbox/token"
+printf 'ghp_SYMLINK\n' | token_script --store-stdin > /dev/null 2>&1
+if [ ! -L "$sandbox/token" ] && [ ! -s "$target" ]; then
+    pass "a symlink at the cache path is replaced rather than written through"
+else
+    fail "a symlink at the cache path is replaced rather than written through" \
+        "link=$( [ -L "$sandbox/token" ] && echo yes || echo no) target bytes=$(wc -c < "$target")"
 fi
 rm -rf "$sandbox"
 

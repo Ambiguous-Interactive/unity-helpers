@@ -228,6 +228,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             null,
             "a zero axis first, so the product is zero before the large axis is even read"
         )]
+        [TestCase(
+            2,
+            "808080020200",
+            null,
+            "a rank-three header whose zero axis hides an unbacked one, the shape #434 had"
+        )]
         [TestCase(1, "02020202", "01020304", "a rank-four header on a rank-two member")]
         [TestCase(1, "02", "01020304", "a rank-one header on a rank-two member")]
         [TestCase(1, "0202", "010203040506", "a run longer than the header allows")]
@@ -256,7 +262,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // generator suite's fuzz strategies: a zero axis makes the product zero whatever the
             // other axes say, so `[int.MaxValue, 0]` matches an empty run exactly and reaches
             // `new int[2147483647, 0]`, which throws OutOfMemoryException out of a TryRead. An axis
-            // is a claim of its own. AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted is their control.
+            // is a claim of its own, so it is bounded by MaximumRestoredCapacity rather than by the
+            // CLR's own limit -- the smaller rows here are refused by that policy, well before any
+            // allocation would have failed. AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted is their control.
             WProtoReader reader = new WProtoReader(Wrapper(tag, dimensions, values));
 
             Assert.IsFalse(

@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
-    using WallstopStudios.UnityHelpers.Core.Serialization;
 
     /// <summary>
     /// The pieces of rectangular-array handling that would otherwise be duplicated into every

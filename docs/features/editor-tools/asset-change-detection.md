@@ -502,14 +502,20 @@ using (AssetChangeDetectionUtility.EnabledScope(false))
 
 ### A Watcher Does Not Fire for a Prefab
 
-A prefab is matched by the type of its **main asset**, which Unity reports as `GameObject`. It is never
-opened to see what components it contains, and a watcher on some other type will not fire for it.
+A prefab is matched by the type of its **main asset**, which Unity reports as `GameObject`. It is
+never opened to see what it contains, so a watcher on some other type will not fire for it — and
+neither will a watcher on the type of a sub-asset nested into a `.prefab`. (Nested sub-assets in
+`.asset` files are matched normally.)
 
 That is deliberate. Opening a prefab deserializes every component in it, which runs each one's
 `OnValidate` — so your own code runs, on every prefab, on every import, and Unity logs
 `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate` for any `OnValidate`
-that touches an API it relays. Use `SearchPrefabs` on the handler when you want prefab contents
-inspected; it is opt-in precisely because it carries that cost.
+that touches an API it relays. Watching a prefab by what it contains is not supported; watch a
+`GameObject` and inspect the prefab yourself if you need it.
+
+`SearchPrefabs` is a **different** feature and does not change this: it searches prefabs for
+instances of the **handler's own type**, so that a non-static `[DetectAssetChanged]` method can be
+invoked on them. It has no effect on which assets match a watcher.
 
 ### MonoBehaviour Instance Methods Not Working
 

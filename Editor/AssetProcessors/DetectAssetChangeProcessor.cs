@@ -1071,6 +1071,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 // Fallback for test assets: Unity's GetMainAssetTypeAtPath may return incorrect
                 // types when test classes are defined in files that don't match the class name.
                 // Actually load the asset and check its runtime type.
+                //
+                // This is the pattern the guard above exists to remove -- a load answering a type
+                // question -- and it is kept deliberately, because it is reachable only for paths
+                // under this package's own test-fixture folder and only while _includeTestAssets is
+                // set. No consumer asset can reach it, so it cannot run anyone's OnValidate but
+                // ours. It is not a template: production paths must use asset metadata.
                 if (
                     _includeTestAssets
                     && path.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase) >= 0
@@ -1104,8 +1110,15 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             // help and never could. The load is also pure waste here: the whole decision is a Type
             // predicate, and every loaded object is discarded.
             //
-            // Watching prefabs by the components they contain is not supported behavior (owner
-            // decision, #280); `SearchPrefabs` on the handler is the deliberate, opt-in route for it.
+            // Watching a prefab by what it CONTAINS is not supported behavior (owner decision,
+            // #280). Note this is not what DetectAssetChangedOptions.SearchPrefabs does -- that
+            // option searches prefabs for instances of the HANDLER's own type, so a non-static
+            // handler can be invoked on them, and has no effect on which assets match a watcher.
+            //
+            // The cost of the guard, stated rather than discovered later: a ScriptableObject nested
+            // into a .prefab with AddObjectToAsset no longer matches a watcher on its type either.
+            // Nested sub-assets conventionally live in .asset files, which are unaffected, and
+            // there is no way to tell the two cases apart without the load that is the defect.
             if (IsPrefabPath(path))
             {
                 return false;

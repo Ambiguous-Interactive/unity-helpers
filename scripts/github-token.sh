@@ -34,6 +34,32 @@ BOOTSTRAP_TIMEOUT_SECONDS="${UNITY_HELPERS_GITHUB_TOKEN_TIMEOUT:-120}"
 
 log() { printf '[github-token] %s\n' "$1" >&2; }
 
+# Extracts the host from a `url=` line's value.
+#
+# Order matters and getting it wrong is a credential leak: `#*@` strips through the FIRST `@`
+# anywhere in the string, so cutting userinfo before the path treats an `@` in a PATH as a userinfo
+# delimiter -- and `https://evil.example/@github.com` then reads as host `github.com`. The path is
+# therefore cut first, and only what remains can carry userinfo.
+host_from_url() {
+    local remainder="$1"
+    remainder="${remainder#*://}"
+    remainder="${remainder%%/*}"
+    remainder="${remainder%%\?*}"
+    remainder="${remainder##*@}"
+    printf '%s' "$remainder"
+}
+
+# github.com and its siblings (gist., www., raw.) share one credential; anything else is not ours.
+is_github_host() {
+    local candidate
+    candidate="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    candidate="${candidate%%:*}"
+    case "$candidate" in
+        github.com | *.github.com) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 usage() {
     cat >&2 <<'EOF'
 Usage: scripts/github-token.sh [command]
@@ -73,6 +99,9 @@ write_cache() {
     dir="$(dirname "$CACHE_FILE")"
     mkdir -p "$dir"
     chmod 700 "$dir" 2>/dev/null || true
+    # Removed rather than truncated, because `>` FOLLOWS a symlink: a stale or planted link at this
+    # path would otherwise receive the token, and be chmod-ed to 600 to hide the fact.
+    rm -f "$CACHE_FILE"
     # Create the file empty and lock it down BEFORE the secret lands in it: writing first and
     # chmod-ing after leaves a window where the token is world-readable.
     : > "$CACHE_FILE"
@@ -115,8 +144,28 @@ case "$command" in
         resolve_token > /dev/null 2>&1 && exit 0
         exit 1
         ;;
-    --erase | erase)
+    --erase)
         rm -f "$CACHE_FILE"
+        exit 0
+        ;;
+    erase)
+        # Git calls `erase` whenever a credential is REJECTED, for whatever host was being reached.
+        # Discarding the cache on someone else's 401 would send a human back through --bootstrap for
+        # a failure that had nothing to do with this token, so the host is checked first.
+        host=''
+        while IFS= read -r line; do
+            [ -n "$line" ] || break
+            case "$line" in
+                host=*) host="${line#host=}" ;;
+                url=*) host="$(host_from_url "${line#url=}")" ;;
+                *) ;;
+            esac
+        done
+        if is_github_host "$host"; then
+            rm -f "$CACHE_FILE"
+            log 'GitHub rejected the cached credential, so it was discarded.'
+            log 'Supply a new one with: npm run github:token:store'
+        fi
         exit 0
         ;;
     --store-stdin)
@@ -187,18 +236,11 @@ case "$command" in
             [ -n "$line" ] || break
             case "$line" in
                 host=*) host="${line#host=}" ;;
-                url=*)
-                    stripped="${line#url=}"
-                    stripped="${stripped#*://}"
-                    stripped="${stripped#*@}"
-                    host="${stripped%%/*}"
-                    ;;
+                url=*) host="$(host_from_url "${line#url=}")" ;;
                 *) ;;
             esac
         done
-        # A port is part of the host field git sends; github.com:443 is still github.com.
-        host="${host%%:*}"
-        if [ -n "$host" ] && [ "$host" != "github.com" ]; then
+        if [ -n "$host" ] && ! is_github_host "$host"; then
             exit 0
         fi
         if token="$(resolve_token)"; then
@@ -217,19 +259,13 @@ case "$command" in
             [ -n "$line" ] || break
             case "$line" in
                 host=*) host="${line#host=}" ;;
-                url=*)
-                    stripped="${line#url=}"
-                    stripped="${stripped#*://}"
-                    stripped="${stripped#*@}"
-                    host="${stripped%%/*}"
-                    ;;
+                url=*) host="$(host_from_url "${line#url=}")" ;;
                 password=*) password="${line#password=}" ;;
                 *) ;;
             esac
         done
-        host="${host%%:*}"
         password="$(sanitize_token "$password")"
-        if [ "$host" = "github.com" ] && [ -n "$password" ]; then
+        if is_github_host "$host" && [ -n "$password" ]; then
             write_cache "$password"
         fi
         exit 0

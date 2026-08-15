@@ -74,16 +74,28 @@ fi
 # once and which resets this list again to reach the Dev Containers helper directly.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOKEN_HELPER="!${SCRIPT_DIR}/github-token.sh"
-GITHUB_HELPER_KEY='credential.https://github.com.helper'
-
-current_github_helpers="$(git config --global --get-all "$GITHUB_HELPER_KEY" 2>/dev/null || true)"
 expected_github_helpers="$(printf '\n%s' "$TOKEN_HELPER")"
 
-if [ "$current_github_helpers" != "$expected_github_helpers" ]; then
-    git config --global --unset-all "$GITHUB_HELPER_KEY" 2>/dev/null || true
-    git config --global --add "$GITHUB_HELPER_KEY" '' 2>/dev/null || true
-    git config --global --add "$GITHUB_HELPER_KEY" "$TOKEN_HELPER" 2>/dev/null || true
-    log "github.com credentials now come from the cache only (scripts/github-token.sh)."
-fi
+# A URL-scoped entry matches that URL and its paths, NOT its siblings: registering github.com alone
+# leaves gist.github.com and an http:// remote reaching the Dev Containers helper, which is the
+# dialog this exists to remove. Each is claimed explicitly; the script itself serves github.com and
+# its subdomains and declines everything else.
+for github_url in \
+    'https://github.com' \
+    'http://github.com' \
+    'https://www.github.com' \
+    'https://gist.github.com' \
+    'https://raw.githubusercontent.com'; do
+    helper_key="credential.${github_url}.helper"
+    current_github_helpers="$(git config --global --get-all "$helper_key" 2>/dev/null || true)"
+    if [ "$current_github_helpers" = "$expected_github_helpers" ]; then
+        continue
+    fi
+
+    git config --global --unset-all "$helper_key" 2>/dev/null || true
+    git config --global --add "$helper_key" '' 2>/dev/null || true
+    git config --global --add "$helper_key" "$TOKEN_HELPER" 2>/dev/null || true
+    log "$github_url credentials now come from the cache only (scripts/github-token.sh)."
+done
 
 log "Container git config normalized."
