@@ -207,6 +207,10 @@ offenders="$(cd "$REPO_ROOT" && node -e '
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const allowed = new Set(["scripts/github-token.sh", "scripts/tests/test-github-token.sh"]);
+// A file that pins GIT_CONFIG_SYSTEM is running git against a throwaway config, which by
+// construction cannot reach the helper the host registered -- so it cannot raise a dialog. That
+// is a property of the file rather than its name, which is what #445 asks a contract to assert.
+const sandboxed = /GIT_CONFIG_SYSTEM=/;
 const pattern = /git (-c \S+ )*credential fill/;
 const files = execFileSync("git", ["grep", "-l", "-E", "git (-c [^ ]+ )*credential fill",
   "--", ":!*.meta", ":!progress/**"], { encoding: "utf8" })
@@ -215,8 +219,10 @@ const offenders = [];
 for (const file of files) {
   if (allowed.has(file)) continue;
   const isMarkdown = file.endsWith(".md");
+  const contents = fs.readFileSync(file, "utf8");
+  if (!isMarkdown && sandboxed.test(contents)) continue;
   let fenced = false;
-  for (const [index, line] of fs.readFileSync(file, "utf8").split("\n").entries()) {
+  for (const [index, line] of contents.split("\n").entries()) {
     if (isMarkdown && /^\s*```/.test(line)) { fenced = !fenced; continue; }
     if (!pattern.test(line)) continue;
     if (isMarkdown && !fenced) continue;                 // prose, including a prohibition

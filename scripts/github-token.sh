@@ -20,7 +20,16 @@
 # github.com in the container's ~/.gitconfig.
 set -euo pipefail
 
-CACHE_FILE="${UNITY_HELPERS_GITHUB_TOKEN_CACHE:-${HOME}/.cache/unity-helpers-devcontainer/github-token}"
+CACHE_HOME="${HOME:-}"
+if [ -z "$CACHE_HOME" ]; then
+    # Reported rather than defaulted: a cache written somewhere the caller did not expect is a
+    # secret in a surprising place, and `set -u` would otherwise fail here with "unbound variable".
+    printf '[github-token] HOME is not set, so there is nowhere to cache a credential.\n' >&2
+    printf '[github-token] Set HOME, or point UNITY_HELPERS_GITHUB_TOKEN_CACHE at a file.\n' >&2
+    exit 78
+fi
+
+CACHE_FILE="${UNITY_HELPERS_GITHUB_TOKEN_CACHE:-${CACHE_HOME}/.cache/unity-helpers-devcontainer/github-token}"
 BOOTSTRAP_TIMEOUT_SECONDS="${UNITY_HELPERS_GITHUB_TOKEN_TIMEOUT:-120}"
 
 log() { printf '[github-token] %s\n' "$1" >&2; }
@@ -169,14 +178,26 @@ case "$command" in
     get)
         # git credential protocol. Answer only for github.com; anything else is not ours to serve,
         # and claiming it would break the host's other remotes.
+        #
+        # `url=` is read as well as `host=`. Git normally decomposes a URL before calling a helper,
+        # but a caller may feed one straight through -- and a helper that ignored it would fall back
+        # to its "no host stated" branch and hand a GitHub token to whatever host was named.
         host=''
         while IFS= read -r line; do
             [ -n "$line" ] || break
             case "$line" in
                 host=*) host="${line#host=}" ;;
+                url=*)
+                    stripped="${line#url=}"
+                    stripped="${stripped#*://}"
+                    stripped="${stripped#*@}"
+                    host="${stripped%%/*}"
+                    ;;
                 *) ;;
             esac
         done
+        # A port is part of the host field git sends; github.com:443 is still github.com.
+        host="${host%%:*}"
         if [ -n "$host" ] && [ "$host" != "github.com" ]; then
             exit 0
         fi
@@ -196,10 +217,17 @@ case "$command" in
             [ -n "$line" ] || break
             case "$line" in
                 host=*) host="${line#host=}" ;;
+                url=*)
+                    stripped="${line#url=}"
+                    stripped="${stripped#*://}"
+                    stripped="${stripped#*@}"
+                    host="${stripped%%/*}"
+                    ;;
                 password=*) password="${line#password=}" ;;
                 *) ;;
             esac
         done
+        host="${host%%:*}"
         password="$(sanitize_token "$password")"
         if [ "$host" = "github.com" ] && [ -n "$password" ]; then
             write_cache "$password"
