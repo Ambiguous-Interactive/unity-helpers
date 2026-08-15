@@ -1474,7 +1474,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     type = typeof(SpriteRenderer),
                     path = "",
-                    propertyName = "m_Sprite",
+                    propertyName = UnityExtensions.SpriteBindingProperty,
                 };
 
                 ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[

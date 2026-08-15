@@ -1821,7 +1821,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             AnimationUtility.SetObjectReferenceCurve(
                 clip,
-                EditorCurveBinding.PPtrCurve("", typeof(SpriteRenderer), "m_Sprite"),
+                EditorCurveBinding.PPtrCurve(
+                    "",
+                    typeof(SpriteRenderer),
+                    UnityExtensions.SpriteBindingProperty
+                ),
                 keyframes
             );
 
@@ -2529,7 +2533,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             AnimationUtility.SetObjectReferenceCurve(
                 clip,
-                EditorCurveBinding.PPtrCurve("", typeof(SpriteRenderer), "m_Sprite"),
+                EditorCurveBinding.PPtrCurve(
+                    "",
+                    typeof(SpriteRenderer),
+                    UnityExtensions.SpriteBindingProperty
+                ),
                 keyframes
             );
 

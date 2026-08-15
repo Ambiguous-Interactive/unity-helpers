@@ -100,15 +100,35 @@ function Test-WatchdogCadenceFitsRecoveryWindow {
         [Parameter(Mandatory = $true)][int]$ThrottleFactor
     )
 
-    $cronMatch = [regex]::Match($Content, '(?m)^\s*-\s*cron:\s*"\*/(?<minutes>\d+) \* \* \* \*"\s*$')
-    $windowMatch = [regex]::Match($Content, '(?m)^\s*MAX_RERUN_AGE_SECONDS:\s*"(?<seconds>\d+)"\s*$')
-    if (-not $cronMatch.Success -or -not $windowMatch.Success) {
+    # EVERY schedule, not the first: a workflow with two crons is delivered on the union, and the
+    # slowest one is what a reader would reason from. Quoting is accepted in all three YAML spellings
+    # so a purely stylistic edit cannot redden this with a message about intervals.
+    $cronMatches = [regex]::Matches($Content, '(?m)^\s*-\s*cron:\s*(?<quote>["'']?)(?<schedule>[^"''\r\n]+)\k<quote>\s*$')
+    $windowMatch = [regex]::Match($Content, '(?m)^\s*MAX_RERUN_AGE_SECONDS:\s*["'']?(?<seconds>\d+)["'']?\s*$')
+    if ($cronMatches.Count -eq 0 -or -not $windowMatch.Success) {
         return $false
     }
 
-    $requestedSeconds = [int]$cronMatch.Groups['minutes'].Value * 60
+    $slowestSeconds = 0
+    foreach ($cronMatch in $cronMatches) {
+        $everyMatch = [regex]::Match($cronMatch.Groups['schedule'].Value.Trim(), '^\*/(?<minutes>\d+) \* \* \* \*$')
+        if (-not $everyMatch.Success) {
+            return $false
+        }
+
+        $minutes = [int]$everyMatch.Groups['minutes'].Value
+        if ($minutes -lt 1) {
+            return $false
+        }
+
+        $seconds = $minutes * 60
+        if ($seconds -gt $slowestSeconds) {
+            $slowestSeconds = $seconds
+        }
+    }
+
     $windowSeconds = [int]$windowMatch.Groups['seconds'].Value
-    return ($requestedSeconds * $ThrottleFactor) -lt $windowSeconds
+    return ($slowestSeconds * $ThrottleFactor) -lt $windowSeconds
 }
 
 function Get-BuildLockActionPins {
@@ -3187,7 +3207,7 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
             # window in which an all-green cancelled run (#342) can still be recovered.
             Name = 'watchdog cadence leaves room inside the re-run recovery window'
             Ok = (Test-WatchdogCadenceFitsRecoveryWindow -Content $watchdogContent -ThrottleFactor 4)
-            Message = 'The watchdog schedule must satisfy (cron interval x 4) < MAX_RERUN_AGE_SECONDS. GitHub delivers roughly one run per four requested ticks, so a cron of 15 minutes is already an hour of real latency -- and at an hour a run cancelled with every step green ages out of the recovery window between two ticks, which is the one failure this workflow exists to repair automatically. Express the schedule as "*/N * * * *" so this contract can read it.'
+            Message = 'The watchdog schedule must satisfy (slowest cron interval x 4) < MAX_RERUN_AGE_SECONDS. GitHub delivers roughly one run per four requested ticks, so a cron of 15 minutes is already an hour of real latency -- and at an hour a run cancelled with every step green ages out of the recovery window between two ticks, which is the one failure this workflow exists to repair automatically. Every schedule must be written as "*/N * * * *" (quoted or not) with N of at least 1, because that is the only form whose delivered gap this can reason about; a fixed-time cron fails closed here rather than being waved through.'
             File = '.github/workflows/stuck-job-watchdog.yml'
         }
     )

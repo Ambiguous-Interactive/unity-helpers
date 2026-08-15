@@ -393,6 +393,25 @@ done
 # way to close that path is to be the askpass.
 ASKPASS="$REPO_ROOT/scripts/git-askpass-refuse.sh"
 
+# git EXECUTES GIT_ASKPASS as a program, so the exec bit is the wiring. Every assertion below runs
+# it through `bash`, which succeeds on a 644 file -- so without this the suite stays green while git
+# reports "cannot exec" and falls back to... nothing, which is safe, but the refusal message the
+# whole file exists to deliver never reaches anyone. `.git` is bind-mounted from a Windows host with
+# `filemode = false`, which is exactly how a mode regression gets committed unnoticed.
+if [ -x "$ASKPASS" ]; then
+    pass "the askpass refusal is executable"
+else
+    fail "the askpass refusal is executable" \
+        "git runs GIT_ASKPASS as a program; $ASKPASS is not executable"
+fi
+
+if [ "$(git -C "$REPO_ROOT" ls-files -s scripts/git-askpass-refuse.sh | cut -d' ' -f1)" = "100755" ]; then
+    pass "the askpass refusal is executable in the index"
+else
+    fail "the askpass refusal is executable in the index" \
+        "run: git update-index --chmod=+x scripts/git-askpass-refuse.sh"
+fi
+
 # STDOUT is the answer git uses. A single character here is handed to the remote as a credential,
 # so "prints nothing on stdout" is the security property, not a tidiness one.
 askpass_stdout="$(bash "$ASKPASS" "Password for 'https://github.com': " 2>/dev/null)"

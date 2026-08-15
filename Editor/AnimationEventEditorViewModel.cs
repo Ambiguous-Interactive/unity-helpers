@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -60,7 +61,11 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             ObjectReferenceKeyframe[] curve = AnimationUtility.GetObjectReferenceCurve(
                 clip,
-                EditorCurveBinding.PPtrCurve(string.Empty, typeof(SpriteRenderer), "m_Sprite")
+                EditorCurveBinding.PPtrCurve(
+                    string.Empty,
+                    typeof(SpriteRenderer),
+                    UnityExtensions.SpriteBindingProperty
+                )
             );
             if (curve != null)
             {

@@ -187,9 +187,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal IReadOnlyList<byte[]> Seeds { get; }
 
             /// <summary>
-            /// The field numbers this contract's members occupy, read out of the seeds rather than
-            /// declared here. A member added to a contract and set in its sample is covered by the
-            /// gate automatically; a list written down beside it would have to be remembered.
+            /// The wire keys this contract's members occupy -- <c>(field &lt;&lt; 3) | wireType</c>
+            /// -- read out of the seeds rather than declared here. A member added to a contract and
+            /// set in its sample is covered by the gate automatically; a list written down beside it
+            /// would have to be remembered.
             /// </summary>
             internal IReadOnlyList<int> Members { get; }
 
@@ -322,11 +323,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// How far the reader got. A key that ends at or before this offset is one the reader
         /// dispatched on, which is the question a per-member coverage claim is really asking.
         /// </param>
-        /// <param name="fields">Receives the field numbers found.</param>
+        /// <param name="fields">Receives the keys found, as <c>(field &lt;&lt; 3) | wireType</c>.</param>
         /// <remarks>
+        /// <para>
         /// A deliberately independent walk rather than a hook inside the reader: instrumenting the
         /// thing under test to report on itself would let a reader that silently skipped a member
         /// look covered.
+        /// </para>
+        /// <para>
+        /// The <b>whole key</b> is recorded, not the field number. A generated reader dispatches on
+        /// field and wire type together and skips a field whose wire type it does not expect -- and
+        /// the bit-flip mutator changes a wire type on roughly three keys in eight. Recording the
+        /// field alone would count those skips as "this member's reader ran", which is exactly what
+        /// the gate's failure message denies.
+        /// </para>
         /// </remarks>
         private static void ScanTopLevelFields(byte[] payload, int limit, ISet<int> fields)
         {
@@ -347,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 if (offset <= limit)
                 {
-                    fields.Add(field);
+                    fields.Add((field << 3) | wireType);
                 }
 
                 switch (wireType)
@@ -991,10 +1001,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal string DescribeMembers(string target, IReadOnlyList<int> members)
             {
                 StringBuilder text = new StringBuilder(Describe(target));
-                text.Append("; per member:");
+                text.Append("; per member (field/wire=hits):");
                 foreach (int member in members)
                 {
-                    text.Append(' ').Append(member).Append('=').Append(HitsFor(member));
+                    text.Append(' ')
+                        .Append(member >> 3)
+                        .Append('/')
+                        .Append(member & 7)
+                        .Append('=')
+                        .Append(HitsFor(member));
                 }
 
                 return text.ToString();
@@ -1181,6 +1196,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// the formatter also refused.
         /// </para>
         /// <para>
+        /// <b>What is and is not incremental, stated rather than implied.</b> The facade reaches the
+        /// same formatter with the same bytes, so it decodes nothing this suite has not already
+        /// decoded -- against the shipped code every assertion below except the
+        /// unexpected-exception arm is unreachable, and saying otherwise would oversell it. They are
+        /// <i>regression</i> assertions, and the mutations prove they fire: making
+        /// <c>TryDeserializeAs</c> decline instead of throwing reddens eight tests here. What the
+        /// facade adds over the formatter is the SHAPE OF A REFUSAL, and that is the thing a corrupt
+        /// save file meets and the thing nothing pinned.
+        /// </para>
+        /// <para>
         /// Allocation is measured on the formatter's own read rather than here, because a throw
         /// allocates an exception and a stack trace -- charging that to the payload would say a
         /// refusal is more expensive than an acceptance, which is true and irrelevant.
@@ -1321,8 +1346,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         coverage.HitsFor(member),
                         minimumHits,
                         coverage.DescribeMembers(target.Name, target.Members)
-                            + $" -- field {member} was dispatched on fewer than {minimumHits} "
-                            + "times, so this suite does not fuzz that member's reader."
+                            + $" -- field {member >> 3} at wire type {member & 7} was dispatched "
+                            + $"on fewer than {minimumHits} times, so this suite does not fuzz that "
+                            + "member's reader."
                     );
                 }
             }
@@ -1717,15 +1743,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// </summary>
         /// <param name="hex">The payload.</param>
         /// <param name="limit">How far the reader is claimed to have got.</param>
-        /// <returns>The field numbers found, comma separated.</returns>
-        [TestCase("0801", 2, ExpectedResult = "1")]
-        [TestCase("08011002", 4, ExpectedResult = "1,2")]
-        [TestCase("08011002", 1, ExpectedResult = "1")]
+        /// <returns>The keys found, as <c>field/wireType</c>, comma separated.</returns>
+        [TestCase("0801", 2, ExpectedResult = "1/0")]
+        [TestCase("08011002", 4, ExpectedResult = "1/0,2/0")]
+        [TestCase("08011002", 1, ExpectedResult = "1/0")]
         [TestCase("08011002", 0, ExpectedResult = "")]
-        [TestCase("0A026162 1003", 6, ExpectedResult = "1,2")]
-        [TestCase("0A05", 2, ExpectedResult = "1")]
-        [TestCase("0D0000803F 1103000000000000 00", 14, ExpectedResult = "1,2")]
-        [TestCase("1B 0801", 3, ExpectedResult = "3")]
+        [TestCase("0A026162 1003", 6, ExpectedResult = "1/2,2/0")]
+        [TestCase("0A05", 2, ExpectedResult = "1/2")]
+        [TestCase("0D0000803F 1103000000000000 00", 14, ExpectedResult = "1/5,2/1")]
+        [TestCase("1B 0801", 3, ExpectedResult = "3/3")]
+        // One field at two wire types is two keys, because it is two dispatch outcomes: the reader
+        // serves the one its member declares and skips the other as unknown.
+        [TestCase("0801 0A0161", 5, ExpectedResult = "1/0,1/2")]
         [TestCase("00", 1, ExpectedResult = "")]
         [TestCase("FFFFFFFFFFFFFFFFFFFF7F", 11, ExpectedResult = "")]
         [TestCase("", 0, ExpectedResult = "")]
@@ -1734,9 +1763,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             int limit
         )
         {
-            SortedSet<int> fields = new SortedSet<int>();
-            ScanTopLevelFields(FromHex(hex.Replace(" ", string.Empty)), limit, fields);
-            return string.Join(",", fields);
+            SortedSet<int> keys = new SortedSet<int>();
+            ScanTopLevelFields(FromHex(hex.Replace(" ", string.Empty)), limit, keys);
+            List<string> rendered = new List<string>(keys.Count);
+            foreach (int key in keys)
+            {
+                rendered.Add($"{key >> 3}/{key & 7}");
+            }
+
+            return string.Join(",", rendered);
         }
 
         [Test]

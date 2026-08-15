@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             binding.type == typeof(SpriteRenderer)
                             && string.Equals(
                                 binding.propertyName,
-                                "m_Sprite",
+                                UnityExtensions.SpriteBindingProperty,
                                 StringComparison.Ordinal
                             )
                         )
@@ -1498,7 +1498,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 if (
                     b.type == typeof(SpriteRenderer)
-                    && string.Equals(b.propertyName, "m_Sprite", StringComparison.Ordinal)
+                    && string.Equals(
+                        b.propertyName,
+                        UnityExtensions.SpriteBindingProperty,
+                        StringComparison.Ordinal
+                    )
                     && (
                         string.IsNullOrWhiteSpace(bindingPath)
                         || string.Equals(b.path, bindingPath, StringComparison.Ordinal)
@@ -1517,7 +1521,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     if (
                         b.type == typeof(SpriteRenderer)
-                        && string.Equals(b.propertyName, "m_Sprite", StringComparison.Ordinal)
+                        && string.Equals(
+                            b.propertyName,
+                            UnityExtensions.SpriteBindingProperty,
+                            StringComparison.Ordinal
+                        )
                     )
                     {
                         spriteBinding = b;

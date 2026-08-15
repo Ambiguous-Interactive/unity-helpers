@@ -99,15 +99,17 @@ function registryLeafCommands() {
 }
 
 /**
- * A file's text with comments and bare YAML list entries removed.
+ * A file's text with everything that MENTIONS a script but does not RUN it removed.
  *
- * Both removals are load-bearing. `llm-instructions-lint.yml` names
- * `scripts/lint-llm-instructions.ps1` twice in `paths:` filters before it ever runs it, so a plain
- * substring search cannot tell "this workflow re-runs when the linter changes" from "this workflow
- * runs the linter" -- and the first is true of workflows that do not run it at all.
+ * Every removal here is a shape that produced a false "this owner runs it":
+ * - Comments, whole-line and trailing. `llm-instructions-lint.yml` names
+ *   `scripts/lint-llm-instructions.ps1` twice in `paths:` filters before it ever runs it.
+ * - `paths:` / `paths-ignore:` / `files:` keys, including a flow sequence written on the same line
+ *   (`paths: ["scripts/x.ps1"]`), and the bare list entries under them.
+ * - Documentation keys (`name:`, `description:`, `title:`), which are prose about the step.
  *
  * @param {string} relativePath Repo-relative file.
- * @returns {string} Text with comments and path-filter entries dropped.
+ * @returns {string} Text with mentions dropped and invocations kept.
  */
 function invocationText(relativePath) {
   const full = path.join(repoRoot, relativePath);
@@ -117,9 +119,23 @@ function invocationText(relativePath) {
   return fs
     .readFileSync(full, "utf8")
     .split(/\r?\n/)
+    .map((line) => line.replace(/\s+#.*$/, ""))
     .filter((line) => !/^\s*#/.test(line))
+    .filter((line) => !/^\s*-?\s*(?:paths|paths-ignore|files|exclude)\s*:/.test(line))
+    .filter((line) => !/^\s*-?\s*(?:name|description|title|summary)\s*:/.test(line))
     .filter((line) => !/^\s*-\s*["']?!?[^:\s"']+["']?\s*$/.test(line))
     .join("\n");
+}
+
+/**
+ * @param {string} file Repo-relative script path.
+ * @returns {RegExp} Matches the path as a token, not as a suffix of a longer one.
+ */
+function invocationPattern(file) {
+  const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // The leading class excludes `/`, so `tools/scripts/lint-foo.ps1` does not answer for
+  // `scripts/lint-foo.ps1`; the trailing lookahead excludes a longer file name.
+  return new RegExp(`(?:^|[^\\w/.-])(?:\\./)?${escaped}(?![\\w.-])`, "m");
 }
 
 /**
@@ -132,7 +148,7 @@ function fileInvokes(containerRelativePath, file) {
   if (!text) {
     return false;
   }
-  if (text.includes(file)) {
+  if (invocationPattern(file).test(text)) {
     return true;
   }
   for (const match of text.matchAll(/npm run ([\w:.-]+)/g)) {
@@ -144,19 +160,25 @@ function fileInvokes(containerRelativePath, file) {
 }
 
 /**
- * @param {string} dir Repo-relative directory to scan, one level deep.
+ * @param {string} dir Repo-relative directory to scan, recursively.
  * @param {string} file Repo-relative script path.
- * @returns {string[]} The files in `dir` that invoke it.
+ * @returns {string[]} The files under `dir` that invoke it.
  */
 function filesInvoking(dir, file) {
   const full = path.join(repoRoot, dir);
   if (!fs.existsSync(full)) {
     return [];
   }
-  return fs
-    .readdirSync(full)
-    .map((name) => `${dir}/${name}`)
-    .filter((candidate) => fileInvokes(candidate, file));
+  const found = [];
+  for (const entry of fs.readdirSync(full, { withFileTypes: true })) {
+    const candidate = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      found.push(...filesInvoking(candidate, file));
+    } else if (fileInvokes(candidate, file)) {
+      found.push(candidate);
+    }
+  }
+  return found;
 }
 
 console.log("Testing scripts/run-repo-lint.js...\n");
@@ -431,9 +453,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/validate-git-push-config.ps1", "prepush"]
   ]);
 
+  // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
+  // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
-    ["hook", (file) => filesInvoking(".githooks", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
     ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)],
     ["precommit-config", (file) => fileInvokes(".pre-commit-config.yaml", file)]
