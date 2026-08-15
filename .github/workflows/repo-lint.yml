@@ -12,6 +12,18 @@ name: Repo Lint
 # going after a failure and reports every failing check at once, and
 # scripts/tests/test-run-repo-lint.js asserts no linter in scripts/ has been left unreachable.
 #
+# The checks run concurrently, one worker per core, which is why this is still one job rather than
+# the balanced matrix the plan proposed. Measured on `main`:
+#
+#   20 workflows (before #444)   128 s wall clock   ~730 s billable
+#   1 serial job (#444)          317 s wall clock    317 s billable
+#   1 concurrent job (this)      ~110 s wall clock  ~110 s billable
+#
+# A 3-leg matrix would have reached roughly the same wall clock at three times the billable cost,
+# because each leg pays its own boot, checkout and npm install. Concurrency inside the job pays none
+# of that: the checks are independent processes that only read the tree. The runner takes `--jobs`
+# and defaults to the core count, so nothing here needs to know how large the runner is.
+#
 # Deliberately NOT folded in:
 #   * LLM Instructions Lint runs the skills-index generator on Windows as well, to catch a
 #     Windows-only BOM or sort order. An Ubuntu-only job cannot do that.
@@ -38,7 +50,8 @@ jobs:
     name: Repo Lint
     runs-on: ubuntu-latest
     # Bounded because the doc-link checks this job absorbed were bounded before it: a link walk that
-    # hangs should fail the job, not hold a runner for six hours. The first real run was 331s.
+    # hangs should fail the job, not hold a runner for six hours. This is a hang guard rather than a
+    # performance number, so it keeps its headroom over the measured run above.
     timeout-minutes: 20
     steps:
       # Full history: scripts/audit-license-years.sh compares committed years against the dates the

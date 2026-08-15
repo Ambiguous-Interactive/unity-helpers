@@ -15,12 +15,19 @@
 //     `scripts/` is actually reached by something -- the failure mode consolidation invites is a
 //     linter that still exists and no longer runs.
 //
+// The checks run concurrently (`--jobs`, one worker per core by default). Consolidation traded the
+// lint signal's wall clock for its billable cost -- measured on `main`, the twenty retired workflows
+// finished in 128 s of wall clock for ~730 s of runner time, and the one job that replaced them took
+// 317 s for 317 s. Concurrency buys the wall clock back without buying the runner boots back: the
+// checks are independent processes that only read the tree, so the constraint is cores, not order.
+//
 // Commands are the ones the retired workflows ran, verbatim, so consolidation moved the work
 // without changing it. Where an npm script was already the exact entry point, that script is used
 // so the definition still lives in exactly one place.
 
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -298,12 +305,29 @@ const CHECKS = [
 ];
 
 /**
+ * Concurrency the runner uses when `--jobs` is not supplied. The checks are independent processes
+ * that only read the tree, so this is bounded by cores rather than by anything about the registry.
+ *
+ * @returns {number} Default worker count.
+ */
+function defaultJobs() {
+  const cores =
+    typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
+  return Math.max(1, cores);
+}
+
+/**
  * @param {string[]} argv Raw process arguments, without node and the script path.
- * @returns {{only: Set<string>, list: boolean}} Parsed selection.
+ * @returns {{only: Set<string>, list: boolean, jobs: number, jobsInvalid: string|null}} Selection.
  */
 function parseArguments(argv) {
   const only = new Set();
   let list = false;
+  let jobs = 0;
+  // Null rather than "" for absent: `--jobs ""` is itself an invalid value to report, and an empty
+  // string is falsy, so a truthiness test would wave through the one spelling most likely to arrive
+  // from a shell expansion that produced nothing.
+  let jobsInvalid = null;
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
     if (argument === "--list") {
@@ -317,65 +341,118 @@ function parseArguments(argv) {
           }
         }
       }
+    } else if (argument === "--jobs") {
+      // A malformed value must fail rather than silently fall back to the default: `--jobs 0` from a
+      // shell expansion that produced nothing would otherwise look like it was honored.
+      const value = argv[++index];
+      const parsed = Number(value);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        jobsInvalid = String(value);
+      } else {
+        jobs = parsed;
+      }
     }
   }
-  return { only, list };
+  return { only, list, jobs: jobs || defaultJobs(), jobsInvalid };
 }
 
 /**
+ * Runs one check to completion, capturing its output rather than letting it stream.
+ *
+ * Capturing is what makes concurrency readable. `::group::` is a positional marker -- GitHub folds
+ * everything between it and the next `::endgroup::` -- so two checks writing to the log at once
+ * would interleave into each other's folds and the whole log becomes unreadable. Buffering costs
+ * one check's output in memory (the largest in this registry is well under a megabyte) and lets the
+ * completed fold be written as a unit.
+ *
  * @param {{id: string, name: string, run: string}} check The registry entry to execute.
- * @returns {{id: string, name: string, ok: boolean, seconds: number}} Its outcome.
+ * @returns {Promise<{id: string, name: string, ok: boolean, seconds: number}>} Its outcome.
  */
 function runCheck(check) {
-  const startedAt = process.hrtime.bigint();
-  // GitHub renders `::group::` as a collapsible section, which is what keeps ~57 checks in one job
-  // readable. The name is echoed before the command so a failure is identifiable from the fold.
-  process.stdout.write(`::group::${check.name} (${check.id})\n`);
-  process.stdout.write(`$ ${check.run}\n`);
+  return new Promise((resolve) => {
+    const startedAt = process.hrtime.bigint();
+    const child = spawn("bash", ["-c", check.run], {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env
+    });
 
-  const result = spawnSync("bash", ["-c", check.run], {
-    cwd: repoRoot,
-    stdio: "inherit",
-    env: process.env
+    // Interleaved into one buffer rather than two, so a script's stderr stays next to the stdout it
+    // was describing instead of being appended after everything it explains.
+    const chunks = [];
+    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.stderr.on("data", (chunk) => chunks.push(chunk));
+
+    const finish = (status, signal) => {
+      const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+      const ok = status === 0;
+      // The name is echoed before the command so a failure is identifiable from the collapsed fold.
+      let block = `::group::${check.name} (${check.id})\n$ ${check.run}\n`;
+      block += Buffer.concat(chunks).toString("utf8");
+      block += "::endgroup::\n";
+      if (!ok) {
+        // Outside the fold, so a red job shows what failed without expanding anything.
+        const reason = status === null ? `signal ${signal}` : `exit ${status}`;
+        block += `::error::${check.name} (${check.id}) failed with ${reason}.\n`;
+      }
+      process.stdout.write(block);
+      resolve({ id: check.id, name: check.name, ok, seconds });
+    };
+
+    // A command bash cannot even launch must be a failed check, not an unhandled rejection.
+    child.on("error", (error) => {
+      chunks.push(Buffer.from(`${error.message}\n`, "utf8"));
+      finish(null, "spawn-error");
+    });
+    child.on("close", finish);
   });
-
-  const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
-  const ok = result.status === 0;
-  process.stdout.write("::endgroup::\n");
-  if (!ok) {
-    // Outside the fold, so a red job shows what failed without expanding anything.
-    const reason = result.status === null ? `signal ${result.signal}` : `exit ${result.status}`;
-    process.stdout.write(`::error::${check.name} (${check.id}) failed with ${reason}.\n`);
-  }
-  return { id: check.id, name: check.name, ok, seconds };
 }
 
 /**
- * Runs every supplied check, in order, regardless of how many of them fail. This is the property
- * that distinguishes the runner from the `&&` chain it replaced, so it is exported for
+ * Runs every supplied check regardless of how many of them fail. This is the property that
+ * distinguishes the runner from the `&&` chain it replaced, so it is exported for
  * scripts/tests/test-run-repo-lint.js to assert directly rather than infer.
  *
+ * Results are returned in registry order however the workers interleave, so the summary table does
+ * not reorder itself run to run; the folds are written in completion order, which is what makes the
+ * log show progress rather than arriving all at once.
+ *
  * @param {{id: string, name: string, run: string}[]} checks Registry entries to execute.
- * @returns {{id: string, name: string, ok: boolean, seconds: number}[]} One outcome per check.
+ * @param {number} [jobs] Maximum checks to run at once. Defaults to one worker per core.
+ * @returns {Promise<{id: string, name: string, ok: boolean, seconds: number}[]>} One per check.
  */
-function runChecks(checks) {
-  return checks.map(runCheck);
+async function runChecks(checks, jobs = defaultJobs()) {
+  const results = new Array(checks.length);
+  let next = 0;
+  const worker = async () => {
+    for (let index = next++; index < checks.length; index = next++) {
+      results[index] = await runCheck(checks[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(jobs, checks.length) }, worker));
+  return results;
 }
 
 /**
  * @param {{id: string, name: string, ok: boolean, seconds: number}[]} results Completed outcomes.
+ * @param {number} wallSeconds Elapsed time for the whole run.
+ * @param {number} jobs Worker count the run used.
  */
-function writeStepSummary(results) {
+function writeStepSummary(results, wallSeconds, jobs) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) {
     return;
   }
   const failures = results.filter((result) => !result.ok);
   const total = results.reduce((sum, result) => sum + result.seconds, 0);
+  // The per-check table goes to the summary because the job log has no other place it can be read
+  // without expanding sixty folds, and it is the measurement any future re-balancing starts from.
+  const slowest = [...results].sort((a, b) => b.seconds - a.seconds).slice(0, 10);
   const lines = [
     "## Repo Lint",
     "",
-    `${results.length - failures.length}/${results.length} checks passed in ${total.toFixed(1)}s.`,
+    `${results.length - failures.length}/${results.length} checks passed in ` +
+      `${wallSeconds.toFixed(1)}s wall clock across ${jobs} job(s) (${total.toFixed(1)}s serial).`,
     ""
   ];
   if (failures.length > 0) {
@@ -393,11 +470,28 @@ function writeStepSummary(results) {
       ""
     );
   }
+  lines.push(
+    "<details><summary>Ten slowest checks</summary>",
+    "",
+    "| Check | id | Seconds |",
+    "| --- | --- | ---: |",
+    ...slowest.map(
+      (result) => `| ${result.name} | \`${result.id}\` | ${result.seconds.toFixed(1)} |`
+    ),
+    "",
+    "</details>",
+    ""
+  );
   fs.appendFileSync(summaryPath, lines.join("\n") + "\n", "utf8");
 }
 
-function main() {
-  const { only, list } = parseArguments(process.argv.slice(2));
+async function main() {
+  const { only, list, jobs, jobsInvalid } = parseArguments(process.argv.slice(2));
+
+  if (jobsInvalid !== null) {
+    process.stdout.write(`::error::--jobs must be a positive integer, got: ${jobsInvalid}\n`);
+    return 1;
+  }
 
   if (list) {
     for (const check of CHECKS) {
@@ -419,10 +513,12 @@ function main() {
     }
   }
 
-  const results = runChecks(selected);
+  const wallStartedAt = process.hrtime.bigint();
+  const results = await runChecks(selected, jobs);
+  const wallSeconds = Number(process.hrtime.bigint() - wallStartedAt) / 1e9;
   const failures = results.filter((result) => !result.ok);
 
-  writeStepSummary(results);
+  writeStepSummary(results, wallSeconds, jobs);
 
   process.stdout.write("\n");
   for (const result of results) {
@@ -431,8 +527,12 @@ function main() {
     );
   }
   const total = results.reduce((sum, result) => sum + result.seconds, 0);
+  // Both numbers, because only the wall clock says what the job cost and only the sum says what the
+  // registry costs -- and their ratio is the evidence for whether `--jobs` is still earning its keep.
   process.stdout.write(
-    `\n${results.length - failures.length}/${results.length} checks passed in ${total.toFixed(1)}s.\n`
+    `\n${results.length - failures.length}/${results.length} checks passed in ` +
+      `${wallSeconds.toFixed(1)}s wall clock across ${jobs} job(s) ` +
+      `(${total.toFixed(1)}s serial).\n`
   );
 
   if (failures.length > 0) {
@@ -450,5 +550,7 @@ function main() {
 module.exports = { CHECKS, runChecks };
 
 if (require.main === module) {
-  process.exitCode = main();
+  main().then((code) => {
+    process.exitCode = code;
+  });
 }
