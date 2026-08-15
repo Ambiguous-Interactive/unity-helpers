@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     ///
     /// This attribute ignores the test ONLY in IL2CPP builds (<c>ENABLE_IL2CPP</c>); on Mono it is a
     /// no-op and the test runs normally. It is an INTERIM measure: remove every usage once the
-    /// in-tree, AOT-native, wire-compatible WallstopProto serializer lands (see PLAN.md). Tracking the
+    /// in-tree, AOT-native, wire-compatible WallstopProto serializer lands (issue 343). Tracking the
     /// usages is how we find the gates to delete.
     /// </summary>
     [AttributeUsage(
@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     {
         private const string DefaultReason =
             "Reflection-based serialization (protobuf-net / System.Text.Json) is not AOT-compatible "
-            + "under IL2CPP; runs on the Mono backend. Interim gate tracked by WallstopProto (PLAN.md).";
+            + "under IL2CPP; runs on the Mono backend. Interim gate tracked by WallstopProto (issue 343).";
 
         private readonly string _reason;
 

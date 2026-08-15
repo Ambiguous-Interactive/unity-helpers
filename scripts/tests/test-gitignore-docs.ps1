@@ -392,13 +392,13 @@ Write-TestResult "IgnoredButUntrackedFile_Passes" ($result6b.ExitCode -eq 0) "Ex
 Remove-TestRepo $repo6b
 
 # Test 6c: a negation resolves it the other way -- the file is meant to be tracked, so the pattern
-# is what gets narrowed. This is what PLAN.md needed.
-$repo6c = New-TestRepo -GitignoreContent "PLAN.md*`n!PLAN.md" -DocsFiles @('index.md')
+# is what gets narrowed rather than the file untracked.
+$repo6c = New-TestRepo -GitignoreContent "NOTES.md*`n!NOTES.md" -DocsFiles @('index.md')
 Push-Location $repo6c
 try {
-  '# Plan' | Set-Content -Path 'PLAN.md' -Encoding UTF8
+  '# Notes' | Set-Content -Path 'NOTES.md' -Encoding UTF8
   & git add -A 2>&1 | Out-Null
-  & git commit -q -m 'Track the plan' 2>&1 | Out-Null
+  & git commit -q -m 'Track the notes' 2>&1 | Out-Null
 } finally {
   Pop-Location
 }

@@ -351,7 +351,8 @@ if (Test-Path 'mkdocs.yml') {
 # in the repository forever, `git status` never mentions it, and re-adding it after a delete
 # silently does nothing. Every instance found when this check was written was a bug in one direction
 # or the other -- ten agent session logs and eight `.github/**.meta` files that should never have
-# been committed, and `PLAN.md`, which should never have been ignored.
+# been committed, and a plan file that was ignored and tracked at the same time for a while, which
+# is the shape that reads as "nothing is wrong" right up until a delete silently does nothing.
 Write-Info 'Check 4: Verifying no tracked file is gitignored...'
 
 # --exclude-per-directory rather than --exclude-standard, deliberately. The latter also honours
@@ -382,7 +383,7 @@ if ($trackedIgnoredPaths.Count -gt 0) {
   }
   Write-Host ''
   Write-Host 'Fix: decide which one is wrong.' -ForegroundColor Cyan
-  Write-Host '  - The file belongs in the repository: narrow the pattern, or add a negation (!PLAN.md).' -ForegroundColor Cyan
+  Write-Host '  - The file belongs in the repository: narrow the pattern, or add a negation (!kept.md).' -ForegroundColor Cyan
   Write-Host '  - The file does not: git rm --cached <path> to untrack it while keeping it on disk.' -ForegroundColor Cyan
   Write-Host ''
 } else {

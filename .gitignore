@@ -40,6 +40,12 @@ logs_*zip.meta
 /design-system.meta
 /GOAL.md
 /GOAL.md.meta
+# The plan is scaffolding like the progress logs beside it: rewritten every session, read by the
+# next one, and not part of what the package ships. The trailing `*` covers the scratch copies that
+# appear next to it (PLAN.md.bak, PLAN.md.orig); anchoring to the root leaves a docs/PLAN.md, should
+# one ever be written, tracked like any other documentation.
+/PLAN.md*
+/BACKUP_PLAN.md*
 
 logs_extracted*
 
@@ -369,14 +375,6 @@ Samples~/**/*.rsp.meta
 !Generator~/**
 Generator~/**/bin/**
 Generator~/**/obj/**
-
-# The plan itself is tracked; the pattern exists for the scratch copies beside it
-# (PLAN.md.bak, PLAN.md.orig). Without these negations `PLAN.md` is a tracked file that
-# git says should not exist, which is what `lint-gitignore-docs.ps1` check 4 refuses.
-PLAN.md*
-!PLAN.md
-!PLAN.md.meta
-BACKUP_PLAN.md*
 
 artifacts*/
 artifacts/**

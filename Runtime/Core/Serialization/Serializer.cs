@@ -1035,8 +1035,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         // The dispatch happens in our managed code rather than protobuf's model builder. NOTE: protobuf-net
         // serialization is NOT AOT-compatible under IL2CPP -- its serializer model is built at runtime via
         // reflection/MakeGenericType, which IL2CPP cannot emit -- so it is supported only on the Mono
-        // scripting backend. The in-tree WallstopProto serializer (see PLAN.md) is the planned IL2CPP-safe,
-        // wire-compatible replacement.
+        // scripting backend. The in-tree WallstopProto serializer is the planned IL2CPP-safe,
+        // wire-compatible replacement; see docs/features/serialization/serialization.md.
         private static readonly ConcurrentDictionary<
             Type,
             Func<object, byte[]>
