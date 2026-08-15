@@ -265,6 +265,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             null,
             "a rank-three header whose product wraps to 0"
         )]
+        [TestCase(
+            1,
+            "FFFFFFFF0700",
+            null,
+            "an axis of int.MaxValue beside a zero axis, which multiplies to an empty run"
+        )]
+        [TestCase(
+            1,
+            "008080C002",
+            null,
+            "a zero axis first, so the product is zero before the large axis is even read"
+        )]
         [TestCase(1, "02020202", "01020304", "a rank-four header on a rank-two member")]
         [TestCase(1, "02", "01020304", "a rank-one header on a rank-two member")]
         [TestCase(1, "0202", "010203040506", "a run longer than the header allows")]
@@ -312,6 +324,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(2, restored.Grid.GetLength(0));
             Assert.AreEqual(2, restored.Grid.GetLength(1));
             Assert.AreEqual(4, restored.Grid[1, 1]);
+        }
+
+        [Test]
+        public void AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted()
+        {
+            // The control for the two zero-axis rows above, and the reason they are refused for the
+            // axis rather than for being empty. `new int[5, 0]` is a real shape with real dimensions
+            // and no elements, and it has to keep round-tripping -- the refusal is of an axis
+            // nothing pays for, not of an empty array.
+            IWProtoFormatter<RectangularArrayContract> formatter =
+                WProtoFormatterProvider.Get<RectangularArrayContract>();
+            WProtoReader reader = new WProtoReader(Wrapper(1, "0500", null));
+
+            Assert.IsTrue(formatter.TryRead(ref reader, out RectangularArrayContract restored));
+            Assert.AreEqual(5, restored.Grid.GetLength(0));
+            Assert.AreEqual(0, restored.Grid.GetLength(1));
         }
 
         [Test]

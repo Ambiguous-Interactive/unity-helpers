@@ -22,6 +22,9 @@
     <!-- The real serializer, not a copy. The bootstrap is excluded because it is the one file that
          references UnityEngine, and the Unity-free compilation is exactly what makes this harness
          possible. -->
+    <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
+         dimension through them, so the harness needs the real file rather than a stand-in. -->
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
     <Compile
       Include="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/*.cs"
       Exclude="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBootstrap.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBuiltInFormatters.cs"

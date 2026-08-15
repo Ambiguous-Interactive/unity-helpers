@@ -216,6 +216,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             null,
             "a rank-three header whose product wraps to 0"
         )]
+        [TestCase(
+            1,
+            "FFFFFFFF0700",
+            null,
+            "an axis of int.MaxValue beside a zero axis, which multiplies to an empty run"
+        )]
+        [TestCase(
+            1,
+            "008080C002",
+            null,
+            "a zero axis first, so the product is zero before the large axis is even read"
+        )]
         [TestCase(1, "02020202", "01020304", "a rank-four header on a rank-two member")]
         [TestCase(1, "02", "01020304", "a rank-one header on a rank-two member")]
         [TestCase(1, "0202", "010203040506", "a run longer than the header allows")]
@@ -239,6 +251,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // malformed and the property under test was never reached -- they passed, and proved
             // nothing. AWellFormedHeaderIsAcceptedByTheSameBuilder is the control that keeps this
             // honest.
+            //
+            // The two zero-axis rows are the case product-equality does NOT cover, found by the
+            // generator suite's fuzz strategies: a zero axis makes the product zero whatever the
+            // other axes say, so `[int.MaxValue, 0]` matches an empty run exactly and reaches
+            // `new int[2147483647, 0]`, which throws OutOfMemoryException out of a TryRead. An axis
+            // is a claim of its own. AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted is their control.
             WProtoReader reader = new WProtoReader(Wrapper(tag, dimensions, values));
 
             Assert.IsFalse(
@@ -247,6 +265,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .TryRead(ref reader, out WProtoRectangularArrayContract _),
                 "a payload was accepted that should not have been: " + why
             );
+        }
+
+        [Test]
+        public void AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted()
+        {
+            // The control for the two zero-axis rows above, and the reason they are refused for the
+            // axis rather than for being empty. `new int[5, 0]` is a real shape with real dimensions
+            // and no elements, and it has to keep round-tripping.
+            WProtoReader reader = new WProtoReader(Wrapper(1, "0500", null));
+
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoRectangularArrayContract>()
+                    .TryRead(ref reader, out WProtoRectangularArrayContract restored)
+            );
+            Assert.AreEqual(5, restored.Grid.GetLength(0));
+            Assert.AreEqual(0, restored.Grid.GetLength(1));
         }
 
         [Test]

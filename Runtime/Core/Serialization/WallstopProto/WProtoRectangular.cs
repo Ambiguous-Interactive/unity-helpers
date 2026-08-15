@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 
     /// <summary>
     /// The pieces of rectangular-array handling that would otherwise be duplicated into every
@@ -95,21 +96,67 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// dimension has already been refused if negative, so this is never negative.
         /// </param>
         /// <param name="deliveredElements">How many elements the payload actually carried.</param>
+        /// <param name="largestDimension">
+        /// The largest single dimension the payload stated, folded by the caller alongside the
+        /// product.
+        /// </param>
         /// <returns><c>true</c> when the array may be allocated and filled.</returns>
         /// <remarks>
-        /// Both halves are refusals of a malformed payload rather than of a large one, so neither has
-        /// a configurable bound. A rank the member does not have cannot be reshaped into one that it
-        /// does, and a product that disagrees with the delivered count describes an array this
-        /// payload does not contain.
+        /// <para>
+        /// The first two halves are refusals of a malformed payload rather than of a large one, so
+        /// neither has a configurable bound. A rank the member does not have cannot be reshaped into
+        /// one that it does, and a product that disagrees with the delivered count describes an array
+        /// this payload does not contain.
+        /// </para>
+        /// <para>
+        /// <b>The third exists because the product stops bounding the axes as soon as one of them is
+        /// zero.</b> <c>[int.MaxValue, 0]</c> has a product of zero, matches an empty element run
+        /// exactly, and is a shape the payload paid ten bytes for -- and <c>new int[2147483647, 0]</c>
+        /// then throws <see cref="OutOfMemoryException"/> out of a method whose whole contract is to
+        /// report failure by returning <c>false</c>. So a single axis is a capacity claim in its own
+        /// right and is refused as one.
+        /// </para>
+        /// <para>
+        /// It cannot refuse a shape whose elements exist: with every axis at one or more, each axis
+        /// divides the product, so each is at most the delivered count and
+        /// <see cref="SerializationCapacityLimits.TryAccept"/> raises its ceiling to exactly that.
+        /// This check is therefore <b>unreachable for any array that carries data</b>, and applies
+        /// only to the empty shapes whose axes nothing pays for.
+        /// </para>
         /// </remarks>
         public static bool TryAcceptShape(
             int rank,
             int dimensionCount,
             long declaredElements,
-            int deliveredElements
+            int deliveredElements,
+            int largestDimension
         )
         {
-            return dimensionCount == rank && declaredElements == deliveredElements;
+            if (dimensionCount != rank || declaredElements != deliveredElements)
+            {
+                return false;
+            }
+
+            return SerializationCapacityLimits.TryAccept(
+                largestDimension,
+                deliveredElements,
+                out int _
+            );
+        }
+
+        /// <summary>
+        /// Folds one more dimension into the largest seen so far.
+        /// </summary>
+        /// <param name="largest">The largest dimension so far.</param>
+        /// <param name="dimension">The next dimension.</param>
+        /// <returns>The larger of the two.</returns>
+        /// <remarks>
+        /// Emitted rather than <c>Math.Max</c> so the generated fold reads the same way the product's
+        /// does, and so the two are changed together.
+        /// </remarks>
+        public static int LargerDimension(int largest, int dimension)
+        {
+            return dimension > largest ? dimension : largest;
         }
 
         /// <summary>
