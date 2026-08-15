@@ -137,11 +137,16 @@ runTest("every check resolves to a real npm script or an existing file", () => {
  * line, and GitHub turns that into an annotation on this job -- a green run that reports an error it
  * deliberately caused. Only the return value is under test.
  *
+ * `drainMs` keeps the capture open after the last check settles. A duplicate write is emitted
+ * *after* the promise resolves, so restoring stdout immediately sends it to the real log where no
+ * assertion can see it -- the capture would show one fold while the job log showed two.
+ *
  * @param {{id: string, name: string, run: string}[]} checks Synthetic checks.
  * @param {number} jobs Worker count.
+ * @param {number} [drainMs] Milliseconds to keep capturing after the run resolves.
  * @returns {Promise<{captured: string, results: object[]}>} Suppressed log and outcomes.
  */
-async function runQuietly(checks, jobs) {
+async function runQuietly(checks, jobs, drainMs = 0) {
   const realWrite = process.stdout.write.bind(process.stdout);
   let captured = "";
   try {
@@ -150,6 +155,9 @@ async function runQuietly(checks, jobs) {
       return true;
     };
     const results = await runChecks(checks, jobs);
+    if (drainMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, drainMs));
+    }
     return { captured, results };
   } finally {
     process.stdout.write = realWrite;
@@ -218,21 +226,41 @@ runTest("concurrent checks actually overlap", async () => {
   );
 });
 
-runTest("a check whose command cannot launch is a failure, not a crash", async () => {
-  // `spawn` reports a command it cannot launch through an `error` event rather than `close`. Resolving
-  // only on `close` would leave the pool awaiting a promise that never settles, and the job would
-  // hang until the workflow timeout rather than reporting a failed check.
-  const { results } = await runQuietly(
-    [
-      {
-        id: "synthetic-no-such-command",
-        name: "synthetic no such command",
-        run: "exec /nonexistent-bin"
-      }
-    ],
-    1
-  );
+runTest("a command bash itself cannot be launched for settles exactly once", async () => {
+  // The first version of this test ran `exec /nonexistent-bin`, which spawns bash perfectly well
+  // and exits 127 -- so it never reached the spawn-error path at all and passed with the `error`
+  // handler deleted outright. Emptying PATH is what actually fails the spawn (measured: ENOENT).
+  //
+  // Node then emits BOTH `error` and `close`, so this pins the settle-once guard as much as the
+  // handler: without it the fold and the `::error::` line are written twice and the group nesting
+  // the concurrent log depends on comes apart.
+  const realPath = process.env.PATH;
+  let captured;
+  let results;
+  try {
+    process.env.PATH = "";
+    ({ captured, results } = await runQuietly(
+      [{ id: "synthetic-no-bash", name: "synthetic no bash", run: "true" }],
+      1,
+      250
+    ));
+  } finally {
+    process.env.PATH = realPath;
+  }
+
+  const count = (needle) => captured.split(needle).length - 1;
+  assert.strictEqual(count("::group::"), 1, "the fold must be written exactly once");
+  assert.strictEqual(count("::endgroup::"), 1, "the fold must be closed exactly once");
+  assert.strictEqual(count("::error::"), 1, "the annotation must be written exactly once");
   assert.strictEqual(results.length, 1, "a command that cannot launch must still produce a result");
+  // Pins the `error` handler itself, which the settle-once assertions above do not: `close` fires
+  // for a failed spawn too, so deleting the handler still yields one fold and one failed result --
+  // just a fold that never says why. The reason has to be in the log or the check is unactionable.
+  assert.match(
+    captured,
+    /ENOENT/,
+    "the fold must carry the spawn error's reason, not just report a failure"
+  );
   assert.strictEqual(results[0].ok, false, "it must be recorded as a failed check");
 });
 

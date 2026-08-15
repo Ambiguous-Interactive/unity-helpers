@@ -383,7 +383,18 @@ function runCheck(check) {
     child.stdout.on("data", (chunk) => chunks.push(chunk));
     child.stderr.on("data", (chunk) => chunks.push(chunk));
 
+    // Node emits BOTH `error` and `close` when a spawn fails -- measured, `error` then
+    // `close(-2, null)` for ENOENT -- so an unguarded pair of handlers writes the fold and the
+    // `::error::` line twice and unbalances the group nesting the concurrent log depends on.
+    // Listening only for `close` is not the fix either: the documentation is explicit that it "may
+    // or may not fire after an error has occurred", and a check that never settles hangs the pool
+    // until the job timeout. Both handlers, one settle.
+    let settled = false;
     const finish = (status, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
       const ok = status === 0;
       // The name is echoed before the command so a failure is identifiable from the collapsed fold.
