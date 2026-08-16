@@ -183,5 +183,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             Assert.IsTrue(sawMaxChannel, "Rounding never produced a fully saturated channel.");
         }
+
+        /// <remarks>
+        /// The property that makes this the one usable definition of "the same colour": it is an
+        /// equivalence relation, so a hash can agree with it. An absolute tolerance is not transitive
+        /// and no hash can, which is what broke four colour caches.
+        /// </remarks>
+        [Test]
+        public void AreSameColorIsExactlyEqualityOfTheEncodedChannels()
+        {
+            IRandom random = PRNG.Instance;
+            for (int i = 0; i < FuzzIterations; ++i)
+            {
+                Color left = new(
+                    random.NextFloat(),
+                    random.NextFloat(),
+                    random.NextFloat(),
+                    random.NextFloat()
+                );
+                Color right = random.NextBool()
+                    ? left
+                    : new Color(
+                        left.r + (random.NextFloat() - 0.5f) * ColorQuantization.ChannelStep * 2f,
+                        left.g,
+                        left.b,
+                        left.a
+                    );
+
+                bool same = ColorQuantization.AreSameColor(left, right);
+                bool encodesAlike =
+                    ColorQuantization.ToByte(left.r) == ColorQuantization.ToByte(right.r)
+                    && ColorQuantization.ToByte(left.g) == ColorQuantization.ToByte(right.g)
+                    && ColorQuantization.ToByte(left.b) == ColorQuantization.ToByte(right.b)
+                    && ColorQuantization.ToByte(left.a) == ColorQuantization.ToByte(right.a);
+
+                Assert.AreEqual(encodesAlike, same, $"{left} against {right}");
+                Assert.AreEqual(same, ColorQuantization.AreSameColor(right, left), "not symmetric");
+            }
+        }
+
+        /// <remarks>
+        /// A change notifier comparing with <c>Mathf.Abs(a - b) &lt; tolerance</c> answered
+        /// <see langword="false"/> for a NaN channel, because every comparison against NaN is false, so
+        /// it reported "changed" on every check and never settled.
+        /// </remarks>
+        [Test]
+        public void AreSameColorIsReflexiveForChannelsThatAreNotNumbers()
+        {
+            Color notANumber = new(float.NaN, float.NaN, float.NaN, float.NaN);
+            Color infinite = new(
+                float.PositiveInfinity,
+                float.NegativeInfinity,
+                float.PositiveInfinity,
+                float.NegativeInfinity
+            );
+
+            Assert.IsTrue(ColorQuantization.AreSameColor(notANumber, notANumber));
+            Assert.IsTrue(ColorQuantization.AreSameColor(infinite, infinite));
+            Assert.IsTrue(
+                ColorQuantization.AreSameColor(notANumber, Color.clear),
+                "NaN encodes to 0, so it is the same colour as one whose channels are 0."
+            );
+            Assert.IsFalse(ColorQuantization.AreSameColor(notANumber, Color.white));
+        }
+
+        [Test]
+        public void AreSameColorSeparatesEveryAdjacentChannelPair()
+        {
+            for (int channel = 0; channel < byte.MaxValue; ++channel)
+            {
+                Color lower = new(ColorQuantization.ToNormalized((byte)channel), 0f, 0f, 1f);
+                Color upper = new(ColorQuantization.ToNormalized((byte)(channel + 1)), 0f, 0f, 1f);
+
+                Assert.IsTrue(ColorQuantization.AreSameColor(lower, lower), $"channel {channel}");
+                Assert.IsFalse(
+                    ColorQuantization.AreSameColor(lower, upper),
+                    $"channels {channel} and {channel + 1} compared equal."
+                );
+            }
+        }
     }
 }

@@ -147,6 +147,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary = new SortedDictionary<TKey, TValue>();
         }
 
+        /// <remarks>
+        /// The ordering travels with the entries. Building an empty <see cref="SortedDictionary{TKey, TValue}"/>
+        /// and copying into it would silently substitute the default comparer, which made the documented
+        /// way to build a case-insensitive sorted dictionary - seeding it with
+        /// <c>new SortedDictionary&lt;string, T&gt;(StringComparer.OrdinalIgnoreCase)</c> - do nothing.
+        /// </remarks>
         protected SerializableSortedDictionaryBase(IDictionary<TKey, TValue> dictionary)
         {
             if (dictionary == null)
@@ -154,7 +160,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 throw new ArgumentNullException(nameof(dictionary));
             }
 
-            _dictionary = new SortedDictionary<TKey, TValue>();
+            _dictionary = dictionary is SortedDictionary<TKey, TValue> sorted
+                ? new SortedDictionary<TKey, TValue>(sorted.Comparer)
+                : new SortedDictionary<TKey, TValue>();
             foreach (KeyValuePair<TKey, TValue> pair in dictionary)
             {
                 _dictionary[pair.Key] = pair.Value;

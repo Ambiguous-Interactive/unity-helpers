@@ -154,7 +154,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                         format.StartsWith(colorCharCheck) ? format.Substring(1) : baseColor,
                         baseColor
                     );
-                    return $"<color={hexCode}>{value}</color>";
+
+                    // A colour Unity cannot parse produces a tag it renders as literal text, so the
+                    // message reads "<color=notacolor>whatever</color>" instead of the value. Emitting
+                    // the value undecorated loses the colour and keeps the message.
+                    return ColorUtility.TryParseHtmlString(hexCode, out Color _)
+                        ? $"<color={hexCode}>{value}</color>"
+                        : $"{value}";
                 },
                 tag: "Color",
                 editorOnly: true,

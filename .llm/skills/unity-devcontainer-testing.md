@@ -250,6 +250,15 @@ Four constraints. The first two were recorded backwards before being measured on
   three fixtures did. Do **not** shape a new fixture to avoid the base class for this reason: what you
   give up is the teardown's leak and unexpected-log assertions, which CI still runs, plus tracked
   objects are not destroyed, so an editor session accumulates them.
+- **Check the loaded assembly is current before trusting any measurement.** The host editor has the
+  Hot Reload package installed, whose whole purpose is to avoid domain reloads — so an
+  `AssetDatabase.Refresh` can compile a new DLL to `Library/ScriptAssemblies` while the **loaded**
+  image stays old, and a run then measures the previous build and reports it as fact. Neither
+  `RequestScriptCompilation` nor `EditorUtility.RequestScriptReload` reliably breaks it. Probe for a
+  member the edit added (`type.GetMethod("NewThing") != null`) and treat `false` as "this domain is
+  stale", not "my change is wrong". `Assembly.Location` is only a path: reading its timestamp reports
+  the file on disk, not the image in memory, so a newer DLL there is the signature of exactly this
+  state.
 - **Compile errors do not surface in the tool result.** When the type lookup returns null, read the
   tail of `%LOCALAPPDATA%/Unity/Editor/Editor.log` for lines containing an `error CS` code.
 - **`result.Log` does not format.** `result.Log("{0:E3}", x)` prints the literal `{0:E3}`. Build the

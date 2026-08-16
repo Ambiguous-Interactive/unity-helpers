@@ -376,17 +376,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            // Check for removed keys
-            foreach (string previousKey in PreviousWButtonButtonColors.Keys)
-            {
-                if (!currentKeys.Contains(previousKey))
-                {
-                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    changedKeys.Add(previousKey);
-                }
-            }
+            // Check for removed keys, across every snapshot. A key whose button colour property was
+            // absent at capture time is only in the text map, and sweeping one map missed its removal.
+            CollectRemovedKeys(PreviousWButtonButtonColors, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWButtonTextColors, currentKeys, ref changedKeys);
 
             return changedKeys;
+        }
+
+        private static void CollectRemovedKeys(
+            Dictionary<string, Color> previous,
+            HashSet<string> currentKeys,
+            ref HashSet<string> changedKeys
+        )
+        {
+            foreach (string previousKey in previous.Keys)
+            {
+                if (currentKeys.Contains(previousKey))
+                {
+                    continue;
+                }
+
+                changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                changedKeys.Add(previousKey);
+            }
         }
 
         private static HashSet<string> DetectWEnumToggleButtonsChanges(
@@ -507,26 +520,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            // Check for removed keys
-            foreach (string previousKey in PreviousWEnumSelectedBackgrounds.Keys)
-            {
-                if (!currentKeys.Contains(previousKey))
-                {
-                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    changedKeys.Add(previousKey);
-                }
-            }
+            // Check for removed keys, across every snapshot rather than only the first.
+            CollectRemovedKeys(PreviousWEnumSelectedBackgrounds, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumSelectedTexts, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumInactiveBackgrounds, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumInactiveTexts, currentKeys, ref changedKeys);
 
             return changedKeys;
         }
 
+        /// <remarks>
+        /// One definition of "the same colour", shared with the settings file and the style caches.
+        /// The absolute tolerance this used to apply answered <c>false</c> for a NaN channel, because
+        /// every comparison against NaN is false - so a colour holding one was reported as changed on
+        /// every check and the notifier never settled.
+        /// </remarks>
         private static bool ColorsEqual(Color a, Color b)
         {
-            const float tolerance = 0.001f;
-            return Mathf.Abs(a.r - b.r) < tolerance
-                && Mathf.Abs(a.g - b.g) < tolerance
-                && Mathf.Abs(a.b - b.b) < tolerance
-                && Mathf.Abs(a.a - b.a) < tolerance;
+            return ColorQuantization.AreSameColor(a, b);
         }
     }
 #endif

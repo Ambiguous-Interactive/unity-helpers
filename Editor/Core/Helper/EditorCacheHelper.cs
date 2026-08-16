@@ -633,10 +633,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             /// <inheritdoc />
             public bool Equals(Color x, Color y)
             {
-                return ColorQuantization.ToByte(x.r) == ColorQuantization.ToByte(y.r)
-                    && ColorQuantization.ToByte(x.g) == ColorQuantization.ToByte(y.g)
-                    && ColorQuantization.ToByte(x.b) == ColorQuantization.ToByte(y.b)
-                    && ColorQuantization.ToByte(x.a) == ColorQuantization.ToByte(y.a);
+                return ColorQuantization.AreSameColor(x, y);
             }
 
             /// <inheritdoc />

@@ -5653,13 +5653,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
+        /// <remarks>
+        /// One definition of "the same colour", shared with the style caches and the change notifier.
+        /// The 0.01 tolerance this used to apply is about two and a half 8-bit steps, so a colour the
+        /// user had visibly moved away from white still counted as an untouched factory default and
+        /// was overwritten by the auto-suggested palette.
+        /// </remarks>
         private static bool ColorsApproximatelyEqual(Color left, Color right)
         {
-            const float tolerance = 0.01f;
-            return Mathf.Abs(left.r - right.r) <= tolerance
-                && Mathf.Abs(left.g - right.g) <= tolerance
-                && Mathf.Abs(left.b - right.b) <= tolerance
-                && Mathf.Abs(left.a - right.a) <= tolerance;
+            return ColorQuantization.AreSameColor(left, right);
         }
 
         private static UnityHelpersBufferSettingsAsset EnsureWaitInstructionBufferSettingsAsset()

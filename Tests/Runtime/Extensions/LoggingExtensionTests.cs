@@ -245,6 +245,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 go.Log($"Hello {"world":#FFAABB}", pretty: pretty);
                 Assert.AreEqual(++expectedLogCount, logCount);
                 Assert.IsTrue(exception == null, exception?.ToString());
+
+                // A colour name Unity cannot parse used to be passed through verbatim, producing a rich
+                // text tag Unity renders as literal text - so the reader saw the markup, not the value.
+                assertion = message =>
+                {
+                    Assert.IsFalse(message.Contains("notacolor"), message);
+                    Assert.IsFalse(message.Contains("<color="), message);
+                    if (pretty)
+                    {
+                        Assert.IsTrue(message.Contains("Hello world"), message);
+                    }
+                    else
+                    {
+                        Assert.AreEqual("Hello world", message);
+                    }
+                };
+                ExpectLogContaining("Hello world");
+                go.Log($"Hello {"world":#notacolor}", pretty: pretty);
+                Assert.AreEqual(++expectedLogCount, logCount);
+                Assert.IsTrue(exception == null, exception?.ToString());
             }
             finally
             {

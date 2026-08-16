@@ -107,6 +107,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 : base(dictionary) { }
 
             /// <summary>
+            /// Creates a runtime dictionary pre-populated from another dictionary and keyed by the
+            /// given comparer.
+            /// </summary>
+            /// <param name="dictionary">The source collection to copy.</param>
+            /// <param name="comparer">The comparer to key the copy by.</param>
+            /// <remarks>
+            /// The copy constructor above cannot carry a comparer: the framework overload it forwards
+            /// to substitutes the default one, so a case-insensitive source produced a case-sensitive
+            /// copy.
+            /// </remarks>
+            public Dictionary(
+                IDictionary<TKey, TValue> dictionary,
+                IEqualityComparer<TKey> comparer
+            )
+                : base(dictionary, comparer) { }
+
+            /// <summary>
             /// Rehydrates the dictionary from a <see cref="SerializationInfo"/> payload.
             /// </summary>
             /// <param name="serializationInfo">Serialized data describing the dictionary.</param>
@@ -318,9 +335,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary = new Dictionary<TKey, TValue>();
         }
 
+        /// <remarks>
+        /// The comparer travels with the entries. <c>new Dictionary&lt;TKey, TValue&gt;(IDictionary)</c>
+        /// alone would silently substitute the default comparer, which made the documented way to build
+        /// a case-insensitive serializable dictionary - seeding it with
+        /// <c>new Dictionary&lt;string, T&gt;(StringComparer.OrdinalIgnoreCase)</c> - do nothing at all.
+        /// </remarks>
         protected SerializableDictionaryBase(IDictionary<TKey, TValue> dictionary)
         {
-            _dictionary = new Dictionary<TKey, TValue>(dictionary);
+            // Fully qualified because the nested Dictionary shadows the framework one here, and it is
+            // the framework type a caller seeds with.
+            _dictionary = dictionary is System.Collections.Generic.Dictionary<TKey, TValue> concrete
+                ? new Dictionary<TKey, TValue>(concrete, concrete.Comparer)
+                : new Dictionary<TKey, TValue>(dictionary);
         }
 
         protected SerializableDictionaryBase(
@@ -407,7 +434,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             _dictionary.Clear();
-            HashSet<TKey> observedKeys = new();
+            // The duplicate detector has to agree with the dictionary it is filling. With the default
+            // comparer it would call two keys distinct that the map then collapses into one, so an
+            // entry would vanish without the Inspector reporting a duplicate.
+            HashSet<TKey> observedKeys = new(_dictionary.Comparer);
             bool hasDuplicateKeys = false;
             bool encounteredNullReference = false;
             bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));

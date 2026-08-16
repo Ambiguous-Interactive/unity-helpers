@@ -1957,5 +1957,57 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual("only", persistedKeys[0]);
             Assert.AreEqual(42, persistedValues[0]);
         }
+
+        /// <remarks>
+        /// The documented way to build a case-insensitive serializable dictionary is to seed it with a
+        /// dictionary carrying the comparer. That did nothing: the base constructor copied through
+        /// <c>new Dictionary&lt;TKey, TValue&gt;(IDictionary)</c>, which substitutes the default
+        /// comparer, so the seeded one was dropped and every lookup stayed case sensitive.
+        /// </remarks>
+        [Test]
+        public void SeededComparerSurvivesConstruction()
+        {
+            Dictionary<string, int> seed = new(StringComparer.OrdinalIgnoreCase) { { "Alpha", 1 } };
+
+            SerializableDictionary<string, int> dictionary = new(seed);
+
+            Assert.IsTrue(dictionary.ContainsKey("alpha"), "The seeded comparer was dropped.");
+            Assert.IsTrue(dictionary.ContainsKey("ALPHA"));
+            Assert.AreEqual(1, dictionary["alpha"]);
+            Assert.IsFalse(dictionary.ContainsKey("beta"));
+        }
+
+        [Test]
+        public void DefaultConstructionStaysCaseSensitive()
+        {
+            SerializableDictionary<string, int> dictionary = new() { { "Alpha", 1 } };
+
+            Assert.IsTrue(dictionary.ContainsKey("Alpha"));
+            Assert.IsFalse(dictionary.ContainsKey("alpha"));
+        }
+
+        /// <remarks>
+        /// The duplicate detector has to agree with the dictionary it fills. Under a case-insensitive
+        /// comparer two keys that differ only in case collapse into one entry, and a detector using the
+        /// default comparer would call them distinct - so an entry would vanish with the Inspector
+        /// reporting nothing wrong.
+        /// </remarks>
+        [Test]
+        public void DeserializingCaseCollidingKeysUnderACaseInsensitiveComparerReportsDuplicates()
+        {
+            Dictionary<string, int> seed = new(StringComparer.OrdinalIgnoreCase);
+            SerializableDictionary<string, int> dictionary = new(seed);
+            dictionary._keys = new[] { "Alpha", "alpha" };
+            dictionary._values = new[] { 1, 2 };
+
+            dictionary.OnAfterDeserialize();
+
+            Assert.AreEqual(
+                1,
+                dictionary.Count,
+                "Case-colliding keys should collapse into one entry."
+            );
+            Assert.AreEqual(2, dictionary["ALPHA"]);
+        }
     }
 }

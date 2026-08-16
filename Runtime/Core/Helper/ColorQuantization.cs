@@ -116,5 +116,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             return (byte)Mathf.FloorToInt(cutoff * 255f);
         }
+
+        /// <summary>
+        /// Reports whether two colors are the same color, meaning they encode to the same 8-bit channels.
+        /// </summary>
+        /// <param name="left">One color.</param>
+        /// <param name="right">The other color.</param>
+        /// <returns><see langword="true"/> when every channel encodes to the same byte.</returns>
+        /// <remarks>
+        /// This is the one definition of "the same color" in the package, and it is the only one that
+        /// can back an <see cref="System.Collections.Generic.IEqualityComparer{T}"/>: an absolute
+        /// tolerance is not transitive, so no hash can agree with it. It is also the only distinction a
+        /// <see cref="Color32"/>, a texture, or a serialized swatch can preserve - two colors that
+        /// encode alike are indistinguishable once stored.
+        /// Edge Cases: <see cref="ToByte(float)"/> maps NaN to 0, so two NaN channels compare equal.
+        /// A comparison written as <c>Mathf.Abs(a - b) &lt; tolerance</c> instead answers <c>false</c>
+        /// for NaN, which is how a change notifier reported "changed" on every check and never settled.
+        /// </remarks>
+        public static bool AreSameColor(Color left, Color right)
+        {
+            return ToByte(left.r) == ToByte(right.r)
+                && ToByte(left.g) == ToByte(right.g)
+                && ToByte(left.b) == ToByte(right.b)
+                && ToByte(left.a) == ToByte(right.a);
+        }
     }
 }
