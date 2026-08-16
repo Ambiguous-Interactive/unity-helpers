@@ -13,6 +13,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class TextureScaleTests : CommonTestBase
     {
+        private const float Tolerance = 5e-5f;
+
         private TextureTestHelper _textureHelper;
 
         [SetUp]
@@ -84,42 +86,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.Throws<UnityException>(() => InvokeScale(texture, 1, 1, useBilinear));
         }
 
-        [Test]
-        public void PointDownscaleProducesNearestNeighborSamples()
+        [TestCase(5, 4, 3, 2)]
+        [TestCase(2, 3, 5, 7)]
+        [TestCase(7, 5, 3, 9)]
+        public void PointScaleOnlyEmitsColorsPresentInTheSource(
+            int sourceWidth,
+            int sourceHeight,
+            int destWidth,
+            int destHeight
+        )
         {
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                5,
-                4,
-                (x, y) => new Color(x / 10f, y / 10f, (x + y) / 20f, (x + 1) / 5f)
+                sourceWidth,
+                sourceHeight,
+                (x, y) => new Color(x / 10f, y / 10f, (x + y) / 20f, (x + 1) / 10f),
+                TextureFormat.RGBAFloat
             );
             Color[] source = texture.GetPixels();
-            Color[] expected = ComputeNearestNeighbor(source, 5, 4, 3, 2);
 
-            TextureScale.Point(texture, 3, 2);
+            TextureScale.Point(texture, destWidth, destHeight);
 
-            Assert.AreEqual(3, texture.width);
-            Assert.AreEqual(2, texture.height);
+            Assert.AreEqual(destWidth, texture.width);
+            Assert.AreEqual(destHeight, texture.height);
             Color[] actual = texture.GetPixels();
-            AssertColorsEqual(actual, expected);
+            Assert.AreEqual(destWidth * destHeight, actual.Length);
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                Assert.IsTrue(
+                    ContainsColor(source, actual[i]),
+                    $"pixel {i} was interpolated rather than sampled"
+                );
+            }
+        }
+
+        [TestCase(2, 3, 2)]
+        [TestCase(3, 2, 4)]
+        [TestCase(4, 4, 1)]
+        public void PointUpscaleByAnIntegerFactorDuplicatesEverySourcePixel(
+            int sourceWidth,
+            int sourceHeight,
+            int factor
+        )
+        {
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(
+                sourceWidth,
+                sourceHeight,
+                (x, y) => new Color(x * 0.25f, y * 0.2f, (x + y) * 0.1f, 1f - (0.1f * x)),
+                TextureFormat.RGBAFloat
+            );
+            Color[] source = texture.GetPixels();
+            int destWidth = sourceWidth * factor;
+
+            TextureScale.Point(texture, destWidth, sourceHeight * factor);
+
+            Color[] actual = texture.GetPixels();
+            for (int y = 0; y < sourceHeight * factor; ++y)
+            {
+                for (int x = 0; x < destWidth; ++x)
+                {
+                    Color expected = source[((y / factor) * sourceWidth) + (x / factor)];
+                    AssertColor(actual[(y * destWidth) + x], expected, Tolerance);
+                }
+            }
         }
 
         [Test]
-        public void PointUpscaleDuplicatesSourcePixels()
+        public void PointDownscaleOfSymmetricSourceIsSymmetric()
         {
+            // Mapping destination index straight onto source index biased every sample toward the
+            // origin, so a mirror-symmetric row stopped downscaling to a mirror-symmetric row.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                2,
-                3,
-                (x, y) => new Color(x * 0.25f, y * 0.2f, (x + y) * 0.1f, 1f - 0.1f * x)
+                9,
+                1,
+                (x, _) => new Color(Mathf.Min(x, 8 - x) / 4f, 0f, 0f, 1f),
+                TextureFormat.RGBAFloat
             );
-            Color[] source = texture.GetPixels();
-            Color[] expected = ComputeNearestNeighbor(source, 2, 3, 5, 7);
 
-            TextureScale.Point(texture, 5, 7);
+            TextureScale.Point(texture, 3, 1);
 
-            Assert.AreEqual(5, texture.width);
-            Assert.AreEqual(7, texture.height);
             Color[] actual = texture.GetPixels();
-            AssertColorsEqual(actual, expected);
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                AssertColor(actual[i], actual[actual.Length - 1 - i], Tolerance);
+            }
         }
 
         [Test]
@@ -134,62 +183,176 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(texture.isReadable);
         }
 
-        [Test]
-        public void BilinearDownscaleInterpolatesBetweenSourcePixels()
+        // The bilinear cases below assert properties a correct resampler has, never a second copy of
+        // the algorithm. A reimplementation would reproduce any sampling error on both sides and pass.
+
+        [TestCase(4, 3, 2, 2)]
+        [TestCase(3, 2, 6, 4)]
+        [TestCase(2, 2, 5, 5)]
+        [TestCase(7, 5, 3, 9)]
+        [TestCase(1, 1, 4, 4)]
+        public void BilinearOutputStaysInsideTheSourceRange(
+            int sourceWidth,
+            int sourceHeight,
+            int destWidth,
+            int destHeight
+        )
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                4,
-                3,
-                (x, y) => new Color(x / 5f, y / 4f, (x * y) / 20f, ((x + y) % 4) / 4f)
-            );
+            Texture2D texture = CreateRamp(sourceWidth, sourceHeight);
             Color[] source = texture.GetPixels();
-            Color[] expected = ComputeBilinear(source, 4, 3, 2, 2);
+            float min = MinChannel(source);
+            float max = MaxChannel(source);
 
-            TextureScale.Bilinear(texture, 2, 2);
+            TextureScale.Bilinear(texture, destWidth, destHeight);
 
-            Assert.AreEqual(2, texture.width);
-            Assert.AreEqual(2, texture.height);
             Color[] actual = texture.GetPixels();
-            AssertColorsEqual(actual, expected, 5e-5f);
+            Assert.That(MinChannel(actual), Is.GreaterThanOrEqualTo(min - Tolerance));
+            Assert.That(MaxChannel(actual), Is.LessThanOrEqualTo(max + Tolerance));
+        }
+
+        [TestCase(4, 1, 8, 1)]
+        [TestCase(3, 2, 6, 4)]
+        [TestCase(2, 2, 5, 5)]
+        [TestCase(5, 3, 5, 3)]
+        public void BilinearUpscaleReachesBothSourceExtremes(
+            int sourceWidth,
+            int sourceHeight,
+            int destWidth,
+            int destHeight
+        )
+        {
+            Texture2D texture = CreateRamp(sourceWidth, sourceHeight);
+            Color[] source = texture.GetPixels();
+            float min = MinChannel(source);
+            float max = MaxChannel(source);
+
+            TextureScale.Bilinear(texture, destWidth, destHeight);
+
+            // Sampling at destination corners instead of centers left the far edge unreachable: the
+            // 4x1 ramp ending at 1.0 peaked at 0.8125 once upscaled to 8x1.
+            Color[] actual = texture.GetPixels();
+            Assert.That(MinChannel(actual), Is.EqualTo(min).Within(Tolerance));
+            Assert.That(MaxChannel(actual), Is.EqualTo(max).Within(Tolerance));
+        }
+
+        [TestCase(4, 3, 2, 2)]
+        [TestCase(3, 2, 6, 4)]
+        [TestCase(7, 5, 3, 9)]
+        [TestCase(1, 4, 6, 1)]
+        public void BilinearScaleOfUniformImageIsUniform(
+            int sourceWidth,
+            int sourceHeight,
+            int destWidth,
+            int destHeight
+        )
+        {
+            Color uniform = new(0.3f, 0.6f, 0.9f, 0.5f);
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(
+                sourceWidth,
+                sourceHeight,
+                (_, _) => uniform,
+                TextureFormat.RGBAFloat
+            );
+
+            TextureScale.Bilinear(texture, destWidth, destHeight);
+
+            Color[] actual = texture.GetPixels();
+            Assert.AreEqual(destWidth * destHeight, actual.Length);
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                AssertColor(actual[i], uniform, Tolerance);
+            }
         }
 
         [Test]
-        public void BilinearUpscaleInterpolatesSmoothly()
+        public void BilinearDownscaleOfSymmetricSourceIsSymmetric()
         {
+            // The checkerboard is the discriminating case: with corner sampling the first output pixel
+            // landed exactly on a source corner, giving its neighbor zero weight, so 4x1 [1,0,1,0]
+            // downscaled to 1.000, 0.500 instead of the symmetric 0.500, 0.500.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                3,
-                2,
-                (x, y) => new Color(x / 3f, y / 2f, (x + y) / 6f, 1f)
+                8,
+                1,
+                (x, _) => x % 2 == 0 ? Color.white : Color.black,
+                TextureFormat.RGBAFloat
             );
-            Color[] source = texture.GetPixels();
-            Color[] expected = ComputeBilinear(source, 3, 2, 6, 4);
 
-            TextureScale.Bilinear(texture, 6, 4);
+            TextureScale.Bilinear(texture, 4, 1);
 
-            Assert.AreEqual(6, texture.width);
-            Assert.AreEqual(4, texture.height);
             Color[] actual = texture.GetPixels();
-            AssertColorsEqual(actual, expected, 5e-5f);
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                AssertColor(actual[i], actual[actual.Length - 1 - i], Tolerance);
+            }
         }
 
         [Test]
-        public void BilinearClampsSamplingAtTextureEdges()
+        public void BilinearDoesNotBleedColorFromInvisibleNeighbors()
         {
+            // Straight-alpha interpolation gave the transparent green half the weight of the visible
+            // red, so a source containing only red produced a yellow edge.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 2,
-                2,
-                (x, y) => new Color(x == 0 ? 0f : 1f, y == 0 ? 0f : 1f, (x + y) / 3f, 1f)
+                1,
+                (x, _) => x == 0 ? new Color(1f, 0f, 0f, 1f) : new Color(0f, 1f, 0f, 0f),
+                TextureFormat.RGBAFloat
             );
-            Color[] source = texture.GetPixels();
-            Color[] expected = ComputeBilinear(source, 2, 2, 5, 5);
 
-            TextureScale.Bilinear(texture, 5, 5);
+            TextureScale.Bilinear(texture, 4, 1);
+
+            // Only a visible pixel can be tinted. The invisible one keeps the source's green, which is
+            // the fallback that stops a fully transparent image collapsing to black.
+            Color[] actual = texture.GetPixels();
+            int visible = 0;
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                if (actual[i].a <= Tolerance)
+                {
+                    continue;
+                }
+
+                ++visible;
+                Assert.That(actual[i].g, Is.EqualTo(0f).Within(Tolerance), $"pixel {i} is tinted");
+                Assert.That(actual[i].r, Is.EqualTo(1f).Within(Tolerance), $"pixel {i} lost red");
+            }
+
+            Assert.Greater(visible, 0, "the fixture asserted nothing");
+        }
+
+        [Test]
+        public void BilinearPreservesAFullyTransparentSourceColor()
+        {
+            // Premultiplying cannot divide an all-zero alpha back out, and answering that with black
+            // would silently destroy RGB used as data rather than color.
+            Color transparentWhite = new(1f, 1f, 1f, 0f);
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(
+                3,
+                3,
+                (_, _) => transparentWhite,
+                TextureFormat.RGBAFloat
+            );
+
+            TextureScale.Bilinear(texture, 7, 5);
 
             Color[] actual = texture.GetPixels();
-            AssertColorsEqual(actual, expected, 5e-5f);
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                AssertColor(actual[i], transparentWhite, Tolerance);
+            }
+        }
 
-            int lastIndex = Index(4, 4, 5);
-            AssertColor(actual[lastIndex], expected[lastIndex], 5e-5f);
+        [Test]
+        public void BilinearScaleOfOpaqueSourceStaysOpaque()
+        {
+            Texture2D texture = CreateRamp(5, 4);
+
+            TextureScale.Bilinear(texture, 9, 7);
+
+            Color[] actual = texture.GetPixels();
+            for (int i = 0; i < actual.Length; ++i)
+            {
+                Assert.That(actual[i].a, Is.EqualTo(1f).Within(Tolerance));
+            }
         }
 
         private static void InvokeScale(Texture2D texture, int width, int height, bool useBilinear)
@@ -204,91 +367,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
-        private static Color[] ComputeNearestNeighbor(
-            Color[] source,
-            int sourceWidth,
-            int sourceHeight,
-            int destWidth,
-            int destHeight
-        )
+        private static bool ContainsColor(Color[] source, Color color)
         {
-            Color[] dest = new Color[destWidth * destHeight];
-            float ratioX = (float)sourceWidth / destWidth;
-            float ratioY = (float)sourceHeight / destHeight;
-
-            for (int y = 0; y < destHeight; ++y)
+            for (int i = 0; i < source.Length; ++i)
             {
-                int sourceY = (int)(ratioY * y);
-                int sourceRow = sourceY * sourceWidth;
-                int destRow = y * destWidth;
-                for (int x = 0; x < destWidth; ++x)
+                if (
+                    Mathf.Abs(source[i].r - color.r) <= Tolerance
+                    && Mathf.Abs(source[i].g - color.g) <= Tolerance
+                    && Mathf.Abs(source[i].b - color.b) <= Tolerance
+                    && Mathf.Abs(source[i].a - color.a) <= Tolerance
+                )
                 {
-                    int sourceX = (int)(ratioX * x);
-                    dest[destRow + x] = source[sourceRow + sourceX];
+                    return true;
                 }
             }
 
-            return dest;
+            return false;
         }
 
-        private static Color[] ComputeBilinear(
-            Color[] source,
-            int sourceWidth,
-            int sourceHeight,
-            int destWidth,
-            int destHeight
-        )
+        private Texture2D CreateRamp(int width, int height)
         {
-            Color[] dest = new Color[destWidth * destHeight];
-            float ratioX = (float)(sourceWidth - 1) / destWidth;
-            float ratioY = (float)(sourceHeight - 1) / destHeight;
-            int maxSourceX = sourceWidth - 1;
-            int maxSourceY = sourceHeight - 1;
-
-            for (int y = 0; y < destHeight; ++y)
-            {
-                float sourceYFloat = y * ratioY;
-                int sourceY = (int)sourceYFloat;
-                float yLerp = sourceYFloat - sourceY;
-                int sourceY1 = Math.Min(sourceY, maxSourceY);
-                int sourceY2 = Math.Min(sourceY + 1, maxSourceY);
-                int y1Offset = sourceY1 * sourceWidth;
-                int y2Offset = sourceY2 * sourceWidth;
-                int destRow = y * destWidth;
-
-                for (int x = 0; x < destWidth; ++x)
-                {
-                    float sourceXFloat = x * ratioX;
-                    int sourceX = (int)sourceXFloat;
-                    float xLerp = sourceXFloat - sourceX;
-                    int sourceX1 = Math.Min(sourceX, maxSourceX);
-                    int sourceX2 = Math.Min(sourceX + 1, maxSourceX);
-
-                    Color c11 = source[y1Offset + sourceX1];
-                    Color c21 = source[y1Offset + sourceX2];
-                    Color c12 = source[y2Offset + sourceX1];
-                    Color c22 = source[y2Offset + sourceX2];
-
-                    Color top = Color.LerpUnclamped(c11, c21, xLerp);
-                    Color bottom = Color.LerpUnclamped(c12, c22, xLerp);
-                    dest[destRow + x] = Color.LerpUnclamped(top, bottom, yLerp);
-                }
-            }
-
-            return dest;
+            int last = Mathf.Max(width * height - 1, 1);
+            return _textureHelper.CreateTextureWithFactory(
+                width,
+                height,
+                (x, y) => new Color(((y * width) + x) / (float)last, 0f, 0f, 1f),
+                TextureFormat.RGBAFloat
+            );
         }
 
-        private static void AssertColorsEqual(
-            Color[] actual,
-            Color[] expected,
-            float tolerance = 1e-5f
-        )
+        private static float MinChannel(Color[] pixels)
         {
-            Assert.AreEqual(expected.Length, actual.Length);
-            for (int i = 0; i < expected.Length; ++i)
+            float min = float.PositiveInfinity;
+            for (int i = 0; i < pixels.Length; ++i)
             {
-                AssertColor(actual[i], expected[i], tolerance);
+                min = Mathf.Min(min, pixels[i].r);
             }
+
+            return min;
+        }
+
+        private static float MaxChannel(Color[] pixels)
+        {
+            float max = float.NegativeInfinity;
+            for (int i = 0; i < pixels.Length; ++i)
+            {
+                max = Mathf.Max(max, pixels[i].r);
+            }
+
+            return max;
         }
 
         private static void AssertColor(Color actual, Color expected, float tolerance = 1e-5f)
@@ -297,11 +424,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.That(actual.g, Is.EqualTo(expected.g).Within(tolerance));
             Assert.That(actual.b, Is.EqualTo(expected.b).Within(tolerance));
             Assert.That(actual.a, Is.EqualTo(expected.a).Within(tolerance));
-        }
-
-        private static int Index(int x, int y, int width)
-        {
-            return y * width + x;
         }
     }
 }

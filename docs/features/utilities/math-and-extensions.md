@@ -629,6 +629,44 @@ end up disagreeing about which pixels are transparent.
 
 All three clamp: values outside `[0, 1]` saturate and `NaN` encodes to `0`.
 
+### Resampling a Texture
+
+`TextureResampling` is the matching single rule for scaling: where a destination pixel samples the
+source, and how colors of different opacity are allowed to mix. `TextureScale`, the Image Blur tool
+and the sprite sheet extractor's previews all go through it.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+float ratio = (float)sourceWidth / destinationWidth;
+
+// Bilinear: a coordinate in source pixel centers. Integer part picks the first of two
+// pixels to blend; fractional part is the weight toward the second.
+float coordinate = TextureResampling.BilinearSourceCoordinate(x, ratio, sourceWidth - 1);
+
+// Nearest neighbor: the single source pixel a destination pixel's center falls inside.
+int index = TextureResampling.NearestSourceIndex(x, ratio, sourceWidth - 1);
+```
+
+A destination pixel covers a range of the source, and its sample belongs in the middle of that range.
+Mapping index straight onto index instead shifts the image half a destination texel toward the
+origin, so an upscale never reaches the source's last pixel and a symmetric image stops downscaling
+symmetrically.
+
+```csharp
+// Blend premultiplied, so an invisible pixel cannot tint a visible one.
+Color blended = /* your filter over TextureResampling.Premultiply(...) values */;
+Color straight = /* the same filter over the original colors */;
+Color result = TextureResampling.Unpremultiply(blended, straight);
+```
+
+Interpolating straight color gives a fully transparent texel's RGB the same weight as a visible one,
+which is why a red sprite beside a transparent green background acquires a yellow edge. Premultiplying
+weights each color by its own opacity. It is exactly the identity on an opaque image, so only images
+that are wrong today change. `Unpremultiply` takes the straight-color result as a fallback because an
+all-transparent neighborhood cannot have its alpha divided back out; that keeps a fully transparent
+image's RGB intact instead of flattening it to black.
+
 <a id="collections"></a>
 
 ## Collections

@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     public sealed class TextureScaleEdgeTests : CommonTestBase
     {
         [Test]
-        public void PointScaleToOneByOneSamplesNearest()
+        public void PointScaleToOneByOneSamplesTheCenterPixel()
         {
             Texture2D texture = Track(new Texture2D(3, 3, TextureFormat.RGBA32, false, false));
             texture.filterMode = FilterMode.Point;
@@ -38,11 +38,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreEqual(1, texture.width);
             Assert.AreEqual(1, texture.height);
+
+            // The one destination pixel covers the whole source, so its center is the source's center.
+            // Sampling the corner instead is the same half-texel bias that shifted bilinear output.
+            Color expected = pixels[4];
             Color c = texture.GetPixels()[0];
-            Assert.That(c.r, Is.EqualTo(pixels[0].r).Within(1e-5f));
-            Assert.That(c.g, Is.EqualTo(pixels[0].g).Within(1e-5f));
-            Assert.That(c.b, Is.EqualTo(pixels[0].b).Within(1e-5f));
-            Assert.That(c.a, Is.EqualTo(pixels[0].a).Within(1e-5f));
+            Assert.That(c.r, Is.EqualTo(expected.r).Within(1e-5f));
+            Assert.That(c.g, Is.EqualTo(expected.g).Within(1e-5f));
+            Assert.That(c.b, Is.EqualTo(expected.b).Within(1e-5f));
+            Assert.That(c.a, Is.EqualTo(expected.a).Within(1e-5f));
         }
 
         [Test]

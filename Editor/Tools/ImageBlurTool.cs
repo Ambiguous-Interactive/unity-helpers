@@ -10,8 +10,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomEditors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
     public sealed class ImageBlurTool : EditorWindow
@@ -428,12 +430,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             Texture2D blurred = new(original.width, original.height, original.format, false);
             Color[] pixels = original.GetPixels();
-            Color[] blurredPixels = new Color[pixels.Length];
             int width = original.width;
             int height = original.height;
 
-            // A temporary buffer for the first pass
-            Color[] tempPixels = new Color[pixels.Length];
+            // Every intermediate is pooled. Texture2D.SetPixels accepts an array longer than the
+            // texture (unlike SetPixels32, measured), so the destination can be pooled as well.
+            using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
+                pixels.Length,
+                out Color[] blurredPixels
+            );
+
+            // Both passes run over premultiplied color, so a transparent texel cannot tint a visible
+            // neighbor. The straight color rides alongside because it is the only meaningful answer
+            // where the blurred alpha reaches zero and cannot be divided back out.
+            using PooledArray<Color> pooledPremultiplied = SystemArrayPool<Color>.Get(
+                pixels.Length,
+                out Color[] premultiplied
+            );
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
+            }
+
+            // Temporary buffers for the first pass
+            using PooledArray<Color> pooledTemp = SystemArrayPool<Color>.Get(
+                pixels.Length,
+                out Color[] tempPixels
+            );
+            using PooledArray<Color> pooledTempStraight = SystemArrayPool<Color>.Get(
+                pixels.Length,
+                out Color[] tempStraight
+            );
 
             // Generate the kernel for the weighted average
             float[] kernel = GenerateGaussianKernel(radius);
@@ -448,6 +475,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     for (int x = 0; x < width; x++)
                     {
                         Color weightedSum = Color.clear;
+                        Color straightSum = Color.clear;
                         float weightTotal = 0f;
 
                         for (int k = -radius; k <= radius; k++)
@@ -456,11 +484,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             if (currentX >= 0 && currentX < width)
                             {
                                 float weight = kernel[k + radius];
-                                weightedSum += pixels[yOffset + currentX] * weight;
+                                weightedSum += premultiplied[yOffset + currentX] * weight;
+                                straightSum += pixels[yOffset + currentX] * weight;
                                 weightTotal += weight;
                             }
                         }
                         tempPixels[yOffset + x] = weightedSum / weightTotal;
+                        tempStraight[yOffset + x] = straightSum / weightTotal;
                     }
                 }
             );
@@ -474,6 +504,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     for (int y = 0; y < height; y++)
                     {
                         Color weightedSum = Color.clear;
+                        Color straightSum = Color.clear;
                         float weightTotal = 0f;
 
                         for (int k = -radius; k <= radius; k++)
@@ -482,11 +513,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             if (currentY >= 0 && currentY < height)
                             {
                                 float weight = kernel[k + radius];
-                                weightedSum += tempPixels[currentY * width + x] * weight;
+                                weightedSum += tempPixels[(currentY * width) + x] * weight;
+                                straightSum += tempStraight[(currentY * width) + x] * weight;
                                 weightTotal += weight;
                             }
                         }
-                        blurredPixels[y * width + x] = weightedSum / weightTotal;
+                        blurredPixels[(y * width) + x] = TextureResampling.Unpremultiply(
+                            weightedSum / weightTotal,
+                            straightSum / weightTotal
+                        );
                     }
                 }
             );

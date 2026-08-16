@@ -6530,25 +6530,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int pixelCount = targetWidth * targetHeight;
-            // Note: Cannot use pooled arrays here because SetPixels32 requires the array length
-            // to exactly match the texture dimensions, but ArrayPool returns arrays that may be
-            // larger than requested.
-            Color32[] destPixels = new Color32[pixelCount];
+            // SetPixels32 rejects an array longer than the texture (measured: "the size of data to be
+            // written is outside the target buffer bounds"), which rules out SystemArrayPool's
+            // power-of-two buckets but not WallstopFastArrayPool, which hands back the exact size.
+            using PooledArray<Color32> pooledDestination = WallstopFastArrayPool<Color32>.Get(
+                pixelCount,
+                out Color32[] destPixels
+            );
 
             float xRatio = (float)spriteWidth / targetWidth;
             float yRatio = (float)spriteHeight / targetHeight;
 
             for (int destY = 0; destY < targetHeight; ++destY)
             {
-                int srcY = spriteY + Mathf.FloorToInt(destY * yRatio);
-                srcY = Mathf.Clamp(srcY, 0, sourceHeight - 1);
+                int srcY =
+                    spriteY + TextureResampling.NearestSourceIndex(destY, yRatio, spriteHeight - 1);
                 int destRowStart = destY * targetWidth;
                 int srcRowStart = srcY * sourceWidth;
 
                 for (int destX = 0; destX < targetWidth; ++destX)
                 {
-                    int srcX = spriteX + Mathf.FloorToInt(destX * xRatio);
-                    srcX = Mathf.Clamp(srcX, 0, sourceWidth - 1);
+                    int srcX =
+                        spriteX
+                        + TextureResampling.NearestSourceIndex(destX, xRatio, spriteWidth - 1);
                     destPixels[destRowStart + destX] = sourcePixels[srcRowStart + srcX];
                 }
             }

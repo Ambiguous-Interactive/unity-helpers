@@ -214,30 +214,47 @@ because `Unity_RunCommand` fails with `CS0234` on `WallstopStudios.UnityHelpers.
 everything:
 
 ```csharp
-Type fixture = Type.GetType(
-    "WallstopStudios.UnityHelpers.Tests.Serialization.MyTests, WallstopStudios.UnityHelpers.Tests.Runtime");
-object instance = Activator.CreateInstance(fixture);
-foreach (var method in fixture.GetMethods()) { /* find [Test], Invoke, catch */ }
+System.Type fixture = Find("WallstopStudios.UnityHelpers.Tests.Runtime")
+    .GetType("WallstopStudios.UnityHelpers.Tests.Serialization.MyTests");
+object instance = System.Activator.CreateInstance(fixture);
+// 20 = Instance|Public: the test methods.
+foreach (System.Reflection.MethodInfo m in fixture.GetMethods((System.Reflection.BindingFlags)20))
+{
+    /* find [Test]/[TestCase], run [SetUp] base-first, Invoke, catch */
+}
 ```
 
 The loop is worth writing out each time rather than committing a helper: `[TestCase]` arguments come
 off the attribute's `Arguments` property and `[TestCaseSource]` off the named static property, and a
-failure arrives as `TargetInvocationException.InnerException`.
+failure arrives as `TargetInvocationException.InnerException`. NUnit's attribute types are not
+referenced by the sandbox assembly either, so resolve them by name off the loaded `nunit.framework`
+and pass them to `GetCustomAttributes(Type, bool)`.
 
-Three constraints, all discovered the hard way:
+Four constraints. The first two were recorded backwards before being measured on 2026-08-16:
 
-- **The sandbox rejects the token `System.Reflection` anywhere in the script**, including
-  `BindingFlags`. Use `var` for `MethodInfo` locals and the parameterless `GetMethods()`.
-- **A fixture deriving from `CommonTestBase` cannot run this way.** Its teardown calls
-  `LogAssert.NoUnexpectedReceived()`, which needs the Unity test runner's log scope and reports
-  `No log scope is available` outside it. Skip lifecycle failures for a smoke run, or keep a new
-  fixture free of Unity object allocation so `lint-tests.ps1` does not require the base class.
-- **Compile errors do not surface in the tool result.** When `Type.GetType` returns null, read the
+- **Only the named `BindingFlags` _members_ are rejected, not the type.** `System.Reflection.Assembly`,
+  `MethodInfo` and `PropertyInfo` all compile fully qualified; `System.Reflection.BindingFlags.Static`
+  is refused as an unauthorized namespace, and **a numeric cast is not**:
+  `(System.Reflection.BindingFlags)56` is `Static|Public|NonPublic`. This matters — the parameterless
+  `GetMethods()` returned 26 members of one fixture where flags `52` (`Instance|Public|NonPublic`)
+  returned 50, and `GetMethod("BlurredForTests")` cannot see an `internal` test hook that
+  `GetMethod("BlurredForTests", (System.Reflection.BindingFlags)56)` finds. Values to combine:
+  `Instance` 4, `Static` 8, `Public` 16, `NonPublic` 32.
+- **A `CommonTestBase` fixture runs fine; only its teardown does not.** Both `[SetUp]` methods
+  (`BaseSetUp` and the fixture's own) return normally. `[TearDown] TearDown` throws
+  `InvalidOperationException: No log scope is available`, because `LogAssert.NoUnexpectedReceived()`
+  needs the test runner's log scope. Swallow teardown and the bodies all run — 49 invocations across
+  three fixtures did. Do **not** shape a new fixture to avoid the base class for this reason: what you
+  give up is the teardown's leak and unexpected-log assertions, which CI still runs, plus tracked
+  objects are not destroyed, so an editor session accumulates them.
+- **Compile errors do not surface in the tool result.** When the type lookup returns null, read the
   tail of `%LOCALAPPDATA%/Unity/Editor/Editor.log` for lines containing an `error CS` code.
+- **`result.Log` does not format.** `result.Log("{0:E3}", x)` prints the literal `{0:E3}`. Build the
+  string first.
 
 This is a fast inner loop (a 250-case fixture ran in 1.5 s), not a substitute for CI: it is one
-editor version, EditMode only, on Mono. `[UnityTest]` coroutines and anything needing PlayMode still
-belong to the Docker legs and to CI.
+editor version, EditMode only, on Mono, with teardown assertions skipped. `[UnityTest]` coroutines
+and anything needing PlayMode still belong to the Docker legs and to CI.
 
 ## Limitations
 
