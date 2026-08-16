@@ -230,6 +230,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
+        /// Attempts to wrap an existing <see cref="Guid"/>, enforcing version 4 semantics.
+        /// </summary>
+        /// <param name="guid">The GUID to wrap. <see cref="Guid.Empty"/> yields <see cref="EmptyGuid"/>.</param>
+        /// <param name="value">When this method returns, the wrapper or <see cref="EmptyGuid"/>.</param>
+        /// <returns><c>true</c> when the GUID could be wrapped.</returns>
+        /// <example>
+        /// <code>
+        /// if (WGuid.TryCreate(externalId, out WGuid wrapped)) { Use(wrapped); }
+        /// </code>
+        /// </example>
+        public static bool TryCreate(Guid guid, out WGuid value)
+        {
+            if (guid == global::System.Guid.Empty)
+            {
+                value = EmptyGuid;
+                return true;
+            }
+
+            if (IsVersionFour(guid, out _))
+            {
+                value = new WGuid(guid);
+                return true;
+            }
+
+            value = EmptyGuid;
+            return false;
+        }
+
+        /// <summary>
         /// Attempts to parse a textual GUID, enforcing version 4 semantics.
         /// </summary>
         /// <param name="value">The GUID string to parse.</param>

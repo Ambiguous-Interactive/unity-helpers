@@ -2749,8 +2749,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         return;
                     }
 
-                    Type type = data.GetType();
-                    WriteValueAotSafe(writer, data, type, options);
+                    // Deliberately not data.GetType(): the runtime type is resolved once, below,
+                    // where a registered converter for a base type can claim the value.
+                    WriteValueAotSafe(writer, data, null, options);
                 }
                 else
                 {
@@ -2863,10 +2864,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return;
             }
 
-            Type runtimeType = value.GetType();
             Type effectiveType =
                 type == null || type == typeof(object) || type.IsAbstract || type.IsInterface
-                    ? runtimeType
+                    ? ResolveRuntimeWriteType(value.GetType(), options)
                     : type;
 
             if (!RequiresReflectionLightObjectWriter(effectiveType, options))
@@ -3141,6 +3141,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
+        /// <summary>
+        /// Chooses the type a value is written as when its declaration is <see cref="object"/>, an
+        /// interface, or abstract.
+        /// </summary>
+        /// <remarks>
+        /// Substituting the runtime type is what makes a polymorphic member serialize as what it
+        /// actually holds, but the runtime type can be one no converter claims. Every
+        /// <see cref="Type"/> instance is the internal <c>System.RuntimeType</c>, which
+        /// System.Text.Json refuses outright -- so a <see cref="Type"/> at the root of a graph, or
+        /// behind an <see cref="object"/> member, failed even though this package registers a
+        /// converter for <see cref="Type"/>. A registered converter that claims a base type is a
+        /// statement that the base is the wire shape, so the nearest such base wins.
+        /// </remarks>
+        private static Type ResolveRuntimeWriteType(Type runtimeType, JsonSerializerOptions options)
+        {
+            IList<JsonConverter> converters = options?.Converters;
+            int converterCount = converters?.Count ?? 0;
+            if (converterCount == 0)
+            {
+                return runtimeType;
+            }
+
+            for (Type candidate = runtimeType; candidate != null; candidate = candidate.BaseType)
+            {
+                for (int index = 0; index < converterCount; index++)
+                {
+                    if (converters[index].CanConvert(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+
+            return runtimeType;
+        }
+
         private static string SerializeValueAotSafe(
             object value,
             Type type,
@@ -3154,7 +3190,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             Type effectiveType =
                 type == null || type == typeof(object) || type.IsAbstract || type.IsInterface
-                    ? value.GetType()
+                    ? ResolveRuntimeWriteType(value.GetType(), options)
                     : type;
 
             if (!RequiresReflectionLightObjectWriter(effectiveType, options))
@@ -3259,8 +3295,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     return "{}";
                 }
 
-                Type type = data.GetType();
-                return SerializeValueAotSafe(data, type, options);
+                return SerializeValueAotSafe(data, null, options);
             }
 
             return SerializeValueAotSafe(input, parameterType, options);
@@ -3313,8 +3348,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         return;
                     }
 
-                    Type type = data.GetType();
-                    WriteValueAotSafe(writer, data, type, options);
+                    // Deliberately not data.GetType(): the runtime type is resolved once, below,
+                    // where a registered converter for a base type can claim the value.
+                    WriteValueAotSafe(writer, data, null, options);
                 }
                 else
                 {

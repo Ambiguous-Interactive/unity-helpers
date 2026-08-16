@@ -53,6 +53,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 {
                     if (reader.TokenType == JsonTokenType.EndObject)
                     {
+                        // The constructor validates the ordering and throws ArgumentException. A
+                        // payload that omits "max" reaches it just as readily as a hostile one,
+                        // because the omitted member defaults to zero.
+                        if (0 < min.CompareTo(max))
+                        {
+                            throw new JsonException(
+                                $"Range<{typeof(T).Name}> requires min <= max, but read "
+                                    + $"min {min} and max {max}."
+                            );
+                        }
+
                         return new Range<T>(min, max, startInclusive, endInclusive);
                     }
                     if (reader.TokenType != JsonTokenType.PropertyName)

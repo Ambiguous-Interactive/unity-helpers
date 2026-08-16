@@ -21,7 +21,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            throw new NotImplementedException(nameof(Read));
+            throw new NotSupportedException(
+                $"{nameof(GameObject)} is written as a name/type/instance-id record for diagnostics "
+                    + "only; a scene object cannot be reconstructed from it."
+            );
         }
 
         public override void Write(

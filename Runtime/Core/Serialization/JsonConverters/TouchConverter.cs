@@ -20,7 +20,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            throw new NotImplementedException("Deserializing Touch is not supported");
+            throw new NotSupportedException(
+                $"{nameof(Touch)} is written for diagnostics only; the platform owns every field, "
+                    + "so there is nothing to restore it into."
+            );
         }
 
         public override void Write(

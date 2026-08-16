@@ -59,6 +59,14 @@ When calling the MCP tools directly, `Unity_ManageEditor GetProjectRoot` is the
 same one-request check — make it the first call of any session that is about to
 trust the editor.
 
+## The editor compiles your working tree
+
+The container workspace and the host project's embedded package are the same filesystem, so the
+editor on the other end of this bridge builds the code you are editing. That makes the bridge a real
+test runner when no Unity license is available -- see
+[unity-devcontainer-testing](./unity-devcontainer-testing.md#no-license-the-mcp-editor-still-runs-the-real-fixtures)
+for the reflection loop and its three constraints.
+
 ## "My agent has no `Unity_*` tools"
 
 Most often the server is reachable but the agent session is stale. Order of checks:

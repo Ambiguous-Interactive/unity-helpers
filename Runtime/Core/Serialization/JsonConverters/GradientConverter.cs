@@ -22,6 +22,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         private static readonly JsonEncodedText AlphaProp = JsonEncodedText.Encode("alpha");
         private static readonly JsonEncodedText TimeProp = JsonEncodedText.Encode("time");
 
+        /// <summary>The number of keys a <see cref="Gradient"/> stores per channel.</summary>
+        private const int MaximumKeys = 8;
+
         private GradientConverter() { }
 
         public override Gradient Read(
@@ -84,6 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                             list.Add(ReadColorKey(ref reader, options));
                         }
+                        RefuseKeyOverflow(list.Count, "colorKeys");
                         colorKeys =
                             list.Count == 0 ? Array.Empty<GradientColorKey>() : list.ToArray();
                     }
@@ -105,6 +109,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                             list.Add(ReadAlphaKey(ref reader));
                         }
+                        RefuseKeyOverflow(list.Count, "alphaKeys");
                         alphaKeys =
                             list.Count == 0 ? Array.Empty<GradientAlphaKey>() : list.ToArray();
                     }
@@ -116,6 +121,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             throw new JsonException("Incomplete JSON for Gradient");
+        }
+
+        /// <remarks>
+        /// Unity's <see cref="Gradient"/> setters do not throw past the ceiling: they log an error
+        /// and keep the first eight keys, so a payload with more silently loses the rest and fills
+        /// the player log. Refusing it names the payload instead.
+        /// </remarks>
+        private static void RefuseKeyOverflow(int count, string member)
+        {
+            if (MaximumKeys < count)
+            {
+                throw new JsonException(
+                    $"Gradient.{member} holds at most {MaximumKeys} keys, but the payload "
+                        + $"delivered {count}."
+                );
+            }
         }
 
         private static GradientColorKey ReadColorKey(

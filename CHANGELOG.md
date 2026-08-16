@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `AssetChangeDetectionUtility.Enabled`, `ResetEnabledToDefault()` and `EnabledScope(bool)` to turn the `[DetectAssetChanged]` watcher on and off. The returned `AssetChangeDetectionEnabledScope` restores the previous setting on dispose ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
 - Add `SingleThreadedThreadPool.DrainAsync()`, which closes the pool and waits for queued work to finish instead of dropping it, plus `IsAcceptingWork` ([#318](https://github.com/Ambiguous-Interactive/unity-helpers/issues/318)).
 - Add `SerializableList<T>`, a list that survives Unity serialization inside another serialized collection ([#314](https://github.com/Ambiguous-Interactive/unity-helpers/issues/314)).
+- Add `WGuid.TryCreate(Guid, out WGuid)`, which wraps an existing GUID without throwing when it is not version 4 ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Add `Enum.TryConvertToUInt64()` and `TryConvertToInt64()`, which convert any enum value to its 64-bit bit pattern without overflowing on negative or very large members.
 - Add `SemaphoreSlim.Acquire()`, `TryAcquire()` and `AcquireAsync()`, so a permit can be taken with `using` instead of a `finally`. See [Semaphore Leases](./docs/features/utilities/helper-utilities.md#semaphore-leases).
 - Add `DurableFile`, whose writes cannot leave a truncated file behind: `TryWriteAllText`, `TryAppendAllText`, `TryCopy`, `TryDelete` and async equivalents. See [Durable Writes for Player Data](./docs/features/utilities/helper-utilities.md#durable-writes-for-player-data) ([#319](https://github.com/Ambiguous-Interactive/unity-helpers/issues/319)).
@@ -63,11 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bound a rectangular array's dimensions individually: an empty one whose axis exceeds `SerializationCapacityLimits.MaximumRestoredCapacity` (default 1,048,576) no longer deserializes — raise that limit if you persist one. Arrays that carry elements are unaffected, at any limit ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Size a repeated member from the element count already in the packed run, so reading 128 `int`s into an array allocates 560 bytes instead of 1,744. Throughput is unchanged ([#398](https://github.com/Ambiguous-Interactive/unity-helpers/issues/398)).
 - Allow a `struct` backing set in `SerializableSetBase<T, TSet>`: the `where TSet : class` constraint is gone ([#388](https://github.com/Ambiguous-Interactive/unity-helpers/issues/388)).
+- Report a read of the write-only `GameObject` and `Touch` JSON converters as `NotSupportedException` instead of `NotImplementedException` ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Ship the bundled `System.Text.Json` and friends only on editors that do not provide them; Unity supplies its own from 6000.5. See [Bundled Assembly Conflicts](./docs/guides/bundled-assembly-conflicts.md) ([#331](https://github.com/Ambiguous-Interactive/unity-helpers/issues/331)).
 - Fail the build (`WPROTO018`) when a `[WProtoContract]`'s base is one too but is not declared with `[WProtoInclude]`. It previously failed only when something serialized it ([#394](https://github.com/Ambiguous-Interactive/unity-helpers/issues/394)).
 - Bound `WProtoReader` message nesting at `MaxNestingDepth` (64). A few kilobytes of hostile payload could otherwise describe thousands of nested sub-messages, which a formatter turns into thousands of stack frames ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 
 ### Fixed
+
+- Fix a save holding an unset `WGuid` failing to load: JSON wrote the empty GUID and then refused to read it back ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
+- Fix a JSON payload with `min` greater than `max`, or with `max` missing, crashing a `Range<T>` load with `ArgumentException` instead of reporting corrupt data ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
+- Fix a `Gradient` with more than eight colour or alpha keys silently losing the extras and filling the player log with errors. The payload is now refused ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
+- Fix `Serializer.JsonStringify` and `JsonSerialize` failing on a `Type`, at the root of a graph or behind an `object` member, despite the shipped `Type` converter ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 
 - Fix an unattributed field joining the wrong group when a type declares more than one `[WGroup]`, and a bare `[WGroupEnd]` closing a group other than the one it follows. Auto-include now targets the most recently declared group, and a bare end closes every open group ([#455](https://github.com/Ambiguous-Interactive/unity-helpers/issues/455)).
 - Fix a `SerializableDictionary`'s "Add entry" Value field being drawn 8.5px left of its Key field wherever the inspector indents it ([#284](https://github.com/Ambiguous-Interactive/unity-helpers/issues/284)).

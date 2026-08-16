@@ -872,17 +872,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void GameObjectConverterReadWrapsNotImplementedAsCorruptData()
+        public void GameObjectConverterReadWrapsNotSupportedAsCorruptData()
         {
             string json = "{\"name\":\"Test\"}";
 
-            // The GameObjectConverter.Read throws NotImplementedException; the Serializer wraps that
-            // codec failure as SerializationCorruptDataException, preserving the original as inner.
+            // GameObjectConverter is write-only, which it reports as NotSupportedException; the
+            // Serializer wraps that codec failure, preserving the original as inner.
             SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
                 () =>
                     Serializer.JsonDeserialize<GameObject>(json)
             );
-            Assert.IsTrue(ex.InnerException is NotImplementedException);
+            Assert.IsTrue(ex.InnerException is NotSupportedException);
         }
 
         [Test]
@@ -1210,16 +1210,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void TouchConverterReadWrapsNotImplementedAsCorruptData()
+        public void TouchConverterReadWrapsNotSupportedAsCorruptData()
         {
             string json = "{}";
-            // TouchConverter.Read throws NotImplementedException; the Serializer wraps it as
-            // SerializationCorruptDataException with the original preserved as inner.
+            // TouchConverter is write-only, which it reports as NotSupportedException; the
+            // Serializer wraps it with the original preserved as inner.
             SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
                 () =>
                     Serializer.JsonDeserialize<Touch>(json)
             );
-            Assert.IsTrue(ex.InnerException is NotImplementedException);
+            Assert.IsTrue(ex.InnerException is NotSupportedException);
         }
 
         [Test]

@@ -102,6 +102,31 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void TryCreateAcceptsVersionFourGuid()
+        {
+            Guid source = Guid.NewGuid();
+            bool success = WGuid.TryCreate(source, out WGuid created);
+            Assert.IsTrue(success);
+            Assert.AreEqual(source, created.ToGuid());
+        }
+
+        [Test]
+        public void TryCreateAcceptsTheEmptyGuid()
+        {
+            bool success = WGuid.TryCreate(Guid.Empty, out WGuid created);
+            Assert.IsTrue(success);
+            Assert.IsTrue(created.IsEmpty);
+        }
+
+        [Test]
+        public void TryCreateRejectsNonVersionFourGuid()
+        {
+            bool success = WGuid.TryCreate(Guid.Parse(NonVersionFourGuid), out WGuid created);
+            Assert.IsFalse(success);
+            Assert.AreEqual(WGuid.EmptyGuid, created);
+        }
+
+        [Test]
         public void IsValidReturnsTrueForVersionFourGuid()
         {
             WGuid guid = WGuid.NewGuid();

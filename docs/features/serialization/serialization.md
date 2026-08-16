@@ -222,6 +222,34 @@ if (!Serializer.TryWriteToJsonFile(data, "save.json"))
 - Handling corrupted save files gracefully
 - Writing to paths that may not be writable
 
+### Reading Untrusted JSON
+
+A save file, a downloaded payload, and anything that crossed a network are all input nobody in
+your team wrote. Two guarantees hold for them:
+
+- `Serializer.JsonDeserialize` reports every failure as a `SerializationFailureException`, and
+  `Serializer.TryJsonDeserialize` returns `false` instead of throwing at all.
+- The Unity-aware converters report a payload they cannot read as `JsonException`, which is the
+  contract System.Text.Json defines. This matters when you call `JsonSerializer.Deserialize`
+  yourself with `Serializer.CreateNormalJsonOptions()` rather than going through `Serializer`.
+
+Two converters are deliberately **write-only**, because what they write is a diagnostic record and
+not a value that can be rebuilt: `GameObject` (name, type and instance id) and `Touch` (owned by the
+platform). Reading either reports `NotSupportedException`.
+
+```csharp
+// A grid that came from a downloaded level pack.
+if (!Serializer.TryJsonDeserialize(downloaded, out LevelPack pack))
+{
+    UseBuiltInLevels();
+    return;
+}
+```
+
+The converters are fuzzed against structure-aware mutations of their own output on every CI run --
+wrong token kinds, out-of-range numbers, dropped and duplicated members, truncations and oversized
+repeated members -- and each one must also read back anything it writes.
+
 ### Fast Serialization (Hot Paths)
 
 For performance-critical scenarios where you serialize/deserialize frequently:

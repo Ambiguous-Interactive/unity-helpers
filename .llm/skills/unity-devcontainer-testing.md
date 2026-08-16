@@ -199,6 +199,46 @@ npm run validate:prepush
 
 Do NOT attempt to create `.unity-secrets/` files programmatically — use the wizard.
 
+## No license? The MCP editor still runs the real fixtures
+
+**The container's working tree and the host Unity project's embedded package are the same
+filesystem.** Proven 2026-08-16 by writing a probe file in the container and reading it back through
+`Unity_RunCommand`; the `.git` bind mount in `devcontainer.json` is an addition to the default
+workspace bind, not a substitute for it. So the editor on the other end of the MCP bridge compiles
+**your edits**, and an `AssetDatabase.Refresh` picks up a file you just wrote.
+
+Two sessions in a row concluded that an editor-only change "has no local verification path at all",
+because `Unity_RunCommand` fails with `CS0234` on `WallstopStudios.UnityHelpers.*`. That is
+[#435](https://github.com/Ambiguous-Interactive/unity-helpers/issues/435), and it is a
+**compile-time reference** limitation of the MCP sandbox assembly only. Reflection reaches
+everything:
+
+```csharp
+Type fixture = Type.GetType(
+    "WallstopStudios.UnityHelpers.Tests.Serialization.MyTests, WallstopStudios.UnityHelpers.Tests.Runtime");
+object instance = Activator.CreateInstance(fixture);
+foreach (var method in fixture.GetMethods()) { /* find [Test], Invoke, catch */ }
+```
+
+The loop is worth writing out each time rather than committing a helper: `[TestCase]` arguments come
+off the attribute's `Arguments` property and `[TestCaseSource]` off the named static property, and a
+failure arrives as `TargetInvocationException.InnerException`.
+
+Three constraints, all discovered the hard way:
+
+- **The sandbox rejects the token `System.Reflection` anywhere in the script**, including
+  `BindingFlags`. Use `var` for `MethodInfo` locals and the parameterless `GetMethods()`.
+- **A fixture deriving from `CommonTestBase` cannot run this way.** Its teardown calls
+  `LogAssert.NoUnexpectedReceived()`, which needs the Unity test runner's log scope and reports
+  `No log scope is available` outside it. Skip lifecycle failures for a smoke run, or keep a new
+  fixture free of Unity object allocation so `lint-tests.ps1` does not require the base class.
+- **Compile errors do not surface in the tool result.** When `Type.GetType` returns null, read the
+  tail of `%LOCALAPPDATA%/Unity/Editor/Editor.log` for lines containing an `error CS` code.
+
+This is a fast inner loop (a 250-case fixture ran in 1.5 s), not a substitute for CI: it is one
+editor version, EditMode only, on Mono. `[UnityTest]` coroutines and anything needing PlayMode still
+belong to the Docker legs and to CI.
+
 ## Limitations
 
 - `WaitForEndOfFrame` does not work in batch mode (PlayMode tests)

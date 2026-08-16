@@ -37,6 +37,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return parsed;
                 }
 
+                // WGuid.Empty is representable and is what Write emits for an unset id, but it is
+                // not a version-4 GUID, so TryParse refuses the very text this converter produced.
+                if (Guid.TryParse(value, out Guid raw) && WGuid.TryCreate(raw, out WGuid wrapped))
+                {
+                    return wrapped;
+                }
+
                 throw new JsonException($"Invalid {nameof(WGuid)} string value.");
             }
 
@@ -97,7 +104,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             buffer.Slice(8, 8),
                             unchecked((ulong)high)
                         );
-                        return new WGuid(new Guid(buffer));
+                        // A payload states the two halves; the constructor validates them and
+                        // throws FormatException, which is not the answer a converter owes a reader.
+                        if (WGuid.TryCreate(new Guid(buffer), out WGuid fromHalves))
+                        {
+                            return fromHalves;
+                        }
+
+                        throw new JsonException(
+                            $"{WGuid.LowFieldName}/{WGuid.HighFieldName} on {nameof(WGuid)} do not "
+                                + "form a version 4 GUID."
+                        );
                     }
 
                     return WGuid.Empty;
