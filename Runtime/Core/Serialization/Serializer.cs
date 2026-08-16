@@ -3156,6 +3156,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         private static Type ResolveRuntimeWriteType(Type runtimeType, JsonSerializerOptions options)
         {
+            // The search below is per member of every object this writer walks, so it must not run
+            // for the values that never needed it. A type System.Text.Json can name is one the
+            // caller could have declared, and every such type is public or a public nested type.
+            // Measured: Vector3, List<int>, string and int[] are IsPublic; ParticleSystem.MinMaxCurve
+            // is IsNestedPublic; System.RuntimeType -- the type this whole method exists for -- is
+            // neither.
+            if (runtimeType.IsPublic || runtimeType.IsNestedPublic)
+            {
+                return runtimeType;
+            }
+
             IList<JsonConverter> converters = options?.Converters;
             int converterCount = converters?.Count ?? 0;
             if (converterCount == 0)
