@@ -441,9 +441,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 FastVector3Int dominant = largest.Value.Key;
                 return new Color(
-                    (dominant.x * bucketSize) / 255f,
-                    (dominant.y * bucketSize) / 255f,
-                    (dominant.z * bucketSize) / 255f,
+                    BucketToChannel(dominant.x, bucketSize),
+                    BucketToChannel(dominant.y, bucketSize),
+                    BucketToChannel(dominant.z, bucketSize),
                     1f
                 );
             }
@@ -835,11 +835,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             FastVector3Int dominantBucket = largest.Value.Key;
             return new Color(
-                dominantBucket.x * bucketSize / 255f,
-                dominantBucket.y * bucketSize / 255f,
-                dominantBucket.z * bucketSize / 255f,
+                BucketToChannel(dominantBucket.x, bucketSize),
+                BucketToChannel(dominantBucket.y, bucketSize),
+                BucketToChannel(dominantBucket.z, bucketSize),
                 1f
             );
+        }
+
+        // The topmost bucket represents channel 256, which is not a channel. Without the clamp a
+        // dominant white returns 1.0039 and the caller's "color" is outside the range it declares.
+        private static float BucketToChannel(int bucket, int bucketSize)
+        {
+            return ColorQuantization.ToNormalized((byte)Mathf.Min(bucket * bucketSize, 255));
         }
 
         // Helper struct for LAB color space

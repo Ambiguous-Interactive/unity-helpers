@@ -295,6 +295,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.Greater(value, 0.9f);
         }
 
+        /// <remarks>
+        /// The bucket a saturated channel lands in represents channel 256, which is not a channel,
+        /// so the decode used to hand back 1.0039 for a dominant white - a "color" outside the range
+        /// its own type declares.
+        /// </remarks>
+        [Test]
+        public void GetAverageColorDominantStaysInsideTheUnitRange()
+        {
+            foreach (float channel in new[] { 1f, 0.99f, 0.75f, 0.5f, 0f })
+            {
+                Color input = new(channel, channel, channel, 1f);
+                Color[] pixels = { input, input };
+
+                Color result = pixels.GetAverageColor(ColorAveragingMethod.Dominant);
+
+                Assert.LessOrEqual(result.r, 1f, $"{channel} overshot on red.");
+                Assert.LessOrEqual(result.g, 1f, $"{channel} overshot on green.");
+                Assert.LessOrEqual(result.b, 1f, $"{channel} overshot on blue.");
+                Assert.GreaterOrEqual(result.r, 0f, $"{channel} undershot on red.");
+            }
+        }
+
         [Test]
         public void GetAverageColorEnumerableDominantTracksMostCommonBucket()
         {
