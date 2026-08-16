@@ -78,10 +78,20 @@ $versionHeaders = @()
 $changeTypeHeaders = @()
 $currentSection = $null
 $currentSectionLine = 0
+# A blank line between two sibling entries splits one [Unreleased] list into two, which reads as a
+# deleted entry and renders as a loose list. Tracked here, reset at every heading.
+$previousBulletIndent = $null
+$blankSincePreviousBullet = $false
 
 for ($i = 0; $i -lt $lines.Count; $i++) {
   $line = $lines[$i]
   $lineNumber = $i + 1
+
+  # Any heading starts a fresh list, so entry adjacency never spans one.
+  if ($line -match '^#{2,3}\s') {
+    $previousBulletIndent = $null
+    $blankSincePreviousBullet = $false
+  }
 
   # Check for [Unreleased] section
   if ($line -match '^##\s+\[Unreleased\]\s*$') {
@@ -169,6 +179,27 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     $rendered = Get-RenderedEntryText -Entry $line
     if ($rendered.Length -gt $MaxEntryLength) {
       $errorList += "Line $lineNumber`: Entry is $($rendered.Length) rendered characters, over the $MaxEntryLength limit. Lead with the user-visible effect in one or two sentences and move the explanation into a docs/ guide: $($rendered.Substring(0, 80))..."
+    }
+  }
+
+  # Only [Unreleased] is gated, for the same reason the length check is: released notes are frozen.
+  if ($currentSection -eq 'Unreleased') {
+    if ($line -match '^\s*$') {
+      if ($null -ne $previousBulletIndent) {
+        $blankSincePreviousBullet = $true
+      }
+    }
+    elseif ($line -match '^(\s*)[-*]\s+\S') {
+      $bulletIndent = $Matches[1]
+      if ($blankSincePreviousBullet -and $bulletIndent -eq $previousBulletIndent) {
+        $errorList += "Line $lineNumber`: Blank line between two entries in the same list. Remove it so the section stays one list."
+      }
+      $previousBulletIndent = $bulletIndent
+      $blankSincePreviousBullet = $false
+    }
+    else {
+      $previousBulletIndent = $null
+      $blankSincePreviousBullet = $false
     }
   }
 

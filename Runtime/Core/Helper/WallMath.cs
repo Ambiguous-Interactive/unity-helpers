@@ -464,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static bool Approximately(
             this Color lhs,
             Color rhs,
-            float tolerance = 1f / 255f,
+            float tolerance = ColorQuantization.ChannelStep,
             float delta = 0f,
             bool includeAlpha = true
         )
@@ -519,8 +519,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool includeAlpha = true
         )
         {
-            float floatTolerance = Mathf.Max(0f, tolerance) / 255f;
-            float floatDelta = Mathf.Max(0f, delta) / 255f;
+            float floatTolerance = Mathf.Max(0f, tolerance) * ColorQuantization.ChannelStep;
+            float floatDelta = Mathf.Max(0f, delta) * ColorQuantization.ChannelStep;
             return ((Color)lhs).Approximately(rhs, floatTolerance, floatDelta, includeAlpha);
         }
 

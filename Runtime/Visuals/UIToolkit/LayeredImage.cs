@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             // 2) RGBA32 quantization (alpha stored in 8-bit, ~1/255 steps)
             float maxMagnitude = Mathf.Max(Mathf.Abs(alpha), Mathf.Abs(cutoff));
             float floatFudge = Mathf.Max(1e-6f * maxMagnitude, Mathf.Epsilon * 8f);
-            float quantizationFudge = 0.5f / 255f; // half-step tolerance for 8-bit alpha
+            float quantizationFudge = ColorQuantization.ChannelStep * 0.5f;
             float fudge = Mathf.Max(floatFudge, quantizationFudge);
             return alpha <= cutoff + fudge;
         }

@@ -140,6 +140,19 @@ The CHANGELOG follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 **Exception**: If a _released_ version introduced a bug and the fix is in `[Unreleased]`, then a "Fixed" entry is appropriate because users experienced the bug.
 
+**A fix for a defect that has never been in a release is not a `Fixed` entry.** The feature ships
+correct, so fold whatever the fix guarantees a user (a limit, an API to call, a promise) into that
+feature's `Added` entry, and drop the bug narration. The same test applies to a `Changed`,
+`Improved` or `Security` entry whose "before" is behavior no release ever had.
+
+**Decide with git, never memory** — the subject shipped only if it existed at the last release tag:
+
+```bash
+git tag --sort=-v:refname | head -1                       # last release tag
+git ls-tree -r --name-only <tag> -- <path>                # did the file exist?
+git show <tag>:<path> | rg <symbol>                       # did the symbol exist?
+```
+
 ### Required Format
 
 **CRITICAL**: Every CHANGELOG entry MUST follow this exact format:
