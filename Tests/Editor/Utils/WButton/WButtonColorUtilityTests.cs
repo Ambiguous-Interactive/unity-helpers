@@ -6,12 +6,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 {
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class WButtonColorUtilityTests
     {
+        /// <summary>
+        /// Comfortably above the largest darken amount, so every colour at or over it has room to
+        /// darken without the test having to know the private constants.
+        /// </summary>
+        private const float DarkenFloor = 0.25f;
+
         /// <remarks>
         /// The darkened colour is written straight into a 1x1 RGBA texture that becomes the button
         /// background, so a channel outside [0, 1] is not a rounding curiosity - it is a colour the
@@ -92,9 +99,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         /// <remarks>
         /// Hover and active are the only thing distinguishing the three interaction states - the
         /// styles are otherwise identical - so a "darken" that brightens would invert the feedback.
+        /// Anything with room to darken must darken; only a colour already at the floor may go the
+        /// other way, which is the sole reason a near-black button has any feedback at all.
         /// </remarks>
         [Test]
-        public void HoverAndActiveNeverBrightenAnInGamutColor()
+        public void HoverAndActiveDarkenEveryColorWithRoomToDarken()
         {
             for (int r = 0; r < 16; ++r)
             {
@@ -103,21 +112,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                     for (int b = 0; b < 16; ++b)
                     {
                         Color source = new(r / 15f, g / 15f, b / 15f, 1f);
+                        if (source.maxColorComponent < DarkenFloor)
+                        {
+                            continue;
+                        }
+
                         float sourceValue = source.maxColorComponent;
 
-                        Assert.LessOrEqual(
+                        Assert.Less(
                             WButtonColorUtility.GetHoverColor(source).maxColorComponent,
-                            sourceValue + 1e-5f,
-                            $"Hover brightened {source}."
+                            sourceValue,
+                            $"Hover did not darken {source}."
                         );
-                        Assert.LessOrEqual(
+                        Assert.Less(
                             WButtonColorUtility.GetActiveColor(source).maxColorComponent,
-                            sourceValue + 1e-5f,
-                            $"Active brightened {source}."
+                            sourceValue,
+                            $"Active did not darken {source}."
                         );
                     }
                 }
             }
+        }
+
+        /// <remarks>
+        /// Darkening a colour already at the floor clamps it to black, so rest, hover and press used to
+        /// render identically and a dark button gave no feedback whatsoever.
+        /// </remarks>
+        [Test]
+        public void HoverAndActiveAreDistinctFromRestAndFromEachOther()
+        {
+            for (int hue = 0; hue < 12; ++hue)
+            {
+                for (int value = 0; value <= 100; ++value)
+                {
+                    Color source = Color.HSVToRGB(hue / 12f, 0.8f, value / 100f);
+                    source.a = 1f;
+
+                    Color hover = WButtonColorUtility.GetHoverColor(source);
+                    Color active = WButtonColorUtility.GetActiveColor(source);
+
+                    Assert.Greater(
+                        Distance(hover, source),
+                        0f,
+                        $"Hover gave no feedback for {source}."
+                    );
+                    Assert.Greater(
+                        Distance(active, source),
+                        Distance(hover, source),
+                        $"Press did not move further than hover for {source}."
+                    );
+                }
+            }
+        }
+
+        private static float Distance(Color first, Color second)
+        {
+            return Mathf.Abs(first.r - second.r)
+                + Mathf.Abs(first.g - second.g)
+                + Mathf.Abs(first.b - second.b);
         }
 
         [Test]
@@ -132,8 +184,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             }
         }
 
+        /// <remarks>
+        /// The old rule compared Rec.601 luma against a threshold, which measures brightness rather
+        /// than contrast. It
+        /// chose the less readable of black and white on 22.9% of the colour cube - worst at
+        /// <c>rgb(0, 0.937, 0)</c>, where it picked white at 1.58:1 over black at 13.32:1.
+        /// </remarks>
         [Test]
-        public void GetReadableTextColorReturnsAnOpaqueMonochrome()
+        public void GetReadableTextColorAlwaysPicksTheHigherContrastOption()
         {
             for (int r = 0; r < 16; ++r)
             {
@@ -147,6 +205,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                         Assert.IsTrue(
                             text == Color.black || text == Color.white,
                             $"Readable text for {source} was neither black nor white."
+                        );
+                        Color other = text == Color.black ? Color.white : Color.black;
+                        Assert.GreaterOrEqual(
+                            ColorContrast.ContrastRatio(source, text),
+                            ColorContrast.ContrastRatio(source, other),
+                            $"Readable text for {source} was the less readable choice."
                         );
                     }
                 }

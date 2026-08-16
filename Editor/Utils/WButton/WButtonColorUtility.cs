@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 {
 #if UNITY_EDITOR
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class WButtonColorUtility
     {
@@ -24,27 +25,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         internal static Color GetReadableTextColor(Color background)
         {
-            float luminance =
-                (0.299f * background.r) + (0.587f * background.g) + (0.114f * background.b);
-            return luminance > 0.55f ? Color.black : Color.white;
+            return ColorContrast.ReadableTextColor(background);
         }
 
         internal static Color GetHoverColor(Color baseColor)
         {
-            return AdjustValue(baseColor, -HoverDarkenAmount);
+            return ShiftValue(baseColor, HoverDarkenAmount);
         }
 
         internal static Color GetActiveColor(Color baseColor)
         {
-            return AdjustValue(baseColor, -ActiveDarkenAmount);
+            return ShiftValue(baseColor, ActiveDarkenAmount);
         }
 
-        private static Color AdjustValue(Color color, float delta)
+        /// <remarks>
+        /// Darkens, except where darkening has nowhere to go. A button below the requested amount
+        /// clamps to black for every state, so a near-black one gave the same color for rest, hover and
+        /// press - no feedback at all. Lightening by the same amount there keeps the two states
+        /// distinct and keeps their relative order: press always moves further than hover.
+        /// </remarks>
+        private static Color ShiftValue(Color color, float amount)
         {
-            Color.RGBToHSV(color, out float h, out float s, out float v);
-            s = Clamp01OrZero(s);
-            v = Clamp01OrZero(v + delta);
-            Color adjusted = Color.HSVToRGB(h, s, v);
+            Color.RGBToHSV(color, out float hue, out float saturation, out float value);
+            saturation = Clamp01OrZero(saturation);
+            value = Clamp01OrZero(value);
+            value = Clamp01OrZero(value >= amount ? value - amount : value + amount);
+            Color adjusted = Color.HSVToRGB(hue, saturation, value);
             adjusted.a = color.a;
             return adjusted;
         }

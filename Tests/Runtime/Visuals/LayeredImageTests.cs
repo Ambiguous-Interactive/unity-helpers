@@ -563,14 +563,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
         }
 
-        [Test]
-        public void ComputeTexturesExcludesPixelsEqualToCutoff()
+        /// <remarks>
+        /// The two alphas straddle the cutoff by one 8-bit step, which is the pair that discriminates.
+        /// Authoring <c>0.01f</c> directly does not: RGBA32 rounds it to byte 3 (0.011765), which is
+        /// <em>above</em> a 0.01 cutoff, and only a half-step of extra slack made it read as equal.
+        /// That slack cost an alpha level at some cutoffs and none at others, so the same cutoff
+        /// selected different pixels here than the sprite tools select.
+        /// </remarks>
+        [TestCase(2, true)]
+        [TestCase(3, false)]
+        public void ComputeTexturesDiscardsExactlyTheAlphasAtOrBelowTheCutoff(
+            byte storedAlpha,
+            bool expectDiscarded
+        )
         {
             Sprite edge = VisualsTestHelpers.CreateSprite(
                 _trackedObjects,
                 1,
                 1,
-                (_, _) => new Color(1f, 1f, 1f, 0.01f),
+                (_, _) => new Color(1f, 1f, 1f, storedAlpha / 255f),
                 pivot: Vector2.zero
             );
 
@@ -583,9 +594,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
             Assert.That(computed, Has.Length.EqualTo(1));
-            Assert.IsTrue(
+            Assert.AreEqual(
+                expectDiscarded,
                 computed[0] == null,
-                "Expected frame to be null when alpha equals cutoff."
+                $"Alpha byte {storedAlpha} against cutoff 0.01 (quantized bound 2)."
             );
         }
 

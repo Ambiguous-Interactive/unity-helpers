@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Shared solid-color button styling used by the serialized dictionary and set inspectors.
@@ -120,8 +121,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static Color GetLegibleTextColor(Color background)
         {
-            float luminance = 0.299f * background.r + 0.587f * background.g + 0.114f * background.b;
-            return luminance > 0.55f ? Color.black : Color.white;
+            return ColorContrast.ReadableTextColor(background);
         }
 
         private static Texture2D GetSolidTexture(Color color)

@@ -228,7 +228,10 @@ The loop is worth writing out each time rather than committing a helper: `[TestC
 off the attribute's `Arguments` property and `[TestCaseSource]` off the named static property, and a
 failure arrives as `TargetInvocationException.InnerException`. NUnit's attribute types are not
 referenced by the sandbox assembly either, so resolve them by name off the loaded `nunit.framework`
-and pass them to `GetCustomAttributes(Type, bool)`.
+and pass them to `GetCustomAttributes(Type, bool)`. Two things NUnit does that the loop must also do,
+or a passing test reports as failed: **coerce each `[TestCase]` argument to the parameter type**
+(`[TestCase(2, …)]` on a `byte` parameter arrives boxed as `Int32` and `Invoke` refuses it), and treat
+`InconclusiveException` / `IgnoreException` as skips rather than failures.
 
 Four constraints. The first two were recorded backwards before being measured on 2026-08-16:
 

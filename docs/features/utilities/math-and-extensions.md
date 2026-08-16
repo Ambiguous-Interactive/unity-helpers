@@ -629,6 +629,29 @@ end up disagreeing about which pixels are transparent.
 
 All three clamp: values outside `[0, 1]` saturate and `NaN` encodes to `0`.
 
+### Readable Text on Any Background
+
+`ColorContrast` answers "can this be read against that?" the way
+[WCAG](https://www.w3.org/TR/WCAG21/#contrast-minimum) defines it.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+Color label = ColorContrast.ReadableTextColor(buttonColor);   // black or white, whichever wins
+float ratio = ColorContrast.ContrastRatio(buttonColor, label);
+bool readable = ratio >= ColorContrast.MinimumReadableRatio;  // 4.5:1, WCAG AA body text
+```
+
+The tempting shortcut — threshold the familiar `0.299r + 0.587g + 0.114b` luma — measures perceived
+brightness, and brightness is not contrast. Contrast is a ratio between two colors' _relative
+luminance_, computed on linearized channels with different weights. The two disagree most on saturated
+greens and cyans, which is exactly where a button palette lives: on `rgb(0, 0.937, 0)` the luma rule
+picks white at **1.58:1** where black gives **13.32:1**.
+
+`ReadableTextColor` has no threshold to tune. It computes both candidate ratios and returns the winner.
+Every channel is bounded before it is linearized, so an HDR or NaN color yields a luminance in `[0, 1]`
+and a ratio in `[1, 21]` rather than nonsense.
+
 ### Resampling a Texture
 
 `TextureResampling` is the matching single rule for scaling: where a destination pixel samples the

@@ -15,16 +15,19 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
     public sealed class LayeredImage : VisualElement
     {
+        /// <remarks>
+        /// The tolerance covers float drift only. A half-8-bit-step of slack used to be added on top,
+        /// which discarded an extra alpha level at some cutoffs and none at others - so the same cutoff
+        /// selected different pixels here than <see cref="ColorQuantization.ToThresholdByte"/> selects
+        /// everywhere else in the package, and a pixel the caller asked to keep was dropped. Composited
+        /// alpha does not land on the 8-bit grid, so the plain comparison is the rule; drift is the only
+        /// thing needing slack.
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsAlphaEffectivelyInvisible(float alpha, float cutoff)
         {
-            // Account for two sources of error:
-            // 1) Float math drift (scale with magnitude)
-            // 2) RGBA32 quantization (alpha stored in 8-bit, ~1/255 steps)
             float maxMagnitude = Mathf.Max(Mathf.Abs(alpha), Mathf.Abs(cutoff));
-            float floatFudge = Mathf.Max(1e-6f * maxMagnitude, Mathf.Epsilon * 8f);
-            float quantizationFudge = ColorQuantization.ChannelStep * 0.5f;
-            float fudge = Mathf.Max(floatFudge, quantizationFudge);
+            float fudge = Mathf.Max(1e-6f * maxMagnitude, Mathf.Epsilon * 8f);
             return alpha <= cutoff + fudge;
         }
 

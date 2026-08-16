@@ -602,12 +602,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         thumb.style.backgroundColor = _selectedThumbnailBackgroundColor;
                         thumb.style.borderBottomColor =
-                            _selectedThumbnailBackgroundColor.value * 1.5f;
-                        thumb.style.borderTopColor = _selectedThumbnailBackgroundColor.value * 1.5f;
+                            _selectedThumbnailBackgroundColor.value.ChangeColorBrightness(0.5f);
+                        thumb.style.borderTopColor =
+                            _selectedThumbnailBackgroundColor.value.ChangeColorBrightness(0.5f);
                         thumb.style.borderLeftColor =
-                            _selectedThumbnailBackgroundColor.value * 1.5f;
+                            _selectedThumbnailBackgroundColor.value.ChangeColorBrightness(0.5f);
                         thumb.style.borderRightColor =
-                            _selectedThumbnailBackgroundColor.value * 1.5f;
+                            _selectedThumbnailBackgroundColor.value.ChangeColorBrightness(0.5f);
                     }
                     else
                     {
