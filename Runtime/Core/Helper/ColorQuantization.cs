@@ -59,35 +59,62 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Encodes a normalized [0, 1] float to the nearest 8-bit color channel.
         /// </summary>
-        /// <param name="normalized">The normalized channel value. Values outside [0, 1] are clamped, and NaN encodes to 0.</param>
+        /// <param name="normalized">The normalized channel value. Values outside [0, 1] saturate, and NaN encodes to 0.</param>
         /// <returns>The nearest 8-bit channel, matching Unity's own <see cref="Color"/> to <see cref="Color32"/> conversion.</returns>
         /// <remarks>
-        /// Edge Cases: NaN clamps to 0 because <see cref="Mathf.Clamp01(float)"/> returns 0 for it, and
-        /// infinities clamp to 0 and 255. An unclamped cast of an out-of-range float to <see cref="byte"/>
-        /// is undefined in C#, so the clamp is load-bearing rather than defensive.
+        /// Edge Cases: both infinities are ordered against 0 and 1, so they saturate to 0 and 255 through
+        /// the two branches below and never reach the cast. NaN is the value that does not:
+        /// <see cref="Mathf.Clamp01(float)"/> returns NaN for it, because every comparison against NaN is
+        /// false and it falls through both of that method's branches. The remaining cast would then be a
+        /// float-to-int conversion of NaN, which C# leaves undefined; it happens to yield 0 here only
+        /// because <c>(byte)int.MinValue</c> is 0. Testing <c>!(normalized &gt; 0f)</c> first puts NaN on
+        /// the same branch as a negative, making 0 the answer by construction on every architecture.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ToByte(float normalized)
         {
-            return (byte)Mathf.RoundToInt(Mathf.Clamp01(normalized) * 255f);
+            if (!(normalized > 0f))
+            {
+                return byte.MinValue;
+            }
+
+            if (normalized >= 1f)
+            {
+                return byte.MaxValue;
+            }
+
+            return (byte)Mathf.RoundToInt(normalized * 255f);
         }
 
         /// <summary>
         /// Converts a normalized cutoff into the largest 8-bit channel that still satisfies
         /// <c>channel / 255f &lt;= cutoff</c>.
         /// </summary>
-        /// <param name="cutoff">The normalized cutoff. Values outside [0, 1] are clamped, and NaN clamps to 0.</param>
+        /// <param name="cutoff">The normalized cutoff. Values outside [0, 1] saturate, and NaN yields 0.</param>
         /// <returns>The inclusive upper bound, so <c>channel &lt;= result</c> is exactly the float comparison.</returns>
         /// <remarks>
         /// Use this - never <see cref="ToByte(float)"/> - when comparing stored <see cref="Color32"/>
         /// channels against a float cutoff. Rounding the cutoff instead misclassifies one channel value
         /// at nearly every cutoff, which is how two callers of the same cutoff disagree about which
         /// pixels are transparent.
+        /// Edge Cases: NaN yields 0, so nothing but a zero channel falls under a cutoff that is not a
+        /// number. See <see cref="ToByte(float)"/> for why the bound is not tested with
+        /// <see cref="Mathf.Clamp01(float)"/>.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ToThresholdByte(float cutoff)
         {
-            return (byte)Mathf.FloorToInt(Mathf.Clamp01(cutoff) * 255f);
+            if (!(cutoff > 0f))
+            {
+                return byte.MinValue;
+            }
+
+            if (cutoff >= 1f)
+            {
+                return byte.MaxValue;
+            }
+
+            return (byte)Mathf.FloorToInt(cutoff * 255f);
         }
     }
 }

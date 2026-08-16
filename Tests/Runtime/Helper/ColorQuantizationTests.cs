@@ -38,11 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             new object[] { 0.3f, (byte)76 },
             new object[] { 0.4f, (byte)102 },
             new object[] { 0.999f, (byte)255 },
-            new object[] { -1f, (byte)0 },
-            new object[] { 2f, (byte)255 },
-            new object[] { float.NaN, (byte)0 },
-            new object[] { float.PositiveInfinity, (byte)255 },
-            new object[] { float.NegativeInfinity, (byte)0 },
         };
 
         [Test]
@@ -131,9 +126,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        /// <remarks>
+        /// NaN is the case worth pinning. <c>Mathf.Clamp01(NaN)</c> returns NaN - every comparison
+        /// against NaN is false, so it falls through both of that method's branches - which would leave
+        /// a float-to-int conversion of NaN, undefined in C#. It yields 0 on x64 only because
+        /// <c>(byte)int.MinValue</c> is 0. Both methods test their bounds so that 0 is the answer by
+        /// construction rather than by architecture.
+        /// </remarks>
         [Test]
-        public void ToThresholdByteClampsHostileCutoffs()
+        public void HostileInputsSaturateRatherThanRelyingOnAnUndefinedCast()
         {
+            Assert.IsTrue(
+                float.IsNaN(Mathf.Clamp01(float.NaN)),
+                "Clamp01 no longer passes NaN through."
+            );
+
+            Assert.AreEqual(0, ColorQuantization.ToByte(float.NaN));
+            Assert.AreEqual(0, ColorQuantization.ToByte(float.NegativeInfinity));
+            Assert.AreEqual(0, ColorQuantization.ToByte(-12f));
+            Assert.AreEqual(255, ColorQuantization.ToByte(float.PositiveInfinity));
+            Assert.AreEqual(255, ColorQuantization.ToByte(12f));
+
             Assert.AreEqual(0, ColorQuantization.ToThresholdByte(float.NaN));
             Assert.AreEqual(0, ColorQuantization.ToThresholdByte(float.NegativeInfinity));
             Assert.AreEqual(0, ColorQuantization.ToThresholdByte(-12f));
