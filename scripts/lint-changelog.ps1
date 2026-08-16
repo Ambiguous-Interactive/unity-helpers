@@ -1,5 +1,6 @@
 Param(
-  [switch]$VerboseOutput
+  [switch]$VerboseOutput,
+  [int]$MaxEntryLength = 300
 )
 
 Set-StrictMode -Version Latest
@@ -7,6 +8,19 @@ $ErrorActionPreference = 'Stop'
 
 function Write-Info($msg) {
   if ($VerboseOutput) { Write-Host "[changelog-lint] $msg" -ForegroundColor Cyan }
+}
+
+# What a reader sees: the trailing issue references, the URL half of every link, and the markdown
+# emphasis markers are all removed, so length measures prose rather than punctuation.
+function Get-RenderedEntryText {
+  Param([string]$Entry)
+
+  $text = $Entry.Trim()
+  $text = $text -replace '^[-*]\s+', ''
+  $text = $text -replace '\s*\(\[#\d+\]\([^)]*\)(\s*,\s*\[#\d+\]\([^)]*\))*\)\.?$', ''
+  $text = $text -replace '\[([^\]]*)\]\([^)]*\)', '$1'
+  $text = $text -replace '[`*]', ''
+  return $text.Trim()
 }
 
 function Write-WarningMsg($msg) {
@@ -148,6 +162,16 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     $errorList += "Line $lineNumber`: Empty bullet list item detected. Remove the stray list marker or add entry text."
   }
 
+  # Only [Unreleased] is gated: released notes are immutable, so an entry that shipped cannot be
+  # shortened to satisfy this. Every future released section passes through here while unreleased.
+  # Length is measured as rendered text -- issue references and link targets are not prose.
+  if ($currentSection -eq 'Unreleased' -and $line -match '^\s*[-*]\s+\S') {
+    $rendered = Get-RenderedEntryText -Entry $line
+    if ($rendered.Length -gt $MaxEntryLength) {
+      $errorList += "Line $lineNumber`: Entry is $($rendered.Length) rendered characters, over the $MaxEntryLength limit. Lead with the user-visible effect in one or two sentences and move the explanation into a docs/ guide: $($rendered.Substring(0, 80))..."
+    }
+  }
+
   # Check for version headers without brackets
   if ($line -match '^##\s+\d+\.\d+\.\d+') {
     $warningList += "Line $lineNumber`: Version should be in brackets, e.g., '## [1.0.0] - YYYY-MM-DD'"
@@ -213,8 +237,8 @@ if ($warningList.Count -gt 0) {
 if ($errorList.Count -gt 0) {
   Write-Host ""
   Write-ErrorMsg "Found $($errorList.Count) error(s):"
-  foreach ($error in $errorList) {
-    Write-Host "  - $error" -ForegroundColor Red
+  foreach ($entryError in $errorList) {
+    Write-Host "  - $entryError" -ForegroundColor Red
   }
   Write-Host ""
   Write-Host "=" * 60

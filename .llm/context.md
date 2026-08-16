@@ -83,7 +83,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 
 - **Documentation is NOT optional.** Every user-facing change MUST update: CHANGELOG, XML docs, feature docs in `docs/`
 - CHANGELOG is for USER-FACING changes ONLY. Internal changes (CI/CD, build scripts, dev tooling) do NOT belong
-- **CHANGELOG entries are SHORT** -- one or two sentences, plain language, lead with the user-visible effect. No root-cause narration, no mechanism, no run IDs or "verified on...". Longer explanations go in a `docs/` guide with a link
+- **CHANGELOG entries are SHORT** -- one or two sentences, plain language, lead with the user-visible effect, and start with the verb its section names (`Add`, `Fix`, `Bound`, ...). No root-cause narration, no mechanism, no run IDs or "verified on...". Longer explanations go in a `docs/` guide with a link. `npm run lint:changelog` fails an entry over **300 rendered characters** (issue references and link targets are not counted), so the limit is enforced rather than remembered
 - All public members require `<summary>` XML tags
 - See [update-documentation](./skills/update-documentation.md) for detailed standards
 

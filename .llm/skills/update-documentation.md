@@ -207,7 +207,15 @@ do I need to do anything?_ It is not a design document, not an RCA, and not a co
 
 Hard rules:
 
-- **One or two sentences per entry.** If it needs three, the extra detail belongs in `docs/`.
+- **One or two sentences per entry**, and at most **300 rendered characters**. `npm run lint:changelog`
+  fails a longer one; issue references and link targets do not count toward the limit. If it needs
+  three sentences, the extra detail belongs in `docs/`.
+- **Start with the verb its section names** — `Add` under `### Added`, `Fix` under `### Fixed`.
+  A bold title is optional; when you use one it must be followed by a colon (see
+  [Required Format](#required-format)).
+- The limit is checked in `[Unreleased]` only, because released notes are immutable
+  (see [NEVER Modify Released Notes](#never-modify-released-notes)). Every entry passes through it
+  while unreleased, so a released section is already compliant when it is frozen.
 - **Lead with the user-visible effect**, not the mechanism. "Values are no longer dropped"
   beats "the backing array is now serialized as…".
 - **No root-cause narration.** Never explain Unity internals, dedup order, why the old code was
