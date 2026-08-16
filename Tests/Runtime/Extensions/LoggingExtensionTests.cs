@@ -250,8 +250,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 // text tag Unity renders as literal text - so the reader saw the markup, not the value.
                 assertion = message =>
                 {
+                    // The pretty prefix carries its own markup, so the absence of a colour tag is
+                    // asserted only where the message is nothing but the formatted value.
                     Assert.IsFalse(message.Contains("notacolor"), message);
-                    Assert.IsFalse(message.Contains("<color="), message);
                     if (pretty)
                     {
                         Assert.IsTrue(message.Contains("Hello world"), message);

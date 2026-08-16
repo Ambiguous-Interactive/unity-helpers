@@ -246,10 +246,12 @@ Four constraints. The first two were recorded backwards before being measured on
 - **A `CommonTestBase` fixture runs fine; only its teardown does not.** Both `[SetUp]` methods
   (`BaseSetUp` and the fixture's own) return normally. `[TearDown] TearDown` throws
   `InvalidOperationException: No log scope is available`, because `LogAssert.NoUnexpectedReceived()`
-  needs the test runner's log scope. Swallow teardown and the bodies all run — 49 invocations across
-  three fixtures did. Do **not** shape a new fixture to avoid the base class for this reason: what you
-  give up is the teardown's leak and unexpected-log assertions, which CI still runs, plus tracked
-  objects are not destroyed, so an editor session accumulates them.
+  needs the test runner's log scope. Swallow teardown and the bodies all run — one sweep put 269
+  assertions through eleven fixtures. Do **not** shape a new fixture to avoid the base class for this
+  reason: what you give up is the teardown's leak and unexpected-log assertions, which CI still runs,
+  plus tracked objects are not destroyed, so an editor session accumulates them.
+  The same message from a test **body** means that test calls `LogAssert.Expect` itself, and it cannot
+  run this way at all — leave those to CI rather than reading them as regressions.
 - **Check the loaded assembly is current before trusting any measurement.** The host editor has the
   Hot Reload package installed, whose whole purpose is to avoid domain reloads — so an
   `AssetDatabase.Refresh` can compile a new DLL to `Library/ScriptAssemblies` while the **loaded**
