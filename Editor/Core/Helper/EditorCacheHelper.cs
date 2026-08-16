@@ -617,14 +617,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         }
 
         /// <summary>
-        /// Comparer for Unity Color values that uses approximate equality.
+        /// Comparer for Unity Color values that treats two colors as one key when they quantize to
+        /// the same 8-bit channels.
         /// </summary>
+        /// <remarks>
+        /// Deliberately not <see cref="AreColorsEqual"/>. That compares floats, while
+        /// <see cref="GetColorHashCode"/> quantizes, so two colors either side of a channel boundary
+        /// compared equal and hashed apart - which is a broken equality contract, and lets one cache
+        /// hold two entries for a key it considers single. Quantizing both sides also states what a
+        /// texture cache actually means by equal: a solid texture stores 8 bits per channel, so
+        /// colors sharing a quantized channel share a texture.
+        /// </remarks>
         public sealed class ColorComparer : IEqualityComparer<Color>
         {
             /// <inheritdoc />
             public bool Equals(Color x, Color y)
             {
-                return AreColorsEqual(x, y);
+                return ColorQuantization.ToByte(x.r) == ColorQuantization.ToByte(y.r)
+                    && ColorQuantization.ToByte(x.g) == ColorQuantization.ToByte(y.g)
+                    && ColorQuantization.ToByte(x.b) == ColorQuantization.ToByte(y.b)
+                    && ColorQuantization.ToByte(x.a) == ColorQuantization.ToByte(y.a);
             }
 
             /// <inheritdoc />
