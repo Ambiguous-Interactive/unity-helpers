@@ -157,6 +157,7 @@
     "format:csharp:check": "pwsh -NoProfile -File scripts/lint-csharp-format.ps1 -VerboseOutput",
     "format:check": "npm run format:md:check && npm run format:json:check && npm run format:yaml:check && npm run format:js:check",
     "format:fix": "npm run format:md && npm run format:json && npm run format:yaml && npm run format:js",
+    "lint:preserve-attributes": "node scripts/lint-preserve-attributes.js",
     "lint:changelog": "pwsh -NoProfile -File scripts/lint-changelog.ps1 -VerboseOutput",
     "lint:duplicate-usings": "pwsh -NoProfile -File scripts/lint-duplicate-usings.ps1 -VerboseOutput",
     "lint:yaml": "pwsh -NoProfile -File scripts/lint-yaml.ps1 -VerboseOutput",

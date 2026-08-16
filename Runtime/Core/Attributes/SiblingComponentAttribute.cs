@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections;
     using System.Collections.Generic;
     using UnityEngine;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
     using static RelationalComponentProcessor;
@@ -62,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// ]]></code>
     /// </example>
     [AttributeUsage(AttributeTargets.Field)]
+    [Preserve]
     public sealed class SiblingComponentAttribute : BaseRelationalComponentAttribute { }
 
     public static class SiblingComponentExtensions

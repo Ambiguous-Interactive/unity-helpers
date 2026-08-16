@@ -4,8 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Core.Attributes
 {
     using System;
+    using UnityEngine.Scripting;
 
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
+    [Preserve]
     public sealed class EnumDisplayNameAttribute : Attribute
     {
         public string DisplayName { get; }

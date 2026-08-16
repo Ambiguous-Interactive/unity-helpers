@@ -64,7 +64,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static readonly SingletonCreationPolicy _creationPolicy = ResolveCreationPolicy();
 
-        private static bool _creationRefused;
+        // -1 rather than 0, because frame 0 is a real frame.
+        private static int _creationRefusedFrame = -1;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private static bool _creationRefusedWarningLogged;
@@ -136,19 +137,21 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 UnityMainThreadGuard.EnsureMainThread();
 
-                // A refusal is remembered, because a scene-wide search that already came back empty
-                // cannot start returning something without Awake running -- and Awake assigns
-                // _instance, which is answered above. Without this a NeverCreate singleton with
-                // nothing in the scene pays a full FindAnyObjectByType on EVERY access, forever,
-                // which is exactly what the documented `if (X.Instance != null)` guard does per
-                // frame. CreateOnDemand never had the problem: it creates one and caches it.
+                // An empty search is remembered for the rest of the FRAME, and only that. Without it
+                // a NeverCreate singleton with nothing in the scene pays a full FindAnyObjectByType
+                // on every access, forever -- which is exactly what the `if (X.Instance != null)`
+                // guard this type's documentation recommends does, once per call site per frame.
+                // CreateOnDemand never had the problem: it creates one and caches it.
                 //
-                // Play mode only, and that is not caution -- the invariant is Awake, and Unity does
-                // not run Awake outside play mode. Measured: AddComponent in the editor produces a
-                // live, active instance with _instance still null, so remembering a refusal there
-                // would hide a singleton that is genuinely in the scene from editor tooling.
-                bool canRememberRefusal = Application.isPlaying;
-                if (canRememberRefusal && _creationRefused)
+                // A frame is the bound rather than "until something calls ClearInstance" because
+                // every stronger claim is wrong somewhere. "Nothing can appear without Awake
+                // assigning the cache" is false in the editor, where Unity does not run Awake at all
+                // (measured: AddComponent produced a live instance a sticky refusal then hid), and
+                // false for a subclass whose Awake override forgets base.Awake(). Scoping to the
+                // frame removes the invariant instead of weakening it: the worst case is one search
+                // per frame, which is what a single guarded call site already cost.
+                int frame = Time.frameCount;
+                if (_creationRefusedFrame == frame)
                 {
                     return null;
                 }
@@ -162,7 +165,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Type type = typeof(T);
                 if (_creationPolicy == SingletonCreationPolicy.NeverCreate)
                 {
-                    _creationRefused = canRememberRefusal;
+                    _creationRefusedFrame = frame;
                     WarnCreationRefused(type);
                     return null;
                 }
@@ -223,10 +226,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
-            // An explicit clear is exactly the moment the remembered refusal should end: the next
+            // An explicit clear is exactly the moment a remembered refusal should end: the next
             // access is a fresh question, and a test that expects the warning twice would otherwise
             // never see it a second time.
-            _creationRefused = false;
+            _creationRefusedFrame = -1;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _creationRefusedWarningLogged = false;
 #endif

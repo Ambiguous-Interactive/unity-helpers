@@ -4,8 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Core.Attributes
 {
     using System;
+    using UnityEngine.Scripting;
 
     [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+    [Preserve]
     public sealed class ScriptableSingletonPathAttribute : Attribute
     {
         public readonly string resourcesPath;

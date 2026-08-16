@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Attributes
 {
     using System;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -35,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </code>
     /// </example>
     [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
+    [Preserve]
     public sealed class SingletonCreationAttribute : Attribute
     {
         /// <summary>

@@ -125,6 +125,11 @@ const CHECKS = [
     run: "npm run lint:unity-file-naming"
   },
   {
+    id: "preserve-attributes",
+    name: "IL2CPP-preserved runtime attributes",
+    run: "node scripts/lint-preserve-attributes.js"
+  },
+  {
     id: "meta-exclusions",
     name: "Meta lint exclusions",
     run: "bash scripts/tests/test-lint-meta-exclusions.sh"

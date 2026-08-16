@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using Extension;
     using UnityEngine;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Utils;
     using static RelationalComponentProcessor;
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
@@ -70,6 +71,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// ]]></code>
     /// </example>
     [AttributeUsage(AttributeTargets.Field)]
+    [Preserve]
     public sealed class ParentComponentAttribute : BaseRelationalComponentAttribute
     {
         /// <summary>

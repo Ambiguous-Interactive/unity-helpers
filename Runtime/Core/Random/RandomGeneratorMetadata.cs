@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -24,6 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// Describes statistical quality metadata that can be attached to <see cref="IRandom"/> implementations.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    [Preserve]
     public sealed class RandomGeneratorMetadataAttribute : Attribute
     {
         public RandomGeneratorMetadataAttribute(

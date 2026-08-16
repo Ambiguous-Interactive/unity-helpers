@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -110,6 +111,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// public AbilityOverrides overrideSettings;
     /// </code>
     /// </example>
+    [Preserve]
     public sealed class WShowIfAttribute : PropertyAttribute
     {
         /// <summary>
