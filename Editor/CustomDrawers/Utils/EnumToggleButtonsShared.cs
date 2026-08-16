@@ -167,6 +167,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         public static GUIContent LastPageContent =>
             _lastPageContent ??= EditorGUIUtility.TrTextContent(">>", "Last Page");
 
+        private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
+
         private static readonly Dictionary<ButtonStyleCacheKey, GUIStyle> ButtonStyleCache = new(
             new ButtonStyleCacheKeyComparer()
         );
@@ -687,16 +689,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             {
                 return Segment == other.Segment
                     && IsActive == other.IsActive
-                    && EditorCacheHelper.AreColorsEqual(
-                        SelectedBackground,
-                        other.SelectedBackground
-                    )
-                    && EditorCacheHelper.AreColorsEqual(SelectedText, other.SelectedText)
-                    && EditorCacheHelper.AreColorsEqual(
-                        InactiveBackground,
-                        other.InactiveBackground
-                    )
-                    && EditorCacheHelper.AreColorsEqual(InactiveText, other.InactiveText);
+                    && ColorEquality.Equals(SelectedBackground, other.SelectedBackground)
+                    && ColorEquality.Equals(SelectedText, other.SelectedText)
+                    && ColorEquality.Equals(InactiveBackground, other.InactiveBackground)
+                    && ColorEquality.Equals(InactiveText, other.InactiveText);
             }
 
             /// <inheritdoc />
@@ -711,22 +707,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return Objects.HashCode(
                     Segment,
                     IsActive,
-                    SelectedBackground.r,
-                    SelectedBackground.g,
-                    SelectedBackground.b,
-                    SelectedBackground.a,
-                    SelectedText.r,
-                    SelectedText.g,
-                    SelectedText.b,
-                    SelectedText.a,
-                    InactiveBackground.r,
-                    InactiveBackground.g,
-                    InactiveBackground.b,
-                    InactiveBackground.a,
-                    InactiveText.r,
-                    InactiveText.g,
-                    InactiveText.b,
-                    InactiveText.a
+                    EditorCacheHelper.GetColorHashCode(SelectedBackground),
+                    EditorCacheHelper.GetColorHashCode(SelectedText),
+                    EditorCacheHelper.GetColorHashCode(InactiveBackground),
+                    EditorCacheHelper.GetColorHashCode(InactiveText)
                 );
             }
         }

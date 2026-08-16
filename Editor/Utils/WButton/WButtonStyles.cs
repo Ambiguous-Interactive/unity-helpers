@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Core.Helper;
 
     internal static class WButtonStyles
     {
@@ -27,8 +28,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static readonly Dictionary<ButtonStyleKey, GUIStyle> ColoredMiniButtonStyles = new(
             new ButtonStyleKeyComparer()
         );
+        private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
         private static readonly Dictionary<Color, Texture2D> SolidColorTextures = new(
-            new ColorComparer()
+            ColorEquality
         );
 
         internal const float ButtonHeight = 18f;
@@ -283,8 +285,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             public bool Equals(ButtonStyleKey other)
             {
-                return ColorComparer.AreEqual(ButtonColor, other.ButtonColor)
-                    && ColorComparer.AreEqual(TextColor, other.TextColor);
+                return ColorEquality.Equals(ButtonColor, other.ButtonColor)
+                    && ColorEquality.Equals(TextColor, other.TextColor);
             }
 
             public override bool Equals(object obj)
@@ -294,7 +296,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             public override int GetHashCode()
             {
-                return Objects.HashCode(ButtonColor, TextColor);
+                return Objects.HashCode(
+                    EditorCacheHelper.GetColorHashCode(ButtonColor),
+                    EditorCacheHelper.GetColorHashCode(TextColor)
+                );
             }
         }
 
@@ -308,27 +313,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             public int GetHashCode(ButtonStyleKey obj)
             {
                 return obj.GetHashCode();
-            }
-        }
-
-        private sealed class ColorComparer : IEqualityComparer<Color>
-        {
-            public bool Equals(Color x, Color y)
-            {
-                return AreEqual(x, y);
-            }
-
-            public int GetHashCode(Color obj)
-            {
-                return Objects.HashCode(obj.r, obj.g, obj.b, obj.a);
-            }
-
-            public static bool AreEqual(Color x, Color y)
-            {
-                return Mathf.Approximately(x.r, y.r)
-                    && Mathf.Approximately(x.g, y.g)
-                    && Mathf.Approximately(x.b, y.b)
-                    && Mathf.Approximately(x.a, y.a);
             }
         }
     }

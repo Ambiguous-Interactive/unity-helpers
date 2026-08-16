@@ -42,10 +42,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static Color AdjustValue(Color color, float delta)
         {
             Color.RGBToHSV(color, out float h, out float s, out float v);
-            v = Mathf.Clamp01(v + delta);
+            s = Clamp01OrZero(s);
+            v = Clamp01OrZero(v + delta);
             Color adjusted = Color.HSVToRGB(h, s, v);
             adjusted.a = color.a;
             return adjusted;
+        }
+
+        /// <remarks>
+        /// Saturation above 1 - which <see cref="Color.RGBToHSV"/> reports for an out-of-gamut input -
+        /// makes <see cref="Color.HSVToRGB"/> emit negative channels, so the result has to be bounded
+        /// before the conversion rather than after it. <see cref="Mathf.Clamp01(float)"/> returns NaN
+        /// for NaN because every comparison against NaN is false; ordering the NaN test first makes 0
+        /// the answer by construction.
+        /// </remarks>
+        private static float Clamp01OrZero(float value)
+        {
+            if (!(value > 0f))
+            {
+                return 0f;
+            }
+
+            return value >= 1f ? 1f : value;
         }
     }
 #endif
