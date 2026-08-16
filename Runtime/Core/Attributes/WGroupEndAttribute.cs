@@ -13,7 +13,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// <para>
     /// <b>Important:</b> Place <see cref="WGroupEndAttribute"/> on the <b>last field you want included</b> in the group.
     /// The field with this attribute IS included in the group, and then the group closes for subsequent fields.
-    /// When multiple groups are stacked on the same field, you can provide explicit names to close only the desired scopes.
+    /// </para>
+    /// <para>
+    /// The bare form closes <b>every</b> open group. Name the groups you want closed when others should stay open,
+    /// which is the form to reach for whenever a type declares more than one group.
     /// </para>
     /// </remarks>
     /// <example>
@@ -40,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Creates a new end marker optionally targeting one or more specific groups.
         /// </summary>
         /// <param name="groupNames">
-        /// Explicit group keys to close. When omitted, the attribute ends every currently open group that originated on the same member.
+        /// Explicit group keys to close. When omitted, the attribute closes every group that is currently open, whichever member opened it.
         /// </param>
         public WGroupEndAttribute(params string[] groupNames)
         {

@@ -119,6 +119,29 @@ public int agility;         // Field 3: in group (auto-included)
 public int luck;            // Field 4: in group (last field)
 ```
 
+#### Which Group Captures a Field
+
+An unattributed field joins the group whose `[WGroup]` you passed **most recently**, reading top to
+bottom. Re-declaring an earlier group resumes capturing into it:
+
+```csharp
+[WGroup("alpha", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
+public int a1;
+public int a2;              // In "alpha"
+
+[WGroup("beta", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
+public int b1;
+public int b2;              // In "beta"
+
+[WGroup("alpha", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
+public int a3;
+public int a4;              // In "alpha" again
+```
+
+A group stays open until it is closed or runs out of budget, so when the most recent group is
+exhausted, capture falls back to the next most recent group still open. Close a group explicitly
+with `[WGroupEnd]` when you want the fields after it to be ungrouped.
+
 ---
 
 ### Collapsible Groups
@@ -287,7 +310,21 @@ public int lastField;           // In inner AND outer (last field)
 
 #### 3. Close All Active Groups
 
-Omit the group name to close all currently active auto-include groups:
+Omit the group name to close every currently active auto-include group, whichever member opened it.
+Name the groups when others should stay open:
+
+```csharp
+[WGroup("combat", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
+public int health;
+
+[WGroup("audio", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
+public AudioClip hitSound;
+
+[WGroupEnd("audio")]            // volume IS in "audio", then "audio" closes
+public float volume;
+
+public int stamina;             // In "combat", which never closed
+```
 
 ```csharp
 [WGroup("settings", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]

@@ -15,6 +15,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// Combine it with <see cref="WGroupEndAttribute"/> to stop inclusion early or skip particular fields.
     /// </para>
     /// <para>
+    /// An unattributed member joins the group whose <see cref="WGroupAttribute"/> the reader passed most recently, so re-declaring an
+    /// earlier group resumes capturing into it. When that group's budget runs out, capture falls back to the next most recent group that
+    /// is still open.
+    /// </para>
+    /// <para>
     /// Groups can be toggled collapsible, assigned theme colors via palette keys, and rendered without headers for lightweight inline layouts.
     /// </para>
     /// <para>

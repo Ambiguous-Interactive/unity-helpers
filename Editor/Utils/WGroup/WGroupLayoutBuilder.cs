@@ -279,10 +279,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     // automatically added to groups, only explicitly included via [WGroup]
                     if (!descriptor.IsHiddenInInspector)
                     {
-                        GroupContext autoContext = SelectAutoIncludeTarget(
-                            activeAutoContexts,
-                            explicitContexts
-                        );
+                        GroupContext autoContext = SelectAutoIncludeTarget(activeAutoContexts);
                         if (autoContext != null)
                         {
                             bool added = autoContext.AddProperty(descriptor.PropertyPath, index);
@@ -530,6 +527,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             return new AutoIncludeConfiguration(false, requestedValue);
         }
 
+        // Ordered by when the reader last passed a [WGroup], so the tail is the group a member
+        // sitting here visually belongs to. Ordering by declaration order instead sent a member
+        // to whichever group appeared first in the type, which is not the one written above it.
         private static void UpdateActiveContextList(
             List<GroupContext> activeAutoContexts,
             GroupContext context
@@ -549,31 +549,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 return;
             }
 
-            InsertActiveContext(activeAutoContexts, context);
-        }
-
-        private static void InsertActiveContext(
-            List<GroupContext> activeAutoContexts,
-            GroupContext context
-        )
-        {
-            for (int index = 0; index < activeAutoContexts.Count; index++)
-            {
-                GroupContext existing = activeAutoContexts[index];
-                if (existing.DeclarationOrder > context.DeclarationOrder)
-                {
-                    activeAutoContexts.Insert(index, context);
-                    return;
-                }
-            }
-
             activeAutoContexts.Add(context);
         }
 
-        private static GroupContext SelectAutoIncludeTarget(
-            List<GroupContext> activeAutoContexts,
-            HashSet<GroupContext> explicitContexts
-        )
+        private static GroupContext SelectAutoIncludeTarget(List<GroupContext> activeAutoContexts)
         {
             for (int index = activeAutoContexts.Count - 1; index >= 0; index--)
             {
@@ -581,11 +560,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 if (!candidate.HasAutoIncludeBudget)
                 {
                     activeAutoContexts.RemoveAt(index);
-                    continue;
-                }
-
-                if (explicitContexts != null && explicitContexts.Contains(candidate))
-                {
                     continue;
                 }
 
@@ -607,12 +581,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 IReadOnlyList<string> groupNames = attribute.GroupNames;
                 if (groupNames.Count == 0)
                 {
-                    if (activeAutoContexts.Count > 0)
+                    for (int activeIndex = 0; activeIndex < activeAutoContexts.Count; activeIndex++)
                     {
-                        GroupContext last = activeAutoContexts[^1];
-                        last.SetAutoInclude(new AutoIncludeConfiguration(false, 0));
-                        UpdateActiveContextList(activeAutoContexts, last);
+                        activeAutoContexts[activeIndex]
+                            .SetAutoInclude(new AutoIncludeConfiguration(false, 0));
                     }
+
+                    activeAutoContexts.Clear();
                     continue;
                 }
 

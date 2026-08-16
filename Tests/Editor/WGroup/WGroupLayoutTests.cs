@@ -4,10 +4,12 @@
 #if UNITY_EDITOR
 namespace WallstopStudios.UnityHelpers.Tests.WGroup
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils.WGroup;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -1355,6 +1357,80 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     );
                 }
             }
+        }
+
+        /// <summary>
+        /// Membership cases for reading-order auto-include (#455). A null expected group name
+        /// means the member must not belong to any group.
+        /// </summary>
+        private static IEnumerable<TestCaseData> ReadingOrderMembershipTestCases()
+        {
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.alphaAuto),
+                "Alpha"
+            ).SetName("ReadingOrder.FirstGroupCapturesBeforeSecondOpens");
+
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.betaAuto),
+                "Beta"
+            ).SetName("ReadingOrder.SecondGroupCaptures");
+
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.alphaAfterReopen),
+                "Alpha"
+            ).SetName("ReadingOrder.ReopenedGroupRetargetsAutoInclude");
+
+            yield return new TestCaseData(
+                typeof(WGroupBareEndTestTarget),
+                nameof(WGroupBareEndTestTarget.alphaClosing),
+                "Alpha"
+            ).SetName("BareEnd.TerminatingMemberJoinsItsOwnGroup");
+
+            yield return new TestCaseData(
+                typeof(WGroupBareEndTestTarget),
+                nameof(WGroupBareEndTestTarget.ungrouped),
+                null
+            ).SetName("BareEnd.ClosesEveryActiveGroup");
+        }
+
+        [Test]
+        [TestCaseSource(nameof(ReadingOrderMembershipTestCases))]
+        public void AutoIncludeFollowsReadingOrder(
+            Type targetType,
+            string propertyPath,
+            string expectedGroupName
+        )
+        {
+            ScriptableObject target = CreateScriptableObject(targetType);
+            using SerializedObject serializedObject = new(target);
+
+            WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
+
+            List<string> owners = layout
+                .Groups.Where(group => group.PropertyPaths.Contains(propertyPath))
+                .Select(group => group.Name)
+                .ToList();
+
+            if (string.IsNullOrEmpty(expectedGroupName))
+            {
+                Assert.That(
+                    owners,
+                    Is.Empty,
+                    () =>
+                        $"'{propertyPath}' should belong to no group but belongs to [{string.Join(", ", owners)}].\n{FormatLayoutDiagnostics(layout)}"
+                );
+                return;
+            }
+
+            Assert.That(
+                owners,
+                Is.EqualTo(new[] { expectedGroupName }),
+                () =>
+                    $"'{propertyPath}' should belong only to '{expectedGroupName}' but belongs to [{string.Join(", ", owners)}].\n{FormatLayoutDiagnostics(layout)}"
+            );
         }
     }
 }
