@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Collections.Generic;
     using System.Threading;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -516,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool snapToTextureDivisor
         )
         {
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             using PooledArray<int> columnTransparencyLease = SystemArrayPool<int>.Get(
                 textureWidth,
@@ -898,7 +899,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             CancellationToken cancellationToken
         )
         {
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             using PooledResource<List<Rect>> spriteBoundsLease = Buffers<Rect>.List.Get(
                 out List<Rect> spriteBounds
@@ -1667,7 +1668,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             CancellationToken cancellationToken
         )
         {
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             // Detect sprite bounds for sprite-fit validation in divisor selection
             using PooledResource<List<Rect>> spriteBoundsLease = Buffers<Rect>.List.Get(
@@ -2026,7 +2027,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             CancellationToken cancellationToken
         )
         {
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             // Find seed points based on intensity (sum of RGB)
             using PooledArray<int> intensityLease = SystemArrayPool<int>.Get(
@@ -3024,7 +3025,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float transparencyThreshold
         )
         {
-            byte alphaThreshold = (byte)(transparencyThreshold * 255);
+            byte alphaThreshold = ColorQuantization.ToThresholdByte(transparencyThreshold);
 
             int numVerticalLines = (textureWidth / cellWidth) - 1;
             int numHorizontalLines = (textureHeight / cellHeight) - 1;
@@ -3186,14 +3187,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             int transparentCount = 0;
             int totalCount = 0;
-            byte alphaThreshold = (byte)(transparencyThreshold * 255);
+            byte alphaThreshold = ColorQuantization.ToThresholdByte(transparencyThreshold);
 
             for (int x = startX; x < startX + width && x < textureWidth; ++x)
             {
                 for (int y = 0; y < textureHeight; ++y)
                 {
                     int index = y * textureWidth + x;
-                    if (pixels[index].a < alphaThreshold)
+                    if (pixels[index].a <= alphaThreshold)
                     {
                         ++transparentCount;
                     }
@@ -3225,14 +3226,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             int transparentCount = 0;
             int totalCount = 0;
-            byte alphaThreshold = (byte)(transparencyThreshold * 255);
+            byte alphaThreshold = ColorQuantization.ToThresholdByte(transparencyThreshold);
 
             for (int y = startY; y < startY + height && y < textureHeight; ++y)
             {
                 for (int x = 0; x < textureWidth; ++x)
                 {
                     int index = y * textureWidth + x;
-                    if (pixels[index].a < alphaThreshold)
+                    if (pixels[index].a <= alphaThreshold)
                     {
                         ++transparentCount;
                     }

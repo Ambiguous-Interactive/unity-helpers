@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEngine;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
@@ -534,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (startX == 0 && startY == 0 && width == texture.width && height == texture.height)
             {
                 Color32[] pixels32 = texture.GetPixels32();
-                byte alphaThreshold = (byte)Mathf.CeilToInt(alphaCutoff * 255f);
+                byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
 
                 Parallel.For(
                     0,

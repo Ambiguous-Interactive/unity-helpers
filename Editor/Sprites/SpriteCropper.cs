@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEngine;
     using CustomEditors;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -796,8 +797,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int maxY = 0;
             bool hasVisible = false;
             object lockObject = new();
-            byte alphaByteThreshold = (byte)
-                Mathf.Clamp(Mathf.RoundToInt(alphaThreshold * 255f), 0, 255);
+            byte alphaByteThreshold = ColorQuantization.ToThresholdByte(alphaThreshold);
             Parallel.For(
                 0,
                 width * height,

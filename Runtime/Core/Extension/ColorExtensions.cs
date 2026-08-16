@@ -57,20 +57,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe, no shared state.
         /// Performance: O(1) - simple arithmetic and string formatting.
         /// Allocations: Allocates one string for the result.
-        /// Edge Cases: Color component values outside [0,1] are clamped to valid range.
+        /// Edge Cases: Color component values outside [0,1] are clamped to valid range, and NaN encodes to 00.
+        /// Each channel is rounded to the nearest of the 256 representable values via
+        /// <see cref="ColorQuantization.ToByte(float)"/>, so the result matches Unity's own
+        /// <see cref="ColorUtility.ToHtmlStringRGBA(Color)"/> and the <see cref="Color32"/> the same color casts to.
         /// </remarks>
         public static string ToHex(this Color color, bool includeAlpha = true)
         {
-            int r = (int)(Mathf.Clamp01(color.r) * 255f);
-            int g = (int)(Mathf.Clamp01(color.g) * 255f);
-            int b = (int)(Mathf.Clamp01(color.b) * 255f);
+            byte r = ColorQuantization.ToByte(color.r);
+            byte g = ColorQuantization.ToByte(color.g);
+            byte b = ColorQuantization.ToByte(color.b);
 
             if (!includeAlpha)
             {
                 return $"#{r:X2}{g:X2}{b:X2}";
             }
 
-            int a = (int)(Mathf.Clamp01(color.a) * 255f);
+            byte a = ColorQuantization.ToByte(color.a);
             return $"#{r:X2}{g:X2}{b:X2}{a:X2}";
         }
 

@@ -3635,7 +3635,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             using PooledArray<int> columnTransparencyLease = SystemArrayPool<int>.Get(
                 textureWidth,
@@ -4081,7 +4081,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return (0, 0);
             }
 
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
             using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
                 pixels.Length,
@@ -4266,7 +4266,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return true;
             }
 
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
             int opaqueOnGridLines = 0;
             int totalGridLinePixels = 0;
 
@@ -7290,7 +7290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             result.Clear();
 
-            byte alphaThresholdByte = (byte)(alphaThreshold * 255f);
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
             using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
                 pixels.Length,
                 out bool[] visited

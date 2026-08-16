@@ -232,10 +232,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         /// <returns>A 1x1 texture filled with the color represented by the key.</returns>
         public static Texture2D GetOrCreateTexture(int colorKey)
         {
-            float r = ((colorKey >> 24) & 0xFF) / 255f;
-            float g = ((colorKey >> 16) & 0xFF) / 255f;
-            float b = ((colorKey >> 8) & 0xFF) / 255f;
-            float a = (colorKey & 0xFF) / 255f;
+            float r = ColorQuantization.ToNormalized((byte)((colorKey >> 24) & 0xFF));
+            float g = ColorQuantization.ToNormalized((byte)((colorKey >> 16) & 0xFF));
+            float b = ColorQuantization.ToNormalized((byte)((colorKey >> 8) & 0xFF));
+            float a = ColorQuantization.ToNormalized((byte)(colorKey & 0xFF));
             Color color = new(r, g, b, a);
             return GetSolidTexture(color);
         }
@@ -609,10 +609,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         public static int GetColorHashCode(Color color)
         {
             return Objects.HashCode(
-                Mathf.RoundToInt(color.r * 255f),
-                Mathf.RoundToInt(color.g * 255f),
-                Mathf.RoundToInt(color.b * 255f),
-                Mathf.RoundToInt(color.a * 255f)
+                ColorQuantization.ToByte(color.r),
+                ColorQuantization.ToByte(color.g),
+                ColorQuantization.ToByte(color.b),
+                ColorQuantization.ToByte(color.a)
             );
         }
 

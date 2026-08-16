@@ -594,6 +594,41 @@ RGB space buckets → counts
           ↑ pick max bucket centroid as dominant
 ```
 
+<a id="8-bit-channels-and-normalized-floats"></a>
+
+### 8-bit Channels and Normalized Floats
+
+`ColorQuantization` is the one place a `Color` channel becomes a `Color32` channel and back. Three
+operations look interchangeable and are not, which is the mistake described in
+[Should you normalize RGB values by 255 or 256?](https://30fps.net/pages/255-vs-256-division/):
+"one should never mix the encode and decode steps of the two quantizers."
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+float channel = ColorQuantization.ToNormalized(128);      // decode: 128 / 255
+byte encoded = ColorQuantization.ToByte(0.5f);            // encode: 128, same answer Unity gives
+byte cutoff = ColorQuantization.ToThresholdByte(0.5f);    // compare: 127
+```
+
+| Method            | Rounding | Use it for                                       |
+| ----------------- | -------- | ------------------------------------------------ |
+| `ToNormalized`    | exact    | Reading a stored `Color32` channel as a float    |
+| `ToByte`          | nearest  | Writing a float channel out as 8 bits            |
+| `ToThresholdByte` | floor    | Comparing stored channels against a float cutoff |
+
+`ToByte` rounds rather than truncates, so `Color.ToHex()` returns the same string as Unity's own
+`ColorUtility.ToHtmlStringRGBA()` and the same bytes as the `Color32` that color casts to.
+Truncating instead doubles the mean quantization error and makes `FF` unreachable for any channel
+short of exactly `1.0`.
+
+`ToThresholdByte` is deliberately not `ToByte`. It answers "which channels satisfy
+`channel / 255f <= cutoff`", and only flooring reproduces that comparison exactly — rounding
+misclassifies the channel sitting on the boundary, which is how two callers of the same alpha cutoff
+end up disagreeing about which pixels are transparent.
+
+All three clamp: values outside `[0, 1]` saturate and `NaN` encodes to `0`.
+
 <a id="collections"></a>
 
 ## Collections

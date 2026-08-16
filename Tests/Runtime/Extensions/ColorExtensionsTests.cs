@@ -51,8 +51,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ToHexFormatsCorrectly()
         {
             Color color = new(0.1f, 0.2f, 0.3f, 0.4f);
-            Assert.AreEqual("#19334C66", color.ToHex());
-            Assert.AreEqual("#19334C", color.ToHex(includeAlpha: false));
+            Assert.AreEqual("#1A334C66", color.ToHex());
+            Assert.AreEqual("#1A334C", color.ToHex(includeAlpha: false));
         }
 
         [Test]
@@ -61,6 +61,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Color color = new(1.5f, -0.25f, 2f, -1f);
             Assert.AreEqual("#FF00FF00", color.ToHex());
             Assert.AreEqual("#FF00FF", color.ToHex(includeAlpha: false));
+        }
+
+        /// <remarks>
+        /// A project that quantizes the same color two different ways has no single answer for what
+        /// color it is. Unity's own conversion is the one every other consumer of the color sees, so
+        /// this asserts agreement rather than merely asserting that we round.
+        /// </remarks>
+        [Test]
+        public void ToHexAgreesWithUnityColorUtility()
+        {
+            IRandom random = PRNG.Instance;
+            for (int i = 0; i < 4_096; ++i)
+            {
+                Color color = new(
+                    random.NextFloat(),
+                    random.NextFloat(),
+                    random.NextFloat(),
+                    random.NextFloat()
+                );
+                Assert.AreEqual($"#{ColorUtility.ToHtmlStringRGBA(color)}", color.ToHex());
+                Assert.AreEqual(
+                    $"#{ColorUtility.ToHtmlStringRGB(color)}",
+                    color.ToHex(includeAlpha: false)
+                );
+            }
+        }
+
+        [Test]
+        public void ToHexRoundTripsEveryChannelValue()
+        {
+            for (int channel = 0; channel <= byte.MaxValue; ++channel)
+            {
+                Color32 original = new((byte)channel, (byte)channel, (byte)channel, (byte)channel);
+                string hex = ((Color)original).ToHex();
+                Assert.IsTrue(
+                    ColorUtility.TryParseHtmlString(hex, out Color parsed),
+                    $"{hex} was not parseable."
+                );
+                Color32 roundTripped = parsed;
+                Assert.AreEqual(
+                    original.r,
+                    roundTripped.r,
+                    $"Channel {channel} did not round-trip."
+                );
+                Assert.AreEqual(original.a, roundTripped.a, $"Alpha {channel} did not round-trip.");
+            }
         }
 
         [Test]
