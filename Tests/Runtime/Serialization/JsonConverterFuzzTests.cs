@@ -67,6 +67,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             "true",
             "\"\"",
             "\"not-a-number\"",
+            // An all-zero identifier: the value a type's own "unset" writes, and the one a reader
+            // that validates its input is most likely to refuse for being unset.
+            "\"00000000-0000-0000-0000-000000000000\"",
             "1.5",
             "-1",
             "2147483648",
@@ -331,6 +334,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WGuid restored = Serializer.JsonDeserialize<WGuid>(json);
 
             Assert.IsTrue(restored.IsEmpty, $"An empty WGuid wrote {json} and did not read back.");
+        }
+
+        /// <summary>
+        /// The converter accepts a GUID's text in two shapes, and they must agree about the empty
+        /// one. The first fix reached only the bare string, which left the object form refusing an
+        /// unset id -- the same defect one branch over.
+        /// </summary>
+        [Test]
+        [TestCase("\"00000000-0000-0000-0000-000000000000\"")]
+        [TestCase("{\"Guid\":\"00000000-0000-0000-0000-000000000000\"}")]
+        [TestCase("{\"_low\":0,\"_high\":0}")]
+        [TestCase("\"\"")]
+        [TestCase("null")]
+        public void EveryEncodingOfAnEmptyWGuidReadsBack(string payload)
+        {
+            WGuid restored = Serializer.JsonDeserialize<WGuid>(payload);
+
+            Assert.IsTrue(restored.IsEmpty, $"{payload} should read back as an empty WGuid.");
         }
 
         /// <summary>
