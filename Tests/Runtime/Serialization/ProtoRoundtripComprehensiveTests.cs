@@ -291,5 +291,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(payload.list[0], again.list[0], "List element should match");
             Assert.AreEqual(payload.map["k"], again.map["k"], "Dictionary element should match");
         }
+
+        [Test]
+        public void ValuesWhoseFieldsAreAllDefaultRoundTrip()
+        {
+            // Every other case here uses a non-default value, and RoundTrip asserts a non-empty
+            // payload, so none of them could reach the state that mattered: a value at its defaults
+            // encodes to zero bytes, and zero bytes used to be refused on the way back in. Vector3.zero
+            // is a spawn point, a velocity and an origin, so this was reachable from ordinary saves.
+            AssertAllDefaultRoundTrips(new Color(0f, 0f, 0f, 0f));
+            AssertAllDefaultRoundTrips(new Color32(0, 0, 0, 0));
+            AssertAllDefaultRoundTrips(Vector2.zero);
+            AssertAllDefaultRoundTrips(Vector3.zero);
+            AssertAllDefaultRoundTrips(Vector2Int.zero);
+            AssertAllDefaultRoundTrips(Vector3Int.zero);
+            AssertAllDefaultRoundTrips(new Quaternion(0f, 0f, 0f, 0f));
+            AssertAllDefaultRoundTrips(new Bounds(Vector3.zero, Vector3.zero));
+            AssertAllDefaultRoundTrips(new Rect(0f, 0f, 0f, 0f));
+            AssertAllDefaultRoundTrips(new BoundsInt(Vector3Int.zero, Vector3Int.zero));
+        }
+
+        private static void AssertAllDefaultRoundTrips<T>(T value)
+        {
+            byte[] bytes = Serializer.ProtoSerialize(value);
+
+            Assert.AreEqual(
+                0,
+                bytes.Length,
+                $"{typeof(T).Name} at its defaults should encode to zero bytes"
+            );
+            Assert.AreEqual(
+                value,
+                Serializer.ProtoDeserialize<T>(bytes),
+                $"{typeof(T).Name} should read back what it wrote"
+            );
+        }
     }
 }

@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `Serializer.ProtoDeserialize()` refusing to read back what `ProtoSerialize()` wrote for a value whose fields are all at their defaults — `Vector3.zero`, `Color.clear`, `Quaternion(0,0,0,0)` and any such contract encode to zero bytes, which was rejected as empty input. A `null` payload is still refused ([#474](https://github.com/Ambiguous-Interactive/unity-helpers/issues/474)).
 - Fix `TextureScale.Bilinear()` and `Point()` shifting a scaled texture half a texel toward the origin: an upscale never reached the source's brightest pixel and a symmetric image downscaled asymmetrically ([#470](https://github.com/Ambiguous-Interactive/unity-helpers/issues/470)).
 - Fix `TextureScale.Bilinear()` and the Image Blur tool pulling a fully transparent pixel's color into its visible neighbors, so red beside transparent green produced a yellow edge. Opaque textures are unchanged ([#470](https://github.com/Ambiguous-Interactive/unity-helpers/issues/470)).
 - Fix the sprite sheet extractor's preview thumbnails sampling half a texel toward the origin ([#470](https://github.com/Ambiguous-Interactive/unity-helpers/issues/470)).

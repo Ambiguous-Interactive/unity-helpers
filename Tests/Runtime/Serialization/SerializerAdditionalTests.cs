@@ -822,13 +822,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void ProtoDeserializeEmptyArrayThrowsInputException()
+        public void ProtoDeserializeEmptyArrayReturnsTheAllDefaultsMessage()
         {
+            // Zero bytes is the encoding of a message whose every field is at its default, and it is
+            // what ProtoSerialize writes for one. Only null is missing input.
             byte[] emptyData = Array.Empty<byte>();
 
-            Assert.Throws<SerializationInputException>(() =>
-                Serializer.ProtoDeserialize<TestMessage>(emptyData)
-            );
+            TestMessage message = Serializer.ProtoDeserialize<TestMessage>(emptyData);
+
+            Assert.IsTrue(message != null);
         }
 
         [Test]

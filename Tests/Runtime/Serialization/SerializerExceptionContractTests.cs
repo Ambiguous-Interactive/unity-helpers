@@ -105,15 +105,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         // ---------------------------------------------------------------------------
-        // Empty input — also InputException.
+        // Empty input — InputException for the formats where empty is not a value.
+        // Protobuf is not one of them: zero bytes is the all-defaults message.
         // ---------------------------------------------------------------------------
 
         [Test]
-        public void ProtoDeserializeEmptyBytesThrowsSerializationInputException()
+        public void ProtoDeserializeEmptyBytesReturnsTheAllDefaultsValue()
         {
-            Assert.Throws<SerializationInputException>(() =>
-                Serializer.ProtoDeserialize<Sample>(Array.Empty<byte>())
-            );
+            Sample value = Serializer.ProtoDeserialize<Sample>(Array.Empty<byte>());
+
+            Assert.IsTrue(value != null);
+            Assert.AreEqual(0, value.Id);
+            Assert.IsTrue(value.Name == null);
         }
 
         [Test]

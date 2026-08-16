@@ -98,12 +98,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void ProtoDeserializeEmptyArrayThrowsSerializationInputException()
+        public void ProtoDeserializeEmptyArrayReturnsTheAllDefaultsMessage()
         {
-            // Empty byte[] is unambiguously caller error: no codec can decode 0 bytes into a meaningful instance.
-            Assert.Throws<SerializationInputException>(() =>
-                Serializer.ProtoDeserialize<SampleMessage>(Array.Empty<byte>())
-            );
+            // Zero bytes is not caller error: it is exactly how protobuf encodes a message whose
+            // every field is at its default, and it is what ProtoSerialize writes for one. "The
+            // caller passed nothing" is a distinction the wire format cannot make; null still is.
+            SampleMessage message = Serializer.ProtoDeserialize<SampleMessage>(Array.Empty<byte>());
+
+            Assert.IsTrue(message != null);
+            Assert.AreEqual(0, message.Id);
+            Assert.IsTrue(message.Name == null);
+        }
+
+        [Test]
+        public void ProtoRoundTripsAValueWhoseFieldsAreAllDefault()
+        {
+            SampleMessage original = new();
+
+            byte[] data = Serializer.ProtoSerialize(original);
+            SampleMessage restored = Serializer.ProtoDeserialize<SampleMessage>(data);
+
+            Assert.AreEqual(0, data.Length);
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(original.Id, restored.Id);
+            Assert.AreEqual(original.Name, restored.Name);
         }
 
         [Test]
@@ -134,11 +152,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void ProtoDeserializeWithExplicitTypeWhenDataEmptyThrows()
+        public void ProtoDeserializeWithExplicitTypeWhenDataEmptyReturnsTheAllDefaultsMessage()
         {
-            Assert.Throws<SerializationInputException>(() =>
-                Serializer.ProtoDeserialize<object>(Array.Empty<byte>(), typeof(SampleMessage))
+            object message = Serializer.ProtoDeserialize<object>(
+                Array.Empty<byte>(),
+                typeof(SampleMessage)
             );
+
+            Assert.IsInstanceOf<SampleMessage>(message);
+            Assert.AreEqual(0, ((SampleMessage)message).Id);
         }
 
         [Test]

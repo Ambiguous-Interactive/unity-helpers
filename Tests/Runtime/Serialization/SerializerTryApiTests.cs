@@ -85,11 +85,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
-        public void TryProtoDeserializeEmptyBytesReturnsFalse()
+        public void TryProtoDeserializeEmptyBytesReturnsTheAllDefaultsValue()
         {
+            // Zero bytes is what protobuf encodes a message whose every field is at its default as,
+            // and it is what ProtoSerialize writes for one. Refusing it refused this serializer's own
+            // output.
+            Sample allDefaults = new();
+            byte[] written = Serializer.ProtoSerialize(allDefaults);
+            Assert.AreEqual(0, written.Length);
+
             bool ok = Serializer.TryProtoDeserialize(Array.Empty<byte>(), out Sample value);
-            Assert.IsFalse(ok);
-            Assert.IsTrue(value == null);
+
+            Assert.IsTrue(ok);
+            Assert.IsTrue(value != null);
+            Assert.AreEqual(0, value.Id);
+            Assert.IsTrue(value.Name == null);
         }
 
         [Test]

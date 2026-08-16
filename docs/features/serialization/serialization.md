@@ -1460,9 +1460,11 @@ Three rules decide the rest:
 Two consequences on the read side are worth knowing:
 
 - **An empty payload is a value, not a failure.** A contract whose members all equal their defaults
-  encodes to zero bytes, so `ProtoDeserialize` returns an all-defaults instance where an unported type
-  would report empty input. Refusing it would mean refusing to read back something this serializer
-  wrote. The `Serializable*` collections already behave this way, for the same reason.
+  encodes to zero bytes, so `ProtoDeserialize` returns an all-defaults instance. Refusing it would
+  mean refusing to read back something this serializer wrote — `Vector3.zero`, `Color.clear` and
+  `Quaternion(0, 0, 0, 0)` all encode to nothing. This holds whichever serializer answers, and for the
+  `Serializable*` collections when they are empty. A `null` payload is still an input failure: that is
+  a distinction the wire format can make and an empty one is not.
 - **A refused payload is reported as corrupt data, not as "not mine".** WallstopProto does not hand a
   payload its own formatter rejected on to protobuf-net for a second, differently-implemented decode,
   so a truncated or malformed buffer raises `SerializationCorruptDataException` — which means

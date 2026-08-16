@@ -1713,15 +1713,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return Activator.CreateInstance<T>();
             }
 
-            // Empty-payload guard for all OTHER (non-collection) types: an empty protobuf payload
-            // for an ordinary message is invalid input.
-            if (data.Length == 0)
-            {
-                SerializationFailureException.ThrowEmptyInput<T>(
-                    SerializationFormat.Protobuf,
-                    SerializationOperation.Deserialize
-                );
-            }
+            // No guard for an empty payload. Zero bytes is what protobuf encodes a message whose
+            // every field is at its default as, and it is what THIS serializer writes for
+            // Vector3.zero, Color.clear, Quaternion(0,0,0,0) and any contract in that state.
+            // Refusing it meant the package could not read back what it had just written. "The
+            // caller passed nothing" is a distinction the wire format cannot make; null still is.
 
             try
             {
@@ -1904,16 +1900,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         /// <summary>
         /// Attempts to deserialize a protobuf payload. Returns <see langword="false"/> and sets
-        /// <paramref name="value"/> to <see langword="default"/> for null/empty/corrupt input.
+        /// <paramref name="value"/> to <see langword="default"/> for null or corrupt input.
         /// Polymorphic-root resolution failures still throw (programmer error).
         /// </summary>
         /// <remarks>
-        /// With <c>WALLSTOP_PROTO</c> defined, an <b>empty</b> payload for a type WallstopProto serves
-        /// is not an input failure: a contract whose members all equal their defaults encodes to zero
-        /// bytes, so rejecting it would refuse to read back something this serializer wrote. Such a
-        /// call returns <see langword="true"/> with an all-defaults instance. The same is already true
-        /// of the <c>Serializable*</c> collections, whose wrappers encode an empty collection as zero
-        /// bytes.
+        /// An <b>empty</b> payload is not an input failure, whichever serializer answers: a contract
+        /// whose members all equal their defaults encodes to zero bytes, so rejecting it would refuse
+        /// to read back something this serializer wrote. Such a call returns <see langword="true"/>
+        /// with an all-defaults instance. That includes <c>Vector3.zero</c>, <c>Color.clear</c> and
+        /// every <c>Serializable*</c> collection when it is empty.
         /// </remarks>
         public static bool TryProtoDeserialize<T>(byte[] data, out T value)
         {
@@ -2077,13 +2072,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
-            if (data.Length == 0)
-            {
-                SerializationFailureException.ThrowEmptyInput<T>(
-                    SerializationFormat.Protobuf,
-                    SerializationOperation.Deserialize
-                );
-            }
+            // An empty payload is the all-defaults message, not missing input. See the overload above.
             if (type == null)
             {
                 SerializationFailureException.ThrowConfiguration<T>(
