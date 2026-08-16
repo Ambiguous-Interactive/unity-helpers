@@ -3142,31 +3142,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
+        /// Every runtime type this writer has already resolved, per options instance. The options
+        /// hold the converter list the answer depends on, and System.Text.Json makes an options
+        /// instance read-only the first time it is used to serialize, so an answer cannot go stale
+        /// under a caller who adds a converter later. The table holds the options weakly, so a
+        /// caller who builds options per call does not leak them.
+        /// </summary>
+        private static readonly ConditionalWeakTable<
+            JsonSerializerOptions,
+            ConcurrentDictionary<Type, Type>
+        > RuntimeWriteTypeCache = new();
+
+        /// <summary>
         /// Chooses the type a value is written as when its declaration is <see cref="object"/>, an
         /// interface, or abstract.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// Substituting the runtime type is what makes a polymorphic member serialize as what it
         /// actually holds, but the runtime type can be one no converter claims. Every
-        /// <see cref="Type"/> instance is the internal <c>System.RuntimeType</c>, which
-        /// System.Text.Json refuses outright -- so a <see cref="Type"/> at the root of a graph, or
-        /// behind an <see cref="object"/> member, failed even though this package registers a
+        /// <see cref="Type"/> obtained from <c>typeof</c> is the internal <c>System.RuntimeType</c>,
+        /// which System.Text.Json refuses outright -- so a <see cref="Type"/> at the root of a graph,
+        /// or behind an <see cref="object"/> member, failed even though this package registers a
         /// converter for <see cref="Type"/>. A registered converter that claims a base type is a
         /// statement that the base is the wire shape, so the nearest such base wins.
+        /// </para>
+        /// <para>
+        /// The rule is deliberately not narrowed to non-public runtime types. That was tried, to
+        /// avoid the search below, and it made this summary false: <c>TypeDelegator</c> is a
+        /// <b>public</b> subclass of <see cref="Type"/>, so it would have skipped the walk and
+        /// reached the reflection-light writer, which throws <see cref="NullReferenceException"/>
+        /// walking it. The cost is answered by the cache instead, because
+        /// <c>WriteValueAotSafe</c> calls this once per property and per field.
+        /// </para>
         /// </remarks>
         private static Type ResolveRuntimeWriteType(Type runtimeType, JsonSerializerOptions options)
         {
-            // The search below is per member of every object this writer walks, so it must not run
-            // for the values that never needed it. A type System.Text.Json can name is one the
-            // caller could have declared, and every such type is public or a public nested type.
-            // Measured: Vector3, List<int>, string and int[] are IsPublic; ParticleSystem.MinMaxCurve
-            // is IsNestedPublic; System.RuntimeType -- the type this whole method exists for -- is
-            // neither.
-            if (runtimeType.IsPublic || runtimeType.IsNestedPublic)
-            {
-                return runtimeType;
-            }
-
             IList<JsonConverter> converters = options?.Converters;
             int converterCount = converters?.Count ?? 0;
             if (converterCount == 0)
@@ -3174,18 +3185,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return runtimeType;
             }
 
+            ConcurrentDictionary<Type, Type> resolved = RuntimeWriteTypeCache.GetValue(
+                options,
+                static _ => new ConcurrentDictionary<Type, Type>()
+            );
+            if (resolved.TryGetValue(runtimeType, out Type cached))
+            {
+                return cached;
+            }
+
+            Type answer = runtimeType;
             for (Type candidate = runtimeType; candidate != null; candidate = candidate.BaseType)
             {
+                bool claimed = false;
                 for (int index = 0; index < converterCount; index++)
                 {
                     if (converters[index].CanConvert(candidate))
                     {
-                        return candidate;
+                        claimed = true;
+                        break;
                     }
+                }
+
+                if (claimed)
+                {
+                    answer = candidate;
+                    break;
                 }
             }
 
-            return runtimeType;
+            resolved[runtimeType] = answer;
+            return answer;
         }
 
         private static string SerializeValueAotSafe(

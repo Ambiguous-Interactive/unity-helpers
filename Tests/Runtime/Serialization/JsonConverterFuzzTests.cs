@@ -297,6 +297,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <summary>
+        /// A <see cref="Type"/> written through an <see cref="object"/> reaches the package's
+        /// <c>TypeConverter</c> whatever concrete <see cref="Type"/> subclass carries it.
+        /// </summary>
+        /// <remarks>
+        /// <c>typeof(X)</c> hands back the internal <c>System.RuntimeType</c>, so a rule that
+        /// exempted public runtime types from the base-converter walk looked correct and was not:
+        /// <see cref="System.Reflection.TypeDelegator"/> is a <b>public</b> subclass of
+        /// <see cref="Type"/>, and it reached the reflection-light writer instead, which threw
+        /// <see cref="NullReferenceException"/> walking it.
+        /// </remarks>
+        [Test]
+        public void ATypeSubclassIsWrittenThroughTheTypeConverter()
+        {
+            System.Reflection.TypeDelegator delegated = new(typeof(Vector3));
+
+            string viaDelegator = Serializer.JsonStringify<object>(delegated);
+            string viaType = Serializer.JsonStringify<object>(typeof(Vector3));
+
+            Assert.AreEqual(
+                viaType,
+                viaDelegator,
+                "A public Type subclass must be written by the same converter as the Type it carries."
+            );
+        }
+
+        /// <summary>
         /// A converter that only writes must say so with <see cref="NotSupportedException"/>.
         /// </summary>
         /// <remarks>
