@@ -23,6 +23,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <remarks>
     /// Access the global instance via <see cref="Instance"/>; if no active instance exists,
     /// a new <see cref="GameObject"/> named "&lt;Type&gt;-Singleton" is created and the component is added.
+    /// Annotate the type with
+    /// <see cref="WallstopStudios.UnityHelpers.Core.Attributes.SingletonCreationAttribute"/> and
+    /// <see cref="SingletonCreationPolicy.NeverCreate"/> to keep that from happening, which is what a
+    /// singleton holding authored <c>[SerializeField]</c> state wants.
     ///
     /// Lifecycle:
     /// - On first access, searches for an active instance; otherwise creates one.
@@ -47,9 +51,20 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         public static long InitializeCount => Interlocked.Read(ref _initializeCount);
 
+        /// <summary>
+        /// Gets what <see cref="Instance"/> does when no instance exists, taken from the
+        /// <see cref="SingletonCreationAttribute"/> on <typeparamref name="T"/> and
+        /// <see cref="SingletonCreationPolicy.CreateOnDemand"/> when there is none.
+        /// </summary>
+        public static SingletonCreationPolicy CreationPolicy => _creationPolicy;
+
         protected static long _initializeCount;
 
         protected internal static T _instance;
+
+        private static readonly SingletonCreationPolicy _creationPolicy = ResolveCreationPolicy();
+
+        private static bool _creationRefusedWarningLogged;
 
         static RuntimeSingleton()
         {
@@ -59,6 +74,26 @@ namespace WallstopStudios.UnityHelpers.Utils
                 () => _instance,
                 () => Resources.FindObjectsOfTypeAll<T>()
             );
+        }
+
+        private static SingletonCreationPolicy ResolveCreationPolicy()
+        {
+            if (
+                !ReflectionHelpers.TryGetAttributeSafe(
+                    typeof(T),
+                    out SingletonCreationAttribute attribute,
+                    inherit: true
+                )
+            )
+            {
+                return SingletonCreationPolicy.CreateOnDemand;
+            }
+
+            // An unrecognized value is treated as the default rather than as a refusal: a policy this
+            // build does not know about must not silently stop a singleton from existing.
+            return attribute.Policy == SingletonCreationPolicy.NeverCreate
+                ? SingletonCreationPolicy.NeverCreate
+                : SingletonCreationPolicy.CreateOnDemand;
         }
 
         /// <summary>
@@ -71,7 +106,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         protected virtual bool LogErrorOnDestruction => true;
 
         /// <summary>
-        /// Gets the global instance, creating one if needed.
+        /// Gets the global instance, creating one if needed. Returns <c>null</c> when none exists and
+        /// <see cref="CreationPolicy"/> is <see cref="SingletonCreationPolicy.NeverCreate"/>.
         /// </summary>
         /// <example>
         /// <code>
@@ -103,6 +139,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 Type type = typeof(T);
+                if (_creationPolicy == SingletonCreationPolicy.NeverCreate)
+                {
+                    WarnCreationRefused(type);
+                    return null;
+                }
+
                 GameObject instance = new($"{type.Name}-Singleton", type);
                 if (_instance == null)
                 {
@@ -153,6 +195,29 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
+            // The refusal is deduplicated so a per-frame Instance access cannot flood the console, and
+            // an explicit clear is exactly the moment that dedupe should end: the next refusal is about
+            // a fresh situation, and a test that expects the warning twice would otherwise never see it.
+            _creationRefusedWarningLogged = false;
+        }
+
+        private static void WarnCreationRefused(Type type)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_creationRefusedWarningLogged)
+            {
+                return;
+            }
+
+            _creationRefusedWarningLogged = true;
+            Debug.LogWarning(
+                $"RuntimeSingleton could not locate an active instance of {type.FullName}, and "
+                    + $"{nameof(SingletonCreationPolicy)}.{nameof(SingletonCreationPolicy.NeverCreate)} forbids creating one. Returning null."
+            );
+#else
+            _creationRefusedWarningLogged = true;
+            _ = type;
+#endif
         }
 
         protected virtual void Awake()

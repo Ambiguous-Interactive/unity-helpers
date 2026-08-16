@@ -84,6 +84,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
                 AutoLoadSingletonEntry[] autoLoadEntries = BuildAutoLoadSingletonEntries();
 
+                foreach (
+                    string problem in FindSingletonCreationProblems(
+                        TypeCache.GetTypesWithAttribute<SingletonCreationAttribute>()
+                    )
+                )
+                {
+                    Debug.LogWarning(problem);
+                }
+
                 // Get or create the cache asset
                 AttributeMetadataCache cache = GetOrCreateCache(out bool metadataChanged);
 
@@ -311,6 +320,87 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
             entries.Sort((left, right) => string.CompareOrdinal(left.typeName, right.typeName));
             return entries.ToArray();
+        }
+
+        /// <summary>
+        /// Reports every <see cref="SingletonCreationAttribute"/> that cannot do what its author meant.
+        /// Separate from the generator so each rule can be driven from types written for the purpose;
+        /// a rule only ever run over this repository's own sources is indistinguishable from one that
+        /// always agrees.
+        /// </summary>
+        /// <param name="annotatedTypes">Types carrying <see cref="SingletonCreationAttribute"/>.</param>
+        /// <returns>One message per problem, ordered by type name.</returns>
+        internal static List<string> FindSingletonCreationProblems(IEnumerable<Type> annotatedTypes)
+        {
+            List<string> problems = new();
+            if (annotatedTypes == null)
+            {
+                return problems;
+            }
+
+            foreach (Type type in annotatedTypes)
+            {
+                if (type == null || type.IsAbstract || type.ContainsGenericParameters)
+                {
+                    continue;
+                }
+
+                if (
+                    !ReflectionHelpers.TryGetAttributeSafe(
+                        type,
+                        out SingletonCreationAttribute creation,
+                        inherit: true
+                    )
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !IsSubclassOfRawGeneric(
+                        type,
+                        typeof(WallstopStudios.UnityHelpers.Utils.RuntimeSingleton<>)
+                    )
+                )
+                {
+                    problems.Add(
+                        $"AttributeMetadataCacheGenerator: {type.FullName} is marked with [{nameof(SingletonCreationAttribute)}] but does not derive from RuntimeSingleton<>, so the attribute has no effect. ScriptableObjectSingleton<> never creates an asset at runtime and needs no policy."
+                    );
+                    continue;
+                }
+
+                if (creation.Policy != SingletonCreationPolicy.NeverCreate)
+                {
+                    continue;
+                }
+
+                if (
+                    !ReflectionHelpers.TryGetAttributeSafe(
+                        type,
+                        out AutoLoadSingletonAttribute autoLoad,
+                        inherit: false
+                    )
+                )
+                {
+                    continue;
+                }
+
+                // AfterSceneLoad is the one phase where an authored instance already exists, so
+                // auto-loading a NeverCreate singleton there binds the static cache to it. Every
+                // earlier phase runs before any GameObject exists, so the lookup can only find
+                // nothing and the pair is a contradiction rather than a choice.
+                if (autoLoad.LoadType == RuntimeInitializeLoadType.AfterSceneLoad)
+                {
+                    continue;
+                }
+
+                problems.Add(
+                    $"AttributeMetadataCacheGenerator: {type.FullName} is marked [{nameof(AutoLoadSingletonAttribute)}({nameof(RuntimeInitializeLoadType)}.{autoLoad.LoadType})] and [{nameof(SingletonCreationAttribute)}({nameof(SingletonCreationPolicy)}.{nameof(SingletonCreationPolicy.NeverCreate)})]. That phase runs before any scene has loaded, so the auto-load can only find nothing. Use {nameof(RuntimeInitializeLoadType)}.{nameof(RuntimeInitializeLoadType.AfterSceneLoad)} or drop one of the two attributes."
+                );
+            }
+
+            problems.Sort(StringComparer.Ordinal);
+            return problems;
         }
 
         private static SingletonAutoLoadKind? ResolveSingletonKind(Type type)

@@ -5,12 +5,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
     using System.Collections;
+    using System.Text.RegularExpressions;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -33,6 +36,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DestroyAll<CustomStartSingleton>();
             DestroyAll<CustomDestroyableSingleton>();
             DestroyAll<ApplicationQuitSingleton>();
+            DestroyAll<NeverCreatedSingleton>();
+            DestroyAll<UnrecognizedPolicySingleton>();
+
+            // ClearInstance is what re-arms the once-per-type refusal warning; without it the second
+            // test in this domain to expect that warning never sees it and its LogAssert.Expect goes
+            // unconsumed, failing whichever fixture runs next.
+            NeverCreatedSingleton.ClearInstance();
 
             // Reset test flags
             CustomDestroyableSingleton.destroyWasCalled = false;
@@ -126,6 +136,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 quitWasCalled = true;
             }
         }
+
+        [SingletonCreation(SingletonCreationPolicy.NeverCreate)]
+        private sealed class NeverCreatedSingleton : RuntimeSingleton<NeverCreatedSingleton>
+        {
+            public int authoredValue = 7;
+        }
+
+        // A value this build does not recognize must not be read as a refusal: a singleton silently
+        // ceasing to exist is a worse answer to an unknown policy than creating one.
+        [SingletonCreation((SingletonCreationPolicy)200)]
+        private sealed class UnrecognizedPolicySingleton
+            : RuntimeSingleton<UnrecognizedPolicySingleton> { }
+
+        private static readonly Regex RefusalPattern = new(
+            $".*{nameof(NeverCreatedSingleton)}.*{nameof(SingletonCreationPolicy.NeverCreate)}.*"
+        );
+
+        // The refusal is a development diagnostic, so a release player logs nothing and the count
+        // this fixture expects is zero rather than one.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private const int ExpectedRefusalLogCount = 1;
+#else
+        private const int ExpectedRefusalLogCount = 0;
+#endif
 
         // Cleanup handled by CommonTestBase via tracking
 
@@ -942,6 +976,117 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsFalse(TestRuntimeSingleton.HasInstance);
             Assert.IsTrue(gameObject == null);
+        }
+
+        [Test]
+        public void CreationPolicyDefaultsToCreateOnDemand()
+        {
+            Assert.AreEqual(
+                SingletonCreationPolicy.CreateOnDemand,
+                TestRuntimeSingleton.CreationPolicy
+            );
+        }
+
+        [Test]
+        public void CreationPolicyComesFromTheAttribute()
+        {
+            Assert.AreEqual(
+                SingletonCreationPolicy.NeverCreate,
+                NeverCreatedSingleton.CreationPolicy
+            );
+        }
+
+        [Test]
+        public void AnUnrecognizedCreationPolicyStillCreates()
+        {
+            Assert.AreEqual(
+                SingletonCreationPolicy.CreateOnDemand,
+                UnrecognizedPolicySingleton.CreationPolicy
+            );
+
+            UnrecognizedPolicySingleton instance = UnrecognizedPolicySingleton.Instance;
+            Track(instance.gameObject);
+
+            Assert.IsTrue(instance != null);
+        }
+
+        [Test]
+        public void InstanceReturnsNullWhenCreationIsRefused()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+            NeverCreatedSingleton instance = NeverCreatedSingleton.Instance;
+
+            Assert.IsTrue(instance == null);
+            Assert.IsFalse(NeverCreatedSingleton.HasInstance);
+            Assert.AreEqual(
+                0,
+                UnityObjectExtensions.FindObjectsOfTypeShim<NeverCreatedSingleton>(true).Length,
+                "A refused creation must leave no GameObject behind."
+            );
+        }
+
+        [Test]
+        public void TheRefusalIsReportedOncePerTypeUntilTheInstanceIsCleared()
+        {
+            int refusals = 0;
+            Application.logMessageReceived += CountRefusal;
+            try
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+                for (int i = 0; i < 5; ++i)
+                {
+                    Assert.IsTrue(NeverCreatedSingleton.Instance == null);
+                }
+
+                Assert.AreEqual(ExpectedRefusalLogCount, refusals);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+                NeverCreatedSingleton.ClearInstance();
+                Assert.IsTrue(NeverCreatedSingleton.Instance == null);
+
+                Assert.AreEqual(ExpectedRefusalLogCount * 2, refusals);
+            }
+            finally
+            {
+                Application.logMessageReceived -= CountRefusal;
+            }
+
+            return;
+
+            void CountRefusal(string condition, string stackTrace, LogType type)
+            {
+                if (type == LogType.Warning && RefusalPattern.IsMatch(condition))
+                {
+                    refusals++;
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator AnAuthoredInstanceIsServedWhenCreationIsRefused()
+        {
+            GameObject authoredObject = Track(new GameObject("AuthoredNeverCreatedSingleton"));
+            NeverCreatedSingleton authored = authoredObject.AddComponent<NeverCreatedSingleton>();
+            authored.authoredValue = 11;
+
+            yield return null;
+
+            // Drop the cached reference without destroying anything, which is the state every
+            // scene load leaves behind: the policy governs creation, and must not stop the lookup
+            // that finds an instance the consumer authored.
+            NeverCreatedSingleton._instance = null;
+
+            NeverCreatedSingleton instance = NeverCreatedSingleton.Instance;
+
+            Assert.AreSame(authored, instance);
+            Assert.AreEqual(11, instance.authoredValue);
+            Assert.IsTrue(NeverCreatedSingleton.HasInstance);
         }
     }
 }

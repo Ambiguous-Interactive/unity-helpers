@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `[SingletonCreation(SingletonCreationPolicy.NeverCreate)]`, which stops `RuntimeSingleton<T>.Instance` creating a bare stand-in when no instance exists. It returns `null` and names the type instead. See [Controlling on-demand creation](./docs/features/utilities/singletons.md#controlling-on-demand-creation) ([#321](https://github.com/Ambiguous-Interactive/unity-helpers/issues/321)).
 - Add `AnimationClip.GetSpriteFramesFromClip()`, which pairs every sprite a clip references with the binding that supplies it, a `GetSpritesFromClip(path, propertyName, type)` overload that filters on that binding, and `UnityExtensions.SpriteBindingProperty`. Editor-only. See [Sprites from an AnimationClip](./docs/features/utilities/math-and-extensions.md#sprites-from-an-animationclip) ([#451](https://github.com/Ambiguous-Interactive/unity-helpers/issues/451)).
 - Add `AssetChangeDetectionUtility.Enabled`, `ResetEnabledToDefault()` and `EnabledScope(bool)` to turn the `[DetectAssetChanged]` watcher on and off. The returned `AssetChangeDetectionEnabledScope` restores the previous setting on dispose ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
 - Add `SingleThreadedThreadPool.DrainAsync()`, which closes the pool and waits for queued work to finish instead of dropping it, plus `IsAcceptingWork` ([#318](https://github.com/Ambiguous-Interactive/unity-helpers/issues/318)).
@@ -71,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix defining `UNITY_DISABLE_UI` breaking the runtime assembly. The JSON options named `ColorBlockConverter` while the converter itself was compiled out ([#459](https://github.com/Ambiguous-Interactive/unity-helpers/issues/459)).
 - Fix a save holding an unset `WGuid` failing to load: JSON wrote the empty GUID and then refused to read it back ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a JSON payload with `min` greater than `max`, or with `max` missing, crashing a `Range<T>` load with `ArgumentException` instead of reporting corrupt data ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a `Gradient` with more than eight colour or alpha keys silently losing the extras and filling the player log with errors. The payload is now refused ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).

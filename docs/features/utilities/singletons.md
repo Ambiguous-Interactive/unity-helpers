@@ -116,6 +116,7 @@ Contents
 - Access via `T.Instance` (creates a new `GameObject` named `"<Type>-Singleton"` and adds `T` if none exists; otherwise finds an existing active instance).
 - `HasInstance` lets you check for an existing instance without creating one.
 - `Preserve` (virtual, default `true`) controls `DontDestroyOnLoad`.
+- `CreationPolicy` reports whether on-demand creation is allowed — see [Controlling on-demand creation](#controlling-on-demand-creation).
 - Handles duplicate detection and cleans up instance reference on destroy. Instance is cleared on domain reload before scene load.
 
 Example: Simple service
@@ -163,6 +164,52 @@ Notes:
 
 - To avoid creation during a sensitive frame, place a pre‑made instance in your bootstrap scene.
 - For scene‑local managers, override `Preserve => false`.
+
+<a id="controlling-on-demand-creation"></a>
+
+### Controlling on-demand creation
+
+On-demand creation is what makes `T.Instance` work from anywhere, and it is right for a singleton that
+holds no authored state — a coroutine host, a dispatcher. It is wrong for one that does.
+
+A created instance is a bare component: every `[SerializeField]` is left at its default. So a manager
+you authored in a boot scene, loaded from the wrong scene, hands back a stand-in with no settings that
+behaves like the real thing right up until it writes something. Annotate those:
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Attributes;
+using WallstopStudios.UnityHelpers.Core.Helper;
+using WallstopStudios.UnityHelpers.Utils;
+
+[SingletonCreation(SingletonCreationPolicy.NeverCreate)]
+public sealed class SaveManager : RuntimeSingleton<SaveManager>
+{
+    [SerializeField]
+    private SaveSettings _settings;
+}
+```
+
+`SaveManager.Instance` now returns the instance in the scene when there is one and `null` when there
+is not, logging one warning naming the type instead of substituting an empty stand-in. The policy
+governs _creation_ only — an instance you authored is still found and still served.
+
+| Policy                                   | `Instance` with no instance in any loaded scene            |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| `CreateOnDemand` (default, no attribute) | Creates `"<Type>-Singleton"` and returns the new component |
+| `NeverCreate`                            | Returns `null` and logs one warning per type               |
+
+Notes:
+
+- The decision is read from the type rather than from a virtual property, because there is no instance
+  to ask when the question is whether to make one.
+- The warning is logged once per type and re-armed by `ClearInstance()`, so a per-frame access cannot
+  flood the console.
+- It is a development diagnostic: release players skip it entirely.
+- `ScriptableObjectSingleton<T>` needs no policy. It never creates an asset at runtime — a missing one
+  already returns `null` with a warning — and the editor's opt-out for asset creation is
+  `[ExcludeFromSingletonCreation]`.
+- Pairing `NeverCreate` with `[AutoLoadSingleton]` at any phase before `AfterSceneLoad` is reported in
+  the editor: the auto-load runs before any scene exists, so it can only ever find nothing.
 
 <a id="scriptableobject-singleton"></a>
 

@@ -40,9 +40,89 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static readonly JsonSerializerOptions FastJsonOptions;
         public static readonly JsonSerializerOptions FastPocoJsonOptions;
 
+        /// <summary>
+        /// Registers every converter this package ships, in the order the shipped options have
+        /// always registered them.
+        /// </summary>
+        /// <remarks>
+        /// One list, not one per configuration. The normal, pretty and fast builders each carried a
+        /// verbatim copy of the same forty-six entries, so a forty-seventh converter added to one and
+        /// missed on another would silently change what a value round-trips through based only on
+        /// which options the caller reached for -- and nothing compared the three.
+        ///
+        /// Order is part of the contract: System.Text.Json consults converters in registration order
+        /// and takes the first that claims the type.
+        /// </remarks>
+        /// <param name="options">Options to register into.</param>
+        /// <param name="stringEnums">
+        /// Whether to register <see cref="JsonStringEnumConverter"/>, which writes an enum as its
+        /// name. The fast configuration leaves it off and writes the underlying number.
+        /// </param>
+        private static void AddPackageConverters(JsonSerializerOptions options, bool stringEnums)
+        {
+            IList<JsonConverter> converters = options.Converters;
+            converters.Add(WGuidConverter.Instance);
+            converters.Add(RangeConverterFactory.Instance);
+            converters.Add(FastVector2IntConverter.Instance);
+            converters.Add(FastVector3IntConverter.Instance);
+            if (stringEnums)
+            {
+                converters.Add(new JsonStringEnumConverter());
+            }
+
+            converters.Add(Vector3Converter.Instance);
+            converters.Add(Vector2Converter.Instance);
+            converters.Add(Vector4Converter.Instance);
+            converters.Add(Vector2IntConverter.Instance);
+            converters.Add(Vector3IntConverter.Instance);
+            converters.Add(Matrix4x4Converter.Instance);
+            converters.Add(QuaternionConverter.Instance);
+            converters.Add(LayerMaskConverter.Instance);
+            converters.Add(ResolutionConverter.Instance);
+            converters.Add(RenderTextureDescriptorConverter.Instance);
+            converters.Add(MinMaxCurveConverter.Instance);
+            converters.Add(MinMaxGradientConverter.Instance);
+            // Honours the guard the converter file already carried. Before this list was shared, three
+            // copies of it named ColorBlockConverter unguarded, so defining UNITY_DISABLE_UI compiled
+            // the converter out and then broke the runtime assembly on the references to it -- a guard
+            // that could not be used was indistinguishable from protection that existed.
+#if !UNITY_DISABLE_UI
+            converters.Add(ColorBlockConverter.Instance);
+#endif
+            converters.Add(BoundingSphereConverter.Instance);
+            converters.Add(RaycastHitConverter.Instance);
+            converters.Add(TouchConverter.Instance);
+            converters.Add(SceneConverter.Instance);
+            converters.Add(PoseConverter.Instance);
+            converters.Add(PlaneConverter.Instance);
+            converters.Add(RayConverter.Instance);
+            converters.Add(Ray2DConverter.Instance);
+            converters.Add(RectOffsetConverter.Instance);
+            converters.Add(RangeIntConverter.Instance);
+            converters.Add(Hash128Converter.Instance);
+            converters.Add(AnimationCurveConverter.Instance);
+            converters.Add(GradientConverter.Instance);
+            converters.Add(SphericalHarmonicsL2Converter.Instance);
+            converters.Add(TypeConverter.Instance);
+            converters.Add(GameObjectConverter.Instance);
+            converters.Add(ColorConverter.Instance);
+            converters.Add(Color32Converter.Instance);
+            converters.Add(RectConverter.Instance);
+            converters.Add(RectIntConverter.Instance);
+            converters.Add(BoundsConverter.Instance);
+            converters.Add(BoundsIntConverter.Instance);
+            converters.Add(BitSetConverter.Instance);
+            converters.Add(ImmutableBitSetConverter.Instance);
+            converters.Add(DequeConverterFactory.Instance);
+            converters.Add(CyclicBufferConverterFactory.Instance);
+            converters.Add(SerializableSetConverterFactory.Instance);
+            converters.Add(SerializableDictionaryConverterFactory.Instance);
+            converters.Add(SerializableSortedDictionaryConverterFactory.Instance);
+        }
+
         public static JsonSerializerOptions GetNormalJsonOptions()
         {
-            return new JsonSerializerOptions
+            JsonSerializerOptions options = new()
             {
                 IgnoreReadOnlyFields = false,
                 IgnoreReadOnlyProperties = false,
@@ -54,62 +134,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     | JsonNumberHandling.AllowReadingFromString,
                 ReadCommentHandling = JsonCommentHandling.Skip,
                 AllowTrailingCommas = true,
-                Converters =
-                {
-                    WGuidConverter.Instance,
-                    RangeConverterFactory.Instance,
-                    FastVector2IntConverter.Instance,
-                    FastVector3IntConverter.Instance,
-                    new JsonStringEnumConverter(),
-                    Vector3Converter.Instance,
-                    Vector2Converter.Instance,
-                    Vector4Converter.Instance,
-                    Vector2IntConverter.Instance,
-                    Vector3IntConverter.Instance,
-                    Matrix4x4Converter.Instance,
-                    QuaternionConverter.Instance,
-                    LayerMaskConverter.Instance,
-                    ResolutionConverter.Instance,
-                    RenderTextureDescriptorConverter.Instance,
-                    MinMaxCurveConverter.Instance,
-                    MinMaxGradientConverter.Instance,
-                    ColorBlockConverter.Instance,
-                    BoundingSphereConverter.Instance,
-                    RaycastHitConverter.Instance,
-                    TouchConverter.Instance,
-                    SceneConverter.Instance,
-                    PoseConverter.Instance,
-                    PlaneConverter.Instance,
-                    RayConverter.Instance,
-                    Ray2DConverter.Instance,
-                    RectOffsetConverter.Instance,
-                    RangeIntConverter.Instance,
-                    Hash128Converter.Instance,
-                    AnimationCurveConverter.Instance,
-                    GradientConverter.Instance,
-                    SphericalHarmonicsL2Converter.Instance,
-                    TypeConverter.Instance,
-                    GameObjectConverter.Instance,
-                    ColorConverter.Instance,
-                    Color32Converter.Instance,
-                    RectConverter.Instance,
-                    RectIntConverter.Instance,
-                    BoundsConverter.Instance,
-                    BoundsIntConverter.Instance,
-                    BitSetConverter.Instance,
-                    ImmutableBitSetConverter.Instance,
-                    DequeConverterFactory.Instance,
-                    CyclicBufferConverterFactory.Instance,
-                    SerializableSetConverterFactory.Instance,
-                    SerializableDictionaryConverterFactory.Instance,
-                    SerializableSortedDictionaryConverterFactory.Instance,
-                },
             };
+            AddPackageConverters(options, stringEnums: true);
+            return options;
         }
 
         public static JsonSerializerOptions GetPrettyJsonOptions()
         {
-            return new JsonSerializerOptions
+            JsonSerializerOptions options = new()
             {
                 IgnoreReadOnlyFields = false,
                 IgnoreReadOnlyProperties = false,
@@ -121,63 +153,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     | JsonNumberHandling.AllowReadingFromString,
                 ReadCommentHandling = JsonCommentHandling.Skip,
                 AllowTrailingCommas = true,
-                Converters =
-                {
-                    WGuidConverter.Instance,
-                    RangeConverterFactory.Instance,
-                    FastVector2IntConverter.Instance,
-                    FastVector3IntConverter.Instance,
-                    new JsonStringEnumConverter(),
-                    Vector3Converter.Instance,
-                    Vector2Converter.Instance,
-                    Vector4Converter.Instance,
-                    Vector2IntConverter.Instance,
-                    Vector3IntConverter.Instance,
-                    Matrix4x4Converter.Instance,
-                    QuaternionConverter.Instance,
-                    LayerMaskConverter.Instance,
-                    ResolutionConverter.Instance,
-                    RenderTextureDescriptorConverter.Instance,
-                    MinMaxCurveConverter.Instance,
-                    MinMaxGradientConverter.Instance,
-                    ColorBlockConverter.Instance,
-                    BoundingSphereConverter.Instance,
-                    RaycastHitConverter.Instance,
-                    TouchConverter.Instance,
-                    SceneConverter.Instance,
-                    PoseConverter.Instance,
-                    PlaneConverter.Instance,
-                    RayConverter.Instance,
-                    Ray2DConverter.Instance,
-                    RectOffsetConverter.Instance,
-                    RangeIntConverter.Instance,
-                    Hash128Converter.Instance,
-                    AnimationCurveConverter.Instance,
-                    GradientConverter.Instance,
-                    SphericalHarmonicsL2Converter.Instance,
-                    TypeConverter.Instance,
-                    GameObjectConverter.Instance,
-                    ColorConverter.Instance,
-                    Color32Converter.Instance,
-                    RectConverter.Instance,
-                    RectIntConverter.Instance,
-                    BoundsConverter.Instance,
-                    BoundsIntConverter.Instance,
-                    BitSetConverter.Instance,
-                    ImmutableBitSetConverter.Instance,
-                    DequeConverterFactory.Instance,
-                    CyclicBufferConverterFactory.Instance,
-                    SerializableSetConverterFactory.Instance,
-                    SerializableDictionaryConverterFactory.Instance,
-                    SerializableSortedDictionaryConverterFactory.Instance,
-                },
                 WriteIndented = true,
             };
+            AddPackageConverters(options, stringEnums: true);
+            return options;
         }
 
         public static JsonSerializerOptions GetFastJsonOptions()
         {
-            return new JsonSerializerOptions
+            JsonSerializerOptions options = new()
             {
                 IgnoreReadOnlyFields = false,
                 IgnoreReadOnlyProperties = true,
@@ -187,56 +171,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 NumberHandling = JsonNumberHandling.Strict,
                 ReadCommentHandling = JsonCommentHandling.Disallow,
                 AllowTrailingCommas = false,
-                Converters =
-                {
-                    WGuidConverter.Instance,
-                    RangeConverterFactory.Instance,
-                    FastVector2IntConverter.Instance,
-                    FastVector3IntConverter.Instance,
-                    Vector3Converter.Instance,
-                    Vector2Converter.Instance,
-                    Vector4Converter.Instance,
-                    Vector2IntConverter.Instance,
-                    Vector3IntConverter.Instance,
-                    Matrix4x4Converter.Instance,
-                    QuaternionConverter.Instance,
-                    LayerMaskConverter.Instance,
-                    ResolutionConverter.Instance,
-                    RenderTextureDescriptorConverter.Instance,
-                    MinMaxCurveConverter.Instance,
-                    MinMaxGradientConverter.Instance,
-                    ColorBlockConverter.Instance,
-                    BoundingSphereConverter.Instance,
-                    RaycastHitConverter.Instance,
-                    TouchConverter.Instance,
-                    SceneConverter.Instance,
-                    PoseConverter.Instance,
-                    PlaneConverter.Instance,
-                    RayConverter.Instance,
-                    Ray2DConverter.Instance,
-                    RectOffsetConverter.Instance,
-                    RangeIntConverter.Instance,
-                    Hash128Converter.Instance,
-                    AnimationCurveConverter.Instance,
-                    GradientConverter.Instance,
-                    SphericalHarmonicsL2Converter.Instance,
-                    TypeConverter.Instance,
-                    GameObjectConverter.Instance,
-                    ColorConverter.Instance,
-                    Color32Converter.Instance,
-                    RectConverter.Instance,
-                    RectIntConverter.Instance,
-                    BoundsConverter.Instance,
-                    BoundsIntConverter.Instance,
-                    BitSetConverter.Instance,
-                    ImmutableBitSetConverter.Instance,
-                    DequeConverterFactory.Instance,
-                    CyclicBufferConverterFactory.Instance,
-                    SerializableSetConverterFactory.Instance,
-                    SerializableDictionaryConverterFactory.Instance,
-                    SerializableSortedDictionaryConverterFactory.Instance,
-                },
             };
+            AddPackageConverters(options, stringEnums: false);
+            return options;
         }
 
         public static JsonSerializerOptions GetFastPocoJsonOptions()

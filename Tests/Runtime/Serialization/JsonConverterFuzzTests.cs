@@ -96,6 +96,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static IReadOnlyList<FuzzTarget> _targets;
 
         /// <summary>
+        /// The converters that deliberately write a value they cannot rebuild, each with the reason.
+        /// This is the declaration <see cref="JsonConverterCoverageTests"/> checks the registered
+        /// converters against, so a forty-eighth converter cannot be added the way these two were --
+        /// with a <c>Read</c> that throws and nothing anywhere that says so.
+        /// </summary>
+        /// <remarks>
+        /// Adding an entry is the escape hatch and is meant to cost something: a type listed here is
+        /// asserted to refuse every read, so a converter that quietly gains a read path fails this
+        /// list rather than silently outgrowing it.
+        /// </remarks>
+        public static readonly IReadOnlyDictionary<Type, string> WriteOnlyConverters =
+            new Dictionary<Type, string>
+            {
+                [typeof(Touch)] =
+                    "the platform owns every field, so there is nothing to restore a Touch into",
+                [typeof(GameObject)] =
+                    "the record written is a name/type/instance-id for diagnostics; a scene object cannot be rebuilt from it",
+            };
+
+        /// <summary>
+        /// The <see cref="WriteOnlyConverters"/> keys, as a test case source.
+        /// </summary>
+        public static IEnumerable<Type> WriteOnlyTypes => WriteOnlyConverters.Keys;
+
+        /// <summary>
         /// One entry per converter registered in <c>Serializer.CreateNormalJsonOptions</c>. The seed is
         /// a value the converter can write; the corpus is derived from its own output.
         /// </summary>
@@ -333,15 +358,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// lifecycle management for a converter with no read path to fuzz.
         /// </remarks>
         [Test]
-        [TestCase(typeof(Touch))]
-        [TestCase(typeof(GameObject))]
+        [TestCaseSource(nameof(WriteOnlyTypes))]
         public void AWriteOnlyConverterRefusesToRead(Type type)
         {
             JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
 
             Assert.Throws<NotSupportedException>(
                 () => JsonSerializer.Deserialize("{}", type, options),
-                $"{type.Name} is write-only and must refuse a read with NotSupportedException"
+                $"{type.Name} is declared write-only ({WriteOnlyConverters[type]}) and must refuse a read with NotSupportedException"
+            );
+        }
+
+        /// <summary>
+        /// A converter that is not declared write-only must read back the value it just wrote.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="AcceptedPayloadsSurviveTheirOwnReEncoding"/> cannot make this assertion: a
+        /// payload it fails to decode is skipped, because most of its corpus is deliberately
+        /// hostile, so a converter whose <b>own seed</b> does not read back is silently passed over
+        /// rather than reported. That is precisely the shape of the <see cref="WGuid"/> defect --
+        /// a value the converter writes and then refuses -- and it is a save file that cannot be
+        /// loaded rather than a rejected attack.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void AReadableConverterReadsBackTheValueItWrote(FuzzTarget target)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+            string written = target.Seeds[0];
+
+            if (!target.ReadSupported)
+            {
+                Assert.Throws<NotSupportedException>(
+                    () => JsonSerializer.Deserialize(written, target.Type, options),
+                    $"{target.Name} is declared write-only and must refuse its own output too"
+                );
+                return;
+            }
+
+            object restored = null;
+            Assert.DoesNotThrow(
+                () =>
+                {
+                    restored = JsonSerializer.Deserialize(written, target.Type, options);
+                },
+                $"{target.Name} wrote {Abbreviate(written)} and refused to read it back."
+            );
+            Assert.IsTrue(
+                restored != null,
+                $"{target.Name} wrote {Abbreviate(written)} and read it back as null."
             );
         }
 
@@ -773,7 +838,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     typeof(ParticleSystem.MinMaxGradient),
                     new ParticleSystem.MinMaxGradient(Color.green)
                 ),
+#if !UNITY_DISABLE_UI
                 new(typeof(UnityEngine.UI.ColorBlock), UnityEngine.UI.ColorBlock.defaultColorBlock),
+#endif
                 new(typeof(RaycastHit), default(RaycastHit)),
                 FuzzTarget.WriteOnly(typeof(Touch), default(Touch)),
                 new(typeof(Scene), SceneManager.GetActiveScene()),
