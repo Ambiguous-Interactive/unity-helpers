@@ -665,6 +665,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float b = 0f;
             float a = 0f;
 
+            // Kept alongside the weighted sums for the case where every surviving pixel weighs
+            // nothing. Luma is zero for black, so a wholly black sprite drove totalWeight to zero,
+            // skipped the division, and returned the accumulators untouched - Color.clear, from
+            // opaque input.
+            int count = 0;
+            float plainR = 0f;
+            float plainG = 0f;
+            float plainB = 0f;
+            float plainA = 0f;
+
             switch (pixels)
             {
                 case IReadOnlyList<Color> colorList:
@@ -683,6 +693,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         b += pixel.b * weight;
                         a += pixel.a * weight;
                         totalWeight += weight;
+                        plainR += pixel.r;
+                        plainG += pixel.g;
+                        plainB += pixel.b;
+                        plainA += pixel.a;
+                        ++count;
                     }
 
                     break;
@@ -701,6 +716,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         b += pixel.b * weight;
                         a += pixel.a * weight;
                         totalWeight += weight;
+                        plainR += pixel.r;
+                        plainG += pixel.g;
+                        plainB += pixel.b;
+                        plainA += pixel.a;
+                        ++count;
                     }
 
                     break;
@@ -720,6 +740,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         b += pixel.b * weight;
                         a += pixel.a * weight;
                         totalWeight += weight;
+                        plainR += pixel.r;
+                        plainG += pixel.g;
+                        plainB += pixel.b;
+                        plainA += pixel.a;
+                        ++count;
                     }
 
                     break;
@@ -732,9 +757,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 g /= totalWeight;
                 b /= totalWeight;
                 a /= totalWeight;
+                return new Color(r, g, b, a);
             }
 
-            return new Color(r, g, b, a);
+            if (count > 0)
+            {
+                return new Color(plainR / count, plainG / count, plainB / count, plainA / count);
+            }
+
+            return Color.clear;
         }
 
         // Find dominant color using simple clustering

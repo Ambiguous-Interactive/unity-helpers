@@ -99,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix the sprite cropper and pivot adjuster selecting different pixels than the sheet extractor at the same alpha cutoff, and two transparency scorers disagreeing with their twenty siblings by one alpha level ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
 - Fix the Inspector's solid-texture cache holding two entries for one color: colors a hair either side of a channel boundary compared equal and hashed apart ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
 - Fix `GetAverageColor(ColorAveragingMethod.Dominant)` returning a channel above 1 for a saturated color - a dominant white came back as 1.0039 ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
+- Fix `GetAverageColor(ColorAveragingMethod.Weighted)` returning a fully transparent color for opaque black pixels, which weigh nothing under luminance weighting ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
 
 ## [3.5.1] - 2026-07-12
 

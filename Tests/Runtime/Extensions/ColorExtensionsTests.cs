@@ -317,6 +317,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        /// <remarks>
+        /// Weighted scales each pixel by its own perceived luma, so a wholly black selection weighed
+        /// nothing: the total weight was zero, the division was skipped, and the untouched
+        /// accumulators came back as Color.clear - fully transparent, from opaque input. An empty
+        /// selection still reports clear, which is the documented default for no pixels at all.
+        /// </remarks>
+        [Test]
+        public void GetAverageColorWeightedKeepsAlphaWhenEveryPixelWeighsNothing()
+        {
+            Color[] black = { Color.black, Color.black };
+            Color result = black.GetAverageColor(ColorAveragingMethod.Weighted);
+            Assert.AreEqual(1f, result.a, 1e-5f, "Opaque black averaged to a transparent color.");
+            AssertColorsApproximatelyEqual(Color.black, result, 1e-5f);
+
+            Color[] mixedAlpha = { new(0f, 0f, 0f, 0.5f), new(0f, 0f, 0f, 1f) };
+            Color averaged = mixedAlpha.GetAverageColor(ColorAveragingMethod.Weighted);
+            Assert.AreEqual(0.75f, averaged.a, 1e-5f, "Zero-weight pixels lost their alpha mean.");
+
+            Assert.AreEqual(
+                Color.clear,
+                Array.Empty<Color>().GetAverageColor(ColorAveragingMethod.Weighted)
+            );
+        }
+
+        /// <remarks>
+        /// Pins the cases the zero-weight fallback must not disturb: wherever any pixel carries
+        /// luma, the weighted mean is unchanged.
+        /// </remarks>
+        [Test]
+        public void GetAverageColorWeightedIsUnchangedWhereAnyPixelCarriesLuma()
+        {
+            Color[] redAndBlack = { Color.red, Color.black };
+            AssertColorsApproximatelyEqual(
+                Color.red,
+                redAndBlack.GetAverageColor(ColorAveragingMethod.Weighted),
+                1e-5f
+            );
+
+            Color[] blackAndWhite = { Color.black, Color.white };
+            AssertColorsApproximatelyEqual(
+                Color.white,
+                blackAndWhite.GetAverageColor(ColorAveragingMethod.Weighted),
+                1e-5f
+            );
+        }
+
         [Test]
         public void GetAverageColorEnumerableDominantTracksMostCommonBucket()
         {
