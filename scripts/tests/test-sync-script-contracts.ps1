@@ -2448,13 +2448,36 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
-  $tagWorkflowPath = Join-Path $repoRoot '.github/workflows/release-tag.yml'
   $publishWorkflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
   $publishWorkflowContent = Get-Content -Path $publishWorkflowPath -Raw
   $prepareWorkflowPath = Join-Path $repoRoot '.github/workflows/release-prepare.yml'
   $prepareWorkflowContent = Get-Content -Path $prepareWorkflowPath -Raw
 
-  $tagWorkflowRetired = -not (Test-Path $tagWorkflowPath)
+  # The requirement is that exactly ONE workflow creates release tags, not that one particular
+  # filename is absent (#445). Asserting the absence of release-tag.yml passes silently the moment
+  # tag creation reappears under any other name, which is how a release gets double-tagged.
+  # Comments are stripped so prose recording the retirement cannot satisfy or violate the check.
+  # Creation only, matched per line: `git fetch --tags` and a GET of git/tags read tags without
+  # owning them, and a workflow that reads them is not a second owner.
+  $tagCreationPattern = @(
+    '--method\s+(POST|PATCH)[^\r\n]*git/(tags|refs)'
+    'git\s+push[^\r\n]*(--tags|refs/tags)'
+    'git\s+tag\s+(?!-l\b|--list\b|-d\b|--delete\b)'
+    'gh\s+release\s+create'
+  ) -join '|'
+  $workflowsCreatingTags = @(
+    Get-ChildItem -Path (Join-Path $repoRoot '.github/workflows') -Filter '*.yml' -File |
+      Where-Object {
+        $stripped = (Get-Content -LiteralPath $_.FullName | ForEach-Object { $_ -replace '#.*$', '' }) -join "`n"
+        $stripped -match $tagCreationPattern
+      } |
+      ForEach-Object { $_.Name } |
+      Sort-Object
+  )
+  $tagWorkflowRetired = (
+    $workflowsCreatingTags.Count -eq 1 -and
+    $workflowsCreatingTags[0] -eq 'release.yml'
+  )
   $publishOwnsTagCreation = (
     $publishWorkflowContent.Contains('name: Prepare release tag') -and
     $publishWorkflowContent.Contains('tag_action="create"') -and
@@ -2467,9 +2490,9 @@ function Run-ReleaseTagWorkflowRetirementContractTests {
   )
 
   Write-TestResult `
-    -TestName 'release tag workflow is retired' `
+    -TestName 'exactly one workflow creates release tags' `
     -Passed $tagWorkflowRetired `
-    -Message 'Expected .github/workflows/release-tag.yml to be absent because Release Publish owns tag creation.'
+    -Message "Expected release.yml to be the only workflow that creates release tags, found: $($workflowsCreatingTags -join ', ')."
 
   Write-TestResult `
     -TestName 'release publish owns release tag creation' `
