@@ -228,10 +228,21 @@ The loop is worth writing out each time rather than committing a helper: `[TestC
 off the attribute's `Arguments` property and `[TestCaseSource]` off the named static property, and a
 failure arrives as `TargetInvocationException.InnerException`. NUnit's attribute types are not
 referenced by the sandbox assembly either, so resolve them by name off the loaded `nunit.framework`
-and pass them to `GetCustomAttributes(Type, bool)`. Two things NUnit does that the loop must also do,
-or a passing test reports as failed: **coerce each `[TestCase]` argument to the parameter type**
-(`[TestCase(2, …)]` on a `byte` parameter arrives boxed as `Int32` and `Invoke` refuses it), and treat
-`InconclusiveException` / `IgnoreException` as skips rather than failures.
+and pass them to `GetCustomAttributes(Type, bool)`. Four things NUnit does that the loop must also do,
+or a **passing test reports as failed**:
+
+- **Coerce each `[TestCase]` argument to the parameter type.** `[TestCase(2, …)]` on a `byte` parameter
+  arrives boxed as `Int32` and `Invoke` refuses it.
+- **Treat `SuccessException` as a pass.** `Assert.Pass("…")` signals success by throwing, so a
+  `catch` that assumes any exception is a failure turns every `Assert.Pass` test red — with the pass
+  message as the "error" (`ConstructorWithNullComparerDoesNotThrow: Does not throw.`).
+- **Treat `InconclusiveException` / `IgnoreException` as skips**, not failures.
+- **Skip `[Values]` tests rather than run them.** They carry `[Test]` with parameters and no
+  `[TestCase]`; the real runner expands them and this loop cannot.
+
+Two whole categories cannot run here at all, and neither is a regression: a fixture whose body calls
+`LogAssert.Expect` (`No log scope is available`), and an Editor **drawer** test, which needs a real
+IMGUI draw and fails with a bare `NullReferenceException`.
 
 Four constraints. The first two were recorded backwards before being measured on 2026-08-16:
 
