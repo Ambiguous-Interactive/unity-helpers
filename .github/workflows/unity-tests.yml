@@ -1058,10 +1058,19 @@ jobs:
   # keep time small (no IL2CPP standalone build). Core-only (no integrations): the
   # single-threaded toggle is a core-runtime concern, so installing the DI packages
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
-  # self-hosted Unity seat. This job depends on both Unity tiers so same-workflow
-  # jobs do not contend with each other for the org lock; the external
-  # `wallstop-organization-builds` lock still serializes this work against other
-  # workflows and runs. Reuses the same secrets gate, runner-preflight,
+  # self-hosted Unity seat.
+  #
+  # It `needs: unity-tests` for the SAME reason unity-tests-standalone does -- do not
+  # spend a Unity seat on a fundamentally broken tree -- and NOT for org-lock
+  # contention. It used to also `needs: unity-tests-standalone`, justified as keeping
+  # same-workflow jobs off the org lock, and that premise is false: `Acquire
+  # organization Unity lock` takes 2-4 s on every leg and the two hosts have been
+  # observed running Unity simultaneously (sessions 168/169). The edge bought nothing
+  # and cost a median 2.8 runner-minutes per run in idle -- a runner that finished the
+  # standalone tier early could not start this one -- measured over six runs in
+  # session 194. Each host runs one runner, so removing it never puts two editors on
+  # one machine; the external `wallstop-organization-builds` lock still serializes
+  # this work against other workflows and runs. Reuses the same secrets gate, runner-preflight,
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
   # scaffolding as unity-tests, with DISTINCT project/Library/artifact paths
   # (suffix `-single-threaded`) so its differently-compiled Library never collides
@@ -1072,7 +1081,6 @@ jobs:
       - matrix-config
       - runner-preflight
       - unity-tests
-      - unity-tests-standalone
     if: >-
       ${{
         always() &&
@@ -1082,8 +1090,6 @@ jobs:
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
         needs.unity-tests.result == 'success' &&
-        (needs.unity-tests-standalone.result == 'success' ||
-          needs.unity-tests-standalone.result == 'skipped') &&
         needs.matrix-config.outputs.has-required-secrets == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}

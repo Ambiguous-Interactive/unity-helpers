@@ -3625,32 +3625,49 @@ if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
         @{
             Name = 'needs main Unity matrix'
             Pattern = '(?m)^      - unity-tests\s*$'
-            Message = 'unity-tests-single-threaded must wait for unity-tests so same-workflow jobs do not contend for the org Unity lock.'
+            Message = 'unity-tests-single-threaded must wait for unity-tests so a fundamentally broken tree does not spend a Unity seat.'
         },
         @{
-            Name = 'needs standalone Unity tier'
-            Pattern = '(?m)^      - unity-tests-standalone\s*$'
-            Message = 'unity-tests-single-threaded must wait for unity-tests-standalone so same-workflow jobs do not contend for the org Unity lock after the fast tier.'
-        },
-        @{
-            Name = 'uses always for skipped standalone'
+            Name = 'uses always for skipped dependencies'
             Pattern = 'always\(\)'
-            Message = 'unity-tests-single-threaded must use always() so workflow_dispatch runs with a skipped standalone tier can still evaluate its result gate.'
+            Message = 'unity-tests-single-threaded must use always() so workflow_dispatch runs with a skipped tier can still evaluate its result gate.'
         },
         @{
             Name = 'requires successful main Unity matrix'
             Pattern = "needs\.unity-tests\.result\s*==\s*'success'"
             Message = 'unity-tests-single-threaded must run only after unity-tests succeeds.'
-        },
-        @{
-            Name = 'accepts skipped standalone tier'
-            Pattern = "needs\.unity-tests-standalone\.result\s*==\s*'skipped'"
-            Message = 'unity-tests-single-threaded must allow unity-tests-standalone to be skipped for single-mode dispatch pins.'
         }
     )
 
     foreach ($contract in $requiredSingleThreadedContracts) {
         if ($singleThreadedJob -notmatch $contract.Pattern) {
+            Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info "Checked unity-tests-single-threaded contract '$($contract.Name)'."
+        }
+    }
+
+    # Inverted, like the max-parallel contract above it. The SINGLE_THREADED tier must NOT wait for
+    # the standalone tier: that edge was justified by same-workflow org-lock contention, which
+    # sessions 168/169 disproved by measurement (2-4 s acquires, both hosts running Unity at once),
+    # and it cost a median 2.8 runner-minutes per run in idle. Restoring it needs a measurement,
+    # not a comment.
+    $forbiddenSingleThreadedPatterns = @(
+        @{
+            Name = 'does not wait for the standalone tier'
+            Pattern = '(?m)^      - unity-tests-standalone\s*$'
+            Message = 'unity-tests-single-threaded must not need unity-tests-standalone: a runner that finishes the standalone tier early cannot start this one, and the org lock does not serialize legs.'
+        },
+        @{
+            Name = 'does not gate on the standalone tier result'
+            Pattern = 'needs\.unity-tests-standalone\.result'
+            Message = 'unity-tests-single-threaded must not gate on unity-tests-standalone.result; the standalone tier is no longer one of its dependencies.'
+        }
+    )
+
+    foreach ($contract in $forbiddenSingleThreadedPatterns) {
+        if ($singleThreadedJob -match $contract.Pattern) {
             Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
             $failed = $true
         } elseif ($VerboseOutput) {
