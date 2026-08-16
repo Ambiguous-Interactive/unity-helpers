@@ -95,6 +95,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <summary>
+        /// The second registration channel: a type carrying <see cref="JsonConverterAttribute"/> is
+        /// served by that converter wherever it appears, with or without the package's options.
+        /// </summary>
+        /// <remarks>
+        /// Enumerating <c>JsonSerializerOptions.Converters</c> alone misses these entirely -- three
+        /// of this package's own adapters are registered this way and nothing else in the shipped
+        /// options names them, so a converter added here is invisible to every check above.
+        /// </remarks>
+        [Test]
+        public void EveryTypeLevelConverterIsCoveredByAFuzzTarget()
+        {
+            List<Type> runtimeTypes = new();
+            try
+            {
+                runtimeTypes.AddRange(typeof(Serializer).Assembly.GetTypes());
+            }
+            catch (System.Reflection.ReflectionTypeLoadException loadFailure)
+            {
+                foreach (Type loaded in loadFailure.Types)
+                {
+                    if (loaded != null)
+                    {
+                        runtimeTypes.Add(loaded);
+                    }
+                }
+            }
+
+            List<string> failures = new();
+            foreach (Type type in runtimeTypes)
+            {
+                if (type == null || !type.IsDefined(typeof(JsonConverterAttribute), inherit: false))
+                {
+                    continue;
+                }
+
+                bool covered = false;
+                foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+                {
+                    Type candidate = target.Type.IsGenericType
+                        ? target.Type.GetGenericTypeDefinition()
+                        : target.Type;
+                    if (candidate == type)
+                    {
+                        covered = true;
+                        break;
+                    }
+                }
+
+                if (!covered)
+                {
+                    failures.Add(
+                        $"{type.Name} carries [{nameof(JsonConverterAttribute)}], so its converter serves it everywhere, but "
+                            + $"{nameof(JsonConverterFuzzTests)} has no target for it. A converter reached this way is never fuzzed and never round-trip checked."
+                    );
+                }
+            }
+
+            Assert.That(failures, Is.Empty, Join(failures));
+        }
+
+        /// <summary>
         /// The reverse: a declared exception must still name something that ships. A list naming a
         /// converter nobody registers is a claim about a file that no longer exists.
         /// </summary>

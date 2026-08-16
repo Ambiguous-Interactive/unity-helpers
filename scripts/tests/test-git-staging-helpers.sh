@@ -69,7 +69,8 @@ if (
 
     echo "hello" > sample.txt
     git_add_with_retry sample.txt
-    git diff --cached --name-only | grep -Fxq -- sample.txt
+    staged="$(git diff --cached --name-only || true)"
+    grep -Fxq -- sample.txt <<<"$staged"
 ); then
     pass "git_add_with_retry stages file"
 else

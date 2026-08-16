@@ -98,7 +98,7 @@ git_index_mode() {
     local rel_path
     rel_path="$(relative_path "$file_path")"
 
-    git -C "$REPO_ROOT" ls-files -s -- "$rel_path" 2>/dev/null | sed -E 's/^([0-9]+).*/\1/' | head -n 1
+    git -C "$REPO_ROOT" ls-files -s -- "$rel_path" 2>/dev/null | sed -E 's/^([0-9]+).*/\1/' | head -n 1 || true
 }
 
 permission_diagnostics() {
@@ -715,9 +715,9 @@ fi
 echo -e "${BLUE}Checking command ordering...${NC}"
 
 # Only check non-comment lines (skip lines starting with optional whitespace + #)
-CHOWN_LINE=$(grep -n 'sudo chown' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1)
-DOTNET_LINE=$(grep -n 'dotnet tool restore' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1)
-NPM_LINE=$(grep -nE 'npm ci|npm i ' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1)
+CHOWN_LINE=$(grep -n 'sudo chown' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1 || true)
+DOTNET_LINE=$(grep -n 'dotnet tool restore' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1 || true)
+NPM_LINE=$(grep -nE 'npm ci|npm i ' "$POST_CREATE" | grep -vE '^[[:space:]]*[0-9]*:[[:space:]]*#' | head -1 | cut -d: -f1 || true)
 
 if [[ -n "$CHOWN_LINE" && -n "$DOTNET_LINE" ]]; then
     if [[ "$CHOWN_LINE" -lt "$DOTNET_LINE" ]]; then

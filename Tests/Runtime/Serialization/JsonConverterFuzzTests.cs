@@ -859,6 +859,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new(typeof(Deque<int>), deque),
                 new(typeof(CyclicBuffer<int>), cyclic),
                 new(typeof(SerializableList<int>), new SerializableList<int> { 1, 2, 3 }),
+                new(typeof(SerializableType), new SerializableType(typeof(Vector3))),
+                new(typeof(SerializableNullable<int>), new SerializableNullable<int>(7)),
                 new(typeof(SerializableHashSet<int>), new SerializableHashSet<int> { 1, 2, 3 }),
                 new(
                     typeof(SerializableDictionary<string, int>),

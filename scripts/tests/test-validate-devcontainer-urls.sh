@@ -83,7 +83,7 @@ git_index_mode() {
     local rel_path
     rel_path="$(relative_path "$file_path")"
 
-    git -C "$REPO_ROOT" ls-files -s -- "$rel_path" 2>/dev/null | sed -E 's/^([0-9]+).*/\1/' | head -n 1
+    git -C "$REPO_ROOT" ls-files -s -- "$rel_path" 2>/dev/null | sed -E 's/^([0-9]+).*/\1/' | head -n 1 || true
 }
 
 permission_diagnostics() {

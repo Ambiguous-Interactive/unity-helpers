@@ -65,14 +65,25 @@ echo ""
 # Read the script content once
 SCRIPT_CONTENT="$(cat "$LINT_SCRIPT")"
 
-# Helper: check that a string appears in the excludeDirs array line
+# Each array's declaration is extracted ONCE, into a variable, and every membership question is then
+# answered with bash string matching rather than a pipeline.
+#
+# This used to be `echo "$SCRIPT_CONTENT" | grep '\$excludeDirs' | grep -qF "'obj'"`, and under
+# `set -o pipefail` that is a race: `grep -q` exits at its first match, the upstream `grep` dies of
+# SIGPIPE, and pipefail reports the pipeline as 141 even though the match succeeded. It passes
+# whenever the producer finishes writing first, which is almost always -- and lost that race once in
+# CI under Repo Lint's eight concurrent workers, failing `obj` while `bin`, on the same line of the
+# same string, passed.
+EXCLUDE_DIRS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeDirs *=/,/)/p')"
+EXCLUDE_FILE_PATTERNS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeFilePatterns/,/)/p')"
+EXCLUDE_DIR_PATTERNS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeDirPatterns/,/)/p')"
+
+# Helper: check that a string appears in the excludeDirs array declaration
 check_exclude_dir() {
   local entry="$1"
   local description="$2"
   run_test
-  # Match the entry inside the $excludeDirs array declaration
-  if echo "$SCRIPT_CONTENT" | grep -q "\\\$excludeDirs" && \
-     echo "$SCRIPT_CONTENT" | grep '\$excludeDirs' | grep -qF "'$entry'"; then
+  if [ -n "$EXCLUDE_DIRS_BLOCK" ] && [[ "$EXCLUDE_DIRS_BLOCK" == *"'$entry'"* ]]; then
     pass "excludeDirs contains '$entry' ($description)"
   else
     fail "excludeDirs missing '$entry' ($description)"
@@ -84,9 +95,7 @@ check_exclude_file_pattern() {
   local pattern="$1"
   local description="$2"
   run_test
-  # Match the pattern inside the $excludeFilePatterns array block
-  if echo "$SCRIPT_CONTENT" | grep -q "\\\$excludeFilePatterns" && \
-     echo "$SCRIPT_CONTENT" | sed -n '/\$excludeFilePatterns/,/)/p' | grep -qF "'$pattern'"; then
+  if [ -n "$EXCLUDE_FILE_PATTERNS_BLOCK" ] && [[ "$EXCLUDE_FILE_PATTERNS_BLOCK" == *"'$pattern'"* ]]; then
     pass "excludeFilePatterns contains '$pattern' ($description)"
   else
     fail "excludeFilePatterns missing '$pattern' ($description)"
@@ -98,8 +107,7 @@ check_exclude_dir_pattern() {
   local pattern="$1"
   local description="$2"
   run_test
-  if echo "$SCRIPT_CONTENT" | grep -q '\$excludeDirPatterns' && \
-     echo "$SCRIPT_CONTENT" | sed -n '/\$excludeDirPatterns/,/)/p' | grep -qF "'$pattern'"; then
+  if [ -n "$EXCLUDE_DIR_PATTERNS_BLOCK" ] && [[ "$EXCLUDE_DIR_PATTERNS_BLOCK" == *"'$pattern'"* ]]; then
     pass "excludeDirPatterns contains '$pattern' ($description)"
   else
     fail "excludeDirPatterns missing '$pattern' ($description)"
@@ -278,7 +286,7 @@ else
 
     if ! (cd "$ws" && git add -A >/dev/null 2>&1); then
       local status_preview=""
-      status_preview=$(cd "$ws" && git status --short 2>&1 | head -n 20)
+      status_preview=$(cd "$ws" && git status --short 2>&1 | head -n 20 || true)
       rm -rf "$ws"
       fail "$test_name" "TEST_HARNESS: git add -A failed. Workspace: $ws. Git status: ${status_preview:-<empty>}"
       return
@@ -319,7 +327,7 @@ else
 
     if ! (cd "$ws" && git add -A >/dev/null 2>&1); then
       local status_preview=""
-      status_preview=$(cd "$ws" && git status --short 2>&1 | head -n 20)
+      status_preview=$(cd "$ws" && git status --short 2>&1 | head -n 20 || true)
       rm -rf "$ws"
       fail "$test_name" "TEST_HARNESS: git add -A failed. Workspace: $ws. Git status: ${status_preview:-<empty>}"
       return

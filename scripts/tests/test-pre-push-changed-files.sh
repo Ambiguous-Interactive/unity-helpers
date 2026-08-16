@@ -401,7 +401,10 @@ echo "=== Testing validation-only behavior ==="
 run_test
 # Check that the hook does not EXECUTE Prettier with --write (auto-fix)
 # Mentioning it in user-facing hints is fine.
-if grep -v '^[[:space:]]*#' "$PRE_PUSH_IMPL" | grep -Eiq '(prettier|run-prettier\.js).*--write'; then
+# Captured rather than piped into `grep -q`: under `set -o pipefail` the short-circuiting
+# consumer SIGPIPEs the producer and the pipeline reports 141 on a successful match.
+pre_push_code="$(grep -v '^[[:space:]]*#' "$PRE_PUSH_IMPL" || true)"
+if grep -Eiq '(prettier|run-prettier\.js).*--write' <<<"$pre_push_code"; then
     fail "No prettier --write execution in pre-push" "no auto-fix" "prettier --write found"
 else
     pass "No prettier --write execution in pre-push (validation-only)"
@@ -428,7 +431,7 @@ else
 fi
 
 run_test
-if grep -v '^[[:space:]]*#' "$PRE_PUSH_IMPL" | grep -Eq '(^|[[:space:]])node([[:space:]]|$)'; then
+if grep -Eq '(^|[[:space:]])node([[:space:]]|$)' <<<"$pre_push_code"; then
     fail "No direct Node execution in pre-push implementation" "no node commands" "found direct dependency"
 else
     pass "No direct Node execution in pre-push implementation"

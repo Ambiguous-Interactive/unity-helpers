@@ -177,7 +177,7 @@ rm -rf "$sandbox"
 # deferred, so a call placed after that block would silently not run.
 post_start="$REPO_ROOT/.devcontainer/post-start.sh"
 if grep -q 'normalize-container-git-config.sh' "$post_start"; then
-    normalize_line="$(grep -n 'normalize-container-git-config.sh' "$post_start" | head -1 | cut -d: -f1)"
+    normalize_line="$(grep -n 'normalize-container-git-config.sh' "$post_start" | head -1 | cut -d: -f1 || true)"
     deferred_line="$(grep -n 'retry_is_deferred' "$post_start" | tail -1 | cut -d: -f1)"
     if [ "$normalize_line" -lt "$deferred_line" ]; then
         pass "post-start.sh normalizes git config before its early exit"

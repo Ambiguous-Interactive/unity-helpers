@@ -265,10 +265,10 @@ except Exception as e:
         local test_run_line
         test_run_line=$(head -n 5 "${results_file}" | tr ' ' '\n' | tr '>' '\n')
 
-        total=$(echo "${test_run_line}" | sed -n 's/.*total="\([0-9]*\)".*/\1/p' | head -n 1)
-        passed=$(echo "${test_run_line}" | sed -n 's/.*passed="\([0-9]*\)".*/\1/p' | head -n 1)
-        failed=$(echo "${test_run_line}" | sed -n 's/.*failed="\([0-9]*\)".*/\1/p' | head -n 1)
-        skipped=$(echo "${test_run_line}" | sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' | head -n 1)
+        total=$(echo "${test_run_line}" | sed -n 's/.*total="\([0-9]*\)".*/\1/p' | head -n 1 || true)
+        passed=$(echo "${test_run_line}" | sed -n 's/.*passed="\([0-9]*\)".*/\1/p' | head -n 1 || true)
+        failed=$(echo "${test_run_line}" | sed -n 's/.*failed="\([0-9]*\)".*/\1/p' | head -n 1 || true)
+        skipped=$(echo "${test_run_line}" | sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' | head -n 1 || true)
 
         echo "    Total:   ${total:-0}"
         echo "    Passed:  ${passed:-0}"
