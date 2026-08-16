@@ -1070,7 +1070,9 @@ jobs:
   # standalone tier early could not start this one -- measured over six runs in
   # session 194. Each host runs one runner, so removing it never puts two editors on
   # one machine; the external `wallstop-organization-builds` lock still serializes
-  # this work against other workflows and runs. Reuses the same secrets gate, runner-preflight,
+  # this work against other workflows and runs.
+  #
+  # Reuses the same secrets gate, runner-preflight,
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
   # scaffolding as unity-tests, with DISTINCT project/Library/artifact paths
   # (suffix `-single-threaded`) so its differently-compiled Library never collides
