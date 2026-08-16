@@ -31,21 +31,32 @@
 Create boxed, collapsible sections:
 
 ```csharp
-[WGroup("Movement Settings", WGroupColor.Blue)]
+[WGroup("Movement Settings", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
 [SerializeField] private float moveSpeed = 5f;
 [SerializeField] private float jumpHeight = 2f;
-[SerializeField] private float gravity = -9.81f;
-[WGroupEnd]
 
-[WGroup("Combat Settings", WGroupColor.Red)]
+[WGroupEnd("Movement Settings")] // gravity IS included, then the group closes
+[SerializeField] private float gravity = -9.81f;
+
+[WGroup("Combat Settings", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
 [SerializeField] private int damage = 10;
+
+[WGroupEnd("Combat Settings")] // attackRange IS included, then the group closes
 [SerializeField] private float attackRange = 2f;
-[WGroupEnd]
 ```
 
-### Group Colors
+**`[WGroupEnd]` attaches to the member below it, not the one above.** An attribute always binds to
+the next declaration, so an end written on its own line after the last field of a group actually
+binds to the first field of the **next** one and closes that group instead. Put it on the last field
+you want included.
 
-`WGroupColor.Blue`, `WGroupColor.Red`, `WGroupColor.Green`, `WGroupColor.Yellow`, `WGroupColor.Purple`, `WGroupColor.Orange`, `WGroupColor.Gray`
+**Name the group when a type declares more than one.** A bare `[WGroupEnd]` closes _every_ open
+group, which is right for the last group in a type and wrong in the middle of one.
+
+**There is no color parameter.** `WGroupAttribute` takes `groupName`, `displayName`,
+`autoIncludeCount`, `collapsible`, `startCollapsed`, `hideHeader` and `parentGroup`. Group colors
+come from the palettes under `Project Settings > Wallstop Studios > Unity Helpers > Color Palettes`,
+not from the attribute.
 
 ---
 
@@ -379,25 +390,25 @@ See [update-documentation](./update-documentation.md) for detailed standards.
 ```csharp
 public class EnemyController : MonoBehaviour
 {
-    [WGroup("Identity", WGroupColor.Blue)]
+    [WGroup("Identity", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
     [WNotNull]
     [SerializeField] private string enemyId;
 
     [WReadOnly]
+    [WGroupEnd("Identity")]
     [SerializeField] private string displayName;
-    [WGroupEnd]
 
-    [WGroup("Stats", WGroupColor.Green)]
+    [WGroup("Stats", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
     [SerializeField] private int maxHealth = 100;
 
     [WReadOnly]
     [SerializeField] private int currentHealth;
 
     [WEnumToggleButtons]
+    [WGroupEnd("Stats")]
     [SerializeField] private DamageTypes weaknesses;
-    [WGroupEnd]
 
-    [WGroup("Behavior", WGroupColor.Purple)]
+    [WGroup("Behavior", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
     [SerializeField] private bool isAggressive;
 
     [WShowIf(nameof(isAggressive))]
@@ -405,8 +416,8 @@ public class EnemyController : MonoBehaviour
 
     [WShowIf(nameof(isAggressive))]
     [WInLineEditor]
+    [WGroupEnd("Behavior")]
     [SerializeField] private AttackPattern attackPattern;
-    [WGroupEnd]
 
     [WButton("Reset Health")]
     private void ResetHealth()

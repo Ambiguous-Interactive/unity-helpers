@@ -139,13 +139,15 @@ public GameObject defaultPrefab;
 ### Field Organization
 
 ```csharp
-// Group related fields together
-[WGroup("Movement Settings")]
+// Group related fields together. [WGroupEnd] binds to the member BELOW it, so it goes on the
+// last field you want in the group -- not on its own line after that field.
+[WGroup("Movement Settings", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
 public float speed;
-public float acceleration;
-[WGroupEnd]
 
-// Read-only display
+[WGroupEnd("Movement Settings")]
+public float acceleration;
+
+// Read-only display, outside the group
 [WReadOnly]
 public string computedId;
 
