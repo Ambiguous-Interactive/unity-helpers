@@ -814,14 +814,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Generates a random color with RGB components uniformly distributed in [0, 1].
         /// </summary>
         /// <param name="random">The random number generator to use.</param>
-        /// <param name="randomAlpha">If true, alpha is random [0, 1]; if false, alpha is 1.0 (opaque).</param>
-        /// <returns>A random Color with all components in [0, 1].</returns>
+        /// <param name="randomAlpha">If true, alpha is random [0, 1); if false, alpha is 1.0 (opaque).</param>
+        /// <returns>A random Color with all randomized components in [0, 1).</returns>
         /// <remarks>
         /// Null Handling: Will throw NullReferenceException if random is null.
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - three or four random float generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: None - all values are clamped to valid Color range.
+        /// Edge Cases: The randomized range is half-open. Each channel is drawn from
+        /// <see cref="IRandom.NextFloat()"/>, which yields one of the 2^24 values
+        /// <c>k / 2^24</c>, so 0 is reachable and exactly 1 is not.
         /// </remarks>
         public static Color NextColor(this IRandom random, bool randomAlpha = false)
         {
@@ -840,13 +842,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="hueVariance">The maximum hue deviation (0-1 scale, wraps around).</param>
         /// <param name="saturationVariance">The maximum saturation deviation (clamped to [0, 1]).</param>
         /// <param name="valueVariance">The maximum value/brightness deviation (clamped to [0, 1]).</param>
-        /// <returns>A color randomly varied from baseColor within the specified HSV ranges, with HDR enabled.</returns>
+        /// <returns>A color randomly varied from baseColor within the specified HSV ranges, carrying the alpha of <paramref name="baseColor"/>.</returns>
         /// <remarks>
         /// Null Handling: Will throw NullReferenceException if random is null.
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - involves RGB-to-HSV conversion, random generation, and HSV-to-RGB conversion.
         /// Allocations: No heap allocations.
-        /// Edge Cases: Hue wraps around at boundaries (0 and 1 are adjacent). Saturation and value are clamped.
+        /// Edge Cases: Hue wraps around at boundaries (0 and 1 are adjacent). Saturation and value are clamped
+        /// to [0, 1], so an HDR base color returns with its intensity clamped. A variance of zero pins that
+        /// channel to the base color rather than throwing, a negative variance is read as its magnitude, and a
+        /// variance that is not a finite number is read as zero.
         /// </remarks>
         public static Color NextColorInRange(
             this IRandom random,
@@ -858,13 +863,30 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             Color.RGBToHSV(baseColor, out float h, out float s, out float v);
 
-            h += random.NextFloat(-hueVariance, hueVariance);
-            h = Mathf.Repeat(h, 1f); // Wrap hue to [0, 1]
+            h = Mathf.Repeat(h + NextSymmetricVariance(random, hueVariance), 1f);
+            s = Mathf.Clamp01(s + NextSymmetricVariance(random, saturationVariance));
+            v = Mathf.Clamp01(v + NextSymmetricVariance(random, valueVariance));
 
-            s = Mathf.Clamp01(s + random.NextFloat(-saturationVariance, saturationVariance));
-            v = Mathf.Clamp01(v + random.NextFloat(-valueVariance, valueVariance));
+            Color varied = Color.HSVToRGB(h, s, v, true);
+            // HSVToRGB builds from Color.white, so the base color's alpha would otherwise be lost.
+            varied.a = baseColor.a;
+            return varied;
+        }
 
-            return Color.HSVToRGB(h, s, v, true);
+        private static float NextSymmetricVariance(IRandom random, float variance)
+        {
+            if (float.IsNaN(variance) || float.IsInfinity(variance))
+            {
+                return 0f;
+            }
+
+            float magnitude = Mathf.Abs(variance);
+            if (magnitude <= 0f)
+            {
+                return 0f;
+            }
+
+            return random.NextFloat(-magnitude, magnitude);
         }
 
         /// <summary>

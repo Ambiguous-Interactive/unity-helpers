@@ -240,6 +240,118 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void NextColorInRangeKeepsBaseAlpha()
+        {
+            for (int i = 0; i < 250; ++i)
+            {
+                float alpha = PRNG.Instance.NextFloat();
+                Color baseColor = new(0.2f, 0.5f, 0.9f, alpha);
+                Color result = PRNG.Instance.NextColorInRange(baseColor, 0.3f, 0.3f, 0.3f);
+                Assert.AreEqual(alpha, result.a);
+            }
+        }
+
+        [Test]
+        public void NextColorInRangeAcceptsZeroVariance()
+        {
+            Color baseColor = new(0.2f, 0.5f, 0.9f, 0.4f);
+
+            Color result = PRNG.Instance.NextColorInRange(baseColor, 0f, 0f, 0f);
+
+            Assert.AreEqual(baseColor.r, result.r, 1e-4f);
+            Assert.AreEqual(baseColor.g, result.g, 1e-4f);
+            Assert.AreEqual(baseColor.b, result.b, 1e-4f);
+            Assert.AreEqual(baseColor.a, result.a);
+        }
+
+        [Test]
+        public void NextColorInRangeReadsNegativeVarianceAsMagnitude()
+        {
+            Color baseColor = new(0.2f, 0.5f, 0.9f, 1f);
+            HashSet<Color> seen = new();
+            for (int i = 0; i < 250; ++i)
+            {
+                Color result = PRNG.Instance.NextColorInRange(baseColor, -0.3f, -0.3f, -0.3f);
+                Assert.GreaterOrEqual(result.r, 0f);
+                Assert.LessOrEqual(result.r, 1f);
+                Assert.GreaterOrEqual(result.g, 0f);
+                Assert.LessOrEqual(result.g, 1f);
+                Assert.GreaterOrEqual(result.b, 0f);
+                Assert.LessOrEqual(result.b, 1f);
+                seen.Add(result);
+            }
+
+            Assert.Greater(seen.Count, 1);
+        }
+
+        [Test]
+        public void NextColorInRangeTreatsNonFiniteVarianceAsZero()
+        {
+            Color baseColor = new(0.2f, 0.5f, 0.9f, 0.4f);
+
+            foreach (
+                float variance in new[]
+                {
+                    float.NaN,
+                    float.PositiveInfinity,
+                    float.NegativeInfinity,
+                }
+            )
+            {
+                Color result = PRNG.Instance.NextColorInRange(
+                    baseColor,
+                    variance,
+                    variance,
+                    variance
+                );
+                Assert.IsFalse(float.IsNaN(result.r));
+                Assert.IsFalse(float.IsNaN(result.g));
+                Assert.IsFalse(float.IsNaN(result.b));
+                Assert.AreEqual(baseColor.r, result.r, 1e-4f);
+                Assert.AreEqual(baseColor.g, result.g, 1e-4f);
+                Assert.AreEqual(baseColor.b, result.b, 1e-4f);
+                Assert.AreEqual(baseColor.a, result.a);
+            }
+        }
+
+        [Test]
+        public void NextColorInRangeWrapsHueAcrossTheSeam()
+        {
+            const int iterations = 4000;
+            int wrapped = 0;
+            for (int i = 0; i < iterations; ++i)
+            {
+                Color result = PRNG.Instance.NextColorInRange(Color.red, 0.1f, 0f, 0f);
+                Color.RGBToHSV(result, out float hue, out float _, out float _);
+                if (hue > 0.5f)
+                {
+                    ++wrapped;
+                }
+            }
+
+            // Half of a symmetric perturbation around hue 0 lands on the far side of the seam.
+            Assert.Greater(wrapped, iterations / 4);
+            Assert.Less(wrapped, iterations * 3 / 4);
+        }
+
+        [Test]
+        public void NextColorChannelsStayWithinTheHalfOpenUnitRange()
+        {
+            for (int i = 0; i < 2000; ++i)
+            {
+                Color result = PRNG.Instance.NextColor(true);
+                Assert.GreaterOrEqual(result.r, 0f);
+                Assert.Less(result.r, 1f);
+                Assert.GreaterOrEqual(result.g, 0f);
+                Assert.Less(result.g, 1f);
+                Assert.GreaterOrEqual(result.b, 0f);
+                Assert.Less(result.b, 1f);
+                Assert.GreaterOrEqual(result.a, 0f);
+                Assert.Less(result.a, 1f);
+            }
+        }
+
+        [Test]
         public void NextColor32WithoutAlpha()
         {
             for (int i = 0; i < 100; ++i)

@@ -74,6 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix the `WButton` and `WEnumToggleButtons` style and texture caches growing without bound as inspector colours change: two colours the caches called equal were stored under different keys, so every repaint could add another entry ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
 - Fix a `WButton` hover or pressed colour derived from an out-of-gamut palette colour coming back with a negative channel ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
+- Fix `IRandom.NextColorInRange()` returning the varied colour fully opaque, discarding the alpha of the base colour ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
+- Fix `IRandom.NextColorInRange()` throwing `ArgumentException` for a variance of zero or a negative variance, and returning black for one that is not a finite number ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
+- Fix `Color.ChangeColorBrightness()` returning a colour whose channels are all `NaN` when the correction factor is `NaN` ([#466](https://github.com/Ambiguous-Interactive/unity-helpers/issues/466)).
 - Fix a save holding an unset `WGuid` failing to load: JSON wrote the empty GUID and then refused to read it back ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a JSON payload with `min` greater than `max`, or with `max` missing, crashing a `Range<T>` load with `ArgumentException` instead of reporting corrupt data ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a `Gradient` with more than eight colour or alpha keys silently losing the extras and filling the player log with errors. The payload is now refused ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).

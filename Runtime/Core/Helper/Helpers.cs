@@ -1524,8 +1524,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return normalized.Trim();
         }
 
+        /// <summary>
+        /// Darkens or lightens a color's RGB channels, leaving its alpha untouched.
+        /// </summary>
+        /// <param name="color">The color to adjust.</param>
+        /// <param name="correctionFactor">
+        /// How far to move each channel, clamped to [-1, 1]. -1 goes to black, 0 leaves the color alone,
+        /// and 1 goes to white.
+        /// </param>
+        /// <returns>The adjusted color, with the alpha of <paramref name="color"/>.</returns>
+        /// <remarks>
+        /// Thread Safety: Thread-safe, no shared state.
+        /// Performance: O(1).
+        /// Allocations: None.
+        /// Edge Cases: A factor that is not a number leaves the color alone, because clamping it would
+        /// otherwise pass NaN straight through into every channel. The channels are treated as normalized
+        /// [0, 1] values, so an HDR channel above 1 is pulled *down* by a positive factor.
+        /// </remarks>
         public static Color ChangeColorBrightness(this Color color, float correctionFactor)
         {
+            if (float.IsNaN(correctionFactor))
+            {
+                return color;
+            }
+
             correctionFactor = Math.Clamp(correctionFactor, -1f, 1f);
 
             float red = color.r;

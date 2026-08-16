@@ -991,7 +991,7 @@ Quaternion rotation = rng.NextQuaternion();
 ### Color Generation
 
 ```csharp
-// Random opaque color
+// Random opaque color; each channel is drawn from the half-open range [0, 1)
 Color color = rng.NextColor();
 
 // Random color in HSV range (for similar hues)
@@ -1002,6 +1002,12 @@ Color tint = rng.NextColorInRange(
     valueVariance: 0.2f
 );
 ```
+
+`NextColorInRange` varies hue, saturation and value around `baseColor` and returns the result with
+`baseColor`'s alpha. Hue is an angle, so it wraps: a base hue of 0 varies onto both sides of the
+0/1 seam. Saturation and value are clamped to `[0, 1]`, so an HDR base color comes back with its
+intensity clamped. A variance of zero pins that channel to the base color, a negative variance is
+read as its magnitude, and a variance that is not a finite number is read as zero.
 
 ### Subset Sampling
 

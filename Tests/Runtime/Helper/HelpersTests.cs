@@ -1070,6 +1070,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(baseColor.a, darker.a);
         }
 
+        [Test]
+        public void ChangeColorBrightnessLeavesColorAloneForNotANumberFactor()
+        {
+            Color baseColor = new(0.2f, 0.4f, 0.6f, 0.75f);
+
+            Color adjusted = baseColor.ChangeColorBrightness(float.NaN);
+
+            Assert.IsFalse(float.IsNaN(adjusted.r));
+            Assert.IsFalse(float.IsNaN(adjusted.g));
+            Assert.IsFalse(float.IsNaN(adjusted.b));
+            Assert.AreEqual(baseColor, adjusted);
+        }
+
+        [Test]
+        public void ChangeColorBrightnessSaturatesOutOfRangeFactors()
+        {
+            Color baseColor = new(0.2f, 0.4f, 0.6f, 0.75f);
+
+            Assert.AreEqual(
+                baseColor.ChangeColorBrightness(1f),
+                baseColor.ChangeColorBrightness(9f)
+            );
+            Assert.AreEqual(
+                baseColor.ChangeColorBrightness(1f),
+                baseColor.ChangeColorBrightness(float.PositiveInfinity)
+            );
+            Assert.AreEqual(
+                baseColor.ChangeColorBrightness(-1f),
+                baseColor.ChangeColorBrightness(-9f)
+            );
+            Assert.AreEqual(
+                baseColor.ChangeColorBrightness(-1f),
+                baseColor.ChangeColorBrightness(float.NegativeInfinity)
+            );
+            Assert.AreEqual(baseColor.a, baseColor.ChangeColorBrightness(9f).a);
+        }
+
         [UnityTest]
         public IEnumerator AwakeObjectInvokesAwakeOnComponents()
         {
