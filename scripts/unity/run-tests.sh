@@ -237,9 +237,15 @@ except Exception as e:
     print(f"ERROR: {e}", file=sys.stderr)
 ' "${results_file}" 2>&1) || true
 
-        # Parse the first line for counts
+        # Parse the first line for counts.
+        #
+        # Taken with parameter expansion rather than `echo "${summary}" | head -n 1`: on a failing
+        # run ${summary} carries one line per failed test, `head` exits after the first, the
+        # producer dies of SIGPIPE, and under `set -o pipefail` this capture reports 141 -- which
+        # `set -e` turns into an aborted run at the moment the summary was about to be printed
+        # (#465). The larger the failure, the likelier the abort.
         local counts_line
-        counts_line=$(echo "${summary}" | head -n 1)
+        counts_line="${summary%%$'\n'*}"
         total=$(echo "${counts_line}" | cut -d' ' -f1)
         passed=$(echo "${counts_line}" | cut -d' ' -f2)
         failed=$(echo "${counts_line}" | cut -d' ' -f3)

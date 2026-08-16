@@ -201,7 +201,7 @@ if (cd "$sandbox/subdir" && printf "refs/heads/main %s refs/heads/main %s\n" "$l
     fail "pre-push anchors execution to repo root for repo-relative changed paths" "hook fails on forbidden #region from subdirectory" "$subdir_output"
 else
     subdir_output=$(cat "$subdir_output_file" 2>/dev/null || true)
-    if printf "%s" "$subdir_output" | grep -q "RegionGuard.cs" && printf "%s" "$subdir_output" | grep -q "#region"; then
+    if grep -q "RegionGuard.cs" <<<"$subdir_output" && grep -q "#region" <<<"$subdir_output"; then
         pass "pre-push anchors execution to repo root for repo-relative changed paths"
     else
         fail "pre-push anchors execution to repo root for repo-relative changed paths" "region violation reported for Runtime/RegionGuard.cs" "$subdir_output"
@@ -228,7 +228,7 @@ if (cd "$sandbox" && printf "refs/heads/main %s refs/heads/main %s\n" "$local_sh
     fail "pre-push scans pushed commit when worktree removes #region" "hook fails on committed #region" "$commit_output"
 else
     commit_output=$(cat "$commit_output_file" 2>/dev/null || true)
-    if printf "%s" "$commit_output" | grep -q "RegionGuard.cs" && printf "%s" "$commit_output" | grep -q "#region"; then
+    if grep -q "RegionGuard.cs" <<<"$commit_output" && grep -q "#region" <<<"$commit_output"; then
         pass "pre-push scans pushed commit when worktree removes #region"
     else
         fail "pre-push scans pushed commit when worktree removes #region" "committed region violation reported" "$commit_output"
@@ -237,7 +237,7 @@ fi
 run_test
 commit_path_list="$sandbox/.git/pre-push-agent-preflight-paths.bin"
 commit_path_payload=$(tr '\0' '\n' < "$commit_path_list" 2>/dev/null || true)
-if printf "%s\n" "$commit_path_payload" | grep -Fxq "Runtime/RegionGuard.cs"; then
+if grep -Fxq "Runtime/RegionGuard.cs" <<<"$commit_path_payload"; then
     pass "pre-push no-base fallback writes offending path-scoped recovery list"
 else
     fail "pre-push no-base fallback writes offending path-scoped recovery list" "Runtime/RegionGuard.cs in pre-push-agent-preflight-paths.bin" "$commit_path_payload"
@@ -308,7 +308,7 @@ if git init --object-format=sha256 -q "$sandbox" 2>/dev/null; then
         fail "pre-push handles SHA-256 zero object IDs" "hook fails on SHA-256 new-branch #region" "$sha256_output"
     else
         sha256_output=$(cat "$sha256_output_file" 2>/dev/null || true)
-        if printf "%s" "$sha256_output" | grep -q "RegionGuard.cs" && printf "%s" "$sha256_output" | grep -q "#region"; then
+        if grep -q "RegionGuard.cs" <<<"$sha256_output" && grep -q "#region" <<<"$sha256_output"; then
             pass "pre-push handles SHA-256 zero object IDs"
         else
             fail "pre-push handles SHA-256 zero object IDs" "SHA-256 region violation reported" "$sha256_output"
@@ -337,7 +337,7 @@ if printf "public sealed class ColonRegion\n{\n#region Bad\n}\n" > "$sandbox/Run
         fail "pre-push detects #region in changed C# paths containing colon" "hook fails on Runtime/Foo:Bar.cs" "$colon_output"
     else
         colon_output=$(cat "$colon_output_file" 2>/dev/null || true)
-        if printf "%s" "$colon_output" | grep -q "Runtime/Foo:Bar.cs" && printf "%s" "$colon_output" | grep -q "#region"; then
+        if grep -q "Runtime/Foo:Bar.cs" <<<"$colon_output" && grep -q "#region" <<<"$colon_output"; then
             pass "pre-push detects #region in changed C# paths containing colon"
         else
             fail "pre-push detects #region in changed C# paths containing colon" "colon path region violation reported" "$colon_output"

@@ -67,6 +67,17 @@ extract_cspell_files_exts() {
 AGENT_PREFLIGHT_EXTS=$(extract_agent_preflight_exts)
 CSPELL_FILES_EXTS=$(extract_cspell_files_exts)
 
+# Membership is answered with bash string matching rather than `printf ... | grep -qx`: under
+# `set -o pipefail` the short-circuiting `grep -q` exits at its first match, the producer dies of
+# SIGPIPE, and the pipeline reports 141 from a SUCCESSFUL match (#465). Both lists are
+# newline-separated, so a whole-line match is a substring test on a newline-padded copy -- which is
+# exactly what `grep -qx` means for the alphanumeric extensions these lists hold.
+contains_line() {
+    local haystack="$1"
+    local needle="$2"
+    [[ $'\n'"$haystack"$'\n' == *$'\n'"$needle"$'\n'* ]]
+}
+
 echo "agent-preflight spell-check extensions:"
 # shellcheck disable=SC2086
 printf '  %s\n' $AGENT_PREFLIGHT_EXTS
@@ -77,7 +88,7 @@ printf '  %s\n' $CSPELL_FILES_EXTS
 MISSING=()
 while IFS= read -r ext; do
     [ -z "$ext" ] && continue
-    if ! printf '%s\n' "$CSPELL_FILES_EXTS" | grep -qx "$ext"; then
+    if ! contains_line "$CSPELL_FILES_EXTS" "$ext"; then
         MISSING+=("$ext")
     fi
 done <<< "$AGENT_PREFLIGHT_EXTS"
@@ -98,11 +109,11 @@ fi
 
 REQUIRED=("md" "markdown" "json" "jsonc" "asmdef" "asmref" "yml" "yaml" "js" "cs")
 for ext in "${REQUIRED[@]}"; do
-    if ! printf '%s\n' "$AGENT_PREFLIGHT_EXTS" | grep -qx "$ext"; then
+    if ! contains_line "$AGENT_PREFLIGHT_EXTS" "$ext"; then
         echo "FAIL: required extension '$ext' missing from agent-preflight spell-check set" >&2
         exit 1
     fi
-    if ! printf '%s\n' "$CSPELL_FILES_EXTS" | grep -qx "$ext"; then
+    if ! contains_line "$CSPELL_FILES_EXTS" "$ext"; then
         echo "FAIL: required extension '$ext' missing from cspell.json files glob" >&2
         exit 1
     fi

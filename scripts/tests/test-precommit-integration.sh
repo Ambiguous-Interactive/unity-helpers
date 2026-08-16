@@ -202,7 +202,7 @@ EOF
         # is not a PWS001-style parameter-binding error. We re-run and grep.
         local out
         out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/lint-tests.ps1" -Paths "$fixture" 2>&1 || true)
-        if echo "$out" | grep -q "Parameter cannot be processed"; then
+        if grep -q "Parameter cannot be processed" <<<"$out"; then
             fail "$name" "PWS001-style param binding failure: $out"
         else
             # Any other exit is acceptable for this integration smoke — the
@@ -228,7 +228,7 @@ test_format_staged_csharp_branch() {
 
     local out
     out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/format-staged-csharp.ps1" "$fixture" 2>&1 || true)
-    if echo "$out" | grep -q "Parameter cannot be processed"; then
+    if grep -q "Parameter cannot be processed" <<<"$out"; then
         fail "$name" "PWS001-style param binding failure: $out"
     else
         pass "$name"
@@ -256,7 +256,7 @@ EOF
 
     local out
     out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/lint-drawer-multiobject.ps1" -Paths "$fixture" 2>&1 || true)
-    if echo "$out" | grep -q "Parameter cannot be processed"; then
+    if grep -q "Parameter cannot be processed" <<<"$out"; then
         fail "$name" "PWS001-style param binding failure: $out"
     else
         pass "$name"
@@ -287,9 +287,9 @@ EOF
 
     local out
     out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/lint-duplicate-usings.ps1" -Paths "$fixture" 2>&1 || true)
-    if echo "$out" | grep -q "Parameter cannot be processed"; then
+    if grep -q "Parameter cannot be processed" <<<"$out"; then
         fail "$name" "PWS001-style param binding failure: $out"
-    elif ! echo "$out" | grep -q "UNH007"; then
+    elif ! grep -q "UNH007" <<<"$out"; then
         fail "$name" "Expected UNH007 duplicate-using violation not detected: $out"
     else
         pass "$name"

@@ -146,7 +146,10 @@ printf 'ghp_FROMCACHE\n' | UNITY_HELPERS_GITHUB_TOKEN_CACHE="$sandbox/token" \
     bash "$REPO_ROOT/scripts/github-token.sh" --store-stdin > /dev/null 2>&1
 
 answer="$(ask_credential github.com)"
-if printf '%s' "$answer" | grep -q '^password=ghp_FROMCACHE$' && [ ! -f "$invocations" ]; then
+# Matched against the captured answer rather than piped into `grep -q`: under `set -o pipefail`
+# the short-circuiting consumer SIGPIPEs its producer and the pipeline reports 141 from a
+# SUCCESSFUL match (#465).
+if grep -q '^password=ghp_FROMCACHE$' <<<"$answer" && [ ! -f "$invocations" ]; then
     pass "a github.com credential comes from the cache and the desktop helper is never invoked"
 else
     fail "a github.com credential comes from the cache and the desktop helper is never invoked" \
@@ -199,14 +202,17 @@ fi
 # nothing documents whether that lands before or after postStartCommand -- so post-start alone may
 # normalize a config that is about to be re-broken. postAttachCommand is the only hook guaranteed to
 # run after the copy, which makes it the one that survives a restart.
-if grep -q '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
-    && grep -A1 '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
-        | grep -q 'normalize-container-git-config.sh'; then
+# Both greps read a CAPTURED block instead of forming a `grep | grep -q` pipeline, which under
+# `set -o pipefail` reports 141 when the short-circuiting consumer SIGPIPEs the producer (#465).
+attach_block="$(grep -A1 '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" || true)"
+attach_line="$(grep '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" || true)"
+if [ -n "$attach_line" ] \
+    && grep -q 'normalize-container-git-config.sh' <<<"$attach_block"; then
     pass "devcontainer.json normalizes git config on every attach"
 else
     # Also accept the call on the same line as the key, which is how it is written today.
-    if grep '"postAttachCommand"' "$REPO_ROOT/.devcontainer/devcontainer.json" \
-        | grep -q 'normalize-container-git-config.sh'; then
+    if [ -n "$attach_line" ] \
+        && grep -q 'normalize-container-git-config.sh' <<<"$attach_line"; then
         pass "devcontainer.json normalizes git config on every attach"
     else
         fail "devcontainer.json normalizes git config on every attach" \

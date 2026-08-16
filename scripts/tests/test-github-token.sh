@@ -53,6 +53,19 @@ helper_invocations() {
     wc -l < "$marker" | tr -d ' '
 }
 
+# Every assertion below matches a CAPTURED answer rather than piping a producer into `grep -q`.
+# Under `set -o pipefail` that pipeline is a race: `grep -q` exits at its first match, the producer
+# dies of SIGPIPE, and the pipeline reports 141 from a SUCCESSFUL match (#465). On this file that
+# would turn "the helper served a credential" into "it declined" -- the exact inversion these
+# security assertions exist to catch.
+#
+# `get` reads key=value lines until a blank line or EOF and ALWAYS exits 0, so feeding it the same
+# request through a here-string and capturing its stdout is equivalent to the pipeline in every
+# respect except the race.
+helper_get() {
+    token_script get 2>/dev/null <<<"$1"
+}
+
 printf 'Testing scripts/github-token.sh...\n\n'
 
 # ── The resolver never prompts ──────────────────────────────────────────────
@@ -60,7 +73,7 @@ new_sandbox
 output="$(token_script 2>&1)"
 status=$?
 if [ "$status" = "3" ] && [ "$(helper_invocations)" = "0" ] \
-    && printf '%s' "$output" | grep -q 'github:token:bootstrap'; then
+    && grep -q 'github:token:bootstrap' <<<"$output"; then
     pass "no credential: exits 3, names the fix, and never invokes the helper"
 else
     fail "no credential: exits 3, names the fix, and never invokes the helper" \
@@ -107,16 +120,18 @@ else
     fail "surrounding whitespace and newlines are stripped" "got '$(token_script)'"
 fi
 
-helper_output="$(printf 'protocol=https\nhost=github.com\n\n' | token_script get 2>/dev/null)"
-if printf '%s' "$helper_output" | grep -q '^password=ghp_SPACED$' \
-    && printf '%s' "$helper_output" | grep -q '^username=x-access-token$'; then
+helper_output="$(helper_get 'protocol=https
+host=github.com')"
+if grep -q '^password=ghp_SPACED$' <<<"$helper_output" \
+    && grep -q '^username=x-access-token$' <<<"$helper_output"; then
     pass "credential-helper 'get' serves github.com from the cache"
 else
     fail "credential-helper 'get' serves github.com from the cache" "output='$helper_output'"
 fi
 
 # Claiming another host would break every non-GitHub remote the container uses.
-other_host="$(printf 'protocol=https\nhost=gitlab.com\n\n' | token_script get 2>/dev/null)"
+other_host="$(helper_get 'protocol=https
+host=gitlab.com')"
 if [ -z "$other_host" ]; then
     pass "credential-helper 'get' declines hosts other than github.com"
 else
@@ -134,7 +149,7 @@ for hostile in \
     'https://evil.example.com/x?a=@github.com' \
     'https://evil.example.com@notgithub.test/x' \
     'https://gitlab.com/github.com'; do
-    if printf 'url=%s\n\n' "$hostile" | token_script get 2>/dev/null | grep -q '^password='; then
+    if grep -q '^password=' <<<"$(helper_get "url=$hostile")"; then
         served_url=$((served_url + 1))
         fail "credential-helper 'get' declines a hostile url= line" "served: $hostile"
     fi
@@ -148,7 +163,7 @@ for friendly in \
     'https://x-access-token@github.com/owner/repo' \
     'https://GitHub.com/owner/repo' \
     'https://gist.github.com/owner/id'; do
-    if ! printf 'url=%s\n\n' "$friendly" | token_script get 2>/dev/null | grep -q '^password='; then
+    if ! grep -q '^password=' <<<"$(helper_get "url=$friendly")"; then
         declined_url=$((declined_url + 1))
         fail "credential-helper 'get' serves a legitimate url= line" "declined: $friendly"
     fi
@@ -160,16 +175,16 @@ fi
 # Git normalizes the host in CONFIG matching but hands the helper whatever the remote said, so a
 # case-sensitive comparison declines a request our own config already claimed -- and with the
 # Dev Containers helper reset away there is nothing behind us to answer it.
-if printf 'protocol=https\nhost=GitHub.com\n\n' | token_script get 2>/dev/null \
-    | grep -q '^password='; then
+if grep -q '^password=' <<<"$(helper_get 'protocol=https
+host=GitHub.com')"; then
     pass "credential-helper 'get' matches the host case-insensitively"
 else
     fail "credential-helper 'get' matches the host case-insensitively" "GitHub.com was declined"
 fi
 
 # A GitHub token authenticates gist.github.com too, and that host is a plausible remote.
-if printf 'protocol=https\nhost=gist.github.com\n\n' | token_script get 2>/dev/null \
-    | grep -q '^password='; then
+if grep -q '^password=' <<<"$(helper_get 'protocol=https
+host=gist.github.com')"; then
     pass "credential-helper 'get' serves github.com subdomains"
 else
     fail "credential-helper 'get' serves github.com subdomains" "gist.github.com was declined"
@@ -184,8 +199,8 @@ while IFS= read -r registered_url; do
     [ -n "$registered_url" ] || continue
     registered_host="${registered_url#*://}"
     registered_host="${registered_host%%/*}"
-    if ! printf 'protocol=https\nhost=%s\n\n' "$registered_host" | token_script get 2>/dev/null \
-        | grep -q '^password='; then
+    if ! grep -q '^password=' <<<"$(helper_get "protocol=https
+host=$registered_host")"; then
         unserved="$unserved $registered_url"
     fi
 done <<EOF
@@ -306,7 +321,7 @@ rm -rf "$sandbox"
 new_sandbox
 blocked_output="$(FAKE_HELPER_HANG=1 TOKEN_TIMEOUT=2 token_script --bootstrap 2>&1)"
 blocked_status=$?
-if [ "$blocked_status" = "5" ] && printf '%s' "$blocked_output" | grep -qi 'dialog'; then
+if [ "$blocked_status" = "5" ] && grep -qi 'dialog' <<<"$blocked_output"; then
     pass "a helper that blocks is reported as a pending dialog, not as an absent credential"
 else
     fail "a helper that blocks is reported as a pending dialog, not as an absent credential" \
@@ -431,8 +446,8 @@ else
 fi
 
 askpass_stderr="$(bash "$ASKPASS" "Username for 'https://github.com': " 2>&1 >/dev/null)"
-if printf '%s' "$askpass_stderr" | grep -q 'github:token:bootstrap' \
-    && printf '%s' "$askpass_stderr" | grep -q 'github:token:store'; then
+if grep -q 'github:token:bootstrap' <<<"$askpass_stderr" \
+    && grep -q 'github:token:store' <<<"$askpass_stderr"; then
     pass "the askpass refusal names both commands that fix it"
 else
     fail "the askpass refusal names both commands that fix it" \

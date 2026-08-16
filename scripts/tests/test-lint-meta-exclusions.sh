@@ -257,7 +257,10 @@ else
     tracked_files=$(git -C "$ws" ls-files 2>/dev/null || true)
     if [[ -n "$tracked_files" ]]; then
       tracked_count=$(printf '%s\n' "$tracked_files" | wc -l | tr -d ' ')
-      tracked_preview=$(printf '%s\n' "$tracked_files" | head -n 12 | tr '\n' '; ')
+      # `sed -n '1,12p'` rather than `head -n 12`: head exits at its limit, SIGPIPEs the producer,
+      # and under `set -o pipefail` this capture then reports 141 and `set -e` aborts the run
+      # mid-diagnostic (#465). sed reads its input to EOF, so no stage can short-circuit.
+      tracked_preview=$(printf '%s\n' "$tracked_files" | sed -n '1,12p' | tr '\n' '; ')
     else
       tracked_count="0"
       tracked_preview="<none>"

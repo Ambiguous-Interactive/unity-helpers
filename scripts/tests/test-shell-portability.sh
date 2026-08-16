@@ -105,14 +105,14 @@ for file in "${SHELL_FILES[@]}"; do
 
         # Skip lines that already have -E, -P, or -F flags (portable or literal)
         # Match grep invocations with flags that include E, P, or F
-        if echo "$line" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*[EPF]'; then
+        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*[EPF]' <<<"$line"; then
             continue
         fi
 
         # Check if the pattern argument contains \|
-        if echo "$line" | grep -qF '\|'; then
+        if grep -qF '\|' <<<"$line"; then
             # Allowlist: grep -cF '\|' is literal pipe counting (not alternation)
-            if echo "$line" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*F'; then
+            if grep -qE 'grep[[:space:]]+-[a-zA-Z]*F' <<<"$line"; then
                 continue
             fi
             a1_violations="${a1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
@@ -149,13 +149,13 @@ for file in "${SHELL_FILES[@]}"; do
         esac
 
         # Skip lines using -P (PCRE, where \s is valid) or -F (fixed string, literal match)
-        if echo "$line" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*[PF]'; then
+        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*[PF]' <<<"$line"; then
             continue
         fi
 
         # Check for \s in the grep pattern (not in [[:space:]] form)
         # We look for \s that isn't part of a word like "patterns" or variable like "$s"
-        if echo "$line" | grep -qE '\\s[*+?)]|\\s[^a-zA-Z]|\\s$'; then
+        if grep -qE '\\s[*+?)]|\\s[^a-zA-Z]|\\s$' <<<"$line"; then
             a2_violations="${a2_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"
@@ -196,12 +196,12 @@ while IFS= read -r -d '' file; do
         esac
 
         # Allow: ${VAR:-/home/vscode/...} pattern (env var with default)
-        if echo "$line" | grep -qE '\$\{[A-Z_]+:-/home/vscode/'; then
+        if grep -qE '\$\{[A-Z_]+:-/home/vscode/' <<<"$line"; then
             continue
         fi
 
         # Allow: echo/printf statements (display-only, not assignment)
-        if echo "$line" | grep -qE '^[[:space:]]*(echo|printf)[[:space:]]'; then
+        if grep -qE '^[[:space:]]*(echo|printf)[[:space:]]' <<<"$line"; then
             continue
         fi
 
@@ -232,10 +232,22 @@ else
     pass "Unity test runner does not create generated result symlinks in the package root"
 fi
 
+# The 1-based line number of the first match, or empty when there is none.
+#
+# Written without `grep ... | head -n 1 | cut -d: -f1`: the short-circuiting `head` SIGPIPEs the
+# producer, and under `set -o pipefail` the capture then reports 141 from a SUCCESSFUL match, which
+# `set -e` turns into an aborted run (#465). `grep -n` prefixes every match with "N:", so the first
+# match's number is everything before the first colon of the whole capture -- no pipeline at all.
+first_match_line() {
+    local matches
+    matches="$(grep -n "$@" || true)"
+    printf '%s' "${matches%%:*}"
+}
+
 run_test
-guard_line=$(grep -n 'Refusing to write Unity test results inside the package root' "$unity_run_tests" | head -n 1 | cut -d: -f1)
-create_line=$(grep -n 'create-test-project\.sh' "$unity_run_tests" | head -n 1 | cut -d: -f1)
-mkdir_line=$(grep -n 'mkdir -p "\${RESULTS_DIR}"' "$unity_run_tests" | head -n 1 | cut -d: -f1)
+guard_line=$(first_match_line 'Refusing to write Unity test results inside the package root' "$unity_run_tests")
+create_line=$(first_match_line 'create-test-project\.sh' "$unity_run_tests")
+mkdir_line=$(first_match_line 'mkdir -p "\${RESULTS_DIR}"' "$unity_run_tests")
 if [[ -z "$guard_line" || -z "$create_line" || -z "$mkdir_line" ]]; then
     fail "Unity test runner package-root guard is missing expected structure" \
         "guard_line='${guard_line}', create_line='${create_line}', mkdir_line='${mkdir_line}'"
@@ -251,9 +263,9 @@ echo "--- B3: Unity package export project stays below artifacts root ---"
 
 run_test
 unity_export_package="$REPO_ROOT/scripts/unity/export-unitypackage.sh"
-root_guard_line=$(grep -nF '"${PROJECT_DIR}" == "${ARTIFACTS_ROOT}"' "$unity_export_package" | head -n 1 | cut -d: -f1)
-outside_guard_line=$(grep -nF '"${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"*' "$unity_export_package" | head -n 1 | cut -d: -f1)
-delete_line=$(grep -nF 'rm -rf "${PROJECT_DIR}"' "$unity_export_package" | head -n 1 | cut -d: -f1)
+root_guard_line=$(first_match_line -F '"${PROJECT_DIR}" == "${ARTIFACTS_ROOT}"' "$unity_export_package")
+outside_guard_line=$(first_match_line -F '"${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"*' "$unity_export_package")
+delete_line=$(first_match_line -F 'rm -rf "${PROJECT_DIR}"' "$unity_export_package")
 if [[ -z "$root_guard_line" || -z "$outside_guard_line" || -z "$delete_line" ]]; then
     fail "Unity package export project guard is missing expected structure" \
         "root_guard_line='${root_guard_line}', outside_guard_line='${outside_guard_line}', delete_line='${delete_line}'"
@@ -268,9 +280,9 @@ echo ""
 echo "--- B4: Unity package export supports bare output filenames ---"
 
 run_test
-dirname_line=$(grep -nF 'string outputDirectory = Path.GetDirectoryName(outputPath);' "$unity_export_package" | head -n 1 | cut -d: -f1)
-fallback_line=$(grep -nF 'outputDirectory = Directory.GetCurrentDirectory();' "$unity_export_package" | head -n 1 | cut -d: -f1)
-create_line=$(grep -nF 'Directory.CreateDirectory(outputDirectory);' "$unity_export_package" | head -n 1 | cut -d: -f1)
+dirname_line=$(first_match_line -F 'string outputDirectory = Path.GetDirectoryName(outputPath);' "$unity_export_package")
+fallback_line=$(first_match_line -F 'outputDirectory = Directory.GetCurrentDirectory();' "$unity_export_package")
+create_line=$(first_match_line -F 'Directory.CreateDirectory(outputDirectory);' "$unity_export_package")
 if [[ -z "$dirname_line" || -z "$fallback_line" || -z "$create_line" ]]; then
     fail "Unity package export output-directory fallback is missing expected structure" \
         "dirname_line='${dirname_line}', fallback_line='${fallback_line}', create_line='${create_line}'"
@@ -400,32 +412,32 @@ for hookfile in "$REPO_ROOT"/.githooks/*; do
         skip=false
 
         # Tool detection: command -v, which
-        echo "$line" | grep -qE 'command -v|which ' && skip=true
+        grep -qE 'command -v|which ' <<<"$line" && skip=true
 
         # Process cleanup: kill
-        echo "$line" | grep -qE '\bkill\b' && skip=true
+        grep -qE '\bkill\b' <<<"$line" && skip=true
 
         # Version checks: --version
-        echo "$line" | grep -qF -- '--version' && skip=true
+        grep -qF -- '--version' <<<"$line" && skip=true
 
         # Docker inspect (checking if image exists)
-        echo "$line" | grep -qE 'docker\b.*inspect' && skip=true
-        echo "$line" | grep -qE 'docker\b.*info' && skip=true
+        grep -qE 'docker\b.*inspect' <<<"$line" && skip=true
+        grep -qE 'docker\b.*info' <<<"$line" && skip=true
 
         # Git operations that legitimately fail (merge-base on orphan, etc.)
-        echo "$line" | grep -qE 'git (merge-base|rev-parse|diff|log|ls-tree)' && skip=true
+        grep -qE 'git (merge-base|rev-parse|diff|log|ls-tree)' <<<"$line" && skip=true
 
         # Grep (exit code 1 on no match is expected)
-        echo "$line" | grep -qE '\bgrep\b' && skip=true
+        grep -qE '\bgrep\b' <<<"$line" && skip=true
 
         # Temp file creation
-        echo "$line" | grep -qF 'mktemp' && skip=true
+        grep -qF 'mktemp' <<<"$line" && skip=true
 
         # Tool restoration
-        echo "$line" | grep -qE 'dotnet tool restore' && skip=true
+        grep -qE 'dotnet tool restore' <<<"$line" && skip=true
 
         # Binary format checks (encoding detection)
-        echo "$line" | grep -qF '$'"'"'\r' && skip=true
+        grep -qF '$'"'"'\r' <<<"$line" && skip=true
 
         if [[ "$skip" == false ]]; then
             c1_violations="${c1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
@@ -478,13 +490,13 @@ for file in "${PS1_FILES[@]}"; do
         fi
 
         lookahead=$(sed -n "$((line_num + 1)),${end_line}p" "$file")
-        if echo "$lookahead" | grep -qF 'LASTEXITCODE'; then
+        if grep -qF 'LASTEXITCODE' <<<"$lookahead"; then
             found_check=true
         fi
 
         # Also check if the script immediately exits with $LASTEXITCODE
         # (pattern: "& pwsh ... ; exit $LASTEXITCODE" on same line or "exit $LASTEXITCODE" as next line)
-        if echo "$line" | grep -qF 'LASTEXITCODE'; then
+        if grep -qF 'LASTEXITCODE' <<<"$line"; then
             found_check=true
         fi
 
@@ -522,7 +534,7 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if echo "$line" | grep -qE 'echo[[:space:]]+"\$[A-Z_][A-Z0-9_]*"[[:space:]]*\|[[:space:]]*xargs'; then
+        if grep -qE 'echo[[:space:]]+"\$[A-Z_][A-Z0-9_]*"[[:space:]]*\|[[:space:]]*xargs' <<<"$line"; then
             e1_violations="${e1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"
@@ -550,8 +562,8 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if echo "$line" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+"\$[^"]+"'; then
-            if ! echo "$line" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+--[[:space:]]+"\$[^"]+"'; then
+        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+"\$[^"]+"' <<<"$line"; then
+            if ! grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+--[[:space:]]+"\$[^"]+"' <<<"$line"; then
                 e2_violations="${e2_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
             fi
         fi
@@ -579,7 +591,7 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if echo "$line" | grep -qE "awk.*print[[:space:]]+\\\$4"; then
+        if grep -qE "awk.*print[[:space:]]+\\\$4" <<<"$line"; then
             e3_violations="${e3_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"
@@ -1017,7 +1029,7 @@ if [[ -z "$h1_failure" ]]; then
         return_line="$(grep -nF 'unity return complete' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
         remove_line="$(grep -nE '^docker rm -f ' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
         registration_line="$(grep -nF 'docker registration complete' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
-        first_inspect_line="$(grep -nE '^docker inspect ' "$h1_events" | head -n 1 | cut -d: -f1 || true)"
+        first_inspect_line="$(first_match_line -E '^docker inspect ' "$h1_events")"
         inspect_line="$(grep -nE '^docker inspect ' "$h1_events" | tail -n 1 | cut -d: -f1 || true)"
         if [[ "$h1_wrapper_exit" -ne 143 ]]; then
             h1_failure="${h1_signal_phase} wrapper TERM exited ${h1_wrapper_exit}, expected 143"

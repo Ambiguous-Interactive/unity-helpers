@@ -348,8 +348,9 @@ return_serial_license() {
     # interrupted return instead of mistaking a started attempt for a finished one.
     SERIAL_RETURN_ATTEMPTED=1
     printf "%s\n" "${RETURN_OUTPUT}" | redact_unity_license_output
-    if printf "%s\n" "${RETURN_OUTPUT}" | grep -Eq \
-        "^[[:space:]]*(Serial number unavailable for ULF return|\[Licensing::Module\] Error: Serial number unavailable for ULF return; skipping operation)[[:space:]]*$"; then
+    if grep -Eq \
+        "^[[:space:]]*(Serial number unavailable for ULF return|\[Licensing::Module\] Error: Serial number unavailable for ULF return; skipping operation)[[:space:]]*$" \
+        <<<"${RETURN_OUTPUT}"; then
         echo "ERROR: Unity skipped ULF return; exact cleanup evidence was not confirmed (exit code ${RETURN_EXIT_CODE})." >&2
         if [[ "${RETURN_EXIT_CODE}" -eq 0 ]]; then
             RETURN_EXIT_CODE=1
@@ -414,15 +415,15 @@ printf "%s\n" "${ONLINE_OUTPUT}" > "${ONLINE_LOG_FILE}"
 printf "%s\n" "${ONLINE_OUTPUT}" | redact_unity_license_output
 echo "==> Activation log saved: ${ONLINE_LOG_FILE}"
 
-if echo "${ONLINE_OUTPUT}" | grep -Eqi "No license activation found for this computer|No ULF license found"; then
+if grep -Eqi "No license activation found for this computer|No ULF license found" <<<"${ONLINE_OUTPUT}"; then
     MACHINE_NOT_REGISTERED=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "Found 0 entitlement groups|com\.unity\.editor\.headless was not found|No valid Unity Editor license found|Token not found in cache|No (valid )?(Unity Editor )?license (found|available)"; then
+elif grep -Eqi "Found 0 entitlement groups|com\.unity\.editor\.headless was not found|No valid Unity Editor license found|Token not found in cache|No (valid )?(Unity Editor )?license (found|available)" <<<"${ONLINE_OUTPUT}"; then
     HARD_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "invalid (user )?credentials|invalid username|bad credentials|authentication failed"; then
+elif grep -Eqi "invalid (user )?credentials|invalid username|bad credentials|authentication failed" <<<"${ONLINE_OUTPUT}"; then
     HARD_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -Eqi "timeout|network|connection|temporar|DNS|refused|unreachable"; then
+elif grep -Eqi "timeout|network|connection|temporar|DNS|refused|unreachable" <<<"${ONLINE_OUTPUT}"; then
     SOFT_FAILURE=1
-elif echo "${ONLINE_OUTPUT}" | grep -qiE "license activated|License updated successfully|Entitlement-based licensing initiated"; then
+elif grep -qiE "license activated|License updated successfully|Entitlement-based licensing initiated" <<<"${ONLINE_OUTPUT}"; then
     ONLINE_CONFIRMED=1
 fi
 
