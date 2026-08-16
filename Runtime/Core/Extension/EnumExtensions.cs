@@ -743,11 +743,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out int arrayLength
         )
         {
-            minValue = 0;
-            arrayLength = 0;
-
             if (values == null || values.Length == 0)
             {
+                minValue = 0;
+                arrayLength = 0;
                 return false;
             }
 
@@ -759,6 +758,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (!EnumNumericHelper<T>.TryConvertToUInt64(values[i], out ulong key))
                 {
+                    minValue = 0;
+                    arrayLength = 0;
                     return false;
                 }
 
@@ -783,6 +784,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (!hasAny)
             {
+                minValue = 0;
+                arrayLength = 0;
                 return false;
             }
 
@@ -792,6 +795,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             ulong span = unchecked(maxKey - minKey);
             if (span >= (ulong)MaximumArrayLength)
             {
+                minValue = 0;
+                arrayLength = 0;
                 return false;
             }
 

@@ -92,7 +92,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             out ExactAveragePrd prd
         )
         {
-            prd = null;
             if (
                 !IsFinite(targetChance)
                 || targetChance < 0f
@@ -101,27 +100,31 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 || (0f < targetChance && targetChance < MinimumPositiveTargetChance)
             )
             {
+                prd = null;
                 return false;
             }
 
             if (targetChance <= 0f)
             {
-                prd = new ExactAveragePrd(0f, 0f, int.MaxValue);
-                prd.FailuresSinceSuccess = failuresSinceSuccess;
+                ExactAveragePrd never = new(0f, 0f, int.MaxValue);
+                never.FailuresSinceSuccess = failuresSinceSuccess;
+                prd = never;
                 return true;
             }
 
             if (1f <= targetChance)
             {
-                prd = new ExactAveragePrd(1f, 1f, 1);
-                prd.FailuresSinceSuccess = failuresSinceSuccess;
+                ExactAveragePrd always = new(1f, 1f, 1);
+                always.FailuresSinceSuccess = failuresSinceSuccess;
+                prd = always;
                 return true;
             }
 
             float coefficient = SolveCoefficient(targetChance);
             int guaranteedAttempt = ResolveGuaranteedAttempt(coefficient);
-            prd = new ExactAveragePrd(targetChance, coefficient, guaranteedAttempt);
-            prd.FailuresSinceSuccess = failuresSinceSuccess;
+            ExactAveragePrd created = new(targetChance, coefficient, guaranteedAttempt);
+            created.FailuresSinceSuccess = failuresSinceSuccess;
+            prd = created;
             return true;
         }
 

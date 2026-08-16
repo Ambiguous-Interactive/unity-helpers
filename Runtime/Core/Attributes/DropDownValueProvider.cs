@@ -291,17 +291,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             bool logErrorIfNotFound = true
         )
         {
-            resolvedValueType = typeof(object);
-
             if (providerType == null)
             {
                 Debug.LogWarning($"{attributeName}: Provider type cannot be null.");
+                resolvedValueType = typeof(object);
                 return logErrorIfNotFound ? EmptyFactory : null;
             }
 
             if (string.IsNullOrEmpty(methodName))
             {
                 Debug.LogWarning($"{attributeName}: Method name cannot be null or empty.");
+                resolvedValueType = typeof(object);
                 return logErrorIfNotFound ? EmptyFactory : null;
             }
 
@@ -317,8 +317,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     Debug.LogWarning(
                         $"{attributeName}: Could not locate a parameterless static method named '{methodName}' on {providerType.FullName} that returns enumerable values."
                     );
+                    resolvedValueType = typeof(object);
                     return EmptyFactory;
                 }
+                resolvedValueType = typeof(object);
                 return null;
             }
 
@@ -329,19 +331,19 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     Debug.LogWarning(
                         $"{attributeName}: Method '{providerType.FullName}.{methodName}' must return an array or IEnumerable<T>."
                     );
+                    resolvedValueType = typeof(object);
                     return EmptyFactory;
                 }
                 resolvedValueType = typeof(object);
                 return null;
             }
 
-            resolvedValueType = elementType ?? typeof(object);
-
-            Type conversionType = resolvedValueType ?? typeof(object);
+            Type conversionType = elementType ?? typeof(object);
 
             object cachedSourceResult = null;
             object[] cachedNormalizedResult = null;
 
+            resolvedValueType = conversionType;
             return () =>
             {
                 object result;
@@ -565,9 +567,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         private static bool TryGetElementType(Type returnType, out Type elementType)
         {
-            elementType = null;
             if (returnType == null || returnType == typeof(void))
             {
+                elementType = null;
                 return false;
             }
 
@@ -600,6 +602,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return true;
             }
 
+            elementType = null;
             return false;
         }
 

@@ -123,7 +123,15 @@ for (const file of sourceFiles(path.join(root, "Runtime")).concat(
           next += 1;
         }
 
-        const following = next < lines.length ? lines[next].trim() : "";
+        // Falling off the end of the body IS the exit, and for a `void` method carrying an `out` it
+        // is the only one there is. Requiring a literal `return;` there would be code shaped around
+        // this checker rather than for a reader, and it cannot hide a top-of-method default: the
+        // last statement in a body is the furthest thing from the top.
+        if (next >= lines.length) {
+          continue;
+        }
+
+        const following = lines[next].trim();
         if (following.startsWith("return")) {
           continue;
         }

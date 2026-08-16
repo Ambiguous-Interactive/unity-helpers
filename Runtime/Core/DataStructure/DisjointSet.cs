@@ -177,14 +177,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            size = 0;
+            int memberCount = 0;
             for (int i = 0; i < _parent.Length; i++)
             {
                 if (TryFind(i, out int currentRoot) && currentRoot == root)
                 {
-                    size++;
+                    memberCount++;
                 }
             }
+            size = memberCount;
             return true;
         }
 

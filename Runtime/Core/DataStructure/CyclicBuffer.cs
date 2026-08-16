@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int frontIndex = GetHeadIndex();
-            result = _buffer[frontIndex];
+            T popped = _buffer[frontIndex];
             _buffer[frontIndex] = default; // Clear reference for GC
 
             Count--;
@@ -368,6 +368,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _position = 0;
             }
 
+            result = popped;
             return true;
         }
 
@@ -385,12 +386,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int backIndex = AdjustedIndexFor(Count - 1);
-            result = _buffer[backIndex];
+            T popped = _buffer[backIndex];
             _buffer[backIndex] = default; // Clear reference for GC
 
             Count--;
             _position = Count == 0 ? 0 : backIndex;
 
+            result = popped;
             return true;
         }
 

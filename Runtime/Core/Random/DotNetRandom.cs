@@ -233,9 +233,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private static bool TryCaptureSnapshot(Random random, out RandomSnapshot snapshot)
         {
-            snapshot = default;
             if (!SnapshotSupported || random == null)
             {
+                snapshot = default;
                 return false;
             }
 
@@ -247,6 +247,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                         : (int[])SeedArrayField.GetValue(random);
                 if (seedArray == null)
                 {
+                    snapshot = default;
                     return false;
                 }
 
@@ -262,6 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             catch
             {
+                snapshot = default;
                 return false;
             }
         }
@@ -389,9 +391,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             out RandomSnapshot snapshot
         )
         {
-            snapshot = default;
             if (payload == null || payload.Count < 12)
             {
+                snapshot = default;
                 return false;
             }
 
@@ -404,12 +406,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             int length = BinaryPrimitives.ReadInt32LittleEndian(header);
             if (length <= 0)
             {
+                snapshot = default;
                 return false;
             }
 
             int expectedBytes = 12 + length * sizeof(int);
             if (payload.Count < expectedBytes)
             {
+                snapshot = default;
                 return false;
             }
 

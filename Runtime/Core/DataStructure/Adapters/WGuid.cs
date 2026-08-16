@@ -560,10 +560,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static bool IsVersionFour(Guid guid, out int version)
         {
             Span<byte> buffer = stackalloc byte[16];
-            version = -1;
             bool success = guid.TryWriteBytes(buffer);
             if (!success)
             {
+                version = -1;
                 return false;
             }
 

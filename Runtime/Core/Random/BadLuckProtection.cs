@@ -117,7 +117,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             out BadLuckProtection protection
         )
         {
-            protection = null;
             if (
                 !IsFinite(baseChance)
                 || !IsFinite(chanceIncreasePerFailure)
@@ -128,15 +127,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 || failuresSinceSuccess < 0
             )
             {
+                protection = null;
                 return false;
             }
 
-            protection = new BadLuckProtection(
+            BadLuckProtection created = new(
                 baseChance,
                 chanceIncreasePerFailure,
                 guaranteedAfterFailures
             );
-            protection.FailuresSinceSuccess = failuresSinceSuccess;
+            created.FailuresSinceSuccess = failuresSinceSuccess;
+            protection = created;
             return true;
         }
 

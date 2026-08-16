@@ -299,14 +299,19 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </example>
         public static bool TryGetTagCount(this Object target, string effectTag, out int count)
         {
-            count = 0;
             if (target == null)
             {
+                count = 0;
                 return false;
             }
 
-            return target.TryGetComponent(out TagHandler tagHandler)
-                && tagHandler.TryGetTagCount(effectTag, out count);
+            if (!target.TryGetComponent(out TagHandler tagHandler))
+            {
+                count = 0;
+                return false;
+            }
+
+            return tagHandler.TryGetTagCount(effectTag, out count);
         }
 
         /// <summary>
@@ -764,14 +769,19 @@ namespace WallstopStudios.UnityHelpers.Tags
             out float remainingDuration
         )
         {
-            remainingDuration = 0f;
             if (target == null)
             {
+                remainingDuration = 0f;
                 return false;
             }
 
-            return target.TryGetComponent(out EffectHandler effectHandler)
-                && effectHandler.TryGetRemainingDuration(effectHandle, out remainingDuration);
+            if (!target.TryGetComponent(out EffectHandler effectHandler))
+            {
+                remainingDuration = 0f;
+                return false;
+            }
+
+            return effectHandler.TryGetRemainingDuration(effectHandle, out remainingDuration);
         }
 
         /// <summary>

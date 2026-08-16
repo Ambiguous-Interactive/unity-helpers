@@ -709,9 +709,10 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return type != null;
                 }
 
-                type = ReflectionHelpers.TryResolveType(typeName);
-                _resolvedTypeCache[typeName] = type;
-                return type != null;
+                Type resolved = ReflectionHelpers.TryResolveType(typeName);
+                _resolvedTypeCache[typeName] = resolved;
+                type = resolved;
+                return resolved != null;
             }
         }
 

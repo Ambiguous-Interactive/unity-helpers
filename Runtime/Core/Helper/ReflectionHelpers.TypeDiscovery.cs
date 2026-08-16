@@ -424,23 +424,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            field = null;
             if (type == null || string.IsNullOrEmpty(name))
             {
+                field = null;
                 return false;
             }
 
             (Type type, string name, BindingFlags flags) key = (type, name, flags);
 #if SINGLE_THREADED
-            if (!FieldLookup.TryGetValue(key, out field))
+            if (!FieldLookup.TryGetValue(key, out FieldInfo resolved))
             {
-                field = type.GetField(name, flags);
-                FieldLookup[key] = field;
+                resolved = type.GetField(name, flags);
+                FieldLookup[key] = resolved;
             }
 #else
-            field = FieldLookup.GetOrAdd(key, static k => k.type.GetField(k.name, k.flags));
+            FieldInfo resolved = FieldLookup.GetOrAdd(
+                key,
+                static k => k.type.GetField(k.name, k.flags)
+            );
 #endif
-            return field != null;
+            field = resolved;
+            return resolved != null;
         }
 
         /// <summary>
@@ -457,26 +461,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            property = null;
             if (type == null || string.IsNullOrEmpty(name))
             {
+                property = null;
                 return false;
             }
 
             (Type type, string name, BindingFlags flags) key = (type, name, flags);
 #if SINGLE_THREADED
-            if (!PropertyLookup.TryGetValue(key, out property))
+            if (!PropertyLookup.TryGetValue(key, out PropertyInfo resolved))
             {
-                property = type.GetProperty(name, flags);
-                PropertyLookup[key] = property;
+                resolved = type.GetProperty(name, flags);
+                PropertyLookup[key] = resolved;
             }
 #else
-            property = PropertyLookup.GetOrAdd(
+            PropertyInfo resolved = PropertyLookup.GetOrAdd(
                 key,
                 static k => k.type.GetProperty(k.name, k.flags)
             );
 #endif
-            return property != null;
+            property = resolved;
+            return resolved != null;
         }
 
         /// <summary>
@@ -508,16 +513,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out PropertyInfo property
         )
         {
-            property = null;
             if (type == null || returnType == null || indexParameterTypes == null)
             {
+                property = null;
                 return false;
             }
 
             string paramsSig = BuildIndexerSignatureKey(indexParameterTypes);
             (Type type, Type returnType, string indexParamsSig) key = (type, returnType, paramsSig);
 #if SINGLE_THREADED
-            if (!IndexerLookup.TryGetValue(key, out property))
+            if (!IndexerLookup.TryGetValue(key, out PropertyInfo resolved))
             {
                 PropertyInfo found = type.GetProperty(
                     IndexerPropertyName,
@@ -526,11 +531,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
                 // Unity's Mono may not strictly validate return type in GetProperty,
                 // so we explicitly check that the found property matches our criteria
-                property = ValidateIndexerProperty(found, returnType, indexParameterTypes);
-                IndexerLookup[key] = property;
+                resolved = ValidateIndexerProperty(found, returnType, indexParameterTypes);
+                IndexerLookup[key] = resolved;
             }
 #else
-            property = IndexerLookup.GetOrAdd(
+            PropertyInfo resolved = IndexerLookup.GetOrAdd(
                 key,
                 static (k, state) =>
                 {
@@ -546,7 +551,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 indexParameterTypes
             );
 #endif
-            return property != null;
+            property = resolved;
+            return resolved != null;
         }
 
         private static PropertyInfo ValidateIndexerProperty(
@@ -607,18 +613,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            method = null;
             if (type == null || string.IsNullOrEmpty(name))
             {
+                method = null;
                 return false;
             }
 
             string sig = BuildMethodSignatureKey(name, paramTypes);
             (Type type, string sig, BindingFlags flags) key = (type, sig, flags);
 #if SINGLE_THREADED
-            if (!MethodLookup.TryGetValue(key, out method))
+            if (!MethodLookup.TryGetValue(key, out MethodInfo resolved))
             {
-                method =
+                resolved =
                     paramTypes == null
                         ? type.GetMethod(name, flags)
                         : type.GetMethod(
@@ -628,10 +634,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             types: paramTypes,
                             modifiers: null
                         );
-                MethodLookup[key] = method;
+                MethodLookup[key] = resolved;
             }
 #else
-            method = MethodLookup.GetOrAdd(
+            MethodInfo resolved = MethodLookup.GetOrAdd(
                 key,
                 static (tuple, state) =>
                 {
@@ -650,7 +656,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 (methodName: name, parameterTypes: paramTypes)
             );
 #endif
-            return method != null;
+            method = resolved;
+            return resolved != null;
         }
 
         private static string BuildMethodSignatureKey(string name, Type[] paramTypes)

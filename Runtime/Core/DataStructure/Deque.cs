@@ -281,10 +281,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            result = _items[_head];
+            T popped = _items[_head];
             _items[_head] = default;
             _head = (_head + 1) % _items.Length;
             _count--;
+            result = popped;
             return true;
         }
 
@@ -301,9 +302,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _tail = (_tail - 1 + _items.Length) % _items.Length;
-            result = _items[_tail];
+            T popped = _items[_tail];
             _items[_tail] = default;
             _count--;
+            result = popped;
             return true;
         }
 

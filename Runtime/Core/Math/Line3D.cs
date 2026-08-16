@@ -312,14 +312,16 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         {
             Vector3 d = to - from;
 
-            tEnter = 0f;
-            tExit = 1f;
+            float enter = 0f;
+            float exit = 1f;
 
             // X axis
             if (Mathf.Abs(d.x) < 1e-8f)
             {
                 if (from.x < bounds.min.x || from.x > bounds.max.x)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
@@ -332,10 +334,12 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 {
                     (t1, t2) = (t2, t1);
                 }
-                tEnter = Mathf.Max(tEnter, t1);
-                tExit = Mathf.Min(tExit, t2);
-                if (tEnter > tExit)
+                enter = Mathf.Max(enter, t1);
+                exit = Mathf.Min(exit, t2);
+                if (enter > exit)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
@@ -345,6 +349,8 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             {
                 if (from.y < bounds.min.y || from.y > bounds.max.y)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
@@ -357,10 +363,12 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 {
                     (t1, t2) = (t2, t1);
                 }
-                tEnter = Mathf.Max(tEnter, t1);
-                tExit = Mathf.Min(tExit, t2);
-                if (tEnter > tExit)
+                enter = Mathf.Max(enter, t1);
+                exit = Mathf.Min(exit, t2);
+                if (enter > exit)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
@@ -370,6 +378,8 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             {
                 if (from.z < bounds.min.z || from.z > bounds.max.z)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
@@ -382,15 +392,19 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 {
                     (t1, t2) = (t2, t1);
                 }
-                tEnter = Mathf.Max(tEnter, t1);
-                tExit = Mathf.Min(tExit, t2);
-                if (tEnter > tExit)
+                enter = Mathf.Max(enter, t1);
+                exit = Mathf.Min(exit, t2);
+                if (enter > exit)
                 {
+                    tEnter = enter;
+                    tExit = exit;
                     return false;
                 }
             }
 
-            return tExit >= 0f && tEnter <= 1f && tExit >= tEnter;
+            tEnter = enter;
+            tExit = exit;
+            return exit >= 0f && enter <= 1f && exit >= enter;
         }
 
         /// <summary>

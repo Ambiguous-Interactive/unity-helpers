@@ -364,11 +364,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static bool IsCollectionType(Type type, out int estimatedSize)
         {
-            estimatedSize = 0;
-
             // Check for generic collection types
             if (!type.IsGenericType)
             {
+                estimatedSize = 0;
                 return false;
             }
 
@@ -433,6 +432,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
+            estimatedSize = 0;
             return false;
         }
 

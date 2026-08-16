@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            result = _items[0];
+            T root = _items[0];
             _count--;
             if (_count > 0)
             {
@@ -316,6 +316,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 HeapifyDown(0);
             }
             _items[_count] = default;
+            result = root;
             return true;
         }
 

@@ -117,11 +117,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             IRandom generator = random ?? PRNG.Instance;
             int index = generator.Next(_remaining.Count);
-            item = _remaining[index];
+            T drawn = _remaining[index];
 
             int lastIndex = _remaining.Count - 1;
             _remaining[index] = _remaining[lastIndex];
             _remaining.RemoveAt(lastIndex);
+            item = drawn;
             return true;
         }
 

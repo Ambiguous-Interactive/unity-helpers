@@ -1351,9 +1351,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (_disposed)
             {
-                value = _producer();
-                _onGet?.Invoke(value);
-                return new PooledResource<T>(value, _returnAction);
+                T produced = _producer();
+                _onGet?.Invoke(produced);
+                value = produced;
+                return new PooledResource<T>(produced, _returnAction);
             }
 
             float currentTime = _timeProvider();
@@ -1372,15 +1373,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastAccessTime = currentTime;
             _usageTracker.RecordRent(currentTime);
 
+            T rented;
             if (_pool.Count > 0)
             {
                 int lastIndex = _pool.Count - 1;
-                value = _pool[lastIndex].Value;
+                rented = _pool[lastIndex].Value;
                 _pool.RemoveAt(lastIndex);
             }
             else
             {
-                value = _producer();
+                rented = _producer();
                 // Update peak size when creating a new item (tracks total items in circulation)
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
                 if (totalInCirculation > _peakSize)
@@ -1389,8 +1391,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            _onGet?.Invoke(value);
-            return new PooledResource<T>(value, _returnAction);
+            _onGet?.Invoke(rented);
+            value = rented;
+            return new PooledResource<T>(rented, _returnAction);
         }
 
         private void ReturnToPool(T value)
@@ -2310,9 +2313,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (Volatile.Read(ref _disposed) != 0)
             {
-                value = _producer();
-                _onGet?.Invoke(value);
-                return new PooledResource<T>(value, _returnAction);
+                T produced = _producer();
+                _onGet?.Invoke(produced);
+                value = produced;
+                return new PooledResource<T>(produced, _returnAction);
             }
 
             float currentTime = _timeProvider();
@@ -2337,14 +2341,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (_pool.Count > 0)
                 {
                     int lastIndex = _pool.Count - 1;
-                    value = _pool[lastIndex].Value;
+                    T pooled = _pool[lastIndex].Value;
                     _pool.RemoveAt(lastIndex);
-                    _onGet?.Invoke(value);
-                    return new PooledResource<T>(value, _returnAction);
+                    _onGet?.Invoke(pooled);
+                    value = pooled;
+                    return new PooledResource<T>(pooled, _returnAction);
                 }
             }
 
-            value = _producer();
+            T created = _producer();
             // Update peak size when creating a new item (tracks total items in circulation)
             int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
             int peak = _peakSize;
@@ -2357,8 +2362,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 peak = original;
             }
-            _onGet?.Invoke(value);
-            return new PooledResource<T>(value, _returnAction);
+            _onGet?.Invoke(created);
+            value = created;
+            return new PooledResource<T>(created, _returnAction);
         }
 
         private void ReturnToPool(T value)
@@ -3173,12 +3179,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return new PooledArray<T>(array, 0);
             }
 
-            array = System.Buffers.ArrayPool<T>.Shared.Rent(minimumLength);
+            T[] rented = System.Buffers.ArrayPool<T>.Shared.Rent(minimumLength);
             if (clearArray)
             {
-                Array.Clear(array, 0, minimumLength);
+                Array.Clear(rented, 0, minimumLength);
             }
-            return new PooledArray<T>(array, minimumLength);
+            array = rented;
+            return new PooledArray<T>(rented, minimumLength);
         }
     }
 
@@ -3388,12 +3395,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            if (!Pool.Bucket(size).TryRent(out array))
+            if (!Pool.Bucket(size).TryRent(out T[] rented))
             {
-                array = new T[size];
+                rented = new T[size];
             }
 
-            return new PooledArray<T>(array, size, OnRelease);
+            array = rented;
+            return new PooledArray<T>(rented, size, OnRelease);
         }
 
         private static void Release(T[] resource)
@@ -3498,12 +3506,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            if (!Pool.Bucket(size).TryRent(out array))
+            if (!Pool.Bucket(size).TryRent(out T[] rented))
             {
-                array = new T[size];
+                rented = new T[size];
             }
 
-            return new PooledArray<T>(array, size, OnRelease);
+            array = rented;
+            return new PooledArray<T>(rented, size, OnRelease);
         }
 
         private static void Release(T[] resource)

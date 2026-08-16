@@ -327,7 +327,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out Component childComponent
         )
         {
-            childComponent = null;
             ChildComponentAttribute attribute = metadata.attribute;
 
             if (
@@ -337,6 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 || attribute.NameFilter != null
             )
             {
+                childComponent = null;
                 return false;
             }
 
@@ -347,6 +347,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (results == null || results.Length == 0)
             {
+                childComponent = null;
                 return false;
             }
 
@@ -368,6 +369,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return true;
             }
 
+            childComponent = null;
             return false;
         }
 
@@ -378,7 +380,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out bool assignedAny
         )
         {
-            assignedAny = false;
             ChildComponentAttribute attribute = metadata.attribute;
             if (metadata.isInterface || filters.RequiresPostProcessing || attribute.MaxDepth > 0)
             {
@@ -386,6 +387,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 ChildFallbackMarker.Begin();
                 ChildFallbackMarker.End();
 #endif
+                assignedAny = false;
                 return false;
             }
 
@@ -692,7 +694,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 scratch = Buffers<Component>.List.Get(out scratchList);
             }
 
-            childComponent = null;
+            Component resolvedChild = null;
 
             foreach (
                 Transform child in component.IterateOverAllChildrenRecursivelyBreadthFirst(
@@ -714,7 +716,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     )
                 )
                 {
-                    childComponent = resolved;
+                    resolvedChild = resolved;
                     break;
                 }
             }
@@ -724,7 +726,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 scratch.Dispose();
             }
 
-            return childComponent != null;
+            childComponent = resolvedChild;
+            return resolvedChild != null;
         }
 
         private static int EnumerateFilteredChildComponents(

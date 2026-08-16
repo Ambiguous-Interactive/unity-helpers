@@ -1347,22 +1347,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out PooledArray<string> arrayResource
         )
         {
-            listResource = default;
-            arrayResource = default;
-
             if (assetPaths == null)
             {
+                listResource = default;
+                arrayResource = default;
                 return defaultFolders;
             }
 
             if (assetPaths is string[] array)
             {
+                listResource = default;
+                arrayResource = default;
                 return array;
             }
 
             if (assetPaths is IReadOnlyList<string> readonlyList)
             {
-                arrayResource = SystemArrayPool<string>.Get(
+                PooledArray<string> pooledBuffer = SystemArrayPool<string>.Get(
                     readonlyList.Count,
                     out string[] buffer
                 );
@@ -1372,20 +1373,34 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     buffer[i] = path;
                 }
 
+                listResource = default;
+                arrayResource = pooledBuffer;
                 return buffer;
             }
             if (assetPaths is ICollection<string> collection)
             {
-                arrayResource = SystemArrayPool<string>.Get(collection.Count, out string[] buffer);
+                PooledArray<string> pooledBuffer = SystemArrayPool<string>.Get(
+                    collection.Count,
+                    out string[] buffer
+                );
                 collection.CopyTo(buffer, 0);
+                listResource = default;
+                arrayResource = pooledBuffer;
                 return buffer;
             }
 
-            listResource = Buffers<string>.List.Get(out List<string> list);
+            PooledResource<List<string>> pooledList = Buffers<string>.List.Get(
+                out List<string> list
+            );
             list.AddRange(assetPaths);
 
-            arrayResource = SystemArrayPool<string>.Get(list.Count, out string[] temp);
+            PooledArray<string> pooledTemp = SystemArrayPool<string>.Get(
+                list.Count,
+                out string[] temp
+            );
             list.CopyTo(temp);
+            listResource = pooledList;
+            arrayResource = pooledTemp;
             return temp;
         }
 

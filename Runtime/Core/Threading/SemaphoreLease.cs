@@ -167,9 +167,9 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             out SemaphoreLease lease
         )
         {
-            lease = default;
             if (semaphore == null)
             {
+                lease = default;
                 return false;
             }
 
@@ -177,11 +177,13 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 if (!semaphore.Wait(timeout))
                 {
+                    lease = default;
                     return false;
                 }
             }
             catch (Exception)
             {
+                lease = default;
                 return false;
             }
 

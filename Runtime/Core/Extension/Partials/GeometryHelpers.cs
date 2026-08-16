@@ -1129,7 +1129,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             vectorPoints.Clear();
             mapping.Clear();
-            fallbackZ = 0;
+            int firstZ = 0;
             bool fallbackAssigned = false;
 
             if (source is ICollection<FastVector3Int> collection)
@@ -1151,9 +1151,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     continue;
                 }
 
-                fallbackZ = point.z;
+                firstZ = point.z;
                 fallbackAssigned = true;
             }
+
+            fallbackZ = firstZ;
         }
 
         private static List<FastVector3Int> ConvertVector2HullToFastVector3(

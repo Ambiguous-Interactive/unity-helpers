@@ -403,7 +403,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out bool assignedAny
         )
         {
-            assignedAny = false;
             ParentComponentAttribute attribute = metadata.attribute;
             if (
                 metadata.isInterface
@@ -416,6 +415,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 ParentFallbackMarker.Begin();
                 ParentFallbackMarker.End();
 #endif
+                assignedAny = false;
                 return false;
             }
 
@@ -624,8 +624,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out Component parentComponent
         )
         {
-            parentComponent = null;
-
             if (
                 root == null
                 || metadata.isInterface
@@ -634,12 +632,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 || metadata.attribute.MaxDepth > 0
             )
             {
+                parentComponent = null;
                 return false;
             }
 
             Component candidate = root.GetComponentInParent(metadata.elementType);
             if (candidate == null)
             {
+                parentComponent = null;
                 return false;
             }
 

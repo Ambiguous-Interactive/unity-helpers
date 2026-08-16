@@ -1744,20 +1744,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<object> getter
             )
             {
-                getter = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    getter = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    getter = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    getter = null;
                     return false;
                 }
 #endif
@@ -1771,6 +1772,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsStaticFieldGetterStrategyUnavailable(key))
                 {
+                    getter = null;
                     return false;
                 }
 
@@ -1778,6 +1780,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkStaticFieldGetterStrategyUnavailable(key);
+                    getter = null;
                     return false;
                 }
 
@@ -1835,20 +1838,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Action<object> setter
             )
             {
-                setter = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    setter = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    setter = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    setter = null;
                     return false;
                 }
 #endif
@@ -1862,6 +1866,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsStaticFieldSetterStrategyUnavailable(key))
                 {
+                    setter = null;
                     return false;
                 }
 
@@ -1869,6 +1874,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkStaticFieldSetterStrategyUnavailable(key);
+                    setter = null;
                     return false;
                 }
 
@@ -2192,20 +2198,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<TValue> getter
             )
             {
-                getter = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    getter = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    getter = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    getter = null;
                     return false;
                 }
 #endif
@@ -2222,6 +2229,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsTypedStaticFieldGetterStrategyUnavailable(key))
                 {
+                    getter = null;
                     return false;
                 }
 
@@ -2229,6 +2237,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkTypedStaticFieldGetterStrategyUnavailable(key);
+                    getter = null;
                     return false;
                 }
 
@@ -2300,20 +2309,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Action<TValue> setter
             )
             {
-                setter = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    setter = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    setter = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    setter = null;
                     return false;
                 }
 #endif
@@ -2330,6 +2340,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsTypedStaticFieldSetterStrategyUnavailable(key))
                 {
+                    setter = null;
                     return false;
                 }
 
@@ -2337,6 +2348,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkTypedStaticFieldSetterStrategyUnavailable(key);
+                    setter = null;
                     return false;
                 }
 
@@ -2693,20 +2705,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<object[], object> invoker
             )
             {
-                invoker = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    invoker = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    invoker = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    invoker = null;
                     return false;
                 }
 #endif
@@ -2720,6 +2733,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsConstructorInvokerStrategyUnavailable(key))
                 {
+                    invoker = null;
                     return false;
                 }
 
@@ -2727,6 +2741,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkConstructorInvokerStrategyUnavailable(key);
+                    invoker = null;
                     return false;
                 }
 
@@ -2764,20 +2779,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<object> creator
             )
             {
-                creator = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    creator = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    creator = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    creator = null;
                     return false;
                 }
 #endif
@@ -2791,6 +2807,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsParameterlessConstructorStrategyUnavailable(key))
                 {
+                    creator = null;
                     return false;
                 }
 
@@ -2798,6 +2815,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkParameterlessConstructorStrategyUnavailable(key);
+                    creator = null;
                     return false;
                 }
 
@@ -2833,20 +2851,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<T> creator
             )
             {
-                creator = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    creator = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    creator = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    creator = null;
                     return false;
                 }
 #endif
@@ -2863,6 +2882,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsTypedParameterlessConstructorStrategyUnavailable(key))
                 {
+                    creator = null;
                     return false;
                 }
 
@@ -2870,6 +2890,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkTypedParameterlessConstructorStrategyUnavailable(key);
+                    creator = null;
                     return false;
                 }
 
@@ -4270,20 +4291,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 out Func<object[], object> invoker
             )
             {
-                invoker = null;
-
                 if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
                 {
+                    invoker = null;
                     return false;
                 }
 #if EMIT_DYNAMIC_IL
                 if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
                 {
+                    invoker = null;
                     return false;
                 }
 #else
                 if (strategy == ReflectionDelegateStrategy.DynamicIl)
                 {
+                    invoker = null;
                     return false;
                 }
 #endif
@@ -4297,6 +4319,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (IsStaticMethodInvokerStrategyUnavailable(key))
                 {
+                    invoker = null;
                     return false;
                 }
 
@@ -4304,6 +4327,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (candidate == null)
                 {
                     MarkStaticMethodInvokerStrategyUnavailable(key);
+                    invoker = null;
                     return false;
                 }
 

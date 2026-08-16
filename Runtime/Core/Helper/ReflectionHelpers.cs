@@ -3318,9 +3318,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         )
             where TAttribute : Attribute
         {
-            attribute = default;
             if (provider == null)
             {
+                attribute = default;
                 return false;
             }
 
@@ -3328,12 +3328,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 if (!provider.IsDefined(typeof(TAttribute), inherit))
                 {
+                    attribute = default;
                     return false;
                 }
 
                 object[] attributes = provider.GetCustomAttributes(typeof(TAttribute), inherit);
                 if (attributes == null || attributes.Length == 0)
                 {
+                    attribute = default;
                     return false;
                 }
 
@@ -3363,9 +3365,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool inherit = true
         )
         {
-            attribute = null;
             if (provider == null || attributeType == null)
             {
+                attribute = null;
                 return false;
             }
 
@@ -3373,12 +3375,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 if (!provider.IsDefined(attributeType, inherit))
                 {
+                    attribute = null;
                     return false;
                 }
 
                 object[] attributes = provider.GetCustomAttributes(attributeType, inherit);
                 if (attributes == null || attributes.Length == 0)
                 {
+                    attribute = null;
                     return false;
                 }
 

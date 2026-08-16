@@ -1303,9 +1303,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static bool TryDecodeBase64Utf8(string s, out string result)
         {
-            result = string.Empty;
             if (!IsLikelyBase64(s))
             {
+                result = string.Empty;
                 return false;
             }
 
@@ -1323,6 +1323,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int outputLen = (len >> 2) * 3 - padding;
             if (outputLen < 0)
             {
+                result = string.Empty;
                 return false;
             }
 
@@ -1340,6 +1341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (v0 < 0 || v1 < 0 || (c2 != '=' && v2 < 0) || (c3 != '=' && v3 < 0))
                 {
+                    result = string.Empty;
                     return false;
                 }
 

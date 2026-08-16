@@ -114,8 +114,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    error = e;
                     DiscardStagedFile(temporaryPath);
+                    error = e;
                     return false;
                 }
             }
@@ -300,9 +300,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True when the destination holds the source's contents.</returns>
         public static bool TryCopy(string sourcePath, string destinationPath, out Exception error)
         {
-            error = ValidateCopyPaths(sourcePath, destinationPath);
-            if (error != null)
+            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
+            if (validation != null)
             {
+                error = validation;
                 return false;
             }
 
@@ -351,8 +352,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    error = e;
                     DiscardStagedFile(temporaryPath);
+                    error = e;
                     return false;
                 }
             }

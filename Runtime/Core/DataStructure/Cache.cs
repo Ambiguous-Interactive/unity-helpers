@@ -338,11 +338,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            value = _entries[index].Value;
+            TValue cached = _entries[index].Value;
             OnAccess(index, currentTime);
             RecordHit();
-            InvokeOnGet(key, value);
+            InvokeOnGet(key, cached);
 
+            value = cached;
             return true;
         }
 
@@ -555,8 +556,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     return false;
                 }
 
-                value = _entries[index].Value;
+                TValue removed = _entries[index].Value;
                 EvictEntry(index, EvictionReason.Explicit);
+                value = removed;
                 return true;
             }
             finally
