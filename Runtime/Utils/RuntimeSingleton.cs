@@ -64,7 +64,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static readonly SingletonCreationPolicy _creationPolicy = ResolveCreationPolicy();
 
+        private static bool _creationRefused;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         private static bool _creationRefusedWarningLogged;
+#endif
 
         static RuntimeSingleton()
         {
@@ -132,6 +136,23 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 UnityMainThreadGuard.EnsureMainThread();
 
+                // A refusal is remembered, because a scene-wide search that already came back empty
+                // cannot start returning something without Awake running -- and Awake assigns
+                // _instance, which is answered above. Without this a NeverCreate singleton with
+                // nothing in the scene pays a full FindAnyObjectByType on EVERY access, forever,
+                // which is exactly what the documented `if (X.Instance != null)` guard does per
+                // frame. CreateOnDemand never had the problem: it creates one and caches it.
+                //
+                // Play mode only, and that is not caution -- the invariant is Awake, and Unity does
+                // not run Awake outside play mode. Measured: AddComponent in the editor produces a
+                // live, active instance with _instance still null, so remembering a refusal there
+                // would hide a singleton that is genuinely in the scene from editor tooling.
+                bool canRememberRefusal = Application.isPlaying;
+                if (canRememberRefusal && _creationRefused)
+                {
+                    return null;
+                }
+
                 _instance = FindAnyObjectByType<T>(FindObjectsInactive.Exclude);
                 if (_instance != null)
                 {
@@ -141,6 +162,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Type type = typeof(T);
                 if (_creationPolicy == SingletonCreationPolicy.NeverCreate)
                 {
+                    _creationRefused = canRememberRefusal;
                     WarnCreationRefused(type);
                     return null;
                 }
@@ -164,6 +186,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// instance on the next <see cref="Instance"/> access. Automatic clearing on domain reload is
         /// handled by <see cref="RuntimeSingletonRegistry"/> because Unity disallows
         /// <c>[RuntimeInitializeOnLoadMethod]</c> on methods in generic classes.
+        ///
+        /// <b>There is no fresh instance for a <see cref="SingletonCreationPolicy.NeverCreate"/>
+        /// singleton.</b> This destroys every live instance, including one authored in a scene, and
+        /// such a type will not build a replacement -- <see cref="Instance"/> returns <c>null</c>
+        /// until something else creates one. Clearing those is for tests and for editor tooling that
+        /// is about to reload the scene, not for ordinary runtime resets.
         /// </remarks>
         public static void ClearInstance()
         {
@@ -195,10 +223,13 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
-            // The refusal is deduplicated so a per-frame Instance access cannot flood the console, and
-            // an explicit clear is exactly the moment that dedupe should end: the next refusal is about
-            // a fresh situation, and a test that expects the warning twice would otherwise never see it.
+            // An explicit clear is exactly the moment the remembered refusal should end: the next
+            // access is a fresh question, and a test that expects the warning twice would otherwise
+            // never see it a second time.
+            _creationRefused = false;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             _creationRefusedWarningLogged = false;
+#endif
         }
 
         private static void WarnCreationRefused(Type type)
@@ -215,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     + $"{nameof(SingletonCreationPolicy)}.{nameof(SingletonCreationPolicy.NeverCreate)} forbids creating one. Returning null."
             );
 #else
-            _creationRefusedWarningLogged = true;
             _ = type;
 #endif
         }

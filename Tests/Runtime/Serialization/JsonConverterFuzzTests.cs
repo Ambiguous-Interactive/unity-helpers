@@ -408,6 +408,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 restored != null,
                 $"{target.Name} wrote {Abbreviate(written)} and read it back as null."
             );
+
+            // Re-encoding rather than comparing values, for two reasons. `restored` is a boxed struct
+            // for most of this corpus, so a null check proves nothing there; and several reference
+            // targets (AnimationCurve, Gradient, RectOffset) have reference equality only. The bytes
+            // are the contract anyway -- a converter that reads its own output back as a *different*
+            // value writes different bytes for it, which the null check above cannot see.
+            string rewritten = JsonSerializer.Serialize(restored, target.Type, options);
+            Assert.AreEqual(
+                written,
+                rewritten,
+                $"{target.Name} wrote {Abbreviate(written)}, read it back, and then wrote {Abbreviate(rewritten)} -- the value did not survive."
+            );
         }
 
         /// <summary>
@@ -838,9 +850,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     typeof(ParticleSystem.MinMaxGradient),
                     new ParticleSystem.MinMaxGradient(Color.green)
                 ),
-#if !UNITY_DISABLE_UI
                 new(typeof(UnityEngine.UI.ColorBlock), UnityEngine.UI.ColorBlock.defaultColorBlock),
-#endif
                 new(typeof(RaycastHit), default(RaycastHit)),
                 FuzzTarget.WriteOnly(typeof(Touch), default(Touch)),
                 new(typeof(Scene), SceneManager.GetActiveScene()),

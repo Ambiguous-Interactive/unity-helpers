@@ -84,9 +84,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
                 AutoLoadSingletonEntry[] autoLoadEntries = BuildAutoLoadSingletonEntries();
 
+                // Both attribute sets, because TypeCache reports only types carrying the attribute
+                // DIRECTLY while the runtime resolves SingletonCreationAttribute with inherit: true.
+                // An annotated abstract base with a concrete [AutoLoadSingleton] subclass is the
+                // contradiction below, and enumerating either set alone cannot see it: the base is
+                // skipped as abstract and the subclass carries no SingletonCreationAttribute of its
+                // own.
+                HashSet<Type> singletonCandidates = new();
                 foreach (
                     Type annotated in TypeCache.GetTypesWithAttribute<SingletonCreationAttribute>()
                 )
+                {
+                    singletonCandidates.Add(annotated);
+                }
+
+                foreach (
+                    Type annotated in TypeCache.GetTypesWithAttribute<AutoLoadSingletonAttribute>()
+                )
+                {
+                    singletonCandidates.Add(annotated);
+                }
+
+                foreach (Type annotated in singletonCandidates)
                 {
                     if (
                         annotated == null

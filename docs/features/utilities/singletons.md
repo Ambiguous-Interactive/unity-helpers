@@ -203,7 +203,11 @@ Notes:
 - The decision is read from the type rather than from a virtual property, because there is no instance
   to ask when the question is whether to make one.
 - The warning is logged once per type and re-armed by `ClearInstance()`, so a per-frame access cannot
-  flood the console.
+  flood the console. In play mode the refused lookup is remembered too, so `if (X.Instance != null)`
+  in `Update()` costs nothing after the first miss.
+- **`ClearInstance()` is not a reset for these.** It destroys every live instance, and a `NeverCreate`
+  type will not build a replacement — `Instance` stays `null` until something else creates one. Use it
+  in tests and in editor tooling that is about to reload the scene, not as a runtime reset.
 - It is a development diagnostic: release players skip it entirely.
 - `ScriptableObjectSingleton<T>` needs no policy. It never creates an asset at runtime — a missing one
   already returns `null` with a warning — and the editor's opt-out for asset creation is

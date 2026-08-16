@@ -74,7 +74,11 @@ SCRIPT_CONTENT="$(cat "$LINT_SCRIPT")"
 # whenever the producer finishes writing first, which is almost always -- and lost that race once in
 # CI under Repo Lint's eight concurrent workers, failing `obj` while `bin`, on the same line of the
 # same string, passed.
-EXCLUDE_DIRS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeDirs *=/,/)/p')"
+# `$excludeDirs` is declared on ONE line, so it is matched as one line. A `/start/,/end/` range
+# would not do: sed never closes a range on its start line, so it would run on to the closing `)` of
+# `$excludeFilePatterns` and this check would accept a directory name that had been moved into the
+# file-pattern array -- which is exactly the drift it exists to catch.
+EXCLUDE_DIRS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/^\$excludeDirs *=/p')"
 EXCLUDE_FILE_PATTERNS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeFilePatterns/,/)/p')"
 EXCLUDE_DIR_PATTERNS_BLOCK="$(printf '%s\n' "$SCRIPT_CONTENT" | sed -n '/\$excludeDirPatterns/,/)/p')"
 

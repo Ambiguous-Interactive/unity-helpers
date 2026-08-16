@@ -1,8 +1,6 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Requires UnityEngine.UI; file can be excluded if UI module isn't referenced.
-#if !UNITY_DISABLE_UI
 namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 {
     using System;
@@ -123,4 +121,3 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         }
     }
 }
-#endif

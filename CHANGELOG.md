@@ -72,7 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix defining `UNITY_DISABLE_UI` breaking the runtime assembly. The JSON options named `ColorBlockConverter` while the converter itself was compiled out ([#459](https://github.com/Ambiguous-Interactive/unity-helpers/issues/459)).
 - Fix a save holding an unset `WGuid` failing to load: JSON wrote the empty GUID and then refused to read it back ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a JSON payload with `min` greater than `max`, or with `max` missing, crashing a `Range<T>` load with `ArgumentException` instead of reporting corrupt data ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).
 - Fix a `Gradient` with more than eight colour or alpha keys silently losing the extras and filling the player log with errors. The payload is now refused ([#437](https://github.com/Ambiguous-Interactive/unity-helpers/issues/437)).

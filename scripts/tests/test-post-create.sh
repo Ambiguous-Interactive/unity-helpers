@@ -727,8 +727,15 @@ if [[ -n "$CHOWN_LINE" && -n "$DOTNET_LINE" ]]; then
             "chown on line $CHOWN_LINE, dotnet on line $DOTNET_LINE"
     fi
 else
+    # Each marker is reported by name. Before these lookups were guarded against a SIGPIPE from the
+    # short-circuiting `head`, a missing marker made the command substitution non-zero and `set -e`
+    # killed the whole suite with no message; guarding it without these branches would have traded
+    # that for a silently skipped ordering assertion, which is worse than either.
     if [[ -z "$CHOWN_LINE" ]]; then
         fail "chown command exists in post-create.sh" "No sudo chown found"
+    fi
+    if [[ -z "$DOTNET_LINE" ]]; then
+        fail "dotnet tool restore exists in post-create.sh" "No dotnet tool restore found"
     fi
 fi
 
@@ -739,6 +746,8 @@ if [[ -n "$CHOWN_LINE" && -n "$NPM_LINE" ]]; then
         fail "chown runs before npm install" \
             "chown on line $CHOWN_LINE, npm on line $NPM_LINE"
     fi
+elif [[ -z "$NPM_LINE" ]]; then
+    fail "npm install exists in post-create.sh" "No npm ci / npm i found"
 fi
 
 # ── Test 9: Script handles workspace folder detection ────────────────────────

@@ -38,6 +38,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     public sealed class JsonConverterCoverageTests
     {
         /// <summary>
+        /// How many converters the normal configuration registers, pinned against history so a
+        /// reorder or a silent addition to the one shared list is visible.
+        /// </summary>
+        private const int ShippedConverterCount = 47;
+
+        /// <summary>
+        /// Where <see cref="JsonStringEnumConverter"/> sits in that list. Registration order is
+        /// precedence, and this is the only entry claiming a category rather than a concrete type.
+        /// </summary>
+        private const int StringEnumConverterIndex = 4;
+
+        /// <summary>
         /// Registered converters this package does not own and does not fuzz, each with the reason.
         /// </summary>
         private static readonly IReadOnlyDictionary<Type, string> NotCovered = new Dictionary<
@@ -276,6 +288,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 fast,
                 typeof(JsonStringEnumConverter),
                 "The fast configuration writes an enum as its underlying number; adding the string converter changes the wire format."
+            );
+
+            // Comparing the three lists to each other cannot see a change that reorders the shared
+            // list, because it reorders all three identically -- and that is the one risk collapsing
+            // three copies into one introduces. The count and the enum converter's position are
+            // pinned against history instead: order decides precedence, and JsonStringEnumConverter
+            // is the only registration that claims a whole category of types rather than one.
+            Assert.AreEqual(
+                ShippedConverterCount,
+                normal.Count,
+                "A converter was added or removed. If that is intended, update ShippedConverterCount and add a fuzz target."
+            );
+            Assert.AreEqual(
+                StringEnumConverterIndex,
+                normal.IndexOf(typeof(JsonStringEnumConverter)),
+                "JsonStringEnumConverter must stay at the index it has always occupied; moving it changes which converter claims an enum-shaped type first."
             );
         }
 

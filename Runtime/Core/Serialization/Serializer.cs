@@ -82,13 +82,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             converters.Add(RenderTextureDescriptorConverter.Instance);
             converters.Add(MinMaxCurveConverter.Instance);
             converters.Add(MinMaxGradientConverter.Instance);
-            // Honours the guard the converter file already carried. Before this list was shared, three
-            // copies of it named ColorBlockConverter unguarded, so defining UNITY_DISABLE_UI compiled
-            // the converter out and then broke the runtime assembly on the references to it -- a guard
-            // that could not be used was indistinguishable from protection that existed.
-#if !UNITY_DISABLE_UI
             converters.Add(ColorBlockConverter.Instance);
-#endif
             converters.Add(BoundingSphereConverter.Instance);
             converters.Add(RaycastHitConverter.Instance);
             converters.Add(TouchConverter.Instance);

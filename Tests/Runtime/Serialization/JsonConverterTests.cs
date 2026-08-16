@@ -1232,7 +1232,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(scene.name, deserialized.name);
         }
 
-#if !UNITY_DISABLE_UI
         [Test]
         public void ColorBlockConverterSerializeAndDeserializeSuccess()
         {
@@ -1255,6 +1254,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(original.colorMultiplier, deserialized.colorMultiplier);
             Assert.AreEqual(original.fadeDuration, deserialized.fadeDuration);
         }
-#endif
     }
 }

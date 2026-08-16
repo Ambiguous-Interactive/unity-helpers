@@ -1068,6 +1068,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
+        /// <summary>
+        /// A refusal is remembered so the scene-wide search does not repeat on every access. That is
+        /// only sound because an instance cannot appear without <c>Awake</c> assigning the cache, so
+        /// this drives exactly that sequence: refuse, then add one, then ask again.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AnInstanceCreatedAfterARefusalIsStillServed()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+            Assert.IsTrue(NeverCreatedSingleton.Instance == null);
+
+            GameObject lateObject = Track(new GameObject("LateNeverCreatedSingleton"));
+            NeverCreatedSingleton late = lateObject.AddComponent<NeverCreatedSingleton>();
+            late.authoredValue = 23;
+
+            yield return null;
+
+            Assert.AreSame(late, NeverCreatedSingleton.Instance);
+            Assert.AreEqual(23, NeverCreatedSingleton.Instance.authoredValue);
+        }
+
         [UnityTest]
         public IEnumerator AnAuthoredInstanceIsServedWhenCreationIsRefused()
         {
