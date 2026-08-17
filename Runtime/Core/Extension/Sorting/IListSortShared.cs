@@ -160,7 +160,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     else
                     {
-                        if (nextCompare >= 0)
+                        // A descending run is reversed to become ascending, so it may only hold strictly
+                        // descending elements: reversing a pair that compares equal would reorder them.
+                        if (nextCompare > 0)
                         {
                             index++;
                             continue;

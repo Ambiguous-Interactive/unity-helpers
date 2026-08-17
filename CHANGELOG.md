@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `SortAlgorithm.Power` and `SortAlgorithm.PowerPlus` reordering elements that compare equal, which both are documented as never doing. Any list whose equal elements sit inside a descending stretch was affected ([#461](https://github.com/Ambiguous-Interactive/unity-helpers/issues/461)).
 - Fix `SerializableDictionary` and `SerializableSortedDictionary` discarding a comparer they were constructed with, so seeding one with `StringComparer.OrdinalIgnoreCase` — the documented way to make it case-insensitive — did nothing ([#472](https://github.com/Ambiguous-Interactive/unity-helpers/issues/472)).
 - Fix the settings window treating any color within about two and a half 8-bit steps of the factory default as untouched, so a color you had deliberately changed could be overwritten by the suggested palette ([#472](https://github.com/Ambiguous-Interactive/unity-helpers/issues/472)).
 - Fix the inspector repainting on every settings check once a custom color held a `NaN` channel, and missing the removal of a color key present in any snapshot but the first ([#472](https://github.com/Ambiguous-Interactive/unity-helpers/issues/472)).

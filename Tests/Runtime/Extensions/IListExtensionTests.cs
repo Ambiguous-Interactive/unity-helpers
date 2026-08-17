@@ -154,6 +154,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        private static readonly int[] StabilityCounts = { 7, 64, 120, 513 };
+
+        // A stable sort only reorders equal elements when it moves a block of them, and the shapes
+        // that make it do so are descending: run detection that reverses a descending run must
+        // refuse to take equal neighbors into it. An ascending shape alone proves nothing.
+        private static readonly (string Name, Func<int, int, int> KeyOf)[] StabilityShapes =
+        {
+            ("ascending duplicates", static (i, _) => i / 3),
+            ("descending duplicates", static (i, count) => (count - i) / 3),
+            ("descending pairs", static (i, count) => (count - i) / 2),
+            (
+                "strict descent then equals",
+                static (i, count) => (count - i) % 5 == 0 ? count - i : 0
+            ),
+            ("all equal", static (_, _) => 0),
+            ("sawtooth duplicates", static (i, count) => (i % Math.Max(1, count / 4)) / 2),
+        };
+
         private static IEnumerable<TestCaseData> StableSortingAlgorithmCases
         {
             get
@@ -436,23 +454,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             TupleSortAlgorithm algorithm
         )
         {
-            ValueTuple<int, int>[] input = Enumerable
-                .Range(0, 120)
-                .Select(i => ValueTuple.Create(i / 3, i))
-                .ToArray();
-            ValueTuple<int, int>[] actual = input.ToArray();
-
-            algorithm(actual, new StableTupleComparer());
-
-            for (int i = 1; i < actual.Length; ++i)
+            foreach ((string shapeName, Func<int, int, int> keyOf) in StabilityShapes)
             {
-                if (actual[i - 1].Item1 == actual[i].Item1)
+                foreach (int count in StabilityCounts)
                 {
-                    Assert.That(
-                        actual[i - 1].Item2,
-                        Is.LessThan(actual[i].Item2),
-                        $"{algorithmName} broke stability at index {i}"
-                    );
+                    ValueTuple<int, int>[] actual = Enumerable
+                        .Range(0, count)
+                        .Select(i => ValueTuple.Create(keyOf(i, count), i))
+                        .ToArray();
+
+                    algorithm(actual, new StableTupleComparer());
+
+                    for (int i = 1; i < actual.Length; ++i)
+                    {
+                        Assert.That(
+                            actual[i - 1].Item1,
+                            Is.LessThanOrEqualTo(actual[i].Item1),
+                            $"{algorithmName} left {shapeName} (n={count}) unsorted at index {i}"
+                        );
+                        if (actual[i - 1].Item1 == actual[i].Item1)
+                        {
+                            Assert.That(
+                                actual[i - 1].Item2,
+                                Is.LessThan(actual[i].Item2),
+                                $"{algorithmName} broke stability on {shapeName} (n={count}) at index {i}"
+                            );
+                        }
+                    }
                 }
             }
         }
