@@ -10,6 +10,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -19,20 +20,38 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Implementation reference: ipnsort (Voultapher) — https://github.com/Voultapher/sort-research-rs/tree/main/writeup/ipnsort_introduction.
         /// </remarks>
-        public static void IpnSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void IpnSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                IpnSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            IpnSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void IpnSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             IpnSortRange(array, 0, count - 1, comparer, 2 * FloorLog2(count));
         }
 
         private static void IpnSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer,
@@ -86,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int IpnSelectPivotIndex<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer

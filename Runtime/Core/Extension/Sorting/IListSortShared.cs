@@ -8,8 +8,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class IListExtensions
     {
+        // Every sort runs over a T[]: an IList<T> indexer is an interface call per element, which costs
+        // more across a whole sort than copying the list into a pooled array and back again does.
+        private static void SortSwap<T>(T[] array, int left, int right)
+        {
+            (array[left], array[right]) = (array[right], array[left]);
+        }
+
+        private static void SortReverse<T>(T[] array, int start, int end)
+        {
+            while (start < end)
+            {
+                (array[start], array[end]) = (array[end], array[start]);
+                start++;
+                end--;
+            }
+        }
+
         private static int SelectPivotIndex<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer
@@ -19,21 +36,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int mid = left + ((right - left) >> 1);
             if (0 < comparer.Compare(array[left], array[mid]))
             {
-                array.Swap(left, mid);
+                SortSwap(array, left, mid);
             }
             if (0 < comparer.Compare(array[left], array[right]))
             {
-                array.Swap(left, right);
+                SortSwap(array, left, right);
             }
             if (0 < comparer.Compare(array[mid], array[right]))
             {
-                array.Swap(mid, right);
+                SortSwap(array, mid, right);
             }
             return mid;
         }
 
         private static void MergeRuns<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int leftStart,
             int leftLength,
@@ -125,14 +142,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void CollectNaturalRuns<T, TComparer>(
-            IList<T> array,
+            T[] array,
+            int count,
             TComparer comparer,
             List<(int start, int length)> runs
         )
             where TComparer : IComparer<T>
         {
             runs.Clear();
-            int count = array.Count;
             int index = 0;
             while (index < count)
             {
@@ -174,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int end = index - 1;
                 if (!ascending && start < end)
                 {
-                    array.Reverse(start, end);
+                    SortReverse(array, start, end);
                 }
 
                 runs.Add((start, end - start + 1));
@@ -182,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int MakeAscendingRun<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int count,
             TComparer comparer
@@ -212,14 +229,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     runEnd++;
                 }
 
-                array.Reverse(start, runEnd - 1);
+                SortReverse(array, start, runEnd - 1);
             }
 
             return runEnd - start;
         }
 
         private static int MedianOfFiveIndices<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int first,
             int second,
             int third,
@@ -247,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void InsertionSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer
@@ -273,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void HeapSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int end,
             TComparer comparer
@@ -293,13 +310,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             for (int i = length - 1; i > 0; --i)
             {
-                array.Swap(start, start + i);
+                SortSwap(array, start, start + i);
                 SiftDown(array, start, i, 0, comparer);
             }
         }
 
         private static void SiftDown<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int length,
             int root,
@@ -329,13 +346,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return;
                 }
 
-                array.Swap(start + root, start + child);
+                SortSwap(array, start + root, start + child);
                 root = child;
             }
         }
 
         private static bool IsRangeSorted<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer

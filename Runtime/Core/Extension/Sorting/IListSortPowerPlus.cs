@@ -21,20 +21,42 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Implementation reference: PowerSort+ (Wild & Nebel), which prioritizes runs via their power metric.
         /// </remarks>
-        public static void PowerSortPlus<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void PowerSortPlus<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                PowerSortPlusCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            PowerSortPlusCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void PowerSortPlusCore<T, TComparer>(
+            T[] array,
+            int count,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
             using PooledResource<List<(int start, int length)>> runBuffer = Buffers<(
                 int start,
                 int length
             )>.List.Get(out List<(int start, int length)> runs);
-            CollectNaturalRuns(array, comparer, runs);
+            CollectNaturalRuns(array, count, comparer, runs);
             if (runs.Count <= 1)
             {
                 return;
@@ -139,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int PowerSortPlusMergeNodes<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             TComparer comparer,
             int headIndex,

@@ -10,6 +10,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -68,15 +69,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Implementation reference: SmoothSort (Dijkstra, Edelkamp/Wegener) via Nico Lomuto’s refresher and Keith Schwarz’s lecture notes.
         /// </remarks>
-        public static void SmoothSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void SmoothSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                SmoothSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            SmoothSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void SmoothSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             int head = 0;
             int last = count - 1;
             int p = 1;
@@ -149,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SmoothSortSift<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int head,
             int pshift,
             TComparer comparer
@@ -189,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SmoothSortTrinkle<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int head,
             int p,
             int pshift,

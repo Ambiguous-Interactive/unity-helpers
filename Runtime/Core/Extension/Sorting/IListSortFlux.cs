@@ -10,6 +10,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -19,15 +20,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Implementation reference: Fluxsort / Fluxsort2 (Voultapher), https://github.com/Voultapher/sort-research-rs.
         /// </remarks>
-        public static void FluxSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void FluxSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                FluxSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            FluxSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void FluxSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             DualPivotQuickSort(array, 0, count - 1, comparer);
         }
 
@@ -38,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Adapted for <c>IList&lt;T&gt;</c> with an insertion sort threshold to avoid excess recursion.
         /// </remarks>
         private static void DualPivotQuickSort<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer
@@ -66,11 +85,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (comparer.Compare(array[m1], array[m2]) > 0)
             {
-                array.Swap(m1, m2);
+                SortSwap(array, m1, m2);
             }
 
-            array.Swap(left, m1);
-            array.Swap(right, m2);
+            SortSwap(array, left, m1);
+            SortSwap(array, right, m2);
 
             T pivot1 = array[left];
             T pivot2 = array[right];
@@ -89,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (comparer.Compare(array[i], pivot1) < 0)
                 {
-                    array.Swap(i, lt);
+                    SortSwap(array, i, lt);
                     lt++;
                 }
                 else if (comparer.Compare(array[i], pivot2) > 0)
@@ -98,11 +117,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         gt--;
                     }
-                    array.Swap(i, gt);
+                    SortSwap(array, i, gt);
                     gt--;
                     if (comparer.Compare(array[i], pivot1) < 0)
                     {
-                        array.Swap(i, lt);
+                        SortSwap(array, i, lt);
                         lt++;
                     }
                 }
@@ -111,8 +130,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             lt--;
             gt++;
-            array.Swap(left, lt);
-            array.Swap(right, gt);
+            SortSwap(array, left, lt);
+            SortSwap(array, right, gt);
 
             DualPivotQuickSort(array, left, lt - 1, comparer);
             DualPivotQuickSort(array, lt + 1, gt - 1, comparer);

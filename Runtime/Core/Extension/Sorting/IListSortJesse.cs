@@ -21,15 +21,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: JesseSort by Jesse Michel, https://github.com/lewj85/jessesort.
         /// This adaptation materializes patience piles as <c>IList</c>-backed stacks and performs a k-way merge.
         /// </remarks>
-        public static void JesseSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void JesseSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                JesseSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            JesseSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void JesseSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             using PooledResource<List<List<T>>> ascendingLease = Buffers<List<T>>.List.Get(
                 out List<List<T>> ascendingPiles
             );

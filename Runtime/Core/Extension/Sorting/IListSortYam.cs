@@ -39,18 +39,36 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) worst/average case, O(n) on sorted or reverse-sorted input. Stable sort.</para>
-        /// <para>Allocations: One pooled buffer of half the list length.</para>
+        /// <para>Allocations: A list that is already a <c>T[]</c> is sorted in place; any other <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied back. The merge itself uses a further pooled buffer of half that length.</para>
         /// <para>Edge cases: Empty or single element lists require no sorting.</para>
         /// </remarks>
-        public static void YamSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void YamSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                YamSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            YamSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void YamSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             YamSortState state = new(YamSequenceScoreDefault);
             if (count <= YamSequenceThresholds[state.sequenceScore])
             {
@@ -66,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void YamSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int length,
             T[] buffer,
@@ -121,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         // Both halves are sorted and the right half's maximum is below the left half's minimum, so swapping
         // the halves finishes the range without a single further comparison.
         private static bool YamRotateHalves<T>(
-            IList<T> array,
+            T[] array,
             int start,
             int length,
             int mid,
@@ -153,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void YamSimpleMerge<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int length,
             int mid,
@@ -222,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void YamGallopMerge<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int start,
             int length,
             int mid,
@@ -377,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         // The buffer is a queue that grows downwards from its own tail, so the largest pending element of the
         // right run is always the one at head.
-        private static int YamFillBuffer<T>(IList<T> array, T[] buffer, int from, int to, int head)
+        private static int YamFillBuffer<T>(T[] array, T[] buffer, int from, int to, int head)
         {
             int count = to - from + 1;
             for (int i = 0; i < count; i++)
@@ -388,13 +406,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return count;
         }
 
-        private static void YamDrainBuffer<T>(
-            IList<T> array,
-            int start,
-            T[] buffer,
-            int head,
-            int count
-        )
+        private static void YamDrainBuffer<T>(T[] array, int start, T[] buffer, int head, int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -402,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        private static void YamCopyDown<T>(IList<T> array, int source, int destination, int count)
+        private static void YamCopyDown<T>(T[] array, int source, int destination, int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -411,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void YamCopyFromBuffer<T>(
-            IList<T> array,
+            T[] array,
             int destination,
             T[] buffer,
             int head,
@@ -427,7 +439,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         // Equal elements are excluded, so a run of duplicates in the left half stays put and the right half's
         // copies land above it.
         private static int YamCountGreater<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int index,
             int lowerBound,
             T target,
@@ -439,7 +451,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int YamCountAtLeast<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int index,
             int lowerBound,
             T target,
@@ -450,51 +462,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return index - YamGallopBoundary(array, index, lowerBound, target, comparer, -1);
         }
 
-        private static int YamCountAtLeast<T, TComparer>(
-            T[] buffer,
-            int index,
-            int lowerBound,
-            T target,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
-        {
-            int span = index - lowerBound + 1;
-            int probe = 1;
-            int count = 0;
-            while (count < span && comparer.Compare(buffer[index - count], target) >= 0)
-            {
-                count += probe;
-                probe <<= 1;
-            }
-
-            if (count > span)
-            {
-                count = span;
-            }
-
-            int low = index - count + 1;
-            int high = index;
-            while (low <= high)
-            {
-                int middle = low + ((high - low) >> 1);
-                if (comparer.Compare(buffer[middle], target) >= 0)
-                {
-                    high = middle - 1;
-                }
-                else
-                {
-                    low = middle + 1;
-                }
-            }
-
-            return index - high;
-        }
-
         // Walks down from index in doubling steps, then binary searches the overshot window for the last
         // element that must stay put. The comparison floor decides whether equal elements stay or move.
         private static int YamGallopBoundary<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int index,
             int lowerBound,
             T target,

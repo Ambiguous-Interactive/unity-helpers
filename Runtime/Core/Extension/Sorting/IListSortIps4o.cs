@@ -29,20 +29,38 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Implementation reference: IPS⁴o samplesort (Axtmann, Witt, Ferizovic, Sanders), https://arxiv.org/abs/1705.02257.
         /// </remarks>
-        public static void Ips4oSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void Ips4oSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                Ips4oSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            Ips4oSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void Ips4oSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             Ips4oSortRange(array, 0, count - 1, comparer);
         }
 
         private static void Ips4oSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer
@@ -162,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void Ips4oBuildSample<T>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             T[] sample,

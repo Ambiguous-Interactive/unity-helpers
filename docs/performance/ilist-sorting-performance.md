@@ -29,6 +29,29 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 >
 > **Heads up:** The original Ghost Sort repository was formerly hosted on GitHub under `wstaffordp/ghostsort`, but it currently returns 404. The Unity Helpers implementation remains based on that source; we will relink if/when an official mirror returns.
 
+## Where the Time Actually Goes
+
+Every algorithm here sorts a `T[]`, never an `IList<T>` directly. Reaching an element through the
+`IList<T>` indexer is an interface call, and a sort makes O(n log n) of them; copying a list into a
+pooled array and copying it back is 2n moves and then the whole sort runs on direct array indexing.
+Pass a `T[]` and it is sorted in place with no copy at all.
+
+Measured on .NET 9 with a struct comparer, sorting `int`, best of nine runs — the same source before
+and after the change:
+
+| Algorithm | Shape         |       n | `T[]` before | `T[]` after | `List<T>` before | `List<T>` after |
+| --------- | ------------- | ------: | -----------: | ----------: | ---------------: | --------------: |
+| Grail     | shuffled      | 100,000 |     13.32 ms | **5.29 ms** |          6.28 ms |         5.39 ms |
+| Tim       | shuffled      | 100,000 |     11.85 ms | **4.55 ms** |          5.66 ms |         4.65 ms |
+| Grail     | nearly sorted | 100,000 |      5.65 ms | **1.42 ms** |          2.14 ms |         1.51 ms |
+| Grail     | reversed      | 100,000 |      5.84 ms | **1.07 ms** |          1.98 ms |         1.13 ms |
+| Tim       | reversed      | 100,000 |      0.38 ms | **0.06 ms** |          0.08 ms |         0.11 ms |
+
+The one shape that pays rather than gains is a `List<T>` an adaptive sort would finish in O(n)
+anyway: there the copy is most of the work, and it costs tens of microseconds on 100,000 elements.
+These are desktop CLR numbers, where the JIT can speculatively devirtualize `List<T>`; a Unity player
+cannot, so the run the Unity benchmark below produces is the one that describes a build.
+
 ## Dataset Scenarios
 
 - **Sorted** – ascending integers, verifying best-case behavior.

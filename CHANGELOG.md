@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Every `IList<T>` sort now runs over an array rather than the list's indexer, so sorting a `T[]` is 2.5x to 5.4x faster and needs no copy. Any other list is copied through a pooled buffer and back. See [Where the Time Actually Goes](./docs/performance/ilist-sorting-performance.md#where-the-time-actually-goes) ([#463](https://github.com/Ambiguous-Interactive/unity-helpers/issues/463)).
 - Enable WallstopProto by default for the runtime assembly: every `Serializer.ProtoSerialize` and `ProtoDeserialize` overload, including `ref buffer` and `forceRuntimeType: true`, uses generated formatters when available and falls back to protobuf-net ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343), [#403](https://github.com/Ambiguous-Interactive/unity-helpers/issues/403)).
 - Serialize thirty of this package's own contracts through WallstopProto when `WALLSTOP_PROTO` is defined, including `AbstractRandom` and all seventeen generators. Saved data is unchanged ([#394](https://github.com/Ambiguous-Interactive/unity-helpers/issues/394)).
 - Serialize `SerializableHashSet`, `SerializableSortedSet`, `SerializableDictionary`, `SerializableSortedDictionary`, `Deque`, `CyclicBuffer` and `SparseSet` through WallstopProto when `WALLSTOP_PROTO` is defined. Saved data is unchanged ([#402](https://github.com/Ambiguous-Interactive/unity-helpers/issues/402)).

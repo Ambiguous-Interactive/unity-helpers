@@ -10,6 +10,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -20,20 +21,38 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: Ska Sort by Malte Skarupke, https://probablydance.com/2016/12/27/i-wrote-a-faster-sorting-algorithm/.
         /// This adaptation applies multi-way partitioning with ninther sampling and tail recursion elimination.
         /// </remarks>
-        public static void SkaSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void SkaSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                SkaSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            SkaSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void SkaSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             SkaSortRange(array, 0, count - 1, comparer, 2 * FloorLog2(count));
         }
 
         private static void SkaSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer,
@@ -81,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int SkaSelectPivot<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer
@@ -104,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static (int leftEnd, int rightStart) SkaPartition<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             T pivot,
@@ -121,13 +140,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int compare = comparer.Compare(array[i], pivot);
                 if (compare < 0)
                 {
-                    array.Swap(i, lt);
+                    SortSwap(array, i, lt);
                     lt++;
                     i++;
                 }
                 else if (compare > 0)
                 {
-                    array.Swap(i, gt);
+                    SortSwap(array, i, gt);
                     gt--;
                 }
                 else

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System;
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -30,27 +31,49 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) on average with protection against quadratic worst cases via heapsort fallback.</para>
-        /// <para>Allocations: No allocations.</para>
+        /// <para>Allocations: A list that is already a <c>T[]</c> is sorted in place; any other <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied back.</para>
         /// <para>Edge cases: Not a stable sort - equal elements may be reordered.</para>
         /// </remarks>
         public static void PatternDefeatingQuickSort<T, TComparer>(
-            this IList<T> array,
+            this IList<T> list,
             TComparer comparer
         )
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                PatternDefeatingQuickSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            PatternDefeatingQuickSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void PatternDefeatingQuickSortCore<T, TComparer>(
+            T[] array,
+            int count,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
             int depthLimit = 2 * FloorLog2(count);
             PatternDefeatingQuickSortRange(array, 0, count - 1, comparer, depthLimit);
         }
 
         private static void PatternDefeatingQuickSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             TComparer comparer,
@@ -120,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static (int pivotStart, int pivotEnd, bool swapped) PartitionRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             int left,
             int right,
             int pivotIndex,
@@ -128,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            array.Swap(left, pivotIndex);
+            SortSwap(array, left, pivotIndex);
             T pivot = array[left];
             int i = left + 1;
             int j = right;
@@ -153,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (i < j)
                 {
-                    array.Swap(i, j);
+                    SortSwap(array, i, j);
                     swapped = true;
                 }
 
@@ -162,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int pivotPosition = j;
-            array.Swap(left, pivotPosition);
+            SortSwap(array, left, pivotPosition);
 
             int pivotStart = pivotPosition;
             int pivotEnd = pivotPosition;

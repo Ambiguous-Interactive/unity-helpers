@@ -29,25 +29,43 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) worst/average case. Stable sort.</para>
-        /// <para>Allocations: Uses pooled temporary buffers sized to half of the list.</para>
+        /// <para>Allocations: A list that is already a <c>T[]</c> is sorted in place; any other <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied back. The merge itself uses a further pooled buffer of half that length.</para>
         /// <para>Edge cases: Empty or single element lists require no sorting.</para>
         /// </remarks>
-        public static void GrailSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void GrailSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                GrailSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            GrailSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void GrailSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             int bufferLength = count / 2 + 1;
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(bufferLength, out T[] buffer);
             GrailSortRange(array, buffer, 0, count - 1, comparer);
         }
 
         private static void GrailSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int left,
             int right,

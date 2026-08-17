@@ -22,15 +22,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: TimSort by Tim Peters (Python) and the OpenJDK adaptation.
         /// Sources: https://bugs.python.org/file4451/timsort.txt and https://openjdk.java.net/projects/amber/.
         /// </remarks>
-        public static void TimSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void TimSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                TimSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            TimSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void TimSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             int minRun = ComputeTimSortMinRun(count);
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(
                 Math.Max(count / 2 + 1, 32),
@@ -75,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeCollapse<T, TComparer>(
-            IList<T> array,
+            T[] array,
             TComparer comparer,
             T[] buffer,
             List<(int start, int length)> runStack
@@ -117,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeForce<T, TComparer>(
-            IList<T> array,
+            T[] array,
             TComparer comparer,
             T[] buffer,
             List<(int start, int length)> runStack
@@ -138,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeAt<T, TComparer>(
-            IList<T> array,
+            T[] array,
             TComparer comparer,
             T[] buffer,
             List<(int start, int length)> runStack,

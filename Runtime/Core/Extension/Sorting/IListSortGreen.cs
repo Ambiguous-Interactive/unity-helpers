@@ -21,15 +21,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: greeNsort (Jens Oehlschlägel) — https://www.greensort.org.
         /// This adaptation uses symmetric trimming before merging halves to reduce data movement.
         /// </remarks>
-        public static void GreenSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void GreenSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                GreenSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            GreenSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void GreenSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(
                 Math.Max(count / 2 + 1, 64),
                 out T[] buffer
@@ -38,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GreenSortRange<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int left,
             int right,
@@ -65,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GreenSymmetricMerge<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int left,
             int mid,

@@ -30,18 +30,36 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) worst/average case, approaching O(n) on partially sorted data. Stable sort.</para>
-        /// <para>Allocations: Uses pooled lists and buffers for run management and merging.</para>
+        /// <para>Allocations: A list that is already a <c>T[]</c> is sorted in place; any other <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied back. Run management and merging use further pooled lists and buffers.</para>
         /// <para>Edge cases: Empty or single element lists require no sorting.</para>
         /// </remarks>
-        public static void PowerSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void PowerSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                PowerSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            PowerSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void PowerSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             using PooledResource<List<(int start, int length)>> runBuffer = Buffers<(
                 int start,
                 int length
@@ -51,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int length
             )>.List.Get(out List<(int start, int length)> mergedRuns);
 
-            CollectNaturalRuns(array, comparer, runs);
+            CollectNaturalRuns(array, count, comparer, runs);
             if (runs.Count <= 1)
             {
                 return;

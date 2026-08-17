@@ -21,15 +21,37 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: WikiSort / block merge sort by Mike McFadden (BonzaiThePenguin, public domain),
         /// https://github.com/BonzaiThePenguin/WikiSort. This adaptation uses a pooled full-size buffer.
         /// </remarks>
-        public static void BlockMergeSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void BlockMergeSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                BlockMergeSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            BlockMergeSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void BlockMergeSortCore<T, TComparer>(
+            T[] array,
+            int count,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(count, out T[] buffer);
             int runSize = 1;
             while (runSize < count)
@@ -46,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void BlockMerge<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int left,
             int mid,

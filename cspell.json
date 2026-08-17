@@ -870,7 +870,8 @@
         "protoc",
         "quantizers",
         "luma",
-        "texel"
+        "texel",
+        "devirtualize"
       ]
     }
   ],

@@ -26,15 +26,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: Glidesort (Rust std::sort write-up by Orson Peters & Sebastian W.),
         /// https://github.com/Voultapher/sort-research-rs.
         /// </remarks>
-        public static void GlideSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void GlideSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int count = array.Count;
+            int count = list.Count;
             if (count < 2)
             {
                 return;
             }
 
+            if (list is T[] array)
+            {
+                GlideSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            GlideSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void GlideSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(count, out T[] buffer);
             using PooledResource<List<(int start, int length)>> runsLease = Buffers<(
                 int start,
@@ -99,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GlideMergeRuns<T, TComparer>(
-            IList<T> array,
+            T[] array,
             T[] buffer,
             int leftStart,
             int leftLength,
@@ -132,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int rightRemaining = rightLength;
             int leftWins = 0;
             int rightWins = 0;
-            IList<T> leftBuffer = buffer;
+            T[] leftBuffer = buffer;
 
             while (leftRemaining > 0 && rightRemaining > 0)
             {
@@ -203,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int GlideGallopLeft<T, TComparer>(
-            IList<T> list,
+            T[] list,
             int start,
             int length,
             T key,
@@ -230,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int GlideGallopRight<T, TComparer>(
-            IList<T> list,
+            T[] list,
             int start,
             int length,
             T key,

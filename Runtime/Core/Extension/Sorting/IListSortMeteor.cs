@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System;
     using System.Collections.Generic;
+    using Utils;
 
     public static partial class IListExtensions
     {
@@ -29,13 +30,37 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) average case using adaptive gap reductions.</para>
-        /// <para>Allocations: No allocations.</para>
+        /// <para>Allocations: A list that is already a <c>T[]</c> is sorted in place; any other <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied back.</para>
         /// <para>Edge cases: Not a stable sort - equal elements may be reordered.</para>
         /// </remarks>
-        public static void MeteorSort<T, TComparer>(this IList<T> array, TComparer comparer)
+        public static void MeteorSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            int length = array.Count;
+            int count = list.Count;
+            if (count < 2)
+            {
+                return;
+            }
+
+            if (list is T[] array)
+            {
+                MeteorSortCore(array, count, comparer);
+                return;
+            }
+
+            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
+            list.CopyTo(scratch, 0);
+            MeteorSortCore(scratch, count, comparer);
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = scratch[i];
+            }
+        }
+
+        private static void MeteorSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
+            int length = count;
             int gap = length;
 
             int i;
