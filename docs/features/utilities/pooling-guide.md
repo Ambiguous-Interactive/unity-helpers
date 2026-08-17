@@ -21,6 +21,7 @@
 - [Access Frequency Tracking](#access-frequency-tracking)
 - [Application Lifecycle Hooks](#application-lifecycle-hooks)
 - [Global Pool Registry](#global-pool-registry)
+- [Renting an Array](#renting-an-array)
 - [Best Practices](#best-practices)
 
 ---
@@ -464,6 +465,39 @@ PoolPurgeSettings.Configure<byte[]>(o =>
     o.WarmRetainCount = 1;
 });
 ```
+
+## Renting an Array
+
+`SystemArrayPool<T>` rents from the process-wide `ArrayPool<T>.Shared`. Two consequences follow,
+and they pull in opposite directions.
+
+**A rented array is longer than you asked for.** The shared pool rounds a request up to its bucket
+size — a minimum of sixteen, then powers of two. Use `PooledArray<T>.length`, never
+`array.Length`, and never hand the raw array to an API that reads all of it.
+
+**A rented array is not zeroed.** Returning one never leaves a managed reference rooted — the
+package clears on return whenever `T` is, or contains, a reference — but nothing zeroes blittable
+data, and the shared pool hands out arrays that code outside this package returned. So every slot
+you read must be one you wrote:
+
+```csharp
+// Wrong: `seen` may arrive holding another renter's flags.
+using PooledArray<bool> lease = SystemArrayPool<bool>.Get(count, out bool[] seen);
+if (!seen[index]) { /* ... */ }
+
+// Right: ask for the clear when the algorithm reads before it writes.
+using PooledArray<bool> lease = SystemArrayPool<bool>.Get(count, clearArray: true, out bool[] seen);
+if (!seen[index]) { /* ... */ }
+```
+
+Counters, visited flags and running sums all need `clearArray: true`. An algorithm that fills the
+array before reading it — a sort's scratch buffer, a copy destination — should not pay for it.
+
+For an exactly-sized array whose size comes from a small, known set, use `WallstopArrayPool<T>`,
+which is always zeroed on return. Do not use it for a size derived from a collection count: it
+creates a permanent bucket per distinct size.
+
+---
 
 ### Performance Tips
 

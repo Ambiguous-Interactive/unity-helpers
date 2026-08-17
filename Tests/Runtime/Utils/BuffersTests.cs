@@ -2506,5 +2506,150 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             intReacquired.Dispose();
             byteReacquired.Dispose();
         }
+
+        [Test]
+        public void SystemArrayPoolReferenceElementsAreNotRootedAfterDispose()
+        {
+            const int requestedSize = 100;
+            PoolRootProbe[] rented;
+            {
+                using PooledArray<PoolRootProbe> pooled = SystemArrayPool<PoolRootProbe>.Get(
+                    requestedSize,
+                    out PoolRootProbe[] buffer
+                );
+                rented = buffer;
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    buffer[i] = new PoolRootProbe();
+                }
+            }
+
+            using PooledArray<PoolRootProbe> reacquired = SystemArrayPool<PoolRootProbe>.Get(
+                requestedSize,
+                out PoolRootProbe[] reused
+            );
+            Assert.AreSame(rented, reused);
+            for (int i = 0; i < reused.Length; i++)
+            {
+                Assert.IsTrue(
+                    reused[i] == null,
+                    $"Slot {i} still roots a reference the pool handed back to the shared pool."
+                );
+            }
+        }
+
+        [Test]
+        public void SystemArrayPoolStructElementsHoldingReferencesAreNotRootedAfterDispose()
+        {
+            const int requestedSize = 40;
+            PoolRootProbeHolder[] rented;
+            {
+                using PooledArray<PoolRootProbeHolder> pooled =
+                    SystemArrayPool<PoolRootProbeHolder>.Get(
+                        requestedSize,
+                        out PoolRootProbeHolder[] buffer
+                    );
+                rented = buffer;
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    buffer[i] = new PoolRootProbeHolder { probe = new PoolRootProbe(), tag = i };
+                }
+            }
+
+            using PooledArray<PoolRootProbeHolder> reacquired =
+                SystemArrayPool<PoolRootProbeHolder>.Get(
+                    requestedSize,
+                    out PoolRootProbeHolder[] reused
+                );
+            Assert.AreSame(rented, reused);
+            for (int i = 0; i < reused.Length; i++)
+            {
+                Assert.IsTrue(
+                    reused[i].probe == null,
+                    $"Slot {i} still roots a reference held inside a struct element."
+                );
+            }
+        }
+
+        // Pins the cost side of the same decision: a blittable element roots nothing, so clearing it
+        // on return would be pure waste on the sort and geometry paths that rent the most.
+        [Test]
+        public void SystemArrayPoolBlittableElementsAreNotClearedOnReturn()
+        {
+            const int requestedSize = 64;
+            PoolBlittableProbe[] rented;
+            {
+                using PooledArray<PoolBlittableProbe> pooled =
+                    SystemArrayPool<PoolBlittableProbe>.Get(
+                        requestedSize,
+                        out PoolBlittableProbe[] buffer
+                    );
+                rented = buffer;
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    buffer[i] = new PoolBlittableProbe { value = i + 1 };
+                }
+            }
+
+            using PooledArray<PoolBlittableProbe> reacquired =
+                SystemArrayPool<PoolBlittableProbe>.Get(
+                    requestedSize,
+                    out PoolBlittableProbe[] reused
+                );
+            Assert.AreSame(rented, reused);
+            bool anySurvived = false;
+            for (int i = 0; i < reused.Length; i++)
+            {
+                if (reused[i].value != 0)
+                {
+                    anySurvived = true;
+                    break;
+                }
+            }
+
+            Assert.IsTrue(
+                anySurvived,
+                "Blittable elements were cleared on return; that clear costs the whole rented array and prevents nothing."
+            );
+        }
+
+        [Test]
+        public void SystemArrayPoolGetWithClearArrayZeroesAnArrayReturnedDirtyByOtherCode()
+        {
+            const int requestedSize = 32;
+            PoolBlittableProbe[] dirtied = System.Buffers.ArrayPool<PoolBlittableProbe>.Shared.Rent(
+                requestedSize
+            );
+            for (int i = 0; i < dirtied.Length; i++)
+            {
+                dirtied[i] = new PoolBlittableProbe { value = -1 };
+            }
+
+            System.Buffers.ArrayPool<PoolBlittableProbe>.Shared.Return(dirtied, clearArray: false);
+
+            using PooledArray<PoolBlittableProbe> pooled = SystemArrayPool<PoolBlittableProbe>.Get(
+                requestedSize,
+                clearArray: true,
+                out PoolBlittableProbe[] buffer
+            );
+            Assert.AreSame(dirtied, buffer);
+            for (int i = 0; i < requestedSize; i++)
+            {
+                Assert.AreEqual(0, buffer[i].value);
+            }
+        }
+
+        private sealed class PoolRootProbe { }
+
+        private struct PoolRootProbeHolder
+        {
+            public PoolRootProbe probe;
+            public int tag;
+        }
+
+        private struct PoolBlittableProbe
+        {
+            public int value;
+        }
     }
 }

@@ -1340,68 +1340,55 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if UNITY_EDITOR
-        private static string[] PrepareSearchFolders(
+        /// <summary>
+        /// Narrows a caller-supplied set of asset paths to the exactly-sized array that
+        /// <c>AssetDatabase.FindAssets</c> requires.
+        /// </summary>
+        /// <remarks>
+        /// The result must be exactly as long as the caller's path count: <c>FindAssets</c> reads
+        /// every slot of the array it is handed, so a pooled buffer -- which the shared pool rounds
+        /// up to its bucket size, a minimum of sixteen -- would have it search folders the caller
+        /// never named. That is why this path allocates rather than rents.
+        /// </remarks>
+        internal static string[] PrepareSearchFolders(
             IEnumerable<string> assetPaths,
-            string[] defaultFolders,
-            out PooledResource<List<string>> listResource,
-            out PooledArray<string> arrayResource
+            string[] defaultFolders
         )
         {
             if (assetPaths == null)
             {
-                listResource = default;
-                arrayResource = default;
                 return defaultFolders;
             }
 
             if (assetPaths is string[] array)
             {
-                listResource = default;
-                arrayResource = default;
                 return array;
             }
 
             if (assetPaths is IReadOnlyList<string> readonlyList)
             {
-                PooledArray<string> pooledBuffer = SystemArrayPool<string>.Get(
-                    readonlyList.Count,
-                    out string[] buffer
-                );
-                for (int i = 0; i < readonlyList.Count; i++)
+                int count = readonlyList.Count;
+                string[] buffer = new string[count];
+                for (int i = 0; i < count; i++)
                 {
-                    string path = readonlyList[i];
-                    buffer[i] = path;
+                    buffer[i] = readonlyList[i];
                 }
 
-                listResource = default;
-                arrayResource = pooledBuffer;
-                return buffer;
-            }
-            if (assetPaths is ICollection<string> collection)
-            {
-                PooledArray<string> pooledBuffer = SystemArrayPool<string>.Get(
-                    collection.Count,
-                    out string[] buffer
-                );
-                collection.CopyTo(buffer, 0);
-                listResource = default;
-                arrayResource = pooledBuffer;
                 return buffer;
             }
 
-            PooledResource<List<string>> pooledList = Buffers<string>.List.Get(
+            if (assetPaths is ICollection<string> collection)
+            {
+                string[] buffer = new string[collection.Count];
+                collection.CopyTo(buffer, 0);
+                return buffer;
+            }
+
+            using PooledResource<List<string>> pooledList = Buffers<string>.List.Get(
                 out List<string> list
             );
             list.AddRange(assetPaths);
-
-            PooledArray<string> pooledTemp = SystemArrayPool<string>.Get(
-                list.Count,
-                out string[] temp
-            );
-            list.CopyTo(temp);
-            listResource = pooledList;
-            arrayResource = pooledTemp;
-            return temp;
+            return list.ToArray();
         }
 
         /// <summary>
@@ -1411,29 +1398,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             IEnumerable<string> assetPaths = null
         )
         {
-            string[] searchFolders = PrepareSearchFolders(
-                assetPaths,
-                DefaultPrefabSearchFolders,
-                out PooledResource<List<string>> pathListResource,
-                out PooledArray<string> pathArrayResource
-            );
+            string[] searchFolders = PrepareSearchFolders(assetPaths, DefaultPrefabSearchFolders);
 
-            try
+            foreach (string assetGuid in AssetDatabase.FindAssets("t:prefab", searchFolders))
             {
-                foreach (string assetGuid in AssetDatabase.FindAssets("t:prefab", searchFolders))
+                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
+                GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (go != null)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(assetGuid);
-                    GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                    if (go != null)
-                    {
-                        yield return go;
-                    }
+                    yield return go;
                 }
-            }
-            finally
-            {
-                pathArrayResource.Dispose();
-                pathListResource.Dispose();
             }
         }
 
@@ -1447,32 +1421,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             string[] searchFolders = PrepareSearchFolders(
                 assetPaths,
-                DefaultScriptableObjectSearchFolders,
-                out PooledResource<List<string>> pathListResource,
-                out PooledArray<string> pathArrayResource
+                DefaultScriptableObjectSearchFolders
             );
 
-            try
+            foreach (
+                string assetGuid in AssetDatabase.FindAssets("t:" + typeof(T).Name, searchFolders)
+            )
             {
-                foreach (
-                    string assetGuid in AssetDatabase.FindAssets(
-                        "t:" + typeof(T).Name,
-                        searchFolders
-                    )
-                )
+                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
+                T so = AssetDatabase.LoadAssetAtPath<T>(path);
+                if (so != null)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(assetGuid);
-                    T so = AssetDatabase.LoadAssetAtPath<T>(path);
-                    if (so != null)
-                    {
-                        yield return so;
-                    }
+                    yield return so;
                 }
-            }
-            finally
-            {
-                pathArrayResource.Dispose();
-                pathListResource.Dispose();
             }
         }
 #endif

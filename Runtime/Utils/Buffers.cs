@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading;
     using UnityEngine;
@@ -3118,9 +3119,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A <see cref="PooledArray{T}"/> wrapping the array with proper length tracking.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when minimumLength is negative.</exception>
         /// <remarks>
+        /// <para>
         /// The returned array may be larger than <paramref name="minimumLength"/>. Always use
         /// <see cref="PooledArray{T}.length"/> (or the <paramref name="minimumLength"/> you passed in)
         /// to determine the valid portion of the array.
+        /// </para>
+        /// <para>
+        /// The array is <strong>not</strong> zeroed. Every element you read must be one you wrote
+        /// first; if the algorithm accumulates into slots or tests them as flags, rent through
+        /// <see cref="Get(int, bool, out T[])"/> with clearArray=true instead.
+        /// </para>
         /// </remarks>
         public static PooledArray<T> Get(int minimumLength, out T[] array)
         {
@@ -3158,8 +3166,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// array (if any) may contain stale data.
         /// </para>
         /// <para>
-        /// For security-sensitive scenarios or when using reference types, consider always setting
-        /// <paramref name="clearArray"/> to true to prevent data leakage between uses.
+        /// Set <paramref name="clearArray"/> to true whenever the algorithm reads a slot before it
+        /// writes it -- counters, visited flags, running sums. Returning an array to the pool never
+        /// leaves a managed reference rooted, but it does not zero blittable data, and
+        /// <see cref="System.Buffers.ArrayPool{T}.Shared"/> is process-wide, so an array that code
+        /// outside this package returned dirty can be handed straight back here.
         /// </para>
         /// </remarks>
         public static PooledArray<T> Get(int minimumLength, bool clearArray, out T[] array)
@@ -3187,6 +3198,28 @@ namespace WallstopStudios.UnityHelpers.Utils
             array = rented;
             return new PooledArray<T>(rented, minimumLength);
         }
+    }
+
+    /// <summary>
+    /// Decides whether an array of <typeparamref name="T"/> must be cleared before it goes back to
+    /// <see cref="System.Buffers.ArrayPool{T}.Shared"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type for the arrays.</typeparam>
+    /// <remarks>
+    /// Clearing exists to stop a returned array from rooting the objects it still points at, which
+    /// only a reference-bearing element can do. A blittable element roots nothing, so clearing it is
+    /// pure cost -- and the cost is the whole rented array (the shared pool rounds a rent up to a
+    /// power of two), not just the portion the caller asked for.
+    /// </remarks>
+    internal static class PooledArrayClearPolicy<T>
+    {
+        /// <summary>
+        /// True when an element of <typeparamref name="T"/> is, or transitively contains, a managed
+        /// reference. A struct holding a <see cref="string"/> answers true, which
+        /// <c>!typeof(T).IsValueType</c> would miss.
+        /// </summary>
+        internal static readonly bool ClearOnReturn =
+            RuntimeHelpers.IsReferenceOrContainsReferences<T>();
     }
 
     /// <summary>
@@ -3276,16 +3309,19 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// Returns the array to the pool. The clearing behavior depends on which pool the array came from:
         /// <list type="bullet">
-        /// <item><see cref="SystemArrayPool{T}"/>: Array is NOT cleared by default</item>
+        /// <item><see cref="SystemArrayPool{T}"/>: cleared when <typeparamref name="T"/> is, or
+        /// contains, a managed reference; not cleared for blittable element types</item>
         /// <item><see cref="WallstopArrayPool{T}"/>: Array IS cleared on return</item>
         /// <item><see cref="WallstopFastArrayPool{T}"/>: Array is NOT cleared (for performance)</item>
         /// </list>
         /// </summary>
         /// <remarks>
-        /// After disposal, the array should not be used as it may be reused by another caller.
-        /// For reference types when using <see cref="SystemArrayPool{T}"/>, consider using
-        /// <see cref="SystemArrayPool{T}.Get(int, bool, out T[])"/> with clearArray=true
-        /// to prevent data leakage.
+        /// After disposal, the array should not be used as it may be reused by another caller. A
+        /// returned array never roots the objects it held, but it is not otherwise zeroed: rent
+        /// through <see cref="SystemArrayPool{T}.Get(int, bool, out T[])"/> with clearArray=true
+        /// whenever a slot is read before it is written, because
+        /// <see cref="System.Buffers.ArrayPool{T}.Shared"/> is process-wide and hands out arrays
+        /// that code outside this package returned.
         /// </remarks>
         public void Dispose()
         {
@@ -3300,7 +3336,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
-                System.Buffers.ArrayPool<T>.Shared.Return(array, clearArray: true);
+                System.Buffers.ArrayPool<T>.Shared.Return(
+                    array,
+                    PooledArrayClearPolicy<T>.ClearOnReturn
+                );
             }
         }
     }
