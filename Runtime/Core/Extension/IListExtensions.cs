@@ -306,8 +306,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(factory));
             }
 
-            int count = list.Count;
-            for (int i = 0; i < count; ++i)
+            // Deliberately re-read: the factory can mutate the list, and a hoisted bound would
+            // index past the end of a shorter one rather than stopping at it.
+            for (int i = 0; i < list.Count; ++i)
             {
                 list[i] = factory(i);
             }
@@ -352,7 +353,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            for (int i = 0; i < count; ++i)
+            // Deliberately re-read: the predicate can mutate the list. An array cannot change length
+            // under the branch above, so that one hoists.
+            for (int i = 0; i < list.Count; ++i)
             {
                 if (predicate(list[i]))
                 {
@@ -434,9 +437,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(predicate));
             }
 
-            int count = list.Count;
             List<T> result = new();
-            for (int i = 0; i < count; ++i)
+            for (int i = 0; i < list.Count; ++i)
             {
                 T element = list[i];
                 if (predicate(element))
@@ -542,11 +544,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(predicate));
             }
 
-            int count = list.Count;
             List<T> matching = new();
             List<T> notMatching = new();
 
-            for (int i = 0; i < count; ++i)
+            for (int i = 0; i < list.Count; ++i)
             {
                 T element = list[i];
                 if (predicate(element))

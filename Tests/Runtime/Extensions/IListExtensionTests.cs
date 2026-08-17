@@ -788,6 +788,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         /// <remarks>
+        /// A caller-supplied factory or predicate can shrink the list it is being run over, and the
+        /// package never throws from a public API for it. So the loop bound of anything that calls
+        /// back into caller code is re-read rather than hoisted - the array paths hoist, because an
+        /// array cannot change length underneath one.
+        /// </remarks>
+        [Test]
+        public void CallbacksThatShrinkTheListDoNotThrow()
+        {
+            // Every local is IList<int> deliberately: List<T> declares its own FindAll(Predicate<T>),
+            // which wins overload resolution and would leave the extension untested.
+            IList<int> filled = new List<int>(Enumerable.Range(0, 32));
+            Assert.DoesNotThrow(() =>
+                filled.Fill(index =>
+                {
+                    if (filled.Count > 4)
+                    {
+                        filled.RemoveAt(filled.Count - 1);
+                    }
+
+                    return index;
+                })
+            );
+
+            IList<int> searched = new List<int>(Enumerable.Range(0, 32));
+            Assert.DoesNotThrow(() =>
+                searched.IndexOf(value =>
+                {
+                    if (searched.Count > 4)
+                    {
+                        searched.RemoveAt(searched.Count - 1);
+                    }
+
+                    return value < 0;
+                })
+            );
+
+            IList<int> found = new List<int>(Enumerable.Range(0, 32));
+            Assert.DoesNotThrow(() =>
+                found.FindAll(value =>
+                {
+                    if (found.Count > 4)
+                    {
+                        found.RemoveAt(found.Count - 1);
+                    }
+
+                    return value >= 0;
+                })
+            );
+
+            IList<int> partitioned = new List<int>(Enumerable.Range(0, 32));
+            Assert.DoesNotThrow(() =>
+                partitioned.Partition(value =>
+                {
+                    if (partitioned.Count > 4)
+                    {
+                        partitioned.RemoveAt(partitioned.Count - 1);
+                    }
+
+                    return value >= 0;
+                })
+            );
+        }
+
+        /// <remarks>
         /// The predicate scans take a direct-indexing path for an array. They must not copy, because
         /// a copy would read every element before a predicate that matches the first one ever runs -
         /// so the count of predicate invocations is the assertion, not the elapsed time.
