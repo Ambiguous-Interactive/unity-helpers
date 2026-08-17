@@ -317,34 +317,19 @@ function Run-AgentValidationContractTests {
     -Passed $localValidationRetainsFullAggregate `
     -Message "validate:local = $validateLocalScript"
 
-  $localGatesPath = Join-Path $repoRoot '.github/workflows/local-gates.yml'
-  $localGatesContent = if (Test-Path $localGatesPath) {
-    Get-Content -Path $localGatesPath -Raw
-  }
-  else {
-    ''
-  }
-  $localGatesContractJob = [regex]::Match(
-    $localGatesContent,
-    '(?ms)^  contract-suites:\r?\n(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\r?\n|\z)'
-  ).Groups['body'].Value
-  $localGatesContractJobPreamble = [regex]::Match(
-    $localGatesContractJob,
-    '(?ms)\A(?<body>.*?)(?=^    steps:\s*$)'
-  ).Groups['body'].Value
-  $localGatesContractStep = [regex]::Match(
-    $localGatesContractJob,
-    '(?ms)^      - name: Run contract suites\s*$(?<body>.*?)(?=^      - name:|\z)'
-  ).Groups['body'].Value
+  # The requirement is that the full aggregate runs somewhere unconditionally, not that a workflow
+  # called local-gates.yml runs it. Naming the file made this contract fail when the job moved, and
+  # would have let it keep passing if the aggregate had been quietly gated behind an `if:` in a
+  # differently-named workflow (#445).
+  $unconditionalAggregateRunners = @(
+    Find-UnconditionalWorkflowSteps `
+      -RepoRoot $repoRoot `
+      -RunPattern '(?m)^\s+run: npm run validate:tests\s*$'
+  )
   Write-TestResult `
-    -TestName 'Local Gates keeps the full test aggregate including hook regressions' `
-    -Passed (
-      -not [string]::IsNullOrWhiteSpace($localGatesContractStep) -and
-      $localGatesContractStep -match '(?m)^        run: npm run validate:tests\s*$' -and
-      $localGatesContractStep -notmatch '(?m)^\s+(if|continue-on-error):' -and
-      $localGatesContractJobPreamble -notmatch '(?m)^\s+(if|continue-on-error):'
-    ) `
-    -Message 'Expected .github/workflows/local-gates.yml to run the full validate:tests aggregate.'
+    -TestName 'Some workflow runs the full test aggregate unconditionally' `
+    -Passed ($unconditionalAggregateRunners.Count -gt 0) `
+    -Message "Expected a workflow job with no if:/continue-on-error: to run 'npm run validate:tests'. Found: $($unconditionalAggregateRunners -join ', ')"
 
   $includesLintSpelling = $validateLocalScript -match 'npm run lint:spelling(?!:config)'
   Write-TestResult `
@@ -1450,6 +1435,107 @@ function Get-WorkflowContentWithoutComments {
   return [string]($strippedLines -join "`n")
 }
 
+function Find-UnconditionalWorkflowSteps {
+  <#
+    .SYNOPSIS
+    Finds every workflow step whose `run:` matches a pattern and which nothing can skip.
+
+    .DESCRIPTION
+    Returns `<workflow file>:<job id>` for each match, so a contract can assert that a requirement is
+    met SOMEWHERE rather than naming the file that happens to meet it today (#445). A step counts only
+    when neither it nor its job preamble carries `if:` or `continue-on-error:`, because a gated step
+    satisfies the letter of "the workflow runs it" while satisfying none of the intent.
+
+    An empty result is the failure the caller must check for: a discovery that matches nothing would
+    otherwise pass silently, which is the quiet failure mode the named-file version at least avoided.
+  #>
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$RunPattern
+  )
+
+  [string[]]$found = @()
+  $workflowDirectory = Join-Path $RepoRoot '.github/workflows'
+  if (-not (Test-Path -LiteralPath $workflowDirectory)) {
+    return $found
+  }
+
+  $workflows = Get-ChildItem -LiteralPath $workflowDirectory -File |
+    Where-Object { $_.Extension -in @('.yml', '.yaml') } |
+    Sort-Object Name
+  foreach ($workflow in $workflows) {
+    $content = Get-WorkflowContentWithoutComments -Path $workflow.FullName
+    $jobsBlock = [regex]::Match(
+      $content,
+      '(?ms)^jobs:\s*\r?\n(?<body>.*?)(?=^[a-zA-Z]|\z)'
+    ).Groups['body'].Value
+    if ([string]::IsNullOrWhiteSpace($jobsBlock)) {
+      continue
+    }
+
+    $jobMatches = [regex]::Matches(
+      $jobsBlock,
+      '(?ms)^  (?<id>[a-zA-Z0-9_-]+):\s*\r?\n(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:|\z)'
+    )
+    foreach ($jobMatch in $jobMatches) {
+      $jobBody = $jobMatch.Groups['body'].Value
+      $jobPreamble = [regex]::Match(
+        $jobBody,
+        '(?ms)\A(?<body>.*?)(?=^    steps:\s*$)'
+      ).Groups['body'].Value
+      if ([string]::IsNullOrWhiteSpace($jobPreamble)) {
+        continue
+      }
+      if ($jobPreamble -match '(?m)^\s+(if|continue-on-error):') {
+        continue
+      }
+
+      $stepMatches = [regex]::Matches($jobBody, '(?ms)^      - (?<body>.*?)(?=^      - |\z)')
+      foreach ($stepMatch in $stepMatches) {
+        $stepBody = $stepMatch.Groups['body'].Value
+        if ($stepBody -notmatch $RunPattern) {
+          continue
+        }
+        if ($stepBody -match '(?m)^\s+(if|continue-on-error):') {
+          continue
+        }
+        $found += "$($workflow.Name):$($jobMatch.Groups['id'].Value)"
+      }
+    }
+  }
+
+  return $found
+}
+
+function Find-WorkflowsUsingAction {
+  <#
+    .SYNOPSIS
+    Returns the paths of the workflows that invoke a given action, comments stripped.
+  #>
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$Action
+  )
+
+  [string[]]$found = @()
+  $workflowDirectory = Join-Path $RepoRoot '.github/workflows'
+  if (-not (Test-Path -LiteralPath $workflowDirectory)) {
+    return $found
+  }
+
+  $workflows = Get-ChildItem -LiteralPath $workflowDirectory -File |
+    Where-Object { $_.Extension -in @('.yml', '.yaml') } |
+    Sort-Object Name
+  foreach ($workflow in $workflows) {
+    $content = Get-WorkflowContentWithoutComments -Path $workflow.FullName
+    if ($content -match ('(?m)^\s+uses:\s+' + [regex]::Escape($Action) + '(@|\s|$)')) {
+      $found += $workflow.FullName
+    }
+  }
+
+  return $found
+}
+
 function Run-DocumentationWorkflowContractTests {
   Write-Host ""
   Write-Host "Documentation workflow contracts:" -ForegroundColor Magenta
@@ -1616,13 +1702,21 @@ function Run-ReleaseDrafterChangelogVersionContractTests {
   Write-Host ""
 
   $repoRoot = Get-RepoRoot
-  $workflowPath = Join-Path $repoRoot '.github/workflows/release-drafter.yml'
+  # The subject is whichever workflow drafts releases, which the action it invokes identifies and its
+  # filename only happens to (#445).
+  $drafterWorkflows = @(
+    Find-WorkflowsUsingAction -RepoRoot $repoRoot -Action 'release-drafter/release-drafter'
+  )
 
-  if (-not (Test-Path $workflowPath)) {
-    Write-TestResult -TestName 'release-drafter workflow exists for version extraction contracts' -Passed $false -Message "Missing file: $workflowPath"
+  if ($drafterWorkflows.Count -ne 1) {
+    Write-TestResult `
+      -TestName 'Exactly one workflow drafts releases' `
+      -Passed $false `
+      -Message "Expected one workflow using release-drafter/release-drafter, found $($drafterWorkflows.Count): $($drafterWorkflows -join ', ')"
     return
   }
 
+  $workflowPath = $drafterWorkflows[0]
   $workflowContent = Get-Content -Path $workflowPath -Raw
   $workflowLines = @($workflowContent -split "`r?`n")
   $onBlockLines = @()
@@ -1645,7 +1739,7 @@ function Run-ReleaseDrafterChangelogVersionContractTests {
   Write-TestResult `
     -TestName 'release-drafter is manual-only so release publishes cannot race draft updates' `
     -Passed ((-not $hasPushTrigger) -and $hasWorkflowDispatchTrigger) `
-    -Message 'Expected release-drafter.yml to expose workflow_dispatch without an automatic push trigger.'
+    -Message "Expected $workflowPath to expose workflow_dispatch without an automatic push trigger."
 
   Write-TestResult `
     -TestName 'release-drafter extracts latest changelog header before version selection' `
