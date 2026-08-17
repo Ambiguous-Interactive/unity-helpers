@@ -51,10 +51,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
-        /// Dual-pivot quicksort helper modeled after Vladimir Yaroslavskiy’s Java 7 implementation.
+        /// Dual-pivot quicksort helper, implemented from Vladimir Yaroslavskiy's published description
+        /// of the scheme rather than from any particular implementation of it.
         /// </summary>
         /// <remarks>
-        /// Adapted for <c>IList&lt;T&gt;</c> with an insertion sort threshold to avoid excess recursion.
+        /// Written against <c>T[]</c> with an insertion sort threshold to avoid excess recursion.
         /// </remarks>
         private static void DualPivotQuickSort<T, TComparer>(
             T[] array,

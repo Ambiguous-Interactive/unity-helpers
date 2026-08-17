@@ -21,6 +21,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const int TestIterations = 10_000;
         private const float Epsilon = 0.0001f;
 
+        // The contract is not "smaller than max", it is "the next representable value below it".
+        // Anything looser passes for an implementation that gives away far more range than it must.
+        private static readonly double[] BoundedDoubleMaxima =
+        {
+            1d,
+            10d,
+            0.1d,
+            double.MaxValue,
+            double.Epsilon,
+            2.2250738585072014E-308,
+            -1d,
+            -0.1d,
+        };
+
+        private static readonly float[] BoundedFloatMaxima =
+        {
+            1f,
+            10f,
+            0.1f,
+            float.MaxValue,
+            float.Epsilon,
+            1.17549435E-38f,
+            -1f,
+            -0.1f,
+        };
+
+        [Test]
+        public void BoundedDoubleAtMaxReturnsTheNextRepresentableValueDown()
+        {
+            foreach (double max in BoundedDoubleMaxima)
+            {
+                long bits = BitConverter.DoubleToInt64Bits(max);
+                double expected = BitConverter.Int64BitsToDouble(max > 0d ? bits - 1L : bits + 1L);
+
+                double result = WallMath.BoundedDouble(max, max);
+
+                Assert.AreEqual(
+                    expected,
+                    result,
+                    $"BoundedDouble({max:R}) gave away more range than one representable step."
+                );
+                Assert.Less(result, max);
+            }
+        }
+
+        [Test]
+        public void BoundedDoubleAtZeroReturnsTheFirstNegativeSubnormal()
+        {
+            Assert.AreEqual(-double.Epsilon, WallMath.BoundedDouble(0d, 0d));
+        }
+
+        [Test]
+        public void BoundedFloatAtMaxReturnsTheNextRepresentableValueDown()
+        {
+            foreach (float max in BoundedFloatMaxima)
+            {
+                int bits = BitConverter.SingleToInt32Bits(max);
+                float expected = BitConverter.Int32BitsToSingle(max > 0f ? bits - 1 : bits + 1);
+
+                float result = WallMath.BoundedFloat(max, max);
+
+                Assert.AreEqual(
+                    expected,
+                    result,
+                    $"BoundedFloat({max:R}) gave away more range than one representable step."
+                );
+                Assert.Less(result, max);
+            }
+        }
+
+        [Test]
+        public void BoundedFloatAtZeroReturnsTheFirstNegativeSubnormal()
+        {
+            Assert.AreEqual(-float.Epsilon, WallMath.BoundedFloat(0f, 0f));
+        }
+
         [Test]
         public void BoundedDoubleValueLessThanMax()
         {

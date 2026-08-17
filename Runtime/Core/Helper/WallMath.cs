@@ -1,10 +1,5 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
-//
-// The BoundedDouble helper in this file follows the bounded-double technique from Java's
-// ThreadLocalRandom (OpenJDK); see the method remark for the reference. The design is the original
-// author's, whose name and license terms are not recorded in this repository.
-// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
@@ -21,14 +16,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static class WallMath
     {
         /// <summary>
-        /// Ensures a double value is strictly less than the specified maximum by decrementing
-        /// its bit representation if necessary. Borrowed from Java's ThreadLocalRandom.
+        /// Returns <paramref name="value"/> if it is already below <paramref name="max"/>, and
+        /// otherwise the largest representable value below it.
         /// </summary>
         /// <param name="max">The exclusive upper bound</param>
         /// <param name="value">The value to bound</param>
         /// <returns>A value strictly less than max</returns>
         /// <remarks>
-        /// Reference: http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/concurrent/ThreadLocalRandom.java#356
+        /// <para>
+        /// Scaling a unit random draw by a bound can round up to the bound itself, which breaks the
+        /// half-open interval every caller assumes. Stepping down one representable value is the
+        /// smallest correction that restores it.
+        /// </para>
+        /// <para>
+        /// The step relies on IEEE-754 laying out same-signed values in the same order as their bit
+        /// patterns, so the next value down is one integer step away. This is what
+        /// <c>Math.BitDecrement</c> does; it is reimplemented here because Unity's profile does not
+        /// carry that method, and the two agree on every <see cref="float"/>.
+        /// </para>
         /// </remarks>
         public static double BoundedDouble(double max, double value)
         {
@@ -77,6 +82,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return PreviousFloat(value);
         }
 
+        /// <summary>
+        /// The largest <see cref="double"/> below <paramref name="value"/>.
+        /// </summary>
+        /// <remarks>
+        /// Positive values step down in bit space and negative values step up, because the sign bit
+        /// reverses the ordering. Zero is its own case: the value below it is the first negative
+        /// subnormal, whose bit pattern is not adjacent to zero's.
+        /// </remarks>
         private static double PreviousDouble(double value)
         {
             if (double.IsNaN(value))
@@ -104,6 +117,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return BitConverter.Int64BitsToDouble(bits);
         }
 
+        /// <summary>
+        /// The largest <see cref="float"/> below <paramref name="value"/>. The <see cref="double"/>
+        /// overload's remark explains the cases.
+        /// </summary>
         private static float PreviousFloat(float value)
         {
             if (float.IsNaN(value))

@@ -184,21 +184,14 @@ The following runtime helpers adapt code or techniques published by others.
 - License: Not recorded in this repository.
 - Notes: `Runtime/Utils/TextureScale.cs` adapts these routines with pooled buffers, task-based parallelism, input validation, and center-aligned sampling.
 
-### Java ThreadLocalRandom (bounded double)
-
-- Description: Technique for bounding a double below an exclusive maximum by adjusting its bit representation.
-- Author: OpenJDK contributors; individual authors are not recorded in this repository.
-- Upstream: [OpenJDK 8 ThreadLocalRandom](http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/concurrent/ThreadLocalRandom.java#356)
-- License: Not recorded in this repository.
-- Notes: `WallMath.BoundedDouble` follows this technique.
-
 ## Academic & Historical Acknowledgments
 
 The following algorithms are based on well-known academic work and are implemented from published descriptions:
 
 ### Sorting Algorithms
 
-- **TimSort**: Hybrid stable sort by Tim Peters (Python) and OpenJDK. [Python description](https://bugs.python.org/file4451/timsort.txt)
+- **TimSort**: Hybrid stable sort by Tim Peters. [His description](https://bugs.python.org/file4451/timsort.txt)
+- **Dual-Pivot Quicksort**: Partitioning scheme published by Vladimir Yaroslavskiy (2009), used by `FluxSort`'s partition helper.
 - **SmoothSort**: Heap-based adaptive sort by Edsger Dijkstra. Further analysis by Stefan Edelkamp and Armin Wegener.
 - **JesseSort**: Dual-patience sort hybrid by Jesse Michel. [GitHub](https://github.com/lewj85/jessesort)
 - **greeNsort**: Symmetric mergesort by Jens Oehlschlegel. [Website](https://www.greensort.org)

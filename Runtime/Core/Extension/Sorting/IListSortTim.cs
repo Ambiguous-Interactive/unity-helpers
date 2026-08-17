@@ -1,10 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is TimSort, by Tim Peters, described at
-// https://bugs.python.org/file4451/timsort.txt, and further refined by the OpenJDK adaptation. This
-// is an independent implementation of a published algorithm; the design is the original author's.
-// See docs/project/third-party-notices.md.
+// The algorithm in this file is TimSort, by Tim Peters, described by him at
+// https://bugs.python.org/file4451/timsort.txt. This is an independent implementation of that
+// published description -- the run-management helpers carry the names the description gives them --
+// and the design is the original author's. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -19,8 +19,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Sorts the list using TimSort, a hybrid stable sort that detects natural runs and merges them adaptively.
         /// </summary>
         /// <remarks>
-        /// Implementation reference: TimSort by Tim Peters (Python) and the OpenJDK adaptation.
-        /// Sources: https://bugs.python.org/file4451/timsort.txt and https://openjdk.java.net/projects/amber/.
+        /// Implementation reference: TimSort by Tim Peters, from his own description at
+        /// https://bugs.python.org/file4451/timsort.txt.
         /// </remarks>
         public static void TimSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
