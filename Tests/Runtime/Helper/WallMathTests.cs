@@ -1402,8 +1402,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void PositiveModDoubleWithOne()
         {
+            // -5.5 mod 1 is 0.5 under floored modulo, the same as 5.5 mod 1.
             Assert.AreEqual(0.5, 5.5.PositiveMod(1.0), Epsilon);
-            Assert.AreEqual(0.0, (-5.5).PositiveMod(1.0), Epsilon);
+            Assert.AreEqual(0.5, (-5.5).PositiveMod(1.0), Epsilon);
+            Assert.AreEqual(0.0, 5.0.PositiveMod(1.0), Epsilon);
         }
 
         [Test]
