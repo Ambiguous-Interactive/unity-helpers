@@ -1,0 +1,151 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+// ReSharper disable once CheckNamespace
+namespace WallstopStudios.UnityHelpers.Core.Extension
+{
+    using System;
+    using System.Collections.Generic;
+    using Utils;
+
+    public static partial class IListExtensions
+    {
+        /// <summary>
+        /// Sorts the list using TimSort, a hybrid stable sort that detects natural runs and merges them adaptively.
+        /// </summary>
+        /// <remarks>
+        /// Implementation reference: TimSort by Tim Peters (Python) and the OpenJDK adaptation.
+        /// Sources: https://bugs.python.org/file4451/timsort.txt and https://openjdk.java.net/projects/amber/.
+        /// </remarks>
+        public static void TimSort<T, TComparer>(this IList<T> array, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
+            int count = array.Count;
+            if (count < 2)
+            {
+                return;
+            }
+
+            int minRun = ComputeTimSortMinRun(count);
+            using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(
+                Math.Max(count / 2 + 1, 32),
+                out T[] buffer
+            );
+            using PooledResource<List<(int start, int length)>> runStackLease = Buffers<(
+                int start,
+                int length
+            )>.List.Get(out List<(int start, int length)> runStack);
+            runStack.Clear();
+
+            int index = 0;
+            while (index < count)
+            {
+                int runLength = MakeAscendingRun(array, index, count, comparer);
+                int forcedLength = Math.Max(runLength, minRun);
+                int targetEnd = Math.Min(count, index + forcedLength);
+                if (runLength < forcedLength)
+                {
+                    InsertionSortRange(array, index, targetEnd - 1, comparer);
+                    runLength = targetEnd - index;
+                }
+
+                runStack.Add((index, runLength));
+                TimSortMergeCollapse(array, comparer, buffer, runStack);
+                index += runLength;
+            }
+
+            TimSortMergeForce(array, comparer, buffer, runStack);
+        }
+
+        private static int ComputeTimSortMinRun(int length)
+        {
+            int remainder = 0;
+            while (length >= 64)
+            {
+                remainder |= length & 1;
+                length >>= 1;
+            }
+
+            return length + remainder;
+        }
+
+        private static void TimSortMergeCollapse<T, TComparer>(
+            IList<T> array,
+            TComparer comparer,
+            T[] buffer,
+            List<(int start, int length)> runStack
+        )
+            where TComparer : IComparer<T>
+        {
+            while (runStack.Count > 1)
+            {
+                int size = runStack.Count;
+                if (size >= 3)
+                {
+                    (int startA, int lengthA) = runStack[size - 3];
+                    (int startB, int lengthB) = runStack[size - 2];
+                    (int startC, int lengthC) = runStack[size - 1];
+                    if (lengthA <= lengthB + lengthC || lengthB <= lengthC)
+                    {
+                        if (lengthA < lengthC)
+                        {
+                            TimSortMergeAt(array, comparer, buffer, runStack, size - 3);
+                        }
+                        else
+                        {
+                            TimSortMergeAt(array, comparer, buffer, runStack, size - 2);
+                        }
+                        continue;
+                    }
+                }
+
+                (int prevStart, int prevLength) = runStack[size - 2];
+                (int lastStart, int lastLength) = runStack[size - 1];
+                if (prevLength <= lastLength)
+                {
+                    TimSortMergeAt(array, comparer, buffer, runStack, size - 2);
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        private static void TimSortMergeForce<T, TComparer>(
+            IList<T> array,
+            TComparer comparer,
+            T[] buffer,
+            List<(int start, int length)> runStack
+        )
+            where TComparer : IComparer<T>
+        {
+            while (runStack.Count > 1)
+            {
+                int size = runStack.Count;
+                int index = size - 2;
+                if (size >= 3 && runStack[size - 3].length < runStack[size - 1].length)
+                {
+                    index = size - 3;
+                }
+
+                TimSortMergeAt(array, comparer, buffer, runStack, index);
+            }
+        }
+
+        private static void TimSortMergeAt<T, TComparer>(
+            IList<T> array,
+            TComparer comparer,
+            T[] buffer,
+            List<(int start, int length)> runStack,
+            int index
+        )
+            where TComparer : IComparer<T>
+        {
+            (int leftStart, int leftLength) = runStack[index];
+            (int rightStart, int rightLength) = runStack[index + 1];
+            MergeRuns(array, buffer, leftStart, leftLength, rightStart, rightLength, comparer);
+            runStack[index] = (leftStart, leftLength + rightLength);
+            runStack.RemoveAt(index + 1);
+        }
+    }
+}
