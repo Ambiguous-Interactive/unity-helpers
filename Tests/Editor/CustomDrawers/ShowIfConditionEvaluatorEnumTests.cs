@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
+namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 {
     using System;
     using NUnit.Framework;
@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         // Convert.ToInt64 throws OverflowException on any of these above long.MaxValue, and the
         // evaluator's catch turned that into a silent "does not match" -- so a WShowIf naming
         // Highest hid the field it was supposed to reveal.
-        private enum UnsignedExampleEnum : ulong
+        public enum UnsignedExampleEnum : ulong
         {
             None = 0,
             One = 1,
@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         }
 
         [Flags]
-        private enum UnsignedExampleFlags : ulong
+        public enum UnsignedExampleFlags : ulong
         {
             None = 0,
             Low = 1UL << 0,
@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             TopBit = 1UL << 63,
         }
 
-        private enum SignedExampleEnum : long
+        public enum SignedExampleEnum : long
         {
             None = 0,
             Minimum = long.MinValue,
