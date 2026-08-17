@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The BoundedDouble helper in this file follows the bounded-double technique from Java's
+// ThreadLocalRandom (OpenJDK); see the method remark for the reference. The design is the original
+// author's, whose name and license terms are not recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {

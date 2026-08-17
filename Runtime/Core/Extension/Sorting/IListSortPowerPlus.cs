@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is PowerSort+, from the published work of Sebastian Wild and Martin
+// Nebel. This is an independent implementation of a published algorithm; the design is the original
+// authors'. No upstream URL or license is recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension

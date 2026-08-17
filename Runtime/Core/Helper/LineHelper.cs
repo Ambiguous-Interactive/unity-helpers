@@ -1,5 +1,11 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The polyline simplification in this file is the Ramer-Douglas-Peucker algorithm, by way of the C#
+// implementation by Craig Selbert,
+// https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap.
+// This is an adaptation of that work; the design is the original author's. The upstream license is
+// not recorded in this repository. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {

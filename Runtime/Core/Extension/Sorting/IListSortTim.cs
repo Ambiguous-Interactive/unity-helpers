@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is TimSort, by Tim Peters, described at
+// https://bugs.python.org/file4451/timsort.txt, and further refined by the OpenJDK adaptation. This
+// is an independent implementation of a published algorithm; the design is the original author's.
+// See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension

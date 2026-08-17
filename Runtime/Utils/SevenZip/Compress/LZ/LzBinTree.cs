@@ -1,5 +1,9 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The code in this file is from the 7-Zip LZMA SDK, Public Domain, https://www.7-zip.org/sdk.html.
+// This is vendored upstream source with only namespace and style adjustments; the design is the
+// original author's. See docs/project/third-party-notices.md.
 
 // LzBinTree.cs
 

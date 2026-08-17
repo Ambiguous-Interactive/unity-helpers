@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is IPS4o (in-place parallel super scalar samplesort), from the paper by
+// Michael Axtmann, Sascha Witt, Daniel Ferizovic, and Peter Sanders, https://arxiv.org/abs/1705.02257.
+// This is an independent implementation of a published algorithm; the design is the original authors'.
+// See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -22,7 +27,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Sorts the list using IPS⁴o, a cache-aware samplesort that partitions into multiple buckets per pass.
         /// </summary>
         /// <remarks>
-        /// Implementation reference: IPS⁴o samplesort (Axtmann, Sanders, Schulz, Wenger), https://arxiv.org/abs/1705.02257.
+        /// Implementation reference: IPS⁴o samplesort (Axtmann, Witt, Ferizovic, Sanders), https://arxiv.org/abs/1705.02257.
         /// </remarks>
         public static void Ips4oSort<T, TComparer>(this IList<T> array, TComparer comparer)
             where TComparer : IComparer<T>

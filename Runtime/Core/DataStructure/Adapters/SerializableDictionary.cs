@@ -1,8 +1,9 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
-
-// Portions of this file are adapted from JDSherbert's Unity-Serializable-Dictionary (MIT License):
-// https://github.com/JDSherbert/Unity-Serializable-Dictionary
+//
+// Portions of this file are adapted from Unity-Serializable-Dictionary by JDSherbert, MIT License,
+// https://github.com/JDSherbert/Unity-Serializable-Dictionary. The design of those portions is the
+// original author's. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 {

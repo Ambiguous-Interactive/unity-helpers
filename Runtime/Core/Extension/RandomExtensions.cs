@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// Portions of this file are independent implementations of published algorithms: uniform random
+// rotations from Shoemake, "Uniform Random Rotations", Graphics Gems III; and uniform points on a
+// sphere from Marsaglia's method. The designs are the original authors'.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {

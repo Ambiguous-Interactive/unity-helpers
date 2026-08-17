@@ -1,5 +1,9 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is PCG (Permuted Congruential Generator), by Melissa O'Neill,
+// Apache License 2.0, https://www.pcg-random.org/. This is an adaptation of that work; the design is
+// the original author's. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

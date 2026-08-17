@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is XorShift, from George Marsaglia, "Xorshift RNGs", Journal of
+// Statistical Software (2003), https://doi.org/10.18637/jss.v008.i14. This is an independent
+// implementation of a published algorithm; the design is the original author's.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

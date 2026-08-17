@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The bilinear and point scaling routines in this file are adapted from the Unity Community wiki
+// TextureScale, http://wiki.unity3d.com/index.php/TextureScale. The design is the original author's;
+// no author or license for that page is recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Utils
 {

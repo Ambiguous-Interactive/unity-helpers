@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// Portions of this file are adapted from SeniaAnimationEventEditor by yujen,
+// https://gist.github.com/yujen/5e1cd78e2a341260b38029de08a449da. The design of those portions is
+// the original author's. The upstream license is not recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Editor
 {

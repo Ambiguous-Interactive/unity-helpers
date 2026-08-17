@@ -1,5 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is Grail Sort, by Mrrl (Andrey Astrelin), MIT License,
+// https://github.com/Mrrl/GrailSort. This is an adaptation of that work; the design is the original
+// author's. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension

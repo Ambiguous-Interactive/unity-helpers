@@ -1,9 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
-
-// Portions of this file are adapted from Unity Editor Toolbox (InlineEditorAttributeDrawer)
-// Copyright (c) 2017-2023 arimger
-// Licensed under the MIT License: https://github.com/arimger/Unity-Editor-Toolbox/blob/main/LICENSE.md
+//
+// Portions of this file are adapted from Unity Editor Toolbox (InlineEditorAttributeDrawer),
+// Copyright (c) 2017-2023 arimger, MIT License,
+// https://github.com/arimger/Unity-Editor-Toolbox/blob/main/LICENSE.md. The design of those portions
+// is the original author's. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {

@@ -1,5 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is WikiSort (block merge sort), by Mike McFadden (BonzaiThePenguin),
+// Public Domain, https://github.com/BonzaiThePenguin/WikiSort. This is an adaptation of that work;
+// the design is the original author's. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -14,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Sorts the list using block-based stable merges backed by a pooled buffer.
         /// </summary>
         /// <remarks>
-        /// Implementation reference: WikiSort / block merge sort by Mike Ash (public domain),
+        /// Implementation reference: WikiSort / block merge sort by Mike McFadden (BonzaiThePenguin, public domain),
         /// https://github.com/BonzaiThePenguin/WikiSort. This adaptation uses a pooled full-size buffer.
         /// </remarks>
         public static void BlockMergeSort<T, TComparer>(this IList<T> array, TComparer comparer)

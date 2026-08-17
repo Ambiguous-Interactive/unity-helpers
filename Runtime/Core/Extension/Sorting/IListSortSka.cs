@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is Ska Sort, by Malte Skarupke,
+// https://probablydance.com/2016/12/27/i-wrote-a-faster-sorting-algorithm/. This is an adaptation of
+// that work; the design is the original author's. The upstream license is not recorded in this
+// repository. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension

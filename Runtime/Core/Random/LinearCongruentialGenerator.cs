@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is the Park-Miller linear congruential generator, from Park and Miller,
+// "Random Number Generators: Good Ones Are Hard to Find", Communications of the ACM 31(10):1192-1201
+// (1988). This is an independent implementation of a published algorithm; the design is the original
+// authors'. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

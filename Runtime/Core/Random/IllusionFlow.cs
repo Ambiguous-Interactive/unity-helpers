@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is IllusionFlow, by Will Stafford Parsons,
+// https://github.com/wstaffordp/illusionflow. This is an adaptation of that work; the design is the
+// original author's. The upstream license is not recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 /*
     IllusionFlow is a significant enhancement upon the classic XoroShiroRandom discovered by Will Stafford Parsons.

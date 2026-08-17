@@ -35,9 +35,17 @@ This package contains third-party software components governed by the license(s)
 - License URL: [MIT License](https://opensource.org/license/MIT)
 - Notes: Portions of `WInLineEditorDrawer` build upon concepts from the toolbox's InlineEditor drawer implementation.
 
+### SeniaAnimationEventEditor
+
+- Description: Editor window for inspecting and editing `AnimationEvent` entries on an `AnimationClip`.
+- Author: yujen
+- Upstream: [GitHub gist](https://gist.github.com/yujen/5e1cd78e2a341260b38029de08a449da)
+- License: Not recorded in this repository.
+- Notes: Portions of `Editor/AnimationEventEditor.cs` are adapted from this gist.
+
 ## Sorting Algorithms
 
-The following sorting algorithm implementations in `Runtime/Core/Extension/IListExtensions.cs` are adapted from or inspired by third-party sources.
+The following sorting algorithm implementations in `Runtime/Core/Extension/Sorting/` are adapted from or inspired by third-party sources.
 
 ### Pattern-Defeating QuickSort (pdqsort)
 
@@ -86,6 +94,14 @@ The following sorting algorithm implementations in `Runtime/Core/Extension/IList
 - Upstream: [arXiv paper](https://arxiv.org/abs/1705.02257)
 - License: Academic paper; algorithm concepts are freely implementable
 - Notes: Single-threaded C# adaptation with multiway partitioning.
+
+### YamSort
+
+- Description: Stable top-down bisection mergesort that adapts its insertion-sort threshold and merge strategy to how sequential the data turns out to be.
+- Author: Gary Gende
+- Upstream: [GitHub repository](https://github.com/gendeg/YamSort)
+- License: MIT License
+- Notes: Adaptation in `Runtime/Core/Extension/Sorting/IListSortYam.cs` replaces the upstream `Span`/`IComparable` surface with `IList<T>` and an explicit comparer.
 
 ## Random Number Generators
 
@@ -140,6 +156,42 @@ The following algorithms are by Will Stafford Parsons (wileylooper). Note: The o
 
 License: These implementations are used with attribution to the original author. Please refer to the individual repositories for specific licensing terms if they become available again.
 
+### Perlin Noise (Improved Noise)
+
+- Description: Gradient noise function; the default permutation table and the fade and gradient functions come from Ken Perlin's reference implementation.
+- Author: Ken Perlin
+- Upstream: Not recorded in this repository (Ken Perlin's Improved Noise reference implementation).
+- License: Not recorded in this repository.
+- Notes: Implemented in `Runtime/Core/Random/PerlinNoise.cs`, which adds seeded permutation shuffling and Unity vector overloads.
+
+## Runtime Utilities
+
+The following runtime helpers adapt code or techniques published by others.
+
+### Ramer-Douglas-Peucker Line Simplification
+
+- Description: Polyline simplification by recursive perpendicular-distance splitting.
+- Authors: Algorithm by Ramer, Douglas, and Peucker; the C# implementation adapted here was published by Craig Selbert.
+- Upstream: [CodeProject article](https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap)
+- License: Not recorded in this repository.
+- Notes: `Runtime/Core/Helper/LineHelper.cs` adapts the implementation for Unity vector types.
+
+### Unity Community Wiki TextureScale
+
+- Description: Bilinear and point texture scaling routines for `Texture2D`.
+- Author: Not recorded in this repository.
+- Upstream: [Unity Community wiki](http://wiki.unity3d.com/index.php/TextureScale)
+- License: Not recorded in this repository.
+- Notes: `Runtime/Utils/TextureScale.cs` adapts these routines with pooled buffers, task-based parallelism, input validation, and center-aligned sampling.
+
+### Java ThreadLocalRandom (bounded double)
+
+- Description: Technique for bounding a double below an exclusive maximum by adjusting its bit representation.
+- Author: OpenJDK contributors; individual authors are not recorded in this repository.
+- Upstream: [OpenJDK 8 ThreadLocalRandom](http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/concurrent/ThreadLocalRandom.java#356)
+- License: Not recorded in this repository.
+- Notes: `WallMath.BoundedDouble` follows this technique.
+
 ## Academic & Historical Acknowledgments
 
 The following algorithms are based on well-known academic work and are implemented from published descriptions:
@@ -159,6 +211,11 @@ The following algorithms are based on well-known academic work and are implement
 - **Linear Congruential Generator**: Park-Miller variant (1988). "Random Number Generators: Good Ones Are Hard to Find" Communications of the ACM 31(10):1192-1201
 - **Squirrel Noise**: Hash-based noise function by Squirrel Eiserloh. [GDC Talk](https://youtu.be/LWFzPP8ZbdU?t=2673)
 
+### Sampling & Geometry
+
+- **Uniform Random Rotations**: Shoemake, "Uniform Random Rotations", Graphics Gems III. Implemented in `RandomExtensions.NextRotation`.
+- **Sphere Point Picking**: Marsaglia's rejection method for uniform points on a sphere. Implemented in `RandomExtensions`.
+
 ## Additional Notes
 
 - System.Text.Json and other .NET BCL components are used as part of the .NET runtime and are subject to their respective licenses (e.g., MIT for dotnet/runtime). No vendored sources from these components are included in this repository.
@@ -167,7 +224,7 @@ The following algorithms are based on well-known academic work and are implement
 
 ### MIT License
 
-Used by: Unity-Serializable-Dictionary, Unity Editor Toolbox, Grail Sort, cocowalla/wyhash-dotnet
+Used by: Unity-Serializable-Dictionary, Unity Editor Toolbox, Grail Sort, YamSort, cocowalla/wyhash-dotnet
 
 ```text
 MIT License

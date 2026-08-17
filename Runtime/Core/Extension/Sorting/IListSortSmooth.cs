@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is SmoothSort, from the published work of Edsger W. Dijkstra, with later
+// analysis by Stefan Edelkamp and Armin Wegener, and explanatory write-ups by Nico Lomuto and Keith
+// Schwarz. This is an independent implementation of a published algorithm; the design is the original
+// author's. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension

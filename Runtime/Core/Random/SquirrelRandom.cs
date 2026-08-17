@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is Squirrel Noise, by Squirrel Eiserloh, presented in his GDC talk
+// "Math for Game Programmers: Noise-Based RNG", https://youtu.be/LWFzPP8ZbdU?t=2673. This
+// implementation follows the approach presented there; the design is the original author's. The
+// upstream license is not recorded in this repository. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

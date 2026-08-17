@@ -1,5 +1,9 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is RomuDuo, from the ROMU family by Mark A. Overton, CC0 1.0 Universal
+// (Public Domain), https://romu-random.org/. This is an adaptation of that work; the design is the
+// original author's. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

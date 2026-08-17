@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is BlastCircuit, by Will Stafford Parsons (wileylooper/blastcircuit, the
+// upstream repository is offline). This is an adaptation of that work; the design is the original
+// author's. The upstream license is not recorded in this repository.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is wyhash/wyrand, by Wang Yi, The Unlicense (Public Domain),
+// https://github.com/wangyi-fudan/wyhash, by way of the .NET port cocowalla/wyhash-dotnet
+// (MIT License), https://github.com/cocowalla/wyhash-dotnet. This is an adaptation of that work; the
+// design is the original author's. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {

@@ -1,5 +1,10 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+//
+// The algorithm in this file is Perlin noise (Improved Noise), by Ken Perlin. The default permutation
+// table and the fade and gradient functions come from his reference implementation. This is an
+// adaptation of that work; the design is the original author's. The upstream license is not recorded
+// in this repository. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
