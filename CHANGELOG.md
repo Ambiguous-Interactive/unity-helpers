@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix settings color keys being stored case-sensitively while every reader matched them without regard to case, so `"Save"` and `"save"` were two palette entries on disk and one entry to every reader ([#476](https://github.com/Ambiguous-Interactive/unity-helpers/issues/476)).
+- Fix `SerializableSortedDictionary` skipping the rebuild of its serialized arrays when two stored keys compare equal under its own comparer, which could leave a newly added key unsaved ([#476](https://github.com/Ambiguous-Interactive/unity-helpers/issues/476)).
 - Fix `SerializableDictionary`, `SerializableSortedDictionary` and `SerializableHashSet` writing back entries their own comparer holds as one, so a case-insensitive dictionary could save two entries that merged into one on the next load ([#476](https://github.com/Ambiguous-Interactive/unity-helpers/issues/476)).
 - Fix `SortAlgorithm.Power` and `SortAlgorithm.PowerPlus` reordering elements that compare equal, which both are documented as never doing. Any list whose equal elements sit inside a descending stretch was affected ([#461](https://github.com/Ambiguous-Interactive/unity-helpers/issues/461)).
 - Fix `SerializableDictionary` and `SerializableSortedDictionary` discarding a comparer they were constructed with, so seeding one with `StringComparer.OrdinalIgnoreCase` — the documented way to make it case-insensitive — did nothing ([#472](https://github.com/Ambiguous-Interactive/unity-helpers/issues/472)).

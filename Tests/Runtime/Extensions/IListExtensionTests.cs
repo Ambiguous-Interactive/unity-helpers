@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.Linq;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -446,6 +447,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int[] viaEnum = input.ToArray();
             viaEnum.Sort(new IntComparer(), SortAlgorithm.Ips4o);
             Assert.That(viaEnum, Is.EqualTo(expected));
+        }
+
+        /// <remarks>
+        /// The sorts run over an array and write the result back, and the write-back has a bulk path
+        /// for the list types that offer one. A container that takes that path has to come out sorted,
+        /// the same length, and holding the same elements.
+        /// </remarks>
+        [TestCaseSource(nameof(SortingAlgorithmCases))]
+        public void SortingAlgorithmsWriteBackToEveryContainerShape(
+            string algorithmName,
+            IntSortAlgorithm algorithm
+        )
+        {
+            int[] source = Enumerable.Range(0, 257).Select(i => (i * 37) % 101).ToArray();
+            int[] expected = source.OrderBy(value => value).ToArray();
+
+            int[] array = source.ToArray();
+            algorithm(array, new IntComparer());
+            Assert.That(array, Is.EqualTo(expected), $"{algorithmName} over T[]");
+
+            List<int> list = new(source);
+            algorithm(list, new IntComparer());
+            Assert.That(list, Is.EqualTo(expected), $"{algorithmName} over List<T>");
+
+            SerializableList<int> serializable = new();
+            serializable.AddRange(source);
+            algorithm(serializable, new IntComparer());
+            Assert.That(serializable.Count, Is.EqualTo(expected.Length));
+            Assert.That(
+                serializable.ToArray(),
+                Is.EqualTo(expected),
+                $"{algorithmName} over SerializableList<T>"
+            );
         }
 
         [TestCaseSource(nameof(StableSortingAlgorithmCases))]

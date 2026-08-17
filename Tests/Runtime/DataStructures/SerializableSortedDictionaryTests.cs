@@ -525,6 +525,34 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(dictionary.PreserveSerializedEntries);
         }
 
+        /// <remarks>
+        /// The count-matched fast path skips the rebuild entirely, so it has to prove the serialized
+        /// keys are unique under this dictionary's own comparer -- not merely that each one exists.
+        /// Two keys that the comparer calls the same make the counts match by coincidence, and a key
+        /// the user added is then never written to disk at all.
+        /// </remarks>
+        [Test]
+        public void ComparerEqualDuplicatesDoNotLetTheFastPathDropANewKey()
+        {
+            SortedDictionary<string, int> seed = new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Alpha", 1 },
+                { "Beta", 2 },
+            };
+            SerializableSortedDictionary<string, int> dictionary = new(seed);
+            dictionary._keys = new[] { "Alpha", "alpha" };
+            dictionary._values = new[] { 1, 1 };
+
+            dictionary.OnBeforeSerialize();
+
+            Assert.AreEqual(2, dictionary._keys.Length);
+            CollectionAssert.AreEquivalent(
+                new[] { "Alpha", "Beta" },
+                dictionary._keys,
+                "The fast path kept a comparer-equal duplicate and never wrote the added key."
+            );
+        }
+
         [Test]
         public void UnitySerializationPreservesUserDefinedOrderAfterDeserialization()
         {

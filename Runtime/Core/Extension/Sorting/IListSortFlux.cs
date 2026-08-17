@@ -38,10 +38,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
             FluxSortCore(scratch, count, comparer);
-            for (int i = 0; i < count; i++)
-            {
-                list[i] = scratch[i];
-            }
+            WriteBackSorted(list, scratch, count);
         }
 
         private static void FluxSortCore<T, TComparer>(T[] array, int count, TComparer comparer)

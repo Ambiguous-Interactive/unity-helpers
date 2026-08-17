@@ -833,14 +833,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             int dictionaryCount = _dictionary.Count;
             int arrayLength = _keys.Length;
 
-            // Fast path: if counts match and all keys exist, just update values in place
+            // Fast path: if counts match, all array keys are unique under this dictionary's comparer, and
+            // all keys still exist, just update values in place. Uniqueness has to be checked because
+            // duplicate keys in the array can make the counts match by coincidence (array holds
+            // {"Alpha", "alpha"} under an ignore-case comparer with a count of 2 after "Beta" is added,
+            // and the array should have become {"Alpha", "Beta"}).
             if (dictionaryCount == arrayLength)
             {
+                using PooledResource<SortedSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
+                    .GetSortedSetPool(_dictionary.Comparer)
+                    .Get(out SortedSet<TKey> fastPathSeenKeys);
+
                 bool allKeysMatch = true;
                 for (int i = 0; i < arrayLength; i++)
                 {
                     TKey key = _keys[i];
-                    if (key == null || !_dictionary.ContainsKey(key))
+                    if (key == null || !_dictionary.ContainsKey(key) || !fastPathSeenKeys.Add(key))
                     {
                         allKeysMatch = false;
                         break;

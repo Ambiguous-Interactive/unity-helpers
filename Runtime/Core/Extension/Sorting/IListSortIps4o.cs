@@ -47,10 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
             Ips4oSortCore(scratch, count, comparer);
-            for (int i = 0; i < count; i++)
-            {
-                list[i] = scratch[i];
-            }
+            WriteBackSorted(list, scratch, count);
         }
 
         private static void Ips4oSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
