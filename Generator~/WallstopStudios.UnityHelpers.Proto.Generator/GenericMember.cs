@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer)
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
         {
             if (!Deferred)
             {

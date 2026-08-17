@@ -377,7 +377,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Line("// -- which is what makes a zero-length dimension round trip.");
             Inner.EmitPresentSeed(writer);
-            Inner.EmitReadEpilogue(writer);
+            Inner.EmitReadEpilogue(writer, Qualified);
 
             EmitShapeCheck(writer);
             EmitFill(writer);

@@ -1489,7 +1489,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // back, for the same reason the after-deserialization hook does not run on a failed read.
             foreach (Member member in members)
             {
-                member.EmitReadEpilogue(writer);
+                member.EmitReadEpilogue(writer, qualified);
             }
 
             if (constructAtEnd)

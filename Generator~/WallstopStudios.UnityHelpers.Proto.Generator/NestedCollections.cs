@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Line("// it -- which is what makes an empty inner collection round trip.");
             Inner.EmitPresentSeed(writer);
-            Inner.EmitReadEpilogue(writer);
+            Inner.EmitReadEpilogue(writer, Qualified);
 
             writer.Line("value = ", Inner.ReadLocal, ";");
             writer.Line("return true;");

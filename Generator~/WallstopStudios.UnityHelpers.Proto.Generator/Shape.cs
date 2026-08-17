@@ -47,6 +47,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal string ReadArguments = string.Empty;
 
         /// <summary>
+        /// The expression naming the formatter that decodes this value, for a sub-message shape.
+        /// </summary>
+        /// <remarks>
+        /// The same text <see cref="ReadArguments"/> carries, without the trailing separator, so a
+        /// caller that decodes a payload it has already carved out can name the formatter directly.
+        /// </remarks>
+        internal string ReadFormatter;
+
+        /// <summary>
+        /// Whether the value is encoded as a length-delimited sub-message, which is the one shape a
+        /// duplicated field has to merge rather than replace.
+        /// </summary>
+        internal bool IsMessage;
+
+        /// <summary>
         /// Whether the write call emits its own field key, as a nested message must.
         /// </summary>
         internal bool WritesOwnTag;
@@ -153,6 +168,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 WritesOwnTag = true,
                 ReadMethod = "TryReadMessage",
                 ReadArguments = formatter + ", ",
+                ReadFormatter = formatter,
+                IsMessage = true,
                 ReadLocalType = qualified,
                 AssignExpression = Placeholder,
                 IsReference = !isValueType,
@@ -210,6 +227,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     WritesOwnTag = true,
                     ReadMethod = "TryReadMessage",
                     ReadArguments = surrogateFormatter + ", ",
+                    ReadFormatter = surrogateFormatter,
+                    IsMessage = true,
                     ReadLocalType = surrogateQualified,
                     AssignExpression = "(" + qualified + ")" + Placeholder,
                     IsReference = !type.IsValueType,

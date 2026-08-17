@@ -1023,10 +1023,14 @@ public sealed partial class Inventory
 }
 ```
 
-Four behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
+Five behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
 
 - **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length —
   the same distinction an empty `string` draws.
+- **A sub-message field carried more than once merges**, as protobuf requires and protobuf-net does:
+  `12 02 08 01` followed by `12 02 10 02` sets both members rather than only the second. The merge is
+  recursive, and a `struct` sub-message merges the same way a reference one does. A non-repeated
+  **scalar** carried twice is still last-wins.
 - **A struct sub-message is always written**, even when every member equals its default. protobuf-net
   does the same, and matching it is what keeps saved data readable.
 - **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so

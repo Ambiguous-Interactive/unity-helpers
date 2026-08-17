@@ -772,7 +772,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer)
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
         {
             writer.Line("if (" + SeenFlag + ")" + Writer.Open);
             writer.Indent();

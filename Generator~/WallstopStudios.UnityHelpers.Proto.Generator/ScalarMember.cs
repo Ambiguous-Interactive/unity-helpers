@@ -40,6 +40,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string SeenFlag => "seen" + Tag;
 
+        /// <summary>The accumulator that gathers every occurrence of a sub-message field.</summary>
+        private string Occurrences => "occurrences" + Tag;
+
+        /// <summary>The destination the decoded value lands on once the read loop is done.</summary>
+        private string Destination => ConstructAtEnd ? Local : "read." + Name;
+
         /// <summary>
         /// Builds the member when <paramref name="type"/> has a single-value shape, and returns
         /// <c>null</c> otherwise.
@@ -163,6 +169,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitReadLocals(Writer writer)
         {
+            if (_shape.IsMessage)
+            {
+                // Always, not only when deferred: a sub-message is decoded after the loop whatever
+                // the contract looks like, because the second occurrence of the field is part of the
+                // same value as the first and neither is complete until the loop has ended.
+                writer.Line(
+                    Proto
+                        + ".WProtoMessageAccumulator "
+                        + Occurrences
+                        + " = default("
+                        + Proto
+                        + ".WProtoMessageAccumulator);"
+                );
+                if (ConstructAtEnd)
+                {
+                    writer.Line(_declared + " " + Local + " = default(" + _declared + ");");
+                }
+
+                return;
+            }
+
             if (!Deferred)
             {
                 return;
@@ -173,8 +200,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer)
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
         {
+            if (_shape.IsMessage)
+            {
+                EmitMessageEpilogue(writer, qualifiedContract);
+                return;
+            }
+
             if (!Deferred)
             {
                 return;
@@ -196,6 +229,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitReadCases(Writer writer, string qualifiedContract)
         {
+            if (_shape.IsMessage)
+            {
+                EmitMessageCase(writer, qualifiedContract);
+                return;
+            }
+
             string local = "decoded" + Tag;
             OpenCase(writer, _shape.WireType);
             writer.Line(
@@ -229,6 +268,75 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("break;");
             Close(writer);
+        }
+
+        /// <summary>
+        /// Emits the case that gathers one occurrence of a sub-message field.
+        /// </summary>
+        /// <remarks>
+        /// The payload is kept rather than decoded, because protobuf says a parser merges repeated
+        /// occurrences of a non-repeated sub-message "as if with <c>Message::MergeFrom</c>" --
+        /// measured, protobuf-net reads <c>12 02 08 01</c> followed by <c>12 02 10 02</c> as both
+        /// members set, for a struct sub-message as well as a reference one. Decoding here instead
+        /// is what made the second occurrence REPLACE the first, losing its members in silence.
+        /// </remarks>
+        private void EmitMessageCase(Writer writer, string qualifiedContract)
+        {
+            string chunk = "chunk" + Tag;
+            OpenCase(writer, _shape.WireType);
+            writer.Line(
+                "if (!reader.TryReadBytes(out global::System.ReadOnlySpan<byte> "
+                    + chunk
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+            writer.Line("if (!" + Occurrences + ".TryAdd(" + chunk + "))" + Writer.Open);
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+            writer.Line("break;");
+            Close(writer);
+        }
+
+        /// <summary>
+        /// Emits the single decode of every occurrence a sub-message field carried.
+        /// </summary>
+        /// <remarks>
+        /// Once, deliberately, however many occurrences there were: the concatenation of two
+        /// encodings IS their merge, so decoding it once produces the merged value and runs the
+        /// nested type's lifecycle hooks exactly once. It also lands after the loop's malformed
+        /// check and after an include has settled which instance the member belongs to, which is
+        /// where a value that outlives the read has to be committed.
+        /// </remarks>
+        private void EmitMessageEpilogue(Writer writer, string qualifiedContract)
+        {
+            string local = "decoded" + Tag;
+            writer.Line("if (" + Occurrences + ".HasValue)" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "if (!reader.TryReadMessage("
+                    + Occurrences
+                    + ".Payload, "
+                    + _shape.ReadFormatter
+                    + ", out "
+                    + _shape.ReadLocalType
+                    + " "
+                    + local
+                    + "))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+            writer.Line(Destination + " = " + Shape.Fill(_assign, local) + ";");
+            Close(writer);
+            writer.Blank();
         }
     }
 }

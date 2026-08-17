@@ -673,7 +673,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         int firstCopy = cursor;
                         WriteVerbatim(writer, element, ref firstCopy);
                         writer.WritePropertyName(propertyName);
-                        WriteVerbatim(writer, element, ref cursor);
+                        WriteDiffering(writer, element, ref cursor);
                         return;
                 }
             }
@@ -760,6 +760,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         )
         {
             element.WriteTo(writer);
+            SkipSubtree(element, ref cursor);
+        }
+
+        /// <summary>
+        /// Writes a value that is never equal to <paramref name="element"/>, consuming the same
+        /// span of the node walk that writing it verbatim would.
+        /// </summary>
+        /// <remarks>
+        /// The second copy of a duplicated property has to <b>differ</b> from the first, or the
+        /// mutation cannot detect the thing it is named for: two identical copies decode to the same
+        /// object whether the converter keeps the first, keeps the last, or merges them, so the only
+        /// outcome it could ever distinguish is a throw. The kind is preserved where the kind has
+        /// more than one value, so the payload stays the shape a converter expects and the divergence
+        /// is in the value rather than in the token.
+        /// </remarks>
+        private static void WriteDiffering(
+            Utf8JsonWriter writer,
+            JsonElement element,
+            ref int cursor
+        )
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    writer.WriteStartObject();
+                    if (!element.EnumerateObject().MoveNext())
+                    {
+                        writer.WriteNumber("§second", 1);
+                    }
+                    writer.WriteEndObject();
+                    break;
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    if (!element.EnumerateArray().MoveNext())
+                    {
+                        writer.WriteNumberValue(1);
+                    }
+                    writer.WriteEndArray();
+                    break;
+                case JsonValueKind.String:
+                    writer.WriteStringValue(element.GetString() + "§second");
+                    break;
+                case JsonValueKind.Number:
+                    writer.WriteNumberValue(element.GetRawText() == "0" ? 1 : 0);
+                    break;
+                case JsonValueKind.True:
+                    writer.WriteBooleanValue(false);
+                    break;
+                case JsonValueKind.False:
+                    writer.WriteBooleanValue(true);
+                    break;
+                default:
+                    // Null is the one kind with a single value, so the copies differ by kind here or
+                    // they do not differ at all.
+                    writer.WriteNumberValue(0);
+                    break;
+            }
+
             SkipSubtree(element, ref cursor);
         }
 

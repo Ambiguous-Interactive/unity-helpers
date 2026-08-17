@@ -610,6 +610,47 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Decodes a sub-message payload this reader has already carved out, with
+        /// <paramref name="formatter"/>.
+        /// </summary>
+        /// <typeparam name="T">The sub-message type.</typeparam>
+        /// <param name="payload">The sub-message bytes, without a key or length prefix.</param>
+        /// <param name="formatter">The formatter for the sub-message.</param>
+        /// <param name="value">Receives the decoded value, or <c>default</c> on failure.</param>
+        /// <returns><c>true</c> when the payload decoded completely.</returns>
+        /// <remarks>
+        /// What <see cref="WProtoMessageAccumulator"/> hands back is bytes rather than a field still
+        /// on the wire, so it needs this rather than
+        /// <see cref="TryReadMessage{T}(IWProtoFormatter{T}, out T)"/>. Everything that overload
+        /// guarantees is preserved: the nesting level is spent here rather than skipped, a request
+        /// past <see cref="MaxNestingDepth"/> is refused, and a nested read that fails latches
+        /// <see cref="Malformed"/> on this reader so the refusal reaches its caller.
+        /// </remarks>
+        public bool TryReadMessage<T>(
+            ReadOnlySpan<byte> payload,
+            IWProtoFormatter<T> formatter,
+            out T value
+        )
+        {
+            if (formatter == null || _malformed || _depth >= MaxNestingDepth)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            WProtoReader nested = new WProtoReader(payload, _depth + 1);
+            if (formatter.TryRead(ref nested, out value) && !nested.Malformed)
+            {
+                return true;
+            }
+
+            _malformed = true;
+            value = default;
+            return false;
+        }
+
+        /// <summary>
         /// Reads a length prefix.
         /// </summary>
         /// <param name="length">Receives the length, or 0 on failure.</param>

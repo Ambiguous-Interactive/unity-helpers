@@ -1254,5 +1254,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(original.colorMultiplier, deserialized.colorMultiplier);
             Assert.AreEqual(original.fadeDuration, deserialized.fadeDuration);
         }
+
+        [Test]
+        public void ADuplicatedJsonPropertyIsLastWinsForAHandWrittenConverter()
+        {
+            // RFC 8259 leaves duplicate names to the implementation; System.Text.Json 9 takes the
+            // last occurrence and offers no setting to do anything else, and `JSON.parse` agrees, so
+            // last-wins is the answer every reader of this package's JSON already gets. Asserted
+            // rather than inherited: a converter that accumulated instead -- summing, or refusing --
+            // would be a silent disagreement with the tool that wrote the file.
+            Vector2 decoded = Serializer.JsonDeserialize<Vector2>("{\"x\":4,\"x\":5,\"y\":6}");
+
+            Assert.AreEqual(5f, decoded.x);
+            Assert.AreEqual(6f, decoded.y);
+        }
+
+        [Test]
+        public void ADuplicatedJsonPropertyIsLastWinsForAPlainObject()
+        {
+            // The same rule where no converter of this package's is involved at all, so the two
+            // halves of the JSON surface cannot drift apart.
+            DuplicatePropertyPoco decoded = Serializer.JsonDeserialize<DuplicatePropertyPoco>(
+                "{\"x\":4,\"x\":5,\"y\":6}"
+            );
+
+            Assert.AreEqual(5, decoded.X);
+            Assert.AreEqual(6, decoded.Y);
+        }
+
+        private sealed class DuplicatePropertyPoco
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("x")]
+            public int X { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("y")]
+            public int Y { get; set; }
+        }
     }
 }

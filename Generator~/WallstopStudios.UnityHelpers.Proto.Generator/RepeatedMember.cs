@@ -1190,7 +1190,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer)
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
         {
             // Guarded, because an absent field must leave the constructor's value alone. "Absent"
             // and "empty" are the same bytes, so this is the only place the difference survives.

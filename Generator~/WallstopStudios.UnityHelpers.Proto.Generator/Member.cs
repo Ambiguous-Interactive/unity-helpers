@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Appends anything that has to happen after the read loop, such as committing an
         /// accumulated collection.
         /// </summary>
-        internal virtual void EmitReadEpilogue(Writer writer) { }
+        internal virtual void EmitReadEpilogue(Writer writer, string qualifiedContract) { }
 
         /// <summary>
         /// Emits the two statements that abandon a read, shared by every failure path.
