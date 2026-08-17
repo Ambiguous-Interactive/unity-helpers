@@ -363,9 +363,7 @@ export function resolveOptions(args, environment = process.env, localValues, rep
 
 /** A Unity project root is the directory holding both Assets and ProjectSettings. */
 export function isUnityProjectRoot(directory, exists = fs.existsSync) {
-  return (
-    exists(path.join(directory, "Assets")) && exists(path.join(directory, "ProjectSettings"))
-  );
+  return exists(path.join(directory, "Assets")) && exists(path.join(directory, "ProjectSettings"));
 }
 
 /**
@@ -746,6 +744,16 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
 
   if (response.status === 401 || response.status === 403) {
     return classify("unauthorized", `HTTP ${response.status}`);
+  }
+  // A WebSocket-only server answers every plain HTTP request with 426 (or completes a 101 upgrade).
+  // This bridge never emits either, so the responder is definitively not it: the port belongs to
+  // some other process. That is a different failure from silence and needs different advice, and
+  // folding it into "nothing responded" once cost a session's time chasing Unity's approval dialog.
+  if (response.status === 426 || response.status === 101) {
+    return classify(
+      "port-occupied",
+      `HTTP ${response.status} ${response.statusText || "Upgrade Required"}`
+    );
   }
   if (!response.ok) {
     return classify("http-error", `HTTP ${response.status} ${body.slice(0, 120)}`);
@@ -1676,6 +1684,16 @@ export async function runProbe(options, runtime = {}) {
           `Attempts:\n${describeAttempts(attempts)}`
       );
     }
+    const occupied = attempts.find((attempt) => attempt.status === "port-occupied");
+    if (occupied) {
+      fail(
+        `${occupied.url} answered ${occupied.detail}. That is a WebSocket-only server, not the ` +
+          `unity-mcp relay, so another process owns port ${occupied.port} - most often a bridge ` +
+          `belonging to a neighbouring repository, or the Unity editor's own bridge grabbing the ` +
+          `port while this relay was down. Stop that process or pass --port to pick another.\n` +
+          `Attempts:\n${describeAttempts(attempts)}`
+      );
+    }
     fail(`No Unity MCP endpoint responded. Attempts:\n${describeAttempts(attempts)}`);
   }
   console.log(`Unity MCP is reachable at ${found.url} (protocol ${found.protocolVersion}).`);
@@ -1724,6 +1742,17 @@ export async function runConfigure(options, runtime = {}) {
         `(${unauthorized.detail}). Nothing was written and no token was generated: copy ` +
         `${ENV_KEYS.bearerToken} from the host's .env.local into ` +
         `${path.join(options.repoRoot, ".env.local")}, or pass --token, then re-run configure.`
+    );
+  }
+  // A foreign WebSocket server on the port is as unusable as a bridge with the wrong token, and
+  // writing its endpoint into four configs would point every agent at something that can never
+  // answer. Refuse for the same reason the three cases above do.
+  const occupied = found ? undefined : attempts.find((a) => a.status === "port-occupied");
+  if (occupied) {
+    fail(
+      `${occupied.url} answered ${occupied.detail}, which is a WebSocket-only server rather than ` +
+        `the unity-mcp relay: another process owns port ${occupied.port}. Nothing was written. ` +
+        `Stop that process, or re-run configure with --port pointing somewhere free.`
     );
   }
   const target = endpoint ?? {

@@ -18,10 +18,28 @@ import {
   parseArgs,
   pinProjectRoot,
   probeEndpoint,
+  runProbe,
   sameProjectRoot
 } from "../mcp/unity-mcp.mjs";
 
 const PROTOCOL_VERSION = "2025-11-25";
+
+/**
+ * A WebSocket-only server: it answers every plain HTTP request with 426, which is what the Unity
+ * editor's own bridge (or a neighbouring repository's) does when it owns the port (issue #349).
+ */
+function startWebSocketOnlyServer() {
+  const server = http.createServer((request, response) => {
+    response.writeHead(426, { "Content-Type": "text/plain" });
+    response.end("Upgrade Required");
+  });
+
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => {
+      resolve({ server, port: server.address().port });
+    });
+  });
+}
 
 /** A stand-in bridge: MCP initialize, plus GetProjectRoot answering with the supplied root. */
 function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }) {
@@ -243,10 +261,7 @@ test("the Codex merge replaces the existing table rather than adding a second", 
 test("project discovery walks up to the Unity project containing the package", () => {
   const project = path.resolve("/Code/Packages");
   const pkg = path.join(project, "Packages", "com.wallstop-studios.unity-helpers");
-  const present = new Set([
-    path.join(project, "Assets"),
-    path.join(project, "ProjectSettings")
-  ]);
+  const present = new Set([path.join(project, "Assets"), path.join(project, "ProjectSettings")]);
   const exists = (candidate) => present.has(candidate);
 
   assert.equal(findUnityProjectRoot(pkg, exists), project);
@@ -269,7 +284,10 @@ test("a stray Assets directory without ProjectSettings is not a project root", (
 });
 
 test("discovery reports nothing when no Unity project encloses the package", () => {
-  assert.equal(findUnityProjectRoot(path.resolve("/tmp/standalone"), () => false), undefined);
+  assert.equal(
+    findUnityProjectRoot(path.resolve("/tmp/standalone"), () => false),
+    undefined
+  );
 });
 
 // A bridge with no editor attached handshakes perfectly and exposes nothing. Reporting that as
@@ -303,6 +321,47 @@ test("no-editor fails even when no project root is pinned", async () => {
       optionsFor(undefined)
     );
     assert.equal(result.ok, false);
+  } finally {
+    server.close();
+  }
+});
+
+// A port that answers is a categorically different failure from a port that is silent, and reporting
+// it as silence once sent a session after Unity's approval dialog instead of after the occupant.
+test("a WebSocket-only server on the port is classified as an occupant, not as silence", async () => {
+  const { server, port } = await startWebSocketOnlyServer();
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor("D:/Code/Packages")
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "port-occupied");
+    assert.match(result.detail, /426/);
+  } finally {
+    server.close();
+  }
+});
+
+test("probe names the occupant and its port rather than reporting that nothing responded", async () => {
+  const { server, port } = await startWebSocketOnlyServer();
+  try {
+    await assert.rejects(
+      runProbe(
+        optionsFor("D:/Code/Packages", {
+          host: "127.0.0.1",
+          port,
+          endpointPath: "/mcp",
+          discover: false
+        })
+      ),
+      (error) => {
+        assert.match(error.message, /WebSocket-only server/);
+        assert.match(error.message, new RegExp(String(port)));
+        assert.doesNotMatch(error.message, /^No Unity MCP endpoint responded/);
+        return true;
+      }
+    );
   } finally {
     server.close();
   }
