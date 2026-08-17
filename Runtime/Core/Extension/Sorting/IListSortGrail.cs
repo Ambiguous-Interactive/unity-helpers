@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         /// <typeparam name="T">The type of elements in the list.</typeparam>
         /// <typeparam name="TComparer">The type of comparer.</typeparam>
-        /// <param name="array">The list to sort.</param>
+        /// <param name="list">The list to sort.</param>
         /// <param name="comparer">The comparer to use for element comparisons.</param>
         /// <remarks>
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
