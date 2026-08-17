@@ -100,11 +100,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoInclude(117, typeof(WDoomRandom))]
     public abstract partial class AbstractRandom : IRandom
     {
-#if SINGLE_THREADED
-        private static readonly Dictionary<Type, Array> EnumTypeCache = new();
-#else
-        private static readonly ConcurrentDictionary<Type, Array> EnumTypeCache = new();
-#endif
+        /// <summary>
+        /// The values of one enum type, materialized once by its own static initializer.
+        /// </summary>
+        /// <typeparam name="T">The enum type.</typeparam>
+        /// <remarks>
+        /// A closed generic type gets its own copy of this field, so the lookup that a dictionary
+        /// keyed by <see cref="Type"/> would perform on every roll costs nothing at all.
+        /// </remarks>
+        private static class EnumValues<T>
+            where T : unmanaged, Enum
+        {
+            internal static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
+        }
 
         protected const float MagicFloat = 5.960465E-008F;
         private const ulong LongBias = 1UL << 63;
@@ -832,9 +840,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static T[] GetEnumValues<T>()
             where T : unmanaged, Enum
         {
-            Type enumType = typeof(T);
-            Array boxedValues = EnumTypeCache.GetOrAdd(enumType, type => Enum.GetValues(type));
-            return Unsafe.As<Array, T[]>(ref boxedValues);
+            return EnumValues<T>.Values;
         }
 
         private static void EnsureEnumHasAvailableValues<T>(

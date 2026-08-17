@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speed up every pooled-buffer operation on blittable elements -- the sorts, `Shuffle`, `Fill` and the geometry helpers -- by clearing a returned array only when its element type can hold a reference. A reference element is still never left rooted in the pool ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
+- Speed up `ProtoSerialize`, `ProtoDeserialize`, `ProtoEquals` and `NextEnum` by resolving each one's type questions once per closed generic instead of on every call. Measured at 8.5x for that check alone on reference types ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
 - Every `IList<T>` sort now runs over an array rather than the list's indexer, so sorting a `T[]` is 2.5x to 5.4x faster and needs no copy. Any other list is copied through a pooled buffer and back. See [Where the Time Actually Goes](./docs/performance/ilist-sorting-performance.md#where-the-time-actually-goes) ([#463](https://github.com/Ambiguous-Interactive/unity-helpers/issues/463)).
 - Speed up `IList<T>.Reverse` (26x-37x), `Shift`/`RotateLeft`/`RotateRight` (2.7x-36x), `Fill` (3.6x-38x), `Shuffle` (1.5x-2x) and predicate `IndexOf`/`LastIndexOf` (2.4x-3.1x) with bulk array operations. See [Bulk Operations on a List](./docs/performance/ilist-sorting-performance.md#bulk-operations-on-a-list) ([#480](https://github.com/Ambiguous-Interactive/unity-helpers/issues/480)).
 - Enable WallstopProto by default for the runtime assembly: every `Serializer.ProtoSerialize` and `ProtoDeserialize` overload, including `ref buffer` and `forceRuntimeType: true`, uses generated formatters when available and falls back to protobuf-net ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343), [#403](https://github.com/Ambiguous-Interactive/unity-helpers/issues/403)).
@@ -81,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `Helpers.EnumeratePrefabs` and `EnumerateScriptableObjects` searching folders the caller never named when the asset paths were passed as anything other than a `string[]` ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
+- Fix `[WShowIf]` never matching a member of a `ulong`-backed enum above `long.MaxValue`, which hid the field it was meant to reveal ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
+- Fix `Helpers.EnumeratePrefabs` and `EnumerateScriptableObjects` searching folders the caller never named when the asset paths were passed as anything other than a `string[]` ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
+- Fix `[WShowIf]` never matching a member of a `ulong`-backed enum above `long.MaxValue`, which hid the field it was meant to reveal ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
 - Fix settings color keys being stored case-sensitively while every reader matched them without regard to case, so `"Save"` and `"save"` were two palette entries on disk and one entry to every reader ([#476](https://github.com/Ambiguous-Interactive/unity-helpers/issues/476)).
 - Fix `PositiveMod` returning a negative result -- the one thing it promises never to do -- for any maximum above 2^30 (`int`) or 2^62 (`long`), and rounding `float` and `double` values that were already inside the range. `WrappedAdd` now wraps the real sum when adding overflows.
 - Fix `float` and `double` `PositiveMod` returning `0` for every input when the maximum is 1, which made the normalized-phase case it documents useless: `5.5f.PositiveMod(1f)` is `0.5f`. It could also return the maximum itself when the remainder was too small to survive being added to it.

@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool ProtoEquals<T>(this T self, T other)
         {
-            if (!typeof(T).IsValueType)
+            if (ProtoEqualityComparer<T>.IsReferenceType)
             {
                 if (ReferenceEquals(self, other))
                 {
@@ -119,12 +119,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static readonly ProtoEqualityComparer<T> Instance = new();
 
-        private readonly bool _isValueType;
+        // Reference-type closures share one canonical instantiation, so typeof(T) inside a generic
+        // member is a per-call handle lookup rather than a constant. This resolves it once.
+        internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
 
-        private ProtoEqualityComparer()
-        {
-            _isValueType = typeof(T).IsValueType;
-        }
+        private ProtoEqualityComparer() { }
 
         /// <summary>
         /// Determines whether two objects of type T are equal by comparing their protobuf serialization.
@@ -141,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public bool Equals(T x, T y)
         {
-            if (!_isValueType)
+            if (IsReferenceType)
             {
                 if (ReferenceEquals(x, y))
                 {
