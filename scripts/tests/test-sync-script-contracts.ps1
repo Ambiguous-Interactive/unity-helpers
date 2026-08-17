@@ -1099,7 +1099,6 @@ function Run-RepoLocalPrettierContractTests {
   $packageJsonPath = Join-Path $repoRoot 'package.json'
   $prettierConfigPath = Join-Path $repoRoot '.prettierrc.json'
   $formatStagedPath = Join-Path $repoRoot 'scripts/format-staged-prettier.ps1'
-  $lintStagedMarkdownPath = Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1'
   $agentPreflightPath = Join-Path $repoRoot 'scripts/agent-preflight.ps1'
   $validateLintErrorCodesPath = Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1'
   $preCommitPath = Join-Path $repoRoot '.githooks/pre-commit'
@@ -1162,7 +1161,7 @@ function Run-RepoLocalPrettierContractTests {
   }
 
   $prettierRequiredFiles = @($formatStagedPath, $agentPreflightPath)
-  $requiredFiles = @($formatStagedPath, $lintStagedMarkdownPath, $agentPreflightPath, $validateLintErrorCodesPath, $prePushPath)
+  $requiredFiles = @($formatStagedPath, $agentPreflightPath, $validateLintErrorCodesPath, $prePushPath)
   $launcherDrift = @()
   foreach ($file in $prettierRequiredFiles) {
     if (-not (Test-Path $file)) {
@@ -1200,7 +1199,7 @@ function Run-RepoLocalPrettierContractTests {
     -Message "Missing node-tool launcher reference: $($nodeToolDrift -join '; ')"
 
   $markdownFenceFixDrift = @()
-  foreach ($file in @($lintStagedMarkdownPath, $agentPreflightPath)) {
+  foreach ($file in @($agentPreflightPath)) {
     if (-not (Test-Path $file)) {
       $markdownFenceFixDrift += "missing: $file"
       continue

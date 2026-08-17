@@ -73,4 +73,3 @@ error handling, and debugging lock issues.
 
 - [.githooks/pre-commit](../../.githooks/pre-commit) - Local pre-commit hook (uses helpers)
 - [.githooks/pre-push](../../.githooks/pre-push) - Local pre-push hook
-- [.pre-commit-config.yaml](../../.pre-commit-config.yaml) - Pre-commit framework configuration

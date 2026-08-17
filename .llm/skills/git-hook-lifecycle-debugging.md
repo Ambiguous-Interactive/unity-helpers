@@ -9,7 +9,6 @@
 ## When to Use
 
 - Deciding whether a hook should validate-only or auto-fix
-- Configuring `.pre-commit-config.yaml` for safe parallel execution
 - Debugging `$LASTEXITCODE` leaking from PowerShell hook scripts
 - Investigating `index.lock` errors or other hook failures
 - Understanding CI/CD differences for hooks
@@ -59,20 +58,11 @@ git_add_with_retry $modified_files
 
 ## Pre-Commit Framework Configuration
 
-Ensure hooks that modify and re-stage files use `require_serial: true`:
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: local
-    hooks:
-      - id: my-formatter
-        name: Format and stage
-        entry: pwsh -NoProfile -File scripts/my-formatter.ps1
-        language: system
-        require_serial: true # CRITICAL: prevents parallel execution
-        pass_filenames: false
-```
+This repository runs one hook path: `.githooks/`, installed by `npm run hooks:install`. Its steps
+run in sequence in a single process, so a step that re-stages files cannot race another one. The
+pre-commit framework's config was retired in #453 because nothing installed it, which is the failure
+this note used to guard against, arriving one level up: a second configuration nobody runs is a
+second set of rules nobody applies.
 
 ### Why `require_serial: true` Matters
 
@@ -239,6 +229,5 @@ and what git operations are attempted.
 ## Related Files
 
 - [.githooks/pre-commit](../../.githooks/pre-commit) - Local pre-commit hook
-- [.pre-commit-config.yaml](../../.pre-commit-config.yaml) - Pre-commit framework configuration
 - [scripts/sync-banner-version.ps1](../../scripts/sync-banner-version.ps1) - Banner and [LLM context](../context.md) version sync
 - [scripts/sync-issue-template-versions.ps1](../../scripts/sync-issue-template-versions.ps1) - Issue template version sync

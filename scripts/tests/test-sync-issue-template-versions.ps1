@@ -182,19 +182,6 @@ function Run-PowerShellScriptEndOfOptionsTests {
     Write-Host "  [SKIP] format-staged-prettier.ps1 not found at: $prettierScript" -ForegroundColor Yellow
   }
 
-  # Check lint-staged-markdown.ps1 for '--' before file paths
-  $markdownScript = Join-Path $repoRoot 'scripts' 'lint-staged-markdown.ps1'
-  if (Test-Path $markdownScript) {
-    $markdownContent = Get-Content $markdownScript -Raw
-    # Look for '--' in the markdownlint args array construction
-    $markdownHasSeparator = $markdownContent -match "'--'" -and $markdownContent -match 'markdownlint'
-    Write-TestResult -TestName "lint-staged-markdown.ps1 uses '--' before file paths" `
-      -Passed $markdownHasSeparator `
-      -Message "Missing '--' separator in markdownlint argument construction"
-  } else {
-    Write-Host "  [SKIP] lint-staged-markdown.ps1 not found at: $markdownScript" -ForegroundColor Yellow
-  }
-
   # Check lint-yaml.ps1 for '--' before file paths
   $yamlScript = Join-Path $repoRoot 'scripts' 'lint-yaml.ps1'
   if (Test-Path $yamlScript) {
@@ -208,18 +195,6 @@ function Run-PowerShellScriptEndOfOptionsTests {
     Write-Host "  [SKIP] lint-yaml.ps1 not found at: $yamlScript" -ForegroundColor Yellow
   }
 
-  # Check lint-staged-links.ps1 for '--' before file paths
-  $linksScript = Join-Path $repoRoot 'scripts' 'lint-staged-links.ps1'
-  if (Test-Path $linksScript) {
-    $linksContent = Get-Content $linksScript -Raw
-    # Look for '--' in the lychee args array construction
-    $linksHasSeparator = $linksContent -match "'--'" -and $linksContent -match 'lychee'
-    Write-TestResult -TestName "lint-staged-links.ps1 uses '--' before file paths" `
-      -Passed $linksHasSeparator `
-      -Message "Missing '--' separator in lychee argument construction"
-  } else {
-    Write-Host "  [SKIP] lint-staged-links.ps1 not found at: $linksScript" -ForegroundColor Yellow
-  }
 }
 
 # ── Pre-push End-of-Options Tests ──────────────────────────────────────────

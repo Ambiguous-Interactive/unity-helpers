@@ -440,16 +440,15 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // It used to be free text naming a workflow, and nothing ever read it (#445). Three of the seven
   // claims were false when that was checked: one named a workflow that runs CSharpier directly and
   // never touches the linter, one named pre-push for a script only an npm aggregate runs, and two
-  // said "git hooks" when the hook that runs them is the pre-commit FRAMEWORK's config rather than
-  // anything in .githooks/. An allowlist whose entries are prose excuses whatever is put in it --
-  // the quiet half of #445, one level up: the thing named still exists, so nothing goes red.
+  // said "git hooks" when the hook that runs them was the pre-commit FRAMEWORK's config rather than
+  // anything in .githooks/. Those last two are gone with the config that was their only caller
+  // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
+  // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
     ["scripts/lint-llm-instructions.ps1", "workflow"],
     ["scripts/lint-skill-sizes.ps1", "workflow"],
     ["scripts/lint-unity-test-modules.ps1", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
-    ["scripts/lint-staged-links.ps1", "precommit-config"],
-    ["scripts/lint-staged-markdown.ps1", "precommit-config"],
     ["scripts/validate-git-push-config.ps1", "prepush"]
   ]);
 
@@ -458,8 +457,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   const owners = new Map([
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
-    ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)],
-    ["precommit-config", (file) => fileInvokes(".pre-commit-config.yaml", file)]
+    ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)]
   ]);
 
   const reachable = new Set([

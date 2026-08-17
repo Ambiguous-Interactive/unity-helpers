@@ -174,5 +174,4 @@ exit 0
 ## Related Files
 
 - [.githooks/pre-commit](../../.githooks/pre-commit) - Local pre-commit hook (uses helpers)
-- [.pre-commit-config.yaml](../../.pre-commit-config.yaml) - Pre-commit framework configuration
 - [scripts/format-staged-csharp.ps1](../../scripts/format-staged-csharp.ps1) - Example formatter script

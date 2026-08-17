@@ -72,7 +72,6 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/run-node-bin.js') (Join-Path $scriptsDir 'run-node-bin.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/run-prettier.js') (Join-Path $scriptsDir 'run-prettier.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') (Join-Path $scriptsDir 'fix-markdown-fence-languages.ps1') -Force
-    Copy-Item (Join-Path $repoRoot 'scripts/lint-staged-markdown.ps1') (Join-Path $scriptsDir 'lint-staged-markdown.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') (Join-Path $scriptsDir 'lint-duplicate-usings.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-tests.ps1') (Join-Path $scriptsDir 'lint-tests.ps1') -Force
     # No .config/dotnet-tools.json is copied on purpose: these fixtures are synthetic repositories
@@ -844,40 +843,6 @@ try {
 }
 finally {
     Remove-Item -Path $repo8bb -Recurse -Force -ErrorAction SilentlyContinue
-}
-
-# Test 8c: lint-staged-markdown.ps1 should share the same fence-language recovery
-Write-Host "`nTest group: staged markdown helper fence recovery" -ForegroundColor Magenta
-$repo8c = New-TestRepo -ConfigurePushDefaults
-try {
-    $readmePath = Join-Path $repo8c 'README.md'
-    Set-Content -Path $readmePath -Value @'
-# Fixture
-
-```
-git status --short
-```
-'@ -Encoding UTF8
-    Add-FakeMarkdownlintPackage -RepoPath $repo8c
-
-    Push-Location $repo8c
-    try {
-        git add README.md
-        $helperOutput = & pwsh -NoProfile -File scripts/lint-staged-markdown.ps1 README.md 2>&1
-        $helperExit = $LASTEXITCODE
-        $stagedMarkdown = git show ':README.md' | Out-String
-    }
-    finally {
-        Pop-Location
-    }
-
-    $helperJoined = ($helperOutput -join "`n")
-    Write-TestResult 'LintStagedMarkdownFenceFix_ExitCode0' ($helperExit -eq 0) "Expected exit code 0 from lint-staged-markdown.ps1, got $helperExit. Output: $helperJoined"
-    Write-TestResult 'LintStagedMarkdownFenceFix_WorktreeUpdated' ((Get-Content -Path $readmePath -Raw) -match '```bash\s+git status --short') 'Expected worktree README.md to include bash fence language'
-    Write-TestResult 'LintStagedMarkdownFenceFix_StagedUpdated' ($stagedMarkdown -match '```bash\s+git status --short') 'Expected staged README.md blob to include bash fence language'
-}
-finally {
-    Remove-Item -Path $repo8c -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 9: Changed markdown typos should fail preflight with actionable output

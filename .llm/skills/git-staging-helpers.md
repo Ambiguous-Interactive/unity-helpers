@@ -307,7 +307,6 @@ Invoke-GitAddWithRetry -Items $files -IndexLockPath $repositoryInfo.IndexLockPat
 3. [ ] **Call `Invoke-EnsureNoIndexLock` immediately after getting repository info**
 4. [ ] Use `Invoke-GitAddWithRetry` for ALL staging operations
 5. [ ] Batch files together in a single call when possible
-6. [ ] Add `require_serial: true` to `.pre-commit-config.yaml` if the hook stages files
 
 ### Bash Scripts
 

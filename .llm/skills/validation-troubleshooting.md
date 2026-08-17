@@ -387,7 +387,7 @@ Add files to `.prettierignore`, `.markdownlintignore`, or `cspell.json` `ignoreP
 
 ## PowerShell Exit Code Linter (Potential Safeguard)
 
-Several `scripts/*.ps1` files end without an explicit `exit 0` on their success paths (e.g., `lint-staged-markdown.ps1`, `format-staged-csharp.ps1`, `format-staged-prettier.ps1`). A static linter could check that every script-level `.ps1` file (excluding libraries like `git-staging-helpers.ps1`) has an explicit `exit` as the last statement.
+Several `scripts/*.ps1` files end without an explicit `exit 0` on their success paths (e.g., `format-staged-csharp.ps1`, `format-staged-prettier.ps1`). A static linter could check that every script-level `.ps1` file (excluding libraries like `git-staging-helpers.ps1`) has an explicit `exit` as the last statement.
 
 **Simple heuristic**: Parse each `.ps1`, skip trailing whitespace/comments/closing braces, and verify the last meaningful statement is `exit $something` or `exit <number>`. Scripts ending with a closing `}` from an `if` block that contains `exit` on both branches pass, but scripts that fall through after a conditional exit fail.
 

@@ -180,20 +180,11 @@ Invoke-GitAddWithRetry -Items $files -IndexLockPath $repositoryInfo.IndexLockPat
 
 ## Pre-Commit Hook Configuration
 
-Ensure hooks that modify and re-stage files use `require_serial: true`:
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: local
-    hooks:
-      - id: my-formatter
-        name: Format and stage
-        entry: pwsh -NoProfile -File scripts/my-formatter.ps1
-        language: system
-        require_serial: true # CRITICAL: prevents parallel execution
-        pass_filenames: false
-```
+This repository runs one hook path: `.githooks/`, installed by `npm run hooks:install`. Its steps
+run in sequence in a single process, so a step that re-stages files cannot race another one. The
+pre-commit framework's config was retired in #453 because nothing installed it, which is the failure
+this note used to guard against, arriving one level up: a second configuration nobody runs is a
+second set of rules nobody applies.
 
 For detailed hook patterns, see [git-hook-patterns](./git-hook-patterns.md).
 
@@ -321,4 +312,3 @@ However, for consistency, you may still use the helpers in CI scripts. The overh
 - [scripts/git-staging-helpers.ps1](../../scripts/git-staging-helpers.ps1) - PowerShell shared helper module
 - [scripts/git-staging-helpers.sh](../../scripts/git-staging-helpers.sh) - Bash shared helper module
 - [.githooks/pre-commit](../../.githooks/pre-commit) - Local pre-commit hook (uses helpers)
-- [.pre-commit-config.yaml](../../.pre-commit-config.yaml) - Pre-commit framework configuration
