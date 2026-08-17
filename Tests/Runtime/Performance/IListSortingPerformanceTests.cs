@@ -64,6 +64,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             new("Power+", SortAlgorithm.PowerPlus, true, int.MaxValue),
             new("Glide", SortAlgorithm.Glide, true, int.MaxValue),
             new("Flux", SortAlgorithm.Flux, false, int.MaxValue),
+            new("Yam", SortAlgorithm.Yam, true, int.MaxValue),
         };
 
         [Test]

@@ -147,6 +147,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     "FluxSort",
                     (IntSortAlgorithm)((list, comparer) => list.FluxSort(comparer))
                 ).SetName("SortingAlgorithmsMatchArraySortFluxSort");
+                yield return new TestCaseData(
+                    "YamSort",
+                    (IntSortAlgorithm)((list, comparer) => list.YamSort(comparer))
+                ).SetName("SortingAlgorithmsMatchArraySortYamSort");
             }
         }
 
@@ -185,6 +189,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 yield return new TestCaseData(
                     "GlideSort",
                     (TupleSortAlgorithm)((list, comparer) => list.GlideSort(comparer))
+                );
+                yield return new TestCaseData(
+                    "YamSort",
+                    (TupleSortAlgorithm)((list, comparer) => list.YamSort(comparer))
                 );
             }
         }

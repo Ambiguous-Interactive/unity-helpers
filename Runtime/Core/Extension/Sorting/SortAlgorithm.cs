@@ -65,5 +65,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         /// <summary>Flux sort - pattern-defeating dual-pivot quicksort from sort-research.</summary>
         Flux = 17,
+
+        /// <summary>Yam sort - stable bisection mergesort that adapts to sequential data.</summary>
+        Yam = 18,
     }
 }

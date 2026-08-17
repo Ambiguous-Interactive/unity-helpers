@@ -131,6 +131,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     array.FluxSort(comparer);
                     return;
                 }
+                case SortAlgorithm.Yam:
+                {
+                    array.YamSort(comparer);
+                    return;
+                }
                 default:
                 {
                     throw new InvalidEnumArgumentException(

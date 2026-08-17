@@ -504,7 +504,8 @@
         "stcf",
         "WProto",
         "Prd",
-        "Unpremultiply"
+        "Unpremultiply",
+        "YamSort"
       ]
     },
     {
@@ -1135,7 +1136,12 @@
     "UCRT",
     "IshoBoy",
     "DoxReloaded",
-    "qora"
+    "qora",
+    "Gende",
+    "gendeg",
+    "Senia",
+    "yujen",
+    "Schwarz"
   ],
   "flagWords": [],
   "minWordLength": 3,

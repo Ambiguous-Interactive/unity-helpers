@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SortAlgorithm.Yam` and `IList<T>.YamSort()`, a stable sort that approaches O(n) on sequential and reverse-sequential data. Adapted from [YamSort by Gary Gende](https://github.com/gendeg/YamSort). See [IList Sorting Performance](./docs/performance/ilist-sorting-performance.md) ([#461](https://github.com/Ambiguous-Interactive/unity-helpers/issues/461)).
+
 - Add `[SingletonCreation(SingletonCreationPolicy.NeverCreate)]`, which stops `RuntimeSingleton<T>.Instance` creating a bare stand-in when no instance exists. It returns `null` and names the type instead. See [Controlling on-demand creation](./docs/features/utilities/singletons.md#controlling-on-demand-creation) ([#321](https://github.com/Ambiguous-Interactive/unity-helpers/issues/321)).
 - Add `AnimationClip.GetSpriteFramesFromClip()`, which pairs every sprite a clip references with the binding that supplies it, a `GetSpritesFromClip(path, propertyName, type)` overload that filters on that binding, and `UnityExtensions.SpriteBindingProperty`. Editor-only. See [Sprites from an AnimationClip](./docs/features/utilities/math-and-extensions.md#sprites-from-an-animationclip) ([#451](https://github.com/Ambiguous-Interactive/unity-helpers/issues/451)).
 - Add `AssetChangeDetectionUtility.Enabled`, `ResetEnabledToDefault()` and `EnabledScope(bool)` to turn the `[DetectAssetChanged]` watcher on and off. The returned `AssetChangeDetectionEnabledScope` restores the previous setting on dispose ([#327](https://github.com/Ambiguous-Interactive/unity-helpers/issues/327)).
