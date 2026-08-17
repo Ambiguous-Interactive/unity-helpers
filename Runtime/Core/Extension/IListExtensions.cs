@@ -33,7 +33,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Performance: O(n) where n is the number of elements. A list that is not already a
         /// <c>T[]</c> is shuffled through a pooled array, which is 1.5x to 2x faster than swapping
         /// through the indexer.</para>
-        /// <para>Allocations: No allocations; any scratch array comes from a pool.</para>
+        /// <para>Allocations: the scratch array comes from a pool. A list taking the bulk write-back
+        /// path boxes one <see cref="ArraySegment{T}"/> per <c>AddRange</c>, because
+        /// <see cref="List{T}"/> declares no <see cref="ICollection{T}"/> overload on this profile.</para>
         /// <para>Edge cases: Lists with 0 or 1 elements are not modified.</para>
         /// </remarks>
         public static void Shuffle<T>(this IList<T> list, IRandom random = null)
@@ -84,7 +86,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <see cref="Array.Reverse(Array, int, int)"/> calls; anything else is copied into a pooled
         /// array whose two runs are written back in order, so nothing is reversed at all. Measured
         /// 2.7x to 36x faster than three reversals through the indexer.</para>
-        /// <para>Allocations: No allocations; any scratch array comes from a pool.</para>
+        /// <para>Allocations: the scratch array comes from a pool. A list taking the bulk write-back
+        /// path boxes one <see cref="ArraySegment{T}"/> per <c>AddRange</c>, because
+        /// <see cref="List{T}"/> declares no <see cref="ICollection{T}"/> overload on this profile.</para>
         /// <para>Edge cases: Lists with 0 or 1 elements are not modified. Amount is normalized using modulo. Amount of 0 or multiples of count result in no change.</para>
         /// </remarks>
         public static void Shift<T>(this IList<T> list, int amount)
@@ -254,7 +258,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Performance: O(n) where n is the number of elements. A list that offers bulk
         /// replacement is filled through a pooled array, which measures 3.6x to 38x faster than
         /// assigning through the indexer.</para>
-        /// <para>Allocations: No allocations; any scratch array comes from a pool.</para>
+        /// <para>Allocations: the scratch array comes from a pool. A list taking the bulk write-back
+        /// path boxes one <see cref="ArraySegment{T}"/> per <c>AddRange</c>, because
+        /// <see cref="List{T}"/> declares no <see cref="ICollection{T}"/> overload on this profile.</para>
         /// <para>Edge cases: Empty lists are not modified.</para>
         /// </remarks>
         public static void Fill<T>(this IList<T> list, T value)
@@ -390,6 +396,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(predicate));
             }
 
+            // Evaluated once on both paths, as it always was: a backwards scan fixes its start
+            // index before the first predicate runs, so there is no bound left to re-read.
             int count = list.Count;
             if (list is T[] array)
             {

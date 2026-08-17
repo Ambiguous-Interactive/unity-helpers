@@ -393,8 +393,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool settingsChanged = false;
             bool undoRecorded = false;
 
-            TextureImporter localTextureImporter = localTextureImporter;
-
             buffer ??= new TextureImporterSettings();
             localTextureImporter.ReadTextureSettings(buffer);
 

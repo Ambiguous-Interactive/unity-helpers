@@ -745,10 +745,12 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
   if (response.status === 401 || response.status === 403) {
     return classify("unauthorized", `HTTP ${response.status}`);
   }
-  // A WebSocket-only server answers every plain HTTP request with 426 (or completes a 101 upgrade).
-  // This bridge never emits either, so the responder is definitively not it: the port belongs to
-  // some other process. That is a different failure from silence and needs different advice, and
-  // folding it into "nothing responded" once cost a session's time chasing Unity's approval dialog.
+  // A WebSocket-only server answers every plain HTTP request with 426. This bridge never emits one,
+  // so a 426 is proof the responder is not it: the port belongs to some other process. That is a
+  // different failure from silence and needs different advice, and folding it into "nothing
+  // responded" once cost a session's time chasing Unity's approval dialog. A 101 is checked beside
+  // it for completeness only -- fetch never surfaces a completed upgrade as a Response, so such a
+  // peer arrives through the catch above as `unreachable`.
   if (response.status === 426 || response.status === 101) {
     return classify(
       "port-occupied",

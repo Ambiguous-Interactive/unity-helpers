@@ -1491,7 +1491,10 @@ function Find-UnconditionalWorkflowSteps {
 
       $stepMatches = [regex]::Matches($jobBody, '(?ms)^      - (?<body>.*?)(?=^      - |\z)')
       foreach ($stepMatch in $stepMatches) {
-        $stepBody = $stepMatch.Groups['body'].Value
+        # The `- ` marker is consumed by the match, which leaves the step's FIRST key at column 0
+        # where an `^\s+` guard cannot see it. Putting the indent back is what stops
+        # `- if: ...` reading as unconditional and `- run: ...` reading as absent.
+        $stepBody = '        ' + $stepMatch.Groups['body'].Value
         if ($stepBody -notmatch $RunPattern) {
           continue
         }

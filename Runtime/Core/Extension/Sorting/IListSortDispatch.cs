@@ -199,16 +199,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [Pure]
         public static bool IsSorted<T>(this IList<T> list, IComparer<T> comparer = null)
         {
-            int count = list.Count;
-            if (count <= 1)
+            if (list.Count <= 1)
             {
                 return true;
             }
 
             comparer ??= Comparer<T>.Default;
 
+            // Deliberately re-read: the comparer is caller code and can shorten the list.
             T previous = list[0];
-            for (int i = 1; i < count; ++i)
+            for (int i = 1; i < list.Count; ++i)
             {
                 T current = list[i];
                 if (comparer.Compare(previous, current) > 0)
