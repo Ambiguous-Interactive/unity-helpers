@@ -359,6 +359,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        /// <remarks>
+        /// A remainder smaller than half an ulp of the maximum rounds onto the maximum when the
+        /// maximum is added to it, which is outside the half-open range the method promises.
+        /// </remarks>
+        [Test]
+        public void PositiveModNeverReturnsTheMaximumItself()
+        {
+            foreach (float max in new[] { 360f, 2f, 0.5f, 1e6f, 16777216f })
+            {
+                // A quarter of an ulp below zero: too small to survive being added to max.
+                float oneUlpBelowMax = BitConverter.Int32BitsToSingle(
+                    BitConverter.SingleToInt32Bits(max) - 1
+                );
+                float value = (oneUlpBelowMax - max) / 4f;
+
+                float result = value.PositiveMod(max);
+
+                Assert.That(result, Is.GreaterThanOrEqualTo(0f), $"max {max}");
+                Assert.That(
+                    result,
+                    Is.LessThan(max),
+                    $"PositiveMod({value:R}, {max:R}) returned the maximum itself."
+                );
+            }
+        }
+
         [Test]
         public void WrappedAddLongWrapsTheRealSumWhenItOverflows()
         {
@@ -1366,14 +1392,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void PositiveModFloatWithOne()
         {
-            Assert.AreEqual(0f, 5.5f.PositiveMod(1f), Epsilon);
-            Assert.AreEqual(0f, (-5.5f).PositiveMod(1f), Epsilon);
+            // 5.5 mod 1 is 0.5, not 0. A maximum of 1 is the normalized-phase case, and it used to
+            // return 0 for every input -- which this file's own documented example contradicted.
+            Assert.AreEqual(0.5f, 5.5f.PositiveMod(1f), Epsilon);
+            Assert.AreEqual(0.5f, (-5.5f).PositiveMod(1f), Epsilon);
+            Assert.AreEqual(0f, 5f.PositiveMod(1f), Epsilon);
         }
 
         [Test]
         public void PositiveModDoubleWithOne()
         {
-            Assert.AreEqual(0.0, 5.5.PositiveMod(1.0), Epsilon);
+            Assert.AreEqual(0.5, 5.5.PositiveMod(1.0), Epsilon);
             Assert.AreEqual(0.0, (-5.5).PositiveMod(1.0), Epsilon);
         }
 

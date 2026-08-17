@@ -169,16 +169,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0f;
             }
 
-            // Tests expect modulo 1 to map to 0 for any input
-            if (Mathf.Approximately(max, 1f))
-            {
-                return 0f;
-            }
-
             float remainder = value % max;
-            if (remainder < 0f)
+            if (remainder != 0f && remainder < 0f != max < 0f)
             {
                 remainder += max;
+                if (remainder == max)
+                {
+                    // A remainder below half an ulp of max rounds onto max when added, which is
+                    // outside the half-open range. The second division this replaced folded it to 0.
+                    remainder = 0f;
+                }
             }
 
             // A remainder of negative zero compares equal to zero but is a different value; the two
@@ -212,16 +212,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0d;
             }
 
-            // Tests expect modulo 1 to map to 0 for any input
-            if (Math.Abs(max - 1d) <= 1e-12d)
-            {
-                return 0d;
-            }
-
             double remainder = value % max;
-            if (remainder < 0d)
+            if (remainder != 0d && remainder < 0d != max < 0d)
             {
                 remainder += max;
+                if (remainder == max)
+                {
+                    // See the float overload: rounding onto the boundary folds to 0.
+                    remainder = 0d;
+                }
             }
 
             // See the float overload: negative zero is normalized to keep the old result exactly.
@@ -249,8 +248,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return value;
             }
 
+            // Floored modulo: the result takes the sign of the divisor, which is what a negative
+            // maximum has always returned here. Adding only across a sign difference cannot overflow,
+            // where adding unconditionally did once the maximum passed 2^30.
             int remainder = value % max;
-            return remainder < 0 ? remainder + max : remainder;
+            if (remainder != 0 && remainder < 0 != max < 0)
+            {
+                remainder += max;
+            }
+
+            return remainder;
         }
 
         /// <example>
@@ -274,8 +281,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return value;
             }
 
+            // See the int overload: floored modulo, and the conditional add cannot overflow.
             long remainder = value % max;
-            return remainder < 0 ? remainder + max : remainder;
+            if (remainder != 0 && remainder < 0 != max < 0)
+            {
+                remainder += max;
+            }
+
+            return remainder;
         }
 
         /// <summary>
