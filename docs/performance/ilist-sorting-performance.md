@@ -121,8 +121,15 @@ copying the whole list to reverse a few elements of it would be a pessimization.
 
 Some of the `IList<T>` column is not the copy at all. `Count` was being read on every iteration of
 every loop — one interface call per element, for a value that cannot change — and hoisting it alone
-is worth 1.26x to 1.76x. That accounts for the whole of `Fill`'s gain there, which is why `Fill`
+is worth 1.26x to 1.76x. That accounts for the whole of `Fill(value)`'s gain there, which is why it
 copies only for a list that offers bulk replacement and runs a plain hoisted loop for anything else.
+
+**A value that cannot change, except where it can.** The methods that take a `Func<>` — `Fill(factory)`,
+`IndexOf`, `LastIndexOf`, `FindAll`, `Partition` — deliberately keep re-reading `Count` and give up
+that 1.26x to 1.76x. A caller's factory or predicate can remove elements from the list it is being run
+over, and a hoisted bound then indexes past the end of a shorter list: an `ArgumentOutOfRangeException`
+out of a public API, where the loop used to stop. Their array fast paths still hoist, because an array
+cannot change length underneath one.
 
 ## Dataset Scenarios
 
