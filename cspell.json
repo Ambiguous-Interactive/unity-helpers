@@ -872,7 +872,8 @@
         "quantizers",
         "luma",
         "texel",
-        "devirtualize"
+        "devirtualize",
+        "pessimization"
       ]
     }
   ],

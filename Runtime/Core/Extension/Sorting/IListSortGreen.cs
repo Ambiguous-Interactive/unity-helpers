@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
             GreenSortCore(scratch, count, comparer);
-            WriteBackSorted(list, scratch, count);
+            WriteBack(list, scratch, count);
         }
 
         private static void GreenSortCore<T, TComparer>(T[] array, int count, TComparer comparer)

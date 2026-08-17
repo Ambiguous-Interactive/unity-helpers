@@ -83,6 +83,47 @@ So: a `T[]` is sorted where it lies, a `List<T>` moves in and out in two bulk co
 `IList<T>` reads in bulk and writes back through its indexer, because that is all the interface
 offers.
 
+## Bulk Operations on a List
+
+Sorting is not the only `IList<T>` operation that was reaching every element through an interface
+call. The same measurement was repeated for the rest of them, and it splits cleanly in two.
+
+**An operation that always touches the whole range can afford a copy — and often does not need one,
+because the BCL already has a bulk primitive for it.** `Reverse` and `Fill` take `Array.Reverse` and
+`Array.Fill`; `List<T>` carries its own `Reverse(index, count)`. `Shift` stopped reversing anything:
+a rotation is two contiguous runs of the input, so the copy is written back in two `Array.Copy`
+calls rather than three reversal passes.
+
+**An operation that can stop early must never copy.** `IndexOf` and `LastIndexOf` with a predicate
+return at the first match, and a copy would have read every remaining element before the predicate
+ran once. They get the free half of the change — direct indexing when the list already is a `T[]` —
+and nothing else.
+
+Measured on .NET 9, `int` elements, best of nine runs, the same sources before and after. The
+`IList<T>` column is a list that is neither a `T[]` nor a `List<T>`, measured against two
+implementations so the JIT cannot prove the receiver's type and devirtualize the indexer — a first
+pass that used one sealed class reported a 4x _regression_ that did not exist:
+
+| Operation            | n       |  `T[]` | `List<T>` | `IList<T>` |
+| -------------------- | ------- | -----: | --------: | ---------: |
+| `Reverse`            | 1,000   | 39.79x |    29.58x |      1.00x |
+| `Reverse`            | 100,000 | 30.45x |    28.76x |      1.04x |
+| `Shift`              | 1,000   | 30.63x |    43.19x |      4.06x |
+| `Shift`              | 100,000 | 32.81x |    35.76x |      3.52x |
+| `Fill`               | 1,000   | 38.00x |    17.88x |      1.74x |
+| `Fill`               | 100,000 | 24.20x |    10.15x |      1.76x |
+| `Shuffle`            | 1,000   |  2.06x |     2.04x |      1.61x |
+| `Shuffle`            | 100,000 |  2.01x |     1.98x |      1.54x |
+| `IndexOf(predicate)` | 100,000 |  3.07x |     2.37x |      2.41x |
+
+`Reverse` on an `IList<T>` is unchanged by design: a partial range has no bulk write-back, and
+copying the whole list to reverse a few elements of it would be a pessimization.
+
+Some of the `IList<T>` column is not the copy at all. `Count` was being read on every iteration of
+every loop — one interface call per element, for a value that cannot change — and hoisting it alone
+is worth 1.26x to 1.76x. That accounts for the whole of `Fill`'s gain there, which is why `Fill`
+copies only for a list that offers bulk replacement and runs a plain hoisted loop for anything else.
+
 ## Dataset Scenarios
 
 - **Sorted** – ascending integers, verifying best-case behavior.

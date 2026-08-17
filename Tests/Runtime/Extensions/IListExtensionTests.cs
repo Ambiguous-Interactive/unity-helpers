@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -49,6 +50,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             public bool Equals(int x, int y) => x == y;
 
             public int GetHashCode(int obj) => obj.GetHashCode();
+        }
+
+        public delegate IList<int> ContainerFactory(IEnumerable<int> source);
+
+        /// <remarks>
+        /// Shuffle, Shift, Reverse and Fill each take a different path per container: a bulk array
+        /// primitive, a pooled copy written back in one Array.Copy, or the interface indexer. Every
+        /// shape has to produce the same answer, so every behavior assertion below runs over all
+        /// four rather than over whichever one the operation happens to be fastest on.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> ContainerShapeCases()
+        {
+            yield return new TestCaseData(
+                "T[]",
+                (ContainerFactory)(source => source.ToArray())
+            ).SetName("Array");
+            yield return new TestCaseData(
+                "List<T>",
+                (ContainerFactory)(source => new List<int>(source))
+            ).SetName("List");
+            yield return new TestCaseData(
+                "SerializableList<T>",
+                (ContainerFactory)(
+                    source =>
+                    {
+                        SerializableList<int> serializable = new();
+                        serializable.AddRange(source);
+                        return serializable;
+                    }
+                )
+            ).SetName("SerializableList");
+            yield return new TestCaseData(
+                "IList<T>",
+                (ContainerFactory)(
+                    source =>
+                    {
+                        CustomList<int> custom = new();
+                        foreach (int value in source)
+                        {
+                            custom.Add(value);
+                        }
+
+                        return custom;
+                    }
+                )
+            ).SetName("CustomList");
         }
 
         public delegate void IntSortAlgorithm(IList<int> list, IComparer<int> comparer);
@@ -608,6 +655,182 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.Throws<ArgumentException>(() => input.Reverse(1, input.Length));
             Assert.Throws<ArgumentException>(() => input.Reverse(1, int.MaxValue));
             Assert.Throws<ArgumentException>(() => input.Reverse(1, int.MinValue));
+        }
+
+        /// <remarks>
+        /// A range whose start is past its end is documented as a no-op. The bulk reverses take a
+        /// length rather than two bounds, and both throw on a negative one, so this is the case the
+        /// fast paths would break first.
+        /// </remarks>
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void ReverseWithStartAfterEndLeavesTheListAlone(
+            string shapeName,
+            ContainerFactory factory
+        )
+        {
+            int[] source = Enumerable.Range(0, 10).ToArray();
+            for (int start = 0; start < source.Length; ++start)
+            {
+                for (int end = 0; end < start; ++end)
+                {
+                    IList<int> list = factory(source);
+                    list.Reverse(start, end);
+                    Assert.That(
+                        list.ToArray(),
+                        Is.EqualTo(source),
+                        $"Reverse({start}, {end}) modified a {shapeName}"
+                    );
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void ReverseMatchesElementwiseSwapsInEveryContainer(
+            string shapeName,
+            ContainerFactory factory
+        )
+        {
+            int[] source = Enumerable.Range(0, 33).ToArray();
+            for (int start = 0; start < source.Length; ++start)
+            {
+                for (int end = start; end < source.Length; ++end)
+                {
+                    int[] expected = source.ToArray();
+                    int left = start;
+                    int right = end;
+                    while (left < right)
+                    {
+                        (expected[left], expected[right]) = (expected[right], expected[left]);
+                        left++;
+                        right--;
+                    }
+
+                    IList<int> list = factory(source);
+                    list.Reverse(start, end);
+                    Assert.That(
+                        list.ToArray(),
+                        Is.EqualTo(expected),
+                        $"Reverse({start}, {end}) over a {shapeName}"
+                    );
+                }
+            }
+        }
+
+        /// <remarks>
+        /// Shift no longer reverses anything on any path: an array rotates through three bulk
+        /// reverses and everything else writes back two contiguous runs of a pooled copy. Both have
+        /// to agree with the rotation the documentation describes, for every amount including the
+        /// negative and out-of-range ones the modulo normalizes.
+        /// </remarks>
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void ShiftMatchesRotationInEveryContainer(string shapeName, ContainerFactory factory)
+        {
+            int[] source = Enumerable.Range(0, 17).ToArray();
+            for (int amount = -2 * source.Length; amount <= 2 * source.Length; ++amount)
+            {
+                int normalized = amount.PositiveMod(source.Length);
+                int[] expected = new int[source.Length];
+                for (int i = 0; i < source.Length; ++i)
+                {
+                    expected[(i + normalized) % source.Length] = source[i];
+                }
+
+                IList<int> list = factory(source);
+                list.Shift(amount);
+                Assert.That(
+                    list.ToArray(),
+                    Is.EqualTo(expected),
+                    $"Shift({amount}) over a {shapeName}"
+                );
+            }
+        }
+
+        /// <remarks>
+        /// The array path shuffles in place and every other path shuffles a pooled copy, drawing the
+        /// same number of times in the same order. A seeded generator therefore has to produce the
+        /// identical permutation in all four, which is what pins the copy as a pure relocation.
+        /// </remarks>
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void ShuffleProducesTheSamePermutationInEveryContainer(
+            string shapeName,
+            ContainerFactory factory
+        )
+        {
+            int[] source = Enumerable.Range(0, 64).ToArray();
+
+            int[] expected = source.ToArray();
+            expected.Shuffle(new SystemRandom(9_001));
+
+            IList<int> list = factory(source);
+            list.Shuffle(new SystemRandom(9_001));
+
+            Assert.That(list.Count, Is.EqualTo(source.Length), $"Shuffle resized a {shapeName}");
+            Assert.That(list.ToArray(), Is.EqualTo(expected), $"Shuffle over a {shapeName}");
+        }
+
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void FillReplacesEveryElementInEveryContainer(
+            string shapeName,
+            ContainerFactory factory
+        )
+        {
+            foreach (int count in new[] { 0, 1, 2, 33, 512 })
+            {
+                IList<int> list = factory(Enumerable.Range(0, count));
+                list.Fill(-7);
+                Assert.That(list.Count, Is.EqualTo(count), $"Fill resized a {shapeName}");
+                Assert.That(
+                    list.ToArray(),
+                    Is.EqualTo(Enumerable.Repeat(-7, count).ToArray()),
+                    $"Fill over a {shapeName} of {count}"
+                );
+            }
+        }
+
+        /// <remarks>
+        /// The predicate scans take a direct-indexing path for an array. They must not copy, because
+        /// a copy would read every element before a predicate that matches the first one ever runs -
+        /// so the count of predicate invocations is the assertion, not the elapsed time.
+        /// </remarks>
+        [TestCaseSource(nameof(ContainerShapeCases))]
+        public void PredicateSearchesStopAtTheFirstMatchInEveryContainer(
+            string shapeName,
+            ContainerFactory factory
+        )
+        {
+            int[] source = Enumerable.Range(0, 128).ToArray();
+
+            IList<int> forward = factory(source);
+            int forwardCalls = 0;
+            int firstIndex = forward.IndexOf(value =>
+            {
+                forwardCalls++;
+                return value == 0;
+            });
+            Assert.That(firstIndex, Is.EqualTo(0), $"IndexOf over a {shapeName}");
+            Assert.That(
+                forwardCalls,
+                Is.EqualTo(1),
+                $"IndexOf scanned past its match on a {shapeName}"
+            );
+
+            IList<int> backward = factory(source);
+            int backwardCalls = 0;
+            int lastIndex = backward.LastIndexOf(value =>
+            {
+                backwardCalls++;
+                return value == source.Length - 1;
+            });
+            Assert.That(
+                lastIndex,
+                Is.EqualTo(source.Length - 1),
+                $"LastIndexOf over a {shapeName}"
+            );
+            Assert.That(
+                backwardCalls,
+                Is.EqualTo(1),
+                $"LastIndexOf scanned past its match on a {shapeName}"
+            );
         }
 
         [Test]

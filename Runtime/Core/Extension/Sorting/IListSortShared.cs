@@ -4,50 +4,10 @@
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
-    using System;
     using System.Collections.Generic;
-    using DataStructure.Adapters;
 
     public static partial class IListExtensions
     {
-        /// <summary>
-        /// Writes a sorted scratch array back over the list it came from.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// A list that offers bulk replacement takes the whole range in one <c>Array.Copy</c>:
-        /// <c>AddRange</c> takes its <see cref="ICollection{T}"/> fast path for an
-        /// <see cref="ArraySegment{T}"/>, which measures 4.4x to 13x faster than assigning through an
-        /// indexer. <see cref="IList{T}"/> declares no bulk setter at all, so anything else has only
-        /// its indexer, one call per element.
-        /// </para>
-        /// <para>
-        /// Reading the other way needs no such split, because <c>CopyTo</c> is already on
-        /// <see cref="ICollection{T}"/>.
-        /// </para>
-        /// </remarks>
-        private static void WriteBackSorted<T>(IList<T> list, T[] scratch, int count)
-        {
-            if (list is List<T> concrete)
-            {
-                concrete.Clear();
-                concrete.AddRange(new ArraySegment<T>(scratch, 0, count));
-                return;
-            }
-
-            if (list is SerializableList<T> serializable)
-            {
-                serializable.Clear();
-                serializable.AddRange(new ArraySegment<T>(scratch, 0, count));
-                return;
-            }
-
-            for (int i = 0; i < count; i++)
-            {
-                list[i] = scratch[i];
-            }
-        }
-
         // Every sort runs over a T[]: an IList<T> indexer is an interface call per element, which costs
         // more across a whole sort than copying the list into a pooled array and back again does.
         private static void SortSwap<T>(T[] array, int left, int right)

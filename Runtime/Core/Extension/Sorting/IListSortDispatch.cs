@@ -199,7 +199,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [Pure]
         public static bool IsSorted<T>(this IList<T> list, IComparer<T> comparer = null)
         {
-            if (list.Count <= 1)
+            int count = list.Count;
+            if (count <= 1)
             {
                 return true;
             }
@@ -207,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             comparer ??= Comparer<T>.Default;
 
             T previous = list[0];
-            for (int i = 1; i < list.Count; ++i)
+            for (int i = 1; i < count; ++i)
             {
                 T current = list[i];
                 if (comparer.Compare(previous, current) > 0)
