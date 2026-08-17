@@ -74,6 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             yield return new StormDropRandom(CreateGuidSeed(seedIndex++));
             yield return new BlastCircuitRandom(CreateGuidSeed(seedIndex++));
             yield return new WaveSplatRandom(CreateGuidSeed(seedIndex++));
+            yield return new WDoomRandom(CreateGuidSeed(seedIndex++));
         }
 
         private static Guid CreateGuidSeed(int index)

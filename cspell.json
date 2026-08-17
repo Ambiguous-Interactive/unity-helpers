@@ -505,7 +505,8 @@
         "WProto",
         "Prd",
         "Unpremultiply",
-        "YamSort"
+        "YamSort",
+        "WDoomRandom"
       ]
     },
     {
@@ -1142,7 +1143,8 @@
     "gendeg",
     "Senia",
     "yujen",
-    "Schwarz"
+    "Schwarz",
+    "doomwiki"
   ],
   "flagWords": [],
   "minWordLength": 3,

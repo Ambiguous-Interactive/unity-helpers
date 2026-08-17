@@ -386,6 +386,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 new StormDropRandom(12345u),
                 new BlastCircuitRandom(Guid.Parse("12345678-1234-1234-1234-123456789012")),
                 new WaveSplatRandom(0xC0FFEEUL),
+                new WDoomRandom(seedIndex: 7),
             };
 
             foreach (IRandom random in randoms)
@@ -442,6 +443,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 typeof(StormDropRandom),
                 typeof(BlastCircuitRandom),
                 typeof(WaveSplatRandom),
+                typeof(WDoomRandom),
             };
 
             foreach (Type randomType in randomTypes)

@@ -39,6 +39,7 @@ int roll = PRNG.Instance.Next(1, 7);  // 1-6 inclusive
 | `DotNetRandom`                | ★★★   | ★★★     | Wraps System.Random         |
 | `SystemRandom`                | ★★★   | ★★★     | Wraps System.Random         |
 | `UnityRandom`                 | ★★    | ★★★     | Wraps UnityEngine.Random    |
+| `WDoomRandom`                 | ★★★★★ | ★       | Table walk, period 256      |
 
 ---
 

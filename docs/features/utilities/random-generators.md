@@ -82,6 +82,7 @@ All generators implement the `IRandom` interface:
 | `PhotonSpinRandom`            | Slow      | Excellent | Maximum quality needed             |
 | `UnityRandom`                 | Slow      | Fair      | Match Unity behavior               |
 | `SystemRandom`                | Very Slow | Poor      | .NET compatibility                 |
+| `WDoomRandom`                 | Fastest   | Poor      | Retro feel, deterministic replays  |
 
 For detailed benchmarks, see [Random Performance](../../performance/random-performance.md).
 

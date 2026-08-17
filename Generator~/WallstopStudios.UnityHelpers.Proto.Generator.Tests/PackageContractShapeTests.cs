@@ -71,6 +71,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ["FlurryBurstRandom"] = typeof(RandomLeafShape),
             ["BlastCircuitRandom"] = typeof(RandomLeafShape),
             ["WaveSplatRandom"] = typeof(RandomLeafShape),
+            ["WDoomRandom"] = typeof(RandomLeafShape),
             ["DotNetRandom"] = typeof(RandomSkippingShape),
             ["SystemRandom"] = typeof(RandomSkippingShape),
             ["WyRandom"] = typeof(RandomSkippingShape),
