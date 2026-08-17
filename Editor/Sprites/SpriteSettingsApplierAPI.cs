@@ -370,17 +370,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         )
         {
             assetPath = SanitizePath(assetPath);
-            textureImporter = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-            if (textureImporter == null)
+            TextureImporter localTextureImporter =
+                AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (localTextureImporter == null)
             {
+                textureImporter = null;
                 return false;
             }
 
             // Use Unity's canonical assetPath for matching to avoid path separator issues.
-            string realPath = textureImporter.assetPath;
+            string realPath = localTextureImporter.assetPath;
             SpriteSettings spriteData = FindMatchingSettings(realPath, prepared);
             if (spriteData == null)
             {
+                textureImporter = null;
                 return false;
             }
 
@@ -388,27 +391,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool settingsChanged = false;
             bool undoRecorded = false;
 
-            TextureImporter localTextureImporter = textureImporter;
+            TextureImporter localTextureImporter = localTextureImporter;
 
             buffer ??= new TextureImporterSettings();
-            textureImporter.ReadTextureSettings(buffer);
+            localTextureImporter.ReadTextureSettings(buffer);
 
             if (spriteData.applyTextureType)
             {
-                if (textureImporter.textureType != spriteData.textureType)
+                if (localTextureImporter.textureType != spriteData.textureType)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.textureType = spriteData.textureType;
+                    localTextureImporter.textureType = spriteData.textureType;
                     changed = true;
                 }
             }
 
             if (spriteData.applySpriteMode)
             {
-                if (textureImporter.spriteImportMode != spriteData.spriteMode)
+                if (localTextureImporter.spriteImportMode != spriteData.spriteMode)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.spriteImportMode = spriteData.spriteMode;
+                    localTextureImporter.spriteImportMode = spriteData.spriteMode;
                     changed = true;
                 }
                 if (buffer.spriteMode != (int)spriteData.spriteMode)
@@ -420,10 +423,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyPixelsPerUnit)
             {
-                if (textureImporter.spritePixelsPerUnit != spriteData.pixelsPerUnit)
+                if (localTextureImporter.spritePixelsPerUnit != spriteData.pixelsPerUnit)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.spritePixelsPerUnit = spriteData.pixelsPerUnit;
+                    localTextureImporter.spritePixelsPerUnit = spriteData.pixelsPerUnit;
                     changed = true;
                 }
                 if (buffer.spritePixelsPerUnit != spriteData.pixelsPerUnit)
@@ -435,10 +438,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyPivot)
             {
-                if (textureImporter.spritePivot != spriteData.pivot)
+                if (localTextureImporter.spritePivot != spriteData.pivot)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.spritePivot = spriteData.pivot;
+                    localTextureImporter.spritePivot = spriteData.pivot;
                     changed = true;
                 }
                 if (buffer.spriteAlignment != (int)SpriteAlignment.Custom)
@@ -456,10 +459,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyGenerateMipMaps)
             {
-                if (textureImporter.mipmapEnabled != spriteData.generateMipMaps)
+                if (localTextureImporter.mipmapEnabled != spriteData.generateMipMaps)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.mipmapEnabled = spriteData.generateMipMaps;
+                    localTextureImporter.mipmapEnabled = spriteData.generateMipMaps;
                     changed = true;
                 }
                 if (buffer.mipmapEnabled != spriteData.generateMipMaps)
@@ -471,28 +474,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyCrunchCompression)
             {
-                if (textureImporter.crunchedCompression != spriteData.useCrunchCompression)
+                if (localTextureImporter.crunchedCompression != spriteData.useCrunchCompression)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.crunchedCompression = spriteData.useCrunchCompression;
+                    localTextureImporter.crunchedCompression = spriteData.useCrunchCompression;
                     changed = true;
                 }
             }
             if (spriteData.applyCompression)
             {
-                if (textureImporter.textureCompression != spriteData.compressionLevel)
+                if (localTextureImporter.textureCompression != spriteData.compressionLevel)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.textureCompression = spriteData.compressionLevel;
+                    localTextureImporter.textureCompression = spriteData.compressionLevel;
                     changed = true;
                 }
             }
             if (spriteData.applyAlphaIsTransparency)
             {
-                if (textureImporter.alphaIsTransparency != spriteData.alphaIsTransparency)
+                if (localTextureImporter.alphaIsTransparency != spriteData.alphaIsTransparency)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.alphaIsTransparency = spriteData.alphaIsTransparency;
+                    localTextureImporter.alphaIsTransparency = spriteData.alphaIsTransparency;
                     changed = true;
                 }
                 if (buffer.alphaIsTransparency != spriteData.alphaIsTransparency)
@@ -504,10 +507,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyReadWriteEnabled)
             {
-                if (textureImporter.isReadable != spriteData.readWriteEnabled)
+                if (localTextureImporter.isReadable != spriteData.readWriteEnabled)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.isReadable = spriteData.readWriteEnabled;
+                    localTextureImporter.isReadable = spriteData.readWriteEnabled;
                     changed = true;
                 }
                 if (buffer.readable != spriteData.readWriteEnabled)
@@ -528,10 +531,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyWrapMode)
             {
-                if (textureImporter.wrapMode != spriteData.wrapMode)
+                if (localTextureImporter.wrapMode != spriteData.wrapMode)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.wrapMode = spriteData.wrapMode;
+                    localTextureImporter.wrapMode = spriteData.wrapMode;
                     changed = true;
                 }
                 if (buffer.wrapMode != spriteData.wrapMode)
@@ -543,10 +546,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (spriteData.applyFilterMode)
             {
-                if (textureImporter.filterMode != spriteData.filterMode)
+                if (localTextureImporter.filterMode != spriteData.filterMode)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.filterMode = spriteData.filterMode;
+                    localTextureImporter.filterMode = spriteData.filterMode;
                     changed = true;
                 }
                 if (buffer.filterMode != spriteData.filterMode)
@@ -560,9 +563,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (settingsChanged)
             {
                 EnsureUndoRecorded();
-                textureImporter.SetTextureSettings(buffer);
+                localTextureImporter.SetTextureSettings(buffer);
             }
 
+            textureImporter = localTextureImporter;
             return changed || settingsChanged;
 
             void EnsureUndoRecorded()

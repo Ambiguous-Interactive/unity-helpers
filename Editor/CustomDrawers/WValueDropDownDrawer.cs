@@ -457,23 +457,26 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out string tooltip
         )
         {
-            tooltip = string.Empty;
             if (property == null)
             {
+                tooltip = string.Empty;
                 return string.Empty;
             }
 
             if (property.hasMultipleDifferentValues)
             {
+                tooltip = string.Empty;
                 return "\u2014";
             }
 
             int selectedIndex = ResolveSelectedIndex(property, attribute.ValueType, options);
             if (selectedIndex >= 0 && selectedIndex < options.Length)
             {
+                tooltip = string.Empty;
                 return FormatOptionCached(options[selectedIndex]);
             }
 
+            tooltip = string.Empty;
             return string.Empty;
         }
 

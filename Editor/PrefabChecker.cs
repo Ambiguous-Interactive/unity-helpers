@@ -374,15 +374,16 @@ namespace WallstopStudios.UnityHelpers.Editor
             out string unityRelative
         )
         {
-            unityRelative = string.Empty;
             if (string.IsNullOrWhiteSpace(absolutePath))
             {
+                unityRelative = string.Empty;
                 return false;
             }
 
             string rel = DirectoryHelper.AbsoluteToUnityRelativePath(absolutePath);
             if (string.IsNullOrWhiteSpace(rel))
             {
+                unityRelative = string.Empty;
                 return false;
             }
 

@@ -472,8 +472,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         private static AttributeMetadataCache GetOrCreateCache(out bool metadataChanged)
         {
-            metadataChanged = false;
-
             // Try loading from the expected path first
             const string assetPath =
                 "Assets/Resources/Wallstop Studios/Unity Helpers/AttributeMetadataCache.asset";
@@ -529,6 +527,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 Debug.LogWarning(
                     $"AttributeMetadataCacheGenerator: Failed to ensure folder '{directory.SanitizePath()}'. Skipping cache asset creation."
                 );
+                metadataChanged = false;
                 return null;
             }
 
@@ -550,6 +549,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     {
                         UnityEngine.Object.DestroyImmediate(cache);
                     }
+                    metadataChanged = false;
                     return null;
                 }
             }

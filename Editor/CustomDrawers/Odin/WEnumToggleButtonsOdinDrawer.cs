@@ -725,13 +725,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out int pageSize
         )
         {
-            pageSize = ResolvePageSize(attribute);
+            int resolved = ResolvePageSize(attribute);
             if (attribute is { EnablePagination: false })
             {
+                pageSize = resolved;
                 return false;
             }
 
-            return optionCount > pageSize;
+            pageSize = resolved;
+            return optionCount > resolved;
         }
 
         internal static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)

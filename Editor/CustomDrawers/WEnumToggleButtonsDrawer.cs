@@ -636,13 +636,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out int pageSize
         )
         {
-            pageSize = ResolvePageSize(attribute);
+            int resolved = ResolvePageSize(attribute);
             if (attribute is { EnablePagination: false })
             {
+                pageSize = resolved;
                 return false;
             }
 
-            return optionCount > pageSize;
+            pageSize = resolved;
+            return optionCount > resolved;
         }
 
         internal static ToggleSet CreateToggleSet(SerializedProperty property, FieldInfo fieldInfo)
@@ -1196,9 +1198,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryConvertToInt64(object value, out long converted)
         {
-            converted = 0L;
             if (value == null)
             {
+                converted = 0L;
                 return false;
             }
 
@@ -1209,15 +1211,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             catch (Exception)
             {
+                converted = 0L;
                 return false;
             }
         }
 
         private static bool TryConvertToDouble(object value, out double converted)
         {
-            converted = 0d;
             if (value == null)
             {
+                converted = 0d;
                 return false;
             }
 
@@ -1228,6 +1231,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             catch (Exception)
             {
+                converted = 0d;
                 return false;
             }
         }

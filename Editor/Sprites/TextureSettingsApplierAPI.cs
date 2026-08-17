@@ -184,9 +184,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             TextureImporterSettings buffer = null
         )
         {
-            textureImporter = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-            if (textureImporter == null)
+            TextureImporter localTextureImporter =
+                AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (localTextureImporter == null)
             {
+                textureImporter = null;
                 return false;
             }
 
@@ -194,72 +196,70 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool settingsChanged = false;
             bool undoRecorded = false;
 
-            TextureImporter localTextureImporter = textureImporter;
-
             // Importer-level fields
             if (config.applyReadWriteEnabled)
             {
-                if (textureImporter.isReadable != config.readWriteEnabled)
+                if (localTextureImporter.isReadable != config.readWriteEnabled)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.isReadable = config.readWriteEnabled;
+                    localTextureImporter.isReadable = config.readWriteEnabled;
                     changed = true;
                 }
             }
             if (config.applyMipMaps)
             {
-                if (textureImporter.mipmapEnabled != config.generateMipMaps)
+                if (localTextureImporter.mipmapEnabled != config.generateMipMaps)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.mipmapEnabled = config.generateMipMaps;
+                    localTextureImporter.mipmapEnabled = config.generateMipMaps;
                     changed = true;
                 }
             }
             if (config.applyWrapMode)
             {
-                if (textureImporter.wrapMode != config.wrapMode)
+                if (localTextureImporter.wrapMode != config.wrapMode)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.wrapMode = config.wrapMode;
+                    localTextureImporter.wrapMode = config.wrapMode;
                     changed = true;
                 }
             }
             if (config.applyFilterMode)
             {
-                if (textureImporter.filterMode != config.filterMode)
+                if (localTextureImporter.filterMode != config.filterMode)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.filterMode = config.filterMode;
+                    localTextureImporter.filterMode = config.filterMode;
                     changed = true;
                 }
             }
             if (config.applyCompression)
             {
-                if (textureImporter.textureCompression != config.compression)
+                if (localTextureImporter.textureCompression != config.compression)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.textureCompression = config.compression;
+                    localTextureImporter.textureCompression = config.compression;
                     changed = true;
                 }
             }
             if (config.applyCrunchCompression)
             {
-                if (textureImporter.crunchedCompression != config.useCrunchCompression)
+                if (localTextureImporter.crunchedCompression != config.useCrunchCompression)
                 {
                     EnsureUndoRecorded();
-                    textureImporter.crunchedCompression = config.useCrunchCompression;
+                    localTextureImporter.crunchedCompression = config.useCrunchCompression;
                     changed = true;
                 }
             }
 
             // Buffer for SetTextureSettings if we need it later (kept for parity/extension)
             buffer ??= new TextureImporterSettings();
-            textureImporter.ReadTextureSettings(buffer);
+            localTextureImporter.ReadTextureSettings(buffer);
 
             // Default platform settings
             bool platformChanged = false;
             TextureImporterPlatformSettings ps =
-                textureImporter.GetDefaultPlatformTextureSettings();
+                localTextureImporter.GetDefaultPlatformTextureSettings();
             if (
                 config.applyPlatformResizeAlgorithm
                 && ps.resizeAlgorithm != config.platformResizeAlgorithm
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (platformChanged)
             {
                 EnsureUndoRecorded();
-                textureImporter.SetPlatformTextureSettings(ps);
+                localTextureImporter.SetPlatformTextureSettings(ps);
                 changed = true;
             }
 
@@ -316,8 +316,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     TextureImporterPlatformSettings ops =
                         po.name == TexturePlatformNameHelper.DefaultPlatformName
-                            ? textureImporter.GetDefaultPlatformTextureSettings()
-                            : textureImporter.GetPlatformTextureSettings(po.name);
+                            ? localTextureImporter.GetDefaultPlatformTextureSettings()
+                            : localTextureImporter.GetPlatformTextureSettings(po.name);
 
                     bool any = false;
                     if (po.applyResizeAlgorithm && ops.resizeAlgorithm != po.resizeAlgorithm)
@@ -356,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 ? true
                                 : ops.overridden;
                         EnsureUndoRecorded();
-                        textureImporter.SetPlatformTextureSettings(ops);
+                        localTextureImporter.SetPlatformTextureSettings(ops);
                         changed = true;
                     }
                 }
@@ -366,9 +366,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (settingsChanged)
             {
                 EnsureUndoRecorded();
-                textureImporter.SetTextureSettings(buffer);
+                localTextureImporter.SetTextureSettings(buffer);
             }
 
+            textureImporter = localTextureImporter;
             return changed || settingsChanged;
 
             void EnsureUndoRecorded()

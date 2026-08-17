@@ -403,14 +403,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out string tooltip
         )
         {
-            tooltip = string.Empty;
             if (property == null)
             {
+                tooltip = string.Empty;
                 return string.Empty;
             }
 
             if (property.hasMultipleDifferentValues)
             {
+                tooltip = string.Empty;
                 return "\u2014";
             }
 
@@ -442,6 +443,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
+            tooltip = string.Empty;
             return string.Empty;
         }
 

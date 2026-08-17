@@ -72,9 +72,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         internal static bool TryCreateInstance(Type type, out object value)
         {
-            value = null;
             if (type == null)
             {
+                value = null;
                 return false;
             }
 
@@ -86,6 +86,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             if (UnsupportedFactoryTypes.ContainsKey(type))
             {
+                value = null;
                 return false;
             }
 
@@ -99,6 +100,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             catch (ArgumentException)
             {
                 UnsupportedFactoryTypes[type] = 0;
+                value = null;
                 return false;
             }
         }

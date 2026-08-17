@@ -942,22 +942,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             out float rightPadding
         )
         {
-            leftPadding = 0f;
-            rightPadding = 0f;
             if (containerStyle == null)
             {
+                leftPadding = 0f;
+                rightPadding = 0f;
                 return 0f;
             }
 
             RectOffset padding = containerStyle.padding;
             if (padding == null)
             {
+                leftPadding = 0f;
+                rightPadding = 0f;
                 return 0f;
             }
 
+            int total = padding.left + padding.right;
             leftPadding = Mathf.Max(0f, padding.left);
             rightPadding = Mathf.Max(0f, padding.right);
-            int total = padding.left + padding.right;
             return Mathf.Max(0f, total);
         }
     }

@@ -899,9 +899,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out float contentHeight
         )
         {
-            contentHeight = 0f;
             if (serializedObject == null)
             {
+                contentHeight = 0f;
                 return false;
             }
 
