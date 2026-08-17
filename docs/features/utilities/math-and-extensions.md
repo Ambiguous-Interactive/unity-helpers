@@ -28,6 +28,9 @@ Contents
 - Positive modulo and wrap-around arithmetic
   - Use `PositiveMod` to ensure non-negative modulo results for indices and cyclic counters.
   - Use `WrappedAdd`/`WrappedIncrement` for ring buffer indexes and cursor navigation.
+  - Both come in `int`, `long`, `float` and `double`, so an angle or a normalized phase wraps with the
+    same call a ring-buffer cursor does. Every one of them returns a value in `[0, max)` for any
+    input, including sums that overflow their own type.
 
 Example:
 
@@ -40,6 +43,12 @@ i = i.WrappedAdd(2, 5); // 1
 
 float angle = -30f;
 float normalized = angle.PositiveMod(360f); // 330f
+
+float heading = 350f;
+heading = heading.WrappedAdd(20f, 360f); // 10f
+
+double phase = 0.9;
+phase = phase.WrappedAdd(0.2, 1.0); // 0.1
 ```
 
 Diagram (wrap-around on a ring of size 5):

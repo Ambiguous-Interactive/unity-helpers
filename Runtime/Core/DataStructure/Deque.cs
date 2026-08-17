@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -58,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 if (++_index < _count)
                 {
-                    int actualIndex = (_head + _index) % _capacity;
+                    int actualIndex = _head.WrappedAdd(_index, _capacity);
                     _current = _items[actualIndex];
                     return true;
                 }
@@ -249,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Resize(ComputeGrowth(_items.Length));
             }
 
-            _head = (_head - 1 + _items.Length) % _items.Length;
+            _head = _head.WrappedAdd(-1, _items.Length);
             _items[_head] = item;
             _count++;
         }
@@ -265,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _items[_tail] = item;
-            _tail = (_tail + 1) % _items.Length;
+            _tail = _tail.WrappedIncrement(_items.Length);
             _count++;
         }
 
@@ -283,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             T popped = _items[_head];
             _items[_head] = default;
-            _head = (_head + 1) % _items.Length;
+            _head = _head.WrappedIncrement(_items.Length);
             _count--;
             result = popped;
             return true;
@@ -301,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            _tail = (_tail - 1 + _items.Length) % _items.Length;
+            _tail = _tail.WrappedAdd(-1, _items.Length);
             T popped = _items[_tail];
             _items[_tail] = default;
             _count--;

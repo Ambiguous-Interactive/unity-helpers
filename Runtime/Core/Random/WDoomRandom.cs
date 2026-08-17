@@ -83,11 +83,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static WDoomRandom Instance => ThreadLocalRandom<WDoomRandom>.Instance;
 
-        public override RandomState InternalState => BuildState(_index);
+        public override RandomState InternalState => BuildState((ulong)_index);
 
+        // An index into a 256-entry table, and nothing else. A wider field would claim state this
+        // generator does not have.
         [ProtoMember(6)]
         [WProtoMember(6)]
-        internal ulong _index;
+        internal int _index;
 
         public WDoomRandom()
             : this(Guid.NewGuid()) { }
@@ -95,18 +97,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public WDoomRandom(Guid guid)
         {
             (ulong a, ulong b) = RandomUtilities.GuidToUInt64Pair(guid);
-            _index = (a ^ b) & (TableSize - 1);
+            _index = (int)((a ^ b) % TableSize);
         }
 
         public WDoomRandom(int seedIndex)
         {
-            _index = (ulong)(seedIndex & (TableSize - 1));
+            _index = seedIndex.PositiveMod(TableSize);
         }
 
         [JsonConstructor]
         public WDoomRandom(RandomState internalState)
         {
-            _index = internalState.State1 & (TableSize - 1);
+            _index = (int)(internalState.State1 % TableSize);
             RestoreCommonState(internalState);
         }
 
@@ -123,8 +125,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 uint value = 0;
                 for (int i = 0; i < 4; ++i)
                 {
-                    _index = (_index + 1) & (TableSize - 1);
-                    value = (value << 8) | Table[(int)_index];
+                    _index = _index.WrappedIncrement(TableSize);
+                    value = (value << 8) | Table[_index];
                 }
 
                 return value;
@@ -137,11 +139,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <returns>The next byte in the table, 0 through 255.</returns>
         public byte NextTableByte()
         {
-            unchecked
-            {
-                _index = (_index + 1) & (TableSize - 1);
-                return Table[(int)_index];
-            }
+            // WrappedIncrement, not a mask: the wrap stays correct if the table ever stops being a
+            // power of two in length, and it is a comparison either way.
+            _index = _index.WrappedIncrement(TableSize);
+            return Table[_index];
         }
 
         public override IRandom Copy()

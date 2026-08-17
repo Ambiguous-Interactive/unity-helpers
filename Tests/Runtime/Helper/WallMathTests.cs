@@ -288,6 +288,119 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(1, 11.PositiveMod(10));
         }
 
+        /// <remarks>
+        /// The contract is a result in [0, max). Adding max to the remainder before taking it again
+        /// overflows once max is above 2^30, and the function then returned a negative number -- the
+        /// one thing its name promises it never does.
+        /// </remarks>
+        [Test]
+        public void PositiveModStaysInRangeForLargeMaxima()
+        {
+            (int Value, int Max)[] cases =
+            {
+                (1_499_999_999, 1_500_000_000),
+                (1_400_000_000, 1_500_000_000),
+                (int.MaxValue - 1, int.MaxValue),
+                (int.MaxValue, int.MaxValue),
+                (int.MinValue, int.MaxValue),
+                (-1, 2_000_000_000),
+            };
+
+            foreach ((int value, int max) in cases)
+            {
+                int result = value.PositiveMod(max);
+                Assert.That(
+                    result,
+                    Is.InRange(0, max - 1),
+                    $"PositiveMod({value}, {max}) left the range it promises."
+                );
+            }
+        }
+
+        [Test]
+        public void PositiveModLongStaysInRangeForLargeMaxima()
+        {
+            (long Value, long Max)[] cases =
+            {
+                (long.MaxValue - 1, long.MaxValue),
+                (long.MaxValue, long.MaxValue),
+                (long.MinValue, long.MaxValue),
+                ((1L << 62) - 1L, 1L << 62),
+                (-1L, (1L << 62) + 1L),
+            };
+
+            foreach ((long value, long max) in cases)
+            {
+                long result = value.PositiveMod(max);
+                Assert.That(
+                    result,
+                    Is.InRange(0L, max - 1L),
+                    $"PositiveMod({value}, {max}) left the range it promises."
+                );
+            }
+        }
+
+        /// <remarks>
+        /// A value already inside the range is its own remainder, exactly. Taking it out and back
+        /// through the maximum rounded it.
+        /// </remarks>
+        [Test]
+        public void PositiveModLeavesAnInRangeFloatExactlyAsItWas()
+        {
+            foreach (float value in new[] { 0.21524368f, 0.010507582f, 359.99997f, 1e-30f })
+            {
+                float max = value < 1f ? 0.5f : 360f;
+                Assert.That(value.PositiveMod(max), Is.EqualTo(value));
+            }
+
+            foreach (double value in new[] { 2.967071348320225d, 111.57282778600822d })
+            {
+                Assert.That(value.PositiveMod(360d), Is.EqualTo(value));
+            }
+        }
+
+        [Test]
+        public void WrappedAddLongWrapsTheRealSumWhenItOverflows()
+        {
+            Assert.That(long.MaxValue.WrappedAdd(5L, 10L), Is.InRange(0L, 9L));
+            Assert.That(long.MinValue.WrappedAdd(-5L, 10L), Is.InRange(0L, 9L));
+            Assert.That(
+                long.MaxValue.WrappedAdd(long.MaxValue, 1L << 40),
+                Is.InRange(0L, (1L << 40) - 1L)
+            );
+            Assert.That(4L.WrappedAdd(2L, 5L), Is.EqualTo(1L));
+            Assert.That(0L.WrappedAdd(-1L, 5L), Is.EqualTo(4L));
+            Assert.That(3L.WrappedIncrement(4L), Is.EqualTo(0L));
+        }
+
+        [Test]
+        public void WrappedAddFloatingPointWrapsIntoRange()
+        {
+            Assert.AreEqual(10f, 350f.WrappedAdd(20f, 360f), Epsilon);
+            Assert.AreEqual(350f, 10f.WrappedAdd(-20f, 360f), Epsilon);
+            Assert.AreEqual(0.1d, 0.9d.WrappedAdd(0.2d, 1.0d), 1e-9d);
+            Assert.AreEqual(0.9d, 0.1d.WrappedAdd(-0.2d, 1.0d), 1e-9d);
+
+            for (float angle = -720f; angle <= 720f; angle += 7.5f)
+            {
+                float wrapped = angle.WrappedAdd(13.25f, 360f);
+                Assert.That(wrapped, Is.GreaterThanOrEqualTo(0f));
+                Assert.That(wrapped, Is.LessThan(360f));
+            }
+        }
+
+        /// <remarks>
+        /// The sum is what wraps, so it has to be computed where it fits: adding the increment first
+        /// overflowed and wrapped to a number that is not congruent to the real sum.
+        /// </remarks>
+        [Test]
+        public void WrappedAddWrapsTheRealSumWhenItOverflows()
+        {
+            Assert.That(int.MaxValue.WrappedAdd(5, 10), Is.EqualTo(2));
+            Assert.That(int.MinValue.WrappedAdd(-5, 10), Is.EqualTo(7));
+            Assert.That((int.MaxValue - 3).WrappedAdd(10, 7), Is.InRange(0, 6));
+        }
+
         [Test]
         public void PositiveModIntNegativeValues()
         {
