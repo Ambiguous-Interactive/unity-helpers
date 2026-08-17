@@ -254,6 +254,14 @@ Four constraints. The first two were recorded backwards before being measured on
   returned 50, and `GetMethod("BlurredForTests")` cannot see an `internal` test hook that
   `GetMethod("BlurredForTests", (System.Reflection.BindingFlags)56)` finds. Values to combine:
   `Instance` 4, `Static` 8, `Public` 16, `NonPublic` 32.
+- **Match the overload by name and parameter count, not by a `Type[]`.** The five-argument
+  `GetMethod(name, flags, binder, types, modifiers)` returned `null` for
+  `CalculateHorizontalPadding(GUIStyle, out float, out float)` passed
+  `typeof(float).MakeByRefType()`, while iterating `GetMethods(flags)` and matching
+  `m.Name == name && m.GetParameters().Length == n` found it immediately. A null `MethodInfo` then
+  surfaces as a bare `NullReferenceException` from the sandbox with no line number, so it reads like a
+  logic bug in the script rather than a failed lookup — name every lookup and report which one was
+  null before using any of them.
 - **A `CommonTestBase` fixture runs fine; only its teardown does not.** Both `[SetUp]` methods
   (`BaseSetUp` and the fixture's own) return normally. `[TearDown] TearDown` throws
   `InvalidOperationException: No log scope is available`, because `LogAssert.NoUnexpectedReceived()`
