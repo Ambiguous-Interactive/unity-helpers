@@ -94,6 +94,27 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             public Dictionary() { }
 
             /// <summary>
+            /// Creates an empty runtime dictionary keyed by the given comparer.
+            /// </summary>
+            /// <param name="comparer">The comparer that decides which keys are the same.</param>
+            /// <remarks>
+            /// This type shadows <see cref="System.Collections.Generic.Dictionary{TKey, TValue}"/>
+            /// inside every subclass, so without this overload the documented way to seed a comparer --
+            /// <c>base(new Dictionary&lt;string, T&gt;(StringComparer.OrdinalIgnoreCase))</c> -- did not
+            /// compile there at all.
+            /// </remarks>
+            /// <example>
+            /// <code><![CDATA[
+            /// public AbilityDictionary()
+            ///     : base(new Dictionary<string, AbilityDefinition>(StringComparer.OrdinalIgnoreCase))
+            /// {
+            /// }
+            /// ]]></code>
+            /// </example>
+            public Dictionary(IEqualityComparer<TKey> comparer)
+                : base(comparer) { }
+
+            /// <summary>
             /// Creates a runtime dictionary pre-populated with entries from another dictionary.
             /// </summary>
             /// <param name="dictionary">The source collection to copy.</param>

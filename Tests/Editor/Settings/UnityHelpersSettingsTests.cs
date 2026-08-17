@@ -962,6 +962,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
         }
 
+        /// <remarks>
+        /// Every reader of a colour key matched without regard to case while the dictionary storing
+        /// them was ordinal: two entries differing only in case were one entry to a reader and two on
+        /// disk, and each reader carried its own linear scan to paper over it.
+        /// </remarks>
+        [Test]
+        public void PaletteResolutionIgnoresColorKeyCase()
+        {
+            const string PaletteKey = "SessionCaseKey";
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            using SerializedObject serialized = new(settings);
+            serialized.Update();
+
+            SerializedProperty paletteProperty = serialized.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
+            );
+            PaletteEntrySnapshot snapshot = CapturePaletteEntrySnapshot(
+                paletteProperty,
+                PaletteKey,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+            );
+
+            try
+            {
+                Color button = new(0.2f, 0.6f, 0.9f, 1f);
+                Color text = new(0.05f, 0.05f, 0.05f, 1f);
+                SetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    button,
+                    text,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                foreach (string lookup in new[] { PaletteKey, "sessioncasekey", "SESSIONCASEKEY" })
+                {
+                    UnityHelpersSettings.WButtonPaletteEntry resolved =
+                        UnityHelpersSettings.ResolveWButtonPalette(lookup);
+                    AssertColorsApproximately(button, resolved.ButtonColor);
+                    Assert.IsTrue(
+                        UnityHelpersSettings.HasWButtonPaletteColorKey(lookup),
+                        $"{lookup} should resolve to the entry stored as {PaletteKey}."
+                    );
+                }
+            }
+            finally
+            {
+                RestorePaletteEntry(
+                    paletteProperty,
+                    PaletteKey,
+                    snapshot,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
         [Test]
         public void EnsureWButtonCustomColorDefaultsManualEditSkipsAutoSuggestion()
         {

@@ -1136,9 +1136,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
+        // Colour keys are matched without regard to case everywhere they are read, so the dictionary
+        // that stores them has to agree: otherwise "Save" and "save" are two entries here and one
+        // entry to every reader.
         [Serializable]
         private sealed class WButtonCustomColorDictionary
-            : SerializableDictionary<string, WButtonCustomColor> { }
+            : SerializableDictionary<string, WButtonCustomColor>
+        {
+            public WButtonCustomColorDictionary()
+                : base(new Dictionary<string, WButtonCustomColor>(StringComparer.OrdinalIgnoreCase))
+            { }
+        }
 
 #if UNITY_EDITOR
         [CustomPropertyDrawer(typeof(WButtonCustomColor))]
@@ -1379,7 +1387,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         [Serializable]
         private sealed class WEnumToggleButtonsCustomColorDictionary
-            : SerializableDictionary<string, WEnumToggleButtonsCustomColor> { }
+            : SerializableDictionary<string, WEnumToggleButtonsCustomColor>
+        {
+            public WEnumToggleButtonsCustomColorDictionary()
+                : base(
+                    new Dictionary<string, WEnumToggleButtonsCustomColor>(
+                        StringComparer.OrdinalIgnoreCase
+                    )
+                ) { }
+        }
 
         /// <summary>
         /// Retrieves the effective page size for StringInList drawers, clamped to safe bounds.
@@ -3261,15 +3277,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 ? DefaultWButtonColorKey
                 : colorKey.Trim();
 
-            foreach (string existingKey in _wbuttonCustomColors.Keys)
-            {
-                if (string.Equals(existingKey, normalized, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return _wbuttonCustomColors.ContainsKey(normalized);
         }
 
         private bool ContainsWEnumToggleButtonsColorKey(string colorKey)
@@ -3294,15 +3302,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             string normalized = colorKey.Trim();
 
-            foreach (string existingKey in _wenumToggleButtonsCustomColors.Keys)
-            {
-                if (string.Equals(existingKey, normalized, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return _wenumToggleButtonsCustomColors.ContainsKey(normalized);
         }
 
         private string NormalizeColorKey(string colorKey)
@@ -3352,17 +3352,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             string normalized = colorKey.Trim();
 
-            if (_wbuttonCustomColors != null)
-            {
-                foreach (string existingKey in _wbuttonCustomColors.Keys)
-                {
-                    if (string.Equals(existingKey, normalized, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return existingKey;
-                    }
-                }
-            }
-
+            // The dictionary matches keys without regard to case, so an existing entry is found by
+            // lookup; there is no stored casing left to hunt for.
             return normalized;
         }
 
@@ -3423,17 +3414,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return DefaultWEnumToggleButtonsColorKey;
             }
 
-            if (_wenumToggleButtonsCustomColors != null)
-            {
-                foreach (string existingKey in _wenumToggleButtonsCustomColors.Keys)
-                {
-                    if (string.Equals(existingKey, colorKey, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return existingKey;
-                    }
-                }
-            }
-
+            // The dictionary matches keys without regard to case, so an existing entry is found by
+            // lookup; there is no stored casing left to hunt for.
             return colorKey.Trim();
         }
 
@@ -3518,18 +3500,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 directValue.EnsureReadableText();
                 return new WButtonPaletteEntry(directValue.ButtonColor, directValue.TextColor);
-            }
-
-            foreach (KeyValuePair<string, WButtonCustomColor> entry in _wbuttonCustomColors)
-            {
-                if (
-                    string.Equals(entry.Key, normalized, StringComparison.OrdinalIgnoreCase)
-                    && entry.Value != null
-                )
-                {
-                    entry.Value.EnsureReadableText();
-                    return new WButtonPaletteEntry(entry.Value.ButtonColor, entry.Value.TextColor);
-                }
             }
 
             return GetThemeAwareDefaultWButtonPalette();
@@ -3639,31 +3609,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     directValue.InactiveBackgroundColor,
                     directValue.InactiveTextColor
                 );
-            }
-
-            if (_wenumToggleButtonsCustomColors != null)
-            {
-                foreach (
-                    KeyValuePair<
-                        string,
-                        WEnumToggleButtonsCustomColor
-                    > entry in _wenumToggleButtonsCustomColors
-                )
-                {
-                    if (
-                        string.Equals(entry.Key, normalized, StringComparison.OrdinalIgnoreCase)
-                        && entry.Value != null
-                    )
-                    {
-                        entry.Value.EnsureReadableText();
-                        return new WEnumToggleButtonsPaletteEntry(
-                            entry.Value.SelectedBackgroundColor,
-                            entry.Value.SelectedTextColor,
-                            entry.Value.InactiveBackgroundColor,
-                            entry.Value.InactiveTextColor
-                        );
-                    }
-                }
             }
 
             return GetThemeAwareDefaultWEnumToggleButtonsPalette();
