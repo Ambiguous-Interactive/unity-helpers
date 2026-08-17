@@ -20,26 +20,26 @@ int roll = PRNG.Instance.Next(1, 7);  // 1-6 inclusive
 
 ## Available PRNGs
 
-| PRNG                          | Speed | Quality | Notes                       |
-| ----------------------------- | ----- | ------- | --------------------------- |
-| `IllusionFlow`                | ★★★★★ | ★★★★★   | Default, best all-around    |
-| `PcgRandom`                   | ★★★★★ | ★★★★★   | PCG algorithm, excellent    |
-| `XorShiftRandom`              | ★★★★★ | ★★★★    | Classic, very fast          |
-| `XoroShiroRandom`             | ★★★★★ | ★★★★★   | xoroshiro128+, high quality |
-| `SplitMix64`                  | ★★★★★ | ★★★★    | Good for seeding            |
-| `RomuDuo`                     | ★★★★★ | ★★★★    | Fast, small state           |
-| `WyRandom`                    | ★★★★★ | ★★★★★   | wyrand, excellent           |
-| `SquirrelRandom`              | ★★★★  | ★★★★    | Noise-based                 |
-| `FlurryBurstRandom`           | ★★★★  | ★★★★    | Burst-compatible            |
-| `PhotonSpinRandom`            | ★★★★  | ★★★★    | Novel algorithm             |
-| `StormDropRandom`             | ★★★★  | ★★★★    | Novel algorithm             |
-| `WaveSplatRandom`             | ★★★★  | ★★★★    | Novel algorithm             |
-| `BlastCircuitRandom`          | ★★★★  | ★★★★    | Novel algorithm             |
-| `LinearCongruentialGenerator` | ★★★   | ★★      | Simple LCG                  |
-| `DotNetRandom`                | ★★★   | ★★★     | Wraps System.Random         |
-| `SystemRandom`                | ★★★   | ★★★     | Wraps System.Random         |
-| `UnityRandom`                 | ★★    | ★★★     | Wraps UnityEngine.Random    |
-| `WDoomRandom`                 | ★★★★★ | ★       | Table walk, period 256      |
+| PRNG                          | Speed | Quality | Notes                        |
+| ----------------------------- | ----- | ------- | ---------------------------- |
+| `IllusionFlow`                | ★★★★★ | ★★★★★   | Default, best all-around     |
+| `PcgRandom`                   | ★★★★★ | ★★★★★   | PCG algorithm, excellent     |
+| `XorShiftRandom`              | ★★★★★ | ★★★★    | Classic, very fast           |
+| `XoroShiroRandom`             | ★★★★★ | ★★★★★   | xoroshiro128+, high quality  |
+| `SplitMix64`                  | ★★★★★ | ★★★★    | Good for seeding             |
+| `RomuDuo`                     | ★★★★★ | ★★★★    | Fast, small state            |
+| `WyRandom`                    | ★★★★★ | ★★★★★   | wyrand, excellent            |
+| `SquirrelRandom`              | ★★★★  | ★★★★    | Noise-based                  |
+| `FlurryBurstRandom`           | ★★★★  | ★★★★    | Burst-compatible             |
+| `PhotonSpinRandom`            | ★★★★  | ★★★★    | Novel algorithm              |
+| `StormDropRandom`             | ★★★★  | ★★★★    | Novel algorithm              |
+| `WaveSplatRandom`             | ★★★★  | ★★★★    | Novel algorithm              |
+| `BlastCircuitRandom`          | ★★★★  | ★★★★    | Novel algorithm              |
+| `LinearCongruentialGenerator` | ★★★   | ★★      | Simple LCG                   |
+| `DotNetRandom`                | ★★★   | ★★★     | Wraps System.Random          |
+| `SystemRandom`                | ★★★   | ★★★     | Wraps System.Random          |
+| `UnityRandom`                 | ★★    | ★★★     | Wraps UnityEngine.Random     |
+| `WDoomRandom`                 | ★★★★★ | ★       | Index-into-array, period 256 |
 
 ---
 

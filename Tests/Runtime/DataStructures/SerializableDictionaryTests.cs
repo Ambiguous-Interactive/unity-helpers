@@ -2009,5 +2009,46 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.AreEqual(2, dictionary["ALPHA"]);
         }
+
+        /// <remarks>
+        /// The other half of the same rule: the array rebuild dedupes too, and a pooled set carrying
+        /// the default comparer calls a stale "Alpha"/"alpha" pair distinct and writes both back. The
+        /// next deserialize then collapses them, so an entry the user can see disappears on reload.
+        /// </remarks>
+        [Test]
+        public void SerializingCaseCollidingKeysUnderACaseInsensitiveComparerWritesOneEntry()
+        {
+            Dictionary<string, int> seed = new(StringComparer.OrdinalIgnoreCase) { { "Alpha", 7 } };
+            SerializableDictionary<string, int> dictionary = new(seed);
+            dictionary._keys = new[] { "Alpha", "alpha" };
+            dictionary._values = new[] { 7, 7 };
+
+            dictionary.OnBeforeSerialize();
+
+            Assert.AreEqual(1, dictionary._keys.Length, "The rebuild wrote back a duplicate key.");
+            Assert.AreEqual(1, dictionary._values.Length);
+            Assert.IsTrue(StringComparer.OrdinalIgnoreCase.Equals("Alpha", dictionary._keys[0]));
+        }
+
+        [Test]
+        public void SerializingUnderACaseInsensitiveComparerKeepsEveryDistinctKey()
+        {
+            Dictionary<string, int> seed = new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Alpha", 1 },
+                { "Beta", 2 },
+                { "Gamma", 3 },
+            };
+            SerializableDictionary<string, int> dictionary = new(seed);
+
+            dictionary.OnBeforeSerialize();
+
+            Assert.AreEqual(3, dictionary._keys.Length);
+            CollectionAssert.AreEquivalent(
+                new[] { "Alpha", "Beta", "Gamma" },
+                dictionary._keys,
+                "A case-insensitive comparer must not merge keys that differ by more than case."
+            );
+        }
     }
 }

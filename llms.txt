@@ -107,7 +107,7 @@ tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
 - `IllusionFlow`, `PcgRandom`, `XorShiftRandom`, `XoroShiroRandom`, `SplitMix64`, `RomuDuo`, `WyRandom`
 - `BlastCircuitRandom`, `WaveSplatRandom`, `FlurryBurstRandom`, `PhotonSpinRandom`, `StormDropRandom`, `SquirrelRandom`
 - `LinearCongruentialGenerator`, `DotNetRandom`, `SystemRandom`, `UnityRandom` (wrappers)
-- `WDoomRandom` - 256-entry table walk, period 256; deterministic replays, not statistical randomness
+- `WDoomRandom` - index-into-array generator, period 256; deterministic replays, not statistical randomness
 - `NativePcgRandom` - Burst/Jobs compatible
 - All implement `IRandom` with extensive API: `NextFloat()`, `NextVector2()`, `NextGaussian()`, `NextWeightedIndex()`, `Shuffle()`, `NextGuid()`
 - `PerlinNoise` - Coherent noise generation

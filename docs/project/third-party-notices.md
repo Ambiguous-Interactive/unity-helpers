@@ -156,13 +156,6 @@ The following algorithms are by Will Stafford Parsons (wileylooper). Note: The o
 
 License: These implementations are used with attribution to the original author. Please refer to the individual repositories for specific licensing terms if they become available again.
 
-### WDoomRandom (technique only, clean-room)
-
-- Description: A table-walk generator: draw from a constant 256-entry table, advance a wrapping index. The technique was popularized by DOOM (id Software, 1993).
-- Author: Technique popularized by id Software; this implementation is Wallstop Studios'.
-- Upstream: [DOOM Wiki: Random number generator](https://doomwiki.org/wiki/Random_number_generator)
-- License: MIT (this package). **No third-party code or data is included.** DOOM's source is GPL-2.0 and its 256-byte table is GPL-2.0 data; neither was read nor copied. `Runtime/Core/Random/WDoomRandom.cs` was written clean-room from a description of the technique, and its table is this package's own permutation of 0-255, shuffled by `SplitMix64` from a fixed seed. This entry records the inspiration, not a dependency.
-
 ### Perlin Noise (Improved Noise)
 
 - Description: Gradient noise function; the default permutation table and the fade and gradient functions come from Ken Perlin's reference implementation.

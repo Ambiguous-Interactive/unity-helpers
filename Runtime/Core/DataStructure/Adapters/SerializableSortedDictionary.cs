@@ -867,9 +867,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             using PooledResource<List<TValue>> valuesResource = Buffers<TValue>.List.Get(
                 out List<TValue> newValues
             );
-            using PooledResource<HashSet<TKey>> seenResource = Buffers<TKey>.HashSet.Get(
-                out HashSet<TKey> seenKeys
-            );
+            // A SortedSet rather than a HashSet: this dictionary orders keys with an IComparer, and no
+            // hash set can agree with a comparer that calls two unequal-hashing keys the same.
+            using PooledResource<SortedSet<TKey>> seenResource = SetBuffers<TKey>
+                .GetSortedSetPool(_dictionary.Comparer)
+                .Get(out SortedSet<TKey> seenKeys);
 
             // First pass: keep existing keys that still exist in the dictionary, in their original order
             for (int i = 0; i < arrayLength; i++)

@@ -663,8 +663,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             // (e.g., array has {3, 3} with dictCount=2 after adding key 4, but the array should become {3, 4}).
             if (dictCount == arrayLength)
             {
-                using PooledResource<HashSet<TKey>> fastPathSeenResource =
-                    Buffers<TKey>.HashSet.Get(out HashSet<TKey> fastPathSeenKeys);
+                using PooledResource<HashSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
+                    .GetHashSetPool(_dictionary.Comparer)
+                    .Get(out HashSet<TKey> fastPathSeenKeys);
 
                 bool allEntriesMatchAndUnique = true;
                 for (int i = 0; i < arrayLength; i++)
@@ -702,9 +703,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             using PooledResource<List<TValue>> valuesResource = Buffers<TValue>.List.Get(
                 out List<TValue> newValues
             );
-            using PooledResource<HashSet<TKey>> seenResource = Buffers<TKey>.HashSet.Get(
-                out HashSet<TKey> seenKeys
-            );
+            using PooledResource<HashSet<TKey>> seenResource = SetBuffers<TKey>
+                .GetHashSetPool(_dictionary.Comparer)
+                .Get(out HashSet<TKey> seenKeys);
 
             // First pass: keep existing keys that still exist in the dictionary, in their original order
             for (int i = 0; i < arrayLength; i++)

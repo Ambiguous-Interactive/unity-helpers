@@ -1,13 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// Clean-room. This file is inspired by the fixed-table generator DOOM (id Software, 1993) made
-// famous -- draw from a constant table, advance a wrapping index -- which is a technique, not
-// expression, and so is nobody's to license. No DOOM source was read or copied while writing it,
-// and none of DOOM's data appears in it: the table is this package's own blend, a permutation of
-// 0-255 shuffled by SplitMix64 from a fixed seed and built at type load, and it is a permutation
-// where DOOM's table is not. Every line here is MIT under this package's own license.
-// See docs/project/third-party-notices.md.
+// Clean-room. An "index-into-array" random number generator, inspired by id's original DOOM
+// technique. No third-party code or data is used: the table is this package's own permutation of
+// 0-255, shuffled by SplitMix64 from a fixed seed and built at type load.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
@@ -20,8 +16,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
-    /// A table-walk generator in the style DOOM made famous: a 256-byte table read one entry at a
-    /// time by an index that wraps at 256.
+    /// An index-into-array generator: a 256-entry table read one value at a time by an index that
+    /// wraps at 256.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -31,11 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// repeats forever, so it is not random in any statistical sense.
     /// </para>
     /// <para>
-    /// Clean-room, and MIT throughout. DOOM's table is GPL-2.0 data and does not appear here: the 256
-    /// entries are this package's own blend, a permutation of 0-255 shuffled by
-    /// <see cref="SplitMix64"/> from a fixed seed and built once at type load. A full cycle therefore
-    /// emits every byte value exactly once, which DOOM's table does not do. Only the technique is
-    /// borrowed, and a technique is not something anyone licenses.
+    /// The table is this package's own: a permutation of 0-255 shuffled by <see cref="SplitMix64"/>
+    /// from a fixed seed and built once at type load, so a full cycle emits every byte value exactly
+    /// once.
     /// </para>
     /// <para>Pros:</para>
     /// <list type="bullet">
@@ -63,14 +57,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// using WallstopStudios.UnityHelpers.Core.Random;
     ///
     /// WDoomRandom rng = new(seedIndex: 0);
-    /// int damage = 5 * ((rng.Next(256) % 10) + 1); // the shape of DOOM's damage rolls
+    /// int damage = 5 * ((rng.Next(256) % 10) + 1); // a table-driven damage roll
     /// </code>
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Poor,
-        "Fixed 256-entry lookup table walked in order. Period 256; deterministic by design, not statistically random. Clean-room: the table is this package's own permutation of 0-255.",
-        "Technique popularized by DOOM (1993)",
-        "https://doomwiki.org/wiki/Random_number_generator"
+        "Index-into-array generator over a fixed 256-entry table. Period 256; deterministic by design, not statistically random.",
+        "",
+        ""
     )]
     [Serializable]
     [DataContract]
@@ -138,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         /// <summary>
-        /// Draws a single table entry, the byte-at-a-time draw this generator's style is named for.
+        /// Draws a single table entry, which is this generator's natural unit.
         /// </summary>
         /// <returns>The next byte in the table, 0 through 255.</returns>
         public byte NextTableByte()
@@ -155,8 +149,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return new WDoomRandom(InternalState);
         }
 
-        // A permutation rather than 256 arbitrary bytes: over a full cycle every byte value comes out
-        // exactly once, which DOOM's table does not do and nothing here needs to copy it to get.
+        // A permutation rather than 256 arbitrary bytes, so a full cycle emits every value exactly once.
         private static byte[] BuildTable()
         {
             byte[] table = new byte[TableSize];

@@ -116,6 +116,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </remarks>
         protected TSet Set => _set;
 
+        /// <summary>
+        /// The comparer the backing set uses. The serialized-array rebuild dedupes with it, because a
+        /// dedupe that disagrees with the set it is rebuilding writes back entries the set holds as one.
+        /// </summary>
+        protected virtual IEqualityComparer<T> SetComparer => EqualityComparer<T>.Default;
+
         protected internal T[] SerializedItems => _items;
 
         protected virtual bool SupportsSorting => false;
@@ -816,9 +822,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             // (e.g., array has {3, 3} with setCount=2 after adding item 4, but the array should become {3, 4}).
             if (setCount == arrayLength)
             {
-                using PooledResource<HashSet<T>> fastPathSeenResource = Buffers<T>.HashSet.Get(
-                    out HashSet<T> fastPathSeenItems
-                );
+                using PooledResource<HashSet<T>> fastPathSeenResource = SetBuffers<T>
+                    .GetHashSetPool(SetComparer)
+                    .Get(out HashSet<T> fastPathSeenItems);
 
                 bool allItemsMatchAndUnique = true;
                 for (int i = 0; i < arrayLength; i++)
@@ -842,9 +848,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             // Need to rebuild array while preserving order of existing items
             using PooledResource<List<T>> itemsResource = Buffers<T>.List.Get(out List<T> newItems);
-            using PooledResource<HashSet<T>> seenResource = Buffers<T>.HashSet.Get(
-                out HashSet<T> seenItems
-            );
+            using PooledResource<HashSet<T>> seenResource = SetBuffers<T>
+                .GetHashSetPool(SetComparer)
+                .Get(out HashSet<T> seenItems);
 
             // First pass: keep existing items that still exist in the set, in their original order
             for (int i = 0; i < arrayLength; i++)
@@ -1389,6 +1395,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// Gets the equality comparer used by the underlying hash set.
         /// </summary>
         public IEqualityComparer<T> Comparer => Set.Comparer;
+
+        /// <inheritdoc />
+        protected override IEqualityComparer<T> SetComparer => Set.Comparer;
 
         /// <summary>
         /// Creates a new <see cref="global::System.Collections.Generic.HashSet{T}"/> populated with this set's contents.
