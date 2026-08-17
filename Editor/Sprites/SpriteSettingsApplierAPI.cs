@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         /// <param name="assetPath">The asset path to update. Returns false if null/empty/missing.</param>
         /// <param name="prepared">Prepared profiles to search for matching settings. Returns false if null.</param>
-        /// <param name="textureImporter">The texture importer that was updated, or null if no update occurred.</param>
+        /// <param name="textureImporter">The importer at <paramref name="assetPath"/>, whether or not it was updated, and null only when the path carries none.</param>
         /// <param name="buffer">Optional buffer for reading/writing texture settings. If null, a new one will be created.</param>
         /// <returns>True if changes were applied, false otherwise.</returns>
         public static bool TryUpdateTextureSettings(
@@ -383,7 +383,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             SpriteSettings spriteData = FindMatchingSettings(realPath, prepared);
             if (spriteData == null)
             {
-                textureImporter = null;
+                // Deliberately the importer rather than null: a caller that matched no profile can
+                // still use it, which SpriteSettingsApplierAdditionalTests pins by name.
+                textureImporter = localTextureImporter;
                 return false;
             }
 
