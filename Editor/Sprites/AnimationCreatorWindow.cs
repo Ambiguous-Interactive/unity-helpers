@@ -2051,36 +2051,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static bool TryExtractBaseAndIndex(string name, out string baseName, out int index)
         {
-            baseName = null;
-            index = -1;
-
             Match m = s_ParenIndexRegex.Match(name);
             if (m.Success)
             {
-                baseName = m.Groups["base"].Value;
-                _ = int.TryParse(m.Groups["index"].Value, out index);
-                baseName = baseName.TrimEnd('_', '-', '.', ' ');
+                string parenBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                _ = int.TryParse(m.Groups["index"].Value, out int parenIndex);
+                baseName = parenBase;
+                index = parenIndex;
                 return true;
             }
 
             m = s_SeparatorIndexRegex.Match(name);
             if (m.Success)
             {
-                baseName = m.Groups["base"].Value;
-                _ = int.TryParse(m.Groups["index"].Value, out index);
-                baseName = baseName.TrimEnd('_', '-', '.', ' ');
+                string separatorBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                _ = int.TryParse(m.Groups["index"].Value, out int separatorIndex);
+                baseName = separatorBase;
+                index = separatorIndex;
                 return true;
             }
 
             m = s_TrailingIndexRegex.Match(name);
             if (m.Success && m.Groups["base"].Length > 0)
             {
-                baseName = m.Groups["base"].Value;
-                _ = int.TryParse(m.Groups["index"].Value, out index);
-                baseName = baseName.TrimEnd('_', '-', '.', ' ');
+                string trailingBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                _ = int.TryParse(m.Groups["index"].Value, out int trailingIndex);
+                baseName = trailingBase;
+                index = trailingIndex;
                 return true;
             }
 
+            baseName = null;
+            index = -1;
             return false;
         }
 
@@ -2326,15 +2328,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             string finalAnimName = SanitizeName(finalNameCore);
 
-            duplicateResolved = false;
+            bool resolvedDuplicate = false;
             if (resolveDuplicateAnimationNames && usedNames != null)
             {
                 if (usedNames.Contains(finalAnimName))
                 {
                     finalAnimName = EnsureUniqueName(finalAnimName, usedNames);
-                    duplicateResolved = true;
+                    resolvedDuplicate = true;
                 }
             }
+
+            duplicateResolved = resolvedDuplicate;
             return finalAnimName;
         }
 

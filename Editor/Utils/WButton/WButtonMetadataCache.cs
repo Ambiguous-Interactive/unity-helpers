@@ -327,12 +327,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             out int cancellationTokenIndex
         )
         {
-            cancellationTokenIndex = -1;
             if (rawParameters == null || rawParameters.Length == 0)
             {
+                cancellationTokenIndex = -1;
                 return Array.Empty<WButtonParameterMetadata>();
             }
 
+            int tokenIndex = -1;
             WButtonParameterMetadata[] parameters = new WButtonParameterMetadata[
                 rawParameters.Length
             ];
@@ -348,17 +349,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     Debug.LogWarning(
                         $"[WButton] Method {method.DeclaringType?.Name}.{method.Name} has an unsupported parameter '{parameter.Name}'. Ref, out, and pointer parameters are not supported."
                     );
+                    cancellationTokenIndex = tokenIndex;
                     return null;
                 }
 
                 WButtonParameterMetadata metadata = new(parameter, index);
                 parameters[index] = metadata;
-                if (metadata.IsCancellationToken && cancellationTokenIndex == -1)
+                if (metadata.IsCancellationToken && tokenIndex == -1)
                 {
-                    cancellationTokenIndex = index;
+                    tokenIndex = index;
                 }
             }
 
+            cancellationTokenIndex = tokenIndex;
             return parameters;
         }
 

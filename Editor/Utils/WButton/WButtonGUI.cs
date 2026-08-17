@@ -1434,31 +1434,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             out bool cancellable
         )
         {
-            runningCount = 0;
-            cancellable = false;
+            int running = 0;
+            bool anyCancellable = false;
 
-            if (states == null || states.Length == 0)
+            if (states != null)
             {
-                return;
-            }
-
-            foreach (WButtonMethodState state in states)
-            {
-                WButtonInvocationHandle handle = state.ActiveInvocation;
-                if (handle == null)
+                foreach (WButtonMethodState state in states)
                 {
-                    continue;
-                }
+                    WButtonInvocationHandle handle = state.ActiveInvocation;
+                    if (handle == null)
+                    {
+                        continue;
+                    }
 
-                if (
-                    handle.Status == WButtonInvocationStatus.Running
-                    || handle.Status == WButtonInvocationStatus.CancelRequested
-                )
-                {
-                    runningCount++;
-                    cancellable |= handle.SupportsCancellation;
+                    if (
+                        handle.Status == WButtonInvocationStatus.Running
+                        || handle.Status == WButtonInvocationStatus.CancelRequested
+                    )
+                    {
+                        running++;
+                        anyCancellable |= handle.SupportsCancellation;
+                    }
                 }
             }
+
+            runningCount = running;
+            cancellable = anyCancellable;
         }
 
         private static void DrawRunningStatus(

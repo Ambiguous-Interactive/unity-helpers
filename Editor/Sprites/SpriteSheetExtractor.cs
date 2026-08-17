@@ -3350,195 +3350,200 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (effectiveGridSizeMode == GridSizeMode.Manual)
             {
-                columns = Mathf.Max(1, effectiveGridColumns);
-                rows = Mathf.Max(1, effectiveGridRows);
-
                 // In Manual mode, always derive cell size from columns/rows
-                cellWidth = textureWidth / columns;
-                cellHeight = textureHeight / rows;
+                int manualColumns = Mathf.Max(1, effectiveGridColumns);
+                int manualRows = Mathf.Max(1, effectiveGridRows);
+
+                columns = manualColumns;
+                rows = manualRows;
+                cellWidth = textureWidth / manualColumns;
+                cellHeight = textureHeight / manualRows;
+                return;
             }
-            else
+
+            float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
+            AutoDetectionAlgorithm algorithm = GetEffectiveAutoDetectionAlgorithm(entry);
+            int expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry);
+            bool detectedFromAlgorithm = false;
+            int detectedCellWidth = 0;
+            int detectedCellHeight = 0;
+
+            // Try to use cached result if available and valid (check BEFORE pixels check
+            // so cached results work even when called without pixel data)
+            if (entry != null && entry._cachedAlgorithmResult.HasValue)
             {
-                float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
-                AutoDetectionAlgorithm algorithm = GetEffectiveAutoDetectionAlgorithm(entry);
-                int expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry);
-                bool detectedFromAlgorithm = false;
-                cellWidth = 0;
-                cellHeight = 0;
-
-                // Try to use cached result if available and valid (check BEFORE pixels check
-                // so cached results work even when called without pixel data)
-                if (entry != null && entry._cachedAlgorithmResult.HasValue)
+                SpriteSheetAlgorithms.AlgorithmResult cached = entry._cachedAlgorithmResult.Value;
+                if (cached.IsValid)
                 {
-                    SpriteSheetAlgorithms.AlgorithmResult cached = entry
-                        ._cachedAlgorithmResult
-                        .Value;
-                    if (cached.IsValid)
-                    {
-                        cellWidth = cached.CellWidth;
-                        cellHeight = cached.CellHeight;
-                        detectedFromAlgorithm = true;
-                        entry._lastAlgorithmDisplayText =
-                            $"{cached.Algorithm}: {cached.Confidence:P0}";
-                    }
+                    detectedCellWidth = cached.CellWidth;
+                    detectedCellHeight = cached.CellHeight;
+                    detectedFromAlgorithm = true;
+                    entry._lastAlgorithmDisplayText = $"{cached.Algorithm}: {cached.Confidence:P0}";
                 }
+            }
 
-                // If no cached result and pixels available, run algorithm detection
-                if (
-                    !detectedFromAlgorithm
-                    && pixels != null
-                    && pixels.Length == textureWidth * textureHeight
-                )
-                {
-                    bool snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry);
-                    SpriteSheetAlgorithms.AlgorithmResult result = SpriteSheetAlgorithms.DetectGrid(
-                        pixels,
-                        textureWidth,
-                        textureHeight,
-                        effectiveAlphaThreshold,
-                        algorithm,
-                        expectedSpriteCount,
-                        snapToTextureDivisor
-                    );
-
-                    if (DiagnosticsEnabled && entry != null)
-                    {
-                        this.Log(
-                            $"Algorithm detection for '{Path.GetFileName(entry._assetPath)}': algorithm={algorithm}, expectedSpriteCount={expectedSpriteCount}, textureSize={textureWidth}x{textureHeight}, isValid={result.IsValid}, cellSize={result.CellWidth}x{result.CellHeight}, confidence={result.Confidence:P0}"
-                        );
-                    }
-
-                    if (result.IsValid)
-                    {
-                        cellWidth = result.CellWidth;
-                        cellHeight = result.CellHeight;
-                        detectedFromAlgorithm = true;
-                        if (entry != null)
-                        {
-                            entry._cachedAlgorithmResult = result;
-                            entry._lastAlgorithmDisplayText =
-                                $"{result.Algorithm}: {result.Confidence:P0}";
-                        }
-
-                        // Task 5: Verify grid does not cut through sprites after successful detection
-                        // IMPORTANT: Skip this verification when user has specified expectedSpriteCount,
-                        // because the user explicitly told us how many sprites they want and we should trust that.
-                        // The verification can incorrectly fail for sprites with anti-aliasing or shadows.
-                        bool skipVerification = expectedSpriteCount > 0;
-                        if (
-                            !skipVerification
-                            && !VerifyGridDoesNotCutSprites(
-                                pixels,
-                                textureWidth,
-                                textureHeight,
-                                cellWidth,
-                                cellHeight,
-                                effectiveAlphaThreshold
-                            )
-                        )
-                        {
-                            // Grid cuts sprites - try region-based detection as alternative
-                            (int regionCellWidth, int regionCellHeight) =
-                                DetectCellSizeFromOpaqueRegions(
-                                    pixels,
-                                    textureWidth,
-                                    textureHeight,
-                                    effectiveAlphaThreshold
-                                );
-
-                            if (DiagnosticsEnabled && entry != null)
-                            {
-                                this.Log(
-                                    $"VerifyGridDoesNotCutSprites FAILED for '{Path.GetFileName(entry._assetPath)}': original cellSize={cellWidth}x{cellHeight}, region detection returned {regionCellWidth}x{regionCellHeight}"
-                                );
-                            }
-
-                            if (regionCellWidth > 0 && regionCellHeight > 0)
-                            {
-                                cellWidth = regionCellWidth;
-                                cellHeight = regionCellHeight;
-                                if (entry != null)
-                                {
-                                    entry._lastAlgorithmDisplayText =
-                                        $"{result.Algorithm}: {result.Confidence:P0} (adjusted)";
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (!detectedFromAlgorithm)
-                {
-                    // Task 4: First try region-based detection for accurate cell size detection
-                    (int regionWidth, int regionHeight) = DetectCellSizeFromOpaqueRegions(
-                        pixels,
-                        textureWidth,
-                        textureHeight,
-                        effectiveAlphaThreshold
-                    );
-
-                    if (regionWidth > 0 && regionHeight > 0)
-                    {
-                        cellWidth = regionWidth;
-                        cellHeight = regionHeight;
-                        if (entry != null)
-                        {
-                            entry._lastAlgorithmDisplayText = "Fallback (region analysis)";
-                        }
-                    }
-                    else
-                    {
-                        // Use smarter fallback that prefers common sprite sizes over GCD
-                        cellWidth = FindSmallestReasonableDivisor(textureWidth);
-                        cellHeight = FindSmallestReasonableDivisor(textureHeight);
-
-                        // If both return the full dimension, try using GCD as a fallback
-                        if (cellWidth == textureWidth && cellHeight == textureHeight)
-                        {
-                            int gcd = CalculateGCD(textureWidth, textureHeight);
-                            if (gcd >= 8 && gcd < textureWidth && gcd < textureHeight)
-                            {
-                                cellWidth = gcd;
-                                cellHeight = gcd;
-                            }
-                        }
-
-                        if (entry != null)
-                        {
-                            entry._lastAlgorithmDisplayText = "Fallback (divisor heuristic)";
-                        }
-                    }
-                }
-
-                // Only recalculate cell dimensions if they don't evenly divide the texture
-                // This preserves algorithm-detected values when they're already valid
-                if (textureWidth % cellWidth == 0)
-                {
-                    columns = textureWidth / cellWidth;
-                }
-                else
-                {
-                    columns = Mathf.Max(1, textureWidth / cellWidth);
-                    cellWidth = textureWidth / columns;
-                }
-
-                if (textureHeight % cellHeight == 0)
-                {
-                    rows = textureHeight / cellHeight;
-                }
-                else
-                {
-                    rows = Mathf.Max(1, textureHeight / cellHeight);
-                    cellHeight = textureHeight / rows;
-                }
+            // If no cached result and pixels available, run algorithm detection
+            if (
+                !detectedFromAlgorithm
+                && pixels != null
+                && pixels.Length == textureWidth * textureHeight
+            )
+            {
+                bool snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry);
+                SpriteSheetAlgorithms.AlgorithmResult result = SpriteSheetAlgorithms.DetectGrid(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    effectiveAlphaThreshold,
+                    algorithm,
+                    expectedSpriteCount,
+                    snapToTextureDivisor
+                );
 
                 if (DiagnosticsEnabled && entry != null)
                 {
                     this.Log(
-                        $"CalculateGridDimensions FINAL for '{Path.GetFileName(entry._assetPath)}': columns={columns}, rows={rows}, cellWidth={cellWidth}, cellHeight={cellHeight}, detectedFromAlgorithm={detectedFromAlgorithm}"
+                        $"Algorithm detection for '{Path.GetFileName(entry._assetPath)}': algorithm={algorithm}, expectedSpriteCount={expectedSpriteCount}, textureSize={textureWidth}x{textureHeight}, isValid={result.IsValid}, cellSize={result.CellWidth}x{result.CellHeight}, confidence={result.Confidence:P0}"
                     );
                 }
+
+                if (result.IsValid)
+                {
+                    detectedCellWidth = result.CellWidth;
+                    detectedCellHeight = result.CellHeight;
+                    detectedFromAlgorithm = true;
+                    if (entry != null)
+                    {
+                        entry._cachedAlgorithmResult = result;
+                        entry._lastAlgorithmDisplayText =
+                            $"{result.Algorithm}: {result.Confidence:P0}";
+                    }
+
+                    // Task 5: Verify grid does not cut through sprites after successful detection
+                    // IMPORTANT: Skip this verification when user has specified expectedSpriteCount,
+                    // because the user explicitly told us how many sprites they want and we should trust that.
+                    // The verification can incorrectly fail for sprites with anti-aliasing or shadows.
+                    bool skipVerification = expectedSpriteCount > 0;
+                    if (
+                        !skipVerification
+                        && !VerifyGridDoesNotCutSprites(
+                            pixels,
+                            textureWidth,
+                            textureHeight,
+                            detectedCellWidth,
+                            detectedCellHeight,
+                            effectiveAlphaThreshold
+                        )
+                    )
+                    {
+                        // Grid cuts sprites - try region-based detection as alternative
+                        (int regionCellWidth, int regionCellHeight) =
+                            DetectCellSizeFromOpaqueRegions(
+                                pixels,
+                                textureWidth,
+                                textureHeight,
+                                effectiveAlphaThreshold
+                            );
+
+                        if (DiagnosticsEnabled && entry != null)
+                        {
+                            this.Log(
+                                $"VerifyGridDoesNotCutSprites FAILED for '{Path.GetFileName(entry._assetPath)}': original cellSize={detectedCellWidth}x{detectedCellHeight}, region detection returned {regionCellWidth}x{regionCellHeight}"
+                            );
+                        }
+
+                        if (regionCellWidth > 0 && regionCellHeight > 0)
+                        {
+                            detectedCellWidth = regionCellWidth;
+                            detectedCellHeight = regionCellHeight;
+                            if (entry != null)
+                            {
+                                entry._lastAlgorithmDisplayText =
+                                    $"{result.Algorithm}: {result.Confidence:P0} (adjusted)";
+                            }
+                        }
+                    }
+                }
             }
+
+            if (!detectedFromAlgorithm)
+            {
+                // Task 4: First try region-based detection for accurate cell size detection
+                (int regionWidth, int regionHeight) = DetectCellSizeFromOpaqueRegions(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    effectiveAlphaThreshold
+                );
+
+                if (regionWidth > 0 && regionHeight > 0)
+                {
+                    detectedCellWidth = regionWidth;
+                    detectedCellHeight = regionHeight;
+                    if (entry != null)
+                    {
+                        entry._lastAlgorithmDisplayText = "Fallback (region analysis)";
+                    }
+                }
+                else
+                {
+                    // Use smarter fallback that prefers common sprite sizes over GCD
+                    detectedCellWidth = FindSmallestReasonableDivisor(textureWidth);
+                    detectedCellHeight = FindSmallestReasonableDivisor(textureHeight);
+
+                    // If both return the full dimension, try using GCD as a fallback
+                    if (detectedCellWidth == textureWidth && detectedCellHeight == textureHeight)
+                    {
+                        int gcd = CalculateGCD(textureWidth, textureHeight);
+                        if (gcd >= 8 && gcd < textureWidth && gcd < textureHeight)
+                        {
+                            detectedCellWidth = gcd;
+                            detectedCellHeight = gcd;
+                        }
+                    }
+
+                    if (entry != null)
+                    {
+                        entry._lastAlgorithmDisplayText = "Fallback (divisor heuristic)";
+                    }
+                }
+            }
+
+            // Only recalculate cell dimensions if they don't evenly divide the texture
+            // This preserves algorithm-detected values when they're already valid
+            int detectedColumns;
+            if (textureWidth % detectedCellWidth == 0)
+            {
+                detectedColumns = textureWidth / detectedCellWidth;
+            }
+            else
+            {
+                detectedColumns = Mathf.Max(1, textureWidth / detectedCellWidth);
+                detectedCellWidth = textureWidth / detectedColumns;
+            }
+
+            int detectedRows;
+            if (textureHeight % detectedCellHeight == 0)
+            {
+                detectedRows = textureHeight / detectedCellHeight;
+            }
+            else
+            {
+                detectedRows = Mathf.Max(1, textureHeight / detectedCellHeight);
+                detectedCellHeight = textureHeight / detectedRows;
+            }
+
+            if (DiagnosticsEnabled && entry != null)
+            {
+                this.Log(
+                    $"CalculateGridDimensions FINAL for '{Path.GetFileName(entry._assetPath)}': columns={detectedColumns}, rows={detectedRows}, cellWidth={detectedCellWidth}, cellHeight={detectedCellHeight}, detectedFromAlgorithm={detectedFromAlgorithm}"
+                );
+            }
+
+            columns = detectedColumns;
+            rows = detectedRows;
+            cellWidth = detectedCellWidth;
+            cellHeight = detectedCellHeight;
         }
 
         private static int CalculateGCD(int a, int b)
@@ -3609,11 +3614,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out int cellHeight
         )
         {
-            cellWidth = 0;
-            cellHeight = 0;
-
             if (pixels == null || pixels.Length == 0)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
@@ -3622,16 +3626,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
             )
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
             if (pixels.Length != textureWidth * textureHeight)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
             if (alphaThreshold < 0f || alphaThreshold >= 1f)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
@@ -3668,6 +3678,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int totalPixels = textureWidth * textureHeight;
             if (totalTransparent == 0 || totalTransparent == totalPixels)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
@@ -3794,26 +3806,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return true;
             }
 
-            if (detectedCellWidth > 0 && detectedCellHeight <= 0)
+            // A single detected spacing is squared into both dimensions; the caller is told whether
+            // that square actually tiles the other dimension, but still receives the square so the
+            // partial detection is not thrown away.
+            if (detectedCellWidth > 0)
             {
                 cellWidth = detectedCellWidth;
                 cellHeight = detectedCellWidth;
-                if (textureHeight % cellHeight == 0)
-                {
-                    return true;
-                }
+                return textureHeight % detectedCellWidth == 0;
             }
 
-            if (detectedCellHeight > 0 && detectedCellWidth <= 0)
+            if (detectedCellHeight > 0)
             {
-                cellHeight = detectedCellHeight;
                 cellWidth = detectedCellHeight;
-                if (textureWidth % cellWidth == 0)
-                {
-                    return true;
-                }
+                cellHeight = detectedCellHeight;
+                return textureWidth % detectedCellHeight == 0;
             }
 
+            cellWidth = 0;
+            cellHeight = 0;
             return false;
         }
 

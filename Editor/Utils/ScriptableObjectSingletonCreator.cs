@@ -545,7 +545,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         )
         {
             int totalRemoved = 0;
-            emptyFolderCandidates = new List<string>();
+            List<string> candidateFolders = new();
 
             foreach (Type derivedType in candidateTypes)
             {
@@ -561,10 +561,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                int removed = CleanupDuplicatesForType(derivedType, emptyFolderCandidates);
+                int removed = CleanupDuplicatesForType(derivedType, candidateFolders);
                 totalRemoved += removed;
             }
 
+            emptyFolderCandidates = candidateFolders;
             return totalRemoved;
         }
 

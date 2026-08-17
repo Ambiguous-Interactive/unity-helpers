@@ -889,7 +889,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Dictionary<string, bool> originalReadable
         )
         {
-            outcome = ProcessOutcome.FatalError;
             string assetDirectory = Path.GetDirectoryName(assetPath);
             if (string.IsNullOrWhiteSpace(assetDirectory))
             {

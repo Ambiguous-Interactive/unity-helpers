@@ -1497,9 +1497,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             out Type createdElementType
         )
         {
-            mode = SubscriptionParameterMode.None;
-            createdElementType = null;
-
             if (method.ReturnType != typeof(void))
             {
                 LogUnsupportedSignature(
@@ -1507,6 +1504,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     method,
                     "must return void to receive DetectAssetChanged notifications."
                 );
+                mode = SubscriptionParameterMode.None;
+                createdElementType = null;
                 return false;
             }
 
@@ -1514,12 +1513,14 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             if (parameters.Length == 0)
             {
                 mode = SubscriptionParameterMode.None;
+                createdElementType = null;
                 return true;
             }
 
             if (parameters.Length == 1 && parameters[0].ParameterType == typeof(AssetChangeContext))
             {
                 mode = SubscriptionParameterMode.Context;
+                createdElementType = null;
                 return true;
             }
 
@@ -1539,32 +1540,37 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 method,
                 "has an unsupported parameter signature for DetectAssetChanged."
             );
+            mode = SubscriptionParameterMode.None;
+            createdElementType = null;
             return false;
         }
 
         private static bool TryResolveCreatedParameterType(Type parameterType, out Type elementType)
         {
-            elementType = null;
             if (parameterType == null || !parameterType.IsArray)
-            {
-                return false;
-            }
-
-            elementType = parameterType.GetElementType();
-            if (elementType == null)
             {
                 elementType = null;
                 return false;
             }
 
-            bool isUnityObjectType = typeof(UnityEngine.Object).IsAssignableFrom(elementType);
-            bool isInterfaceType = elementType.IsInterface;
+            Type resolvedElementType = parameterType.GetElementType();
+            if (resolvedElementType == null)
+            {
+                elementType = null;
+                return false;
+            }
+
+            bool isUnityObjectType = typeof(UnityEngine.Object).IsAssignableFrom(
+                resolvedElementType
+            );
+            bool isInterfaceType = resolvedElementType.IsInterface;
             if (!isUnityObjectType && !isInterfaceType)
             {
                 elementType = null;
                 return false;
             }
 
+            elementType = resolvedElementType;
             return true;
         }
 

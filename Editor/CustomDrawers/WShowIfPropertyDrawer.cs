@@ -342,15 +342,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return conditionProperty != null;
             }
 
-            conditionProperty = serializedObject.FindProperty(conditionField);
-            if (conditionProperty != null)
+            SerializedProperty resolvedProperty = serializedObject.FindProperty(conditionField);
+            if (resolvedProperty != null)
             {
                 EditorCacheHelper.AddToBoundedCache(
                     ConditionPropertyCache,
                     cacheKey,
-                    conditionProperty,
+                    resolvedProperty,
                     MaxConditionPropertyCacheSize
                 );
+                conditionProperty = resolvedProperty;
                 return true;
             }
 
@@ -361,15 +362,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     separatorIndex == -1
                         ? conditionField
                         : propertyPath.Substring(0, separatorIndex + 1) + conditionField;
-                conditionProperty = serializedObject.FindProperty(siblingPath);
-                if (conditionProperty != null)
+                resolvedProperty = serializedObject.FindProperty(siblingPath);
+                if (resolvedProperty != null)
                 {
                     EditorCacheHelper.AddToBoundedCache(
                         ConditionPropertyCache,
                         cacheKey,
-                        conditionProperty,
+                        resolvedProperty,
                         MaxConditionPropertyCacheSize
                     );
+                    conditionProperty = resolvedProperty;
                     return true;
                 }
             }

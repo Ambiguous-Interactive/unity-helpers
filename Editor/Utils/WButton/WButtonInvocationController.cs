@@ -590,8 +590,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return true;
             }
 
-            arguments = new object[parameters.Length];
-            cancellationSource = null;
+            object[] builtArguments = new object[parameters.Length];
+            CancellationTokenSource builtCancellationSource = null;
 
             for (int index = 0; index < parameters.Length; index++)
             {
@@ -600,8 +600,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
                 if (parameter.IsCancellationToken)
                 {
-                    cancellationSource = new CancellationTokenSource();
-                    arguments[index] = cancellationSource.Token;
+                    builtCancellationSource = new CancellationTokenSource();
+                    builtArguments[index] = builtCancellationSource.Token;
                     continue;
                 }
 
@@ -617,8 +617,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                         )
                     )
                     {
+                        builtCancellationSource?.Dispose();
                         arguments = null;
-                        cancellationSource?.Dispose();
                         cancellationSource = null;
                         error = $"Failed to deserialize '{parameter.Name}': {jsonError}";
                         return false;
@@ -651,9 +651,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     }
                 }
 
-                arguments[index] = WButtonValueUtility.CloneValue(value);
+                builtArguments[index] = WButtonValueUtility.CloneValue(value);
             }
 
+            arguments = builtArguments;
+            cancellationSource = builtCancellationSource;
             error = null;
             return true;
         }
@@ -726,65 +728,75 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             out bool logged
         )
         {
-            logged = false;
+            bool didLog = false;
+            string summary;
             switch (kind)
             {
                 case WButtonResultKind.Cancelled:
-                    return "Cancelled.";
-
+                {
+                    summary = "Cancelled.";
+                    break;
+                }
                 case WButtonResultKind.Error:
-                    logged = true;
-                    return exception?.Message ?? "Error.";
-
+                {
+                    didLog = true;
+                    summary = exception?.Message ?? "Error.";
+                    break;
+                }
                 default:
+                {
                     if (value == null)
                     {
-                        return "Completed.";
+                        summary = "Completed.";
                     }
-
-                    if (value is UnityEngine.Object unityObject)
+                    else if (value is UnityEngine.Object unityObject)
                     {
-                        return unityObject != null ? unityObject.name : "None";
+                        summary = unityObject != null ? unityObject.name : "None";
                     }
-
-                    if (value is string str)
+                    else if (value is string str)
                     {
-                        return str;
+                        summary = str;
                     }
-
-                    if (value is float or double or decimal)
+                    else if (value is float or double or decimal)
                     {
-                        return Convert.ToString(
+                        summary = Convert.ToString(
                             value,
                             System.Globalization.CultureInfo.InvariantCulture
                         );
                     }
-
-                    if (value is IFormattable formattable)
+                    else if (value is IFormattable formattable)
                     {
-                        return formattable.ToString(
+                        summary = formattable.ToString(
                             null,
                             System.Globalization.CultureInfo.InvariantCulture
                         );
                     }
+                    else
+                    {
+                        try
+                        {
+                            summary = JsonSerializer.Serialize(
+                                value,
+                                valueType ?? value.GetType(),
+                                JsonOptions
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            didLog = true;
+                            Debug.LogWarning(
+                                $"[WButton] Failed to serialize result of type {(valueType ?? value.GetType()).Name}: {ex.Message}"
+                            );
+                            summary = "(see console)";
+                        }
+                    }
 
-                    try
-                    {
-                        return JsonSerializer.Serialize(
-                            value,
-                            valueType ?? value.GetType(),
-                            JsonOptions
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        logged = true;
-                        Debug.LogWarning(
-                            $"[WButton] Failed to serialize result of type {(valueType ?? value.GetType()).Name}: {ex.Message}"
-                        );
-                        return "(see console)";
-                    }
+                    break;
+                }
             }
+
+            logged = didLog;
+            return summary;
         }
 
         private static void RequestRepaint()

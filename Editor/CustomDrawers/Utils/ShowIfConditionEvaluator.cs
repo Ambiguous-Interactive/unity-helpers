@@ -7,8 +7,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Reflection;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Provides shared condition evaluation logic for WShowIf attribute drawers.
@@ -201,8 +203,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             {
                 if (actualType.IsEnum || expectedType.IsEnum)
                 {
-                    long actualValue = Convert.ToInt64(actual);
-                    long expectedValue = Convert.ToInt64(expected);
+                    // Convert.ToInt64 overflows on a ulong-backed member above long.MaxValue, and
+                    // the catch below turns that into a silent "not equal". TryConvertToUInt64
+                    // dispatches on the underlying type and is total over all nine enum shapes.
+                    if (
+                        !TryConvertOperandToUInt64(actual, out ulong actualValue)
+                        || !TryConvertOperandToUInt64(expected, out ulong expectedValue)
+                    )
+                    {
+                        return false;
+                    }
 
                     Type enumType = actualType.IsEnum ? actualType : expectedType;
                     if (enumType.IsDefined(typeof(FlagsAttribute), false))
@@ -232,6 +242,42 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             catch
             {
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Reduces one side of an enum comparison to the 64 bits both sides are compared on.
+        /// </summary>
+        /// <param name="value">The operand, an enum or any convertible the caller passed.</param>
+        /// <param name="result">The bit pattern, or 0 when the operand cannot be reduced.</param>
+        /// <returns><c>true</c> when a bit pattern was produced.</returns>
+        private static bool TryConvertOperandToUInt64(object value, out ulong result)
+        {
+            if (value is Enum boxedEnum)
+            {
+                return boxedEnum.TryConvertToUInt64(out result);
+            }
+
+            switch (Type.GetTypeCode(value.GetType()))
+            {
+                case TypeCode.Byte:
+                case TypeCode.UInt16:
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
+                {
+                    result = ((IConvertible)value).ToUInt64(CultureInfo.InvariantCulture);
+                    return true;
+                }
+                default:
+                {
+                    // Everything else -- the signed integers, and the float, string and bool forms
+                    // the old Convert.ToInt64 accepted -- keeps its previous conversion,
+                    // reinterpreted so both operands are compared as one domain. A throw here is
+                    // still caught by the caller and still means "not equal".
+                    long signed = Convert.ToInt64(value, CultureInfo.InvariantCulture);
+                    result = unchecked((ulong)signed);
+                    return true;
+                }
             }
         }
 
@@ -282,9 +328,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>True if comparison was successful; false otherwise.</returns>
         public static bool TryCompare(object actual, object expected, out int comparisonResult)
         {
-            comparisonResult = 0;
             if (actual == null || expected == null)
             {
+                comparisonResult = 0;
                 return false;
             }
 
@@ -310,8 +356,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 }
             }
 
-            if (TryGenericComparableCompare(actual, expected, out comparisonResult, false))
+            if (TryGenericComparableCompare(actual, expected, out int genericResult, false))
             {
+                comparisonResult = genericResult;
                 return true;
             }
 
@@ -337,8 +384,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 }
             }
 
-            if (TryGenericComparableCompare(expected, actual, out comparisonResult, true))
+            if (TryGenericComparableCompare(expected, actual, out int invertedResult, true))
             {
+                comparisonResult = invertedResult;
                 return true;
             }
 
@@ -351,6 +399,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return true;
             }
 
+            comparisonResult = 0;
             return false;
         }
 
@@ -363,19 +412,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The converted value, or null if conversion failed.</returns>
         public static object ConvertValue(Type targetType, object value, out bool success)
         {
-            success = true;
             if (value == null)
             {
-                if (targetType.IsValueType && Nullable.GetUnderlyingType(targetType) == null)
-                {
-                    success = false;
-                }
-
+                success = !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
                 return null;
             }
 
             if (targetType.IsInstanceOfType(value))
             {
+                success = true;
                 return value;
             }
 
@@ -385,10 +430,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 {
                     Type underlyingType = Enum.GetUnderlyingType(targetType);
                     object numericValue = Convert.ChangeType(value, underlyingType);
-                    return Enum.ToObject(targetType, numericValue);
+                    object enumValue = Enum.ToObject(targetType, numericValue);
+                    success = true;
+                    return enumValue;
                 }
 
-                return Convert.ChangeType(value, targetType);
+                object converted = Convert.ChangeType(value, targetType);
+                success = true;
+                return converted;
             }
             catch
             {
@@ -405,9 +454,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>True if conversion succeeded; false otherwise.</returns>
         public static bool TryConvertToDouble(object value, out double result)
         {
-            result = 0d;
             if (value == null)
             {
+                result = 0d;
                 return false;
             }
 
@@ -418,6 +467,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             }
             catch
             {
+                result = 0d;
                 return false;
             }
         }
@@ -441,9 +491,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             bool invert
         )
         {
-            comparisonResult = 0;
             if (lhs == null)
             {
+                comparisonResult = 0;
                 return false;
             }
 
@@ -457,6 +507,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             if (compareTo == null)
             {
+                comparisonResult = 0;
                 return false;
             }
 
@@ -464,6 +515,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             object converted = ConvertValue(genericArgument, rhs, out bool success);
             if (!success)
             {
+                comparisonResult = 0;
                 return false;
             }
 
@@ -472,16 +524,18 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 object[] args = new object[1];
                 args[0] = converted;
                 object compareResult = compareTo.Invoke(lhs, args);
-                comparisonResult = Convert.ToInt32(compareResult);
+                int result = Convert.ToInt32(compareResult);
                 if (invert)
                 {
-                    comparisonResult = -comparisonResult;
+                    result = -result;
                 }
 
+                comparisonResult = result;
                 return true;
             }
             catch
             {
+                comparisonResult = 0;
                 return false;
             }
         }

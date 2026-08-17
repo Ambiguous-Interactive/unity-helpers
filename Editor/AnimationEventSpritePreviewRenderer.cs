@@ -141,29 +141,29 @@ namespace WallstopStudios.UnityHelpers.Editor
             out Sprite sprite
         )
         {
-            sprite = null;
             if (referenceCurve == null || referenceCurve.Count == 0)
             {
+                sprite = null;
                 return false;
             }
 
+            Sprite lastSpriteAtOrBeforeEvent = null;
             foreach (ObjectReferenceKeyframe keyFrame in referenceCurve)
             {
-                if (keyFrame.time <= item.animationEvent.time)
+                // Keyframes are ordered by time, so the first one past the event ends the search
+                if (keyFrame.time > item.animationEvent.time)
                 {
-                    if (keyFrame.value is Sprite frameSprite)
-                    {
-                        sprite = frameSprite;
-                        continue;
-                    }
-
-                    continue;
+                    break;
                 }
 
-                return sprite != null;
+                if (keyFrame.value is Sprite frameSprite)
+                {
+                    lastSpriteAtOrBeforeEvent = frameSprite;
+                }
             }
 
-            return sprite != null;
+            sprite = lastSpriteAtOrBeforeEvent;
+            return lastSpriteAtOrBeforeEvent != null;
         }
 
         private static Texture2D CopyTexture(Rect textureRect, Texture2D sourceTexture)

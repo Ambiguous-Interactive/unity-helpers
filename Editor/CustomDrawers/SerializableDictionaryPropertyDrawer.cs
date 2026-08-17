@@ -2339,27 +2339,37 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out DuplicateKeyState state
         )
         {
-            info = null;
-            state = null;
             if (string.IsNullOrEmpty(cacheKey))
             {
+                info = null;
+                state = null;
                 return false;
             }
 
-            return _duplicateStates.TryGetValue(cacheKey, out state)
-                && state.TryGetInfo(arrayIndex, out info);
+            if (!_duplicateStates.TryGetValue(cacheKey, out state))
+            {
+                info = null;
+                return false;
+            }
+
+            return state.TryGetInfo(arrayIndex, out info);
         }
 
         private bool TryGetNullKeyInfo(string cacheKey, int arrayIndex, out NullKeyInfo info)
         {
-            info = null;
             if (string.IsNullOrEmpty(cacheKey))
             {
+                info = null;
                 return false;
             }
 
-            return _nullKeyStates.TryGetValue(cacheKey, out NullKeyState state)
-                && state.TryGetInfo(arrayIndex, out info);
+            if (!_nullKeyStates.TryGetValue(cacheKey, out NullKeyState state))
+            {
+                info = null;
+                return false;
+            }
+
+            return state.TryGetInfo(arrayIndex, out info);
         }
 
         private static void DrawDuplicateTooltip(Rect rect, string tooltip)
@@ -3129,9 +3139,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out bool stateChanged
         )
         {
-            stateChanged = false;
             if (valueProperty == null || !foldoutKey.IsValid)
             {
+                stateChanged = false;
                 return false;
             }
 
@@ -5300,11 +5310,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out bool isSortedDictionary
         )
         {
-            keyType = null;
-            valueType = null;
-            isSortedDictionary = false;
             if (fieldInfo == null)
             {
+                keyType = null;
+                valueType = null;
+                isSortedDictionary = false;
                 return false;
             }
 
@@ -5344,6 +5354,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 type = type.BaseType;
             }
 
+            keyType = null;
+            valueType = null;
+            isSortedDictionary = false;
             return false;
         }
 
@@ -5390,12 +5403,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out bool isSortedDictionary
         )
         {
-            keyType = null;
-            valueType = null;
-            isSortedDictionary = false;
-
             if (dictionaryInstance == null)
             {
+                keyType = null;
+                valueType = null;
+                isSortedDictionary = false;
                 return false;
             }
 
@@ -5435,6 +5447,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 type = type.BaseType;
             }
 
+            keyType = null;
+            valueType = null;
+            isSortedDictionary = false;
             return false;
         }
 
@@ -5546,7 +5561,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool changed = false;
             float headerHeight = EditorGUIUtility.singleLineHeight;
             Rect headerRect = new(valueRect.x, valueRect.y, valueRect.width, headerHeight);
-            renderedHeight = headerHeight;
 
             EditorGUI.BeginChangeCheck();
             EditorGUI.PropertyField(headerRect, valueProperty, valueLabel, includeChildren: false);
@@ -5557,6 +5571,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (!valueProperty.isExpanded || !valueProperty.hasVisibleChildren)
             {
+                renderedHeight = headerHeight;
                 return changed;
             }
 
@@ -6828,18 +6843,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out bool hasAnimBool
         )
         {
-            isExpanded = false;
-            animProgress = 0f;
-            hasAnimBool = false;
-
             if (property == null)
             {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
                 return false;
             }
 
             string cacheKey = GetListKey(property);
             if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
             {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
                 return false;
             }
 
@@ -8057,20 +8074,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryInvokeParameterlessConstructor(Type type, out object instance)
         {
-            instance = null;
             if (type == null)
             {
+                instance = null;
                 return false;
             }
 
             if (ParameterlessConstructorCache.TryGetValue(type, out Func<object> cached))
             {
-                instance = cached();
-                return instance != null;
+                object cachedInstance = cached();
+                instance = cachedInstance;
+                return cachedInstance != null;
             }
 
             if (UnsupportedParameterlessTypes.ContainsKey(type))
             {
+                instance = null;
                 return false;
             }
 
@@ -8078,19 +8097,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (factory != null)
             {
                 ParameterlessConstructorCache[type] = factory;
-                instance = factory();
-                if (instance != null)
+                object created = factory();
+                if (created != null)
                 {
+                    instance = created;
                     return true;
                 }
             }
 
-            if (TryInstantiateWithoutConstructor(type, out instance))
+            if (TryInstantiateWithoutConstructor(type, out object fallbackInstance))
             {
+                instance = fallbackInstance;
                 return true;
             }
 
             UnsupportedParameterlessTypes[type] = 0;
+            instance = null;
             return false;
         }
 
@@ -8135,8 +8157,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             try
             {
-                instance = Activator.CreateInstance(type, nonPublic: true);
-                if (instance != null)
+                object created = Activator.CreateInstance(type, nonPublic: true);
+                if (created != null)
                 {
                     ParameterlessConstructorCache[type] = () =>
                     {
@@ -8149,6 +8171,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             return null;
                         }
                     };
+                    instance = created;
                     return true;
                 }
             }
@@ -8159,7 +8182,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             try
             {
-                instance = FormatterServices.GetUninitializedObject(type);
+                object uninitialized = FormatterServices.GetUninitializedObject(type);
                 ParameterlessConstructorCache[type] = () =>
                 {
                     try
@@ -8171,7 +8194,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         return null;
                     }
                 };
-                return instance != null;
+                instance = uninitialized;
+                return uninitialized != null;
             }
             catch
             {
@@ -8182,19 +8206,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryCreateDefaultInstance(Type type, out object instance)
         {
-            instance = null;
             if (type == null)
             {
+                instance = null;
                 return false;
             }
 
             if (type.IsAbstract || type.IsInterface)
             {
+                instance = null;
                 return false;
             }
 
             if (typeof(Object).IsAssignableFrom(type))
             {
+                instance = null;
                 return false;
             }
 

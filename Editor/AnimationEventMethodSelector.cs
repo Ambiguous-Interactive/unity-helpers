@@ -402,8 +402,8 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             if (filtered.Count > limit)
             {
-                truncated = true;
                 filtered.RemoveRange(limit, filtered.Count - limit);
+                truncated = true;
                 return;
             }
 

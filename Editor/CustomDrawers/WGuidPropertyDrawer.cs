@@ -78,12 +78,18 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             // Cache miss or invalid - refresh the cache
-            lowProperty = property.FindPropertyRelative(WGuid.LowFieldName);
-            highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
-            state.cachedLowProperty = lowProperty;
-            state.cachedHighProperty = highProperty;
+            SerializedProperty resolvedLowProperty = property.FindPropertyRelative(
+                WGuid.LowFieldName
+            );
+            SerializedProperty resolvedHighProperty = property.FindPropertyRelative(
+                WGuid.HighFieldName
+            );
+            state.cachedLowProperty = resolvedLowProperty;
+            state.cachedHighProperty = resolvedHighProperty;
             state.cachedSerializedObject = serializedObject;
             state.lastCacheFrame = currentFrame;
+            lowProperty = resolvedLowProperty;
+            highProperty = resolvedHighProperty;
         }
 
         private static bool IsSerializedObjectValid(SerializedObject serializedObject)

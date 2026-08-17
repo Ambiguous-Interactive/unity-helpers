@@ -624,7 +624,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         )
         {
             List<WGroupDrawOperation> operations = new(descriptors.Count);
-            hiddenPropertyPaths = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> hidden = new(StringComparer.Ordinal);
             WallstopGenericPool<HashSet<string>> consumedPool = SetBuffers<string>.GetHashSetPool(
                 StringComparer.Ordinal
             );
@@ -703,12 +703,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     bool isHidden = descriptor.IsHiddenInInspector;
                     if (isHidden)
                     {
-                        hiddenPropertyPaths.Add(propertyPath);
+                        hidden.Add(propertyPath);
                     }
                     operations.Add(new WGroupDrawOperation(propertyPath, isHidden));
                 }
             }
 
+            hiddenPropertyPaths = hidden;
             return operations;
         }
 

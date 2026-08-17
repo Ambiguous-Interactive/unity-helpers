@@ -1142,11 +1142,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out int cellHeight
         )
         {
-            cellWidth = 0;
-            cellHeight = 0;
-
             if (spriteCount < 1)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
@@ -1270,10 +1269,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            cellWidth = textureWidth / bestCols;
-            cellHeight = textureHeight / bestRows;
+            int inferredCellWidth = textureWidth / bestCols;
+            int inferredCellHeight = textureHeight / bestRows;
 
-            return cellWidth >= MinimumCellSize && cellHeight >= MinimumCellSize;
+            cellWidth = inferredCellWidth;
+            cellHeight = inferredCellHeight;
+            return inferredCellWidth >= MinimumCellSize && inferredCellHeight >= MinimumCellSize;
         }
 
         /// <summary>
@@ -1294,11 +1295,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out int cellHeight
         )
         {
-            cellWidth = 0;
-            cellHeight = 0;
-
             if (expectedSpriteCount < 1)
             {
+                cellWidth = 0;
+                cellHeight = 0;
                 return false;
             }
 
@@ -1338,10 +1338,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            cellWidth = textureWidth / bestCols;
-            cellHeight = textureHeight / bestRows;
+            int inferredCellWidth = textureWidth / bestCols;
+            int inferredCellHeight = textureHeight / bestRows;
 
-            return cellWidth >= MinimumCellSize && cellHeight >= MinimumCellSize;
+            cellWidth = inferredCellWidth;
+            cellHeight = inferredCellHeight;
+            return inferredCellWidth >= MinimumCellSize && inferredCellHeight >= MinimumCellSize;
         }
 
         /// <summary>

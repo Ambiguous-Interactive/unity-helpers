@@ -114,10 +114,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             out FieldInfo fieldInfo
         )
         {
-            fieldInfo = null;
+            FieldInfo resolvedField = null;
             object obj = property.serializedObject.targetObject;
             if (obj == null)
             {
+                fieldInfo = null;
                 return null;
             }
             Type type = obj.GetType();
@@ -142,39 +143,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
                     obj = GetElementAtIndex(obj, index);
                     type = obj?.GetType();
-                    UpdateField(fieldName, ref fieldInfo);
+                    UpdateField(fieldName, ref resolvedField);
 
                     if (i == pathParts.Length - 2)
                     {
                         fieldName = pathParts[i + 1];
-                        UpdateField(fieldName, ref fieldInfo);
+                        UpdateField(fieldName, ref resolvedField);
                     }
                     continue;
                 }
 
-                UpdateField(fieldName, ref fieldInfo);
-                if (fieldInfo == null)
+                UpdateField(fieldName, ref resolvedField);
+                if (resolvedField == null)
                 {
+                    fieldInfo = null;
                     return null;
                 }
 
                 // Move deeper but stop before the last property in the path
                 if (i < pathParts.Length - 2)
                 {
-                    obj = fieldInfo.GetValue(obj);
-                    type = fieldInfo.FieldType;
+                    obj = resolvedField.GetValue(obj);
+                    type = resolvedField.FieldType;
                 }
             }
 
-            if (fieldInfo == null)
+            if (resolvedField == null)
             {
                 // Use the last segment of the possibly-trimmed path (actual field name), not property.name (which can be "data")
                 if (pathParts.Length > 0)
                 {
-                    UpdateField(pathParts[^1], ref fieldInfo);
+                    UpdateField(pathParts[^1], ref resolvedField);
                 }
             }
 
+            fieldInfo = resolvedField;
             return obj;
 
             void UpdateField(string fieldName, ref FieldInfo field)
@@ -211,10 +214,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             out FieldInfo fieldInfo
         )
         {
-            fieldInfo = null;
+            FieldInfo resolvedField = null;
             object obj = property.serializedObject.targetObject;
             if (obj == null)
             {
+                fieldInfo = null;
                 return null;
             }
 
@@ -245,20 +249,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
                     continue;
                 }
 
-                fieldInfo = type?.GetField(
+                resolvedField = type?.GetField(
                     fieldName,
                     BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance
                 );
-                if (fieldInfo == null)
+                if (resolvedField == null)
                 {
+                    fieldInfo = null;
                     return null;
                 }
 
                 // Move deeper into the object tree
-                obj = fieldInfo.GetValue(obj);
-                type = fieldInfo.FieldType;
+                obj = resolvedField.GetValue(obj);
+                type = resolvedField.FieldType;
             }
 
+            fieldInfo = resolvedField;
             return obj;
         }
 
@@ -268,9 +274,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
         private static bool TryParseArrayIndex(string dataField, out int index)
         {
-            if (ArrayIndexCache.TryGetValue(dataField, out index))
+            if (ArrayIndexCache.TryGetValue(dataField, out int cachedIndex))
             {
-                return index >= 0;
+                index = cachedIndex;
+                return cachedIndex >= 0;
             }
 
             if (
@@ -279,15 +286,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             )
             {
                 ReadOnlySpan<char> span = dataField.AsSpan(5, dataField.Length - 6);
-                if (int.TryParse(span, out index))
+                if (int.TryParse(span, out int parsedIndex))
                 {
-                    ArrayIndexCache[dataField] = index;
+                    ArrayIndexCache[dataField] = parsedIndex;
+                    index = parsedIndex;
                     return true;
                 }
             }
 
+            ArrayIndexCache[dataField] = -1;
             index = -1;
-            ArrayIndexCache[dataField] = index;
             return false;
         }
 

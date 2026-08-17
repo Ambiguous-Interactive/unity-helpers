@@ -559,21 +559,23 @@ namespace SevenZip.Compression.LZMA
 
         private void ReadMatchDistances(out UInt32 lenRes, out UInt32 numDistancePairs)
         {
-            lenRes = 0;
-            numDistancePairs = _matchFinder.GetMatches(_matchDistances);
-            if (numDistancePairs > 0)
+            UInt32 length = 0;
+            UInt32 pairs = _matchFinder.GetMatches(_matchDistances);
+            if (pairs > 0)
             {
-                lenRes = _matchDistances[numDistancePairs - 2];
-                if (lenRes == _numFastBytes)
+                length = _matchDistances[pairs - 2];
+                if (length == _numFastBytes)
                 {
-                    lenRes += _matchFinder.GetMatchLen(
-                        (int)lenRes - 1,
-                        _matchDistances[numDistancePairs - 1],
-                        Base.KMatchMaxLen - lenRes
+                    length += _matchFinder.GetMatchLen(
+                        (int)length - 1,
+                        _matchDistances[pairs - 1],
+                        Base.KMatchMaxLen - length
                     );
                 }
             }
             _additionalOffset++;
+            lenRes = length;
+            numDistancePairs = pairs;
         }
 
         private void MovePos(UInt32 num)
@@ -668,8 +670,8 @@ namespace SevenZip.Compression.LZMA
                 _optimum[posPrev].posPrev = cur;
                 cur = posPrev;
             } while (cur > 0);
-            backRes = _optimum[0].backPrev;
             _optimumCurrentIndex = _optimum[0].posPrev;
+            backRes = _optimum[0].backPrev;
             return _optimumCurrentIndex;
         }
 
@@ -681,8 +683,9 @@ namespace SevenZip.Compression.LZMA
             if (_optimumEndIndex != _optimumCurrentIndex)
             {
                 UInt32 lenRes = _optimum[_optimumCurrentIndex].posPrev - _optimumCurrentIndex;
-                backRes = _optimum[_optimumCurrentIndex].backPrev;
+                UInt32 cachedBack = _optimum[_optimumCurrentIndex].backPrev;
                 _optimumCurrentIndex = _optimum[_optimumCurrentIndex].posPrev;
+                backRes = cachedBack;
                 return lenRes;
             }
             _optimumCurrentIndex = _optimumEndIndex = 0;
@@ -724,16 +727,17 @@ namespace SevenZip.Compression.LZMA
             }
             if (_repLens[repMaxIndex] >= _numFastBytes)
             {
-                backRes = repMaxIndex;
                 UInt32 lenRes = _repLens[repMaxIndex];
                 MovePos(lenRes - 1);
+                backRes = repMaxIndex;
                 return lenRes;
             }
 
             if (lenMain >= _numFastBytes)
             {
-                backRes = _matchDistances[numDistancePairs - 1] + Base.KNumRepDistances;
+                UInt32 mainBack = _matchDistances[numDistancePairs - 1] + Base.KNumRepDistances;
                 MovePos(lenMain - 1);
+                backRes = mainBack;
                 return lenMain;
             }
 
@@ -1349,9 +1353,9 @@ namespace SevenZip.Compression.LZMA
 
         public void CodeOneBlock(out Int64 inSize, out Int64 outSize, out bool finished)
         {
-            inSize = 0;
-            outSize = 0;
-            finished = true;
+            Int64 processedIn = 0;
+            Int64 processedOut = 0;
+            bool blockFinished = true;
 
             if (_inStream != null)
             {
@@ -1367,6 +1371,9 @@ namespace SevenZip.Compression.LZMA
 
             if (_finished)
             {
+                inSize = processedIn;
+                outSize = processedOut;
+                finished = blockFinished;
                 return;
             }
 
@@ -1378,6 +1385,9 @@ namespace SevenZip.Compression.LZMA
                 if (_matchFinder.GetNumAvailableBytes() == 0)
                 {
                     Flush((UInt32)_nowPos64);
+                    inSize = processedIn;
+                    outSize = processedOut;
+                    finished = blockFinished;
                     return;
                 }
                 UInt32 len,
@@ -1398,6 +1408,9 @@ namespace SevenZip.Compression.LZMA
             if (_matchFinder.GetNumAvailableBytes() == 0)
             {
                 Flush((UInt32)_nowPos64);
+                inSize = processedIn;
+                outSize = processedOut;
+                finished = blockFinished;
                 return;
             }
             while (true)
@@ -1549,18 +1562,24 @@ namespace SevenZip.Compression.LZMA
                         FillAlignPrices();
                     }
 
-                    inSize = _nowPos64;
-                    outSize = _rangeEncoder.GetProcessedSizeAdd();
+                    processedIn = _nowPos64;
+                    processedOut = _rangeEncoder.GetProcessedSizeAdd();
                     if (_matchFinder.GetNumAvailableBytes() == 0)
                     {
                         Flush((UInt32)_nowPos64);
+                        inSize = processedIn;
+                        outSize = processedOut;
+                        finished = blockFinished;
                         return;
                     }
 
                     if (_nowPos64 - progressPosValuePrev >= (1 << 12))
                     {
                         _finished = false;
-                        finished = false;
+                        blockFinished = false;
+                        inSize = processedIn;
+                        outSize = processedOut;
+                        finished = blockFinished;
                         return;
                     }
                 }

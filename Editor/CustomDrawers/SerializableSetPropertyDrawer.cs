@@ -3364,18 +3364,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out bool hasAnimBool
         )
         {
-            isExpanded = false;
-            animProgress = 0f;
-            hasAnimBool = false;
-
             if (property == null)
             {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
                 return false;
             }
 
             string cacheKey = GetPropertyCacheKey(property);
             if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
             {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
                 return false;
             }
 
@@ -4139,19 +4141,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryCreateDefaultInstance(Type type, out object instance)
         {
-            instance = null;
             if (type == null)
             {
+                instance = null;
                 return false;
             }
 
             if (type.IsAbstract || type.IsInterface)
             {
+                instance = null;
                 return false;
             }
 
             if (typeof(Object).IsAssignableFrom(type))
             {
+                instance = null;
                 return false;
             }
 
@@ -4160,20 +4164,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryInvokeParameterlessConstructor(Type type, out object value)
         {
-            value = null;
             if (!TryGetParameterlessFactory(type, out Func<object> factory))
             {
+                value = null;
                 return false;
             }
 
-            value = factory();
-            if (value != null)
+            object created = factory();
+            if (created != null)
             {
+                value = created;
                 return true;
             }
 
             ParameterlessFactoryCache.TryRemove(type, out _);
             UnsupportedParameterlessTypes[type] = 0;
+            value = null;
             return false;
         }
 
@@ -5029,20 +5035,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool TryGetParameterlessFactory(Type type, out Func<object> factory)
         {
-            factory = null;
             if (type == null)
             {
+                factory = null;
                 return false;
             }
 
             if (ParameterlessFactoryCache.TryGetValue(type, out Func<object> cached))
             {
                 factory = cached;
-                return factory != null;
+                return cached != null;
             }
 
             if (UnsupportedParameterlessTypes.ContainsKey(type))
             {
+                factory = null;
                 return false;
             }
 
@@ -5060,6 +5067,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             UnsupportedParameterlessTypes[type] = 0;
+            factory = null;
             return false;
         }
 
