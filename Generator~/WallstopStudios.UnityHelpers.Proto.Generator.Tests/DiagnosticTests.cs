@@ -68,6 +68,77 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AFieldInitializerSkipConstructorDiscardsIsAWarning()
+        {
+            // The shape that shipped for five releases: a scratch buffer whose only guarantee was
+            // its field initializer, on a contract asking protobuf-net to allocate uninitialized.
+            // Invisible through this package's own reader, which emits a constructor that DOES run
+            // initializers -- so nothing but a diagnostic can catch the next one.
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoContract(SkipConstructor = true)] public partial class Generator { [WProtoMember(1)] public ulong State; private byte[] _scratch = new byte[16]; }"
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033");
+
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("_scratch"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("Generator"), match.GetMessage());
+        }
+
+        [Test]
+        public void OnlyAFieldWhoseValueNeedsAConstructorWarns()
+        {
+            // Four ways not to be the defect, each of which a coarser rule would report. A
+            // diagnostic that fires on correct code is a build break in someone else's project.
+            string[] clean =
+            {
+                // No initializer: its default IS what it holds either way.
+                @"[WProtoContract(SkipConstructor = true)] public partial class A { [WProtoMember(1)] public ulong State; private byte[] _scratch; }",
+                // On the wire, so the payload restores it.
+                @"[WProtoContract(SkipConstructor = true)] public partial class B { [WProtoMember(1)] public ulong State; [WProtoMember(2)] public byte[] Scratch = new byte[16]; }",
+                // Static, so no instance allocation is involved.
+                @"[WProtoContract(SkipConstructor = true)] public partial class C { [WProtoMember(1)] public ulong State; private static readonly byte[] Shared = new byte[16]; }",
+                // No SkipConstructor, so the constructor and its initializers run.
+                @"[WProtoContract] public partial class D { [WProtoMember(1)] public ulong State; private byte[] _scratch = new byte[16]; }",
+            };
+
+            foreach (string source in clean)
+            {
+                Assert.IsEmpty(
+                    Run(source).Where(diagnostic => diagnostic.Id == "WPROTO033"),
+                    source
+                );
+            }
+
+            // An auto-property initializer is the same mechanism -- the backing field is what the
+            // uninitialized allocation leaves at its default -- and names the property.
+            ImmutableArray<Diagnostic> property = Run(
+                @"[WProtoContract(SkipConstructor = true)] public partial class E { [WProtoMember(1)] public ulong State; private byte[] Scratch { get; } = new byte[16]; }"
+            );
+            Assert.IsTrue(
+                property
+                    .Single(diagnostic => diagnostic.Id == "WPROTO033")
+                    .GetMessage()
+                    .Contains("Scratch")
+            );
+        }
+
+        [Test]
+        public void AnImmutableContractDeclaringSkipConstructorStillWarns()
+        {
+            // This generator IGNORES SkipConstructor on a contract it builds through a constructor,
+            // and protobuf-net honours it regardless -- so the hazard is exactly as real there, and
+            // asking the emitter's flag rather than the author's would have missed it.
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoContract(SkipConstructor = true)] public partial class Frozen { [WProtoMember(1)] public readonly ulong State; private byte[] _scratch = new byte[16]; }"
+            );
+
+            Assert.AreEqual(
+                DiagnosticSeverity.Warning,
+                diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033").Severity
+            );
+        }
+
+        [Test]
         public void AProtobufContractWithoutAWallstopProtoContractReportsMigrationInfo()
         {
             ImmutableArray<Diagnostic> diagnostics = Run(

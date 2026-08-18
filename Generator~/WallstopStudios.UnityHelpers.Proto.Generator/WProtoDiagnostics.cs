@@ -327,6 +327,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor SkipConstructorDropsAnInitializer =
+            new DiagnosticDescriptor(
+                "WPROTO033",
+                "WallstopProto SkipConstructor discards this field's initializer",
+                "'{0}.{1}' is initialized where it is declared and is not a [WProtoMember], so its value exists only because a constructor ran. '{0}' declares SkipConstructor, which asks protobuf-net to allocate the instance UNINITIALIZED -- no constructor runs, no initializer runs, and a member the payload does not carry cannot restore it, so '{1}' arrives at its type's default on every deserialized instance. Allocate it where it is used instead, or give it a [WProtoMember] so the wire carries it. A [WProtoAfterDeserialization] hook is not enough on its own: protobuf-net does not invoke [ProtoAfterDeserialization] on a SkipConstructor contract. Suppress WPROTO033 at the declaration when the default really is a valid value for '{1}'.",
+                "WallstopProto",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

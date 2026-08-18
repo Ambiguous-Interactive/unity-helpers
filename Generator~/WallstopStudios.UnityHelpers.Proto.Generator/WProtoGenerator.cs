@@ -499,6 +499,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 member.SkipConstructor = declaredSkipConstructor;
             }
 
+            ReportInitializersSkipConstructorDiscards(context, contract);
+
             // Not asked of a contract that builds itself. The diagnostic exists because the formatter
             // normally calls `new T()` to have something to read into; a contract with a member that
             // cannot be assigned after construction never takes that path, holding every value in a
@@ -978,6 +980,95 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Warns about each field whose value exists only because a constructor ran, on a contract
+        /// that asks for one never to run.
+        /// </summary>
+        /// <param name="context">The generator context, for reporting.</param>
+        /// <param name="contract">The contract being emitted.</param>
+        /// <remarks>
+        /// The shape that shipped for five releases. <c>AbstractRandom._guidBytes</c> is a scratch
+        /// buffer, not a <c>[WProtoMember]</c>, and its only guarantee was its field initializer --
+        /// so every one of twelve generators restored through protobuf-net threw from
+        /// <c>NextGuid()</c>. Invisible through this package's own API, because the constructor
+        /// WallstopProto emits for <c>SkipConstructor</c> does run initializers and protobuf-net's
+        /// uninitialized allocation runs none.
+        ///
+        /// Asked of <see cref="Shape.SkipsConstructor"/> rather than of the flag the emitter ends up
+        /// with: an immutable contract makes this generator ignore <c>SkipConstructor</c>, and
+        /// protobuf-net honours it regardless.
+        /// </remarks>
+        private static void ReportInitializersSkipConstructorDiscards(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol contract
+        )
+        {
+            if (!Shape.SkipsConstructor(contract) || contract.IsValueType)
+            {
+                return;
+            }
+
+            foreach (ISymbol member in contract.GetMembers())
+            {
+                if (
+                    member.IsStatic
+                    || member is not IFieldSymbol field
+                    || field.IsConst
+                    || HasAttribute(member, MemberAttribute)
+                )
+                {
+                    continue;
+                }
+
+                // An auto-property's backing field carries the initializer and is what the
+                // uninitialized allocation leaves at its default, so the property it belongs to is
+                // what the developer has to be pointed at. Its own attributes are the ones that
+                // matter, including the [WProtoMember] that would put it on the wire.
+                ISymbol declared = field.AssociatedSymbol ?? field;
+                if (declared != field && HasAttribute(declared, MemberAttribute))
+                {
+                    continue;
+                }
+
+                // The property's references, not the backing field's: an auto-property's backing
+                // field is implicitly declared and has none, so asking it reports every such
+                // property as clean.
+                bool initialized = false;
+                foreach (SyntaxReference reference in declared.DeclaringSyntaxReferences)
+                {
+                    SyntaxNode syntax = reference.GetSyntax();
+                    if (
+                        (
+                            syntax is VariableDeclaratorSyntax declarator
+                            && declarator.Initializer != null
+                        )
+                        || (
+                            syntax is PropertyDeclarationSyntax property
+                            && property.Initializer != null
+                        )
+                    )
+                    {
+                        initialized = true;
+                        break;
+                    }
+                }
+
+                if (!initialized)
+                {
+                    continue;
+                }
+
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.SkipConstructorDropsAnInitializer,
+                        declared.Locations.FirstOrDefault(),
+                        contract.Name,
+                        declared.Name
+                    )
+                );
+            }
         }
 
         /// <summary>

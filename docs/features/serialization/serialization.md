@@ -976,6 +976,16 @@ registrar would be `CS0122` in your own build, so it is skipped instead; the war
 the skip is otherwise invisible until that type is serialized in a shipped player. Widen the offending
 type to `internal`, or register the formatter yourself from code that can name it.
 
+`WPROTO033` warns when a contract declaring `SkipConstructor` has a field that is initialized where
+it is declared and is not a `[WProtoMember]`. `SkipConstructor` asks protobuf-net to allocate the
+instance **uninitialized**: no constructor runs, so no field initializer runs either, and a field the
+wire does not carry cannot be restored — it arrives at its type's default on every deserialized
+instance. A scratch buffer is the usual case, and the usual fix is to allocate it where it is used
+rather than where it is declared. Putting it on the wire works too. A
+`[WProtoAfterDeserialization]` hook does **not**, on its own: protobuf-net does not invoke
+`[ProtoAfterDeserialization]` on a `SkipConstructor` contract. Suppress `WPROTO033` at the
+declaration when the default really is a valid value.
+
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.
 Generated registrars run in Unity's unordered startup phase, so leaving the conflict unresolved
