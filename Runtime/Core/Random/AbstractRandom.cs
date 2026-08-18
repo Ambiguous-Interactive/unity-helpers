@@ -119,6 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const int MaxRejectionAttempts32 = 1 << 16;
         private const int MaxRejectionAttempts64 = 1 << 20;
         private const int MaxGaussianAttempts = 1 << 20;
+        private const int GuidByteCount = 16;
         private const int MaxDoubleBitAttempts = 1 << 20;
 
         [ProtoMember(1)]
@@ -127,7 +128,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public abstract RandomState InternalState { get; }
 
-        private readonly byte[] _guidBytes = new byte[16];
+        // Allocated on first use rather than by an initializer: a formatter that allocates an
+        // uninitialized instance -- which is what SkipConstructor asks protobuf-net for -- runs no
+        // initializer at all, and a buffer that only NextGuid touches would arrive null.
+        private byte[] _guidBytes;
 
         // Bit/byte reservoirs to accelerate small requests
         // Note: included in protobuf to preserve exact generator state across round-trips
@@ -1235,16 +1239,23 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public Guid NextGuid()
         {
-            return new Guid(GenerateGuidBytes(_guidBytes));
+            return new Guid(GenerateGuidBytes());
         }
 
         public WGuid NextWGuid()
         {
-            return new WGuid(GenerateGuidBytes(_guidBytes));
+            return new WGuid(GenerateGuidBytes());
         }
 
-        private byte[] GenerateGuidBytes(byte[] guidBytes)
+        private byte[] GenerateGuidBytes()
         {
+            byte[] guidBytes = _guidBytes;
+            if (guidBytes == null)
+            {
+                guidBytes = new byte[GuidByteCount];
+                _guidBytes = guidBytes;
+            }
+
             NextBytes(guidBytes);
             SetUuidV4Bits(guidBytes);
             return guidBytes;
@@ -1252,7 +1263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static void SetUuidV4Bits(byte[] bytes)
         {
-            if (bytes == null || bytes.Length < 16)
+            if (bytes == null || bytes.Length < GuidByteCount)
             {
                 throw new ArgumentException(
                     "UUID buffer must contain at least 16 bytes.",

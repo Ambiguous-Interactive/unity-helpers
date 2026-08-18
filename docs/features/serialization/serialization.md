@@ -1406,6 +1406,12 @@ survive IL2CPP, so the generator emits a private constructor into your type's `p
 instead. The consequence is that C# field initializers and base constructors still run, where under
 protobuf-net they do not — the object is more initialized, never less.
 
+That asymmetry is a trap worth naming, because it points the wrong way: a buffer your type needs but
+does not serialize — a scratch array, a cached hash — is guaranteed by a field initializer under this
+generator and **not** guaranteed under protobuf-net, which reads the same bytes. If the same contract
+can ever be read by protobuf-net, allocate such a buffer where you use it or rebuild it from a
+`[WProtoAfterDeserialization]` hook, rather than relying on the initializer.
+
 **No constructor is emitted into a type that declares none of its own.** There is nothing to skip
 there, and emitting one would delete the implicit parameterless constructor and stop `new Yours()`
 from compiling in your own code. The flag still governs seeding on such a type: a member of an

@@ -66,12 +66,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static SystemRandom Instance => ThreadLocalRandom<SystemRandom>.Instance;
 
-        public override RandomState InternalState =>
-            BuildState(
-                unchecked((ulong)_inext),
-                unchecked((ulong)_inextp),
-                ArrayConverter.IntArrayToByteArrayBlockCopy(_seedArray)
-            );
+        public override RandomState InternalState
+        {
+            get
+            {
+                EnsureSeedArray();
+                return BuildState(
+                    unchecked((ulong)_inext),
+                    unchecked((ulong)_inextp),
+                    ArrayConverter.IntArrayToByteArrayBlockCopy(_seedArray)
+                );
+            }
+        }
 
         /*
             Copied from Random.cs source. Apparently it isn't guaranteed to be the
@@ -88,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         [ProtoMember(8)]
         [WProtoMember(8)]
-        private readonly int[] _seedArray = new int[SeedArraySize];
+        private int[] _seedArray = new int[SeedArraySize];
 
         public SystemRandom()
             : this(Guid.NewGuid().GetHashCode()) { }
@@ -136,10 +142,23 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             RestoreCommonState(internalState);
             _seedArray = ArrayConverter.ByteArrayToIntArrayBlockCopy(internalState._payload);
+            EnsureSeedArray();
+        }
+
+        private void EnsureSeedArray()
+        {
+            if (_seedArray == null || _seedArray.Length != SeedArraySize)
+            {
+                _seedArray = new int[SeedArraySize];
+            }
         }
 
         public override int Next()
         {
+            // A formatter may hand back an instance no constructor ran and a payload that never
+            // named this member, so the initializer above guarantees nothing a caller can reach.
+            EnsureSeedArray();
+
             int localINext = _inext;
             int localINextP = _inextp;
             int index1;

@@ -85,6 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             get
             {
+                EnsureElements();
                 using PooledArray<byte> payloadLease = WallstopArrayPool<byte>.Get(
                     ElementByteSize,
                     out byte[] buffer
@@ -146,6 +147,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override uint NextUint()
         {
+            // A formatter may hand back an instance no constructor ran and a payload that never
+            // named this member, so the initializer above guarantees nothing a caller can reach.
+            EnsureElements();
             unchecked
             {
                 uint index = _b & ElementMask;
@@ -177,6 +181,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
+            EnsureElements();
+            other.EnsureElements();
             if (!_elements.AsSpan().SequenceEqual(other._elements))
             {
                 return false;
@@ -201,6 +207,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 return -1;
             }
+
+            EnsureElements();
+            other.EnsureElements();
 
             int comparison = _a.CompareTo(other._a);
             if (comparison != 0)
@@ -252,10 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private void InitializeFromMixer(ref ulong mixer)
         {
-            if (_elements == null || _elements.Length != ElementCount)
-            {
-                _elements = new uint[ElementCount];
-            }
+            EnsureElements();
 
             for (int i = 0; i < ElementCount; ++i)
             {
@@ -271,12 +277,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        private void LoadSerializedElements(byte[] payload)
+        private void EnsureElements()
         {
             if (_elements == null || _elements.Length != ElementCount)
             {
                 _elements = new uint[ElementCount];
             }
+        }
+
+        private void LoadSerializedElements(byte[] payload)
+        {
+            EnsureElements();
 
             if (payload != null && payload.Length >= ElementByteSize)
             {

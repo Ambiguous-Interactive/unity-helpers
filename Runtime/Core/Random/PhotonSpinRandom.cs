@@ -82,6 +82,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             get
             {
+                EnsureElements();
                 using PooledArray<byte> payloadLease = WallstopArrayPool<byte>.Get(
                     ElementByteSize,
                     out byte[] buffer
@@ -179,6 +180,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override uint NextUint()
         {
+            // A formatter may hand back an instance no constructor ran and a payload that never
+            // named this member, so the initializer above guarantees nothing a caller can reach.
+            EnsureElements();
+
             if (!_hasPrimed)
             {
                 GenerateBlock();
@@ -223,6 +228,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
+            EnsureElements();
+            other.EnsureElements();
             if (!_elements.AsSpan().SequenceEqual(other._elements))
             {
                 return false;
@@ -253,6 +260,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 return -1;
             }
+
+            EnsureElements();
+            other.EnsureElements();
 
             int comparison = _a.CompareTo(other._a);
             if (comparison != 0)
@@ -296,12 +306,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return 0;
         }
 
-        private void LoadSerializedElements(byte[] payload)
+        private void EnsureElements()
         {
             if (_elements == null || _elements.Length != BlockSize)
             {
                 _elements = new uint[BlockSize];
             }
+        }
+
+        private void LoadSerializedElements(byte[] payload)
+        {
+            EnsureElements();
 
             if (payload != null && payload.Length >= ElementByteSize)
             {
@@ -335,10 +350,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private void InitializeFromUlongs(ulong seed0, ulong seed1)
         {
-            if (_elements == null || _elements.Length != BlockSize)
-            {
-                _elements = new uint[BlockSize];
-            }
+            EnsureElements();
 
             ulong mixer = seed0 ^ (seed1 << 1) ^ 0x9E3779B97F4A7C15UL;
 
