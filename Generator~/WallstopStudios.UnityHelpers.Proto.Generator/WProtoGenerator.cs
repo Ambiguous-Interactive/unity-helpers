@@ -448,18 +448,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // SkipConstructor means no constructor the author wrote may run, so the formatter reads
-            // into an instance made by a private constructor emitted alongside it. Only meaningful
-            // for a reference type that is created here at all: a struct has no constructor to skip,
-            // an abstract contract creates nothing, and one that builds itself never calls `new`.
+            // SkipConstructor means no constructor the author wrote may run. Only meaningful for a
+            // reference type that is created here at all: a struct has no constructor to skip, an
+            // abstract contract creates nothing, and one that builds itself never calls `new`.
             //
-            // The last condition is about not breaking the consumer's source. Emitting ANY
-            // constructor into a type that declares none removes the implicit parameterless one, so
-            // `new Theirs()` stops compiling -- an attribute silently breaking unrelated code. A type
-            // that declares no constructor also has nothing to skip: the implicit one runs field
-            // initializers and nothing else, which is exactly what the emitted one would do.
-            // What the AUTHOR asked for, which is the question a member's seed depends on:
-            // protobuf-net's SkipConstructor allocates the instance uninitialized, so no field
+            // This is what the AUTHOR asked for, and it is the flag every SEEDING decision reads:
+            // protobuf-net honours it by allocating the instance uninitialized, so no field
             // initializer has run and no member has anything to merge into or append to.
             bool declaredSkipConstructor =
                 Shape.SkipsConstructor(contract)
@@ -467,16 +461,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 && !contract.IsAbstract
                 && !constructAtEnd;
 
-            // Narrower, and a different question: whether a private constructor is emitted and
-            // called. A type that declares none must not get one, per the note above.
+            // A narrower, separate question: whether a private constructor is emitted and called.
+            // A type that declares none must not get one -- emitting ANY constructor into it removes
+            // the implicit parameterless one, so `new Theirs()` stops compiling in the consumer's own
+            // source, an attribute silently breaking unrelated code.
+            //
+            // These two were ONE flag until session 202, on the reasoning that a type declaring no
+            // constructor has nothing to skip, because the implicit one runs field initializers and
+            // nothing else. That is true of what this generator emits and false of what the oracle
+            // does -- an uninitialized allocation runs no initializer at all -- so every such
+            // contract had been seeding its members from initializers the oracle never had.
             bool skipConstructor = declaredSkipConstructor && DeclaresAConstructor(contract);
 
             foreach (Member member in members)
             {
-                // The declared flag, deliberately. A contract that declares SkipConstructor and no
-                // constructor of its own is still read into an instance whose field initializers
-                // ran, and seeding from those would append to -- or merge into -- a value the oracle
-                // never had.
                 member.SkipConstructor = declaredSkipConstructor;
             }
 
