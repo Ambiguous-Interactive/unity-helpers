@@ -567,26 +567,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static IEnumerable<TestCaseData> EveryGenerator()
         {
             Guid seed = Guid.Parse("12345678-1234-1234-1234-123456789012");
-            yield return Named("DotNetRandom", new DotNetRandom(seed));
-            yield return Named("PcgRandom", new PcgRandom(seed));
-            yield return Named("XorShiftRandom", new XorShiftRandom(12345));
-            yield return Named("WyRandom", new WyRandom(seed));
-            yield return Named("XoroShiroRandom", new XoroShiroRandom(seed));
-            yield return Named("SystemRandom", new SystemRandom(12345));
+            yield return Named("Restored", "DotNetRandom", new DotNetRandom(seed));
+            yield return Named("Restored", "PcgRandom", new PcgRandom(seed));
+            yield return Named("Restored", "XorShiftRandom", new XorShiftRandom(12345));
+            yield return Named("Restored", "WyRandom", new WyRandom(seed));
+            yield return Named("Restored", "XoroShiroRandom", new XoroShiroRandom(seed));
+            yield return Named("Restored", "SystemRandom", new SystemRandom(12345));
             yield return Named(
+                "Restored",
                 "LinearCongruentialGenerator",
                 new LinearCongruentialGenerator(12345)
             );
-            yield return Named("SquirrelRandom", new SquirrelRandom(12345));
-            yield return Named("RomuDuo", new RomuDuo(seed));
-            yield return Named("SplitMix64", new SplitMix64(seed));
-            yield return Named("IllusionFlow", new IllusionFlow(seed));
-            yield return Named("FlurryBurstRandom", new FlurryBurstRandom(seed));
-            yield return Named("PhotonSpinRandom", new PhotonSpinRandom(seed));
-            yield return Named("StormDropRandom", new StormDropRandom(12345u));
-            yield return Named("BlastCircuitRandom", new BlastCircuitRandom(seed));
-            yield return Named("WaveSplatRandom", new WaveSplatRandom(0xC0FFEEUL));
-            yield return Named("WDoomRandom", new WDoomRandom(seedIndex: 7));
+            yield return Named("Restored", "SquirrelRandom", new SquirrelRandom(12345));
+            yield return Named("Restored", "RomuDuo", new RomuDuo(seed));
+            yield return Named("Restored", "SplitMix64", new SplitMix64(seed));
+            yield return Named("Restored", "IllusionFlow", new IllusionFlow(seed));
+            yield return Named("Restored", "FlurryBurstRandom", new FlurryBurstRandom(seed));
+            yield return Named("Restored", "PhotonSpinRandom", new PhotonSpinRandom(seed));
+            yield return Named("Restored", "StormDropRandom", new StormDropRandom(12345u));
+            yield return Named("Restored", "BlastCircuitRandom", new BlastCircuitRandom(seed));
+            yield return Named("Restored", "WaveSplatRandom", new WaveSplatRandom(0xC0FFEEUL));
+            yield return Named("Restored", "WDoomRandom", new WDoomRandom(seedIndex: 7));
         }
 
         /// <summary>
@@ -599,19 +600,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         /// </remarks>
         private static IEnumerable<TestCaseData> EveryAllDefaultGenerator()
         {
-            yield return Named("BlastCircuitRandom", new BlastCircuitRandom(0UL, 0UL, 0UL, 0UL));
-            yield return Named("FlurryBurstRandom", new FlurryBurstRandom(default(RandomState)));
-            yield return Named("LinearCongruentialGenerator", new LinearCongruentialGenerator(0));
-            yield return Named("SplitMix64", new SplitMix64(0UL));
-            yield return Named("SquirrelRandom", new SquirrelRandom(0));
-            yield return Named("WaveSplatRandom", new WaveSplatRandom(0UL));
-            yield return Named("WDoomRandom", new WDoomRandom(seedIndex: 0));
-            yield return Named("WyRandom", new WyRandom(0UL));
+            yield return Named(
+                "AllDefault",
+                "BlastCircuitRandom",
+                new BlastCircuitRandom(0UL, 0UL, 0UL, 0UL)
+            );
+            yield return Named(
+                "AllDefault",
+                "FlurryBurstRandom",
+                new FlurryBurstRandom(default(RandomState))
+            );
+            yield return Named(
+                "AllDefault",
+                "LinearCongruentialGenerator",
+                new LinearCongruentialGenerator(0)
+            );
+            yield return Named("AllDefault", "SplitMix64", new SplitMix64(0UL));
+            yield return Named("AllDefault", "SquirrelRandom", new SquirrelRandom(0));
+            yield return Named("AllDefault", "WaveSplatRandom", new WaveSplatRandom(0UL));
+            yield return Named("AllDefault", "WDoomRandom", new WDoomRandom(seedIndex: 0));
+            yield return Named("AllDefault", "WyRandom", new WyRandom(0UL));
         }
 
-        private static TestCaseData Named(string name, IRandom random)
+        /// <summary>Names one case, uniquely across both sources.</summary>
+        /// <remarks>
+        /// <c>SetName</c> replaces the WHOLE test name, so the suite has to be part of it or the
+        /// two sources both produce a case called <c>WyRandom</c> and a failure report cannot say
+        /// which one it came from. The overload that keeps the method name is absent from the
+        /// NUnit that Unity 2021.3 ships.
+        /// </remarks>
+        private static TestCaseData Named(string suite, string name, IRandom random)
         {
-            return new TestCaseData(random).SetArgDisplayNames(name);
+            return new TestCaseData(random).SetName(suite + "-" + name);
         }
 
         private static IRandom ProtobufNetRoundTrip(IRandom random)
