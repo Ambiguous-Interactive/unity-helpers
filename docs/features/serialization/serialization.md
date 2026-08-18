@@ -1365,7 +1365,27 @@ The generated constructor takes a `WProtoConstruct` marker as its first paramete
 collide with one you wrote yourself — a two-field type very plausibly has its own `(int, int)`
 constructor, and both continue to exist.
 
-Two consequences worth knowing:
+Declaring that constructor would normally remove the parameterless one C# gives a type that declares
+none, so the generator emits that back as well — `new Coordinate()` keeps compiling in your own code,
+and protobuf-net, which refuses a type it cannot construct, keeps reading it.
+
+Your constructor still seeds the value. A member the payload does not carry comes back holding
+whatever your parameterless constructor left on it, a sub-message merges into it, a collection appends
+to it and a map merges by key — the same rules an assignable contract follows:
+
+```csharp
+[WProtoContract]
+public sealed partial class Loadout
+{
+    [WProtoMember(1)] public readonly List<int> Slots;
+
+    public Loadout() => Slots = new List<int> { 1 };
+}
+
+// A payload carrying only slot 7 reads back as { 1, 7 }, and one carrying nothing as { 1 }.
+```
+
+Three consequences worth knowing:
 
 - **A `[WProtoBeforeDeserialization]` hook runs after construction**, because for a type whose members
   _are_ its construction there is no earlier moment. Nothing is assigned after it, since nothing can
@@ -1373,6 +1393,10 @@ Two consequences worth knowing:
 - **Immutable members and `[WProtoInclude]` cannot be combined** (`WPROTO015`). One needs the instance
   built once the last member is read; the other replaces the instance when an include tag arrives.
   The generator refuses rather than picking.
+- **A contract with only parameterized constructors is not seeded.** There is no way to build one to
+  take a seed from without inventing a public constructor you did not write, and protobuf-net refuses
+  such a type outright, so every member starts at its type's default. `SkipConstructor` likewise
+  removes the seed, because it asks for an instance no constructor ever touched.
 
 #### Reading without running your constructor
 

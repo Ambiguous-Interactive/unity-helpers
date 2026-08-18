@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
+    using System.Collections.Generic;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -238,6 +239,126 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public SeededImmutableHolder()
         {
             Child = new DuplicateChild { A = 9 };
+        }
+    }
+
+    /// <summary>
+    /// Every member kind on a contract that builds itself, each seeded by its own constructor.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SeededImmutableHolder"/> asked the question of one sub-message. The answer -- the
+    /// oracle merges -- does not generalize to the other three kinds on its own, because each has a
+    /// different combining rule: repeated appends, a map merges by key, and a generic member's rule
+    /// is decided by its closure. Every one is measured here rather than reasoned about.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class SeededImmutableShapes
+    {
+        /// <summary>A reference sub-message, whose first occurrence merges.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly DuplicateChild Reference;
+
+        /// <summary>A struct sub-message, which cannot be null and is always seeded.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly Outer.Point Where;
+
+        /// <summary>A repeated member, whose occurrences append rather than replace.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public readonly List<int> Values;
+
+        /// <summary>A map member, whose entries merge by key.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public readonly Dictionary<int, int> Map;
+
+        /// <summary>Fills each member so a merge and a replace give different answers.</summary>
+        public SeededImmutableShapes()
+        {
+            Reference = new DuplicateChild { A = 9 };
+            Where = new Outer.Point { X = 9 };
+            Values = new List<int> { 99 };
+            Map = new Dictionary<int, int> { { 7, 9 } };
+        }
+    }
+
+    /// <summary>
+    /// The same shape with no constructor the oracle can call, so "what is there to merge into"
+    /// has a different answer.
+    /// </summary>
+    /// <remarks>
+    /// The canonical immutable class -- one parameterized constructor, all-readonly members -- is a
+    /// shape this generator accepts and protobuf-net has no obvious way to create. Whether it
+    /// refuses, or allocates uninitialized and therefore has no seed, decides whether seeding can
+    /// be unconditional or has to be gated on a constructor being there to run.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class UnseededImmutableHolder
+    {
+        /// <summary>The member the only constructor fills.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly DuplicateChild Child;
+
+        /// <summary>The author's only constructor, which takes the member's value.</summary>
+        /// <param name="child">The value to hold.</param>
+        public UnseededImmutableHolder(DuplicateChild child)
+        {
+            Child = child;
+        }
+    }
+
+    /// <summary>An immutable contract that declares no constructor of its own.</summary>
+    /// <remarks>
+    /// The shape that loses its implicit parameterless constructor to the one emitted for the read,
+    /// unless a replacement is emitted with it. Both readers need that constructor: a consumer
+    /// writing <c>new ImplicitlyConstructedImmutable()</c>, and protobuf-net, which refuses a type
+    /// it cannot construct.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class ImplicitlyConstructedImmutable
+    {
+        /// <summary>A readonly member, which is what forces construction at the end of the read.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly int Id;
+    }
+
+    /// <summary>
+    /// An immutable contract that also declares <c>SkipConstructor</c>, which is a shape this
+    /// package ships -- <c>PcgRandom</c> is one.
+    /// </summary>
+    /// <remarks>
+    /// The two flags answer the same question differently. <c>SkipConstructor</c> asks protobuf-net
+    /// to allocate uninitialized, so no constructor runs and no member has a seed; a readonly member
+    /// makes this generator build the instance at the end of the read, where a seed would have to
+    /// come from a construction the oracle never performs. Which one wins is a fact about the
+    /// oracle, so it is measured.
+    /// </remarks>
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
+    public sealed partial class SeededSkipImmutableHolder
+    {
+        /// <summary>A sub-message the constructor fills and the read cannot assign onto.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly DuplicateChild Child;
+
+        /// <summary>A scalar the constructor fills, so an absent field has a value to keep.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly int Number;
+
+        /// <summary>Seeds both members, so a construction that ran is visible in the result.</summary>
+        public SeededSkipImmutableHolder()
+        {
+            Child = new DuplicateChild { A = 9 };
+            Number = 9;
         }
     }
 }

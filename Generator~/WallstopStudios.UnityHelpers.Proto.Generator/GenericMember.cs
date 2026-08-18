@@ -79,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             get
             {
                 string none = "default(" + _parameter + ")";
-                if (ConstructAtEnd)
+                if (Unseeded)
                 {
                     return none;
                 }
@@ -149,7 +149,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             writer.Line("bool ", SeenFlag, " = false;");
-            writer.Line(_parameter, " ", Local, " = default(", _parameter, ");");
+            writer.Line(
+                _parameter,
+                " ",
+                Local,
+                " = ",
+                SeedsFromInstance ? SeedSource : "default(" + _parameter + ")",
+                ";"
+            );
         }
 
         /// <inheritdoc />

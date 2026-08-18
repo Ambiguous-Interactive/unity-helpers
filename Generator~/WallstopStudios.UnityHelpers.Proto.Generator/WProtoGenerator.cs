@@ -424,10 +424,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
+            // Measured against protobuf-net 2.4.9 and 3.2.56, both the same: an immutable contract
+            // is CONSTRUCTED, read into, and then its readonly members assigned by reflection -- so
+            // every member the payload does not overwrite keeps what the author's constructor gave
+            // it, a sub-message merges into it, a repeated member appends to it and a map merges by
+            // key. Holding every value in a local that starts at `default` loses all of that in
+            // silence. The seed instance costs one construction per read, so it is built only where
+            // construction is possible and could actually set something.
+            // Measured, and it is the exclusion that matters most: a contract declaring
+            // SkipConstructor is allocated UNINITIALIZED by protobuf-net whether or not it is
+            // immutable, so no constructor runs and there is no seed at all -- a sub-message
+            // replaces, and an absent scalar comes back at its type's default rather than at what
+            // the constructor would have set. `PcgRandom` is exactly this shape, and seeding it
+            // would run `Guid.NewGuid()` on every read to produce an answer the oracle disagrees
+            // with.
+            bool seedsFromInstance =
+                constructAtEnd
+                && !Shape.SkipsConstructor(contract)
+                && CanConstructParameterlessly(contract)
+                && ConstructionCouldSeedAMember(contract);
+
             foreach (Member member in members)
             {
                 member.Deferred = constructAtEnd || 0 < includes.Count;
                 member.ConstructAtEnd = constructAtEnd;
+                member.SeedsFromInstance = seedsFromInstance;
             }
 
             Hooks hooks = CollectHooks(context, contract);
@@ -602,6 +623,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 includes,
                 hooks,
                 constructAtEnd,
+                seedsFromInstance,
                 skipConstructor,
                 EncodedTypeParameters(contract),
                 nested
@@ -763,6 +785,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Include> includes,
             Hooks hooks,
             bool constructAtEnd,
+            bool seedsFromInstance,
             bool skipConstructor,
             List<string> encodedTypeParameters,
             NestedCollections nested
@@ -830,6 +853,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 includes,
                 hooks,
                 constructAtEnd,
+                seedsFromInstance,
                 skipConstructor,
                 mergeable,
                 guardedSeeding
@@ -950,6 +974,104 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 if (!constructor.IsImplicitlyDeclared)
                 {
                     return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Reports whether <c>new T()</c> compiles inside the emitted formatter, given the
+        /// constructors this generator is about to add.
+        /// </summary>
+        /// <param name="contract">The contract being emitted.</param>
+        /// <remarks>
+        /// A struct always has one and it cannot be taken away. A class's IMPLICIT parameterless
+        /// constructor does not survive the read constructor emitted alongside this -- declaring any
+        /// constructor removes it -- which is why one is emitted back in its place; see
+        /// <see cref="EmitConstructor"/>. What cannot be recovered is a class whose author declared
+        /// only parameterized constructors: adding a parameterless one there would invent a public
+        /// API and let a caller past invariants the author's constructor enforces.
+        /// </remarks>
+        private static bool CanConstructParameterlessly(INamedTypeSymbol contract)
+        {
+            return contract.IsValueType
+                || !DeclaresAConstructor(contract)
+                || HasAccessibleParameterlessConstructor(contract);
+        }
+
+        /// <summary>
+        /// Reports whether <c>new T()</c> could leave any serialized member at something other than
+        /// its type's default.
+        /// </summary>
+        /// <param name="contract">The contract being emitted.</param>
+        /// <remarks>
+        /// The whole cost of seeding an immutable contract is one construction per read, so it is
+        /// paid only where it can change an answer. Two syntactic things can set a member before the
+        /// read loop starts: an initializer on the member itself, and the body of a parameterless
+        /// constructor. A constructor that chains to another (<c>: this(...)</c>) counts as a body,
+        /// because the constructor it chains to is one.
+        /// </remarks>
+        private static bool ConstructionCouldSeedAMember(INamedTypeSymbol contract)
+        {
+            foreach (ISymbol member in contract.GetMembers())
+            {
+                if (member is IMethodSymbol candidate)
+                {
+                    if (
+                        candidate.MethodKind != MethodKind.Constructor
+                        || candidate.IsStatic
+                        || candidate.Parameters.Length != 0
+                        || candidate.IsImplicitlyDeclared
+                    )
+                    {
+                        continue;
+                    }
+
+                    foreach (SyntaxReference reference in candidate.DeclaringSyntaxReferences)
+                    {
+                        if (
+                            reference.GetSyntax() is ConstructorDeclarationSyntax declaration
+                            && (
+                                declaration.Initializer != null
+                                || declaration.ExpressionBody != null
+                                || (
+                                    declaration.Body != null
+                                    && 0 < declaration.Body.Statements.Count
+                                )
+                            )
+                        )
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (member.IsStatic || (!(member is IFieldSymbol) && !(member is IPropertySymbol)))
+                {
+                    continue;
+                }
+
+                foreach (SyntaxReference reference in member.DeclaringSyntaxReferences)
+                {
+                    SyntaxNode syntax = reference.GetSyntax();
+                    if (
+                        syntax is VariableDeclaratorSyntax declarator
+                        && declarator.Initializer != null
+                    )
+                    {
+                        return true;
+                    }
+
+                    if (
+                        syntax is PropertyDeclarationSyntax property
+                        && property.Initializer != null
+                    )
+                    {
+                        return true;
+                    }
                 }
             }
 
@@ -1215,6 +1337,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Member> members
         )
         {
+            // Declaring ANY constructor removes the implicit parameterless one, so a contract whose
+            // author declared none loses `new Theirs()` -- in the consumer's own source, from an
+            // attribute that says nothing about constructors. protobuf-net loses the type entirely
+            // at the same moment ("No parameterless constructor found"), which is the whole of the
+            // WALLSTOP_PROTO-off build. Emitting the one the compiler would have is what keeps both.
+            if (!contract.IsValueType && !DeclaresAConstructor(contract))
+            {
+                writer.Line(
+                    "/// <summary>The parameterless constructor this type would have had.</summary>"
+                );
+                writer.Line("public " + contract.Name + "() { }");
+                writer.Blank();
+            }
+
             writer.Line(
                 "/// <summary>Generated WallstopProto constructor. Do not edit or call.</summary>"
             );
@@ -1359,6 +1495,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Include> includes,
             Hooks hooks,
             bool constructAtEnd,
+            bool seedsFromInstance,
             bool skipConstructor,
             bool mergeable,
             bool guardedSeeding
@@ -1442,9 +1579,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else if (constructAtEnd)
             {
-                // Deliberately not created here: a readonly member can only be assigned by a
-                // constructor, so there is nothing to assign onto until the last value is in hand.
-                writer.Line(qualified + " read = default(" + qualified + ");");
+                // Nothing is assigned onto this -- a readonly member can only be assigned by a
+                // constructor, and the one at the end of the read overwrites it. It exists so every
+                // member's read local can START at what the author's constructor left there, which
+                // is what protobuf-net reads into and what a merge, an append and a map union all
+                // combine with. Where construction could not set anything, `default` says so and
+                // costs nothing.
+                writer.Line(
+                    seedsFromInstance
+                        ? qualified + " read = new " + qualified + "();"
+                        : qualified + " read = default(" + qualified + ");"
+                );
             }
             else if (contract.IsValueType)
             {

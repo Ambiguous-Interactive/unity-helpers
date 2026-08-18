@@ -210,24 +210,132 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void TheOracleMergesIntoAnImmutableContractsSeed()
+        public void AnImmutableContractsSubMessageMergesIntoItsSeed()
         {
-            // A contract with a readonly member is built by a constructor at the end of the read,
-            // so this package has no instance to take a seed off and replaces instead. protobuf-net
-            // is under no such constraint: it constructs, merges, and then assigns the readonly
-            // field by reflection. Field 1 sets only B, so a merge keeps A == 9 and a replace does
-            // not -- and both oracle versions merge.
-            //
-            // Pinned here as the answer to the question issue #491 asked, and deliberately not
-            // asserted of this package: closing the gap means seeding every read local from a
-            // constructed instance, which runs the author's constructor on every read of an
-            // immutable contract. That is #491's remaining work, not a detail of this test.
+            // A contract with a readonly member is built by a constructor at the end of the read.
+            // protobuf-net constructs, merges, and then assigns the readonly field by reflection;
+            // this package constructs one instance to take seeds off and hands the merged value to
+            // the generated constructor. Field 1 sets only B, so a merge keeps A == 9 and a replace
+            // does not -- and both oracle versions merge.
             const string once = "0A021002";
 
             SeededImmutableHolder oracle = OracleDecode<SeededImmutableHolder>(once);
+            SeededImmutableHolder ours = Decode<SeededImmutableHolder>(once);
 
             Assert.AreEqual(9, oracle.Child.A, once);
             Assert.AreEqual(2, oracle.Child.B, once);
+            Assert.AreEqual(oracle.Child.A, ours.Child.A, once);
+            Assert.AreEqual(oracle.Child.B, ours.Child.B, once);
+
+            // And a payload that never mentions the member leaves the constructor's value entirely
+            // alone, which is the half that was lost outright rather than merely un-merged.
+            Assert.AreEqual(9, Decode<SeededImmutableHolder>(string.Empty).Child.A);
+        }
+
+        [Test]
+        public void EveryMemberKindOnAnImmutableContractKeepsItsConstructorsSeed()
+        {
+            // An immutable contract holds every value in a local and passes them to a constructor at
+            // the end of the read, so for as long as those locals started at `default` the author's
+            // constructor was discarded entirely -- not merely un-merged. Measured against
+            // protobuf-net 2.4.9 and 3.2.56, which both construct, read into that instance and
+            // assign the readonly members by reflection: each payload below sets ONE member, and the
+            // other three must come back exactly as the constructor left them.
+            //
+            // One payload per member kind, because each combines differently: a sub-message merges,
+            // a repeated member appends, and a map unions by key.
+            string[] payloads = { "0A021002", "12021002", "1A0101", "22040800100D" };
+
+            foreach (string payload in payloads)
+            {
+                SeededImmutableShapes oracle = OracleDecode<SeededImmutableShapes>(payload);
+                SeededImmutableShapes ours = Decode<SeededImmutableShapes>(payload);
+
+                Assert.AreEqual(oracle.Reference.A, ours.Reference.A, payload);
+                Assert.AreEqual(oracle.Reference.B, ours.Reference.B, payload);
+                Assert.AreEqual(oracle.Where.X, ours.Where.X, payload);
+                Assert.AreEqual(oracle.Where.Y, ours.Where.Y, payload);
+                CollectionAssert.AreEqual(oracle.Values, ours.Values, payload);
+                CollectionAssert.AreEquivalent(oracle.Map, ours.Map, payload);
+
+                // The seed itself, spelled out: a reader that agrees with a wrong oracle is not
+                // evidence, and 9 is the value the constructor -- and only the constructor -- sets.
+                Assert.AreEqual(9, ours.Reference.A, payload);
+                Assert.AreEqual(9, ours.Where.X, payload);
+                Assert.AreEqual(99, ours.Values[0], payload);
+                Assert.AreEqual(9, ours.Map[7], payload);
+            }
+
+            // And the member each payload DOES set still arrives.
+            Assert.AreEqual(2, Decode<SeededImmutableShapes>(payloads[0]).Reference.B);
+            Assert.AreEqual(2, Decode<SeededImmutableShapes>(payloads[1]).Where.Y);
+            CollectionAssert.AreEqual(
+                new[] { 99, 1 },
+                Decode<SeededImmutableShapes>(payloads[2]).Values
+            );
+            Assert.AreEqual(13, Decode<SeededImmutableShapes>(payloads[3]).Map[0]);
+        }
+
+        [Test]
+        public void SkipConstructorBeatsImmutabilityAndLeavesNoSeed()
+        {
+            // Two flags asking the same question, and SkipConstructor wins. protobuf-net allocates
+            // the instance uninitialized whether or not the contract is immutable, so no constructor
+            // runs: the sub-message has nothing to merge into and an absent scalar comes back at its
+            // type's default rather than at what the constructor would have set. Both oracle
+            // versions agree.
+            //
+            // The shape matters because this package ships it -- PcgRandom is a SkipConstructor
+            // contract with a readonly member -- and seeding it would run the author's constructor
+            // on every read to produce an answer the oracle disagrees with.
+            const string merges = "0A021002";
+            SeededSkipImmutableHolder oracle = OracleDecode<SeededSkipImmutableHolder>(merges);
+            SeededSkipImmutableHolder ours = Decode<SeededSkipImmutableHolder>(merges);
+
+            Assert.AreEqual(0, oracle.Child.A, merges);
+            Assert.AreEqual(oracle.Child.A, ours.Child.A, merges);
+            Assert.AreEqual(oracle.Child.B, ours.Child.B, merges);
+            Assert.AreEqual(oracle.Number, ours.Number, merges);
+
+            const string absent = "1007";
+            Assert.AreEqual(0, OracleDecode<SeededSkipImmutableHolder>(absent).Child?.A ?? 0);
+            Assert.AreEqual(
+                OracleDecode<SeededSkipImmutableHolder>(absent).Number,
+                Decode<SeededSkipImmutableHolder>(absent).Number,
+                absent
+            );
+        }
+
+        [Test]
+        public void AnImmutableContractWithNoParameterlessConstructorHasNoSeedToKeep()
+        {
+            // The one shape that cannot be seeded: its author declared only a parameterized
+            // constructor, so there is no way to build one to read seeds off without inventing a
+            // public API. protobuf-net refuses the type outright rather than answering differently,
+            // which is what makes replacing correct here rather than merely unavoidable.
+            Assert.Throws<ProtoBuf.ProtoException>(() =>
+                OracleDecode<UnseededImmutableHolder>("0A021002")
+            );
+
+            UnseededImmutableHolder ours = Decode<UnseededImmutableHolder>("0A021002");
+            Assert.AreEqual(0, ours.Child.A);
+            Assert.AreEqual(2, ours.Child.B);
+        }
+
+        [Test]
+        public void AnImmutableContractKeepsTheParameterlessConstructorItsAuthorNeverWrote()
+        {
+            // Declaring any constructor removes the implicit parameterless one, and an immutable
+            // contract always gets one emitted for the read. Without the replacement emitted
+            // alongside it, `new Theirs()` stops compiling in the consumer's own source and
+            // protobuf-net loses the type entirely -- from an attribute that says nothing about
+            // constructors. This line failing to COMPILE is the regression.
+            ImplicitlyConstructedImmutable made = new ImplicitlyConstructedImmutable();
+            Assert.AreEqual(0, made.Id);
+
+            // The other half: the oracle can construct it, so the WALLSTOP_PROTO-off build reads it.
+            Assert.AreEqual(7, OracleDecode<ImplicitlyConstructedImmutable>("0807").Id);
+            Assert.AreEqual(7, Decode<ImplicitlyConstructedImmutable>("0807").Id);
         }
 
         [Test]

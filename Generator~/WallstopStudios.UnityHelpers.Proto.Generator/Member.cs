@@ -76,6 +76,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool ConstructAtEnd { get; set; }
 
         /// <summary>
+        /// Whether this member's read local starts at what the contract's own parameterless
+        /// constructor left on the member, rather than at <c>default</c>.
+        /// </summary>
+        /// <remarks>
+        /// Only ever set alongside <see cref="ConstructAtEnd"/>, and it is what makes an immutable
+        /// contract combine with its seed the way protobuf-net does -- measured against 2.4.9 and
+        /// 3.2.56, which both construct the contract, read into that instance and assign the
+        /// readonly members by reflection. Where it is false there is genuinely nothing to seed
+        /// from: the contract cannot be constructed without arguments, so protobuf-net refuses it
+        /// outright, or construction provably leaves every member at its default.
+        /// </remarks>
+        internal bool SeedsFromInstance { get; set; }
+
+        /// <summary>
+        /// Whether this member reads into a local that must be treated as having no seed -- a
+        /// contract built at the end of the read, unless that read constructed an instance to seed
+        /// from.
+        /// </summary>
+        protected bool Unseeded => ConstructAtEnd && !SeedsFromInstance;
+
+        /// <summary>The expression naming the seed instance's value for this member.</summary>
+        protected string SeedSource => "read." + Name;
+
+        /// <summary>
         /// Whether the generated read constructor is standing in for protobuf-net's uninitialized
         /// allocation because the contract declares <c>SkipConstructor</c>.
         /// </summary>

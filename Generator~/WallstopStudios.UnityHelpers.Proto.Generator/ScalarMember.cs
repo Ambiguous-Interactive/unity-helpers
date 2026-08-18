@@ -49,6 +49,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>The destination the decoded value lands on once the read loop is done.</summary>
         private string Destination => ConstructAtEnd ? Local : "read." + Name;
 
+        /// <summary>What the read local holds before the payload has said anything about it.</summary>
+        /// <remarks>
+        /// The seed, where the contract built an instance to take one from. A member the payload
+        /// never mentions is then handed to the generated constructor unchanged, which is what makes
+        /// an absent field leave the author's constructor value alone -- the same thing an assignable
+        /// contract gets for free by reading into the instance itself.
+        /// </remarks>
+        private string LocalStart => SeedsFromInstance ? SeedSource : "default(" + _declared + ")";
+
         /// <summary>The value a merged sub-message decodes into, as the type the read produces.</summary>
         /// <remarks>
         /// protobuf reads a sub-message field as <c>MergeFrom</c>, so the FIRST occurrence keeps
@@ -63,13 +72,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             get
             {
                 string none = "default(" + _shape.ReadLocalType + ")";
-                if (ConstructAtEnd || _shape.SeedExpression == null)
+                if (Unseeded || _shape.SeedExpression == null)
                 {
                     return none;
                 }
 
-                string current =
-                    "read." + Name + (_nullable ? ".GetValueOrDefault()" : string.Empty);
+                string current = SeedSource + (_nullable ? ".GetValueOrDefault()" : string.Empty);
                 string seed = Shape.Fill(_shape.SeedExpression, current);
                 if (!SkipConstructor)
                 {
@@ -224,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 if (ConstructAtEnd)
                 {
-                    writer.Line(_declared + " " + Local + " = default(" + _declared + ");");
+                    writer.Line(_declared + " " + Local + " = " + LocalStart + ";");
                 }
 
                 return;
@@ -236,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             writer.Line("bool " + SeenFlag + " = false;");
-            writer.Line(_declared + " " + Local + " = default(" + _declared + ");");
+            writer.Line(_declared + " " + Local + " = " + LocalStart + ";");
         }
 
         /// <inheritdoc />

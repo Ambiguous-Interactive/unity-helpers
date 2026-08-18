@@ -784,8 +784,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(PendingType + " " + Pending + " = null;");
                 if (ConstructAtEnd)
                 {
+                    // The seed, where the read constructed an instance to take one from: an absent
+                    // repeated field must hand the generated constructor what the author's
+                    // constructor built, not an empty collection.
                     writer.Line(
-                        DeclaredType + " " + ReadLocal + " = default(" + DeclaredType + ");"
+                        DeclaredType
+                            + " "
+                            + ReadLocal
+                            + " = "
+                            + (SeedsFromInstance ? SeedSource : "default(" + DeclaredType + ")")
+                            + ";"
                     );
                 }
 
@@ -1306,7 +1314,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + target
                     + " = "
                     + (
-                        _overwrite || ConstructAtEnd || SeedSuppressed ? fresh
+                        _overwrite || Unseeded || SeedSuppressed ? fresh
                         : Guard == null ? "read." + Name + " ?? " + fresh
                         : "(" + Guard + " ? read." + Name + " : null) ?? " + fresh
                     )
@@ -1337,13 +1345,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string fresh = "new " + AccumulatorType + "()";
 
-            // A contract built by a constructor has no instance to append onto: the formatter never
-            // runs the author's constructor, so there is no seeded collection to preserve. `Fresh`
-            // seeding starts empty for the same reason it does in EmitSeed -- its commit is what
-            // reads the member.
+            // A contract built by a constructor appends onto the instance the read constructed to
+            // take seeds from -- measured, protobuf-net appends to an immutable contract's
+            // constructor collection exactly as it does to an assignable one. Where there is no such
+            // instance there is nothing to append onto. `Fresh` seeding starts empty for the same
+            // reason it does in EmitSeed -- its commit is what reads the member.
             if (
                 _overwrite
-                || ConstructAtEnd
+                || Unseeded
                 || SeedSuppressed
                 || _form.Seeding == CollectionSeeding.Fresh
             )

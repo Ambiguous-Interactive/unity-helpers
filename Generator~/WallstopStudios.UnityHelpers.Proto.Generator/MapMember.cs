@@ -512,8 +512,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(PendingType + " " + Accumulator + " = null;");
                 if (ConstructAtEnd)
                 {
+                    // The seed, where the read constructed an instance to take one from: an absent
+                    // map field must hand the generated constructor what the author's constructor
+                    // built, and a present one merges its entries into those.
                     writer.Line(
-                        DeclaredType + " " + ReadLocal + " = default(" + DeclaredType + ");"
+                        DeclaredType
+                            + " "
+                            + ReadLocal
+                            + " = "
+                            + (SeedsFromInstance ? SeedSource : "default(" + DeclaredType + ")")
+                            + ";"
                     );
                 }
 
@@ -807,7 +815,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             string target = "target" + Tag;
-            bool fresh = _overwrite || ConstructAtEnd || SeedSuppressed;
+            bool fresh = _overwrite || Unseeded || SeedSuppressed;
             writer.Line(
                 _accumulatorQualified
                     + " "
