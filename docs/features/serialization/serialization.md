@@ -1395,6 +1395,12 @@ public sealed partial class Loadout
 // A payload carrying only slot 7 reads back as { 1, 7 }, and one carrying nothing as { 1 }.
 ```
 
+Reading such a contract therefore **runs your parameterless constructor**, once, before the read
+loop — the same thing protobuf-net does, and the reason the two agree. The generator only does it
+when construction could set something: a contract whose parameterless constructor has an empty body
+and whose members have no initializers is provably all-default, so it is built once at the end of the
+read and not before.
+
 Three consequences worth knowing:
 
 - **A `[WProtoBeforeDeserialization]` hook runs after construction**, because for a type whose members
