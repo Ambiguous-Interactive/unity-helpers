@@ -611,7 +611,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         private static TestCaseData Named(string name, IRandom random)
         {
-            return new TestCaseData(random).SetName(name);
+            return new TestCaseData(random).SetArgDisplayNames(name);
         }
 
         private static IRandom ProtobufNetRoundTrip(IRandom random)
@@ -648,16 +648,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             byte[] payload = Serializer.ProtoSerialize<IRandom>(random);
             Assert.LessOrEqual(payload.Length, 3, "expected a payload naming no member");
 
+            // Every restored generator is taken from the saved state, so they must be built
+            // before the draw below advances the original past it.
+            IRandom viaWallstopProto = Serializer.ProtoDeserialize<IRandom>(payload);
+            IRandom viaWallstopProtoAgain = Serializer.ProtoDeserialize<IRandom>(payload);
+            IRandom viaProtobufNet = ProtobufNetRoundTrip(random);
+
             uint[] expected = Draw(random);
-            CollectionAssert.AreEqual(
-                expected,
-                Draw(Serializer.ProtoDeserialize<IRandom>(payload))
-            );
-            CollectionAssert.AreEqual(
-                expected,
-                Draw(Serializer.ProtoDeserialize<IRandom>(payload))
-            );
-            CollectionAssert.AreEqual(expected, Draw(ProtobufNetRoundTrip(random)));
+            CollectionAssert.AreEqual(expected, Draw(viaWallstopProto));
+            CollectionAssert.AreEqual(expected, Draw(viaWallstopProtoAgain));
+            CollectionAssert.AreEqual(expected, Draw(viaProtobufNet));
         }
 
         [Test]
