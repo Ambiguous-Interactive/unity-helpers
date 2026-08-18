@@ -1236,6 +1236,232 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
         }
 
+        [Test]
+        [TestCase(0f, 0f, 0f, 1f, TestName = "ChosenTextColorSurvives(OpaqueBlack)")]
+        [TestCase(0f, 0f, 0f, 0.5f, TestName = "ChosenTextColorSurvives(TranslucentBlack)")]
+        [TestCase(0.25f, 0.25f, 0.25f, 1f, TestName = "ChosenTextColorSurvives(DarkGrey)")]
+        public void AChosenTextColorSurvivesTheDefaultsPass(float r, float g, float b, float a)
+        {
+            // The colours the old sentinel could not tell from "unset": it asked
+            // maxColorComponent <= 0f, which is true of every zero-RGB colour whatever its alpha,
+            // so a chosen black was overwritten with the derived one and a chosen alpha was lost.
+            const string PaletteKey = "EditorChosenTextWButton";
+            Color chosen = new(r, g, b, a);
+            Color button = new(0.15f, 0.15f, 0.2f, 1f);
+
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            using SerializedObject serialized = new(settings);
+            serialized.Update();
+
+            SerializedProperty paletteProperty = serialized.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
+            );
+            PaletteEntrySnapshot snapshot = CapturePaletteEntrySnapshot(
+                paletteProperty,
+                PaletteKey,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+            );
+
+            try
+            {
+                SetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    button,
+                    chosen,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                SetPaletteEntryFlag(paletteProperty, PaletteKey, true);
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                settings.EnsureWButtonCustomColorDefaults();
+                serialized.Update();
+
+                (Color _, Color text) = GetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+
+                AssertColorsApproximately(chosen, text);
+                Assert.AreEqual(a, text.a, 0.001f, "The chosen alpha must survive.");
+            }
+            finally
+            {
+                RestorePaletteEntry(
+                    paletteProperty,
+                    PaletteKey,
+                    snapshot,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        [Test]
+        public void AnEntryThatChoseNoTextColorStillGetsAReadableOne()
+        {
+            // The other half of the flag: absent a choice, the colour is still derived from the
+            // button, which is what the sentinel was there to do.
+            const string PaletteKey = "EditorDerivedTextWButton";
+            Color button = new(0.1f, 0.1f, 0.1f, 1f);
+
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            using SerializedObject serialized = new(settings);
+            serialized.Update();
+
+            SerializedProperty paletteProperty = serialized.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
+            );
+            PaletteEntrySnapshot snapshot = CapturePaletteEntrySnapshot(
+                paletteProperty,
+                PaletteKey,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+            );
+
+            try
+            {
+                SetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    button,
+                    default,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                SetPaletteEntryFlag(paletteProperty, PaletteKey, false);
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                settings.EnsureWButtonCustomColorDefaults();
+                serialized.Update();
+
+                (Color _, Color text) = GetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+
+                AssertColorsApproximately(WButtonColorUtility.GetReadableTextColor(button), text);
+            }
+            finally
+            {
+                RestorePaletteEntry(
+                    paletteProperty,
+                    PaletteKey,
+                    snapshot,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        [Test]
+        public void AnAssetWrittenBeforeTheFlagKeepsTheColorItWasShowing()
+        {
+            // The migration's whole promise. An entry from an older asset has no flag set, and
+            // whatever non-zero colour it stored is what the editor was drawing, so it has to stay
+            // -- including a colour the old sentinel would have kept deriving over.
+            const string PaletteKey = "EditorMigratedTextWButton";
+            Color stored = new(0.8f, 0.2f, 0.2f, 1f);
+            Color button = new(0.1f, 0.1f, 0.1f, 1f);
+
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            using SerializedObject serialized = new(settings);
+            serialized.Update();
+
+            SerializedProperty paletteProperty = serialized.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
+            );
+            PaletteEntrySnapshot snapshot = CapturePaletteEntrySnapshot(
+                paletteProperty,
+                PaletteKey,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+            );
+
+            try
+            {
+                SetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    button,
+                    stored,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                SetPaletteEntryFlag(paletteProperty, PaletteKey, false);
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                settings.EnsureWButtonCustomColorDefaults();
+                serialized.Update();
+
+                (Color _, Color text) = GetPaletteEntryColors(
+                    paletteProperty,
+                    PaletteKey,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+
+                AssertColorsApproximately(stored, text);
+                Assert.IsTrue(
+                    GetPaletteEntryFlag(paletteProperty, PaletteKey),
+                    "The migration must record that the stored colour was a choice."
+                );
+            }
+            finally
+            {
+                RestorePaletteEntry(
+                    paletteProperty,
+                    PaletteKey,
+                    snapshot,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton,
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        private static void SetPaletteEntryFlag(
+            SerializedProperty dictionaryProperty,
+            string key,
+            bool hasTextColor
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+            values
+                .GetArrayElementAtIndex(index)
+                .FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
+                )
+                .boolValue = hasTextColor;
+        }
+
+        private static bool GetPaletteEntryFlag(SerializedProperty dictionaryProperty, string key)
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+            return values
+                .GetArrayElementAtIndex(index)
+                .FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
+                )
+                .boolValue;
+        }
+
         private readonly struct PaletteEntrySnapshot
         {
             public PaletteEntrySnapshot(bool exists, Color button, Color text)

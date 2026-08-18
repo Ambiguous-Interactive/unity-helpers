@@ -1113,7 +1113,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             [FormerlySerializedAs("textColor")]
             [SerializeField]
-            internal Color _textColor = Color.black;
+            internal Color _textColor;
+
+            // Whether the text colour above is one someone CHOSE, rather than one to derive from
+            // the button. A flag rather than a sentinel value, because every sentinel a Color can
+            // spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
+            // read deliberately chosen opaque black as "unset" and overwrote it on the next load,
+            // and it could not represent a translucent choice at all -- any alpha under a
+            // zero-RGB colour was discarded the same way.
+            [SerializeField]
+            internal bool _hasTextColor;
 
             public Color ButtonColor
             {
@@ -1124,15 +1133,50 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             public Color TextColor
             {
                 get => _textColor;
-                set => _textColor = value;
+                set
+                {
+                    _textColor = value;
+                    _hasTextColor = true;
+                }
             }
 
+            /// <summary>Whether someone chose this entry's text colour rather than deriving it.</summary>
+            internal bool HasChosenTextColor => _hasTextColor;
+
+            /// <summary>Derives a readable text colour for an entry that has not chosen one.</summary>
+            /// <remarks>
+            /// The flag is deliberately NOT set here. An entry with no chosen colour keeps deriving
+            /// one, so editing the button colour moves the text with it; under the old sentinel a
+            /// derived colour froze the moment it happened to be non-black, which is how a white
+            /// text colour survived onto a button someone later made white.
+            /// </remarks>
             public void EnsureReadableText()
             {
-                if (_textColor.maxColorComponent <= 0f)
+                if (_hasTextColor)
                 {
-                    _textColor = WButtonColorUtility.GetReadableTextColor(_buttonColor);
+                    return;
                 }
+
+                _textColor = WButtonColorUtility.GetReadableTextColor(_buttonColor);
+            }
+
+            /// <summary>Reads an entry written before the flag existed.</summary>
+            /// <returns><c>true</c> when this entry was changed.</returns>
+            /// <remarks>
+            /// The old sentinel meant "unset" for any colour whose RGB was zero, so a stored colour
+            /// that is entirely zero is the only one that can have BEEN unset and round-tripped as
+            /// one. Everything else was already being kept, and stays kept -- nobody's colour
+            /// changes on upgrade, which is the whole requirement.
+            /// </remarks>
+            internal bool MigrateChosenTextColor()
+            {
+                if (_hasTextColor || _textColor == default)
+                {
+                    return false;
+                }
+
+                _hasTextColor = true;
+                return true;
             }
         }
 
@@ -1172,6 +1216,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 SerializedProperty textColor = property.FindPropertyRelative(
                     SerializedPropertyNames.WButtonCustomColorText
                 );
+                SerializedProperty hasTextColor = property.FindPropertyRelative(
+                    SerializedPropertyNames.WButtonCustomColorHasText
+                );
 
                 float spacing = EditorGUIUtility.standardVerticalSpacing;
                 float availableWidth = Mathf.Max(0f, position.width - spacing);
@@ -1204,11 +1251,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         buttonColor,
                         useLabels ? ButtonLabelContent : GUIContent.none
                     );
+                    // Touching the field IS the choice. The drawer writes the serialized field
+                    // directly rather than through the property setter, so nothing else would
+                    // record that a colour stopped being derived.
+                    EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         textRect,
                         textColor,
                         useLabels ? TextLabelContent : GUIContent.none
                     );
+                    if (EditorGUI.EndChangeCheck() && hasTextColor != null)
+                    {
+                        hasTextColor.boolValue = true;
+                    }
                 }
                 finally
                 {
@@ -1249,6 +1304,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 );
                 SerializedProperty inactiveText = property.FindPropertyRelative(
                     SerializedPropertyNames.WEnumToggleButtonsInactiveText
+                );
+                SerializedProperty hasSelectedText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsHasSelectedText
+                );
+                SerializedProperty hasInactiveText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsHasInactiveText
                 );
 
                 float spacing = EditorGUIUtility.standardVerticalSpacing;
@@ -1300,21 +1361,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         selectedBackground,
                         useLabels ? SelectedBackgroundLabelContent : GUIContent.none
                     );
+                    // Touching either text field IS the choice; see the WButton drawer.
+                    EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         selectedTextRect,
                         selectedText,
                         useLabels ? SelectedTextLabelContent : GUIContent.none
                     );
+                    if (EditorGUI.EndChangeCheck() && hasSelectedText != null)
+                    {
+                        hasSelectedText.boolValue = true;
+                    }
+
                     EditorGUI.PropertyField(
                         inactiveBackgroundRect,
                         inactiveBackground,
                         useLabels ? InactiveBackgroundLabelContent : GUIContent.none
                     );
+                    EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         inactiveTextRect,
                         inactiveText,
                         useLabels ? InactiveTextLabelContent : GUIContent.none
                     );
+                    if (EditorGUI.EndChangeCheck() && hasInactiveText != null)
+                    {
+                        hasInactiveText.boolValue = true;
+                    }
                 }
                 finally
                 {
@@ -1333,7 +1406,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             [FormerlySerializedAs("selectedTextColor")]
             [SerializeField]
-            internal Color _selectedTextColor = Color.white;
+            internal Color _selectedTextColor;
+
+            /// <summary>Whether the selected text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasSelectedTextColor;
 
             [FormerlySerializedAs("inactiveBackgroundColor")]
             [SerializeField]
@@ -1341,7 +1418,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             [FormerlySerializedAs("inactiveTextColor")]
             [SerializeField]
-            internal Color _inactiveTextColor = Color.black;
+            internal Color _inactiveTextColor;
+
+            /// <summary>Whether the inactive text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasInactiveTextColor;
 
             public Color SelectedBackgroundColor
             {
@@ -1352,7 +1433,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             public Color SelectedTextColor
             {
                 get => _selectedTextColor;
-                set => _selectedTextColor = value;
+                set
+                {
+                    _selectedTextColor = value;
+                    _hasSelectedTextColor = true;
+                }
             }
 
             public Color InactiveBackgroundColor
@@ -1364,24 +1449,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             public Color InactiveTextColor
             {
                 get => _inactiveTextColor;
-                set => _inactiveTextColor = value;
+                set
+                {
+                    _inactiveTextColor = value;
+                    _hasInactiveTextColor = true;
+                }
             }
 
+            /// <summary>Derives readable text colours for the halves that chose none.</summary>
             public void EnsureReadableText()
             {
-                if (_selectedTextColor.maxColorComponent <= 0f)
+                if (!_hasSelectedTextColor)
                 {
                     _selectedTextColor = WButtonColorUtility.GetReadableTextColor(
                         _selectedBackgroundColor
                     );
                 }
 
-                if (_inactiveTextColor.maxColorComponent <= 0f)
+                if (!_hasInactiveTextColor)
                 {
                     _inactiveTextColor = WButtonColorUtility.GetReadableTextColor(
                         _inactiveBackgroundColor
                     );
                 }
+            }
+
+            /// <summary>Reads an entry written before the flags existed.</summary>
+            /// <returns><c>true</c> when this entry was changed.</returns>
+            internal bool MigrateChosenTextColors()
+            {
+                bool changed = false;
+                if (!_hasSelectedTextColor && _selectedTextColor != default)
+                {
+                    _hasSelectedTextColor = true;
+                    changed = true;
+                }
+
+                if (!_hasInactiveTextColor && _inactiveTextColor != default)
+                {
+                    _hasInactiveTextColor = true;
+                    changed = true;
+                }
+
+                return changed;
             }
         }
 
@@ -2552,6 +2662,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 WButtonCustomColor._buttonColor
             );
             internal const string WButtonCustomColorText = nameof(WButtonCustomColor._textColor);
+            internal const string WButtonCustomColorHasText = nameof(
+                WButtonCustomColor._hasTextColor
+            );
             internal const string WEnumToggleButtonsSelectedBackground = nameof(
                 WEnumToggleButtonsCustomColor._selectedBackgroundColor
             );
@@ -2563,6 +2676,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             );
             internal const string WEnumToggleButtonsInactiveText = nameof(
                 WEnumToggleButtonsCustomColor._inactiveTextColor
+            );
+            internal const string WEnumToggleButtonsHasSelectedText = nameof(
+                WEnumToggleButtonsCustomColor._hasSelectedTextColor
+            );
+            internal const string WEnumToggleButtonsHasInactiveText = nameof(
+                WEnumToggleButtonsCustomColor._hasInactiveTextColor
             );
             internal const string FailedTestsOutputDirectory = nameof(_failedTestsOutputDirectory);
 
@@ -2609,12 +2728,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     nameof(WButtonPriority) => WButtonPriority,
                     nameof(WButtonCustomColorButton) => WButtonCustomColorButton,
                     nameof(WButtonCustomColorText) => WButtonCustomColorText,
+                    nameof(WButtonCustomColorHasText) => WButtonCustomColorHasText,
                     nameof(WEnumToggleButtonsSelectedBackground) =>
                         WEnumToggleButtonsSelectedBackground,
                     nameof(WEnumToggleButtonsSelectedText) => WEnumToggleButtonsSelectedText,
                     nameof(WEnumToggleButtonsInactiveBackground) =>
                         WEnumToggleButtonsInactiveBackground,
                     nameof(WEnumToggleButtonsInactiveText) => WEnumToggleButtonsInactiveText,
+                    nameof(WEnumToggleButtonsHasSelectedText) => WEnumToggleButtonsHasSelectedText,
+                    nameof(WEnumToggleButtonsHasInactiveText) => WEnumToggleButtonsHasInactiveText,
                     nameof(FailedTestsOutputDirectory) => FailedTestsOutputDirectory,
                     _ => null,
                 };
@@ -2932,6 +3054,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             bool changed = false;
             changed |= MigrateLegacyWButtonPalette();
 
+            // Before ANY entry derives a text colour, because deriving is what the flag exists to
+            // prevent: an entry migrated after EnsureReadableText has already lost the colour the
+            // migration was meant to keep.
+            foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
+            {
+                if (stored != null)
+                {
+                    changed |= stored.MigrateChosenTextColor();
+                }
+            }
+
             if (
                 _wbuttonCustomColors.TryGetValue(
                     DefaultWButtonColorKey,
@@ -2994,11 +3127,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     continue;
                 }
 
+                // Both spellings of "nobody has touched this entry": one that has chosen no text
+                // colour, and one from an asset written before the flag existed, whose derived
+                // colour was stored as black. An entirely zero button colour is the only one that
+                // can mean "no colour" -- opaque black is a colour someone can pick.
                 bool needsSuggestion =
-                    value.ButtonColor.maxColorComponent <= 0f
+                    value.ButtonColor == default
                     || (
                         ColorsApproximatelyEqual(value.ButtonColor, Color.white)
-                        && ColorsApproximatelyEqual(value.TextColor, Color.black)
+                        && (
+                            !value.HasChosenTextColor
+                            || ColorsApproximatelyEqual(value.TextColor, Color.black)
+                        )
                     );
 
                 if (needsSuggestion)
@@ -3029,7 +3169,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return ShouldSkipAutoSuggest(_wbuttonCustomColorSkipAutoSuggest, key);
         }
 
-        private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color defaultTextColor)
+        // The default is nullable rather than sentinel-valued for the same reason the stored flag
+        // exists: `maxColorComponent <= 0f` cannot tell "no default was supplied" from "the default
+        // is opaque black", and black is the default this is called with for the light theme.
+        private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color? defaultTextColor)
         {
             if (
                 _wbuttonCustomColors.TryGetValue(key, out WButtonCustomColor existing)
@@ -3041,9 +3184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             Color textColor =
-                defaultTextColor.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(buttonColor)
-                    : defaultTextColor;
+                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
             WButtonCustomColor themeColor = new()
             {
                 ButtonColor = buttonColor,
@@ -3088,8 +3229,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 WButtonCustomColor color = new()
                 {
                     ButtonColor = legacy.ButtonColor,
+                    // The obsolete type has no flag, so an entirely zero colour is the only one it
+                    // can have meant as "none" -- the same reading the stored migration applies.
                     TextColor =
-                        legacy.TextColor.maxColorComponent <= 0f
+                        legacy.TextColor == default
                             ? WButtonColorUtility.GetReadableTextColor(legacy.ButtonColor)
                             : legacy.TextColor,
                 };
@@ -3109,6 +3252,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             bool changed = false;
+
+            // Before anything derives, for the same reason as the WButton pass above.
+            foreach (WEnumToggleButtonsCustomColor stored in _wenumToggleButtonsCustomColors.Values)
+            {
+                if (stored != null)
+                {
+                    changed |= stored.MigrateChosenTextColors();
+                }
+            }
 
             if (!_wenumToggleButtonsCustomColors.ContainsKey(DefaultWEnumToggleButtonsColorKey))
             {
@@ -3184,9 +3336,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private bool EnsureWEnumToggleButtonsThemeEntry(
             string key,
             Color selectedBackground,
-            Color selectedTextDefault,
+            Color? selectedTextDefault,
             Color inactiveBackground,
-            Color inactiveTextDefault
+            Color? inactiveTextDefault
         )
         {
             if (
@@ -3202,13 +3354,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             Color resolvedSelectedText =
-                selectedTextDefault.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(selectedBackground)
-                    : selectedTextDefault;
+                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
             Color resolvedInactiveText =
-                inactiveTextDefault.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(inactiveBackground)
-                    : inactiveTextDefault;
+                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
 
             WEnumToggleButtonsCustomColor themeColor = new()
             {
@@ -3520,7 +3668,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private WButtonPaletteEntry GetWButtonThemePaletteEntry(
             string key,
             Color buttonColor,
-            Color defaultTextColor
+            Color? defaultTextColor
         )
         {
             EnsureWButtonCustomColorDefaults();
@@ -3536,9 +3684,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             Color textColor =
-                defaultTextColor.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(buttonColor)
-                    : defaultTextColor;
+                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
             return new WButtonPaletteEntry(buttonColor, textColor);
         }
 
@@ -3637,9 +3783,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private WEnumToggleButtonsPaletteEntry GetWEnumToggleButtonsThemePaletteEntry(
             string key,
             Color selectedBackground,
-            Color selectedTextDefault,
+            Color? selectedTextDefault,
             Color inactiveBackground,
-            Color inactiveTextDefault
+            Color? inactiveTextDefault
         )
         {
             EnsureWEnumToggleButtonsCustomColorDefaults();
@@ -3663,13 +3809,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             Color resolvedSelectedText =
-                selectedTextDefault.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(selectedBackground)
-                    : selectedTextDefault;
+                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
             Color resolvedInactiveText =
-                inactiveTextDefault.maxColorComponent <= 0f
-                    ? WButtonColorUtility.GetReadableTextColor(inactiveBackground)
-                    : inactiveTextDefault;
+                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
 
             return new WEnumToggleButtonsPaletteEntry(
                 selectedBackground,
