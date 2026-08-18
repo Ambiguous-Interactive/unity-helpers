@@ -1327,6 +1327,13 @@ in no source could not have been reached at runtime either.
 If you need a closure that no code names directly, name it — a `static` field of that type is
 enough.
 
+**A member typed as the parameter follows the closure's rules, not the field's.** The merge that a
+sub-message field gets when a payload carries it twice applies here too, and only when the closure is
+message-shaped: `Box<Child>` merges the two occurrences, while `Box<string>` — length-delimited on
+the wire in exactly the same way — stays last-wins, because concatenating two strings is not a merge.
+The decision is `WProtoGeneric<T>.IsMessage`, asked at run time because the closure is the only thing
+that knows the answer.
+
 A contract **nested inside** a generic type is still refused (`WPROTO009`): it is not itself generic,
 so there is no construction of it to discover, and its formatter would be emitted and never
 registered. Move it out, or make it generic itself.

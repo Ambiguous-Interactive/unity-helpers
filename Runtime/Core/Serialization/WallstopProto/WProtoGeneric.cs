@@ -118,6 +118,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Reports whether a field of this type is encoded as a length-delimited sub-message.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The question a duplicated field has to answer. protobuf merges repeated occurrences of a
+        /// non-repeated <b>sub-message</b> and takes the last occurrence of everything else, so the
+        /// branch cannot be taken on the wire type: a <c>string</c> closure is length-delimited
+        /// without being a message, and merging one would concatenate two strings into a third.
+        /// </para>
+        /// <para>
+        /// This is the same condition <see cref="TryReadValue(ref WProtoReader, out T)"/> branches
+        /// on, exposed rather than restated, so emitted code and this type cannot disagree about
+        /// which path a closure takes.
+        /// </para>
+        /// </remarks>
+        public static bool IsMessage
+        {
+            get
+            {
+                Resolve();
+                return _scalar == null;
+            }
+        }
+
+        /// <summary>
         /// Returns the encoded size of the field, key included, or 0 when it is omitted.
         /// </summary>
         /// <param name="tag">The field number.</param>
@@ -312,6 +337,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             return reader.TryReadMessage(Message(), out value);
+        }
+
+        /// <summary>
+        /// Decodes a sub-message payload the caller has already carved out of the wire.
+        /// </summary>
+        /// <param name="reader">The reader the payload came from, which spends the nesting level.</param>
+        /// <param name="payload">The sub-message bytes, without a key or length prefix.</param>
+        /// <param name="value">Receives the value, or <c>default</c> on failure.</param>
+        /// <returns><c>true</c> when the payload decoded completely.</returns>
+        /// <remarks>
+        /// The counterpart of <see cref="TryReadValue(ref WProtoReader, out T)"/> for a member whose
+        /// occurrences were gathered by <see cref="WProtoMessageAccumulator"/>, and the reason the
+        /// merge protobuf requires reaches a generic member at all. Only meaningful when
+        /// <see cref="IsMessage"/>; a scalar closure has no sub-message payload, and one asked for
+        /// anyway is refused through <paramref name="reader"/> rather than decoded as something it
+        /// is not.
+        /// </remarks>
+        public static bool TryReadValue(
+            ref WProtoReader reader,
+            ReadOnlySpan<byte> payload,
+            out T value
+        )
+        {
+            Resolve();
+
+            IWProtoFormatter<T> formatter = _scalar == null ? Message() : null;
+            return reader.TryReadMessage(payload, formatter, out value);
         }
 
         /// <summary>

@@ -235,6 +235,89 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [Test]
+        public void ADuplicatedSubMessageMergesThroughAGenericMember()
+        {
+            // The same merge one level of indirection away: the member's type is the contract's own
+            // type parameter, so whether it is a sub-message at all is a property of the closure and
+            // not of the emitted code. A reference closure first.
+            const string twice = "0A020801" + "0A021002";
+
+            Box<DuplicateChild> oracle = OracleDecode<Box<DuplicateChild>>(twice);
+            Box<DuplicateChild> ours = Decode<Box<DuplicateChild>>(twice);
+
+            Assert.AreEqual(1, oracle.Value.A);
+            Assert.AreEqual(2, oracle.Value.B);
+            Assert.AreEqual(oracle.Value.A, ours.Value.A, twice);
+            Assert.AreEqual(oracle.Value.B, ours.Value.B, twice);
+        }
+
+        [Test]
+        public void ADuplicatedStructSubMessageMergesThroughAGenericMember()
+        {
+            // The struct closure, where "merge into the existing instance" has no obvious meaning
+            // and protobuf-net merges anyway -- the same answer its non-generic counterpart gives.
+            const string twice = "0A020801" + "0A021002";
+
+            Box<Outer.Point> oracle = OracleDecode<Box<Outer.Point>>(twice);
+            Box<Outer.Point> ours = Decode<Box<Outer.Point>>(twice);
+
+            Assert.AreEqual(1, oracle.Value.X);
+            Assert.AreEqual(2, oracle.Value.Y);
+            Assert.AreEqual(oracle.Value.X, ours.Value.X, twice);
+            Assert.AreEqual(oracle.Value.Y, ours.Value.Y, twice);
+        }
+
+        [Test]
+        public void ADuplicatedGenericScalarIsStillLastWins()
+        {
+            // The discriminator the branch has to get right. A string closure is length-delimited
+            // too, so a reader that decided to merge from the WIRE type rather than from whether the
+            // closure is message-shaped would concatenate two strings into one.
+            const string texts = "0A0161" + "0A0162";
+            Assert.AreEqual("b", OracleDecode<Box<string>>(texts).Value);
+            Assert.AreEqual("b", Decode<Box<string>>(texts).Value, texts);
+
+            const string numbers = "0801" + "0802";
+            Assert.AreEqual(2, OracleDecode<Box<int>>(numbers).Value);
+            Assert.AreEqual(2, Decode<Box<int>>(numbers).Value, numbers);
+        }
+
+        [Test]
+        public void AMergedGenericSubMessageRunsItsAfterDeserializationHookOnce()
+        {
+            // The generic path accumulates and decodes once for the same reason the emitted one
+            // does: two occurrences are one value, so they are one decode and one hook.
+            int before = HookedContract.AfterDeserializationRuns;
+
+            Box<HookedContract> decoded = Decode<Box<HookedContract>>("0A020801" + "0A020802");
+
+            Assert.AreEqual(2, decoded.Value.Value);
+            Assert.AreEqual(
+                1,
+                HookedContract.AfterDeserializationRuns - before,
+                "a merged generic member must not run its lifecycle hooks once per occurrence"
+            );
+        }
+
+        [Test]
+        public void ATruncatedLaterOccurrenceOfAGenericSubMessageIsRefused()
+        {
+            // Accumulating must not turn a truncated payload into a partial value here either.
+            foreach (string hex in new[] { "0A020801" + "0A02", "0A020801" + "0A0210" })
+            {
+                Assert.IsFalse(OracleAccepts<Box<DuplicateChild>>(hex), hex);
+
+                WProtoReader reader = new WProtoReader(Parse(hex));
+                Assert.IsFalse(
+                    WProtoFormatterProvider
+                        .Get<Box<DuplicateChild>>()
+                        .TryRead(ref reader, out Box<DuplicateChild> _),
+                    hex
+                );
+            }
+        }
+
         private static bool TryDecodeChain(int links)
         {
             List<byte> payload = new List<byte>();

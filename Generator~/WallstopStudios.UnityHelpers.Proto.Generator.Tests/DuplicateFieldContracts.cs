@@ -74,4 +74,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(1)]
         public DuplicateHolder Holder;
     }
+
+    /// <summary>
+    /// Names the <see cref="Box{T}"/> closures the duplicate-field fixtures use, so the generator
+    /// registers them.
+    /// </summary>
+    /// <remarks>
+    /// A generic member's encoding is decided by its closure, so "does a duplicated sub-message
+    /// merge" has to be asked of a closure that IS message-shaped. These are the two kinds --
+    /// a reference contract and one carrying a lifecycle hook -- alongside the struct and scalar
+    /// closures <c>BoxClosures</c> already names.
+    /// </remarks>
+    public static class DuplicateBoxClosures
+    {
+        /// <summary>A reference-message closure, whose occurrences must merge.</summary>
+        public static Box<DuplicateChild> Children;
+
+        /// <summary>A closure with an after-deserialization hook, which must run once.</summary>
+        public static Box<HookedContract> Hooked;
+    }
 }
