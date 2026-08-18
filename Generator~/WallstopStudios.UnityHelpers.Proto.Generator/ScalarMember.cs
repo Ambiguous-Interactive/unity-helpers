@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _value;
         private readonly string _assign;
         private readonly string _declared;
+        private readonly bool _nullable;
 
         private ScalarMember(
             string name,
@@ -25,7 +26,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string presence,
             string value,
             string assign,
-            string declared
+            string declared,
+            bool nullable
         )
             : base(name, tag)
         {
@@ -34,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _value = value;
             _assign = assign;
             _declared = declared;
+            _nullable = nullable;
         }
 
         private string Local => ReadLocal;
@@ -45,6 +48,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         /// <summary>The destination the decoded value lands on once the read loop is done.</summary>
         private string Destination => ConstructAtEnd ? Local : "read." + Name;
+
+        /// <summary>The value a merged sub-message decodes into, as the type the read produces.</summary>
+        /// <remarks>
+        /// protobuf reads a sub-message field as <c>MergeFrom</c>, so the FIRST occurrence keeps
+        /// whatever the constructor left on the member. Three shapes have nothing to keep and say so
+        /// rather than reaching for a value that is not there: a contract built at the end of the
+        /// read has no instance to read from, <c>SkipConstructor</c> is standing in for an
+        /// uninitialized allocation the oracle does not seed either, and a surrogate member is not
+        /// stored as the type the read decodes.
+        /// </remarks>
+        private string Seed
+        {
+            get
+            {
+                if (ConstructAtEnd || SkipConstructor || _shape.SeedExpression == null)
+                {
+                    return "default(" + _shape.ReadLocalType + ")";
+                }
+
+                string current =
+                    "read." + Name + (_nullable ? ".GetValueOrDefault()" : string.Empty);
+                return Shape.Fill(_shape.SeedExpression, current);
+            }
+        }
 
         /// <summary>
         /// Builds the member when <paramref name="type"/> has a single-value shape, and returns
@@ -131,7 +158,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 presence,
                 value,
                 assign,
-                type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                nullable
             );
         }
 
@@ -323,6 +351,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Occurrences
                     + ".Payload, "
                     + _shape.ReadFormatter
+                    + ", "
+                    + Seed
                     + ", out "
                     + _shape.ReadLocalType
                     + " "

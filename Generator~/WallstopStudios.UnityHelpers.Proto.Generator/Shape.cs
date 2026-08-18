@@ -62,6 +62,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool IsMessage;
 
         /// <summary>
+        /// How the member's current value is spelled as the type the read decodes, or <c>null</c>
+        /// when it has no such spelling.
+        /// </summary>
+        /// <remarks>
+        /// The seed a sub-message merges into. A plain message member already holds the decoded
+        /// type, so the expression is the value itself. A <b>surrogate</b> member does not: seeding
+        /// one would mean running the consumer's real-to-surrogate conversion on the read path,
+        /// where it has never run and where a null real value would reach it. That case is left
+        /// replacing and pinned by a differential test rather than guessed at.
+        /// </remarks>
+        internal string SeedExpression;
+
+        /// <summary>
         /// Whether the write call emits its own field key, as a nested message must.
         /// </summary>
         internal bool WritesOwnTag;
@@ -172,6 +185,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 IsMessage = true,
                 ReadLocalType = qualified,
                 AssignExpression = Placeholder,
+                SeedExpression = Placeholder,
                 IsReference = !isValueType,
             };
         }
@@ -231,6 +245,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     IsMessage = true,
                     ReadLocalType = surrogateQualified,
                     AssignExpression = "(" + qualified + ")" + Placeholder,
+                    // The merge seed, converted the same way the write path converts. Measured: a
+                    // surrogated member seeded to x=9 plus a payload setting only y reads back as
+                    // x=9 from protobuf-net, so the conversion runs on read as well as on write. A
+                    // reference real type is guarded rather than converted blind, because a null one
+                    // would reach a consumer's operator on a path it has never seen.
+                    SeedExpression = type.IsValueType
+                        ? "(" + surrogateQualified + ")" + Placeholder
+                        : "("
+                            + Placeholder
+                            + " == null ? default("
+                            + surrogateQualified
+                            + ") : ("
+                            + surrogateQualified
+                            + ")"
+                            + Placeholder
+                            + ")",
                     IsReference = !type.IsValueType,
                 };
             }

@@ -67,6 +67,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private string Destination => ConstructAtEnd ? Local : "read." + Name;
 
+        /// <summary>The value a merged message closure decodes into.</summary>
+        /// <remarks>
+        /// The same rule a declared sub-message member follows, for the same reason: the first
+        /// occurrence merges into whatever the constructor seeded, except where there is no seed to
+        /// preserve -- a contract built at the end of the read, or one standing in for an
+        /// uninitialized allocation.
+        /// </remarks>
+        private string Seed =>
+            ConstructAtEnd || SkipConstructor ? "default(" + _parameter + ")" : Destination;
+
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
         {
@@ -230,7 +240,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Generic
                     + ".TryReadValue(ref reader, "
                     + Occurrences
-                    + ".Payload, out "
+                    + ".Payload, "
+                    + Seed
+                    + ", out "
                     + _parameter
                     + " "
                     + merged

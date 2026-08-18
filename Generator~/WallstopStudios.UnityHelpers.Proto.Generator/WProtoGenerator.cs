@@ -458,16 +458,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // `new Theirs()` stops compiling -- an attribute silently breaking unrelated code. A type
             // that declares no constructor also has nothing to skip: the implicit one runs field
             // initializers and nothing else, which is exactly what the emitted one would do.
-            bool skipConstructor =
+            // What the AUTHOR asked for, which is the question a member's seed depends on:
+            // protobuf-net's SkipConstructor allocates the instance uninitialized, so no field
+            // initializer has run and no member has anything to merge into or append to.
+            bool declaredSkipConstructor =
                 Shape.SkipsConstructor(contract)
                 && !contract.IsValueType
                 && !contract.IsAbstract
-                && !constructAtEnd
-                && DeclaresAConstructor(contract);
+                && !constructAtEnd;
+
+            // Narrower, and a different question: whether a private constructor is emitted and
+            // called. A type that declares none must not get one, per the note above.
+            bool skipConstructor = declaredSkipConstructor && DeclaresAConstructor(contract);
 
             foreach (Member member in members)
             {
-                member.SkipConstructor = skipConstructor;
+                // The declared flag, deliberately. A contract that declares SkipConstructor and no
+                // constructor of its own is still read into an instance whose field initializers
+                // ran, and seeding from those would append to -- or merge into -- a value the oracle
+                // never had.
+                member.SkipConstructor = declaredSkipConstructor;
             }
 
             // Not asked of a contract that builds itself. The diagnostic exists because the formatter
@@ -760,6 +770,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             NestedCollections nested
         )
         {
+            // A contract with an instance to assign onto can be merged into, which is what makes the
+            // FIRST occurrence of a sub-message field keep whatever its constructor seeded --
+            // protobuf's MergeFrom semantics, and what protobuf-net does. The two exclusions have no
+            // instance to merge into at all: a contract built by a constructor at the end of the
+            // read has none until the last value is in hand, and one whose instance an include tag
+            // chooses may not be this type. SkipConstructor is NOT one of them -- it decides how an
+            // instance is CREATED, and a caller that already holds one is not creating anything.
+            bool mergeable = !constructAtEnd && includes.Count == 0 && !contract.IsAbstract;
+
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
             writer.Line(
                 "public sealed class WProtoFormatter : "
@@ -769,6 +788,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ">, "
                     + Proto
                     + ".IWProtoPolymorphicFormatter"
+                    + (
+                        mergeable
+                            ? ", " + Proto + ".IWProtoMergeFormatter<" + qualified + ">"
+                            : string.Empty
+                    )
                     + (
                         0 < encodedTypeParameters.Count
                             ? ", " + Proto + ".IWProtoConditionalFormatter"
@@ -798,7 +822,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 includes,
                 hooks,
                 constructAtEnd,
-                skipConstructor
+                skipConstructor,
+                mergeable
             );
 
             // Last, and nested inside this formatter rather than beside it: a wrapper message exists
@@ -1325,23 +1350,80 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Include> includes,
             Hooks hooks,
             bool constructAtEnd,
-            bool skipConstructor
+            bool skipConstructor,
+            bool mergeable
         )
         {
+            bool polymorphic = 0 < includes.Count;
+
+            if (mergeable)
+            {
+                // One body, entered two ways. TryRead is the no-seed case rather than a second copy
+                // of the loop, because a duplicated read body is a duplicated wire format: the two
+                // would be free to drift, and the compiled size of every contract would double for
+                // a difference of one statement.
+                writer.Line("/// <inheritdoc />");
+                writer.Line(
+                    "public bool TryRead(ref "
+                        + Proto
+                        + ".WProtoReader reader, out "
+                        + qualified
+                        + " value)"
+                        + Writer.Open
+                );
+                writer.Indent();
+                writer.Line(
+                    "return TryReadInto(ref reader, default(" + qualified + "), out value);"
+                );
+                writer.Outdent();
+                writer.Line("}");
+                writer.Blank();
+            }
+
             writer.Line("/// <inheritdoc />");
             writer.Line(
-                "public bool TryRead(ref "
-                    + Proto
-                    + ".WProtoReader reader, out "
-                    + qualified
-                    + " value)"
-                    + Writer.Open
+                mergeable
+                    ? "public bool TryReadInto(ref "
+                        + Proto
+                        + ".WProtoReader reader, in "
+                        + qualified
+                        + " seed, out "
+                        + qualified
+                        + " value)"
+                        + Writer.Open
+                    : "public bool TryRead(ref "
+                        + Proto
+                        + ".WProtoReader reader, out "
+                        + qualified
+                        + " value)"
+                        + Writer.Open
             );
             writer.Indent();
 
-            bool polymorphic = 0 < includes.Count;
-
-            if (constructAtEnd)
+            if (mergeable)
+            {
+                // The seed IS the instance being read into, so a member the payload never mentions
+                // keeps what the contract's constructor gave it. A reference seed of null is the
+                // ordinary case -- nothing to merge -- and gets the instance TryRead used to make.
+                writer.Line(qualified + " read = seed;");
+                if (!contract.IsValueType)
+                {
+                    writer.Line("if (read == null)" + Writer.Open);
+                    writer.Indent();
+                    writer.Line(
+                        skipConstructor
+                            ? "read = new "
+                                + qualified
+                                + "(default("
+                                + Proto
+                                + ".WProtoConstruct));"
+                            : "read = new " + qualified + "();"
+                    );
+                    writer.Outdent();
+                    writer.Line("}");
+                }
+            }
+            else if (constructAtEnd)
             {
                 // Deliberately not created here: a readonly member can only be assigned by a
                 // constructor, so there is nothing to assign onto until the last value is in hand.

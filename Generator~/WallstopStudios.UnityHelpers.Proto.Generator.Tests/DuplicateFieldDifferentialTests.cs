@@ -180,32 +180,114 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void TheFirstOccurrenceStillReplacesTheConstructorsSubMessage()
+        public void TheFirstOccurrenceMergesIntoTheConstructorsSubMessage()
         {
-            // A DIVERGENCE, pinned rather than fixed. protobuf-net merges the first occurrence into
-            // whatever the constructor left on the member -- measured, {A=9} seeded plus `12 02 10
-            // 02` reads back as {A=9, B=2} -- while this package replaces it, exactly as it did
-            // before duplicate fields merged at all. Nothing on the wire distinguishes the two
-            // readings, and changing it would alter what every existing payload decodes to for a
-            // member whose contract seeds one.
+            // protobuf defines reading a sub-message field as MergeFrom, so the FIRST occurrence
+            // merges into whatever the contract's constructor left on the member. Decoding into a
+            // fresh instance instead drops the seed, on a payload that says nothing about it.
             const string once = "12021002";
 
             SeededHolder oracle = OracleDecode<SeededHolder>(once);
             SeededHolder ours = Decode<SeededHolder>(once);
 
-            Assert.AreEqual(9, oracle.Child.A, "protobuf-net keeps the constructor's member");
-            Assert.AreEqual(0, ours.Child.A, "this package replaces it");
+            Assert.AreEqual(9, oracle.Child.A);
             Assert.AreEqual(2, oracle.Child.B);
-            Assert.AreEqual(2, ours.Child.B);
+            Assert.AreEqual(oracle.Child.A, ours.Child.A, once);
+            Assert.AreEqual(oracle.Child.B, ours.Child.B, once);
 
-            // The divergence stops at the seed: once the payload says anything about the member, the
-            // two agree again.
+            // A payload that DOES mention the member overrides the seed rather than combining with
+            // it -- merge is per member, not per value.
             const string twice = "12021002" + "12020801";
             Assert.AreEqual(
                 OracleDecode<SeededHolder>(twice).Child.A,
                 Decode<SeededHolder>(twice).Child.A,
                 twice
             );
+
+            // And a payload that never mentions the field at all leaves the seed entirely alone.
+            Assert.AreEqual(9, Decode<SeededHolder>("0807").Child.A);
+            Assert.AreEqual(0, Decode<SeededHolder>("0807").Child.B);
+        }
+
+        [Test]
+        public void EverySeededMemberShapeAgreesWithTheOracle()
+        {
+            // One payload per shape, each setting the member the seed does NOT set, so "merged" and
+            // "replaced" produce different answers for all four.
+            const string reference = "0A021002";
+            const string structural = "12021002";
+            const string nullable = "1A021002";
+            const string surrogate = "2205150000" + "0040";
+
+            Assert.AreEqual(
+                OracleDecode<SeededShapes>(reference).Reference.A,
+                Decode<SeededShapes>(reference).Reference.A,
+                reference
+            );
+            Assert.AreEqual(
+                OracleDecode<SeededShapes>(structural).Where.X,
+                Decode<SeededShapes>(structural).Where.X,
+                structural
+            );
+            Assert.AreEqual(
+                OracleDecode<SeededShapes>(nullable).Maybe.Value.X,
+                Decode<SeededShapes>(nullable).Maybe.Value.X,
+                nullable
+            );
+            Assert.AreEqual(
+                OracleDecode<SeededShapes>(surrogate).Vector.x,
+                Decode<SeededShapes>(surrogate).Vector.x,
+                surrogate
+            );
+
+            // The member each payload DID set arrives whatever the seeding rule is.
+            Assert.AreEqual(2, Decode<SeededShapes>(reference).Reference.B);
+            Assert.AreEqual(2, Decode<SeededShapes>(structural).Where.Y);
+            Assert.AreEqual(2, Decode<SeededShapes>(nullable).Maybe.Value.Y);
+            Assert.AreEqual(2f, Decode<SeededShapes>(surrogate).Vector.y);
+        }
+
+        [Test]
+        public void ASkipConstructorContractIgnoresTheSeedItsInitializerLeft()
+        {
+            // protobuf-net allocates this one uninitialized, so its member has no seed at all. This
+            // package's generated read constructor necessarily runs field initializers, so the seed
+            // exists and must be ignored anyway -- the rule a repeated member already follows.
+            const string once = "0A021002";
+
+            SeededSkipHolder oracle = OracleDecode<SeededSkipHolder>(once);
+            SeededSkipHolder ours = Decode<SeededSkipHolder>(once);
+
+            Assert.AreEqual(0, oracle.Child.A);
+            Assert.AreEqual(oracle.Child.A, ours.Child.A, once);
+            Assert.AreEqual(oracle.Child.B, ours.Child.B, once);
+
+            // The same rule for a repeated member, which is where the flag was already being
+            // ignored: a contract declaring SkipConstructor and no constructor of its own kept the
+            // initializer and appended to it, where the oracle's uninitialized instance has none.
+            const string values = "10011002";
+            CollectionAssert.AreEqual(
+                OracleDecode<SeededSkipHolder>(values).Values,
+                Decode<SeededSkipHolder>(values).Values,
+                values
+            );
+            CollectionAssert.AreEqual(new[] { 1, 2 }, Decode<SeededSkipHolder>(values).Values);
+        }
+
+        [Test]
+        public void AGenericMemberMergesIntoItsConstructorsSeed()
+        {
+            // The generic path reaches the same merge through WProtoGeneric<T>, whose closure is the
+            // only thing that knows the member is a message at all.
+            const string once = "0A021002";
+
+            SeededBox<SeededChild> oracle = OracleDecode<SeededBox<SeededChild>>(once);
+            SeededBox<SeededChild> ours = Decode<SeededBox<SeededChild>>(once);
+
+            Assert.AreEqual(9, oracle.Value.A);
+            Assert.AreEqual(2, oracle.Value.B);
+            Assert.AreEqual(oracle.Value.A, ours.Value.A, once);
+            Assert.AreEqual(oracle.Value.B, ours.Value.B, once);
         }
 
         [Test]

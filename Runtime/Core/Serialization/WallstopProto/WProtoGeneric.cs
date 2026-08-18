@@ -344,6 +344,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="reader">The reader the payload came from, which spends the nesting level.</param>
         /// <param name="payload">The sub-message bytes, without a key or length prefix.</param>
+        /// <param name="seed">The value the destination member already holds, merged into.</param>
         /// <param name="value">Receives the value, or <c>default</c> on failure.</param>
         /// <returns><c>true</c> when the payload decoded completely.</returns>
         /// <remarks>
@@ -357,13 +358,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static bool TryReadValue(
             ref WProtoReader reader,
             ReadOnlySpan<byte> payload,
+            in T seed,
             out T value
         )
         {
             Resolve();
 
             IWProtoFormatter<T> formatter = _scalar == null ? Message() : null;
-            return reader.TryReadMessage(payload, formatter, out value);
+            return reader.TryReadMessage(payload, formatter, seed, out value);
         }
 
         /// <summary>

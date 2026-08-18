@@ -1027,10 +1027,14 @@ Five behaviors are worth knowing, because two of them are the opposite of the ru
 
 - **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length —
   the same distinction an empty `string` draws.
-- **A sub-message field carried more than once merges**, as protobuf requires and protobuf-net does:
-  `12 02 08 01` followed by `12 02 10 02` sets both members rather than only the second. The merge is
-  recursive, and a `struct` sub-message merges the same way a reference one does. A non-repeated
-  **scalar** carried twice is still last-wins.
+- **A sub-message field merges into what the member already holds**, as protobuf requires and
+  protobuf-net does. Two occurrences combine — `12 02 08 01` followed by `12 02 10 02` sets both
+  members rather than only the second — and so does the **first** occurrence and whatever your
+  constructor gave the member: a member seeded to `{A = 9}` plus a payload setting only `B` reads
+  back as `{A = 9, B = 2}`. The merge is recursive, reaches a `struct` sub-message, a `Nullable<T>`
+  one and one behind a surrogate, and a non-repeated **scalar** carried twice is still last-wins.
+  A contract declaring `SkipConstructor` has no seed to merge into, because the instance protobuf-net
+  reads into was never constructed.
 - **A struct sub-message is always written**, even when every member equals its default. protobuf-net
   does the same, and matching it is what keeps saved data readable.
 - **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so

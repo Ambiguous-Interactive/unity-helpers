@@ -651,6 +651,53 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Decodes a sub-message payload into <paramref name="seed"/> where
+        /// <paramref name="formatter"/> can, and into a fresh value where it cannot.
+        /// </summary>
+        /// <typeparam name="T">The sub-message type.</typeparam>
+        /// <param name="payload">The sub-message bytes, without a key or length prefix.</param>
+        /// <param name="formatter">The formatter for the sub-message.</param>
+        /// <param name="seed">The value the destination member already holds.</param>
+        /// <param name="value">Receives the decoded value, or <c>default</c> on failure.</param>
+        /// <returns><c>true</c> when the payload decoded completely.</returns>
+        /// <remarks>
+        /// protobuf reads a sub-message field as <c>Message::MergeFrom</c>, so a member the payload
+        /// does not mention keeps the value its contract's constructor gave it. That needs the
+        /// existing value, which only the caller has -- hence the extra argument rather than a
+        /// second entry point on <see cref="IWProtoFormatter{T}"/>, which is public and
+        /// hand-implementable. A formatter that does not implement
+        /// <see cref="IWProtoMergeFormatter{T}"/> decodes fresh here, which is what every formatter
+        /// did before and is still correct for a member with nothing to preserve.
+        /// </remarks>
+        public bool TryReadMessage<T>(
+            ReadOnlySpan<byte> payload,
+            IWProtoFormatter<T> formatter,
+            in T seed,
+            out T value
+        )
+        {
+            if (formatter == null || _malformed || _depth >= MaxNestingDepth)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            WProtoReader nested = new WProtoReader(payload, _depth + 1);
+            bool read = formatter is IWProtoMergeFormatter<T> merging
+                ? merging.TryReadInto(ref nested, seed, out value)
+                : formatter.TryRead(ref nested, out value);
+            if (read && !nested.Malformed)
+            {
+                return true;
+            }
+
+            _malformed = true;
+            value = default;
+            return false;
+        }
+
+        /// <summary>
         /// Reads a length prefix.
         /// </summary>
         /// <param name="length">Receives the length, or 0 on failure.</param>
