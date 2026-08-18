@@ -110,17 +110,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    [ProtoContract]
-    [WProtoContract]
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
     public sealed partial class PcgRandom
         : AbstractRandom,
             IEquatable<PcgRandom>,
             IComparable,
             IComparable<PcgRandom>
     {
+        // PCG requires an odd increment, and setting the low bit is what makes any value odd --
+        // an already-odd one is its own answer, so no branch distinguishes the two cases.
         private static ulong NormalizeIncrement(ulong increment)
         {
-            return (increment & 1UL) == 0 ? increment | 1UL : increment;
+            return increment | 1UL;
         }
 
         public static PcgRandom Instance => ThreadLocalRandom<PcgRandom>.Instance;
@@ -172,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             unchecked
             {
                 ulong oldState = _state;
-                _state = oldState * 6364136223846793005UL + _increment;
+                _state = oldState * 6364136223846793005UL + NormalizeIncrement(_increment);
                 uint xorShifted = (uint)(((oldState >> 18) ^ oldState) >> 27);
                 int rot = (int)(oldState >> 59);
                 return (xorShifted >> rot) | (xorShifted << (-rot & 31));

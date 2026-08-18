@@ -85,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `NextGuid()` and `NextWGuid()` throwing on any generator restored from a protobuf payload read by protobuf-net. Twelve generators were affected, so the first GUID drawn after loading a save crashed ([#492](https://github.com/Ambiguous-Interactive/unity-helpers/issues/492)).
+- Fix `IllusionFlow`, `PcgRandom`, `RomuDuo`, `XorShiftRandom` and `XoroShiroRandom` replaying a different sequence than the one saved when their whole serialized state was at its default ([#492](https://github.com/Ambiguous-Interactive/unity-helpers/issues/492)).
+- Fix a `PcgRandom` whose increment arrived as zero returning the same value forever, and `StormDropRandom`, `PhotonSpinRandom` and `SystemRandom` throwing on first use, when a payload omitted the members their internal buffers come from ([#492](https://github.com/Ambiguous-Interactive/unity-helpers/issues/492)).
 - Fix `Helpers.EnumeratePrefabs` and `EnumerateScriptableObjects` searching folders the caller never named when the asset paths were passed as anything other than a `string[]` ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
 - Fix `[WShowIf]` never matching a member of a `ulong`-backed enum above `long.MaxValue`, which hid the field it was meant to reveal ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
 - Fix a chosen text colour on a `[WButton]` or `[WEnumToggleButtons]` palette entry being overwritten whenever its red, green and blue were all zero, so opaque black was replaced by the auto-computed colour and any transparency was discarded. Existing entries keep the colour they were showing ([#476](https://github.com/Ambiguous-Interactive/unity-helpers/issues/476)).

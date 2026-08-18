@@ -76,8 +76,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    [ProtoContract]
-    [WProtoContract]
+    // SkipConstructor for the reason its siblings carry it: protobuf omits a member equal to its
+    // default, so an all-default state writes a payload naming none of it, and a parameterless
+    // constructor seeding from Guid.NewGuid() would invent a stream the save never held.
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
     public sealed partial class IllusionFlow : AbstractRandom
     {
         private const int UintByteCount = sizeof(uint) * 8;
@@ -91,8 +94,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 ulong stateA = ((ulong)_a << UintByteCount) | _b;
                 ulong stateB = ((ulong)_c << UintByteCount) | _d;
-                BinaryPrimitives.WriteUInt32LittleEndian(_payload, _e);
-                return BuildState(stateA, stateB, payload: _payload);
+                byte[] payload = _payload;
+                if (payload == null)
+                {
+                    payload = new byte[StatePayloadLength];
+                    _payload = payload;
+                }
+
+                BinaryPrimitives.WriteUInt32LittleEndian(payload, _e);
+                return BuildState(stateA, stateB, payload: payload);
             }
         }
 
@@ -116,8 +126,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(10)]
         private uint _e;
 
-        // Cached space for RandomState
-        private readonly byte[] _payload = new byte[StatePayloadLength];
+        // Cached space for RandomState, allocated on first use rather than by an initializer:
+        // a formatter is free to allocate an instance no constructor ever ran, and this buffer
+        // is not on the wire to be restored.
+        private byte[] _payload;
 
         public IllusionFlow()
             : this(Guid.NewGuid()) { }
