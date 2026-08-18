@@ -42,6 +42,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void TheFirstOccurrenceMergesIntoTheConstructorsSubMessage()
+        {
+            // protobuf reads a sub-message field as MergeFrom, so a member the payload never
+            // mentions keeps whatever the contract's constructor gave it.
+            WProtoSeededHolder decoded = Decode<WProtoSeededHolder>("0A021002");
+
+            Assert.AreEqual(9, decoded.Child.A);
+            Assert.AreEqual(2, decoded.Child.B);
+
+            WProtoSeededHolder structural = Decode<WProtoSeededHolder>("12021002");
+            Assert.AreEqual(9, structural.Where.X);
+            Assert.AreEqual(2, structural.Where.Y);
+        }
+
+        [Test]
+        public void ADuplicatedSubMessageMergesThroughAGenericMember()
+        {
+            // Whether a generic member is a sub-message at all is a property of the closure, so the
+            // merge decision is made at run time rather than emitted.
+            WProtoDuplicateBox<WProtoDuplicateChild> reference = Decode<
+                WProtoDuplicateBox<WProtoDuplicateChild>
+            >("0A020801" + "0A021002");
+            Assert.AreEqual(1, reference.Value.A);
+            Assert.AreEqual(2, reference.Value.B);
+
+            WProtoDuplicateBox<WProtoDuplicatePoint> structural = Decode<
+                WProtoDuplicateBox<WProtoDuplicatePoint>
+            >("0A020801" + "0A021002");
+            Assert.AreEqual(1, structural.Value.X);
+            Assert.AreEqual(2, structural.Value.Y);
+        }
+
+        [Test]
+        public void ADuplicatedGenericScalarIsStillLastWins()
+        {
+            // The discriminator: a string closure is length-delimited too, so merging on the wire
+            // type rather than on whether the closure is message-shaped would concatenate strings.
+            Assert.AreEqual("b", Decode<WProtoDuplicateBox<string>>("0A0161" + "0A0162").Value);
+        }
+
+        [Test]
         public void ADuplicatedNonRepeatedScalarIsLastWins()
         {
             Assert.AreEqual(5, Decode<WProtoDuplicateHolder>("0804" + "0805").Number);
