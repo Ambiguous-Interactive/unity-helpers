@@ -65,8 +65,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    [ProtoContract]
-    [WProtoContract]
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
     public sealed partial class SquirrelRandom : AbstractRandom
     {
         private const uint BitNoise1 = 0xB5297A4D;

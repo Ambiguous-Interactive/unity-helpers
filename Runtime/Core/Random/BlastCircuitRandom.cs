@@ -62,8 +62,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    [ProtoContract]
-    [WProtoContract]
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
     public sealed partial class BlastCircuitRandom : AbstractRandom
     {
         private const ulong Increment = 111_111_111_111_111UL;
