@@ -384,6 +384,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string Accumulator => "repeated" + Tag;
 
+        /// <summary>
+        /// Whether <c>SkipConstructor</c> suppresses this member's seed outright.
+        /// </summary>
+        /// <remarks>
+        /// Only when the instance can never have come from a caller. Where it can, the answer is
+        /// decided at run time by <see cref="Member.SeedGuard"/> instead: a collection on an
+        /// instance a parent's constructor built is one the oracle appends to.
+        /// </remarks>
+        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
+
+        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
+        private string Guard => SkipConstructor ? SeedGuard : null;
+
         /// <summary>The list a deferred read collects into before it knows what to commit onto.</summary>
         private string Pending => "pending" + Tag;
 
@@ -1148,7 +1161,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             // `Fresh` seeding starts empty whatever the member holds, because its commit is what
             // consults the member -- a stack's elements cannot be pushed until all of them arrived.
-            if (_overwrite || SkipConstructor || _form.Seeding == CollectionSeeding.Fresh)
+            if (_overwrite || SeedSuppressed || _form.Seeding == CollectionSeeding.Fresh)
             {
                 writer.Line(Accumulator + " = " + fresh + ";");
             }
@@ -1159,7 +1172,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // accumulator the decoded ones are appended to. Every declared type that lands here
                 // is a reference, so the guard is always legal.
                 writer.Line(Accumulator + " = " + fresh + ";");
-                writer.Line("if (read." + Name + " != null)" + Writer.Open);
+                string present = "read." + Name + " != null";
+                writer.Line(
+                    "if ("
+                        + (Guard == null ? present : Guard + " && " + present)
+                        + ")"
+                        + Writer.Open
+                );
                 writer.Indent();
                 writer.Line(Accumulator + "." + _form.BulkAddMethod + "(read." + Name + ");");
                 Close(writer);
@@ -1169,14 +1188,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // A copy, necessarily -- which is why the epilogue assigns it back. Reading into the
                 // member in place is not available for a struct: every mutation would land on
                 // whatever temporary the expression produced.
-                writer.Line(Accumulator + " = read." + Name + ";");
+                writer.Line(
+                    Accumulator
+                        + " = "
+                        + (
+                            Guard == null
+                                ? "read." + Name
+                                : "(" + Guard + " ? read." + Name + " : " + fresh + ")"
+                        )
+                        + ";"
+                );
             }
             else
             {
                 // Appending into the constructor's own instance is what protobuf-net does, and it is
                 // also the only way a member the constructor handed a reference out to keeps seeing
                 // the decoded elements.
-                writer.Line(Accumulator + " = read." + Name + " ?? " + fresh + ";");
+                writer.Line(
+                    Accumulator
+                        + " = "
+                        + (
+                            Guard == null
+                                ? "read." + Name
+                                : "(" + Guard + " ? read." + Name + " : null)"
+                        )
+                        + " ?? "
+                        + fresh
+                        + ";"
+                );
             }
 
             Close(writer);
@@ -1267,9 +1306,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + target
                     + " = "
                     + (
-                        _overwrite || ConstructAtEnd || SkipConstructor
-                            ? fresh
-                            : "read." + Name + " ?? " + fresh
+                        _overwrite || ConstructAtEnd || SeedSuppressed ? fresh
+                        : Guard == null ? "read." + Name + " ?? " + fresh
+                        : "(" + Guard + " ? read." + Name + " : null) ?? " + fresh
                     )
                     + ";"
             );
@@ -1305,7 +1344,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (
                 _overwrite
                 || ConstructAtEnd
-                || SkipConstructor
+                || SeedSuppressed
                 || _form.Seeding == CollectionSeeding.Fresh
             )
             {
@@ -1316,18 +1355,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 // The pending elements are appended after this, so the member's own only has to be
                 // copied in first. Every accumulator type used here takes an IEnumerable<T>.
-                return "read."
-                    + Name
-                    + " == null ? "
-                    + fresh
-                    + " : new "
-                    + AccumulatorType
-                    + "(read."
-                    + Name
-                    + ")";
+                string absent =
+                    Guard == null
+                        ? "read." + Name + " == null"
+                        : "!" + Guard + " || read." + Name + " == null";
+                return absent + " ? " + fresh + " : new " + AccumulatorType + "(read." + Name + ")";
             }
 
-            return _collectionIsValueType ? "read." + Name : "read." + Name + " ?? " + fresh;
+            if (_collectionIsValueType)
+            {
+                return Guard == null
+                    ? "read." + Name
+                    : "(" + Guard + " ? read." + Name + " : " + fresh + ")";
+            }
+
+            return (Guard == null ? "read." + Name : "(" + Guard + " ? read." + Name + " : null)")
+                + " ?? "
+                + fresh;
         }
     }
 }

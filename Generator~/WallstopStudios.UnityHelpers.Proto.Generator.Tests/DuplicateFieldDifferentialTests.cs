@@ -400,6 +400,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        [Test]
+        public void ASkipConstructorContractMergesIntoASeedItsParentBuilt()
+        {
+            // SkipConstructor decides how an instance is CREATED. A parent whose constructor already
+            // built one hands over an instance the oracle built the same way, so its members are
+            // real seeds -- suppressing them there is data loss, not a match.
+            const string nested = "0A040A021002";
+
+            SkipSeedParent oracle = OracleDecode<SkipSeedParent>(nested);
+            SkipSeedParent ours = Decode<SkipSeedParent>(nested);
+
+            Assert.AreEqual(oracle.Child.Child.A, ours.Child.Child.A, nested);
+            Assert.AreEqual(oracle.Child.Child.B, ours.Child.Child.B, nested);
+
+            // The same question for a repeated member of that nested instance.
+            const string values = "0A0410011002";
+            CollectionAssert.AreEqual(
+                OracleDecode<SkipSeedParent>(values).Child.Values,
+                Decode<SkipSeedParent>(values).Child.Values,
+                values
+            );
+        }
+
         private static bool TryDecodeChain(int links)
         {
             List<byte> payload = new List<byte>();

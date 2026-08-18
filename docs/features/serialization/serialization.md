@@ -1033,8 +1033,9 @@ Five behaviors are worth knowing, because two of them are the opposite of the ru
   constructor gave the member: a member seeded to `{A = 9}` plus a payload setting only `B` reads
   back as `{A = 9, B = 2}`. The merge is recursive, reaches a `struct` sub-message, a `Nullable<T>`
   one and one behind a surrogate, and a non-repeated **scalar** carried twice is still last-wins.
-  A contract declaring `SkipConstructor` has no seed to merge into, because the instance protobuf-net
-  reads into was never constructed.
+  A contract declaring `SkipConstructor` has no seed to merge into **when the formatter created the
+  instance itself** — protobuf-net's is never constructed, so its members hold nothing. One a
+  parent's constructor supplied is a real instance the oracle holds too, and its members do merge.
 - **A struct sub-message is always written**, even when every member equals its default. protobuf-net
   does the same, and matching it is what keeps saved data readable.
 - **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so
@@ -1405,9 +1406,12 @@ survive IL2CPP, so the generator emits a private constructor into your type's `p
 instead. The consequence is that C# field initializers and base constructors still run, where under
 protobuf-net they do not — the object is more initialized, never less.
 
-The flag is **inert on a type that declares no constructor of its own**. There is nothing to skip
-there, and emitting a constructor would delete the implicit parameterless one and stop `new Yours()`
-from compiling in your own code.
+**No constructor is emitted into a type that declares none of its own.** There is nothing to skip
+there, and emitting one would delete the implicit parameterless constructor and stop `new Yours()`
+from compiling in your own code. The flag still governs seeding on such a type: a member of an
+instance the formatter created keeps nothing from its field initializers, because the instance
+protobuf-net reads into has none — while a member of an instance handed in by a parent's constructor
+seeds normally, since that one exists on both sides.
 
 ### Resolving a formatter
 

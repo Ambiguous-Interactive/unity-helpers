@@ -334,6 +334,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string Accumulator => "map" + Tag;
 
+        /// <summary>Whether <c>SkipConstructor</c> suppresses this member's seed outright.</summary>
+        /// <remarks>
+        /// Only where the instance can never have come from a caller; otherwise the answer is a
+        /// run-time one. See <see cref="Member.SeedGuard"/>.
+        /// </remarks>
+        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
+
+        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
+        private string Guard => SkipConstructor ? SeedGuard : null;
+
         private string SeenFlag => "seen" + Tag;
 
         private string PendingType =>
@@ -700,7 +710,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line(Accumulator + " = new " + PendingType + "();");
             }
-            else if (_overwrite || SkipConstructor)
+            else if (_overwrite || SeedSuppressed)
             {
                 writer.Line(Accumulator + " = new " + _accumulatorQualified + "();");
             }
@@ -728,7 +738,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private void EmitCopyFromMember(Writer writer, string accumulator)
         {
-            writer.Line("if (read." + Name + " != null)" + Writer.Open);
+            string present = "read." + Name + " != null";
+            writer.Line(
+                "if (" + (Guard == null ? present : Guard + " && " + present) + ")" + Writer.Open
+            );
             writer.Indent();
             writer.Line(
                 "foreach ("
@@ -760,9 +773,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private string ExistingOrFresh()
         {
+            string fresh = "new " + _accumulatorQualified + "()";
+            if (Guard == null)
+            {
+                return _mapIsValueType ? "read." + Name : "read." + Name + " ?? " + fresh;
+            }
+
             return _mapIsValueType
-                ? "read." + Name
-                : "read." + Name + " ?? new " + _accumulatorQualified + "()";
+                ? "(" + Guard + " ? read." + Name + " : " + fresh + ")"
+                : "(" + Guard + " ? read." + Name + " : null) ?? " + fresh;
         }
 
         /// <inheritdoc />
@@ -788,7 +807,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             string target = "target" + Tag;
-            bool fresh = _overwrite || ConstructAtEnd || SkipConstructor;
+            bool fresh = _overwrite || ConstructAtEnd || SeedSuppressed;
             writer.Line(
                 _accumulatorQualified
                     + " "

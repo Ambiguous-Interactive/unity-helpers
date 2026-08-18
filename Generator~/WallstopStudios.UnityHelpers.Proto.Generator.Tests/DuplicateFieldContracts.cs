@@ -194,4 +194,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>A message closure whose instance carries a seed.</summary>
         public static SeededBox<SeededChild> Children;
     }
+
+    /// <summary>
+    /// A contract whose own constructor builds a <see cref="SeededSkipHolder"/>, so the nested
+    /// instance is one the oracle has as well.
+    /// </summary>
+    /// <remarks>
+    /// <c>SkipConstructor</c> says how an instance is CREATED. It says nothing about an instance a
+    /// caller already holds, and a parent that constructed one hands over a value whose members the
+    /// oracle populated the same way -- so they are real seeds, not artifacts of this generator.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class SkipSeedParent
+    {
+        /// <summary>Built by this contract's own initializer, initializers and all.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public SeededSkipHolder Child = new SeededSkipHolder();
+    }
 }

@@ -74,8 +74,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// preserve -- a contract built at the end of the read, or one standing in for an
         /// uninitialized allocation.
         /// </remarks>
-        private string Seed =>
-            ConstructAtEnd || SkipConstructor ? "default(" + _parameter + ")" : Destination;
+        private string Seed
+        {
+            get
+            {
+                string none = "default(" + _parameter + ")";
+                if (ConstructAtEnd)
+                {
+                    return none;
+                }
+
+                if (!SkipConstructor)
+                {
+                    return Destination;
+                }
+
+                return SeedGuard == null
+                    ? none
+                    : "(" + SeedGuard + " ? " + Destination + " : " + none + ")";
+            }
+        }
 
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)

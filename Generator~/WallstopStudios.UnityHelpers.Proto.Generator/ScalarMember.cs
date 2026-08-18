@@ -62,14 +62,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             get
             {
-                if (ConstructAtEnd || SkipConstructor || _shape.SeedExpression == null)
+                string none = "default(" + _shape.ReadLocalType + ")";
+                if (ConstructAtEnd || _shape.SeedExpression == null)
                 {
-                    return "default(" + _shape.ReadLocalType + ")";
+                    return none;
                 }
 
                 string current =
                     "read." + Name + (_nullable ? ".GetValueOrDefault()" : string.Empty);
-                return Shape.Fill(_shape.SeedExpression, current);
+                string seed = Shape.Fill(_shape.SeedExpression, current);
+                if (!SkipConstructor)
+                {
+                    return seed;
+                }
+
+                // Under SkipConstructor the member is a seed only when the instance came from the
+                // caller; see Member.SeedGuard. With no guard the instance is always this
+                // formatter's own, so there is nothing to preserve.
+                return SeedGuard == null
+                    ? none
+                    : "(" + SeedGuard + " ? " + seed + " : " + none + ")";
             }
         }
 

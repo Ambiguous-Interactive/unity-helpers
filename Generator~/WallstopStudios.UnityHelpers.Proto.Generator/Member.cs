@@ -88,6 +88,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal bool SkipConstructor { get; set; }
 
+        /// <summary>The local naming this formatter's guard local, for emitted code.</summary>
+        internal const string SeedGuardLocal = "wprotoSeeded";
+
+        /// <summary>
+        /// The local reporting that the instance being read into came from the CALLER, or
+        /// <c>null</c> where that cannot happen.
+        /// </summary>
+        /// <remarks>
+        /// Only ever set on a contract declaring <c>SkipConstructor</c>, and it is what makes that
+        /// flag mean what it says. The flag describes how an instance is CREATED: when this
+        /// formatter creates one, its field initializers ran where protobuf-net's uninitialized
+        /// allocation ran none, so a member's value is an artifact of this generator and must not be
+        /// seeded from. When a CALLER hands one over -- a parent whose own constructor built it --
+        /// the oracle holds the same instance and the member is a real seed. Only run time knows
+        /// which happened, so suppressing statically loses the second case.
+        /// </remarks>
+        internal string SeedGuard { get; set; }
+
         /// <summary>
         /// Whether this member <b>is</b> the value being encoded rather than a field of one.
         /// </summary>

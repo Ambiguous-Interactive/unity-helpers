@@ -777,6 +777,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // instance is CREATED, and a caller that already holds one is not creating anything.
             bool mergeable = !constructAtEnd && includes.Count == 0 && !contract.IsAbstract;
 
+            // SkipConstructor suppresses seeding only for the instance THIS formatter creates. A
+            // mergeable formatter can also be handed one, and that one is the caller's -- so the
+            // decision moves to run time. `SkipConstructor` is already the declared flag, so it is
+            // read back here rather than recomputed.
+            bool guardedSeeding = mergeable && members.Exists(member => member.SkipConstructor);
+            foreach (Member member in members)
+            {
+                member.SeedGuard = guardedSeeding ? Member.SeedGuardLocal : null;
+            }
+
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
             writer.Line(
                 "public sealed class WProtoFormatter : "
@@ -821,7 +831,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 hooks,
                 constructAtEnd,
                 skipConstructor,
-                mergeable
+                mergeable,
+                guardedSeeding
             );
 
             // Last, and nested inside this formatter rather than beside it: a wrapper message exists
@@ -1349,7 +1360,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Hooks hooks,
             bool constructAtEnd,
             bool skipConstructor,
-            bool mergeable
+            bool mergeable,
+            bool guardedSeeding
         )
         {
             bool polymorphic = 0 < includes.Count;
@@ -1404,6 +1416,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // keeps what the contract's constructor gave it. A reference seed of null is the
                 // ordinary case -- nothing to merge -- and gets the instance TryRead used to make.
                 writer.Line(qualified + " read = seed;");
+                if (guardedSeeding)
+                {
+                    // Before the instance is created, because creating one is exactly what makes
+                    // its members artifacts rather than seeds.
+                    writer.Line("bool " + Member.SeedGuardLocal + " = read != null;");
+                }
+
                 if (!contract.IsValueType)
                 {
                     writer.Line("if (read == null)" + Writer.Open);
