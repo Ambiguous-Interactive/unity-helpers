@@ -68,8 +68,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    [ProtoContract]
-    [WProtoContract]
+    // SkipConstructor for the same reason the other generators carry it: the parameterless
+    // constructor seeds from a fresh Guid, and index 0 -- the one state proto omits, because it
+    // equals the type's default -- would otherwise come back as whatever that Guid invented.
+    [ProtoContract(SkipConstructor = true)]
+    [WProtoContract(SkipConstructor = true)]
     public sealed partial class WDoomRandom
         : AbstractRandom,
             IEquatable<WDoomRandom>,

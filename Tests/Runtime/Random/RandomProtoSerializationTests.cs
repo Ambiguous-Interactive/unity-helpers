@@ -423,6 +423,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        public void WDoomRandomAtTableStartKeepsItsIndex()
+        {
+            // Index 0 is the one state the wire never carries: proto omits a member equal to its
+            // type's default. A contract whose parameterless constructor invents state then keeps
+            // the invented value, which for this generator is a different stream on reload -- one
+            // run in 256, which is why it surfaced as a flake rather than a failure.
+            WDoomRandom random = new(seedIndex: 0);
+
+            IRandom deserialized = Serializer.ProtoDeserialize<IRandom>(
+                Serializer.ProtoSerialize<IRandom>(random)
+            );
+
+            for (int i = 0; i < 16; ++i)
+            {
+                Assert.AreEqual(random.NextUint(), deserialized.NextUint(), $"draw {i}");
+            }
+        }
+
+        [Test]
         public void SerializationPreservesRandomSequenceForAllTypes()
         {
             Type[] randomTypes =
