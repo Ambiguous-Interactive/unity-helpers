@@ -210,6 +210,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void TheOracleMergesIntoAnImmutableContractsSeed()
+        {
+            // A contract with a readonly member is built by a constructor at the end of the read,
+            // so this package has no instance to take a seed off and replaces instead. protobuf-net
+            // is under no such constraint: it constructs, merges, and then assigns the readonly
+            // field by reflection. Field 1 sets only B, so a merge keeps A == 9 and a replace does
+            // not -- and both oracle versions merge.
+            //
+            // Pinned here as the answer to the question issue #491 asked, and deliberately not
+            // asserted of this package: closing the gap means seeding every read local from a
+            // constructed instance, which runs the author's constructor on every read of an
+            // immutable contract. That is #491's remaining work, not a detail of this test.
+            const string once = "0A021002";
+
+            SeededImmutableHolder oracle = OracleDecode<SeededImmutableHolder>(once);
+
+            Assert.AreEqual(9, oracle.Child.A, once);
+            Assert.AreEqual(2, oracle.Child.B, once);
+        }
+
+        [Test]
         public void EverySeededMemberShapeAgreesWithTheOracle()
         {
             // One payload per shape, each setting the member the seed does NOT set, so "merged" and

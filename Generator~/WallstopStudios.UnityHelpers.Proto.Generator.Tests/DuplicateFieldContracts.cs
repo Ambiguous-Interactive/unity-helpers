@@ -213,4 +213,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(1)]
         public SeededSkipHolder Child = new SeededSkipHolder();
     }
+
+    /// <summary>
+    /// A contract that builds itself -- one <c>readonly</c> member, so every value is held in a
+    /// local and passed to a constructor at the end of the read -- whose own constructor seeds
+    /// that member.
+    /// </summary>
+    /// <remarks>
+    /// The seed exists for the oracle and not for this generator: protobuf-net assigns a
+    /// <c>readonly</c> field by reflection onto an instance it constructed, while a formatter
+    /// that constructs at the end has no instance to read a seed off. Which of the two is
+    /// correct is a question about protobuf-net, so it is measured rather than assumed.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class SeededImmutableHolder
+    {
+        /// <summary>A sub-message the constructor fills in and the read cannot assign onto.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly DuplicateChild Child;
+
+        /// <summary>Seeds <see cref="Child"/> so a merge and a replace give different answers.</summary>
+        public SeededImmutableHolder()
+        {
+            Child = new DuplicateChild { A = 9 };
+        }
+    }
 }
