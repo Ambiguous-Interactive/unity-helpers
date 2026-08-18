@@ -51,9 +51,17 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
-    <!-- Unity's test framework ships NUnit 3.5; 3.13 is the closest thing on NuGet and binds the
-         same attributes and assertions these fixtures use. -->
-    <PackageReference Include="NUnit" Version="3.13.3" />
+    <!-- THE VERSION UNITY SHIPS, exactly. It was 3.13.3, "the closest thing on NuGet", which
+         binds every member 3.5 does and a great many it does not. Anything added to a fixture that
+         exists only in the newer one compiled here with 0 errors and failed to compile in all eight
+         Unity legs; `TestCaseData.SetArgDisplayNames` cost a full matrix that way (#495). A gate
+         compiled against a different version of a dependency is no gate for that dependency.
+
+         3.5.0 predates netstandard targeting, so it restores its .NET Framework assets and NuGet
+         says so. That is correct here and is not a compatibility risk to fix: nothing in this project
+         executes, the reference assembly is what binds a call, and it is the one Unity binds
+         against. -->
+    <PackageReference Include="NUnit" Version="3.5.0" NoWarn="NU1701" />
     <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
   </ItemGroup>
   <ItemGroup>

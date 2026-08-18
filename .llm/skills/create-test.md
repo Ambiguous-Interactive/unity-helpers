@@ -179,6 +179,7 @@ For complete naming rules, see [test-naming-conventions](./test-naming-conventio
 2. **One file per MonoBehaviour/ScriptableObject** — Even in tests
 3. **No `async Task` test methods** — Use `IEnumerator` with `[UnityTest]`
 4. **No `Assert.ThrowsAsync`** — Not available in Unity's NUnit
+5. **Unity ships NUnit 3.5** — a member added in a later NUnit does not exist in any editor. `npm run typecheck:tests` compiles against 3.5.0 exactly, so it fails locally rather than in all eight Unity legs; do not "fix" that by raising the version
 
 ### Unity-Specific
 
