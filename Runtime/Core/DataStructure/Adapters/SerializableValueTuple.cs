@@ -5,8 +5,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 {
     using System;
     using System.Collections.Generic;
-    using System.Text.Json;
-    using System.Text.Json.Serialization;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -41,7 +39,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     [ProtoContract]
     [WProtoContract]
-    [JsonConverter(typeof(SerializableValueTupleJsonConverterFactory))]
     public partial struct SerializableValueTuple<T1, T2>
         : IEquatable<SerializableValueTuple<T1, T2>>,
             IEquatable<ValueTuple<T1, T2>>
@@ -161,7 +158,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     [ProtoContract]
     [WProtoContract]
-    [JsonConverter(typeof(SerializableValueTupleJsonConverterFactory))]
     public partial struct SerializableValueTuple<T1, T2, T3>
         : IEquatable<SerializableValueTuple<T1, T2, T3>>,
             IEquatable<ValueTuple<T1, T2, T3>>
@@ -280,177 +276,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override string ToString()
         {
             return "(" + Item1 + ", " + Item2 + ", " + Item3 + ")";
-        }
-    }
-
-    /// <summary>
-    /// Serves hand-written converters for both <c>SerializableValueTuple</c> arities.
-    /// </summary>
-    /// <remarks>
-    /// Without this, System.Text.Json falls back to <c>ObjectDefaultConverter&lt;T&gt;</c>, which it
-    /// instantiates reflectively over the closed type -- so a tuple that serialized fine in the
-    /// editor threw <c>ExecutionEngineException</c> on an IL2CPP player. Measured on Unity 2021.3,
-    /// and it is the same reason <c>SerializableNullable&lt;T&gt;</c> carries a factory of its own.
-    /// </remarks>
-    internal sealed class SerializableValueTupleJsonConverterFactory : JsonConverterFactory
-    {
-        /// <inheritdoc/>
-        public override bool CanConvert(Type typeToConvert)
-        {
-            if (typeToConvert == null || !typeToConvert.IsGenericType)
-            {
-                return false;
-            }
-
-            Type definition = typeToConvert.GetGenericTypeDefinition();
-            return definition == typeof(SerializableValueTuple<,>)
-                || definition == typeof(SerializableValueTuple<,,>);
-        }
-
-        /// <inheritdoc/>
-        public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            Type[] arguments = type.GetGenericArguments();
-            Type converter =
-                arguments.Length == 2
-                    ? typeof(SerializableValueTupleJsonConverter<,>).MakeGenericType(arguments)
-                    : typeof(SerializableValueTripleJsonConverter<,,>).MakeGenericType(arguments);
-            return (JsonConverter)Activator.CreateInstance(converter);
-        }
-    }
-
-    internal sealed class SerializableValueTupleJsonConverter<T1, T2>
-        : JsonConverter<SerializableValueTuple<T1, T2>>
-    {
-        /// <inheritdoc/>
-        public override SerializableValueTuple<T1, T2> Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            SerializableValueTuple<T1, T2> value = default;
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                return value;
-            }
-
-            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
-            {
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    continue;
-                }
-
-                string name = reader.GetString();
-                if (!reader.Read())
-                {
-                    break;
-                }
-
-                if (string.Equals(name, nameof(value.Item1), StringComparison.Ordinal))
-                {
-                    value.Item1 = JsonSerializer.Deserialize<T1>(ref reader, options);
-                }
-                else if (string.Equals(name, nameof(value.Item2), StringComparison.Ordinal))
-                {
-                    value.Item2 = JsonSerializer.Deserialize<T2>(ref reader, options);
-                }
-                else
-                {
-                    reader.Skip();
-                }
-            }
-
-            return value;
-        }
-
-        /// <inheritdoc/>
-        public override void Write(
-            Utf8JsonWriter writer,
-            SerializableValueTuple<T1, T2> value,
-            JsonSerializerOptions options
-        )
-        {
-            writer.WriteStartObject();
-            writer.WritePropertyName(nameof(value.Item1));
-            JsonSerializer.Serialize(writer, value.Item1, options);
-            writer.WritePropertyName(nameof(value.Item2));
-            JsonSerializer.Serialize(writer, value.Item2, options);
-            writer.WriteEndObject();
-        }
-    }
-
-    internal sealed class SerializableValueTripleJsonConverter<T1, T2, T3>
-        : JsonConverter<SerializableValueTuple<T1, T2, T3>>
-    {
-        /// <inheritdoc/>
-        public override SerializableValueTuple<T1, T2, T3> Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            SerializableValueTuple<T1, T2, T3> value = default;
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                return value;
-            }
-
-            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
-            {
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    continue;
-                }
-
-                string name = reader.GetString();
-                if (!reader.Read())
-                {
-                    break;
-                }
-
-                if (string.Equals(name, nameof(value.Item1), StringComparison.Ordinal))
-                {
-                    value.Item1 = JsonSerializer.Deserialize<T1>(ref reader, options);
-                }
-                else if (string.Equals(name, nameof(value.Item2), StringComparison.Ordinal))
-                {
-                    value.Item2 = JsonSerializer.Deserialize<T2>(ref reader, options);
-                }
-                else if (string.Equals(name, nameof(value.Item3), StringComparison.Ordinal))
-                {
-                    value.Item3 = JsonSerializer.Deserialize<T3>(ref reader, options);
-                }
-                else
-                {
-                    reader.Skip();
-                }
-            }
-
-            return value;
-        }
-
-        /// <inheritdoc/>
-        public override void Write(
-            Utf8JsonWriter writer,
-            SerializableValueTuple<T1, T2, T3> value,
-            JsonSerializerOptions options
-        )
-        {
-            writer.WriteStartObject();
-            writer.WritePropertyName(nameof(value.Item1));
-            JsonSerializer.Serialize(writer, value.Item1, options);
-            writer.WritePropertyName(nameof(value.Item2));
-            JsonSerializer.Serialize(writer, value.Item2, options);
-            writer.WritePropertyName(nameof(value.Item3));
-            JsonSerializer.Serialize(writer, value.Item3, options);
-            writer.WriteEndObject();
         }
     }
 }

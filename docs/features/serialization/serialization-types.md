@@ -886,8 +886,8 @@ You do not have to adopt the stand-in to fix protobuf. The package ships
 
 so the generator emits an ahead-of-time formatter for every closed `ValueTuple` your build actually
 uses, and `Serializer.ProtoSerialize((7, 1.5f))` goes through it instead of protobuf-net's
-reflection. JSON is covered too, by a hand-written converter for the tuple and for the stand-in. In
-both cases the output is `SerializableValueTuple`'s by construction, so the two cannot drift apart.
+reflection. The bytes are `SerializableValueTuple`'s by construction, so the tuple and the stand-in
+cannot drift apart. **Protobuf only** — see the JSON caveat above.
 
 The stand-in is still what you need for a **serialized field**, because that is Unity's own
 serializer rather than ours.

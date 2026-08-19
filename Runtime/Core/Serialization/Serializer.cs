@@ -70,14 +70,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 converters.Add(new JsonStringEnumConverter());
             }
 
-#if !WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION
-            // AFTER the enum converter, deliberately. Anywhere ahead of System.Text.Json's own
-            // reflective fallback is early enough for a tuple, and JsonStringEnumConverter's index
-            // is load-bearing -- it decides which converter claims an enum-shaped type first, and
-            // JsonConverterCoverageTests pins it for exactly that reason.
-            converters.Add(ValueTupleJsonConverterFactory.Instance);
-#endif
-
             converters.Add(Vector3Converter.Instance);
             converters.Add(Vector2Converter.Instance);
             converters.Add(Vector4Converter.Instance);
