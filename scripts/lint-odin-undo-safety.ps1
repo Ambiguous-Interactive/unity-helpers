@@ -88,7 +88,13 @@ if ($Paths -and $Paths.Count -gt 0) {
 } else {
   $odinPath = 'Editor/CustomDrawers/Odin'
   if (Test-Path $odinPath) {
-    $filesToScan += Get-ChildItem -Recurse -Include *.cs -Path $odinPath | Select-Object -ExpandProperty FullName
+    # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse -Include; the
+    # Sort-Object -Unique below already fixes the order.
+    $filesToScan += [System.IO.Directory]::EnumerateFiles(
+      (Resolve-Path -LiteralPath $odinPath).Path,
+      '*.cs',
+      [System.IO.SearchOption]::AllDirectories
+    )
   }
 }
 

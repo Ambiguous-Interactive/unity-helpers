@@ -166,7 +166,13 @@ if ($Paths -and $Paths.Count -gt 0) {
 } else {
   $drawerPath = 'Editor/CustomDrawers'
   if (Test-Path $drawerPath) {
-    $filesToScan += Get-ChildItem -Recurse -Include *Drawer.cs -Path $drawerPath | Select-Object -ExpandProperty FullName
+    # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse -Include; the
+    # Sort-Object -Unique below already fixes the order.
+    $filesToScan += [System.IO.Directory]::EnumerateFiles(
+      (Resolve-Path -LiteralPath $drawerPath).Path,
+      '*Drawer.cs',
+      [System.IO.SearchOption]::AllDirectories
+    )
   }
 }
 
