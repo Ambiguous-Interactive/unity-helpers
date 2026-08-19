@@ -225,6 +225,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
+                // A [SerializeReference] field is null on a fresh probe, and a null managed
+                // reference has no children -- so every field of the type it would hold answers
+                // `null` to FindPropertyRelative and would be reported as dropped, on an instance
+                // Unity persists perfectly well. A validator that fires on correct code is worse
+                // than none, so the walk stops at the reference rather than guessing what is behind
+                // it.
+                if (property.propertyType == SerializedPropertyType.ManagedReference)
+                {
+                    continue;
+                }
+
                 Type nested = InlineSerializable(field.FieldType);
                 if (nested == null || !visiting.Add(nested))
                 {

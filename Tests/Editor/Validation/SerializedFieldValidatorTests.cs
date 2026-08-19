@@ -94,12 +94,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assert.AreEqual("SerializableDictionary<string, int>", finding.StandIn);
             }
 
+            string[] reported = findings.Select(finding => finding.FieldName).ToArray();
+
             // And the sibling that Unity does serialize stays quiet, so the nested walk is not
             // simply reporting every field it reaches.
-            CollectionAssert.DoesNotContain(
-                findings.Select(finding => finding.FieldName).ToArray(),
-                "nestedCount"
-            );
+            CollectionAssert.DoesNotContain(reported, "nestedCount");
+
+            // Nor does the walk go behind a [SerializeReference], which is null on a fresh probe and
+            // therefore has no children -- reading that as "Unity dropped them" would report a
+            // field Unity persists perfectly well, which is the one thing this must never do.
+            CollectionAssert.DoesNotContain(reported, "payloadLookup");
+            CollectionAssert.DoesNotContain(reported, "payload");
         }
 
         [Test]

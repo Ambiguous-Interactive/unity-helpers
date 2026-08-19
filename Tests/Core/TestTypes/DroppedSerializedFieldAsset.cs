@@ -55,6 +55,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// <summary>An array of them, the other collection spelling.</summary>
         public NestedBlock[] blockArray = System.Array.Empty<NestedBlock>();
 
+        /// <summary>Serialized by reference and null on a fresh instance, so it has no children.</summary>
+        [SerializeReference]
+        public ProbePayload payload;
+
+        /// <summary>
+        /// A polymorphic payload, held through <c>[SerializeReference]</c>.
+        /// </summary>
+        /// <remarks>
+        /// Its dropped field is deliberately identical to <see cref="NestedBlock"/>'s. Unity
+        /// persists this one on a real instance, and a fresh probe leaves the reference null with no
+        /// children at all -- so a walk that read "no child property" as "Unity dropped it" would
+        /// report a field that is fine.
+        /// </remarks>
+        [Serializable]
+        public sealed class ProbePayload
+        {
+            /// <summary>Would be dropped if this type were inline; it is not asked about.</summary>
+            public Dictionary<string, int> payloadLookup;
+        }
+
         /// <summary>A nested serializable type, which Unity serializes inline.</summary>
         /// <remarks>
         /// The parent field produces a property whatever this holds, so a check that asks only
