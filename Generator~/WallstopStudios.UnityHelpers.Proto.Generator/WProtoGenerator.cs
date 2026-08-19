@@ -1010,7 +1010,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            foreach (ISymbol member in contract.GetMembers())
+            // The BASE CHAIN, not just the contract. An uninitialized allocation zeroes the whole
+            // object, inherited fields included, so a base's declaration initializer is dropped
+            // exactly as the contract's own is. That is the shape this diagnostic was written for
+            // and the one it originally missed: `AbstractRandom._guidBytes` is declared on the base
+            // while `SkipConstructor` sits on each of the twelve concrete generators, so a check
+            // that asks only the contract would never have reported the defect it exists to catch.
+            for (
+                INamedTypeSymbol declaring = contract;
+                declaring != null && declaring.SpecialType != SpecialType.System_Object;
+                declaring = declaring.BaseType
+            )
+            {
+                ReportDroppedInitializers(context, contract, declaring);
+            }
+        }
+
+        /// <summary>
+        /// Reports each field of <paramref name="declaring"/> whose value exists only because a
+        /// constructor ran, against the contract that asked for one never to.
+        /// </summary>
+        /// <param name="context">The generator context, for reporting.</param>
+        /// <param name="contract">The contract declaring <c>SkipConstructor</c>.</param>
+        /// <param name="declaring">The contract itself, or one of its base types.</param>
+        private static void ReportDroppedInitializers(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol contract,
+            INamedTypeSymbol declaring
+        )
+        {
+            foreach (ISymbol member in declaring.GetMembers())
             {
                 if (
                     member.IsStatic
@@ -1065,7 +1094,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         WProtoDiagnostics.SkipConstructorDropsAnInitializer,
                         declared.Locations.FirstOrDefault(),
                         contract.Name,
-                        declared.Name
+                        SymbolEqualityComparer.Default.Equals(declaring, contract)
+                            ? declared.Name
+                            : declaring.Name + "." + declared.Name
                     )
                 );
             }

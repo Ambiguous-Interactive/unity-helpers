@@ -123,6 +123,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AnInheritedFieldInitializerIsReportedToo()
+        {
+            // The shape the diagnostic was written for, and the one it originally missed: the
+            // buffer is declared on the BASE while SkipConstructor sits on the concrete contract.
+            // protobuf-net allocates the whole object uninitialized, inherited fields included, so
+            // the base's initializer is dropped exactly as an own one is -- and this is precisely
+            // `AbstractRandom._guidBytes` under twelve generators.
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public abstract class Machinery { protected byte[] _scratch = new byte[16]; }
+                  [WProtoContract(SkipConstructor = true)] public partial class Engine : Machinery { [WProtoMember(1)] public ulong State; }"
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033");
+
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
+
+            // Names the contract that asked for the uninitialized allocation AND the type that
+            // declares the field, because otherwise the reader has nowhere to look.
+            Assert.IsTrue(match.GetMessage().Contains("Engine"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("Machinery._scratch"), match.GetMessage());
+
+            // A base with nothing to drop stays quiet, so the walk is not simply reporting bases.
+            Assert.IsEmpty(
+                Run(
+                        @"public abstract class Bare { protected byte[] _scratch; }
+                          [WProtoContract(SkipConstructor = true)] public partial class Plain : Bare { [WProtoMember(1)] public ulong State; }"
+                    )
+                    .Where(diagnostic => diagnostic.Id == "WPROTO033")
+            );
+        }
+
+        [Test]
         public void AnImmutableContractDeclaringSkipConstructorStillWarns()
         {
             // This generator IGNORES SkipConstructor on a contract it builds through a constructor,

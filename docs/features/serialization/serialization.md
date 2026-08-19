@@ -977,7 +977,8 @@ the skip is otherwise invisible until that type is serialized in a shipped playe
 type to `internal`, or register the formatter yourself from code that can name it.
 
 `WPROTO033` warns when a contract declaring `SkipConstructor` has a field that is initialized where
-it is declared and is not a `[WProtoMember]`. `SkipConstructor` asks protobuf-net to allocate the
+it is declared and is not a `[WProtoMember]` — **including one inherited from a base type**, because
+an uninitialized allocation zeroes the whole object rather than just the contract's own half. `SkipConstructor` asks protobuf-net to allocate the
 instance **uninitialized**: no constructor runs, so no field initializer runs either, and a field the
 wire does not carry cannot be restored — it arrives at its type's default on every deserialized
 instance. A scratch buffer is the usual case, and the usual fix is to allocate it where it is used
@@ -985,6 +986,11 @@ rather than where it is declared. Putting it on the wire works too. A
 `[WProtoAfterDeserialization]` hook does **not**, on its own: protobuf-net does not invoke
 `[ProtoAfterDeserialization]` on a `SkipConstructor` contract. Suppress `WPROTO033` at the
 declaration when the default really is a valid value.
+
+An inherited field is reported against every contract that declares `SkipConstructor` under it, and
+names the declaring type — `Machinery._scratch` rather than `_scratch` — so the one field is
+findable from each. That multiplicity is not noise: each of those contracts really does hand back an
+instance whose buffer is `null`, and allocating it where it is used fixes all of them at once.
 
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.
