@@ -881,6 +881,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new(typeof(Vector3Int), new Vector3Int(3, -4, 5)),
                 new(typeof(FastVector2Int), new FastVector2Int(3, -4)),
                 new(typeof(FastVector3Int), new FastVector3Int(3, -4, 5)),
+                // Both the framework tuple and its stand-in: they are served by two different
+                // converters that must produce the same JSON, and the tuple's is the one a
+                // consumer reaches without opting into anything.
+                new(typeof(ValueTuple<int, float>), (7, 1.5f)),
+                new(typeof(ValueTuple<int, float, string>), (3, 0.25f, "a")),
+                new(
+                    typeof(SerializableValueTuple<int, float>),
+                    new SerializableValueTuple<int, float>(7, 1.5f)
+                ),
+                new(
+                    typeof(SerializableValueTuple<int, float, string>),
+                    new SerializableValueTuple<int, float, string>(3, 0.25f, "a")
+                ),
                 new(typeof(Quaternion), new Quaternion(0.1f, 0.2f, 0.3f, 0.9f)),
                 new(typeof(Matrix4x4), Matrix4x4.identity),
                 new(typeof(Color), new Color(0.1f, 0.2f, 0.3f, 0.4f)),

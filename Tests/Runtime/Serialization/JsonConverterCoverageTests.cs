@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// How many converters the normal configuration registers, pinned against history so a
         /// reorder or a silent addition to the one shared list is visible.
         /// </summary>
-        private const int ShippedConverterCount = 47;
+        private const int ShippedConverterCount = 48;
 
         /// <summary>
         /// Where <see cref="JsonStringEnumConverter"/> sits in that list. Registration order is
