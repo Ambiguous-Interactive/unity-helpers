@@ -823,6 +823,13 @@ Unity-friendly stand-in for `ValueTuple`, in two- and three-component forms.
   `List<T>` loses whatever you authored with nothing to report it. `[Serializable]` on the type is
   not the obstacle (`ValueTuple<,>` already carries it); Unity declines every type out of the
   framework assemblies.
+- **And it is worse in a player.** `Serializer.ProtoSerialize((7, 1.5f))` and
+  `Serializer.JsonStringify((7, 1.5f))` both work in the editor and both throw
+  `ExecutionEngineException` on an IL2CPP standalone build — protobuf-net's
+  `StructValueChecker<ValueTuple<int, float>>` and System.Text.Json's
+  `ObjectDefaultConverter<ValueTuple<int, float>>` are instantiated reflectively, so no AOT code is
+  generated for them. Measured on Unity 2021.3. A tuple therefore looks serializable right up until
+  you ship.
 - **Solution:** `SerializableValueTuple<T1, T2>` and `SerializableValueTuple<T1, T2, T3>` — the same
   components under a name Unity will serialize, with implicit conversions in both directions so
   `(T1, T2)` stays the spelling everywhere else.
@@ -863,6 +870,10 @@ SerializableValueTuple<int, float> read =
 
 Verified byte-identical for protobuf (`0807150000C03F` either way) and character-identical for JSON
 (`{"Item1":7,"Item2":1.5}`).
+
+The direction that matters is reading _old data into the stand-in_, and that works everywhere. Going
+the other way — deserializing into a `ValueTuple` — is the reflective path described above, so it is
+editor-only; prefer the stand-in on both sides once you have migrated.
 
 ---
 
