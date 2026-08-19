@@ -888,6 +888,13 @@ Two boundaries are worth knowing:
   type its own converter, or serialize it with WallstopProto, which generates a formatter per
   closure for exactly this reason.
 
+Registering the container's converter is necessary and was not sufficient. Every collection converter
+here used to read its payload with `JsonSerializer.Deserialize<List<T>>`, and System.Text.Json
+resolves _that_ through its own factory — so a player got as far as calling the registered converter
+and then threw on `ListOfTConverter<List<sbyte>, sbyte>::.ctor`. Measured on a 2021.3 IL2CPP
+standalone player. They now read and write elements one at a time, which asks only for `T`'s
+converter: a built-in for every primitive and enum, and a registered instance for anything declared.
+
 ## WallstopProto: the reflection-free wire layer (preview)
 
 `WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree

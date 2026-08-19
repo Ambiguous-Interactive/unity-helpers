@@ -84,7 +84,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 // Handle array format (legacy/fallback)
                 if (reader.TokenType == JsonTokenType.StartArray)
                 {
-                    T[] items = JsonSerializer.Deserialize<T[]>(ref reader, options);
+                    T[] items = WJsonArray.ReadArray<T>(
+                        ref reader,
+                        options,
+                        "SerializableHashSet<T>"
+                    );
                     SerializableHashSet<T> set = new();
                     if (items != null)
                     {
@@ -127,7 +131,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        itemsArray = JsonSerializer.Deserialize<T[]>(ref reader, options);
+                        itemsArray = WJsonArray.ReadArray<T>(
+                            ref reader,
+                            options,
+                            "SerializableHashSet<T>"
+                        );
                     }
                     else
                     {
@@ -162,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                 writer.WriteStartObject();
                 writer.WritePropertyName(ItemsPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedItems, options);
+                WJsonArray.Write(writer, value.SerializedItems, options);
                 writer.WriteEndObject();
             }
 
@@ -199,7 +207,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 // Handle array format (legacy/fallback)
                 if (reader.TokenType == JsonTokenType.StartArray)
                 {
-                    T[] items = JsonSerializer.Deserialize<T[]>(ref reader, options);
+                    T[] items = WJsonArray.ReadArray<T>(
+                        ref reader,
+                        options,
+                        "SerializableSortedSet<T>"
+                    );
                     SerializableSortedSet<T> set = new();
                     if (items != null)
                     {
@@ -242,7 +254,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        itemsArray = JsonSerializer.Deserialize<T[]>(ref reader, options);
+                        itemsArray = WJsonArray.ReadArray<T>(
+                            ref reader,
+                            options,
+                            "SerializableSortedSet<T>"
+                        );
                     }
                     else
                     {
@@ -277,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                 writer.WriteStartObject();
                 writer.WritePropertyName(ItemsPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedItems, options);
+                WJsonArray.Write(writer, value.SerializedItems, options);
                 writer.WriteEndObject();
             }
 

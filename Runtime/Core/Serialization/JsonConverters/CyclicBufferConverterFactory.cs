@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("items must be an array");
                         }
-                        items = JsonSerializer.Deserialize<List<T>>(ref reader, options);
+                        items = WJsonArray.ReadList<T>(ref reader, options, "CyclicBuffer<T>");
                     }
                     else
                     {

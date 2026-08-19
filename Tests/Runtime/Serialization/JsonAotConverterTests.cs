@@ -99,6 +99,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             Assert.AreEqual(1.5, readRange.min);
             Assert.AreEqual(2.5, readRange.max);
+
+            // The three remaining shapes whose converters delegated to System.Text.Json for the
+            // COLLECTION rather than for its elements. Registering a converter for the container was
+            // not enough while its first act was to ask for a List<T> or T[] one, which
+            // System.Text.Json also builds reflectively.
+            SerializableList<ulong> list = new() { 1UL, 2UL };
+            SerializableList<ulong> readList = Serializer.JsonDeserialize<SerializableList<ulong>>(
+                Serializer.JsonStringify(list)
+            );
+            CollectionAssert.AreEqual(new ulong[] { 1UL, 2UL }, readList);
+
+            SerializableHashSet<short> set = new() { 3, 4 };
+            SerializableHashSet<short> readSet = Serializer.JsonDeserialize<
+                SerializableHashSet<short>
+            >(Serializer.JsonStringify(set));
+            CollectionAssert.AreEquivalent(new short[] { 3, 4 }, readSet);
+
+            CyclicBuffer<ushort> buffer = new(4) { 5, 6 };
+            CyclicBuffer<ushort> readBuffer = Serializer.JsonDeserialize<CyclicBuffer<ushort>>(
+                Serializer.JsonStringify(buffer)
+            );
+            CollectionAssert.AreEqual(new ushort[] { 5, 6 }, readBuffer);
         }
 
         [Test]

@@ -122,7 +122,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        keysArray = JsonSerializer.Deserialize<TKey[]>(ref reader, options);
+                        keysArray = WJsonArray.ReadArray<TKey>(
+                            ref reader,
+                            options,
+                            "SerializableSortedDictionary<TKey, TValue>"
+                        );
                     }
                     else if (
                         string.Equals(
@@ -132,7 +136,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        valuesArray = JsonSerializer.Deserialize<TValue[]>(ref reader, options);
+                        valuesArray = WJsonArray.ReadArray<TValue>(
+                            ref reader,
+                            options,
+                            "SerializableSortedDictionary<TKey, TValue>"
+                        );
                     }
                     else
                     {
@@ -167,9 +175,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                 writer.WriteStartObject();
                 writer.WritePropertyName(KeysPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedKeys, options);
+                WJsonArray.Write(writer, value.SerializedKeys, options);
                 writer.WritePropertyName(ValuesPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedValues, options);
+                WJsonArray.Write(writer, value.SerializedValues, options);
                 writer.WriteEndObject();
             }
 
@@ -253,7 +261,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        keysArray = JsonSerializer.Deserialize<TKey[]>(ref reader, options);
+                        keysArray = WJsonArray.ReadArray<TKey>(
+                            ref reader,
+                            options,
+                            "SerializableSortedDictionary<TKey, TValue, TValueCache>"
+                        );
                     }
                     else if (
                         string.Equals(
@@ -263,9 +275,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         )
                     )
                     {
-                        valuesArray = JsonSerializer.Deserialize<TValueCache[]>(
+                        valuesArray = WJsonArray.ReadArray<TValueCache>(
                             ref reader,
-                            options
+                            options,
+                            "SerializableSortedDictionary<TKey, TValue, TValueCache>"
                         );
                     }
                     else
@@ -301,9 +314,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
                 writer.WriteStartObject();
                 writer.WritePropertyName(KeysPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedKeys, options);
+                WJsonArray.Write(writer, value.SerializedKeys, options);
                 writer.WritePropertyName(ValuesPropertyName);
-                JsonSerializer.Serialize(writer, value.SerializedValues, options);
+                WJsonArray.Write(writer, value.SerializedValues, options);
                 writer.WriteEndObject();
             }
 

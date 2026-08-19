@@ -52,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 {
                     throw new JsonException("Deque<T> expects a JSON array");
                 }
-                List<T> items = JsonSerializer.Deserialize<List<T>>(ref reader, options);
+                List<T> items = WJsonArray.ReadList<T>(ref reader, options, "Deque<T>");
                 return items == null ? new Deque<T>(Deque<T>.DefaultCapacity) : new Deque<T>(items);
             }
 

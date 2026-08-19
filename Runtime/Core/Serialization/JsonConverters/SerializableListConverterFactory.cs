@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return null;
                 }
 
-                List<T> items = JsonSerializer.Deserialize<List<T>>(ref reader, options);
+                List<T> items = WJsonArray.ReadList<T>(ref reader, options, "SerializableList<T>");
                 return new SerializableList<T>(items);
             }
 
