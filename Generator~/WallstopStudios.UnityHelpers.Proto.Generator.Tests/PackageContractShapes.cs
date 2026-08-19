@@ -105,6 +105,57 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     }
 
     /// <summary>
+    /// Stands in for <c>SerializableValueTuple&lt;T1, T2&gt;</c>: two members whose numbers are
+    /// <see cref="System.ValueTuple{T1, T2}"/>'s own.
+    /// </summary>
+    /// <typeparam name="T1">The first component's type.</typeparam>
+    /// <typeparam name="T2">The second component's type.</typeparam>
+    /// <remarks>
+    /// The interchangeability with <c>ValueTuple</c> is the whole point of the type, so the bytes it
+    /// writes are its contract rather than an implementation detail.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public partial struct ValueTupleShape<T1, T2>
+    {
+        /// <summary>The first component.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public T1 Item1;
+
+        /// <summary>The second component.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public T2 Item2;
+    }
+
+    /// <summary>
+    /// Stands in for <c>SerializableValueTuple&lt;T1, T2, T3&gt;</c>.
+    /// </summary>
+    /// <typeparam name="T1">The first component's type.</typeparam>
+    /// <typeparam name="T2">The second component's type.</typeparam>
+    /// <typeparam name="T3">The third component's type.</typeparam>
+    [ProtoContract]
+    [WProtoContract]
+    public partial struct ValueTripleShape<T1, T2, T3>
+    {
+        /// <summary>The first component.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public T1 Item1;
+
+        /// <summary>The second component.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public T2 Item2;
+
+        /// <summary>The third component.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public T3 Item3;
+    }
+
+    /// <summary>
     /// Stands in for <c>SerializableType</c>: one string member beside fields neither serializer
     /// writes.
     /// </summary>

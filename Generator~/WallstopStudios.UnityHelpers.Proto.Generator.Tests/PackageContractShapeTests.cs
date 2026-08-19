@@ -49,15 +49,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ["None"] = typeof(NoneShape),
             ["Line2D"] = typeof(LineShape),
             ["Line3D"] = typeof(LineShape),
-            ["Range"] = typeof(RangeShape<>),
-            ["SerializableNullable"] = typeof(NullableShape<>),
+            ["Range`1"] = typeof(RangeShape<>),
+            ["SerializableNullable`1"] = typeof(NullableShape<>),
             ["SerializableType"] = typeof(TypeNameShape),
-            ["SerializableList"] = typeof(ListShape<>),
+            ["SerializableList`1"] = typeof(ListShape<>),
+            ["SerializableValueTuple`2"] = typeof(ValueTupleShape<,>),
+            ["SerializableValueTuple`3"] = typeof(ValueTripleShape<,,>),
             ["DisjointSet"] = typeof(DisjointShape),
             ["BitSet"] = typeof(BitShape),
             ["AttributeModification"] = typeof(ModificationShape),
             ["PeriodicEffectDefinition"] = typeof(PeriodicShape),
-            ["Cache"] = typeof(CacheHolderShape.CacheShape<>),
+            ["Cache`1"] = typeof(CacheHolderShape.CacheShape<>),
             ["AbstractRandom"] = typeof(RandomBaseShape),
             ["PcgRandom"] = typeof(RandomLeafShape),
             ["XorShiftRandom"] = typeof(RandomLeafShape),
@@ -169,6 +171,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertIdentical(
                 new NullableShape<double> { hasValue = true, value = -0.5 },
                 "present, double"
+            );
+        }
+
+        [Test]
+        public void AValueTupleShapeEncodesAsTheOracleEncodesIt()
+        {
+            // The point of SerializableValueTuple is that it is interchangeable with ValueTuple, so
+            // its bytes are the contract. Both arities, and a default component in each, because a
+            // member equal to its type's default is the one protobuf omits.
+            AssertIdentical(new ValueTupleShape<int, float>(), "default");
+            AssertIdentical(new ValueTupleShape<int, float> { Item1 = 7 }, "first only");
+            AssertIdentical(new ValueTupleShape<int, float> { Item2 = 1.5f }, "second only");
+            AssertIdentical(new ValueTupleShape<int, float> { Item1 = 7, Item2 = 1.5f }, "both");
+
+            // A reference component, whose empty and null cases differ on the wire.
+            AssertIdentical(new ValueTupleShape<string, int>(), "null string");
+            AssertIdentical(
+                new ValueTupleShape<string, int> { Item1 = string.Empty },
+                "empty string"
+            );
+
+            AssertIdentical(new ValueTripleShape<int, float, string>(), "triple default");
+            AssertIdentical(
+                new ValueTripleShape<int, float, string>
+                {
+                    Item1 = 3,
+                    Item2 = 0.25f,
+                    Item3 = "a",
+                },
+                "triple populated"
             );
         }
 

@@ -75,20 +75,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Hand-written formatter (WGuidWProtoFormatter), byte-verified in session 172.",
             ["RandomState"] =
                 "Hand-written formatter (RandomStateWProtoFormatter), byte-verified in session 172.",
-            ["Deque"] =
+            ["Deque`1"] =
                 "Serializer marshals it through DequeProtoWrapper, which carries the WallstopProto "
                 + "annotation, and [assembly: WProtoRootMarshal] serves it at the root. Annotating "
                 + "Deque itself would make its own formatter answer first, with message bytes where "
                 + "the wrapper writes items-plus-capacity. RootMarshalCoverageTests checks the "
                 + "marshal exists rather than trusting this sentence.",
-            ["CyclicBuffer"] = "As Deque, through CyclicBufferProtoWrapper.",
+            ["CyclicBuffer`1"] = "As Deque, through CyclicBufferProtoWrapper.",
             ["SparseSet"] = "As Deque, through SparseSetProtoWrapper.",
-            ["SerializableDictionaryBase"] =
+            ["SerializableDictionaryBase`3"] =
                 "Serializer marshals SerializableDictionary through SerializableDictionaryProtoWrapper, "
                 + "which carries the annotation.",
-            ["SerializableSortedDictionaryBase"] =
+            ["SerializableSortedDictionaryBase`3"] =
                 "As SerializableDictionaryBase, through SerializableSortedDictionaryProtoWrapper.",
-            ["SerializableSetBase"] =
+            ["SerializableSetBase`2"] =
                 "Serializer marshals SerializableHashSet and SerializableSortedSet through "
                 + "SerializableHashSetProtoWrapper and SerializableSortedSetProtoWrapper.",
         };
@@ -600,15 +600,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     continue;
                 }
 
+                // Matched on the identifier rather than the key, because the reason is prose: a
+                // reviewer writes "As Deque", not "As Deque`1". The arity is in the key so that two
+                // arities of one generic cannot share an entry, which is a different question.
                 string referenced = entry.Value.Substring("As ".Length).Split(',', ' ')[0].Trim();
                 Assert.That(
-                    NotMirrored.ContainsKey(referenced),
+                    NotMirrored.Keys.Any(key => Identifier(key) == referenced),
                     Is.True,
                     $"'{entry.Key}' defers to '{referenced}', which is not itself listed."
                 );
                 Assert.That(
                     referenced,
-                    Is.Not.EqualTo(entry.Key),
+                    Is.Not.EqualTo(Identifier(entry.Key)),
                     $"'{entry.Key}' defers to itself."
                 );
             }
@@ -775,7 +778,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 return new ContractDeclaration
                 {
-                    Name = type.Identifier.ValueText,
+                    Name = NameWithArity(type),
                     Where = Location(file, type),
                     HasProtoContract = proto != null,
                     HasWProtoContract = wproto != null,
@@ -949,6 +952,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         return member.Kind().ToString();
                 }
             }
+        }
+
+        /// <summary>Strips the arity suffix, leaving the name as a person writes it.</summary>
+        /// <param name="key">A contract key, arity-qualified or not.</param>
+        private static string Identifier(string key)
+        {
+            int tick = key.IndexOf('`');
+            return tick < 0 ? key : key.Substring(0, tick);
+        }
+
+        /// <summary>
+        /// Names a contract the way the CLR does, so two arities of one generic are two contracts.
+        /// </summary>
+        /// <param name="type">The declaration to name.</param>
+        /// <remarks>
+        /// The identifier alone is not a key: C# lets <c>Foo&lt;T1, T2&gt;</c> and
+        /// <c>Foo&lt;T1, T2, T3&gt;</c> coexist -- the pattern the BCL itself uses for
+        /// <c>ValueTuple</c>, <c>Func</c> and <c>Tuple</c> -- and this repository now ships one.
+        /// Keying on the identifier let a single <c>NotMirrored</c> or <c>Mirrors</c> entry silently
+        /// cover both, which is the failure
+        /// <see cref="TheMirrorCheckReachesEveryContractInTheRuntimeTree"/> exists to refuse.
+        /// </remarks>
+        private static string NameWithArity(TypeDeclarationSyntax type)
+        {
+            int arity = type.TypeParameterList?.Parameters.Count ?? 0;
+            return arity == 0 ? type.Identifier.ValueText : type.Identifier.ValueText + "`" + arity;
         }
 
         private static List<AttributeSyntax> Attributes(SyntaxList<AttributeListSyntax> lists)
