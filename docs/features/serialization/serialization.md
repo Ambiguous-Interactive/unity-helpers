@@ -983,14 +983,31 @@ instance **uninitialized**: no constructor runs, so no field initializer runs ei
 wire does not carry cannot be restored — it arrives at its type's default on every deserialized
 instance. A scratch buffer is the usual case, and the usual fix is to allocate it where it is used
 rather than where it is declared. Putting it on the wire works too. A
-`[WProtoAfterDeserialization]` hook does **not**, on its own: protobuf-net does not invoke
-`[ProtoAfterDeserialization]` on a `SkipConstructor` contract. Suppress `WPROTO033` at the
-declaration when the default really is a valid value.
+`[WProtoAfterDeserialization]` hook works only when every reader runs it, which is what `WPROTO034`
+is about. Suppress `WPROTO033` at the declaration when the default really is a valid value.
 
 An inherited field is reported against every contract that declares `SkipConstructor` under it, and
 names the declaring type — `Machinery._scratch` rather than `_scratch` — so the one field is
 findable from each. That multiplicity is not noise: each of those contracts really does hand back an
 instance whose buffer is `null`, and allocating it where it is used fixes all of them at once.
+
+`WPROTO034` warns when a lifecycle hook is declared on a **subtype** of a `[WProtoInclude]` chain.
+A reader invokes the callbacks of the type that owns the wire shape — the root — and the three
+readers this package has to satisfy do not agree beyond that point:
+
+| Hook placement           | WallstopProto               | protobuf-net 2.4.9          | protobuf-net 3.2.56 |
+| ------------------------ | --------------------------- | --------------------------- | ------------------- |
+| On the root of the chain | runs once                   | runs once                   | runs once           |
+| On a subtype             | runs, innermost level first | runs, outermost level first | **never runs**      |
+| On a type with no chain  | runs once                   | runs once                   | runs once           |
+
+So a hook on a subtype is silently dead wherever protobuf-net 3 serves the type — a
+`WALLSTOP_PROTO`-off build, or anything `Serializer` reaches reflectively — and where it does run,
+it runs in the opposite order under the two readers that run it. Declare the hook on the root and
+have it call a `protected virtual` method the subtype overrides; that runs once, in one order,
+everywhere. `AbstractRandom` is the worked example: the after-deserialization work `DotNetRandom`
+needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
+`WPROTO034` at the declaration when the hook only repeats work every other path already does.
 
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.

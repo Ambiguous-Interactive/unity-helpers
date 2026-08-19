@@ -2452,6 +2452,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             Hooks hooks = new Hooks();
             bool failed = false;
+            INamedTypeSymbol root = RootContract(contract);
 
             foreach (ISymbol symbol in contract.GetMembers())
             {
@@ -2500,6 +2501,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     Report(context, WProtoDiagnostics.DuplicateHook, method, contract.Name, kind);
                     failed = true;
+                    continue;
+                }
+
+                // Measured against both oracles, and they disagree with each other, which is why
+                // this is a warning rather than a behaviour change. protobuf-net 3.2.56 invokes the
+                // callbacks of the type that owns the wire shape -- the ROOT of the include chain --
+                // and none of a subtype's, so a hook written here is silently dead in any build the
+                // fallback serves. 2.4.9 invokes every level, outermost first, where this generator
+                // emits innermost first. Only the root is a moment all three agree on.
+                if (root != null)
+                {
+                    Report(
+                        context,
+                        WProtoDiagnostics.HookOnSubtype,
+                        method,
+                        contract.Name,
+                        method.Name,
+                        root.Name
+                    );
                 }
             }
 

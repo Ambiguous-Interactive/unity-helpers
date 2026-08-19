@@ -128,6 +128,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public abstract RandomState InternalState { get; }
 
+        /// <summary>
+        /// Runs once on the instance a payload was read into, whichever generator it turned out to
+        /// be.
+        /// </summary>
+        /// <remarks>
+        /// Declared here rather than on the subtype that needs it, and this is the only placement
+        /// every reader agrees on. A reader invokes the callbacks of the type that owns the wire
+        /// shape, which is this one: protobuf-net 3.2.56 runs the root's and none of a subtype's,
+        /// 2.4.9 runs every level outermost-first, and WallstopProto runs every level
+        /// innermost-first. A hook declared on <c>DotNetRandom</c> therefore ran under two readers
+        /// out of three -- see WPROTO034, which now says so at the declaration.
+        /// </remarks>
+        protected virtual void OnAfterDeserialization() { }
+
+        [ProtoAfterDeserialization]
+        [WProtoAfterDeserialization]
+        private void OnProtoDeserialize()
+        {
+            OnAfterDeserialization();
+        }
+
         // Allocated on first use rather than by an initializer: a formatter that allocates an
         // uninitialized instance -- which is what SkipConstructor asks protobuf-net for -- runs no
         // initializer at all, and a buffer that only NextGuid touches would arrive null.

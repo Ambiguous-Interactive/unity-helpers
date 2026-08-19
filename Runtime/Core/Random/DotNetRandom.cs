@@ -155,9 +155,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureRandomInitialized();
         }
 
-        [ProtoAfterDeserialization]
-        [WProtoAfterDeserialization]
-        private void OnProtoDeserialize()
+        protected override void OnAfterDeserialization()
         {
             EnsureRandomInitialized();
         }
