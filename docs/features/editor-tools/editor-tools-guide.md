@@ -1288,6 +1288,50 @@ public class TestClassWithIntentionalIssues : BaseClass
 - Team onboarding
 - Post-refactoring verification
 
+### Serialized Field Validator
+
+**Menu:** `Tools > Wallstop Studios > Unity Helpers > Validate Serialized Fields In Selection`
+
+**Purpose:** Find fields you asked Unity to serialize that Unity silently drops, and name the
+replacement to use.
+
+Unity declines every type out of the framework assemblies, and it declines without a word:
+
+```csharp
+public class Loot : ScriptableObject
+{
+    public Dictionary<string, int> drops;   // gone on the next domain reload
+    public (int, float) weightedRoll;       // gone, and it IS [Serializable]
+}
+```
+
+`SerializedObject.FindProperty("drops")` returns `null`, `JsonUtility.ToJson` omits the field
+entirely, and nothing is logged. Whatever a designer authored into it is gone the next time the
+domain reloads, usually discovered from a build. `[Serializable]` is not the discriminator, which is
+what makes the rule hard to work out from the outside — `ValueTuple<int, float>` carries it and is
+dropped anyway.
+
+**How it decides:** it constructs the type, wraps it in a `SerializedObject`, and asks which fields
+arrived. That is Unity's own answer rather than a model of its rules, so it cannot misreport the
+generic user types Unity has serialized since 2020.
+
+**What it reports:** every `public` or `[SerializeField]` field with no `SerializedProperty`,
+inherited ones included, naming the package stand-in where there is one:
+
+```text
+Loot.drops is declared as Dictionary<String, Int32>, which Unity does not serialize. Anything
+authored into it is gone on the next domain reload. Use SerializableDictionary<String, Int32>
+instead.
+```
+
+**Silencing a field:** mark it `[NonSerialized]`. That is the standard way to say "runtime only",
+Unity honours it, and so does this.
+
+**Why the selection rather than the whole project:** validating a type means constructing one, and
+constructing every type in a project runs the startup half of the project. Select the script you
+just wrote — a `MonoScript`, a prefab, a scene object or an asset; a prefab contributes every
+component on it.
+
 ---
 
 ## Custom Component Editors
