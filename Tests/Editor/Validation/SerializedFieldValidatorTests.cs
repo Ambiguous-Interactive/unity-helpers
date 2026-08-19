@@ -31,7 +31,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
 
             CollectionAssert.AreEquivalent(
-                new[] { "lookup", "tags", "optionalCount", "frameworkPair", "_ordered" },
+                new[]
+                {
+                    "lookup",
+                    "tags",
+                    "optionalCount",
+                    "frameworkPair",
+                    "_ordered",
+                    // Three times over, once per way the same nested type is reached: directly, and
+                    // through each collection spelling.
+                    "nestedLookup",
+                    "nestedLookup",
+                    "nestedLookup",
+                },
                 findings.Select(finding => finding.FieldName).ToArray(),
                 string.Join(", ", findings.Select(finding => finding.ToString()))
             );
@@ -54,6 +66,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             // A field that says it is runtime-only, and one that never asked to be serialized.
             CollectionAssert.DoesNotContain(reported, "runtimeCache");
             CollectionAssert.DoesNotContain(reported, "_privateCache");
+        }
+
+        [Test]
+        public void AFieldOnANestedSerializableTypeIsReachedToo()
+        {
+            // The parent field produces a property whatever the nested type holds, so a check that
+            // asks only about the asset's own fields reports nothing here -- and a serializable
+            // struct or class holding authored data is an ordinary Unity layout, not a corner. The
+            // collection spellings matter separately: the fields of an element exist only under
+            // Array.data[0], so an empty list has nothing to ask about until one is materialized.
+            List<DroppedSerializedField> findings = new();
+            SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
+
+            List<DroppedSerializedField> nested = findings
+                .Where(finding => finding.FieldName == "nestedLookup")
+                .ToList();
+
+            Assert.AreEqual(3, nested.Count, "direct, List<T> and T[] should each be reached");
+            foreach (DroppedSerializedField finding in nested)
+            {
+                Assert.AreEqual(
+                    typeof(DroppedSerializedFieldAsset.NestedBlock),
+                    finding.Owner,
+                    "the finding should name the type that declares the field"
+                );
+                Assert.AreEqual("SerializableDictionary<string, int>", finding.StandIn);
+            }
+
+            // And the sibling that Unity does serialize stays quiet, so the nested walk is not
+            // simply reporting every field it reaches.
+            CollectionAssert.DoesNotContain(
+                findings.Select(finding => finding.FieldName).ToArray(),
+                "nestedCount"
+            );
         }
 
         [Test]

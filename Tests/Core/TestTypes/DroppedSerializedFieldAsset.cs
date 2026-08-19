@@ -46,6 +46,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// <summary>Not serialized and not reported: private, with no request to serialize it.</summary>
         private Dictionary<string, int> _privateCache;
 
+        /// <summary>Serialized as a whole; its own dropped field is the nested case.</summary>
+        public NestedBlock block = new();
+
+        /// <summary>A list of them, where the fields only exist under an array element.</summary>
+        public List<NestedBlock> blocks = new();
+
+        /// <summary>An array of them, the other collection spelling.</summary>
+        public NestedBlock[] blockArray = System.Array.Empty<NestedBlock>();
+
+        /// <summary>A nested serializable type, which Unity serializes inline.</summary>
+        /// <remarks>
+        /// The parent field produces a property whatever this holds, so a check that asks only
+        /// about the asset's own fields sees nothing wrong here -- which is the reason this exists.
+        /// </remarks>
+        [Serializable]
+        public sealed class NestedBlock
+        {
+            /// <summary>Dropped, one level down.</summary>
+            public Dictionary<string, int> nestedLookup;
+
+            /// <summary>Serialized, so the nested walk is not simply reporting everything.</summary>
+            public int nestedCount;
+        }
+
         /// <summary>Reads the private fields so nothing warns them unused.</summary>
         /// <returns>The count of both private caches, or zero.</returns>
         public int PrivateEntryCount()

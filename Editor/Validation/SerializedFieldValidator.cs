@@ -134,24 +134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 using SerializedObject serialized = new(instance);
-                foreach (FieldInfo field in DeclaredSerializationCandidates(type))
-                {
-                    if (serialized.FindProperty(field.Name) != null)
-                    {
-                        continue;
-                    }
-
-                    UnitySerializationStandIns.TryGetStandIn(field.FieldType, out string standIn);
-                    findings.Add(
-                        new DroppedSerializedField(
-                            field.DeclaringType,
-                            field.Name,
-                            field.FieldType,
-                            standIn
-                        )
-                    );
-                }
-
+                Inspect(serialized, null, type, findings, new HashSet<Type>(), 0);
                 return true;
             }
             catch (Exception)
@@ -171,6 +154,139 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     Object.DestroyImmediate(instance);
                 }
             }
+        }
+
+        /// <summary>
+        /// The depth Unity itself stops at for a plain <c>[Serializable]</c> class.
+        /// </summary>
+        /// <remarks>
+        /// A bound rather than a guess about cycles: <see cref="Inspect"/> already refuses a type it
+        /// is inside, which handles a graph that points back at itself. This handles the graph that
+        /// merely goes on for a long time, and the number is Unity's own nesting limit.
+        /// </remarks>
+        private const int MaximumNesting = 7;
+
+        /// <summary>
+        /// Reports the dropped fields of <paramref name="type"/>, then of everything nested in it.
+        /// </summary>
+        /// <param name="serialized">The probe instance's serialized view.</param>
+        /// <param name="parent">The property to resolve against, or <c>null</c> at the top.</param>
+        /// <param name="type">The type whose fields to ask about.</param>
+        /// <param name="findings">Receives one entry per dropped field.</param>
+        /// <param name="visiting">The types already being walked, so a cycle terminates.</param>
+        /// <param name="depth">How far down the graph this call is.</param>
+        /// <remarks>
+        /// <para>
+        /// The nested half matters as much as the top level and is easy to miss: a
+        /// <c>Dictionary</c> on a nested <c>[Serializable]</c> class is dropped exactly as one on
+        /// the behaviour is, but the <b>parent</b> field still produces a property, so asking only
+        /// about the behaviour's own fields reports nothing at all. A serializable struct holding
+        /// authored data is an ordinary Unity layout, not a corner.
+        /// </para>
+        /// <para>
+        /// A collection is materialized to one element before its element type is walked. The
+        /// fields of an element exist under <c>Array.data[0]</c> and there is nothing to ask about
+        /// while the array is empty; the instance is a throwaway probe that is destroyed in the
+        /// <c>finally</c> below, so growing it costs nothing and changes nothing.
+        /// </para>
+        /// </remarks>
+        private static void Inspect(
+            SerializedObject serialized,
+            SerializedProperty parent,
+            Type type,
+            List<DroppedSerializedField> findings,
+            HashSet<Type> visiting,
+            int depth
+        )
+        {
+            if (MaximumNesting < depth)
+            {
+                return;
+            }
+
+            foreach (FieldInfo field in DeclaredSerializationCandidates(type))
+            {
+                SerializedProperty property =
+                    parent == null
+                        ? serialized.FindProperty(field.Name)
+                        : parent.FindPropertyRelative(field.Name);
+
+                if (property == null)
+                {
+                    UnitySerializationStandIns.TryGetStandIn(field.FieldType, out string standIn);
+                    findings.Add(
+                        new DroppedSerializedField(
+                            field.DeclaringType,
+                            field.Name,
+                            field.FieldType,
+                            standIn
+                        )
+                    );
+                    continue;
+                }
+
+                Type nested = InlineSerializable(field.FieldType);
+                if (nested == null || !visiting.Add(nested))
+                {
+                    continue;
+                }
+
+                SerializedProperty scope = property;
+                if (property.isArray && property.propertyType != SerializedPropertyType.String)
+                {
+                    if (property.arraySize == 0)
+                    {
+                        property.arraySize = 1;
+                    }
+
+                    scope = property.GetArrayElementAtIndex(0);
+                }
+
+                Inspect(serialized, scope, nested, findings, visiting, depth + 1);
+                visiting.Remove(nested);
+            }
+        }
+
+        /// <summary>
+        /// Names the type Unity serializes <b>inline</b> for this field, or <c>null</c>.
+        /// </summary>
+        /// <param name="declared">The field's declared type.</param>
+        /// <returns>The nested type worth walking into, or <c>null</c>.</returns>
+        /// <remarks>
+        /// A <c>UnityEngine.Object</c> is a reference rather than an inline value, so its fields
+        /// belong to the asset it points at and are not this field's problem. A framework type is
+        /// not walked either: it is either serialized whole or dropped whole, and the dropped case
+        /// is already reported one level up.
+        /// </remarks>
+        private static Type InlineSerializable(Type declared)
+        {
+            if (declared == null)
+            {
+                return null;
+            }
+
+            if (declared.IsArray)
+            {
+                return InlineSerializable(declared.GetElementType());
+            }
+
+            if (declared.IsGenericType && declared.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                return InlineSerializable(declared.GetGenericArguments()[0]);
+            }
+
+            if (
+                declared.IsPrimitive
+                || declared.IsEnum
+                || declared == typeof(string)
+                || typeof(Object).IsAssignableFrom(declared)
+                || !declared.IsDefined(typeof(SerializableAttribute), inherit: false)
+            )
+            {
+                return null;
+            }
+
+            return declared;
         }
 
         /// <summary>

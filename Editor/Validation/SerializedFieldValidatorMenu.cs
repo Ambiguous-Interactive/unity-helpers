@@ -55,11 +55,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             List<DroppedSerializedField> findings = new();
             List<DroppedSerializedField> all = new();
+            List<Type> skipped = new();
             int inspected = 0;
             foreach (Type type in types)
             {
                 if (!SerializedFieldValidator.TryValidate(type, findings))
                 {
+                    // A type that would not construct was not measured, and reporting it inside the
+                    // "everything survives" count would say the opposite of what happened -- loudest
+                    // when every selected type fails and the command cheerfully reports zero
+                    // problems across zero types.
+                    skipped.Add(type);
                     continue;
                 }
 
@@ -67,26 +73,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 all.AddRange(findings);
             }
 
+            StringBuilder report = new();
             if (all.Count == 0)
             {
-                Debug.Log(
+                report.AppendLine(
                     $"[Unity Helpers] Every serialized field on {inspected} selected type(s) survives Unity's serializer."
                 );
+            }
+            else
+            {
+                report.AppendLine(
+                    $"[Unity Helpers] {all.Count} serialized field(s) on {inspected} selected type(s) are silently dropped by Unity:"
+                );
+                foreach (DroppedSerializedField finding in all)
+                {
+                    report.Append("  - ").AppendLine(finding.ToString());
+                }
+            }
+
+            if (0 < skipped.Count)
+            {
+                report.AppendLine(
+                    $"{skipped.Count} selected type(s) could not be constructed and were NOT checked:"
+                );
+                foreach (Type type in skipped)
+                {
+                    report.Append("  - ").AppendLine(type.FullName);
+                }
+            }
+
+            // A warning rather than an error. Every dropped field compiles and runs, and one may be
+            // deliberately unpersisted -- in which case [NonSerialized] says so and silences it.
+            if (0 < all.Count || 0 < skipped.Count)
+            {
+                Debug.LogWarning(report.ToString());
                 return;
             }
 
-            StringBuilder report = new();
-            report.AppendLine(
-                $"[Unity Helpers] {all.Count} serialized field(s) on {inspected} selected type(s) are silently dropped by Unity:"
-            );
-            foreach (DroppedSerializedField finding in all)
-            {
-                report.Append("  - ").AppendLine(finding.ToString());
-            }
-
-            // A warning rather than an error. Every one of these compiles and runs, and a field may
-            // be deliberately unpersisted -- in which case [NonSerialized] says so and silences it.
-            Debug.LogWarning(report.ToString());
+            Debug.Log(report.ToString().TrimEnd());
         }
 
         /// <summary>
