@@ -158,10 +158,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // exists at this point: `DequeMarshalFormatter<T>` has to implement
                 // `IWProtoFormatter<Deque<T>>` for the same T, and checking it that way catches a
                 // pair whose parameters are transposed as well as one that implements nothing.
-                INamedTypeSymbol real = Close(pair.Real, pair.Real.TypeParameters);
-                INamedTypeSymbol formatter = Close(pair.Formatter, pair.Real.TypeParameters);
+                INamedTypeSymbol real = ClosureScan.Close(pair.Real, pair.Real.TypeParameters);
+                INamedTypeSymbol formatter = ClosureScan.Close(
+                    pair.Formatter,
+                    pair.Real.TypeParameters
+                );
 
-                if (!Formats(formatter, real) || !HasPublicParameterlessConstructor(formatter))
+                if (
+                    !Formats(formatter, real)
+                    || !ClosureScan.HasPublicParameterlessConstructor(formatter)
+                )
                 {
                     report(
                         Diagnostic.Create(
@@ -224,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SemanticModel model = compilation.GetSemanticModel(tree);
                 foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
                 {
-                    INamedTypeSymbol closure = Closure(model, node, out Location where);
+                    INamedTypeSymbol closure = ClosureScan.Closure(model, node, out Location where);
                     if (closure == null)
                     {
                         continue;
@@ -240,8 +246,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    INamedTypeSymbol formatter = Close(definition, closure.TypeArguments);
-                    if (formatter == null || !Satisfies(definition, closure.TypeArguments))
+                    INamedTypeSymbol formatter = ClosureScan.Close(
+                        definition,
+                        closure.TypeArguments
+                    );
+                    if (
+                        formatter == null
+                        || !ClosureScan.Satisfies(definition, closure.TypeArguments)
+                    )
                     {
                         continue;
                     }
@@ -279,171 +291,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return registrations;
         }
 
-        /// <summary>
-        /// Resolves the closed generic a node constructs, from a written type or a tuple literal.
-        /// </summary>
-        /// <param name="model">The semantic model for the node's tree.</param>
-        /// <param name="node">The node to resolve.</param>
-        /// <param name="where">Receives the node's location, for diagnostics.</param>
-        /// <remarks>
-        /// Scanning only <c>TypeSyntax</c> missed the most ordinary way a marshalled generic ever
-        /// appears once <c>ValueTuple</c> became one: <c>Serializer.ProtoSerialize((7, 1.5f))</c>
-        /// names no type, so nothing registered a formatter and the call fell through to the
-        /// reflective path in a player -- the exact failure the marshal was added to close. The
-        /// underlying tuple type is returned so <c>(int Count, float Weight)</c> and
-        /// <c>(int, float)</c> are one closure rather than two spellings.
-        /// </remarks>
-        private static INamedTypeSymbol Closure(
-            SemanticModel model,
-            SyntaxNode node,
-            out Location where
-        )
-        {
-            ITypeSymbol resolved;
-            if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type)
-            {
-                where = type.GetLocation();
-                resolved =
-                    model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
-            }
-            else if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TupleExpressionSyntax tuple)
-            {
-                where = tuple.GetLocation();
-                resolved = model.GetTypeInfo(tuple).Type;
-                if (resolved is INamedTypeSymbol tupleType && tupleType.IsTupleType)
-                {
-                    resolved = tupleType.TupleUnderlyingType ?? tupleType;
-                }
-            }
-            else
-            {
-                where = Location.None;
-                return null;
-            }
-
-            // Still-open constructions need no separate test: a type parameter has no name, so
-            // TypeNaming.IsNameable refuses `StandInRing<T>` for the same reason it refuses a
-            // private nested one. Two checks for one question is how half a rule goes stale.
-            if (
-                !(resolved is INamedTypeSymbol named)
-                || !named.IsGenericType
-                || named.IsUnboundGenericType
-            )
-            {
-                return null;
-            }
-
-            return named;
-        }
-
-        /// <summary>
-        /// Reports whether the formatter's type parameters accept these arguments.
-        /// </summary>
-        /// <param name="definition">The formatter's unbound definition.</param>
-        /// <param name="arguments">The arguments the closure supplies.</param>
-        /// <returns><c>false</c> when closing the formatter would not compile.</returns>
-        /// <remarks>
-        /// <para>
-        /// A formatter may be declared with constraints its collection does not have --
-        /// <c>Formatter&lt;T&gt; where T : struct</c> against an unconstrained <c>Ring&lt;T&gt;</c> --
-        /// and <see cref="INamedTypeSymbol.Construct(ITypeSymbol[])"/> does not enforce them. Emitting
-        /// the registration anyway is <c>CS0453</c> inside generated code the developer never wrote,
-        /// which is exactly what the diagnostics for these pairs exist to prevent.
-        /// </para>
-        /// <para>
-        /// The three constraint <b>kinds</b> are checked against the real argument, which needs no
-        /// substitution and no compilation context. Constraint <b>types</b>
-        /// (<c>where T : IComparable&lt;T&gt;</c>) are not: satisfying them means substituting the
-        /// closure's arguments through the constraint, and getting that subtly wrong would drop
-        /// registrations that do compile. A mismatch there still fails the build, and names the
-        /// formatter while doing so.
-        /// </para>
-        /// </remarks>
-        private static bool Satisfies(
-            INamedTypeSymbol definition,
-            System.Collections.Immutable.ImmutableArray<ITypeSymbol> arguments
-        )
-        {
-            if (definition.TypeParameters.Length != arguments.Length)
-            {
-                return false;
-            }
-
-            for (int index = 0; index < arguments.Length; index++)
-            {
-                ITypeParameterSymbol parameter = definition.TypeParameters[index];
-                ITypeSymbol argument = arguments[index];
-
-                if (parameter.HasReferenceTypeConstraint && !argument.IsReferenceType)
-                {
-                    return false;
-                }
-
-                if (parameter.HasValueTypeConstraint && !argument.IsValueType)
-                {
-                    return false;
-                }
-
-                if (parameter.HasConstructorConstraint && !HasParameterlessConstructor(argument))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool HasParameterlessConstructor(ITypeSymbol type)
-        {
-            if (type.IsValueType)
-            {
-                return true;
-            }
-
-            if (!(type is INamedTypeSymbol named) || named.IsAbstract)
-            {
-                return false;
-            }
-
-            foreach (IMethodSymbol constructor in named.InstanceConstructors)
-            {
-                if (
-                    constructor.Parameters.Length == 0
-                    && constructor.DeclaredAccessibility == Accessibility.Public
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static INamedTypeSymbol Close<TArgument>(
-            INamedTypeSymbol definition,
-            IReadOnlyList<TArgument> arguments
-        )
-            where TArgument : ITypeSymbol
-        {
-            if (definition.Arity == 0)
-            {
-                return definition;
-            }
-
-            if (definition.Arity != arguments.Count)
-            {
-                return null;
-            }
-
-            ITypeSymbol[] closed = new ITypeSymbol[arguments.Count];
-            for (int index = 0; index < arguments.Count; index++)
-            {
-                closed[index] = arguments[index];
-            }
-
-            return definition.Construct(closed);
-        }
-
         private static bool Formats(INamedTypeSymbol formatter, INamedTypeSymbol real)
         {
             if (formatter == null || real == null)
@@ -463,27 +310,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 if (SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], real))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasPublicParameterlessConstructor(INamedTypeSymbol formatter)
-        {
-            if (formatter == null || formatter.IsAbstract || formatter.IsStatic)
-            {
-                return false;
-            }
-
-            foreach (IMethodSymbol constructor in formatter.InstanceConstructors)
-            {
-                if (
-                    constructor.Parameters.Length == 0
-                    && constructor.DeclaredAccessibility == Accessibility.Public
-                )
                 {
                     return true;
                 }

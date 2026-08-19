@@ -26,12 +26,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
+            // Asked before the reflective path below, which is the whole AOT story: the generator
+            // has already constructed this closure's converter where the closure was written, and
+            // MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
+            // a closure no build named -- the editor, Mono, and anything constructed at run time.
+            if (WJsonConverterRegistry.TryGet(typeToConvert, out JsonConverter generated))
+            {
+                return generated;
+            }
+
             Type elementType = typeToConvert.GetGenericArguments()[0];
             Type convType = typeof(DequeConverter<>).MakeGenericType(elementType);
             return (JsonConverter)Activator.CreateInstance(convType);
         }
 
-        private sealed class DequeConverter<T> : JsonConverter<Deque<T>>
+        public sealed class DequeConverter<T> : JsonConverter<Deque<T>>
         {
             public override Deque<T> Read(
                 ref Utf8JsonReader reader,

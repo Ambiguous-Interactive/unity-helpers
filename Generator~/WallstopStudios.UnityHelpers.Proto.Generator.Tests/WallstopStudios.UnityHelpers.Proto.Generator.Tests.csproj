@@ -29,6 +29,12 @@
       Include="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/*.cs"
       Exclude="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBootstrap.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBuiltInFormatters.cs"
     />
+    <!-- The JSON half of the AOT story. Both files are Unity-free, so the closure-to-registration
+         path can be exercised end to end here: a closure written only in this assembly, the
+         registrar the generator emits for it, and a real System.Text.Json round-trip through the
+         registry instead of the reflective factory. -->
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/JsonConverters/WJsonConverterAttribute.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/JsonConverters/WJsonConverterRegistry.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
 

@@ -37,6 +37,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
+            // Asked before the reflective path below, which is the whole AOT story: the generator
+            // has already constructed this closure's converter where the closure was written, and
+            // MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
+            // a closure no build named -- the editor, Mono, and anything constructed at run time.
+            if (WJsonConverterRegistry.TryGet(typeToConvert, out JsonConverter generated))
+            {
+                return generated;
+            }
+
             Type genericDef = typeToConvert.GetGenericTypeDefinition();
             Type[] typeArgs = typeToConvert.GetGenericArguments();
 
@@ -58,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             return (JsonConverter)Activator.CreateInstance(converterType);
         }
 
-        private sealed class SerializableDictionaryConverter<TKey, TValue>
+        public sealed class SerializableDictionaryConverter<TKey, TValue>
             : JsonConverter<SerializableDictionary<TKey, TValue>>
         {
             private const string KeysPropertyName =
@@ -184,7 +193,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
         }
 
-        private sealed class SerializableDictionaryWithCacheConverter<TKey, TValue, TValueCache>
+        public sealed class SerializableDictionaryWithCacheConverter<TKey, TValue, TValueCache>
             : JsonConverter<SerializableDictionary<TKey, TValue, TValueCache>>
             where TValueCache : SerializableDictionary.Cache<TValue>, new()
         {

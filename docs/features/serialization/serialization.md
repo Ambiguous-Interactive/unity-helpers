@@ -846,6 +846,48 @@ System.Text.Json can require extra care under AOT (e.g., IL2CPP):
 - If you rely on many custom converters, ensure they are referenced by code so the linker doesn't strip them. The UnityHelpers converters are referenced via options by default.
 - Avoid deserializing `System.Type` from untrusted input (see `TypeConverter`); this is intended for trusted configs/tools.
 
+### Generic containers get their converters generated
+
+A `JsonConverterFactory` builds the converter for a generic type reflectively:
+
+```csharp
+Type closed = typeof(SomeConverter<,>).MakeGenericType(arguments);
+return (JsonConverter)Activator.CreateInstance(closed);
+```
+
+IL2CPP compiles a generic closure only when something references it, and reference types share one
+compiled body while **value types do not**. So `Deque<TheirStruct>` in a player has no
+`DequeConverter<TheirStruct>` to construct, and the first save throws:
+
+```text
+System.ExecutionEngineException : Attempting to call method
+'...DequeConverter`1[[TheirStruct]]::.ctor' for which no ahead of time (AOT) code was generated.
+```
+
+The package's own tests never caught it, because the closures they exercise (`Deque<int>` and so on)
+are named right here, which is exactly what gives IL2CPP a reason to compile them. A consumer's own
+closure has nothing naming it.
+
+Nothing is required of you. The source generator finds every closed construction your assemblies
+write, constructs the matching converter there, and hands it to `WJsonConverterRegistry`; each
+factory asks that registry before it reaches for reflection. `Deque<TheirStruct>`,
+`SerializableDictionary<string, TheirEnum>` and `Range<float>` all work in a player. Define
+`WALLSTOP_DISABLE_GENERATED_JSON_CONVERTERS` to turn the declarations off if your build never
+serializes one of these to JSON and you would rather not compile the closures.
+
+Two boundaries are worth knowing:
+
+- **An assembly that does not reference `System.Text.Json` gets no registrations.** The registration
+  names a `JsonConverter`, so emitting one there would be `CS0012` in generated code. This is the
+  default for a Unity assembly definition using `overrideReferences`, where every precompiled DLL is
+  listed by hand — add `System.Text.Json.dll` to that assembly's `precompiledReferences` if it
+  serializes package generics to JSON in a player.
+- **This covers the package's own generic types, not System.Text.Json's reflective handling of
+  yours.** A plain `struct` of your own with no converter still reaches
+  `ObjectDefaultConverter<T>`, which System.Text.Json also builds with `MakeGenericType`. Give such a
+  type its own converter, or serialize it with WallstopProto, which generates a formatter per
+  closure for exactly this reason.
+
 ## WallstopProto: the reflection-free wire layer (preview)
 
 `WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -356,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         internal const string Value = SerializableNullable<int>.SerializedPropertyNames.Value;
     }
 
-    internal sealed class SerializableNullableJsonConverterFactory : JsonConverterFactory
+    public sealed class SerializableNullableJsonConverterFactory : JsonConverterFactory
     {
         private static readonly ConcurrentDictionary<Type, JsonConverter> ConverterCache = new();
 
@@ -403,6 +404,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 throw new ArgumentNullException(nameof(type));
             }
 
+            // Asked before the reflective path below, which is the whole AOT story: the generator
+            // has already constructed this closure's converter where the closure was written, and
+            // MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
+            // a closure no build named -- the editor, Mono, and anything constructed at run time.
+            if (WJsonConverterRegistry.TryGet(type, out JsonConverter generated))
+            {
+                return generated;
+            }
+
             Type[] arguments = type.GetGenericArguments();
             Type valueType = arguments[0];
             return ConverterCache.GetOrAdd(
@@ -420,7 +430,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
     }
 
-    internal sealed class SerializableNullableJsonConverter<T>
+    public sealed class SerializableNullableJsonConverter<T>
         : JsonConverter<SerializableNullable<T>>
         where T : struct
     {

@@ -337,6 +337,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor JsonConverterNotUsable =
+            new DiagnosticDescriptor(
+                "WPROTO035",
+                "WallstopProto JSON converter declaration cannot be closed",
+                "[assembly: WJsonConverter(typeof({0}), typeof({1}))] cannot be used. The generator closes both over the arguments of each construction it finds in source and registers the converter, so '{0}' must be an unbound generic, '{1}' must be an unbound generic of the same arity whose constraints the same arguments satisfy, and the closed '{1}' must derive from JsonConverter<{0}> and have a public parameterless constructor. Without all four the registration would not compile, so the declaration is ignored and the closure falls back to the reflective JsonConverterFactory path, which throws under IL2CPP.",
+                "WallstopProto",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor DuplicateJsonConverter =
+            new DiagnosticDescriptor(
+                "WPROTO036",
+                "WallstopProto JSON converter is declared twice for one type",
+                "This assembly declares more than one [assembly: WJsonConverter] for '{0}'. Only the first is used, and which one that is depends on attribute order rather than on anything you can read at the declaration. Remove all but the intended pairing with '{1}'.",
+                "WallstopProto",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookOnSubtype = new DiagnosticDescriptor(
             "WPROTO034",
             "WallstopProto lifecycle hook on a subtype does not run under every reader",
