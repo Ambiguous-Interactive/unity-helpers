@@ -65,6 +65,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             converters.Add(RangeConverterFactory.Instance);
             converters.Add(FastVector2IntConverter.Instance);
             converters.Add(FastVector3IntConverter.Instance);
+#if !WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION
+            // Ahead of the default object converter, which System.Text.Json instantiates
+            // reflectively over the closed tuple and IL2CPP therefore cannot call.
+            converters.Add(ValueTupleJsonConverterFactory.Instance);
+#endif
             if (stringEnums)
             {
                 converters.Add(new JsonStringEnumConverter());

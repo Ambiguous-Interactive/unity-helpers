@@ -886,11 +886,29 @@ You do not have to adopt the stand-in to fix protobuf. The package ships
 
 so the generator emits an ahead-of-time formatter for every closed `ValueTuple` your build actually
 uses, and `Serializer.ProtoSerialize((7, 1.5f))` goes through it instead of protobuf-net's
-reflection. The bytes are `SerializableValueTuple`'s by construction, so the tuple and the stand-in
-cannot drift apart.
+reflection. JSON is covered too, by a hand-written converter for the tuple and for the stand-in. In
+both cases the output is `SerializableValueTuple`'s by construction, so the two cannot drift apart.
 
-The stand-in is still what you need for a **serialized field**, because that is Unity's serializer
-rather than ours — and for JSON, which is still reflective for a raw tuple.
+The stand-in is still what you need for a **serialized field**, because that is Unity's own
+serializer rather than ours.
+
+#### Turning it off
+
+Define **`WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION`** in _Player Settings → Scripting Define
+Symbols_ to remove both. It is on by default because a tuple that throws only in a player is the
+worst failure this package has to offer, but it is not free: the generator emits one formatter per
+closed `ValueTuple` your build uses, and a tuple is a common local aggregate rather than a
+deliberate container. On this package alone that is 41 registrations, 11 of them closing over types
+that can never serialize (`Type`, `ConstructorInfo`, …). Those decline at run time, but under IL2CPP
+each closure is still compiled code.
+
+It also silences a second cost. Because the registration is automatic, a tuple that closes over a
+type the generated registrar cannot name — a `private` nested type, say — produces a `WPROTO028`
+warning asking you to widen it, for a formatter you never asked for. Two such warnings exist in this
+package's own tests.
+
+Turning it off does **not** affect `SerializableValueTuple` — the stand-in keeps its own converter
+and its generated formatter either way. Only the automatic support for the raw framework tuple goes.
 
 ---
 

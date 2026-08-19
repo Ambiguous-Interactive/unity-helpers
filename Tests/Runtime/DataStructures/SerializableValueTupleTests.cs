@@ -101,18 +101,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void JsonIsIdenticalToTheFrameworkTuple()
         {
-            // Constants, unlike the protobuf case above: a raw ValueTuple now has an AOT protobuf
-            // formatter, but System.Text.Json still reaches ObjectDefaultConverter<ValueTuple<..>>,
-            // which is instantiated reflectively and has no AOT code under IL2CPP. Serializing the
-            // framework tuple here would therefore still fail in a player. These strings are what
-            // JsonStringify produces for it on mono.
+            // Both sides serialized for real, and this is the assertion that fails on the gated
+            // IL2CPP leg if either converter regresses. System.Text.Json otherwise reaches
+            // ObjectDefaultConverter<T>, instantiated reflectively over the closed type, which has
+            // no AOT code -- and it did exactly that for the STAND-IN as well as the tuple until
+            // both got hand-written converters.
             Assert.AreEqual(
                 "{\"Item1\":7,\"Item2\":1.5}",
+                Serializer.JsonStringify(new SerializableValueTuple<int, float>(7, 1.5f))
+            );
+            Assert.AreEqual(
+                Serializer.JsonStringify((7, 1.5f)),
                 Serializer.JsonStringify(new SerializableValueTuple<int, float>(7, 1.5f))
             );
 
             Assert.AreEqual(
                 "{\"Item1\":3,\"Item2\":0.25,\"Item3\":\"a\"}",
+                Serializer.JsonStringify(
+                    new SerializableValueTuple<int, float, string>(3, 0.25f, "a")
+                )
+            );
+            Assert.AreEqual(
+                Serializer.JsonStringify((3, 0.25f, "a")),
                 Serializer.JsonStringify(
                     new SerializableValueTuple<int, float, string>(3, 0.25f, "a")
                 )
