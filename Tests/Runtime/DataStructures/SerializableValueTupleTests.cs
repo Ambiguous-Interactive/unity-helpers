@@ -65,40 +65,47 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ProtoBytesAreIdenticalToTheFrameworkTuple()
         {
-            // Pinned as a constant rather than compared against a live ValueTuple, deliberately.
-            // Serializing the framework tuple here reaches protobuf-net's reflective model, which
-            // has no AOT code under IL2CPP -- the static initializer of
-            // `StructValueChecker<ValueTuple<int, float>>` throws `ExecutionEngineException` on a
-            // 2021.3 standalone player. That is not an
-            // accident of the test: it is the same reason this type exists, so asserting it by
-            // round-tripping a ValueTuple would make the fixture fail on exactly the platform the
-            // stand-in was built for.
-            //
-            // The bytes below came from protobuf-net, and the differential that keeps them honest
-            // lives where an oracle can actually run: `PackageContractShapeTests` drives
-            // `ValueTupleShape<,>` against protobuf-net 2.4.9 and 3.2.56 on every generator build.
-            const string expected = "0807150000C03F";
-
+            // The framework tuple is serialized here ON PURPOSE, and it is the assertion that
+            // matters most on the gated IL2CPP leg. protobuf-net reaches a raw ValueTuple through
+            // StructValueChecker<ValueTuple<int, float>>, instantiated reflectively, so this line
+            // threw ExecutionEngineException on a 2021.3 standalone player until
+            // [assembly: WProtoRootMarshal(typeof(ValueTuple<,>), ...)] gave it an AOT formatter.
+            // If that registration regresses, this fails in a player and passes in the editor --
+            // which is exactly the trap the marshal exists to close.
+            byte[] theirs = Serializer.ProtoSerialize((7, 1.5f));
             byte[] mine = Serializer.ProtoSerialize(
                 new SerializableValueTuple<int, float>(7, 1.5f)
             );
 
-            Assert.AreEqual(expected, ToHex(mine));
+            CollectionAssert.AreEqual(theirs, mine);
 
-            // And the payload reads back through this package's own AOT formatter.
-            SerializableValueTuple<int, float> restored = Serializer.ProtoDeserialize<
-                SerializableValueTuple<int, float>
-            >(mine);
+            // Pinned against a literal as well, so the pair agreeing with each other cannot pass by
+            // both being wrong. The bytes came from protobuf-net, and PackageContractShapeTests
+            // keeps them honest against 2.4.9 and 3.2.56 on every generator build.
+            Assert.AreEqual("0807150000C03F", ToHex(mine));
 
-            Assert.AreEqual(new SerializableValueTuple<int, float>(7, 1.5f), restored);
+            // Each reads what the other wrote.
+            Assert.AreEqual(
+                new SerializableValueTuple<int, float>(7, 1.5f),
+                Serializer.ProtoDeserialize<SerializableValueTuple<int, float>>(theirs)
+            );
+            Assert.AreEqual((7, 1.5f), Serializer.ProtoDeserialize<ValueTuple<int, float>>(mine));
+
+            // The three-component form travels the same road.
+            Assert.AreEqual(
+                "0803150000803E1A0161",
+                ToHex(Serializer.ProtoSerialize((3, 0.25f, "a")))
+            );
         }
 
         [Test]
         public void JsonIsIdenticalToTheFrameworkTuple()
         {
-            // Constants for the same reason the protobuf bytes are: System.Text.Json reaches
-            // `ObjectDefaultConverter<ValueTuple<int, float>>`, which has no AOT code under IL2CPP.
-            // These strings are what `JsonStringify` produces for the framework tuple on mono.
+            // Constants, unlike the protobuf case above: a raw ValueTuple now has an AOT protobuf
+            // formatter, but System.Text.Json still reaches ObjectDefaultConverter<ValueTuple<..>>,
+            // which is instantiated reflectively and has no AOT code under IL2CPP. Serializing the
+            // framework tuple here would therefore still fail in a player. These strings are what
+            // JsonStringify produces for it on mono.
             Assert.AreEqual(
                 "{\"Item1\":7,\"Item2\":1.5}",
                 Serializer.JsonStringify(new SerializableValueTuple<int, float>(7, 1.5f))

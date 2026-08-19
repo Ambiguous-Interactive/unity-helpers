@@ -871,9 +871,26 @@ SerializableValueTuple<int, float> read =
 Verified byte-identical for protobuf (`0807150000C03F` either way) and character-identical for JSON
 (`{"Item1":7,"Item2":1.5}`).
 
-The direction that matters is reading _old data into the stand-in_, and that works everywhere. Going
-the other way — deserializing into a `ValueTuple` — is the reflective path described above, so it is
-editor-only; prefer the stand-in on both sides once you have migrated.
+Both directions work in a player for protobuf, so an existing save migrates either way.
+
+---
+
+### Tuples serialize on IL2CPP
+
+You do not have to adopt the stand-in to fix protobuf. The package ships
+
+```csharp
+[assembly: WProtoRootMarshal(typeof(ValueTuple<,>), typeof(ValueTupleMarshalFormatter<,>))]
+[assembly: WProtoRootMarshal(typeof(ValueTuple<, ,>), typeof(ValueTupleMarshalFormatter<, ,>))]
+```
+
+so the generator emits an ahead-of-time formatter for every closed `ValueTuple` your build actually
+uses, and `Serializer.ProtoSerialize((7, 1.5f))` goes through it instead of protobuf-net's
+reflection. The bytes are `SerializableValueTuple`'s by construction, so the tuple and the stand-in
+cannot drift apart.
+
+The stand-in is still what you need for a **serialized field**, because that is Unity's serializer
+rather than ours — and for JSON, which is still reflective for a raw tuple.
 
 ---
 
