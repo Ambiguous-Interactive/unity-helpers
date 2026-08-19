@@ -96,6 +96,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "0803150000803E1A0161",
                 ToHex(Serializer.ProtoSerialize((3, 0.25f, "a")))
             );
+
+            // A closure that appears NOWHERE as a written type -- only as a literal -- which is how
+            // a consumer actually calls this. Registration used to scan TypeSyntax only, so this
+            // exact shape got no formatter and fell through to the reflective path in a player;
+            // every other assertion here passes anyway because it names ValueTuple<int, float>
+            // somewhere, which is what hid the gap. `SerializableValueTuple<short, ulong>` on the
+            // left is a different generic type, so it registers its own formatter and not the
+            // tuple's.
+            Assert.AreEqual(
+                ToHex(Serializer.ProtoSerialize(new SerializableValueTuple<short, ulong>(1, 2))),
+                ToHex(Serializer.ProtoSerialize(((short)1, (ulong)2)))
+            );
         }
 
         [Test]

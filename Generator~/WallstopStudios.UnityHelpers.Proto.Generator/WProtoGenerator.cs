@@ -225,13 +225,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SemanticModel model = compilation.GetSemanticModel(tree);
                 foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
                 {
-                    if (!(node is TypeSyntax type))
-                    {
-                        continue;
-                    }
-
+                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
                     if (
-                        !(Resolve(model, type) is INamedTypeSymbol named)
+                        named == null
                         || !named.IsGenericType
                         || named.IsUnboundGenericType
                         || IsOpen(named)
@@ -259,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         || TypeNaming.ReportIfUnnameable(
                             named,
                             compilation,
-                            type.GetLocation(),
+                            where,
                             report,
                             announced
                         )
@@ -2037,6 +2033,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// the semantic model resolves anywhere in this compilation, deduplicated. A construction
         /// that appears in no source cannot be reached at runtime either.
         /// </remarks>
+        /// <summary>
+        /// Resolves the closed generic a node constructs, whether it is spelled as a type or built
+        /// by a tuple literal.
+        /// </summary>
+        /// <param name="model">The semantic model for the node's tree.</param>
+        /// <param name="node">The node to resolve.</param>
+        /// <param name="location">Receives the node's location, for diagnostics.</param>
+        /// <remarks>
+        /// A <c>TypeSyntax</c> scan alone misses the most ordinary way a tuple ever appears.
+        /// <c>Serializer.ProtoSerialize((7, 1.5f))</c> names no type at all -- the argument is a
+        /// <c>TupleExpressionSyntax</c> and the closure is inferred -- so a consumer who writes only
+        /// that call got no registration and fell through to the reflective path in a player, which
+        /// is the failure the ValueTuple marshal exists to close.
+        ///
+        /// The underlying type is returned rather than the tuple type, so <c>(int Count, float Weight)</c>
+        /// and <c>(int, float)</c> are one closure and the registrar writes <c>ValueTuple&lt;int, float&gt;</c>
+        /// rather than a name carrying element labels.
+        /// </remarks>
+        private static INamedTypeSymbol ConstructedTypeAt(
+            SemanticModel model,
+            SyntaxNode node,
+            out Location location
+        )
+        {
+            if (node is TypeSyntax type)
+            {
+                location = type.GetLocation();
+                return Resolve(model, type) as INamedTypeSymbol;
+            }
+
+            if (node is TupleExpressionSyntax tuple)
+            {
+                location = tuple.GetLocation();
+                if (!(model.GetTypeInfo(tuple).Type is INamedTypeSymbol named))
+                {
+                    return null;
+                }
+
+                return named.IsTupleType ? named.TupleUnderlyingType ?? named : named;
+            }
+
+            location = Location.None;
+            return null;
+        }
+
         private static IEnumerable<string> ClosedConstructions(
             Compilation compilation,
             INamedTypeSymbol contract,
@@ -2051,16 +2092,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SemanticModel model = compilation.GetSemanticModel(tree);
                 foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
                 {
-                    if (!(node is TypeSyntax type))
-                    {
-                        continue;
-                    }
-
-                    if (
-                        !(Resolve(model, type) is INamedTypeSymbol named)
-                        || !named.IsGenericType
-                        || named.IsUnboundGenericType
-                    )
+                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
+                    if (named == null || !named.IsGenericType || named.IsUnboundGenericType)
                     {
                         continue;
                     }
@@ -2084,13 +2117,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     // `Box<SomeFixture.PrivatePayload>` is a name the registrar cannot write, and
                     // emitting it fails the build of the assembly that declared the private type.
                     if (
-                        !TypeNaming.ReportIfUnnameable(
-                            named,
-                            compilation,
-                            type.GetLocation(),
-                            report,
-                            announced
-                        )
+                        !TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
                     )
                     {
                         found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));

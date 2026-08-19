@@ -224,12 +224,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SemanticModel model = compilation.GetSemanticModel(tree);
                 foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
                 {
-                    if (!(node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type))
-                    {
-                        continue;
-                    }
-
-                    INamedTypeSymbol closure = Closure(model, type);
+                    INamedTypeSymbol closure = Closure(model, node, out Location where);
                     if (closure == null)
                     {
                         continue;
@@ -262,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         TypeNaming.ReportIfUnnameable(
                             closure,
                             compilation,
-                            type.GetLocation(),
+                            where,
                             report,
                             announced
                         ) || !TypeNaming.IsNameable(formatter, compilation)
@@ -284,13 +279,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return registrations;
         }
 
+        /// <summary>
+        /// Resolves the closed generic a node constructs, from a written type or a tuple literal.
+        /// </summary>
+        /// <param name="model">The semantic model for the node's tree.</param>
+        /// <param name="node">The node to resolve.</param>
+        /// <param name="where">Receives the node's location, for diagnostics.</param>
+        /// <remarks>
+        /// Scanning only <c>TypeSyntax</c> missed the most ordinary way a marshalled generic ever
+        /// appears once <c>ValueTuple</c> became one: <c>Serializer.ProtoSerialize((7, 1.5f))</c>
+        /// names no type, so nothing registered a formatter and the call fell through to the
+        /// reflective path in a player -- the exact failure the marshal was added to close. The
+        /// underlying tuple type is returned so <c>(int Count, float Weight)</c> and
+        /// <c>(int, float)</c> are one closure rather than two spellings.
+        /// </remarks>
         private static INamedTypeSymbol Closure(
             SemanticModel model,
-            Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type
+            SyntaxNode node,
+            out Location where
         )
         {
-            ITypeSymbol resolved =
-                model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
+            ITypeSymbol resolved;
+            if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type)
+            {
+                where = type.GetLocation();
+                resolved =
+                    model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
+            }
+            else if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TupleExpressionSyntax tuple)
+            {
+                where = tuple.GetLocation();
+                resolved = model.GetTypeInfo(tuple).Type;
+                if (resolved is INamedTypeSymbol tupleType && tupleType.IsTupleType)
+                {
+                    resolved = tupleType.TupleUnderlyingType ?? tupleType;
+                }
+            }
+            else
+            {
+                where = Location.None;
+                return null;
+            }
+
             // Still-open constructions need no separate test: a type parameter has no name, so
             // TypeNaming.IsNameable refuses `StandInRing<T>` for the same reason it refuses a
             // private nested one. Two checks for one question is how half a rule goes stale.
