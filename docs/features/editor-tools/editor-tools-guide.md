@@ -1319,8 +1319,8 @@ generic user types Unity has serialized since 2020.
 inherited ones included, naming the package stand-in where there is one:
 
 ```text
-Loot.drops is declared as Dictionary<String, Int32>, which Unity does not serialize. Anything
-authored into it is gone on the next domain reload. Use SerializableDictionary<String, Int32>
+Loot.drops is declared as Dictionary<string, int>, which Unity does not serialize. Anything
+authored into it is gone on the next domain reload. Use SerializableDictionary<string, int>
 instead.
 ```
 

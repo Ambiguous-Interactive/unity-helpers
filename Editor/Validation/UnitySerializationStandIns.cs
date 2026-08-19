@@ -96,16 +96,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return true;
         }
 
+        private static readonly Dictionary<Type, string> Keywords = new()
+        {
+            [typeof(bool)] = "bool",
+            [typeof(byte)] = "byte",
+            [typeof(sbyte)] = "sbyte",
+            [typeof(char)] = "char",
+            [typeof(short)] = "short",
+            [typeof(ushort)] = "ushort",
+            [typeof(int)] = "int",
+            [typeof(uint)] = "uint",
+            [typeof(long)] = "long",
+            [typeof(ulong)] = "ulong",
+            [typeof(float)] = "float",
+            [typeof(double)] = "double",
+            [typeof(decimal)] = "decimal",
+            [typeof(string)] = "string",
+            [typeof(object)] = "object",
+        };
+
         /// <summary>
         /// Writes a type the way a developer would write it in source.
         /// </summary>
         /// <param name="type">The type to name.</param>
         /// <returns>A readable name.</returns>
+        /// <remarks>
+        /// Keywords rather than framework names, because the suggestion is meant to be pasted:
+        /// <c>SerializableDictionary&lt;string, int&gt;</c> is the line someone would write, where
+        /// <c>SerializableDictionary&lt;String, Int32&gt;</c> is a line they would have to translate
+        /// first.
+        /// </remarks>
         public static string Readable(Type type)
         {
             if (type == null)
             {
                 return "<null>";
+            }
+
+            if (Keywords.TryGetValue(type, out string keyword))
+            {
+                return keyword;
             }
 
             if (type.IsArray)

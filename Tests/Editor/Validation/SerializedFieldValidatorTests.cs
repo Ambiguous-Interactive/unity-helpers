@@ -65,25 +65,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             // Naming the fix is the useful half. A message that only says something is wrong sends
             // the reader to a search engine.
             Assert.AreEqual(
-                "SerializableDictionary<String, Int32>",
+                "SerializableDictionary<string, int>",
                 Reported(findings, "lookup").StandIn
             );
-            Assert.AreEqual("SerializableHashSet<String>", Reported(findings, "tags").StandIn);
+            Assert.AreEqual("SerializableHashSet<string>", Reported(findings, "tags").StandIn);
             Assert.AreEqual(
-                "SerializableNullable<Int32>",
+                "SerializableNullable<int>",
                 Reported(findings, "optionalCount").StandIn
             );
             Assert.AreEqual(
-                "SerializableValueTuple<Int32, Single>",
+                "SerializableValueTuple<int, float>",
                 Reported(findings, "frameworkPair").StandIn
             );
             Assert.AreEqual(
-                "SerializableSortedDictionary<String, Int32>",
+                "SerializableSortedDictionary<string, int>",
                 Reported(findings, "_ordered").StandIn
             );
 
             StringAssert.Contains(
-                "SerializableDictionary<String, Int32>",
+                "SerializableDictionary<string, int>",
                 Reported(findings, "lookup").ToString()
             );
         }
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     out string fromList
                 )
             );
-            Assert.AreEqual("SerializableDictionary<String, Int32>", fromList);
+            Assert.AreEqual("SerializableDictionary<string, int>", fromList);
 
             Assert.IsTrue(
                 UnitySerializationStandIns.TryGetStandIn(
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     out string fromArray
                 )
             );
-            Assert.AreEqual("SerializableDictionary<String, Int32>", fromArray);
+            Assert.AreEqual("SerializableDictionary<string, int>", fromArray);
 
             // And nothing is invented for a type the package has no answer for.
             Assert.IsFalse(UnitySerializationStandIns.TryGetStandIn(typeof(Type), out _));
