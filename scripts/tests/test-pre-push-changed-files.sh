@@ -506,7 +506,7 @@ TEST_FILE=$(mktemp)
 printf '.llm/context.md\n.llm/skills/foo.md\nRuntime/Foo.cs\n' > "$TEST_FILE"
 # The hook uses '^\.llm/' in single quotes — in grep -E, \. matches literal dot
 LLM_PATTERN='^\.llm/'
-RESULT=$(grep -Ec "$LLM_PATTERN" "$TEST_FILE" 2>/dev/null || echo "0")
+RESULT=$(grep -Ec "$LLM_PATTERN" "$TEST_FILE" 2>/dev/null) || true
 if [ "$RESULT" = "2" ]; then
     pass "LLM regex matches .llm/ paths correctly (matched $RESULT/2)"
 else
@@ -526,7 +526,7 @@ fi
 # Test CHANGED_CS regex
 run_test
 printf 'Runtime/Foo.cs\nEditor/Bar.cs\nRuntime/Foo.cs.meta\ndocs/readme.md\n' > "$TEST_FILE"
-CS_RESULT=$(grep -Ec '\.cs$' "$TEST_FILE" 2>/dev/null || echo "0")
+CS_RESULT=$(grep -Ec '\.cs$' "$TEST_FILE" 2>/dev/null) || true
 if [ "$CS_RESULT" = "2" ]; then
     pass "CS regex matches .cs files (matched $CS_RESULT/2, excludes .cs.meta)"
 else
@@ -536,7 +536,7 @@ fi
 # Test region check pattern (POSIX ERE, not GNU BRE \|)
 run_test
 printf '  #region Foo\n  #endregion\n  // normal code\n#REGION Upper\n' > "$TEST_FILE"
-REGION_RESULT=$(grep -E -c -i '^[[:space:]]*#[[:space:]]*(region|endregion)' "$TEST_FILE" 2>/dev/null || echo "0")
+REGION_RESULT=$(grep -E -c -i '^[[:space:]]*#[[:space:]]*(region|endregion)' "$TEST_FILE" 2>/dev/null) || true
 if [ "$REGION_RESULT" = "3" ]; then
     pass "Region regex matches #region/#endregion with POSIX character classes ($REGION_RESULT/3)"
 else
@@ -546,7 +546,7 @@ fi
 # Test CHANGED_GITIGNORE regex (pre-captured for C3 fix)
 run_test
 printf '.gitignore\ndocs/.gitignore\n.gitignore-backup\n' > "$TEST_FILE"
-GITIGNORE_RESULT=$(grep -Ec '^\.gitignore$' "$TEST_FILE" 2>/dev/null || echo "0")
+GITIGNORE_RESULT=$(grep -Ec '^\.gitignore$' "$TEST_FILE" 2>/dev/null) || true
 if [ "$GITIGNORE_RESULT" = "1" ]; then
     pass "Gitignore regex matches only root .gitignore ($GITIGNORE_RESULT/1)"
 else
@@ -556,7 +556,7 @@ fi
 # Test CHANGED_TESTS regex
 run_test
 printf 'Tests/Foo.cs\nTests/Editor/Bar.cs\nRuntime/Foo.cs\n' > "$TEST_FILE"
-TESTS_RESULT=$(grep -Ec '^Tests/' "$TEST_FILE" 2>/dev/null || echo "0")
+TESTS_RESULT=$(grep -Ec '^Tests/' "$TEST_FILE" 2>/dev/null) || true
 if [ "$TESTS_RESULT" = "2" ]; then
     pass "Tests regex matches only Tests/ paths ($TESTS_RESULT/2)"
 else

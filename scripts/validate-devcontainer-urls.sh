@@ -211,8 +211,31 @@ check_url() {
     local url="$2"
 
     CHECKED=$((CHECKED + 1))
-    local status
-    status=$(curl -sI -o /dev/null -w "%{http_code}" -L --max-time 30 "$url" 2>/dev/null || echo "000")
+    local status=""
+    local attempt
+
+    # Retried, because this is a network call to an external host and a single blip on one of
+    # thirty URLs reds the whole Repo Lint job -- observed as a 302 whose redirect could not be
+    # followed, on an asset that answers 200 every time by hand.
+    for attempt in 1 2 3; do
+        # Assigned, then replaced on failure. `status=$(cmd || echo "000")` APPENDS the fallback to
+        # whatever curl already wrote, so a curl that emits "302" and then fails reports the
+        # impossible status "302000" -- which is not 200, so the check fails, and is not a status
+        # anyone can look up either.
+        if ! status=$(
+            curl -sI -o /dev/null -w "%{http_code}" -L --max-time 30 "$url" 2>/dev/null
+        ); then
+            status="000"
+        fi
+
+        if [ "$status" = "200" ]; then
+            break
+        fi
+
+        if [ "$attempt" -lt 3 ]; then
+            sleep $((attempt * 2))
+        fi
+    done
 
     if [ "$status" = "200" ]; then
         printf "  ${GREEN}✓${NC} %-8s %s\n" "[$arch_label]" "$url"
