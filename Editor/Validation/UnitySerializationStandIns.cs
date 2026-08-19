@@ -52,9 +52,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// </remarks>
         public static bool TryGetStandIn(Type declared, out string standIn)
         {
-            standIn = null;
             if (declared == null)
             {
+                standIn = null;
                 return false;
             }
 
@@ -68,6 +68,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             if (!declared.IsGenericType)
             {
+                standIn = null;
                 return false;
             }
 
@@ -81,6 +82,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             if (!ByDefinition.TryGetValue(definition, out string template))
             {
+                standIn = null;
                 return false;
             }
 
