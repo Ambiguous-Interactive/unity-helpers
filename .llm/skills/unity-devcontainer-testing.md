@@ -246,6 +246,9 @@ IMGUI draw and fails with a bare `NullReferenceException`.
 
 Four constraints. The first two were recorded backwards before being measured on 2026-08-16:
 
+- **A `using System.Reflection;` import is refused outright** -- `UNEXPECTED_ERROR: Script uses one
+  or more unauthorized namespaces` names the import line, before compilation. Fully qualified use
+  of the same types is fine, so write `System.Reflection.MethodInfo` and never import it.
 - **Only the named `BindingFlags` _members_ are rejected, not the type.** `System.Reflection.Assembly`,
   `MethodInfo` and `PropertyInfo` all compile fully qualified; `System.Reflection.BindingFlags.Static`
   is refused as an unauthorized namespace, and **a numeric cast is not**:

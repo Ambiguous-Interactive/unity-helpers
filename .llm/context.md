@@ -328,7 +328,13 @@ deliberate act, not the tail of every commit.
   - Relevant targeted checks for the files changed; `npm run validate:local` is the explicit
     repository-wide lint and contract aggregate when that broader evidence is warranted.
   - `npm run validate:prepush` as the final fast Git/config safety check.
-  - The Unity MCP bridge for a real editor compile (see the Unity MCP notes).
+  - The Unity MCP bridge, which compiles your working tree in a real editor **and runs real
+    fixtures against it**. `Unity_RunCommand` cannot *name* a package type -- its sandbox
+    assembly does not reference them, and `using System.Reflection;` is refused -- but fully
+    qualified reflection reaches everything, including generic package types and their private
+    members. See
+    [unity-devcontainer-testing](./skills/unity-devcontainer-testing.md#no-license-the-mcp-editor-still-runs-the-real-fixtures)
+    for the loop and its traps ([#435](https://github.com/Ambiguous-Interactive/unity-helpers/issues/435)).
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
   `Tests/Runtime/Serialization/`, and cost a full matrix run to discover. Grep for the affected byte
@@ -342,11 +348,11 @@ deliberate act, not the tail of every commit.
 Run Unity tests directly via Docker-in-Docker:
 
 1. Check license: `pwsh -NoProfile -File scripts/unity/setup-license.ps1 -Check`
-   - If exit code 1: warn user to run `npm run unity:setup-license`, skip Unity steps, continue with relevant non-Unity checks
+   - If exit code 1: warn user to run `npm run unity:setup-license`, then reach for the MCP bridge rather than skipping Unity entirely -- it needs no license and runs EditMode fixtures against your working tree. Docker legs and PlayMode stay skipped; continue with relevant non-Unity checks
 2. Compile: `bash scripts/unity/compile.sh`
    - If output contains `Machine bindings don't match` or `No valid Unity Editor license found`: license issue, not code issue. Warn user, skip Unity tests, continue with relevant non-Unity checks
    - If compilation fails for other reasons: fix the code
-3. Run `bash scripts/unity/run-tests.sh` (EditMode) and `bash scripts/unity/run-tests.sh --mode playmode` (PlayMode)
+3. Run `bash scripts/unity/run-tests.sh` (EditMode) and `bash scripts/unity/run-tests.sh --mode playmode` (PlayMode). A `--filter` that matches nothing now fails rather than reporting a clean run
 4. Parse test results and fix any failures before marking work complete
 5. Always run the relevant targeted non-Unity checks and the fast `npm run validate:prepush` safety check regardless of Unity license availability
 
