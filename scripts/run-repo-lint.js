@@ -275,6 +275,11 @@ const CHECKS = [
     run: "pwsh -NoProfile -File scripts/tests/test-report-slow-tests.ps1 -VerboseOutput"
   },
   {
+    id: "unity-nunit-results",
+    name: "Unity NUnit results gate",
+    run: "bash scripts/tests/test-unity-nunit-results.sh"
+  },
+  {
     id: "process-watchdog",
     name: "Process watchdog",
     run: "pwsh -NoProfile -File scripts/tests/test-process-watchdog.ps1 -VerboseOutput"

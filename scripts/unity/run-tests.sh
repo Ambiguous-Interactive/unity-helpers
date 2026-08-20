@@ -32,6 +32,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 UNITY_TEST_PROJECT_DIR="${UNITY_TEST_PROJECT_DIR:-/home/vscode/.unity-test-project}"
 
+# shellcheck source=scripts/unity/lib/nunit-results.sh
+source "${SCRIPT_DIR}/lib/nunit-results.sh"
+
 MODE="editmode"
 FILTER=""
 ASSEMBLY=""
@@ -171,119 +174,24 @@ run_test_mode() {
 
     echo "==> [run-tests] ${platform} tests completed in ${elapsed}s (exit code: ${exit_code})."
 
-    # Parse NUnit XML results if the file exists
+    # A zero exit from Unity is not by itself evidence that tests ran, so the results file
+    # gets a vote.
+    local results_exit=0
+    parse_nunit_results "${local_results_file}" "${platform}" || results_exit=$?
+
     if [[ -f "${local_results_file}" ]]; then
-        parse_nunit_results "${local_results_file}" "${platform}"
         # Surface the slowest fixtures/cases so local runs see what to optimize.
         if command -v pwsh > /dev/null 2>&1; then
             pwsh -NoProfile -File "${SCRIPT_DIR}/report-slow-tests.ps1" \
                 -ResultsPath "${local_results_file}" -Top 20 || true
         fi
-    else
-        echo "    WARNING: Results file not found at ${local_results_file}"
+    fi
+
+    if [[ "${exit_code}" -eq 0 ]]; then
+        exit_code="${results_exit}"
     fi
 
     return "${exit_code}"
-}
-
-###############################################################################
-# parse_nunit_results: Parses an NUnit XML results file and prints a summary.
-#
-# Arguments:
-#   $1 - Path to the NUnit XML results file
-#   $2 - Platform name (for display)
-###############################################################################
-parse_nunit_results() {
-    local results_file="$1"
-    local platform="$2"
-
-    echo ""
-    echo "==> [run-tests] ${platform} Test Results Summary:"
-    echo "    ----------------------------------------"
-
-    # Extract attributes from the top-level test-run element
-    local total=0
-    local passed=0
-    local failed=0
-    local skipped=0
-
-    # Use simple text parsing to extract counts from the XML
-    if command -v python3 > /dev/null 2>&1; then
-        # Use Python for reliable XML parsing if available
-        local summary
-        # Pass file path as argv[1] to avoid injection via string interpolation.
-        # Uses local variable instead of backslash-escapes in f-strings for
-        # Python < 3.12 compatibility (PEP 701 only available in 3.12+).
-        summary=$(python3 -c '
-import xml.etree.ElementTree as ET
-import sys
-
-try:
-    tree = ET.parse(sys.argv[1])
-    root = tree.getroot()
-    total = root.get("total", "0")
-    passed = root.get("passed", "0")
-    failed = root.get("failed", "0")
-    skipped = root.get("skipped", root.get("inconclusive", "0"))
-    print(f"{total} {passed} {failed} {skipped}")
-
-    # Print failed test names
-    for test_case in root.iter("test-case"):
-        if test_case.get("result", "").lower() in ("failed", "error"):
-            name = test_case.get("fullname", test_case.get("name", "unknown"))
-            print(f"FAILED: {name}")
-except Exception as e:
-    print("0 0 0 0", file=sys.stderr)
-    print(f"ERROR: {e}", file=sys.stderr)
-' "${results_file}" 2>&1) || true
-
-        # Parse the first line for counts.
-        #
-        # Taken with parameter expansion rather than `echo "${summary}" | head -n 1`: on a failing
-        # run ${summary} carries one line per failed test, `head` exits after the first, the
-        # producer dies of SIGPIPE, and under `set -o pipefail` this capture reports 141 -- which
-        # `set -e` turns into an aborted run at the moment the summary was about to be printed
-        # (#465). The larger the failure, the likelier the abort.
-        local counts_line
-        counts_line="${summary%%$'\n'*}"
-        total=$(echo "${counts_line}" | cut -d' ' -f1)
-        passed=$(echo "${counts_line}" | cut -d' ' -f2)
-        failed=$(echo "${counts_line}" | cut -d' ' -f3)
-        skipped=$(echo "${counts_line}" | cut -d' ' -f4)
-
-        echo "    Total:   ${total}"
-        echo "    Passed:  ${passed}"
-        echo "    Failed:  ${failed}"
-        echo "    Skipped: ${skipped}"
-
-        # Print any failed test names
-        local failed_tests
-        failed_tests=$(echo "${summary}" | tail -n +2)
-        if [[ -n "${failed_tests}" ]]; then
-            echo ""
-            echo "    Failed tests:"
-            echo "${failed_tests}" | while IFS= read -r line; do
-                echo "      ${line}"
-            done
-        fi
-    else
-        # Fallback: basic attribute extraction with bash
-        local test_run_line
-        test_run_line=$(head -n 5 "${results_file}" | tr ' ' '\n' | tr '>' '\n')
-
-        total=$(echo "${test_run_line}" | sed -n 's/.*total="\([0-9]*\)".*/\1/p' | head -n 1 || true)
-        passed=$(echo "${test_run_line}" | sed -n 's/.*passed="\([0-9]*\)".*/\1/p' | head -n 1 || true)
-        failed=$(echo "${test_run_line}" | sed -n 's/.*failed="\([0-9]*\)".*/\1/p' | head -n 1 || true)
-        skipped=$(echo "${test_run_line}" | sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' | head -n 1 || true)
-
-        echo "    Total:   ${total:-0}"
-        echo "    Passed:  ${passed:-0}"
-        echo "    Failed:  ${failed:-0}"
-        echo "    Skipped: ${skipped:-0}"
-    fi
-
-    echo "    ----------------------------------------"
-    echo ""
 }
 
 # Run tests based on mode
