@@ -24,6 +24,110 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [ThreadStatic]
         private static int _messageDepth;
 
+        [ThreadStatic]
+        private static int[] _sizePlanArena;
+
+        [ThreadStatic]
+        private static int _sizePlanArenaCount;
+
+        [ThreadStatic]
+        private static int _sizePlanStart;
+
+        [ThreadStatic]
+        private static int _sizePlanCount;
+
+        [ThreadStatic]
+        private static bool _sizePlanCapturing;
+
+        internal readonly ref struct SizePlanScope
+        {
+            private readonly int _previousArenaCount;
+            private readonly int _previousStart;
+            private readonly int _previousCount;
+            private readonly bool _previousCapturing;
+            private readonly int _start;
+
+            internal SizePlanScope(bool begin)
+            {
+                _previousArenaCount = _sizePlanArenaCount;
+                _previousStart = _sizePlanStart;
+                _previousCount = _sizePlanCount;
+                _previousCapturing = _sizePlanCapturing;
+                _start = _sizePlanArenaCount;
+
+                _sizePlanStart = _start;
+                _sizePlanCount = 0;
+                _sizePlanCapturing = begin;
+            }
+
+            internal ReadOnlySpan<int> Freeze()
+            {
+                if (_sizePlanStart != _start || !_sizePlanCapturing)
+                {
+                    throw new InvalidOperationException(
+                        "WallstopProto size-plan scopes must be frozen in nesting order."
+                    );
+                }
+
+                _sizePlanCapturing = false;
+                return _sizePlanCount == 0
+                    ? ReadOnlySpan<int>.Empty
+                    : new ReadOnlySpan<int>(_sizePlanArena, _sizePlanStart, _sizePlanCount);
+            }
+
+            public void Dispose()
+            {
+                _sizePlanArenaCount = _previousArenaCount;
+                _sizePlanStart = _previousStart;
+                _sizePlanCount = _previousCount;
+                _sizePlanCapturing = _previousCapturing;
+            }
+        }
+
+        internal static SizePlanScope BeginSizePlan()
+        {
+            return new SizePlanScope(true);
+        }
+
+        private static int ReserveSizePlanEntry()
+        {
+            if (!_sizePlanCapturing)
+            {
+                return -1;
+            }
+
+            if (_sizePlanArena == null)
+            {
+                _sizePlanArena = new int[16];
+            }
+            else if (_sizePlanArenaCount == _sizePlanArena.Length)
+            {
+                Array.Resize(ref _sizePlanArena, checked(_sizePlanArena.Length * 2));
+            }
+
+            int index = _sizePlanArenaCount++;
+            _sizePlanCount++;
+            _sizePlanArena[index] = 0;
+            return index;
+        }
+
+        private static void CompleteSizePlanEntry(int index, int payloadSize)
+        {
+            if (0 <= index)
+            {
+                _sizePlanArena[index] = payloadSize;
+            }
+        }
+
+        private static void RollBackSizePlanEntry(int index)
+        {
+            if (0 <= index)
+            {
+                _sizePlanArenaCount = index;
+                _sizePlanCount = index - _sizePlanStart;
+            }
+        }
+
         /// <summary>
         /// Returns the encoded size of <paramref name="value"/> as an unsigned varint.
         /// </summary>
@@ -182,10 +286,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             // No reset on the throw path: each enclosing frame's finally unwinds one level, so the
             // counter is back at zero by the time the exception leaves the outermost call.
+            int sizePlanEntry = ReserveSizePlanEntry();
             _messageDepth++;
             try
             {
-                return LengthDelimitedSize(formatter.Measure(value));
+                int payloadSize = formatter.Measure(value);
+                CompleteSizePlanEntry(sizePlanEntry, payloadSize);
+                return LengthDelimitedSize(payloadSize);
+            }
+            catch
+            {
+                RollBackSizePlanEntry(sizePlanEntry);
+                throw;
             }
             finally
             {

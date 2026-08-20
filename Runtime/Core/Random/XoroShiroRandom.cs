@@ -125,11 +125,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureNonZeroState();
         }
 
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
         public override uint NextUint()
         {
             unchecked
             {
-                EnsureNonZeroState();
                 ulong s0 = _s0;
                 ulong s1 = _s1;
                 ulong result = s0 + s1;

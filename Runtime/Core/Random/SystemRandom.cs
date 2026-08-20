@@ -101,6 +101,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public SystemRandom(int seed)
         {
+            InitializeSeedArray(seed);
+        }
+
+        private void InitializeSeedArray(int seed)
+        {
+            if (_seedArray == null || _seedArray.Length != SeedArraySize)
+            {
+                _seedArray = new int[SeedArraySize];
+            }
+
             int num1 = 161803398 - (seed == int.MinValue ? int.MaxValue : Math.Abs(seed));
             _seedArray[LastSeedIndex] = num1;
             int num2 = 1;
@@ -141,24 +151,55 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _inextp = (int)internalState.State2;
             }
             RestoreCommonState(internalState);
-            _seedArray = ArrayConverter.ByteArrayToIntArrayBlockCopy(internalState._payload);
+            _seedArray =
+                internalState._payload?.Length == SeedArraySize * sizeof(int)
+                    ? ArrayConverter.ByteArrayToIntArrayBlockCopy(internalState._payload)
+                    : null;
             EnsureSeedArray();
+            EnsureValidIndices();
         }
 
         private void EnsureSeedArray()
         {
             if (_seedArray == null || _seedArray.Length != SeedArraySize)
             {
-                _seedArray = new int[SeedArraySize];
+                InitializeSeedArray(0);
+                return;
             }
+
+            for (int index = 1; index < _seedArray.Length; index++)
+            {
+                if (_seedArray[index] != 0)
+                {
+                    return;
+                }
+            }
+
+            InitializeSeedArray(0);
+        }
+
+        private void EnsureValidIndices()
+        {
+            if (_inext < 0 || LastSeedIndex < _inext)
+            {
+                _inext = 0;
+            }
+
+            int expectedInextp = (_inext + 20) % LastSeedIndex + 1;
+            if (_inextp != expectedInextp)
+            {
+                _inextp = expectedInextp;
+            }
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureSeedArray();
+            EnsureValidIndices();
         }
 
         public override int Next()
         {
-            // A formatter may hand back an instance no constructor ran and a payload that never
-            // named this member, so the initializer above guarantees nothing a caller can reach.
-            EnsureSeedArray();
-
             int localINext = _inext;
             int localINextP = _inextp;
             int index1;

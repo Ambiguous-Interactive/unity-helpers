@@ -178,12 +178,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
+        protected override void OnAfterDeserialization()
+        {
+            EnsureElements();
+            NormalizeIndex();
+        }
+
         public override uint NextUint()
         {
-            // A formatter may hand back an instance no constructor ran and a payload that never
-            // named this member, so the initializer above guarantees nothing a caller can reach.
-            EnsureElements();
-
             if (!_hasPrimed)
             {
                 GenerateBlock();

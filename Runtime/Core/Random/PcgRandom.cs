@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         [ProtoMember(6)]
         [WProtoMember(6)]
-        internal readonly ulong _increment;
+        internal ulong _increment;
 
         [ProtoMember(7)]
         [WProtoMember(7)]
@@ -174,11 +174,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             unchecked
             {
                 ulong oldState = _state;
-                _state = oldState * 6364136223846793005UL + NormalizeIncrement(_increment);
+                _state = oldState * 6364136223846793005UL + _increment;
                 uint xorShifted = (uint)(((oldState >> 18) ^ oldState) >> 27);
                 int rot = (int)(oldState >> 59);
                 return (xorShifted >> rot) | (xorShifted << (-rot & 31));
             }
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            _increment = NormalizeIncrement(_increment);
         }
 
         public bool Equals(PcgRandom other)

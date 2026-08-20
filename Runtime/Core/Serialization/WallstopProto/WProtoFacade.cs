@@ -94,7 +94,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return new WProtoWriteResult(0, false);
             }
 
+            using WProtoSizes.SizePlanScope sizePlanScope = WProtoSizes.BeginSizePlan();
             int size = formatter.Measure(value);
+            ReadOnlySpan<int> sizePlan = sizePlanScope.Freeze();
             bool resized = buffer == null || buffer.Length < size;
             if (resized)
             {
@@ -104,8 +106,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // Sliced to `size`, not handed the whole buffer: a reused buffer is longer than this
             // message, and the writer's bounds checks are what stop a formatter from running past
             // its own payload into the previous one's bytes.
-            WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size));
-            if (!formatter.Write(ref writer, value))
+            WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size), sizePlan);
+            bool written = formatter.Write(ref writer, value);
+            if (!written || writer.Faulted || writer.Position != size)
             {
                 // Thrown, not reported as "not served" -- the serialize-side mirror of the refused
                 // READ that already throws below. A registered formatter that fails is a defect in
@@ -205,9 +208,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             WProtoReader reader = new WProtoReader(data);
-            if (formatter.TryRead(ref reader, out value))
+            try
             {
-                return true;
+                if (formatter.TryRead(ref reader, out value))
+                {
+                    return true;
+                }
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    $"WallstopProto could not read a '{typeof(T).FullName}' from {data.Length} byte(s): "
+                        + "the payload is truncated, malformed, or was written by a different contract. "
+                        + "This type has a generated formatter, so it is not retried with protobuf-net.",
+                    exception
+                );
             }
 
             // "No formatter for this type" and "this type's formatter rejected the payload" are

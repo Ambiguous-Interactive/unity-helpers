@@ -4,10 +4,13 @@
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.Text.Json;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using WallstopStudios.UnityHelpers.Utils;
     using SerializerAlias = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -140,6 +143,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 $"Large collection (50k ints): Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x"
             );
             Assert.Pass($"Performance baseline: {fastMs}ms");
+        }
+
+        [Test]
+        public void ReadingAnArrayAllocatesOnlyTheReturnedArray()
+        {
+            const int elementCount = 128;
+            const int iterations = 20;
+            byte[] data = JsonSerializer.SerializeToUtf8Bytes(MakeIntArray(elementCount, 17));
+            JsonSerializerOptions options = SerializerAlias.CreateFastJsonOptions();
+            int[] result = null;
+
+            long returnedArrayAllocation = GCAssert.MeasureAllocatedBytes(
+                () => result = new int[elementCount],
+                measuredIterations: iterations
+            );
+            long readAllocation = GCAssert.MeasureAllocatedBytes(
+                () => result = ReadIntArray(data, options),
+                measuredIterations: iterations
+            );
+
+            Assert.AreEqual(elementCount, result.Length);
+            Assert.LessOrEqual(
+                readAllocation,
+                returnedArrayAllocation + 128,
+                $"Reading allocated {readAllocation} bytes; the returned arrays allocated "
+                    + $"{returnedArrayAllocation} bytes."
+            );
+        }
+
+        [Test]
+        public void ReadingAnOversizedArrayDoesNotRetainItsScratchStorage()
+        {
+            int elementCount = WJsonArray.MaximumRetainedArrayCapacity * 2;
+            byte[] data = JsonSerializer.SerializeToUtf8Bytes(MakeIntArray(elementCount, 23));
+            JsonSerializerOptions options = SerializerAlias.CreateFastJsonOptions();
+
+            int[] result = ReadIntArray(data, options);
+
+            Assert.AreEqual(elementCount, result.Length);
+            using PooledResource<List<int>> lease = Buffers<int>.List.Get(out List<int> scratch);
+            Assert.LessOrEqual(
+                scratch.Capacity,
+                WJsonArray.MaximumRetainedArrayCapacity,
+                "an untrusted array must not leave payload-sized scratch storage rooted in the pool"
+            );
         }
 
         [Test, Timeout(0)]
@@ -390,6 +438,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             // that, but running them locally against such a player would have crashed it.
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
             return GC.GetAllocatedBytesForCurrentThread();
+        }
+
+        private static int[] ReadIntArray(byte[] data, JsonSerializerOptions options)
+        {
+            Utf8JsonReader reader = new(data);
+            if (!reader.Read())
+            {
+                return Array.Empty<int>();
+            }
+
+            return WJsonArray.ReadArray<int>(ref reader, options, nameof(Int32));
         }
 
         private static int[] MakeIntArray(int len, int seed)

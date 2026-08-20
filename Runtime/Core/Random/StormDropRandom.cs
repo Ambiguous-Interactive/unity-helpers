@@ -145,11 +145,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
+        protected override void OnAfterDeserialization()
+        {
+            EnsureElements();
+        }
+
         public override uint NextUint()
         {
-            // A formatter may hand back an instance no constructor ran and a payload that never
-            // named this member, so the initializer above guarantees nothing a caller can reach.
-            EnsureElements();
             unchecked
             {
                 uint index = _b & ElementMask;

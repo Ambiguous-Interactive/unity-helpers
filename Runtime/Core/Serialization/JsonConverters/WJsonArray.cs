@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 {
     using System.Collections.Generic;
     using System.Text.Json;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Reads and writes a JSON array one element at a time, without asking System.Text.Json for a
@@ -38,6 +39,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     /// </remarks>
     internal static class WJsonArray
     {
+        internal const int MaximumRetainedArrayCapacity = 4_096;
+
         /// <summary>
         /// Reads a JSON array into a list, or returns <c>null</c> for a JSON null.
         /// </summary>
@@ -52,9 +55,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             string owner
         )
         {
-            if (reader.TokenType == JsonTokenType.Null)
+            if (!TryBeginArray(ref reader, owner))
             {
                 return null;
+            }
+
+            List<T> items = new();
+            ReadElements(ref reader, options, owner, items);
+            return items;
+        }
+
+        private static bool TryBeginArray(ref Utf8JsonReader reader, string owner)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return false;
             }
 
             if (reader.TokenType != JsonTokenType.StartArray)
@@ -62,12 +77,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 throw new JsonException($"{owner} expects a JSON array, got {reader.TokenType}");
             }
 
-            List<T> items = new();
+            return true;
+        }
+
+        private static void ReadElements<T>(
+            ref Utf8JsonReader reader,
+            JsonSerializerOptions options,
+            string owner,
+            List<T> items
+        )
+        {
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndArray)
                 {
-                    return items;
+                    return;
                 }
 
                 items.Add(JsonSerializer.Deserialize<T>(ref reader, options));
@@ -90,8 +114,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             string owner
         )
         {
-            List<T> items = ReadList<T>(ref reader, options, owner);
-            return items?.ToArray();
+            if (!TryBeginArray(ref reader, owner))
+            {
+                return null;
+            }
+
+            PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> items);
+            try
+            {
+                ReadElements(ref reader, options, owner, items);
+                return items.ToArray();
+            }
+            finally
+            {
+                if (MaximumRetainedArrayCapacity < items.Capacity)
+                {
+                    items.Clear();
+                    items.Capacity = 0;
+                }
+
+                lease.Dispose();
+            }
         }
 
         /// <summary>

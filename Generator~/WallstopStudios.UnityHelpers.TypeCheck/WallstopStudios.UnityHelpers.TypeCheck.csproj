@@ -75,6 +75,7 @@
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
     <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. -->
     <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
   </ItemGroup>
   <ItemGroup>
     <!-- The same vendored binaries the package ships to Unity. -->

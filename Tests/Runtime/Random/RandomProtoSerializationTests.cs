@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using System.IO;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -642,6 +643,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
         }
 
+        private static IEnumerable<TestCaseData> EveryGeneratorRepairedAfterDeserialization()
+        {
+            yield return EmptySubtype("DotNetRandom", 100, true);
+            yield return EmptySubtype("PcgRandom", 101, true);
+            yield return EmptySubtype("XorShiftRandom", 102, true);
+            yield return EmptySubtype("XoroShiroRandom", 104, true);
+            yield return EmptySubtype("SystemRandom", 106, true);
+            yield return EmptySubtype("RomuDuo", 109, true);
+            yield return EmptySubtype("PhotonSpinRandom", 113, true);
+            yield return EmptySubtype("StormDropRandom", 114, true);
+        }
+
+        private static TestCaseData EmptySubtype(
+            string name,
+            int includeTag,
+            bool expectVariedOutput
+        )
+        {
+            byte[] payload = new byte[WProtoSizes.TagSize(includeTag) + 1];
+            WProtoWriter writer = new(payload);
+            if (
+                !writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited)
+                || !writer.TryWriteLengthPrefix(0)
+            )
+            {
+                throw new InvalidOperationException($"Could not build the {name} test payload.");
+            }
+
+            return new TestCaseData(payload, expectVariedOutput).SetName(name);
+        }
+
+        [TestCaseSource(nameof(EveryGeneratorRepairedAfterDeserialization))]
+        public void AGeneratorIsRepairedBeforeItsFirstDraw(byte[] payload, bool expectVariedOutput)
+        {
+            AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
+            using MemoryStream read = new(payload);
+            AbstractRandom protobufNet = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+
+            uint[] expected = Draw(protobufNet);
+            CollectionAssert.AreEqual(expected, Draw(wallstopProto));
+            if (expectVariedOutput)
+            {
+                Assert.Greater(
+                    new HashSet<uint>(expected).Count,
+                    1,
+                    "a dead stream repeats one value"
+                );
+            }
+        }
+
         [TestCaseSource(nameof(EveryGenerator))]
         public void ARestoredGeneratorCanStillProduceAGuid(IRandom random)
         {
@@ -680,20 +731,158 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             CollectionAssert.AreEqual(expected, Draw(viaProtobufNet));
         }
 
-        [Test]
-        public void APcgIncrementRestoredAsZeroStillAdvances()
+        [TestCase(-2, int.MaxValue)]
+        [TestCase(5, 5)]
+        public void MalformedSystemRandomIndicesAreRepairedBeforeDrawing(int inext, int inextp)
         {
-            // PCG multiplies and then adds its increment, so a zero increment leaves the state
-            // where it was and every draw is the same value. Every constructor stores an odd one,
-            // so only a payload can deliver zero -- and it must not produce a dead generator.
-            PcgRandom zeroed = new(0UL, 0UL);
-            IRandom restored = Serializer.ProtoDeserialize<IRandom>(
-                Serializer.ProtoSerialize<IRandom>(zeroed)
+            byte[] payload = BuildMalformedSystemRandomPayload(inext, inextp);
+            int expectedInext = inext < 0 || 55 < inext ? 0 : inext;
+            int expectedInextp = (expectedInext + 20) % 55 + 1;
+
+            AssertReadersDrawMatchingSafeStreams(
+                payload,
+                unchecked((ulong)expectedInext),
+                unchecked((ulong)expectedInextp),
+                expectVariedOutput: true
+            );
+        }
+
+        [Test]
+        public void ExcessiveDotNetReplayCountIsBoundedBeforeDrawing()
+        {
+            byte[] payload = BuildExcessiveDotNetReplayPayload();
+
+            InvalidOperationException wallstopProto = Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, out AbstractRandom _)
+            );
+            Assert.IsInstanceOf<System.Runtime.Serialization.SerializationException>(
+                wallstopProto.InnerException
+            );
+            using MemoryStream read = new(payload);
+            Assert.Catch<Exception>(() => ProtoBuf.Serializer.Deserialize<AbstractRandom>(read));
+        }
+
+        [Test]
+        public void AmplifiedDotNetSnapshotLengthCannotAllocateFromTheHeader()
+        {
+            byte[] payload = BuildAmplifiedDotNetSnapshotPayload();
+
+            AssertReadersDrawMatchingSafeStreams(payload);
+        }
+
+        [Test]
+        public void SystemRandomStateConstructorRepairsMalformedIndices()
+        {
+            IReadOnlyList<byte> seedPayload = new SystemRandom(0).InternalState.PayloadBytes;
+            SystemRandom random = new(
+                new RandomState(state1: 5UL, state2: 5UL, payload: seedPayload)
             );
 
-            uint[] drawn = Draw(restored);
-            CollectionAssert.AreEqual(Draw(zeroed), drawn);
-            Assert.Greater(new HashSet<uint>(drawn).Count, 1, "a dead stream repeats one value");
+            Assert.AreEqual(5UL, random.InternalState.State1);
+            Assert.AreEqual(26UL, random.InternalState.State2);
+            Assert.Greater(
+                new HashSet<uint>(Draw(random)).Count,
+                1,
+                "a dead stream repeats one value"
+            );
+        }
+
+        private static byte[] BuildMalformedSystemRandomPayload(int inext, int inextp)
+        {
+            IReadOnlyList<byte> seedPayload = new SystemRandom(0).InternalState.PayloadBytes;
+            byte[] nested = new byte[1024];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteInt32(inext));
+            Assert.IsTrue(nestedWriter.TryWriteTag(7, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteInt32(inextp));
+            Assert.IsTrue(
+                nestedWriter.TryBeginLengthDelimited(8, false, out WProtoLengthToken token)
+            );
+            for (int offset = 0; offset < seedPayload.Count; offset += sizeof(int))
+            {
+                int seedValue = unchecked(
+                    seedPayload[offset]
+                    | (seedPayload[offset + 1] << 8)
+                    | (seedPayload[offset + 2] << 16)
+                    | (seedPayload[offset + 3] << 24)
+                );
+                Assert.IsTrue(nestedWriter.TryWriteInt32(seedValue));
+            }
+            Assert.IsTrue(nestedWriter.TryCloseLengthDelimited(token));
+
+            return WrapSubtypePayload(106, nestedWriter.Written);
+        }
+
+        private static byte[] BuildExcessiveDotNetReplayPayload()
+        {
+            byte[] nested = new byte[16];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteVarint64(ulong.MaxValue));
+
+            return WrapSubtypePayload(100, nestedWriter.Written);
+        }
+
+        private static byte[] BuildAmplifiedDotNetSnapshotPayload()
+        {
+            byte[] snapshot = new byte[12];
+            snapshot[0] = 0xFF;
+            snapshot[1] = 0xFF;
+            snapshot[2] = 0xFF;
+            snapshot[3] = 0x7F;
+
+            byte[] nested = new byte[32];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(8, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(nestedWriter.TryWriteLengthPrefix(snapshot.Length));
+            Assert.IsTrue(nestedWriter.TryWriteRaw(snapshot));
+
+            return WrapSubtypePayload(100, nestedWriter.Written);
+        }
+
+        private static byte[] WrapSubtypePayload(int includeTag, ReadOnlySpan<byte> nested)
+        {
+            byte[] payload = new byte[nested.Length + 16];
+            WProtoWriter writer = new(payload);
+            Assert.IsTrue(writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(nested.Length));
+            Assert.IsTrue(writer.TryWriteRaw(nested));
+            return writer.Written.ToArray();
+        }
+
+        private static void AssertReadersDrawMatchingSafeStreams(
+            byte[] payload,
+            ulong? expectedState1 = null,
+            ulong? expectedState2 = null,
+            bool expectVariedOutput = false
+        )
+        {
+            AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
+            using MemoryStream read = new(payload);
+            AbstractRandom protobufNet = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+
+            if (expectedState1.HasValue)
+            {
+                Assert.AreEqual(expectedState1.Value, wallstopProto.InternalState.State1);
+                Assert.AreEqual(expectedState1.Value, protobufNet.InternalState.State1);
+            }
+            if (expectedState2.HasValue)
+            {
+                Assert.AreEqual(expectedState2.Value, wallstopProto.InternalState.State2);
+                Assert.AreEqual(expectedState2.Value, protobufNet.InternalState.State2);
+            }
+
+            uint[] expected = Draw(protobufNet);
+            CollectionAssert.AreEqual(expected, Draw(wallstopProto));
+            if (expectVariedOutput)
+            {
+                Assert.Greater(
+                    new HashSet<uint>(expected).Count,
+                    1,
+                    "a dead stream repeats one value"
+                );
+            }
         }
 
         private static IRandom RoundTrip(IRandom random)

@@ -116,11 +116,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureNonZeroState();
         }
 
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
         public override uint NextUint()
         {
             unchecked
             {
-                EnsureNonZeroState();
                 ulong xp = _x;
                 _x = 15241094284759029579UL * _y;
                 _y = Rol64(_y, 27) + xp;

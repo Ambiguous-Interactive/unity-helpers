@@ -1122,6 +1122,11 @@ Five behaviors are worth knowing, because two of them are the opposite of the ru
   does the same, and matching it is what keeps saved data readable.
 - **Every lifecycle hook still runs exactly once per serialization**, however deep the value sits, so
   a `[WProtoBeforeSerialization]` hook that rents pooled scratch releases it exactly once.
+- **The measure pass carries each nested payload size into the write pass.** The writer reserves the
+  final varint-prefix width before writing a large sub-message, so it does not move that payload once
+  per enclosing level. A directly constructed `WProtoWriter` has no size plan and keeps the canonical
+  back-patch path. Closing always recomputes the actual length, so a size hint can change cost but not
+  wire bytes.
 - **`IsRequired` does not make a null appear.** It forces a value equal to its default onto the wire —
   a `0` int, a `default` struct sub-message — but a `null` string, `byte[]` or message reference is
   still absent, which is what protobuf-net does.

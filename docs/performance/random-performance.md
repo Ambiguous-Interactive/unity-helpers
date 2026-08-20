@@ -2,6 +2,16 @@
 
 > Auto-generated via RandomPerformanceTests.Benchmark. Run the test to refresh these summary and detail tables.
 
+State repair for a generator restored from JSON or protobuf happens in its constructor or the shared
+after-deserialization callback. It is not repeated in `NextUint()`, so malformed/default serialized
+state is repaired before the first draw without adding a guard to every later draw.
+
+For statistical batteries, the repository's
+`Generator~/WallstopStudios.UnityHelpers.RandomQuality` host emits a reproducible little-endian byte
+stream from an explicit generator, GUID seed and byte count. Long PractRand/TestU01 runs belong in
+scheduled reporting with pinned tools and expected weak-generator failures; they are not suitable as
+nondeterministic pull-request gates.
+
 <!-- RANDOM_BENCHMARKS_START -->
 
 ## Summary (fastest first)

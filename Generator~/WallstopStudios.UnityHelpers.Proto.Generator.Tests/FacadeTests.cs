@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             public int Measure(in FacadeBrokenContract value) => 4;
 
-            public bool Write(ref WProtoWriter writer, in FacadeBrokenContract value) => false;
+            public bool Write(ref WProtoWriter writer, in FacadeBrokenContract value) => true;
 
             public bool TryRead(ref WProtoReader reader, out FacadeBrokenContract value)
             {

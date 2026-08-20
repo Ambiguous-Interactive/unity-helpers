@@ -19,6 +19,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         internal readonly int PayloadStart;
 
         /// <summary>
+        /// The space already held for the prefix, which may come from a measured size plan.
+        /// </summary>
+        internal readonly int ReservedPrefixSize;
+
+        /// <summary>
         /// Whether opening this field charged a level against the nesting bound.
         /// </summary>
         /// <remarks>
@@ -30,10 +35,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         internal readonly bool Nested;
 
-        internal WProtoLengthToken(int prefixStart, int payloadStart, bool nested)
+        internal WProtoLengthToken(
+            int prefixStart,
+            int payloadStart,
+            int reservedPrefixSize,
+            bool nested
+        )
         {
             PrefixStart = prefixStart;
             PayloadStart = payloadStart;
+            ReservedPrefixSize = reservedPrefixSize;
             Nested = nested;
         }
     }

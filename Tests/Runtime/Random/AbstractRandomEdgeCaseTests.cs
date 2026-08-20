@@ -233,6 +233,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
+        [Test]
+        public void DotNetRandomRefusesAnUnboundedLegacyReplayInsteadOfResettingIt()
+        {
+            RandomState excessiveReplay = new RandomState(state1: 1234UL, state2: 1_000_001UL);
+
+            Assert.Catch<Exception>(() => new DotNetRandom(excessiveReplay));
+        }
+
         private static ulong MultiplyHigh(ulong x, ulong y)
         {
             unchecked

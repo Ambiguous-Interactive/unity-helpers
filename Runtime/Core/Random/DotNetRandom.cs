@@ -65,6 +65,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     {
         private const BindingFlags RandomFieldFlags =
             BindingFlags.Instance | BindingFlags.NonPublic;
+        private const ulong MaximumDeserializationReplayCount = 1_000_000UL;
+        private const int SnapshotSeedArrayLength = 56;
 
         private static readonly FieldInfo SeedArrayField =
             typeof(Random).GetField("SeedArray", RandomFieldFlags)
@@ -185,6 +187,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _pendingStatePayload = null;
             }
 
+            // An old runtime may not expose a restorable snapshot, so a bounded replay remains a
+            // compatibility path. Never silently reset a legitimate advanced stream, but do not
+            // let an untrusted counter turn deserialization into an effectively unbounded loop.
+            if (MaximumDeserializationReplayCount < _numberGenerated)
+            {
+                throw new SerializationException(
+                    $"A DotNetRandom without a usable state snapshot cannot replay more than "
+                        + $"{MaximumDeserializationReplayCount:N0} draws during deserialization."
+                );
+            }
+
             for (ulong i = 0; i < _numberGenerated; ++i)
             {
                 _ = _random.Next(int.MinValue, int.MaxValue);
@@ -193,7 +206,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override uint NextUint()
         {
-            EnsureRandomInitialized();
             ++_numberGenerated;
             return unchecked((uint)_random.Next(int.MinValue, int.MaxValue));
         }
@@ -302,7 +314,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private static bool TryApplySnapshot(Random random, RandomSnapshot snapshot)
         {
-            if (!SnapshotSupported || random == null || snapshot.SeedArray == null)
+            if (
+                !SnapshotSupported
+                || random == null
+                || !IsValidSnapshotShape(snapshot.SeedArray, snapshot.Inext, snapshot.Inextp)
+            )
             {
                 return false;
             }
@@ -360,12 +376,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private static byte[] SerializeSnapshot(RandomSnapshot snapshot)
         {
-            if (snapshot.SeedArray == null)
+            if (!IsValidSnapshotShape(snapshot.SeedArray, snapshot.Inext, snapshot.Inextp))
             {
                 return null;
             }
 
-            int length = snapshot.SeedArray.Length;
+            const int length = SnapshotSeedArrayLength;
             byte[] buffer = new byte[12 + length * sizeof(int)];
             Span<byte> span = buffer.AsSpan();
             BinaryPrimitives.WriteInt32LittleEndian(span, length);
@@ -402,21 +418,26 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             int length = BinaryPrimitives.ReadInt32LittleEndian(header);
-            if (length <= 0)
-            {
-                snapshot = default;
-                return false;
-            }
-
-            int expectedBytes = 12 + length * sizeof(int);
-            if (payload.Count < expectedBytes)
-            {
-                snapshot = default;
-                return false;
-            }
-
             int inext = BinaryPrimitives.ReadInt32LittleEndian(header.Slice(4));
             int inextp = BinaryPrimitives.ReadInt32LittleEndian(header.Slice(8));
+            if (
+                length != SnapshotSeedArrayLength
+                || inext < 0
+                || SnapshotSeedArrayLength <= inext
+                || inextp < 0
+                || SnapshotSeedArrayLength <= inextp
+            )
+            {
+                snapshot = default;
+                return false;
+            }
+
+            const int expectedBytes = 12 + SnapshotSeedArrayLength * sizeof(int);
+            if (payload.Count != expectedBytes)
+            {
+                snapshot = default;
+                return false;
+            }
 
             int[] seedArray = new int[length];
             for (int i = 0; i < length; ++i)
@@ -432,6 +453,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             snapshot = new RandomSnapshot(inext, inextp, seedArray);
             return true;
+        }
+
+        private static bool IsValidSnapshotShape(int[] seedArray, int inext, int inextp)
+        {
+            return seedArray != null
+                && seedArray.Length == SnapshotSeedArrayLength
+                && 0 <= inext
+                && inext < SnapshotSeedArrayLength
+                && 0 <= inextp
+                && inextp < SnapshotSeedArrayLength;
         }
 
         private readonly struct RandomSnapshot

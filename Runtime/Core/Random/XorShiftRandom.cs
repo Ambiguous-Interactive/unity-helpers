@@ -106,9 +106,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        public override uint NextUint()
+        protected override void OnAfterDeserialization()
         {
             _state = NormalizeState(_state);
+        }
+
+        public override uint NextUint()
+        {
             _state ^= _state << 13;
             _state ^= _state >> 17;
             _state ^= _state << 5;

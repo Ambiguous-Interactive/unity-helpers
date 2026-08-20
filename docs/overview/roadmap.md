@@ -27,11 +27,11 @@ This roadmap outlines planned enhancements to Unity Helpers. All "Currently ship
 
 ## 3. Advanced Random & Statistical Testing
 
-**Currently shipping:** 15+ high-quality RNG implementations (IllusionFlow, PcgRandom, XoroShiro, SplitMix64, RomuDuo, FlurryBurst, PhotonSpin, etc.) with extensive `IRandom` API. See [Random Performance](../performance/random-performance.md).
+**Currently shipping:** 15+ high-quality RNG implementations (IllusionFlow, PcgRandom, XoroShiro, SplitMix64, RomuDuo, FlurryBurst, PhotonSpin, etc.) with extensive `IRandom` API. Repository contributors also have a deterministic binary stream host for external statistical batteries. See [Random Performance](../performance/random-performance.md).
 
 **Next up:**
 
-- CI-friendly statistical harness: PractRand/TestU01 suites with automated pass/fail artifacts
+- Pin PractRand/TestU01 versions and add scheduled suites with per-generator expected outcomes and complete report artifacts
 - Automated quality reports: histograms, percentile deltas, change detection for PR gates
 - Higher-level sampling: Poisson disk, stratified sampling, correlated noise, shuffled streams, deterministic scenario builders
 - Investigation of Job/Burst-aware stream schedulers: seed pools, jump-ahead APIs, reservoir/permutation helpers with property-based tests

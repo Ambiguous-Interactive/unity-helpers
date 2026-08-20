@@ -34,7 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public ref struct WProtoWriter
     {
         private readonly Span<byte> _buffer;
+        private readonly ReadOnlySpan<int> _sizePlan;
         private int _position;
+        private int _sizePlanPosition;
         private int _depth;
         private bool _faulted;
 
@@ -43,9 +45,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="buffer">Destination storage; an empty span is valid and overflows on first write.</param>
         public WProtoWriter(Span<byte> buffer)
+            : this(buffer, ReadOnlySpan<int>.Empty) { }
+
+        internal WProtoWriter(Span<byte> buffer, ReadOnlySpan<int> sizePlan)
         {
             _buffer = buffer;
+            _sizePlan = sizePlan;
             _position = 0;
+            _sizePlanPosition = 0;
             _depth = 0;
             _faulted = false;
         }
@@ -383,10 +390,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// serialization, by whoever sized this buffer, at every depth.
         /// </para>
         /// <para>
-        /// The prefix is reserved at its <i>minimum</i> width and the payload shifted right only when
-        /// the finished length needs a wider varint, so the output is the same minimal encoding
-        /// protobuf-net emits, and a sub-message under 128 bytes -- which is most of them -- moves no
-        /// bytes at all.
+        /// When the facade measured this message, the prefix is reserved at the measured width and
+        /// the payload stays in place. A directly constructed writer has no size plan and reserves
+        /// the minimum width instead. Closing always recomputes the actual payload size and moves it
+        /// left or right if the planned width disagrees, so a hint can change cost but never bytes.
         /// </para>
         /// </remarks>
         public bool TryWriteMessage<T>(int fieldNumber, IWProtoFormatter<T> formatter, in T value)
@@ -397,7 +404,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (!TryBeginLengthDelimited(fieldNumber, true, out WProtoLengthToken token))
+            int reservedPrefixSize = 1;
+            int plannedPayloadSize = -1;
+            if (_sizePlanPosition < _sizePlan.Length)
+            {
+                plannedPayloadSize = _sizePlan[_sizePlanPosition++];
+                if (0 <= plannedPayloadSize)
+                {
+                    reservedPrefixSize = WProtoSizes.Varint32Size((uint)plannedPayloadSize);
+                }
+            }
+
+            if (
+                !TryBeginLengthDelimited(
+                    fieldNumber,
+                    true,
+                    reservedPrefixSize,
+                    plannedPayloadSize,
+                    out WProtoLengthToken token
+                )
+            )
             {
                 return false;
             }
@@ -477,11 +503,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out WProtoLengthToken token
         )
         {
+            return TryBeginLengthDelimited(fieldNumber, nested, 1, -1, out token);
+        }
+
+        private bool TryBeginLengthDelimited(
+            int fieldNumber,
+            bool nested,
+            int reservedPrefixSize,
+            int plannedPayloadSize,
+            out WProtoLengthToken token
+        )
+        {
             if (nested && _depth >= WProtoReader.MaxNestingDepth)
             {
                 _faulted = true;
                 token = default;
                 return false;
+            }
+
+            int tagSize = WProtoSizes.TagSize(fieldNumber);
+            int remaining = _buffer.Length - _position;
+            if (1 < reservedPrefixSize && 0 < tagSize)
+            {
+                int remainingAfterHeader = remaining - tagSize - reservedPrefixSize;
+                if (
+                    remainingAfterHeader < 0
+                    || plannedPayloadSize < 0
+                    || remainingAfterHeader < plannedPayloadSize
+                )
+                {
+                    reservedPrefixSize = 1;
+                }
             }
 
             if (!TryWriteTag(fieldNumber, WProtoWireType.LengthDelimited))
@@ -490,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (!TryReserve(1, out int prefixStart))
+            if (!TryReserve(reservedPrefixSize, out int prefixStart))
             {
                 token = default;
                 return false;
@@ -501,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _depth++;
             }
 
-            token = new WProtoLengthToken(prefixStart, _position, nested);
+            token = new WProtoLengthToken(prefixStart, _position, reservedPrefixSize, nested);
             return true;
         }
 
@@ -517,10 +569,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _depth--;
             }
 
-            return TryBackfillLength(token.PrefixStart, token.PayloadStart);
+            return TryBackfillLength(
+                token.PrefixStart,
+                token.PayloadStart,
+                token.ReservedPrefixSize
+            );
         }
 
-        private bool TryBackfillLength(int prefixStart, int payloadStart)
+        private bool TryBackfillLength(int prefixStart, int payloadStart, int reservedPrefixSize)
         {
             if (_faulted)
             {
@@ -542,13 +598,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             int prefixSize = WProtoSizes.Varint32Size((uint)length);
 
-            // Directional, not `!= 1`. Varint32Size never returns 0, but if it ever did, `!= 1`
-            // would compute extra = -1 and shift the payload LEFT over its own length prefix --
-            // silent corruption. `1 < prefixSize` can only ever widen.
-            if (1 < prefixSize)
+            int prefixDelta = prefixSize - reservedPrefixSize;
+            if (prefixDelta > 0)
             {
-                int extra = prefixSize - 1;
-                if (extra > _buffer.Length - _position)
+                if (prefixDelta > _buffer.Length - _position)
                 {
                     _faulted = true;
                     return false;
@@ -560,8 +613,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 // to the LEFT of where it ends up.
                 _buffer
                     .Slice(payloadStart, length)
-                    .CopyTo(_buffer.Slice(payloadStart + extra, length));
-                _position += extra;
+                    .CopyTo(_buffer.Slice(payloadStart + prefixDelta, length));
+                _position += prefixDelta;
+            }
+            else if (prefixDelta < 0)
+            {
+                _buffer
+                    .Slice(payloadStart, length)
+                    .CopyTo(_buffer.Slice(payloadStart + prefixDelta, length));
+                _position += prefixDelta;
             }
 
             uint remaining = (uint)length;
