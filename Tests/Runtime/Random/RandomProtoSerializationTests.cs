@@ -846,6 +846,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             byte[] payload = new byte[64];
             WProtoWriter writer = new(payload);
+            // protobuf-net must learn the concrete subtype before it can apply base members; if a
+            // base member arrives first, it correctly refuses to instantiate AbstractRandom.
+            Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
             Assert.IsTrue(writer.TryWriteTag(2, WProtoWireType.Varint));
             Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
             Assert.IsTrue(writer.TryWriteTag(3, WProtoWireType.Varint));
@@ -854,8 +858,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
             Assert.IsTrue(writer.TryWriteTag(5, WProtoWireType.Varint));
             Assert.IsTrue(writer.TryWriteInt32(byteCount));
-            Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
-            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
             return writer.Written.ToArray();
         }
 
