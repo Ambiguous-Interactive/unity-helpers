@@ -71,10 +71,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             */
             Assert.That(
                 checkedTypes,
-                Has.Count.GreaterThanOrEqualTo(14),
-                $"Discovered only {checkedTypes.Count} comparable types; the sweep found nothing to check."
+                Has.Count.GreaterThanOrEqualTo(15),
+                $"Discovered only {checkedTypes.Count} hand-written comparable types; the sweep is matching less than it did."
             );
-            foreach (string expected in new[] { "StringWrapper", "WGuid", "SplitMix64" })
+            string[] known =
+            {
+                "Attribute",
+                "AttributeModification",
+                "EffectHandle",
+                "FastVector2Int",
+                "FastVector3Int",
+                "FlurryBurstRandom",
+                "PcgRandom",
+                "PhotonSpinRandom",
+                "RomuDuo",
+                "SplitMix64",
+                "StormDropRandom",
+                "StringWrapper",
+                "WDoomRandom",
+                "WGuid",
+                "XoroShiroRandom",
+            };
+            foreach (string expected in known)
             {
                 CollectionAssert.Contains(checkedTypes, expected);
             }
@@ -87,6 +105,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             foreach (Type type in RuntimeTypes())
             {
                 if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
+                {
+                    continue;
+                }
+
+                /*
+                    Every enum implements IComparable, and Enum.CompareTo already answers null
+                    correctly. Including them would let the discovery floor below be met by 48
+                    free passes while every hand-written comparable went unchecked.
+                */
+                if (type.IsEnum)
                 {
                     continue;
                 }
