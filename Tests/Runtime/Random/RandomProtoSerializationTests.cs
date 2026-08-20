@@ -709,6 +709,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
+        [TestCase(-1, 5)]
+        [TestCase(33, -1)]
+        [TestCase(int.MaxValue, int.MinValue)]
+        public void MalformedCommonReservoirsAreRepairedBeforeDrawing(int bitCount, int byteCount)
+        {
+            RandomState malformedState = new(
+                state1: 1UL,
+                bitBuffer: uint.MaxValue,
+                bitCount: bitCount,
+                byteBuffer: uint.MaxValue,
+                byteCount: byteCount
+            );
+            XorShiftRandom constructed = new(malformedState);
+            AssertCommonReservoirsWereRepaired(constructed);
+
+            byte[] payload = BuildMalformedCommonReservoirPayload(bitCount, byteCount);
+            AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
+            using MemoryStream read = new(payload);
+            AbstractRandom protobufNet = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+
+            AssertCommonReservoirsWereRepaired(wallstopProto);
+            AssertCommonReservoirsWereRepaired(protobufNet);
+            CollectionAssert.AreEqual(
+                DrawCommonValues(protobufNet),
+                DrawCommonValues(wallstopProto)
+            );
+        }
+
         [TestCaseSource(nameof(EveryAllDefaultGenerator))]
         public void AnAllDefaultStateRestoresTheStreamItSaved(IRandom random)
         {
@@ -814,6 +842,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return WrapSubtypePayload(106, nestedWriter.Written);
         }
 
+        private static byte[] BuildMalformedCommonReservoirPayload(int bitCount, int byteCount)
+        {
+            byte[] payload = new byte[64];
+            WProtoWriter writer = new(payload);
+            Assert.IsTrue(writer.TryWriteTag(2, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
+            Assert.IsTrue(writer.TryWriteTag(3, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteInt32(bitCount));
+            Assert.IsTrue(writer.TryWriteTag(4, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
+            Assert.IsTrue(writer.TryWriteTag(5, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteInt32(byteCount));
+            Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
+            return writer.Written.ToArray();
+        }
+
         private static byte[] BuildExcessiveDotNetReplayPayload()
         {
             byte[] nested = new byte[16];
@@ -888,6 +933,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static IRandom RoundTrip(IRandom random)
         {
             return Serializer.ProtoDeserialize<IRandom>(Serializer.ProtoSerialize<IRandom>(random));
+        }
+
+        private static void AssertCommonReservoirsWereRepaired(IRandom random)
+        {
+            Assert.AreEqual(0, random.InternalState.BitCount);
+            Assert.AreEqual(0U, random.InternalState.BitBuffer);
+            Assert.AreEqual(0, random.InternalState.ByteCount);
+            Assert.AreEqual(0U, random.InternalState.ByteBuffer);
+        }
+
+        private static byte[] DrawCommonValues(IRandom random)
+        {
+            byte[] drawn = new byte[32];
+            for (int i = 0; i < drawn.Length; i += 2)
+            {
+                drawn[i] = random.NextBool() ? (byte)1 : (byte)0;
+                drawn[i + 1] = random.NextByte();
+            }
+
+            Assert.Greater(new HashSet<byte>(drawn).Count, 2, "common draws are not varied");
+            return drawn;
         }
 
         private static uint[] Draw(IRandom random)

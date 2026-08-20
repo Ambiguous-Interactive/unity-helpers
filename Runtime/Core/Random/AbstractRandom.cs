@@ -146,12 +146,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoAfterDeserialization]
         private void OnProtoDeserialize()
         {
+            RepairCommonState();
             OnAfterDeserialization();
         }
 
-        // Allocated on first use rather than by an initializer: a formatter that allocates an
-        // uninitialized instance -- which is what SkipConstructor asks protobuf-net for -- runs no
-        // initializer at all, and a buffer that only NextGuid touches would arrive null.
+        // This buffer is not serialized. Constructors allocate it for ordinary/JSON instances,
+        // while the root deserialization callback repairs instances created via SkipConstructor.
         private byte[] _guidBytes;
 
         // Bit/byte reservoirs to accelerate small requests
@@ -171,6 +171,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [ProtoMember(5)]
         [WProtoMember(5)]
         protected int _byteCount;
+
+        protected AbstractRandom()
+        {
+            _guidBytes = new byte[GuidByteCount];
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected RandomState BuildState(
@@ -221,6 +226,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _bitCount = state.BitCount;
             _byteBuffer = state.ByteBuffer;
             _byteCount = state.ByteCount;
+            RepairCommonState();
+        }
+
+        private void RepairCommonState()
+        {
+            if (_guidBytes == null)
+            {
+                _guidBytes = new byte[GuidByteCount];
+            }
+
+            if (_bitCount < 0 || 32 < _bitCount)
+            {
+                _bitBuffer = 0;
+                _bitCount = 0;
+            }
+
+            if (_byteCount < 0 || 4 < _byteCount)
+            {
+                _byteBuffer = 0;
+                _byteCount = 0;
+            }
         }
 
         public virtual int Next()
@@ -1271,12 +1297,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private byte[] GenerateGuidBytes()
         {
             byte[] guidBytes = _guidBytes;
-            if (guidBytes == null)
-            {
-                guidBytes = new byte[GuidByteCount];
-                _guidBytes = guidBytes;
-            }
-
             NextBytes(guidBytes);
             SetUuidV4Bits(guidBytes);
             return guidBytes;

@@ -3,8 +3,10 @@
 > Auto-generated via RandomPerformanceTests.Benchmark. Run the test to refresh these summary and detail tables.
 
 State repair for a generator restored from JSON or protobuf happens in its constructor or the shared
-after-deserialization callback. It is not repeated in `NextUint()`, so malformed/default serialized
-state is repaired before the first draw without adding a guard to every later draw.
+after-deserialization callback. This includes each generator's state, the shared bit/byte reservoirs
+and GUID scratch buffer. Repair is not repeated in a draw method, so malformed/default serialized
+state is repaired before the first draw without adding a guard to every later draw. PhotonSpin's
+one-time warmup priming also happens there, leaving only its block-boundary check in the draw path.
 
 For statistical batteries, the repository's
 `Generator~/WallstopStudios.UnityHelpers.RandomQuality` host emits a reproducible little-endian byte
