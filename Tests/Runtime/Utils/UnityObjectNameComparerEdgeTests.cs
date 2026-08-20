@@ -121,6 +121,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
+        // Characterization: `==` binds to Unity's operator because T is constrained to Object.
+        // A constraint relaxed to `class` would fall back to reference equality and throw here.
         [Test]
         public void CompareTreatsADestroyedObjectAsAbsent()
         {

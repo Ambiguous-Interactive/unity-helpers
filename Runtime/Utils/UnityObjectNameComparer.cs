@@ -37,28 +37,26 @@ namespace WallstopStudios.UnityHelpers.Utils
         public int Compare(T x, T y)
         {
             /*
-                `==` on a type parameter is reference equality, so a destroyed Object would survive
-                the null checks and throw from `.name`. Widening to Object restores Unity's operator.
+                These bind to Unity's operator, not reference equality, because T's effective base
+                class is Object -- so a destroyed instance is caught here rather than throwing from
+                `.name`. Relaxing the constraint to `class` would silently change that.
             */
-            UnityEngine.Object left = x;
-            UnityEngine.Object right = y;
-
-            if (left == right)
+            if (x == y)
             {
                 return 0;
             }
 
-            if (right == null)
+            if (y == null)
             {
                 return 1;
             }
 
-            if (left == null)
+            if (x == null)
             {
                 return -1;
             }
 
-            int comparison = CompareNatural(left.name, right.name);
+            int comparison = CompareNatural(x.name, y.name);
             if (comparison != 0)
             {
                 return comparison;

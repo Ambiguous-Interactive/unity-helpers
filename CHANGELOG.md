@@ -97,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `SortByName()` and `ScriptableObjectSingleton<T>.Instance` throwing on a name whose trailing digits do not fit an `int`, such as a timestamp, or are not ASCII digits. Such names now order correctly, and a destroyed Object sorts like a missing one instead of throwing ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
+- Fix `SortByName()` and `ScriptableObjectSingleton<T>.Instance` throwing on a name whose trailing digits do not fit an `int`, such as a timestamp, or are not ASCII digits. Such names now order correctly, and a suffix of any length is compared without being parsed ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
 - Fix `string.Reverse()` destroying emoji and other non-BMP characters: it split every surrogate pair, so the result encoded as replacement characters. Reversing twice now returns the original ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
 - Fix `string.Truncate()` returning a result longer than the limit it was given when the ellipsis did not fit, and cutting characters in half. The result now always fits and is always valid text ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
 - Fix `SerializedStringComparer` throwing from `Equals` and `GetHashCode` when its serialized mode held an unrecognized value. It falls back to ordinal comparison, and hashes null instead of throwing ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
