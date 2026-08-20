@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System;
     using System.Buffers;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Text;
     using System.Text.Json;
     using NUnit.Framework;
@@ -423,6 +424,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <summary>
+        /// Reordering object properties, escaping their names and adding insignificant whitespace
+        /// must not change the value a converter reads (#462).
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void EquivalentJsonSpellingsPreserveConverterValue(FuzzTarget target)
+        {
+            if (!target.ReadSupported)
+            {
+                return;
+            }
+
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            foreach (string seed in target.Seeds)
+            {
+                using JsonDocument document = JsonDocument.Parse(seed);
+                string equivalent = BuildEquivalentJson(document.RootElement);
+                Assert.AreNotEqual(
+                    seed,
+                    equivalent,
+                    $"{target.Name}: the equivalent-spelling transform did not change {Abbreviate(seed)}."
+                );
+
+                using JsonDocument transformedDocument = JsonDocument.Parse(equivalent);
+                Assert.IsTrue(
+                    EquivalentStructureIsReversed(
+                        document.RootElement,
+                        transformedDocument.RootElement,
+                        out int propertyCount
+                    ),
+                    $"{target.Name}: property names must be case-insensitively unique and every object must be reversed in {Abbreviate(seed)}."
+                );
+                Assert.IsTrue(
+                    PropertyTokensUseOnlyUnicodeEscapes(equivalent, propertyCount),
+                    $"{target.Name}: at least one property name was not Unicode-escaped in {Abbreviate(equivalent)}."
+                );
+
+                object original = JsonSerializer.Deserialize(seed, target.Type, options);
+                object transformed = JsonSerializer.Deserialize(equivalent, target.Type, options);
+                string originalCanonical = JsonSerializer.Serialize(original, target.Type, options);
+                string transformedCanonical = JsonSerializer.Serialize(
+                    transformed,
+                    target.Type,
+                    options
+                );
+
+                Assert.AreEqual(
+                    originalCanonical,
+                    transformedCanonical,
+                    $"{target.Name}: equivalent JSON changed the decoded value. Original "
+                        + $"{Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
+                );
+            }
+        }
+
+        /// <summary>
         /// An empty <see cref="WGuid"/> is what an unset id serializes to, and it must load again.
         /// </summary>
         /// <remarks>
@@ -624,6 +682,228 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     break;
             }
             return count;
+        }
+
+        private static bool EquivalentStructureIsReversed(
+            JsonElement original,
+            JsonElement transformed,
+            out int propertyCount
+        )
+        {
+            propertyCount = 0;
+            if (original.ValueKind != transformed.ValueKind)
+            {
+                return false;
+            }
+
+            switch (original.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    List<JsonProperty> originalProperties = new();
+                    List<JsonProperty> transformedProperties = new();
+                    foreach (JsonProperty property in original.EnumerateObject())
+                    {
+                        originalProperties.Add(property);
+                    }
+                    foreach (JsonProperty property in transformed.EnumerateObject())
+                    {
+                        transformedProperties.Add(property);
+                    }
+                    if (originalProperties.Count != transformedProperties.Count)
+                    {
+                        return false;
+                    }
+                    HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+                    for (int index = 0; index < originalProperties.Count; index++)
+                    {
+                        if (!names.Add(originalProperties[index].Name))
+                        {
+                            return false;
+                        }
+                    }
+                    propertyCount += originalProperties.Count;
+                    for (int index = 0; index < originalProperties.Count; index++)
+                    {
+                        JsonProperty originalProperty = originalProperties[index];
+                        JsonProperty transformedProperty = transformedProperties[
+                            transformedProperties.Count - index - 1
+                        ];
+                        if (
+                            !string.Equals(
+                                originalProperty.Name,
+                                transformedProperty.Name,
+                                StringComparison.Ordinal
+                            )
+                            || !EquivalentStructureIsReversed(
+                                originalProperty.Value,
+                                transformedProperty.Value,
+                                out int nestedPropertyCount
+                            )
+                        )
+                        {
+                            return false;
+                        }
+                        propertyCount += nestedPropertyCount;
+                    }
+                    break;
+                case JsonValueKind.Array:
+                    List<JsonElement> originalItems = new();
+                    List<JsonElement> transformedItems = new();
+                    foreach (JsonElement item in original.EnumerateArray())
+                    {
+                        originalItems.Add(item);
+                    }
+                    foreach (JsonElement item in transformed.EnumerateArray())
+                    {
+                        transformedItems.Add(item);
+                    }
+                    if (originalItems.Count != transformedItems.Count)
+                    {
+                        return false;
+                    }
+                    for (int index = 0; index < originalItems.Count; index++)
+                    {
+                        if (
+                            !EquivalentStructureIsReversed(
+                                originalItems[index],
+                                transformedItems[index],
+                                out int nestedPropertyCount
+                            )
+                        )
+                        {
+                            return false;
+                        }
+                        propertyCount += nestedPropertyCount;
+                    }
+                    break;
+            }
+            return true;
+        }
+
+        private static bool PropertyTokensUseOnlyUnicodeEscapes(
+            string transformed,
+            int expectedPropertyCount
+        )
+        {
+            byte[] utf8 = Encoding.UTF8.GetBytes(transformed);
+            Utf8JsonReader reader = new(utf8);
+            int propertyCount = 0;
+            while (reader.Read())
+            {
+                if (reader.TokenType != JsonTokenType.PropertyName)
+                {
+                    continue;
+                }
+
+                propertyCount++;
+                ReadOnlySpan<byte> rawName = reader.ValueSpan;
+                if (rawName.Length == 0)
+                {
+                    continue;
+                }
+                if (rawName.Length % 6 != 0)
+                {
+                    return false;
+                }
+                for (int index = 0; index < rawName.Length; index += 6)
+                {
+                    if (rawName[index] != (byte)'\\' || rawName[index + 1] != (byte)'u')
+                    {
+                        return false;
+                    }
+                    for (int digit = 2; digit < 6; digit++)
+                    {
+                        byte value = rawName[index + digit];
+                        bool isHex =
+                            value is >= (byte)'0' and <= (byte)'9'
+                            || value is >= (byte)'a' and <= (byte)'f'
+                            || value is >= (byte)'A' and <= (byte)'F';
+                        if (!isHex)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return propertyCount == expectedPropertyCount;
+        }
+
+        private static string BuildEquivalentJson(JsonElement root)
+        {
+            StringBuilder builder = new();
+            builder.Append('\n');
+            WriteEquivalentJson(builder, root, 0);
+            builder.Append('\n');
+            return builder.ToString();
+        }
+
+        private static void WriteEquivalentJson(
+            StringBuilder builder,
+            JsonElement element,
+            int depth
+        )
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    List<JsonProperty> properties = new();
+                    foreach (JsonProperty property in element.EnumerateObject())
+                    {
+                        properties.Add(property);
+                    }
+
+                    builder.Append('{');
+                    for (int index = properties.Count - 1; index >= 0; index--)
+                    {
+                        JsonProperty property = properties[index];
+                        builder.Append('\n').Append(' ', (depth + 1) * 2).Append('"');
+                        AppendEscapedPropertyName(builder, property.Name);
+                        builder.Append("\": ");
+                        WriteEquivalentJson(builder, property.Value, depth + 1);
+                        if (index > 0)
+                        {
+                            builder.Append(',');
+                        }
+                    }
+                    if (properties.Count > 0)
+                    {
+                        builder.Append('\n').Append(' ', depth * 2);
+                    }
+                    builder.Append('}');
+                    break;
+                case JsonValueKind.Array:
+                    builder.Append('[');
+                    int itemIndex = 0;
+                    foreach (JsonElement item in element.EnumerateArray())
+                    {
+                        if (itemIndex > 0)
+                        {
+                            builder.Append(',');
+                        }
+                        builder.Append('\n').Append(' ', (depth + 1) * 2);
+                        WriteEquivalentJson(builder, item, depth + 1);
+                        itemIndex++;
+                    }
+                    if (itemIndex > 0)
+                    {
+                        builder.Append('\n').Append(' ', depth * 2);
+                    }
+                    builder.Append(']');
+                    break;
+                default:
+                    builder.Append(element.GetRawText());
+                    break;
+            }
+        }
+
+        private static void AppendEscapedPropertyName(StringBuilder builder, string name)
+        {
+            for (int index = 0; index < name.Length; index++)
+            {
+                builder
+                    .Append("\\u")
+                    .Append(((int)name[index]).ToString("x4", CultureInfo.InvariantCulture));
+            }
         }
 
         private static string Rebuild(JsonElement root, Mutation mutation)

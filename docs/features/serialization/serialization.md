@@ -183,6 +183,10 @@ SaveData data = await Serializer.ReadFromJsonFileAsync<SaveData>("save.json", ct
 await Serializer.WriteToJsonFileAsync(data, "save.json", pretty: true, cts.Token);
 ```
 
+The cancellation-aware reader rents its file scratch buffer and decodes the valid bytes in its
+pooled stream directly. It does not allocate an exact-sized copy of the complete file before JSON
+decoding, removing one payload-sized managed allocation and copy from large-save loads.
+
 **When to use async:**
 
 - Loading screens where you don't want to block the main thread

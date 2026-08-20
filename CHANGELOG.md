@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Read cancellation-aware JSON files through a pooled scratch buffer and deserialize the pooled stream's valid segment directly. Large save files no longer allocate an extra full-payload copy before decoding ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Speed up every pooled-buffer operation on blittable elements -- the sorts, `Shuffle`, `Fill` and the geometry helpers -- by clearing a returned array only when its element type can hold a reference. A reference element is still never left rooted in the pool ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
 - Speed up `ProtoSerialize`, `ProtoDeserialize`, `ProtoEquals` and `NextEnum` by resolving each one's type questions once per closed generic instead of on every call. Measured at 8.5x for that check alone on reference types ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
 - Every `IList<T>` sort now runs over an array rather than the list's indexer, so sorting a `T[]` is 2.5x to 5.4x faster and needs no copy. Any other list is copied through a pooled buffer and back. See [Where the Time Actually Goes](./docs/performance/ilist-sorting-performance.md#where-the-time-actually-goes) ([#463](https://github.com/Ambiguous-Interactive/unity-helpers/issues/463)).

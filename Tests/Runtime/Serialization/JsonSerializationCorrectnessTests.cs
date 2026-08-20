@@ -79,6 +79,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void Utf8SliceDeserializeIgnoresBytesOutsideDeclaredLength()
+        {
+            byte[] paddedJson =
+            {
+                (byte)'{',
+                (byte)'"',
+                (byte)'I',
+                (byte)'d',
+                (byte)'"',
+                (byte)':',
+                (byte)'7',
+                (byte)'}',
+                (byte)'x',
+            };
+
+            SimpleMessage value = Serializer.JsonDeserializeUtf8Slice<SimpleMessage>(paddedJson, 8);
+
+            Assert.NotNull(value);
+            Assert.AreEqual(7, value.Id);
+        }
+
+        [Test]
         public void RoundTripNullValues()
         {
             SimpleMessage msg = new()

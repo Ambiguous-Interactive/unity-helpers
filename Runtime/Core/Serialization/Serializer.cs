@@ -2413,6 +2413,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             JsonSerializerOptions options = null
         )
         {
+            return JsonDeserializeUtf8Slice<T>(data, data?.Length ?? 0, type, options);
+        }
+
+        /// <summary>
+        /// Deserializes the valid prefix of a UTF-8 buffer without copying it into an exact-sized
+        /// array. The caller must keep the buffer alive and exclusively owned until this method
+        /// returns.
+        /// </summary>
+        internal static T JsonDeserializeUtf8Slice<T>(
+            byte[] data,
+            int length,
+            Type type = null,
+            JsonSerializerOptions options = null
+        )
+        {
             if (data == null)
             {
                 SerializationFailureException.ThrowNullInput<T>(
@@ -2420,7 +2435,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
-            if (data.Length == 0)
+            if (length == 0)
             {
                 SerializationFailureException.ThrowEmptyInput<T>(
                     SerializationFormat.Json,
@@ -2430,7 +2445,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             try
             {
-                ReadOnlySpan<byte> span = new(data);
+                ReadOnlySpan<byte> span = new(data, 0, length);
                 return (T)
                     JsonSerializer.Deserialize(
                         span,
@@ -2447,7 +2462,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 SerializationFailureException.ThrowCorrupt<T>(
                     SerializationFormat.Json,
                     SerializationOperation.Deserialize,
-                    data.Length,
+                    length,
                     SerializationStage.Decode,
                     e,
                     "System.Text.Json rejected the payload."
@@ -3369,17 +3384,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 4096,
                 useAsync: true
             );
+            return await ReadJsonStreamAsync<T>(fs, cancellationToken);
+        }
+
+        /// <summary>
+        /// Reads one UTF-8 JSON document from <paramref name="input"/> without materializing an
+        /// exact-sized copy of the pooled stream before decoding it.
+        /// </summary>
+        internal static async Task<T> ReadJsonStreamAsync<T>(
+            Stream input,
+            System.Threading.CancellationToken cancellationToken
+        )
+        {
             using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
                 out PooledBufferStream stream
             );
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = await fs.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+            using (
+                PooledArray<byte> bufferLease = SystemArrayPool<byte>.Get(8192, out byte[] buffer)
+            )
             {
-                stream.Write(buffer, 0, read);
+                int read;
+                while (
+                    (read = await input.ReadAsync(buffer, 0, bufferLease.length, cancellationToken))
+                    > 0
+                )
+                {
+                    stream.Write(buffer, 0, read);
+                }
             }
+            cancellationToken.ThrowIfCancellationRequested();
             ArraySegment<byte> seg = stream.GetWrittenSegment();
-            return JsonDeserialize<T>(seg.Array.AsSpan(0, seg.Count).ToArray());
+            return JsonDeserializeUtf8Slice<T>(seg.Array, seg.Count);
         }
 
         /// <summary>
