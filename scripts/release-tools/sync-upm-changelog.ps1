@@ -90,7 +90,8 @@ function Set-UpmChangelogContent {
     }
 
     $parsed = $updated | ConvertFrom-Json
-    if ([string]$parsed._upm.changelog -ne $Value) {
+    # -ne on strings is case-insensitive in PowerShell; a case-only drift must not read as a match.
+    if (-not [string]::Equals([string]$parsed._upm.changelog, $Value, [System.StringComparison]::Ordinal)) {
         throw 'package.json rewrite verification failed; the parsed _upm.changelog did not match.'
     }
 
@@ -121,7 +122,7 @@ try {
         $actual = [string]$package._upm.changelog
     }
 
-    if ($actual -eq $expected) {
+    if ([string]::Equals($actual, $expected, [System.StringComparison]::Ordinal)) {
         Write-Host "sync-upm-changelog: package.json _upm.changelog is in step with CHANGELOG.md [$version]."
         exit 0
     }
