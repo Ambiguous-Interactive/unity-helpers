@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (ReferenceEquals(other, null))
             {
-                return -1;
+                return 1;
             }
 
             if (_increment == other._increment)

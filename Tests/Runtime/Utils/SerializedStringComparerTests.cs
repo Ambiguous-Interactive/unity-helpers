@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
-    using System.ComponentModel;
     using System.Globalization;
     using System.Linq;
     using NUnit.Framework;
@@ -88,14 +87,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
-        public void InvalidModeThrows()
+        public void InvalidModeFallsBackToOrdinal()
         {
             SerializedStringComparer comparer = new(
                 (SerializedStringComparer.StringCompareMode)999
             );
+            SerializedStringComparer ordinal = new(
+                SerializedStringComparer.StringCompareMode.Ordinal
+            );
 
-            Assert.Throws<InvalidEnumArgumentException>(() => comparer.Equals("a", "b"));
-            Assert.Throws<InvalidEnumArgumentException>(() => comparer.GetHashCode("a"));
+            Assert.IsTrue(comparer.Equals("a", "a"));
+            Assert.IsFalse(comparer.Equals("a", "A"));
+            Assert.IsFalse(comparer.Equals("a", "b"));
+            Assert.AreEqual(ordinal.GetHashCode("a"), comparer.GetHashCode("a"));
+        }
+
+        [Test]
+        public void NullKeysAreHandledInEveryMode()
+        {
+            foreach (SerializedStringComparer.StringCompareMode mode in AllModes())
+            {
+                SerializedStringComparer comparer = new(mode);
+
+                Assert.AreEqual(0, comparer.GetHashCode(null), $"{mode} should hash null to zero");
+                Assert.IsTrue(comparer.Equals(null, null), $"{mode} should equate two nulls");
+                Assert.IsFalse(
+                    comparer.Equals(null, "a"),
+                    $"{mode} should separate null from text"
+                );
+            }
         }
 
         [Test]
@@ -324,11 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void AllModesEmptyStringsAreEqual()
         {
-            SerializedStringComparer.StringCompareMode[] allModes = Enum.GetValues(
-                    typeof(SerializedStringComparer.StringCompareMode)
-                )
-                .OfType<SerializedStringComparer.StringCompareMode>()
-                .ToArray();
+            SerializedStringComparer.StringCompareMode[] allModes = AllModes();
 
             foreach (SerializedStringComparer.StringCompareMode mode in allModes)
             {
@@ -343,11 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void AllModesWhitespaceMatters()
         {
-            SerializedStringComparer.StringCompareMode[] allModes = Enum.GetValues(
-                    typeof(SerializedStringComparer.StringCompareMode)
-                )
-                .OfType<SerializedStringComparer.StringCompareMode>()
-                .ToArray();
+            SerializedStringComparer.StringCompareMode[] allModes = AllModes();
 
             foreach (SerializedStringComparer.StringCompareMode mode in allModes)
             {
@@ -361,6 +373,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     $"Leading whitespace should matter in {mode} mode"
                 );
             }
+        }
+
+        private static SerializedStringComparer.StringCompareMode[] AllModes()
+        {
+            return Enum.GetValues(typeof(SerializedStringComparer.StringCompareMode))
+                .OfType<SerializedStringComparer.StringCompareMode>()
+                .ToArray();
         }
     }
 }

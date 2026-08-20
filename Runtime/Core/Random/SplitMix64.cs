@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (other == null)
             {
-                return -1;
+                return 1;
             }
 
             return _state.CompareTo(other._state);

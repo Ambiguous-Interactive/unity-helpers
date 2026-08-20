@@ -250,8 +250,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             yield return new TestCaseData("hello", 3, "", "hel").SetName(
                 "Truncate.EmptyEllipsisShort.TruncatesExact"
             );
-            yield return new TestCaseData("hello", 2, "...", "...").SetName(
-                "Truncate.EllipsisLongerThanMax.ReturnsEllipsis"
+            yield return new TestCaseData("hello", 2, "...", "he").SetName(
+                "Truncate.EllipsisLongerThanMax.DropsEllipsisToRespectLimit"
+            );
+            yield return new TestCaseData("hello", 0, "...", "").SetName(
+                "Truncate.ZeroLimit.ReturnsEmpty"
             );
             yield return new TestCaseData("testing", 6, "...", "tes...").SetName(
                 "Truncate.ExactAtLimit.TruncatesCorrectly"
@@ -1689,6 +1692,88 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Assert.AreEqual("racecar", "racecar".Reverse());
             Assert.AreEqual("noon", "noon".Reverse());
+        }
+
+        private static IEnumerable<TestCaseData> NonBasicPlaneStrings()
+        {
+            yield return new TestCaseData("ab\U0001F44Dcd").SetName("NonBmp.EmojiInMiddle");
+            yield return new TestCaseData("\U0001F600").SetName("NonBmp.EmojiAlone");
+            yield return new TestCaseData("\U0001F3F4\U000E0067b").SetName("NonBmp.TwoPairs");
+            yield return new TestCaseData("x\U00020BB7").SetName("NonBmp.EmojiLast");
+            yield return new TestCaseData("\U0001D11Ez").SetName("NonBmp.EmojiFirst");
+        }
+
+        [TestCaseSource(nameof(NonBasicPlaneStrings))]
+        public void ReverseKeepsSurrogatePairsIntact(string input)
+        {
+            string reversed = input.Reverse();
+
+            Assert.AreEqual(input.Length, reversed.Length);
+            Assert.IsTrue(
+                IsWellFormedUtf16(reversed),
+                $"'{Describe(reversed)}' is not well-formed UTF-16"
+            );
+            Assert.AreEqual(input, reversed.Reverse());
+        }
+
+        [TestCaseSource(nameof(NonBasicPlaneStrings))]
+        public void TruncateNeverExceedsTheLimitOrSplitsACharacter(string input)
+        {
+            string[] ellipses = { "...", "", "\u2026" };
+            foreach (string ellipsis in ellipses)
+            {
+                for (int maxLength = 0; maxLength <= input.Length + 1; ++maxLength)
+                {
+                    string truncated = input.Truncate(maxLength, ellipsis);
+
+                    Assert.LessOrEqual(
+                        truncated.Length,
+                        maxLength,
+                        $"Truncate('{Describe(input)}', {maxLength}, '{ellipsis}') grew past its limit"
+                    );
+                    Assert.IsTrue(
+                        IsWellFormedUtf16(truncated),
+                        $"Truncate('{Describe(input)}', {maxLength}, '{ellipsis}') produced a lone surrogate"
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void TruncateRespectsTheLimitWhenTheEllipsisCannotFit()
+        {
+            Assert.AreEqual("he", "hello".Truncate(2, "..."));
+            Assert.AreEqual(string.Empty, "hello".Truncate(0, "..."));
+            Assert.AreEqual("...", "hello".Truncate(3, "..."));
+        }
+
+        private static bool IsWellFormedUtf16(string value)
+        {
+            for (int i = 0; i < value.Length; ++i)
+            {
+                if (char.IsHighSurrogate(value[i]))
+                {
+                    if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1]))
+                    {
+                        return false;
+                    }
+
+                    ++i;
+                    continue;
+                }
+
+                if (char.IsLowSurrogate(value[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string Describe(string value)
+        {
+            return string.Concat(value.Select(character => $"\\u{(int)character:X4}"));
         }
 
         [Test]

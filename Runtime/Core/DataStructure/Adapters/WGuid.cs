@@ -389,6 +389,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 WGuid otherWGuid => CompareTo(otherWGuid),
                 Guid otherGuid => CompareTo(otherGuid),
+                null => 1,
                 _ => -1,
             };
         }

@@ -956,6 +956,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return char.IsWhiteSpace(input[0]) || char.IsWhiteSpace(input[^1]);
         }
 
+        /// <summary>
+        /// Shortens a string to at most <paramref name="maxLength"/> characters, marking what was
+        /// removed with <paramref name="ellipsis"/>.
+        /// </summary>
+        /// <param name="input">The string to shorten.</param>
+        /// <param name="maxLength">The maximum length of the result.</param>
+        /// <param name="ellipsis">The marker appended in place of the removed text.</param>
+        /// <returns>The original string when it already fits, otherwise a string of at most <paramref name="maxLength"/> characters.</returns>
+        /// <remarks>
+        /// The result never exceeds <paramref name="maxLength"/>. When the ellipsis alone would not
+        /// fit there is no room to mark the elision, so it is dropped and the input is cut instead.
+        /// The cut never lands between the halves of a surrogate pair, so the result is always
+        /// well-formed UTF-16 and may be one character shorter than requested.
+        /// </remarks>
         public static string Truncate(this string input, int maxLength, string ellipsis = "...")
         {
             if (string.IsNullOrEmpty(input) || maxLength < 0)
@@ -968,13 +982,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return input;
             }
 
-            if (string.IsNullOrEmpty(ellipsis))
+            if (string.IsNullOrEmpty(ellipsis) || maxLength < ellipsis.Length)
             {
-                return input.Substring(0, maxLength);
+                return input.Substring(0, WholeCharacterLength(input, maxLength));
             }
 
-            int truncateLength = Math.Max(0, maxLength - ellipsis.Length);
+            int truncateLength = WholeCharacterLength(input, maxLength - ellipsis.Length);
             return input.Substring(0, truncateLength) + ellipsis;
+        }
+
+        /*
+            Cutting between the halves of a surrogate pair leaves a lone surrogate, which has no
+            UTF-8 encoding and becomes U+FFFD the moment the string is written out. The character is
+            destroyed rather than dropped, so cut in front of the pair instead.
+        */
+        private static int WholeCharacterLength(string input, int length)
+        {
+            if (
+                0 < length
+                && length < input.Length
+                && char.IsHighSurrogate(input[length - 1])
+                && char.IsLowSurrogate(input[length])
+            )
+            {
+                return length - 1;
+            }
+
+            return length;
         }
 
         private static bool IsAlreadyCamelCase(string value)
@@ -1093,6 +1127,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return string.Equals(input, value, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Reverses the characters of a string.
+        /// </summary>
+        /// <param name="input">The string to reverse.</param>
+        /// <returns>The reversed string, or the input when it is null or a single character.</returns>
+        /// <remarks>
+        /// Surrogate pairs are kept intact, so a string containing emoji or any other non-BMP
+        /// character reverses to well-formed UTF-16 rather than to replacement characters.
+        /// Combining marks are reversed along with everything else, so text that uses them is
+        /// re-ordered rather than re-rendered; reversing twice still returns the original.
+        /// </remarks>
         public static string Reverse(this string input)
         {
             if (input == null || input.Length <= 1)
@@ -1106,9 +1151,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 input,
                 static (span, src) =>
                 {
-                    for (int i = 0; i < span.Length; ++i)
+                    int write = 0;
+                    for (int read = src.Length - 1; 0 <= read; --read)
                     {
-                        span[i] = src[src.Length - 1 - i];
+                        char current = src[read];
+                        if (
+                            0 < read
+                            && char.IsLowSurrogate(current)
+                            && char.IsHighSurrogate(src[read - 1])
+                        )
+                        {
+                            span[write++] = src[read - 1];
+                            span[write++] = current;
+                            --read;
+                            continue;
+                        }
+
+                        span[write++] = current;
                     }
                 }
             );

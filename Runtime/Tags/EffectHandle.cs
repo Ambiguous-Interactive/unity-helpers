@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return CompareTo(other);
             }
 
-            return -1;
+            return obj == null ? 1 : -1;
         }
 
         /// <summary>

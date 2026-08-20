@@ -207,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (other == null)
             {
-                return -1;
+                return 1;
             }
 
             EnsureElements();

@@ -62,10 +62,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </code>
     /// </example>
     [RandomGeneratorMetadata(
-        RandomQuality.VeryGood,
-        "xoshiro128** variant; authors recommend for general-purpose use and report clean BigCrush performance with jump functions.",
-        "Blackman & Vigna 2019",
-        "https://prng.di.unimi.it/xoshiro128starstar.c"
+        RandomQuality.Good,
+        "xoroshiro128+; passes every battery its authors are aware of except linearity of its lowest bits, which is the half this returns. Prefer PcgRandom or SplitMix64 where single bits matter.",
+        "Blackman & Vigna 2018",
+        "https://prng.di.unimi.it/xoroshiro128plus.c"
     )]
     [Serializable]
     [DataContract]
@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (other == null)
             {
-                return -1;
+                return 1;
             }
 
             int comparison = _s0.CompareTo(other._s0);

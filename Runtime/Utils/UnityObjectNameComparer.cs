@@ -5,41 +5,60 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
     using System.Collections.Generic;
-    using System.Text.RegularExpressions;
     using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
 
+    /// <summary>
+    /// Orders Unity Objects by name, treating a trailing run of digits as a number so that
+    /// "Item2" sorts before "Item10".
+    /// </summary>
+    /// <typeparam name="T">The Object type being ordered.</typeparam>
+    /// <remarks>
+    /// Null and destroyed Objects order before live ones and never throw. A numeric suffix of any
+    /// length is compared without being parsed, so a name ending in a timestamp orders correctly
+    /// instead of overflowing.
+    /// </remarks>
     public sealed class UnityObjectNameComparer<T> : IComparer<T>
         where T : UnityEngine.Object
     {
-        private static readonly Regex TrailingNumberRegex = new(
-            @"^(.*?)(\d+)$",
-            RegexOptions.Compiled
-        );
+        /// <summary>The shared, stateless comparer instance.</summary>
         public static readonly UnityObjectNameComparer<T> Instance = new();
 
         private UnityObjectNameComparer() { }
 
+        /// <summary>
+        /// Compares two Objects by name, then by asset path, then by instance id.
+        /// </summary>
+        /// <param name="x">The left Object.</param>
+        /// <param name="y">The right Object.</param>
+        /// <returns>A negative value when <paramref name="x"/> orders first, positive when it orders last, zero when neither does.</returns>
         public int Compare(T x, T y)
         {
-            if (x == y)
+            /*
+                `==` on a type parameter is reference equality, so a destroyed Object would survive
+                the null checks and throw from `.name`. Widening to Object restores Unity's operator.
+            */
+            UnityEngine.Object left = x;
+            UnityEngine.Object right = y;
+
+            if (left == right)
             {
                 return 0;
             }
 
-            if (y == null)
+            if (right == null)
             {
                 return 1;
             }
 
-            if (x == null)
+            if (left == null)
             {
                 return -1;
             }
 
-            int comparison = CompareNatural(x.name, y.name);
+            int comparison = CompareNatural(left.name, right.name);
             if (comparison != 0)
             {
                 return comparison;
@@ -62,32 +81,71 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static int CompareNatural(string nameA, string nameB)
         {
-            Match matchA = TrailingNumberRegex.Match(nameA);
-            Match matchB = TrailingNumberRegex.Match(nameB);
+            int digitsA = TrailingDigitRunStart(nameA);
+            int digitsB = TrailingDigitRunStart(nameB);
 
-            // If both have trailing numbers, compare prefix then numeric
-            if (matchA.Success && matchB.Success)
+            if (digitsA < 0 || digitsB < 0)
             {
-                string prefixA = matchA.Groups[1].Value;
-                string prefixB = matchB.Groups[1].Value;
-
-                int prefixCompare = string.Compare(
-                    prefixA,
-                    prefixB,
-                    StringComparison.OrdinalIgnoreCase
-                );
-                if (prefixCompare != 0)
-                {
-                    return prefixCompare;
-                }
-
-                // same prefix → compare parsed integers
-                int numA = int.Parse(matchA.Groups[2].Value);
-                int numB = int.Parse(matchB.Groups[2].Value);
-                return numA.CompareTo(numB);
+                return string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
             }
 
-            return string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
+            int prefixComparison = nameA
+                .AsSpan(0, digitsA)
+                .CompareTo(nameB.AsSpan(0, digitsB), StringComparison.OrdinalIgnoreCase);
+            if (prefixComparison != 0)
+            {
+                return prefixComparison;
+            }
+
+            return CompareDigitRuns(nameA, digitsA, nameB, digitsB);
+        }
+
+        /*
+            Only '0'-'9' count. Every other Unicode digit category member is ordered as text,
+            because no fixed-width integer can represent an arbitrary run of them and a parse
+            of one throws.
+        */
+        private static int TrailingDigitRunStart(string name)
+        {
+            int index = name.Length;
+            while (index > 0 && IsAsciiDigit(name[index - 1]))
+            {
+                --index;
+            }
+
+            return index == name.Length ? -1 : index;
+        }
+
+        private static int CompareDigitRuns(string nameA, int startA, string nameB, int startB)
+        {
+            int significantA = SkipLeadingZeros(nameA, startA);
+            int significantB = SkipLeadingZeros(nameB, startB);
+
+            int lengthA = nameA.Length - significantA;
+            int lengthB = nameB.Length - significantB;
+            if (lengthA != lengthB)
+            {
+                return lengthA < lengthB ? -1 : 1;
+            }
+
+            return string.CompareOrdinal(nameA, significantA, nameB, significantB, lengthA);
+        }
+
+        private static int SkipLeadingZeros(string name, int start)
+        {
+            int index = start;
+            int lastIndex = name.Length - 1;
+            while (index < lastIndex && name[index] == '0')
+            {
+                ++index;
+            }
+
+            return index;
+        }
+
+        private static bool IsAsciiDigit(char character)
+        {
+            return character is >= '0' and <= '9';
         }
     }
 }

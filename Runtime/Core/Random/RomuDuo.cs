@@ -177,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (other == null)
             {
-                return -1;
+                return 1;
             }
 
             int comparison = _x.CompareTo(other._x);

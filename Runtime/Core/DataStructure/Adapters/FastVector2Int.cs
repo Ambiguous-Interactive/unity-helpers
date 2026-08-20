@@ -422,6 +422,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 Vector2Int vector => CompareTo(vector),
                 FastVector3Int vector => CompareTo(vector),
                 Vector3Int vector => CompareTo(vector),
+                null => 1,
                 _ => -1,
             };
         }

@@ -44,13 +44,33 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _hashCode = value.GetHashCode();
         }
 
+        /// <summary>
+        /// Returns the cached wrapper for a string, creating it on first use.
+        /// </summary>
+        /// <param name="value">The string to wrap.</param>
+        /// <returns>The shared wrapper, or <c>null</c> when <paramref name="value"/> is null.</returns>
         public static StringWrapper Get(string value)
         {
+            if (value == null)
+            {
+                return null;
+            }
+
             return Cache.GetOrAdd(value, key => new StringWrapper(key));
         }
 
+        /// <summary>
+        /// Drops a string's wrapper from the cache.
+        /// </summary>
+        /// <param name="value">The string whose wrapper should be dropped.</param>
+        /// <returns><c>true</c> when a wrapper was removed.</returns>
         public static bool Remove(string value)
         {
+            if (value == null)
+            {
+                return false;
+            }
+
             return Cache.TryRemove(value, out _);
         }
 
@@ -81,6 +101,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return string.Equals(value, other.value, StringComparison.Ordinal);
         }
 
+        /// <summary>
+        /// Orders wrappers by their wrapped string, using ordinal comparison.
+        /// </summary>
+        /// <param name="other">The wrapper to compare against.</param>
+        /// <returns>A negative value when this wrapper orders first, positive when it orders last, zero when neither does.</returns>
+        /// <remarks>
+        /// Ordering the hash first would be a valid total order but an arbitrary one, and hash codes
+        /// are not required to be stable across processes, so the order would not be either.
+        /// Null orders first, matching every <see cref="IComparable{T}"/> in the framework.
+        /// </remarks>
         public int CompareTo(StringWrapper other)
         {
             if (ReferenceEquals(this, other))
@@ -90,16 +120,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (ReferenceEquals(other, null))
             {
-                return -1;
+                return 1;
             }
 
-            int comparison = _hashCode.CompareTo(other._hashCode);
-            if (comparison != 0)
-            {
-                return comparison;
-            }
-
-            return string.Compare(value, other.value, StringComparison.Ordinal);
+            return string.CompareOrdinal(value, other.value);
         }
 
         public override int GetHashCode()
