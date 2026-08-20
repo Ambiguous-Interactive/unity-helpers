@@ -437,9 +437,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+            int acceptedSeedCount = 0;
 
             foreach (string seed in target.Seeds)
             {
+                object original = null;
+                bool originalAccepted = true;
+                try
+                {
+                    original = JsonSerializer.Deserialize(seed, target.Type, options);
+                }
+                catch (JsonException)
+                {
+                    originalAccepted = false;
+                }
+
                 using JsonDocument document = JsonDocument.Parse(seed);
                 string equivalent = BuildEquivalentJson(document.RootElement);
                 Assert.AreNotEqual(
@@ -462,7 +474,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     $"{target.Name}: at least one property name was not Unicode-escaped in {Abbreviate(equivalent)}."
                 );
 
-                object original = JsonSerializer.Deserialize(seed, target.Type, options);
+                if (!originalAccepted)
+                {
+                    Assert.Throws<JsonException>(
+                        () => JsonSerializer.Deserialize(equivalent, target.Type, options),
+                        $"{target.Name}: equivalent spelling changed a rejected payload into an accepted value. "
+                            + $"Original {Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
+                    );
+                    continue;
+                }
+
+                acceptedSeedCount++;
                 object transformed = JsonSerializer.Deserialize(equivalent, target.Type, options);
                 string originalCanonical = JsonSerializer.Serialize(original, target.Type, options);
                 string transformedCanonical = JsonSerializer.Serialize(
@@ -478,6 +500,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         + $"{Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
                 );
             }
+
+            Assert.Positive(
+                acceptedSeedCount,
+                $"{target.Name}: no accepted seed exercised the metamorphic equivalence oracle."
+            );
         }
 
         /// <summary>
@@ -1255,8 +1282,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             private string[] _seeds;
 
             /// <param name="alternateSeeds">
-            /// Shapes a converter accepts that it never writes -- a legacy encoding, or a second
-            /// object form. Mutating only the converter's own output leaves those branches unvisited.
+            /// Shapes that reach branches a converter's own output does not -- accepted legacy
+            /// encodings and well-formed probes that validation may reject. Mutating only the
+            /// converter's own output leaves those branches unvisited.
             /// </param>
             public FuzzTarget(Type type, object seed, params string[] alternateSeeds)
             {
