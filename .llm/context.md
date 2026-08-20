@@ -329,7 +329,7 @@ deliberate act, not the tail of every commit.
     repository-wide lint and contract aggregate when that broader evidence is warranted.
   - `npm run validate:prepush` as the final fast Git/config safety check.
   - The Unity MCP bridge, which compiles your working tree in a real editor **and runs real
-    fixtures against it**. `Unity_RunCommand` cannot *name* a package type -- its sandbox
+    fixtures against it**. `Unity_RunCommand` cannot _name_ a package type -- its sandbox
     assembly does not reference them, and `using System.Reflection;` is refused -- but fully
     qualified reflection reaches everything, including generic package types and their private
     members. See
