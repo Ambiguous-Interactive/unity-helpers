@@ -74,7 +74,7 @@ All generators implement the `IRandom` interface:
 | `SplitMix64`                  | Very Fast | Very Good | High-throughput generation         |
 | `PcgRandom`                   | Fast      | Excellent | General purpose, seeded generation |
 | `IllusionFlow`                | Fast      | Excellent | Balanced speed and quality         |
-| `XoroShiroRandom`             | Fast      | Very Good | Game logic, physics                |
+| `XoroShiroRandom`             | Fast      | Good      | Bulk placement, noise seeding      |
 | `RomuDuo`                     | Fast      | Very Good | Alternative to PCG                 |
 | `XorShiftRandom`              | Moderate  | Fair      | Legacy compatibility               |
 | `WyRandom`                    | Moderate  | Very Good | Hash-based scenarios               |

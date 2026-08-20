@@ -4,22 +4,27 @@ Param(
 
 <#
 .SYNOPSIS
-    Test runner for UPM inline changelog rendering contract validation
+    Test runner for the UPM changelog surface contract
 
 .DESCRIPTION
-    Validates that the Unity package is correctly configured for the Unity
-    Package Manager to RENDER the changelog inline (not just link to it).
+    UPM never renders a package's local CHANGELOG.md inline. It shows release notes from
+    PackageInfo.upmReserved, which the editor populates from the resolved package's own
+    package.json `_upm` object, and it offers a Changelog link from `changelogUrl`. The
+    packaged CHANGELOG.md is the offline fallback Unity opens when that URL is unreachable.
 
-    Unity's UPM renders CHANGELOG.md inline only when:
-      1. CHANGELOG.md exists at the package root (next to package.json)
-      2. CHANGELOG.md.meta companion exists (Unity asset tracking)
-      3. changelogUrl is NOT present in package.json (its presence causes
-         UPM to show an external link instead of inline rendering)
-      4. CHANGELOG.md is included in the npm package (not excluded by .npmignore)
-      5. CHANGELOG.md has a version entry matching the current package version
+    So all three are required:
+      1. CHANGELOG.md and its .meta companion at the package root, and packed by npm
+      2. changelogUrl present, and not a raw.githubusercontent.com URL (that opens as
+         unformatted plain text)
+      3. _upm.changelog present and in step with CHANGELOG.md's section for this version
+
+    An earlier attempt removed changelogUrl on the theory that its presence suppressed
+    inline rendering of the local file, and pinned that theory here. There is no inline
+    rendering of a local file to suppress; the documented fallback is a file browser.
 
     References:
       - https://docs.unity3d.com/6000.3/Documentation/Manual/cus-changelog.html
+      - https://docs.unity3d.com/6000.3/Documentation/Manual/upm-manifestPkg.html
       - https://docs.unity3d.com/6000.0/Documentation/Manual/cus-layout.html
 #>
 
@@ -53,7 +58,7 @@ function Write-TestResult {
   }
 }
 
-Write-Host "Testing UPM inline changelog rendering contract..." -ForegroundColor White
+Write-Host "Testing the UPM changelog surface contract..." -ForegroundColor White
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $packageJsonPath = Join-Path $repoRoot 'package.json'
@@ -101,10 +106,17 @@ Write-TestResult -TestName 'package.json is valid JSON' -Passed $jsonParseSuccee
 $versionValue = ''
 
 if ($jsonParseSucceeded) {
-  # changelogUrl must NOT be present - it causes UPM to show an external link
-  # instead of rendering the local CHANGELOG.md inline
+  # changelogUrl is what puts a Changelog link in the Package Manager at all. A third-party
+  # package gets no link synthesized for it, so an absent field means no link.
   $hasChangelogUrl = $null -ne $parsedJson.PSObject.Properties['changelogUrl']
-  Write-TestResult -TestName 'changelogUrl is absent (required for inline rendering)' -Passed (-not $hasChangelogUrl) -Message "Remove changelogUrl from package.json; it overrides inline CHANGELOG.md rendering"
+  Write-TestResult -TestName 'changelogUrl is present' -Passed $hasChangelogUrl -Message "Add changelogUrl to package.json; without it the Package Manager offers no Changelog link"
+
+  $changelogUrlValue = ''
+  if ($hasChangelogUrl) {
+    $changelogUrlValue = [string]$parsedJson.changelogUrl
+  }
+  Write-TestResult -TestName 'changelogUrl is non-empty' -Passed (-not [string]::IsNullOrWhiteSpace($changelogUrlValue))
+  Write-TestResult -TestName 'changelogUrl renders as markup, not plain text' -Passed ($changelogUrlValue -notmatch 'raw\.githubusercontent\.com') -Message "raw.githubusercontent.com serves the changelog as unformatted plain text; use the repository's blob view"
 
   $hasVersion = $null -ne $parsedJson.PSObject.Properties['version']
   Write-TestResult -TestName 'package.json contains version field' -Passed $hasVersion
@@ -115,9 +127,30 @@ if ($jsonParseSucceeded) {
   }
 }
 
-# Also check raw content for stray changelogUrl keys (catches duplicate/commented-out entries)
+# Exactly one key, so a duplicate cannot silently shadow the one that was reviewed.
 $changelogKeyMatches = [regex]::Matches($rawContent, '"changelogUrl"\s*:')
-Write-TestResult -TestName 'no changelogUrl keys in package.json raw content' -Passed ($changelogKeyMatches.Count -eq 0) -Message "Found $($changelogKeyMatches.Count) changelogUrl key(s) in raw content"
+Write-TestResult -TestName 'exactly one changelogUrl key in package.json raw content' -Passed ($changelogKeyMatches.Count -eq 1) -Message "Found $($changelogKeyMatches.Count) changelogUrl key(s) in raw content"
+
+# ── Section: _upm.changelog mirror ───────────────────────────────────────────
+
+Write-Host ""
+Write-Host "  Section: _upm.changelog mirror" -ForegroundColor White
+
+$upmChangelog = ''
+if ($jsonParseSucceeded -and ($null -ne $parsedJson.PSObject.Properties['_upm'])) {
+  if ($null -ne $parsedJson._upm.PSObject.Properties['changelog']) {
+    $upmChangelog = [string]$parsedJson._upm.changelog
+  }
+}
+Write-TestResult -TestName '_upm.changelog is present and non-empty' -Passed (-not [string]::IsNullOrWhiteSpace($upmChangelog)) -Message "Run 'npm run sync:upm-changelog'; the Package Manager reads release notes from this field"
+
+$syncScriptPath = Join-Path $repoRoot 'scripts/release-tools/sync-upm-changelog.ps1'
+$syncExitCode = 1
+if (Test-Path $syncScriptPath) {
+  & pwsh -NoProfile -File $syncScriptPath -Check *> $null
+  $syncExitCode = $LASTEXITCODE
+}
+Write-TestResult -TestName '_upm.changelog matches CHANGELOG.md for the current version' -Passed ($syncExitCode -eq 0) -Message "Run 'npm run sync:upm-changelog' to refresh package.json from CHANGELOG.md"
 
 # ── Section: npm pack inclusion ──────────────────────────────────────────────
 

@@ -106,6 +106,7 @@ jobs:
         run: |
           ./scripts/sync-banner-version.ps1
           ./scripts/sync-issue-template-versions.ps1
+          ./scripts/release-tools/sync-upm-changelog.ps1
 
       - name: Validate prepared release tree
         run: |
