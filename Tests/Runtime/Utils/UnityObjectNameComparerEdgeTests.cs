@@ -83,7 +83,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new TestCaseData("Enemy\u0663", "Enemy\u0664", -1).SetName(
                 "Suffix.ArabicIndicDigits.OrdersAsText"
             );
-            yield return new TestCaseData("Item\uFF13", "Item\uFF13", 0).SetName(
+            // Two distinct Objects never compare equal -- equal names fall through to instance
+            // id -- so this pins the ordering rather than equality.
+            yield return new TestCaseData("Item\uFF13", "Item\uFF14", -1).SetName(
                 "Suffix.FullWidthDigits.OrdersAsText"
             );
         }

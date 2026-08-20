@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -189,11 +190,33 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreNotEqual(0, wrapper2.CompareTo(wrapper1));
         }
 
+        // Any object compares greater than null, the way every IComparable in the framework does.
         [Test]
-        public void CompareToReturnsNegativeOneForNull()
+        public void CompareToOrdersNullFirst()
         {
             StringWrapper wrapper = StringWrapper.Get("test");
-            Assert.AreEqual(-1, wrapper.CompareTo(null));
+            Assert.AreEqual(1, wrapper.CompareTo(null));
+        }
+
+        [Test]
+        public void CompareToOrdersByValueRatherThanHash()
+        {
+            StringWrapper alpha = StringWrapper.Get("alpha");
+            StringWrapper beta = StringWrapper.Get("beta");
+
+            Assert.Less(alpha.CompareTo(beta), 0);
+            Assert.Greater(beta.CompareTo(alpha), 0);
+            Assert.AreEqual(
+                Math.Sign(string.CompareOrdinal("alpha", "beta")),
+                Math.Sign(alpha.CompareTo(beta))
+            );
+        }
+
+        [Test]
+        public void GetAndRemoveHandleNullWithoutThrowing()
+        {
+            Assert.IsTrue(StringWrapper.Get(null) == null);
+            Assert.IsFalse(StringWrapper.Remove(null));
         }
 
         [Test]

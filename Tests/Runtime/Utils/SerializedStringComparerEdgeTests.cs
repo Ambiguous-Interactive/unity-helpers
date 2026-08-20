@@ -12,8 +12,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializedStringComparerEdgeTests
     {
+        // A comparer reached through a serialized field must not throw at lookup time.
         [Test]
-        public void GetHashCodeThrowsOnNullForAllModes()
+        public void GetHashCodeHandlesNullForAllModes()
         {
             SerializedStringComparer.StringCompareMode[] allModes = Enum.GetValues(
                     typeof(SerializedStringComparer.StringCompareMode)
@@ -24,10 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             foreach (SerializedStringComparer.StringCompareMode mode in allModes)
             {
                 SerializedStringComparer comparer = new(mode);
-                Assert.Throws<ArgumentNullException>(
-                    () => comparer.GetHashCode(null),
-                    mode.ToString()
-                );
+                Assert.AreEqual(0, comparer.GetHashCode(null), mode.ToString());
             }
         }
 
