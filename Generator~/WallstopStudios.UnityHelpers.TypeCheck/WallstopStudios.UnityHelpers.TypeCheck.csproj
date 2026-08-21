@@ -60,11 +60,19 @@
       `PooledResource<T>` were the two it caught, and they are used ~740 times.
 
       The rest of the family is silenced rather than baselined, because MEASURED most of it is not
-      real: 39 of the 50 remaining EPS06 are `Span`/`ReadOnlySpan`, which the netstandard2.1
-      REFERENCE assembly does not mark `IsReadOnly`, so the analyzer believes a defensive copy
-      happens where the real runtime makes none. Escalating those would be enforcing an artifact of
-      the reference assemblies this project compiles against. The genuine remainder is inventoried on
-      #517 rather than hidden here.
+      real: 42 of the 50 remaining EPS06 are `Span`/`ReadOnlySpan`, and the analyzer is simply wrong
+      about them. It is NOT a reference-assembly artifact, which is what this comment claimed until
+      it was checked: `UnityEngine.Modules` ships no BCL assembly at all, `Span<T>` resolves from
+      Microsoft's own `NETStandard.Library.Ref` netstandard.dll, and that assembly DOES carry
+      `IsReadOnlyAttribute` on both span types. `ErrorProne.NET.Structs` 0.1.2 fails to recognize
+      them either way. A minimal repro flags them identically under netstandard2.1 and net9.0,
+      while correctly staying silent on a source `readonly struct`, `DateTime` and `Guid`. So the
+      fix is a newer analyzer, not a different reference assembly. The genuine remainder is 8 sites,
+      inventoried on #517 rather than hidden here.
+
+      Count these from SARIF (`-p:ErrorLog=x.sarif%2Cversion=2.1`), never from the console log:
+      MSBuild truncates a warning message at an embedded newline, which hides exactly the 3
+      `_buffer[...]` indexer sites in WProtoWriter and is why this comment used to say 39.
     -->
     <NoWarn>$(NoWarn);EPS02;EPS03;EPS04;EPS05;EPS06;EPS07;EPS08;EPS09;EPS10;EPS11;EPS12</NoWarn>
     <WarningsAsErrors>$(WarningsAsErrors);EPS01</WarningsAsErrors>

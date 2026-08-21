@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -175,6 +176,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             Dictionary<FastVector2Int, int> byDefault = new() { [default] = 9 };
             Assert.IsTrue(byDefault.TryGetValue(new FastVector2Int(0, 0), out int fromConstructed));
             Assert.AreEqual(9, fromConstructed);
+        }
+
+        /// <summary>
+        /// A zero-initialized vector writes no bytes at all -- every member is at its default, so
+        /// the encoder omits all three fields -- while the value it reads back is built through the
+        /// constructor. The round trip therefore crosses exactly the boundary this fixture is about,
+        /// and before the origin had one identity it produced a value unequal to what went in.
+        /// </summary>
+        [Test]
+        public void AZeroInitializedVectorSurvivesItsOwnRoundTrip()
+        {
+            byte[] encoded = Serializer.ProtoSerialize(default(FastVector2Int));
+            Assert.AreEqual(
+                0,
+                encoded.Length,
+                "The fixture no longer exercises the empty-payload path."
+            );
+            Assert.AreEqual(
+                default(FastVector2Int),
+                Serializer.ProtoDeserialize<FastVector2Int>(encoded)
+            );
+
+            byte[] encodedVoxel = Serializer.ProtoSerialize(default(FastVector3Int));
+            Assert.AreEqual(0, encodedVoxel.Length);
+            Assert.AreEqual(
+                default(FastVector3Int),
+                Serializer.ProtoDeserialize<FastVector3Int>(encodedVoxel)
+            );
         }
 
         /// <summary>
