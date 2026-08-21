@@ -122,12 +122,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public bool TryTake(out T taken)
         {
-            taken = null;
             if (_disposed)
             {
+                taken = null;
                 return false;
             }
 
+            T candidate = null;
             while (_idle.Count > 0)
             {
                 int last = _idle.Count - 1;
@@ -138,29 +139,29 @@ namespace WallstopStudios.UnityHelpers.Utils
                     continue;
                 }
 
-                taken = pooled;
+                candidate = pooled;
                 break;
             }
 
-            if (ReferenceEquals(taken, null))
+            if (ReferenceEquals(candidate, null))
             {
                 if (_producer == null)
-                {
-                    return false;
-                }
-
-                T produced = _producer();
-                if (produced == null)
                 {
                     taken = null;
                     return false;
                 }
 
-                taken = produced;
+                candidate = _producer();
+                if (candidate == null)
+                {
+                    taken = null;
+                    return false;
+                }
             }
 
-            _inFlight.Add(taken);
-            _onTake?.Invoke(taken);
+            _inFlight.Add(candidate);
+            _onTake?.Invoke(candidate);
+            taken = candidate;
             return true;
         }
 
