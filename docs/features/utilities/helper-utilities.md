@@ -12,6 +12,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [GameObject & Component Helpers](#gameobject--component-helpers) — Component discovery, hierarchy manipulation
 - [Transform Helpers](#transform-helpers) — Hierarchy traversal
 - [Coroutine Wait Pools](#coroutine-wait-pools) — Configure `Buffers.GetWaitForSeconds*` caching
+- [Pooling Unity Objects That Outlive Their Scope](#pooling-unity-objects-that-outlive-their-scope) — `TrackedObjectPool<T>`
 - [Threading](#threading) — Main thread dispatcher, single-threaded pool teardown
 - [Path & File Helpers](#path--file-helpers) — Path resolution, file operations
 - [Scene Helpers](#scene-helpers) — Scene queries and loading
@@ -82,6 +83,47 @@ void OnGUI()
 ---
 
 <a id="gameplay-helpers"></a>
+
+## Pooling Unity Objects That Outlive Their Scope
+
+`TrackedObjectPool<T>` pools `UnityEngine.Object` instances whose lifetime ends in a **callback**
+rather than at the end of a scope — a tween's `OnComplete`, an animation event, a coroutine.
+
+That is the one shape `WallstopGenericPool<T>` cannot serve. It hands out a `PooledResource<T>` whose
+disposal returns the item, which is a lexical scope and therefore cannot strand anything; it also
+cannot refuse a return, and refusing one is the point here. Use it for scratch buffers, and this for
+pooled effects.
+
+```csharp
+TrackedObjectPool<GameObject> puffs = new(
+    producer: () => Instantiate(_puffPrefab),
+    onTake: puff => puff.SetActive(true),
+    onRelease: puff => puff.SetActive(false),
+    onDestroy: puff => Destroy(puff));
+
+if (puffs.TryTake(out GameObject puff))
+{
+    puff.transform.position = point;
+    tween.OnComplete(() => puffs.Release(puff));
+}
+
+// Destroys the puff still in flight too, rather than leaving it in the scene.
+puffs.Dispose();
+```
+
+| Member           | What it answers                                                                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TryTake(out T)` | `false` when the pool is disposed or nothing could be produced. An item destroyed while pooled is discarded, never handed out.                                                                                     |
+| `Release(T)`     | `false` for a double release, for something this pool never handed out, and for a release arriving after `Dispose`. It never throws — the caller is usually a completion callback, where a throw surfaces nowhere. |
+| `InFlightCount`  | How many are checked out, and would be destroyed by a teardown right now.                                                                                                                                          |
+| `Dispose()`      | Applies `onDestroy` to everything, in flight included, draining the tracking list first so a `Release` from a destroyed item's own ending is refused rather than counted twice.                                    |
+
+An item destroyed while checked out is still removed from tracking when released — `ReferenceEquals(item, null)`
+asks whether anything was handed in, `item == null` asks whether it is gone, and skipping the removal
+on the second question leaks one dead reference per use. The pool never calls `Object.Destroy` on its
+own initiative: `onDestroy` is where destruction lives, and a `null` one means something else owns it.
+
+---
 
 ## Gameplay Helpers
 
