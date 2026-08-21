@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Poor,
-        "Index-into-array generator over a fixed 256-entry table. Period 256; deterministic by design, not statistically random.",
+        "Index-into-array generator over a fixed 256-entry table. The table holds bytes, so the period is 256 byte draws -- measured as exactly 64 draws of NextUint, which consumes four. Deterministic by design, not statistically random.",
         "",
         ""
     )]
