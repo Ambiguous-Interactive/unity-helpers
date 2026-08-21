@@ -62,6 +62,18 @@ float normalValue = random.NextGaussian(mean: 0f, stdDev: 1f);
 | **Cryptographic seeding**   | N/A                   | Use `System.Security.Cryptography` instead     |
 | **Legacy compatibility**    | `UnityRandom`         | Matches `UnityEngine.Random` behavior          |
 
+### Saving and restoring a generator
+
+Every generator answers `InternalState` with a `RandomState` snapshot, and every generator has a
+constructor that takes one back. Snapshot mid-stream, store the snapshot in your save file, and the
+restored generator resumes the exact sequence — verified for all of them by
+`GeneratorSnapshotRestoreTests`.
+
+**`UnityRandom` is the one exception, and it cannot resume a stream.** Its live position belongs to
+`UnityEngine.Random`'s engine globals rather than to the object, so its snapshot carries only the seed it
+was constructed with. Restoring it continues from wherever the engine currently is, without any error.
+Use a concrete PRNG when a save file has to reproduce a sequence.
+
 ---
 
 ## Available Generators

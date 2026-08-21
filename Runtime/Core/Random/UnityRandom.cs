@@ -27,6 +27,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <item><description>Global shared state; can be modified by other code calling <c>UnityEngine.Random</c>.</description></item>
     /// <item><description>Not thread-safe and generally slower than high-performance PRNGs.</description></item>
     /// <item><description>Determinism depends on controlling Unity's global state elsewhere in your project.</description></item>
+    /// <item><description><b>A snapshot cannot resume its stream.</b> <see cref="InternalState"/> carries the
+    /// seed this instance was constructed with and nothing else, because the live position belongs to
+    /// <c>UnityEngine.Random</c>'s globals rather than to this object. Every other generator in this package
+    /// resumes exactly where its snapshot was taken; this one restarts from wherever the engine currently
+    /// is. Save a concrete PRNG instead when a save file has to reproduce a sequence.</description></item>
     /// </list>
     /// <para>When to use:</para>
     /// <list type="bullet">

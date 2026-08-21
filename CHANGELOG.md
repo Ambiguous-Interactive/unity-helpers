@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Document that `UnityRandom` cannot resume its stream from a `RandomState` snapshot: its position lives in `UnityEngine.Random`'s globals, so a restore silently continues from wherever the engine is. Every other generator resumes exactly. See [Random Generators](./docs/features/utilities/random-generators.md#saving-and-restoring-a-generator) ([#521](https://github.com/Ambiguous-Interactive/unity-helpers/issues/521)).
 - Say what has actually been measured about `IllusionFlow`, `StormDropRandom`, `PhotonSpinRandom`, `FlurryBurstRandom` and `BlastCircuitRandom`. All five are now verified clean through 8GB of PractRand 0.95 here, rather than described by an author's claim on a repository that is offline. Ratings are unchanged ([#286](https://github.com/Ambiguous-Interactive/unity-helpers/issues/286), [#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516)).
 - Take every `Bounds`, `BoundsInt`, `Rect` and `Color` extension receiver by `in`. Calling one no longer copies the struct at your call site, which `ErrorProne.NET.Structs` reported as an `EPS06` warning you could not fix without giving up extension syntax ([#512](https://github.com/Ambiguous-Interactive/unity-helpers/issues/512)).
 - Make `PooledArray<T>` and `PooledResource<T>` `readonly struct`, so reading `array`, `length` or `resource` and calling `Dispose()` no longer copies the wrapper first ([#512](https://github.com/Ambiguous-Interactive/unity-helpers/issues/512)).
