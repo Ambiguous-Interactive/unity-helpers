@@ -10,14 +10,15 @@
   "measurement": {
     "seed": "00010203-0405-0607-0809-0a0b0c0d0e0f",
     "recorded": "2026-08-21",
-    "note": "Every outcome below was measured against PractRand 0.95 with the seed above. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault."
+    "note": "Every outcome below was measured against PractRand 0.95 with the seed above. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault. cleanThrough is its mirror for a generator expected to pass: the largest length at which a clean run was actually observed. It exists because a pass is only evidence at a depth where something worse would have been caught -- SystemRandom, rated Poor here, is clean through 4GB and only fails at 8GB, so the 1GB evidence these entries used to carry distinguished nothing. scripts/tests/test-random-quality-outcomes.mjs refuses a pass recorded shallower than the deepest control's failsBy."
   },
   "generators": [
     {
       "name": "BlastCircuitRandom",
       "quality": "Good",
       "expected": "pass",
-      "reason": "Chaotic ARX mixer; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "Chaotic ARX mixer; clean through 8GB with no anomalies."
     },
     {
       "name": "DotNetRandom",
@@ -30,13 +31,15 @@
       "name": "FlurryBurstRandom",
       "quality": "Excellent",
       "expected": "pass",
-      "reason": "Six-word ARX generator; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "Six-word ARX generator; clean through 8GB with no anomalies."
     },
     {
       "name": "IllusionFlow",
       "quality": "Excellent",
       "expected": "pass",
-      "reason": "Rotate/xor/add generator on a Weyl counter; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "Rotate/xor/add generator on a Weyl counter; clean through 8GB with no anomalies."
     },
     {
       "name": "LinearCongruentialGenerator",
@@ -50,25 +53,29 @@
       "name": "PcgRandom",
       "quality": "Excellent",
       "expected": "pass",
-      "reason": "PCG XSH RR 64/32; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "PCG XSH RR 64/32; clean through 8GB with no anomalies."
     },
     {
       "name": "PhotonSpinRandom",
       "quality": "Excellent",
       "expected": "pass",
-      "reason": "SHISHUA-inspired generator; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "SHISHUA-inspired generator; clean through 8GB with no anomalies."
     },
     {
       "name": "RomuDuo",
       "quality": "Good",
       "expected": "pass",
-      "reason": "ROMU multiplier with a modified duo update; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "ROMU multiplier with a modified duo update; clean through 8GB with no anomalies."
     },
     {
       "name": "SplitMix64",
       "quality": "VeryGood",
       "expected": "pass",
-      "reason": "SplitMix64 mixer; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "SplitMix64 mixer; clean through 8GB with no anomalies."
     },
     {
       "name": "SquirrelRandom",
@@ -82,7 +89,8 @@
       "name": "StormDropRandom",
       "quality": "Excellent",
       "expected": "pass",
-      "reason": "Large-state ARX generator over a 1024-word ring; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "Large-state ARX generator over a 1024-word ring; clean through 8GB with no anomalies."
     },
     {
       "name": "SystemRandom",
@@ -112,7 +120,8 @@
       "name": "WyRandom",
       "quality": "VeryGood",
       "expected": "pass",
-      "reason": "Wyhash-based generator; clean through 1GB with no anomalies."
+      "cleanThrough": "8GB",
+      "reason": "Wyhash-based generator; clean through 8GB with no anomalies."
     },
     {
       "name": "XoroShiroRandom",
@@ -134,12 +143,14 @@
       "name": "Xoshiro128StarStar",
       "quality": "Excellent",
       "expected": "pass",
+      "cleanThrough": "8GB",
       "reason": "xoshiro128** 1.1; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
     },
     {
       "name": "Xoshiro256StarStar",
       "quality": "Excellent",
       "expected": "pass",
+      "cleanThrough": "8GB",
       "reason": "xoshiro256** 1.0; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
     }
   ]

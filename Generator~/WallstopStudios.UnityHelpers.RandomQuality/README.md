@@ -37,7 +37,12 @@ and opens or updates a GitHub issue when they disagree.
 
 That manifest is the source of truth for what each generator is expected to do. It records, per
 generator, whether it should pass or fail, why, and -- for the expected-failure controls -- `failsBy`,
-the smallest length at which a definitive `FAIL` was actually measured. The threshold matters: a
+the smallest length at which a definitive `FAIL` was actually measured. Every generator expected to
+pass carries the mirror of that, `cleanThrough`: the largest length at which a clean run was actually
+observed. **A pass is only evidence at a depth where something worse would have been caught**, and
+`SystemRandom` -- rated `Poor` here -- is clean through 4GB, so the contract test refuses a
+`cleanThrough` shallower than the deepest control's `failsBy`. That is currently 8GB, which is also
+the workflow's default budget. The threshold matters: a
 control that passes is only evidence of a broken harness when the run was long enough to have reached
 the length where its failure is known to appear. `SystemRandom`, for instance, survives 4GB and only
 fails at 8GB, so a 1GB run reports it as inconclusive rather than as a fault. `DotNetRandom` carries a

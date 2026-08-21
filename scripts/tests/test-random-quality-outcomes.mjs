@@ -53,6 +53,50 @@ for (const generator of manifest.generators) {
   }
 }
 
+// A "pass" is only evidence at a depth where a generator this package rates worse would already
+// have been caught. Until this was measured, every Good-or-better rating rested on a run of 1GB --
+// and `SystemRandom`, which this package rates Poor, is clean through 4GB and only fails at 8GB. So
+// the manifest was asserting a distinction its own evidence could not draw. `cleanThrough` records
+// the depth at which each pass was actually observed, making the strength of that pass a checked
+// number rather than a sentence in `reason` that nothing reads.
+const deepestControl = manifest.generators
+  .filter((generator) => generator.expected === "fail" && generator.failsBy !== null)
+  .reduce(
+    (deepest, generator) =>
+      parseLength(generator.failsBy) > deepest.length
+        ? { length: parseLength(generator.failsBy), name: generator.name, token: generator.failsBy }
+        : deepest,
+    { length: 0, name: "", token: "" }
+  );
+assert.ok(deepestControl.length > 0, "at least one control must have a measured failing length");
+
+for (const generator of manifest.generators) {
+  if (generator.expected !== "pass") {
+    assert.ok(
+      !("cleanThrough" in generator),
+      `${generator.name} is an expected-failure control, so it must not carry cleanThrough`
+    );
+    continue;
+  }
+
+  assert.ok(
+    generator.cleanThrough,
+    `${generator.name} is expected to pass, so it needs cleanThrough`
+  );
+  assert.doesNotThrow(
+    () => parseLength(generator.cleanThrough),
+    `${generator.name} cleanThrough must parse`
+  );
+  assert.ok(
+    parseLength(generator.cleanThrough) >= deepestControl.length,
+    `${generator.name} is recorded clean only through ${generator.cleanThrough}, but ` +
+      `${deepestControl.name} -- which this package rates ` +
+      `${manifest.generators.find((g) => g.name === deepestControl.name).quality} -- survives that ` +
+      `far and only fails at ${deepestControl.token}. A pass shallower than the deepest control ` +
+      `distinguishes nothing, so it cannot stand as evidence of quality.`
+  );
+}
+
 // Length parsing uses PractRand's power-of-two units.
 assert.equal(parseLength("1GB"), 1073741824);
 assert.equal(parseLength("8GB"), 8589934592);
@@ -211,5 +255,6 @@ assert.equal(statusOf(evaluate(manifest, partial, "8GB"), "PcgRandom"), "error")
 console.log(
   `random-quality outcomes contract: ${manifest.generators.length} generators ` +
     `(${manifest.generators.filter((g) => g.expected === "pass").length} pass, ` +
-    `${manifest.generators.filter((g) => g.expected === "fail").length} expected-failure controls) OK`
+    `${manifest.generators.filter((g) => g.expected === "fail").length} expected-failure controls), ` +
+    `every pass verified through at least ${deepestControl.token} OK`
 );
