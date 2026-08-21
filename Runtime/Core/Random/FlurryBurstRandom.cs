@@ -60,9 +60,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Excellent,
-        "Six-word ARX-style generator tuned for all-around use; passes TestU01 BigCrush per upstream reference implementation.",
-        "Will Stafford Parsons (wileylooper)",
-        "https://github.com/wileylooper/flurryburst"
+        "Six-word ARX-style generator tuned for all-around use; author reports TestU01 BigCrush passes. Not independently verified -- the upstream repository is offline.",
+        "Will Stafford Parsons",
+        "" // Original repository is offline
     )]
     [Serializable]
     [DataContract]

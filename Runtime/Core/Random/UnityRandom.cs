@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Fair,
-        "Mirrors UnityEngine.Random (Xorshift196 + additive); suitable for legacy compatibility but not high-stakes simulation.",
+        "Mirrors UnityEngine.Random, documented by Unity as Xorshift 128; suitable for legacy compatibility but not high-stakes simulation.",
         "UnityEngine.Random",
         "https://docs.unity3d.com/ScriptReference/Random.html"
     )]

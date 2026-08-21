@@ -1,9 +1,11 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is RomuDuo, from the ROMU family by Mark A. Overton, CC0 1.0 Universal
-// (Public Domain), https://romu-random.org/. This is an adaptation of that work; the design is the
-// original author's. See docs/project/third-party-notices.md.
+// This generator uses the ROMU multiplier 15241094284759029579 from the ROMU family by Mark A.
+// Overton (Apache License 2.0, https://romu-random.org/code.c), but its state update
+// (y = ROTL(y, 27) + x) matches neither published romuDuo (ROTL(y,36) + ROTL(y,15) - x) nor
+// romuDuoJr (ROTL(y - x, 27)), so upstream test results do not transfer.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
@@ -54,10 +56,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </code>
     /// </example>
     [RandomGeneratorMetadata(
-        RandomQuality.VeryGood,
-        "ROMU family member (RomuDuo); authors report strong BigCrush results with minor low-bit weaknesses in some rotations.",
-        "Markus & Crow 2019",
-        "" // romu-random.org SSL certificate expired; see archived versions
+        RandomQuality.Good,
+        "ROMU multiplier with a modified duo update; returns the low 32 bits of the 64-bit product. Not the published romuDuo or romuDuoJr, so their measured results do not transfer.",
+        "Overton 2020",
+        "https://romu-random.org/code.c"
     )]
     [Serializable]
     [DataContract]

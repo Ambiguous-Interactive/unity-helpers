@@ -120,17 +120,18 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 
 - Description: Fast, high-quality PRNGs with small state.
 - Authors: David Blackman, Sebastiano Vigna
-- Upstream: [Scrambled Linear PRNGs (xoshiro/xoroshiro)](https://arxiv.org/abs/1805.01407); [Fast Splittable PRNGs (SplitMix64)](https://2014.splashcon.org/details/oopsla2014/48/Fast-Splittable-Pseudorandom-Number-Generators)
+- Upstream: [Scrambled Linear PRNGs (xoshiro/xoroshiro)](https://arxiv.org/abs/1805.01407); [reference implementations](https://prng.di.unimi.it/); [Fast Splittable PRNGs (SplitMix64)](https://2014.splashcon.org/details/oopsla2014/48/Fast-Splittable-Pseudorandom-Number-Generators)
 - License: CC0 1.0 Universal (Public Domain)
-- Notes: Implements xoroshiro128\*\* and SplitMix64 variants.
+- Notes: Implements xoroshiro128+ (returning the low 32 bits of each 64-bit output), xoshiro128\*\*, xoshiro256\*\*, and SplitMix64.
 
 ### RomuDuo
 
 - Description: Rotate-multiply PRNG family optimized for modern CPUs.
-- Authors: Mark A. Overton
-- Upstream: [ROMU website (archived)](https://web.archive.org/web/20240101000000*/https://romu-random.org/)
-- License: CC0 1.0 Universal (Public Domain)
-- Notes: Implements the RomuDuo variant with two 64-bit state words.
+- Author: Mark A. Overton
+- Upstream: [romu-random.org](https://romu-random.org/code.c) (reachable; its TLS certificate is expired)
+- License: Apache License 2.0
+- License URL: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- Notes: Two 64-bit state words and the ROMU multiplier, but the update rule differs from published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
 
 ### WyRandom (wyhash)
 
@@ -143,11 +144,11 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 
 ### Will Stafford Parsons Algorithms
 
-The following algorithms are by Will Stafford Parsons (wileylooper). Note: The original GitHub repositories are currently offline.
+The following algorithms are by Will Stafford Parsons (GitHub: wstaffordp). Note: the original GitHub repositories are currently unreachable (HTTP 404 as of 2026-08).
 
-- **IllusionFlow**: Hybridized PCG + xorshift design.
+- **IllusionFlow**: Five-word 32-bit rotate/xor/add generator with a Weyl counter.
 - **FlurryBurst**: Six-word ARX-style generator.
-- **StormDrop**: Large-state ARX generator inspired by SHISHUA.
+- **StormDrop**: Large-state ARX generator over a 1024-word ring buffer.
 - **PhotonSpin**: 20-word ring-buffer generator.
 - **BlastCircuit**: Four-word ARX-style generator.
 - **WaveSplat**: One-word chaotic generator.
@@ -201,8 +202,9 @@ The following algorithms are based on well-known academic work and are implement
 ### Random Number Generators
 
 - **XorShift**: Classic PRNG by George Marsaglia (2003). [Paper](https://doi.org/10.18637/jss.v008.i14)
-- **Linear Congruential Generator**: Park-Miller variant (1988). "Random Number Generators: Good Ones Are Hard to Find" Communications of the ACM 31(10):1192-1201
+- **Linear Congruential Generator**: "Quick and dirty" LCG (a = 1664525, c = 1013904223, m = 2^32) from Press et al., _Numerical Recipes in C_ (ranqd1), after Knuth and H. W. Lewis.
 - **Squirrel Noise**: Hash-based noise function by Squirrel Eiserloh. [GDC Talk](https://youtu.be/LWFzPP8ZbdU?t=2673)
+- **SystemRandom**: Reimplements the algorithm of .NET's classic `System.Random` — Knuth's subtractive lagged-Fibonacci generator (modulus 2^31-1, the 161803398 seed constant, and a 55-element lag table) from Donald Knuth, _The Art of Computer Programming_, Vol. 2.
 
 ### Sampling & Geometry
 
@@ -245,7 +247,7 @@ SOFTWARE.
 
 ### Apache License 2.0
 
-Used by: protobuf-net, PCG Random, sort-research-rs algorithms
+Used by: protobuf-net, PCG Random, RomuDuo, sort-research-rs algorithms
 
 ```text
 Apache License
@@ -382,7 +384,7 @@ freely, subject to the following restrictions:
 
 ### CC0 1.0 Universal (Public Domain Dedication)
 
-Used by: Xoroshiro/Xoshiro/SplitMix64, RomuDuo
+Used by: Xoroshiro/Xoshiro/SplitMix64
 
 ```text
 CC0 1.0 Universal

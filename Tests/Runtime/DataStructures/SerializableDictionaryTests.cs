@@ -901,7 +901,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Serializable]
-        private sealed class IntCache : SerializableDictionary.Cache<int> { }
+        internal sealed class IntCache : SerializableDictionary.Cache<int> { }
 
         // Internal rather than private so the generated registrar can name the marshalled
         // collection closed over it. A private nested type is skipped with WPROTO028 and

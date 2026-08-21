@@ -8,7 +8,7 @@
 
 ## Overview
 
-Unity Helpers provides 15+ high-performance pseudo-random number generators (PRNGs) through a unified `IRandom` interface. All generators pass standard statistical tests and are optimized for game development workloads.
+Unity Helpers provides 20+ high-performance pseudo-random number generators (PRNGs) through a unified `IRandom` interface. Each generator carries a `[RandomGeneratorMetadata]` quality rating spanning fast-but-weak toys through generators that clear BigCrush — check the rating before choosing; the table below summarizes.
 
 ### Key Features
 
@@ -68,21 +68,35 @@ float normalValue = random.NextGaussian(mean: 0f, stdDev: 1f);
 
 All generators implement the `IRandom` interface:
 
-| Generator                     | Speed     | Quality   | Best For                           |
-| ----------------------------- | --------- | --------- | ---------------------------------- |
-| `LinearCongruentialGenerator` | Fastest   | Poor      | Non-critical effects only          |
-| `SplitMix64`                  | Very Fast | Very Good | High-throughput generation         |
-| `PcgRandom`                   | Fast      | Excellent | General purpose, seeded generation |
-| `IllusionFlow`                | Fast      | Excellent | Balanced speed and quality         |
-| `XoroShiroRandom`             | Fast      | Good      | Bulk placement, noise seeding      |
-| `RomuDuo`                     | Fast      | Very Good | Alternative to PCG                 |
-| `XorShiftRandom`              | Moderate  | Fair      | Legacy compatibility               |
-| `WyRandom`                    | Moderate  | Very Good | Hash-based scenarios               |
-| `SquirrelRandom`              | Moderate  | Good      | Noise-based generation             |
-| `PhotonSpinRandom`            | Slow      | Excellent | Maximum quality needed             |
-| `UnityRandom`                 | Slow      | Fair      | Match Unity behavior               |
-| `SystemRandom`                | Very Slow | Poor      | .NET compatibility                 |
-| `WDoomRandom`                 | Fastest   | Poor      | Retro feel, deterministic replays  |
+| Generator                     | Speed           | Quality      | Best For                                                      |
+| ----------------------------- | --------------- | ------------ | ------------------------------------------------------------- |
+| `LinearCongruentialGenerator` | Fastest         | Poor         | Non-critical effects only                                     |
+| `WaveSplatRandom`             | Fastest         | Experimental | Throwaway effects; no formal test results published           |
+| `SplitMix64`                  | Very Fast       | Very Good    | High-throughput generation                                    |
+| `BlastCircuitRandom`          | Very Fast       | Good         | Bulk effects, chaotic mixing                                  |
+| `PcgRandom`                   | Fast            | Excellent    | General purpose, seeded generation                            |
+| `FlurryBurstRandom`           | Fast            | Excellent    | All-around alternative to PCG                                 |
+| `IllusionFlow`                | Fast            | Excellent    | Balanced speed and quality                                    |
+| `XoroShiroRandom`             | Fast            | Good         | Bulk placement, noise seeding                                 |
+| `RomuDuo`                     | Fast            | Very Good    | Alternative to PCG                                            |
+| `Xoshiro128StarStar`          | Not benchmarked | Excellent    | `NextBool`/low-bit masks; WebGL and other 32-bit targets      |
+| `Xoshiro256StarStar`          | Not benchmarked | Excellent    | `NextDouble`/`NextUlong`-heavy work (one advance per 64 bits) |
+| `StormDropRandom`             | Moderate        | Excellent    | Long streams from a large 1024-word state                     |
+| `XorShiftRandom`              | Moderate        | Fair         | Legacy compatibility                                          |
+| `WyRandom`                    | Moderate        | Very Good    | Hash-based scenarios                                          |
+| `SquirrelRandom`              | Moderate        | Good         | Noise-based generation                                        |
+| `PhotonSpinRandom`            | Slow            | Excellent    | Maximum quality needed                                        |
+| `UnityRandom`                 | Slow            | Fair         | Match Unity behavior                                          |
+| `SystemRandom`                | Very Slow       | Poor         | .NET compatibility                                            |
+| `DotNetRandom`                | Very Slow       | Poor         | Bridging `System.Random` code to `IRandom`                    |
+| `WDoomRandom`                 | Fastest         | Poor         | Retro feel, deterministic replays                             |
+
+`Xoshiro128StarStar` and `Xoshiro256StarStar` are new and have not been through the benchmark
+harness yet; their speed rows fill in the next time
+[Random Performance](../../performance/random-performance.md) is regenerated. Both are rated
+`Excellent`: the `**` scrambler leaves no weak output bit, so unlike the `+` scramblers they are
+safe for `NextBool` and low-bit masks. `Xoshiro256StarStar` is the only generator here that
+overrides `NextUlong`, costing one state advance per 64-bit draw instead of two.
 
 For detailed benchmarks, see [Random Performance](../../performance/random-performance.md).
 

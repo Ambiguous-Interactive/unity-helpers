@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Poor,
-        "Thin wrapper over System.Random; inherits same LCG weaknesses and fails modern statistical batteries.",
+        "Reimplements the classic .NET System.Random algorithm (Knuth subtractive lagged-Fibonacci, mod 2^31-1) so its sequence is serializable and stable across runtimes. Fails modern statistical batteries.",
         "System.Random considered harmful",
         "https://nullprogram.com/blog/2017/09/21/"
     )]

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Xoshiro128StarStar` and `Xoshiro256StarStar`, the first generators here whose every output bit is strong enough for `NextBool` and power-of-two masks. `Xoshiro256StarStar` also answers `NextUlong` in one state advance instead of two. See [Random Generators](./docs/features/utilities/random-generators.md) ([#510](https://github.com/Ambiguous-Interactive/unity-helpers/issues/510), [#285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/285)).
 - Add release notes to the Unity Package Manager: the package now carries its changelog section and a Changelog link, so Version History shows what changed instead of nothing ([#421](https://github.com/Ambiguous-Interactive/unity-helpers/issues/421)).
 - Add AOT protobuf support for `ValueTuple`: `Serializer.ProtoSerialize((7, 1.5f))` threw `ExecutionEngineException` on an IL2CPP player and now goes through a generated formatter. JSON of a tuple stays editor-only. Define `WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION` to opt out. See [Tuples serialize on IL2CPP](./docs/features/serialization/serialization-types.md#tuples-serialize-on-il2cpp) ([#289](https://github.com/Ambiguous-Interactive/unity-helpers/issues/289)).
 - Add `SerializableValueTuple<T1, T2>` and `SerializableValueTuple<T1, T2, T3>`, so a tuple survives Unity serialization -- a `(int, float)` field is silently dropped, taking any authored contents with it. Byte-identical to `ValueTuple` in protobuf and JSON. See [SerializableValueTuple](./docs/features/serialization/serialization-types.md#serializablevaluetuple) ([#289](https://github.com/Ambiguous-Interactive/unity-helpers/issues/289)).
@@ -83,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lower `XoroShiroRandom` to `Fair` and `RomuDuo` to `Good`. Bit 0 of `XoroShiroRandom` follows a linear recurrence of order 128, so its `NextBool()` is predictable from 128 draws; prefer `Xoshiro128StarStar` where single bits matter ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509), [#286](https://github.com/Ambiguous-Interactive/unity-helpers/issues/286)).
 - Read cancellation-aware JSON files through a pooled scratch buffer and deserialize the pooled stream's valid segment directly. Large save files no longer allocate an extra full-payload copy before decoding ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Speed up every pooled-buffer operation on blittable elements -- the sorts, `Shuffle`, `Fill` and the geometry helpers -- by clearing a returned array only when its element type can hold a reference. A reference element is still never left rooted in the pool ([#482](https://github.com/Ambiguous-Interactive/unity-helpers/issues/482)).
 - Speed up `ProtoSerialize`, `ProtoDeserialize`, `ProtoEquals` and `NextEnum` by resolving each one's type questions once per closed generic instead of on every call. Measured at 8.5x for that check alone on reference types ([#346](https://github.com/Ambiguous-Interactive/unity-helpers/issues/346)).
@@ -97,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix generator metadata that named the wrong algorithm: `LinearCongruentialGenerator` is the Numerical Recipes `ranqd1` LCG, not Park-Miller; `RomuDuo` matches neither published ROMU duo variant; `IllusionFlow` is not a PCG or xorshift hybrid ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
+- Fix the license recorded for the ROMU algorithm behind `RomuDuo`: it is Apache 2.0, not CC0 ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
 - Fix `SortByName()` and `ScriptableObjectSingleton<T>.Instance` throwing on a name whose trailing digits do not fit an `int`, such as a timestamp, or are not ASCII digits. Such names now order correctly, and a suffix of any length is compared without being parsed ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
 - Fix `string.Reverse()` destroying emoji and other non-BMP characters: it split every surrogate pair, so the result encoded as replacement characters. Reversing twice now returns the original ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).
 - Fix `string.Truncate()` returning a result longer than the limit it was given when the ellipsis did not fit, and cutting characters in half. The result now always fits and is always valid text ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).

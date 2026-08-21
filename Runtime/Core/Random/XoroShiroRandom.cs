@@ -1,8 +1,8 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is xoroshiro/xoshiro, by David Blackman and Sebastiano Vigna,
-// CC0 1.0 Universal (Public Domain), https://prng.di.unimi.it/xoshiro128starstar.c. This is an
+// The algorithm in this file is xoroshiro128+, by David Blackman and Sebastiano Vigna,
+// CC0 1.0 Universal (Public Domain), https://prng.di.unimi.it/xoroshiro128plus.c. This is an
 // adaptation of that work; the design is the original authors'.
 // See docs/project/third-party-notices.md.
 
@@ -34,7 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <para>Cons:</para>
     /// <list type="bullet">
     /// <item><description>Not cryptographically secure.</description></item>
-    /// <item><description>Low bits may show weaker properties in some variants; use full width for mixing.</description></item>
+    /// <item><description>Bit 0 of the returned value satisfies a linear recurrence of order 128 over GF(2), so
+    /// <see cref="AbstractRandom.NextBool"/> and power-of-two masks are predictable from 128 observations. Prefer
+    /// <see cref="Xoshiro128StarStar"/> or <see cref="PcgRandom"/> where single bits matter.</description></item>
     /// </list>
     /// <para>When to use:</para>
     /// <list type="bullet">
@@ -62,8 +64,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </code>
     /// </example>
     [RandomGeneratorMetadata(
-        RandomQuality.Good,
-        "xoroshiro128+; passes every battery its authors are aware of except linearity of its lowest bits, which is the half this returns. Prefer PcgRandom or SplitMix64 where single bits matter.",
+        RandomQuality.Fair,
+        "xoroshiro128+, returning the low 32 bits -- the half its authors document as linear. Measured: bit 0 has linear complexity exactly 128, so NextBool is predictable from 128 draws. Prefer Xoshiro128StarStar or PcgRandom where single bits matter.",
         "Blackman & Vigna 2018",
         "https://prng.di.unimi.it/xoroshiro128plus.c"
     )]

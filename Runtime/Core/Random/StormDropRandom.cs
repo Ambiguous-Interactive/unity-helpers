@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Excellent,
-        "20-word ARX generator derived from SHISHUA; author reports excellent PractRand performance and long periods.",
+        "Large-state ARX generator over a 1024-word (4 KB) ring buffer with two 32-bit control words; author reports strong PractRand results. Not independently verified -- the upstream repository is offline.",
         "Will Stafford Parsons",
         "" // Original repository wileylooper/stormdrop is offline
     )]

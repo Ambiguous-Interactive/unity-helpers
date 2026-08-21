@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             ("1 neighbor", 1),
         };
 
-        private readonly struct DatasetSpec
+        internal readonly struct DatasetSpec
         {
             public DatasetSpec(string label, Vector2Int gridSize)
             {

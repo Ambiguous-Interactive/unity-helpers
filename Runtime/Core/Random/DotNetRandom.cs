@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Poor,
-        "Linear congruential generator (mod 2^31) with known correlation failures; unsuitable for high-quality simulations.",
+        "Wraps System.Random, which on Mono and for seeded .NET Core is Knuth's subtractive lagged-Fibonacci generator (mod 2^31-1), not an LCG. The sequence is runtime-dependent, so do not rely on it for cross-platform determinism.",
         "System.Random considered harmful",
         "https://nullprogram.com/blog/2017/09/21/"
     )]

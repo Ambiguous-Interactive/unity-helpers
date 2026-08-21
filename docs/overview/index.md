@@ -330,7 +330,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 **Random Extensions** - Random vectors, colors, weighted selection, subset sampling
 → [Random Generators Guide](../features/utilities/random-generators.md)
 
-**Random Generators** - 15+ high-performance PRNG implementations
+**Random Generators** - 20+ high-performance PRNG implementations
 → [Random Generators Guide](../features/utilities/random-generators.md) | [Random Performance](../performance/random-performance.md)
 
 **Range<T>** - Inclusive/exclusive range helper

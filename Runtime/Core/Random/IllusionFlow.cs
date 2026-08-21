@@ -25,12 +25,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
-    /// IllusionFlow: a modern, high-performance PRNG building on Xoroshiro concepts with additional state and mixing.
+    /// IllusionFlow: a five-word 32-bit generator -- a Weyl counter gating a rotate/xor/add mix, with a carry-in reseed step every 2^32 draws.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// IllusionFlow enhances the classic Xoroshiro approach with additional state and update rules for improved
-    /// distribution characteristics. In this package, <see cref="PRNG.Instance"/> defaults to <see cref="IllusionFlow"/>
+    /// The generator advances a 32-bit Weyl counter and mixes five state words with rotations, exclusive-ors and additions.
+    /// In this package, <see cref="PRNG.Instance"/> defaults to <see cref="IllusionFlow"/>
     /// to provide fast, high-quality randomness out of the box.
     /// </para>
     /// <para>Pros:</para>
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Excellent,
-        "Hybridized PCG + xorshift design; upstream PractRand 64GB passes with no anomalies per author.",
+        "Five-word rotate/xor/add generator driven by a 32-bit Weyl counter; author reports PractRand to 64 GB with no anomalies. Not independently verified -- the upstream repository is offline.",
         "Will Stafford Parsons",
         "" // Original repository wileylooper/illusionflow is offline
     )]

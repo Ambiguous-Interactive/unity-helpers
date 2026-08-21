@@ -98,6 +98,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoInclude(116, typeof(WaveSplatRandom))]
     [ProtoInclude(117, typeof(WDoomRandom))]
     [WProtoInclude(117, typeof(WDoomRandom))]
+    [ProtoInclude(118, typeof(Xoshiro128StarStar))]
+    [WProtoInclude(118, typeof(Xoshiro128StarStar))]
+    [ProtoInclude(119, typeof(Xoshiro256StarStar))]
+    [WProtoInclude(119, typeof(Xoshiro256StarStar))]
     public abstract partial class AbstractRandom : IRandom
     {
         /// <summary>

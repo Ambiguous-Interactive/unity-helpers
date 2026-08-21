@@ -27,7 +27,7 @@ Runtime/                   # Runtime C# libraries
     Math/                  # Math utilities, ballistics, geometry
     Model/                 # Serializable types (Dictionary, HashSet, Nullable, Type, Guid)
     OneOf/                 # Discriminated unions
-    Random/                # 15+ PRNG implementations with IRandom interface
+    Random/                # 20+ PRNG implementations with IRandom interface
     Serialization/         # JSON/Protobuf serialization with Unity type converters
     Threading/             # Thread pools, main thread dispatcher, guards
   Tags/                    # Effects/attribute system (AttributeEffect, TagHandler, Cosmetics)

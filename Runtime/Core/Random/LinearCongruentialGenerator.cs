@@ -1,10 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is the Park-Miller linear congruential generator, from Park and Miller,
-// "Random Number Generators: Good Ones Are Hard to Find", Communications of the ACM 31(10):1192-1201
-// (1988). This is an independent implementation of a published algorithm; the design is the original
-// authors'. See docs/project/third-party-notices.md.
+// The algorithm in this file is the "quick and dirty" linear congruential generator
+// (a = 1664525, c = 1013904223, m = 2^32) popularized by Press et al., "Numerical Recipes in C"
+// (ranqd1), after Knuth and H. W. Lewis. This is an independent implementation of a published
+// algorithm. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
@@ -51,9 +51,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Poor,
-        "Minimal standard LCG; fails spectral tests and exhibits lattice artifacts beyond small dimensions.",
-        "Park & Miller 1988",
-        "" // Communications of the ACM 31(10):1192-1201
+        "Numerical Recipes 'quick and dirty' LCG (a=1664525, c=1013904223, m=2^32) returning the raw state, so bit k has period only 2^(k+1) -- measured linear complexity of bit k is 2^k+1, and bit 0 simply alternates. Cosmetic use only.",
+        "Press et al., Numerical Recipes (ranqd1)",
+        ""
     )]
     [Serializable]
     [DataContract]

@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return a.tieBreaker.CompareTo(b.tieBreaker);
         }
 
-        private readonly struct PowerSortPlusCandidate
+        internal readonly struct PowerSortPlusCandidate
         {
             public readonly int leftIndex;
             public readonly int rightIndex;

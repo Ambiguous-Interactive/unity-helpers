@@ -584,7 +584,7 @@ Already read the [Top 5 Time-Savers](#-top-time-savers)? Jump directly to the [C
 
 ### Random Number Generators
 
-Unity Helpers includes **15+ high-quality random number generators**, all implementing a rich `IRandom` interface:
+Unity Helpers includes **20+ high-quality random number generators**, all implementing a rich `IRandom` interface:
 
 #### Available Generators
 

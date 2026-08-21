@@ -32,6 +32,8 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
             nameof(WyRandom),
             nameof(XoroShiroRandom),
             nameof(XorShiftRandom),
+            nameof(Xoshiro128StarStar),
+            nameof(Xoshiro256StarStar),
         };
 
         public static int Main(string[] args)
@@ -134,6 +136,12 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
                     return true;
                 case nameof(XorShiftRandom):
                     random = new XorShiftRandom(seed);
+                    return true;
+                case nameof(Xoshiro128StarStar):
+                    random = new Xoshiro128StarStar(seed);
+                    return true;
+                case nameof(Xoshiro256StarStar):
+                    random = new Xoshiro256StarStar(seed);
                     return true;
                 default:
                     random = null;
