@@ -59,7 +59,9 @@ const expectedNames = [
   "WDoomRandom",
   "WyRandom",
   "XoroShiroRandom",
-  "XorShiftRandom"
+  "XorShiftRandom",
+  "Xoshiro128StarStar",
+  "Xoshiro256StarStar"
 ];
 assert.deepEqual(names, expectedNames, "the public standalone inventory must not drift silently");
 

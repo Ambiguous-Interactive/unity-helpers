@@ -91,6 +91,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 "WDoomRandom",
                 "WGuid",
                 "XoroShiroRandom",
+                "Xoshiro128StarStar",
+                "Xoshiro256StarStar",
             };
             foreach (string expected in known)
             {
