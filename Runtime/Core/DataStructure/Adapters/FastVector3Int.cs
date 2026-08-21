@@ -64,6 +64,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoMember(3)]
         private readonly int _hash;
 
+        // See FastVector2Int.OriginHash: a zero-initialized instance carries _hash == 0 while its
+        // components are already the origin's, so 0 has to mean the origin's hash.
+        private static readonly int OriginHash = Objects.HashCode(0, 0, 0);
+
         /// <summary>
         /// Initializes a fast vector with explicit components and a cached hash.
         /// </summary>
@@ -410,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hash;
+            return _hash != 0 ? _hash : OriginHash;
         }
 
         /// <summary>
@@ -530,10 +534,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(FastVector3Int other)
         {
-            return GetHashCode() == other.GetHashCode()
-                && x == other.x
-                && y == other.y
-                && z == other.z;
+            return x == other.x && y == other.y && z == other.z;
         }
 
         /// <summary>

@@ -103,8 +103,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public bool IsUnused { get; }
 
-        private readonly int _hash;
-
         /// <summary>
         /// Creates a new statistics snapshot.
         /// </summary>
@@ -156,31 +154,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             IsHighFrequency = isHighFrequency;
             IsLowFrequency = isLowFrequency;
             IsUnused = isUnused;
-            _hash = Objects.HashCode(
-                currentSize,
-                peakSize,
-                rentCount,
-                returnCount,
-                purgeCount,
-                idleTimeoutPurges,
-                capacityPurges,
-                fullPurgeOperations,
-                partialPurgeOperations,
-                rentalsPerMinute,
-                averageInterRentalTimeSeconds,
-                lastAccessTime,
-                isHighFrequency,
-                isLowFrequency,
-                isUnused
-            );
         }
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(PoolStatistics other)
         {
-            return _hash == other._hash
-                && CurrentSize == other.CurrentSize
+            return CurrentSize == other.CurrentSize
                 && PeakSize == other.PeakSize
                 && RentCount == other.RentCount
                 && ReturnCount == other.ReturnCount
@@ -208,7 +188,25 @@ namespace WallstopStudios.UnityHelpers.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hash;
+            // Deliberately excludes RentalsPerMinute, AverageInterRentalTimeSeconds and
+            // LastAccessTime. Equals compares those three within FloatEqualityTolerance, so two
+            // snapshots that are equal can hold different float bits; hashing them would let equal
+            // values produce different hash codes and land in different buckets. Only members
+            // equality compares exactly may contribute.
+            return Objects.HashCode(
+                CurrentSize,
+                PeakSize,
+                RentCount,
+                ReturnCount,
+                PurgeCount,
+                IdleTimeoutPurges,
+                CapacityPurges,
+                FullPurgeOperations,
+                PartialPurgeOperations,
+                IsHighFrequency,
+                IsLowFrequency,
+                IsUnused
+            );
         }
 
         /// <summary>

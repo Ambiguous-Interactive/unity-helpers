@@ -60,6 +60,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoMember(3)]
         private readonly int _hash;
 
+        // A zero-initialized instance -- default(FastVector2Int), an array element, a struct a
+        // deserializer allocated without running a constructor -- carries _hash == 0 while its
+        // components are already the origin's. Mapping 0 onto the origin's hash is what makes such
+        // an instance indistinguishable from new FastVector2Int(0, 0), which is what its components
+        // claim it is. A non-origin cell whose hash happens to be 0 merely collides with the origin,
+        // and Equals settles that the same way it settles every other collision.
+        private static readonly int OriginHash = Objects.HashCode(0, 0);
+
         /// <summary>
         /// Initializes a new fast vector with integer components and a cached hash.
         /// </summary>
@@ -224,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(FastVector2Int other)
         {
-            return GetHashCode() == other.GetHashCode() && x == other.x && y == other.y;
+            return x == other.x && y == other.y;
         }
 
         /// <summary>
@@ -385,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hash;
+            return _hash != 0 ? _hash : OriginHash;
         }
 
         /// <summary>

@@ -56,8 +56,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public int GrowthEvents { get; }
 
-        private readonly int _hash;
-
         /// <summary>
         /// The cache hit rate as a value between 0.0 and 1.0.
         /// Returns 0.0 if no requests have been made.
@@ -104,24 +102,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             CurrentSize = currentSize;
             PeakSize = peakSize;
             GrowthEvents = growthEvents;
-            _hash = Objects.HashCode(
-                hitCount,
-                missCount,
-                evictionCount,
-                loadCount,
-                expiredCount,
-                currentSize,
-                peakSize,
-                growthEvents
-            );
         }
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(CacheStatistics other)
         {
-            return _hash == other._hash
-                && HitCount == other.HitCount
+            return HitCount == other.HitCount
                 && MissCount == other.MissCount
                 && EvictionCount == other.EvictionCount
                 && LoadCount == other.LoadCount
@@ -141,7 +128,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hash;
+            return Objects.HashCode(
+                HitCount,
+                MissCount,
+                EvictionCount,
+                LoadCount,
+                ExpiredCount,
+                CurrentSize,
+                PeakSize,
+                GrowthEvents
+            );
         }
 
         /// <summary>
