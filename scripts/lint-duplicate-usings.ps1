@@ -210,7 +210,7 @@ $violations = @()
 
 foreach ($filePath in $filesToScan) {
   $relativePath = Get-RelativePath $filePath
-  $lines = @(Get-Content -LiteralPath $filePath)
+  $lines = [System.IO.File]::ReadAllLines($filePath)
 
   if ($lines.Count -eq 0) {
     continue

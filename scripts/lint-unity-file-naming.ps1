@@ -154,7 +154,7 @@ foreach ($file in $files) {
   # Skip .meta files
   if ($filePath -like '*.meta') { continue }
 
-  $content = Get-Content $filePath -Raw
+  $content = [System.IO.File]::ReadAllText($filePath)
   if ([string]::IsNullOrWhiteSpace($content)) { continue }
 
   # Check for lint disable comment

@@ -104,7 +104,7 @@ foreach ($file in $filesToScan) {
   if ($file -like '*.meta') { continue }
   $rel = Get-RelativePath $file
 
-  $rawContent = Get-Content $file
+  $rawContent = [System.IO.File]::ReadAllLines($file)
   if ($rawContent.Count -eq 0) { continue }
 
   # Replace comments with spaces so unsafe-cast patterns inside XML-doc/block

@@ -49,7 +49,7 @@ function Get-ConditionalMethods {
 
     $found = @()
     foreach ($file in $Files) {
-        [string[]]$lines = @(Get-Content -LiteralPath $file)
+        [string[]]$lines = [System.IO.File]::ReadAllLines($file)
         $relative = $file.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
 
         for ($i = 0; $i -lt $lines.Length; $i++) {

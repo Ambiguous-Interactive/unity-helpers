@@ -39,6 +39,7 @@ function Write-TestResult {
 function Invoke-LinterForContent {
   param(
     [Parameter(Mandatory = $true)]
+    [AllowEmptyString()]
     [string]$Content
   )
 
@@ -213,6 +214,19 @@ namespace Second
 $result = Invoke-LinterForContent -Content $braceInStringContent
 $hasUNH007 = $result.Output -match 'UNH007'
 Write-TestResult 'UNH007.BraceInStringDoesNotCorruptScopeTracking' (($result.ExitCode -ne 0) -and $hasUNH007) "Exit: $($result.ExitCode), Output: $($result.Output)"
+
+Write-Host ''
+Write-Host '  Section: Degenerate files' -ForegroundColor White
+
+# The reads here are [IO.File]::ReadAllLines rather than Get-Content, which are not the same
+# function on a file with no content: Get-Content answers $null and ReadAllLines answers an empty
+# array. A linter that indexed the result would throw on one and not the other, so the degenerate
+# shapes are asserted rather than assumed.
+$emptyResult = Invoke-LinterForContent -Content ''
+Write-TestResult 'UNH007.AnEmptyFileIsClean' ($emptyResult.ExitCode -eq 0) "Exit: $($emptyResult.ExitCode), Output: $($emptyResult.Output)"
+
+$singleLineResult = Invoke-LinterForContent -Content 'using System;'
+Write-TestResult 'UNH007.ASingleLineFileIsClean' ($singleLineResult.ExitCode -eq 0) "Exit: $($singleLineResult.ExitCode), Output: $($singleLineResult.Output)"
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor White

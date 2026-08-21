@@ -166,7 +166,7 @@ foreach ($file in $files) {
   # Skip .meta files
   if ($filePath -like '*.meta') { continue }
 
-  $content = Get-Content $filePath -Raw
+  $content = [System.IO.File]::ReadAllText($filePath)
   if ([string]::IsNullOrWhiteSpace($content)) { continue }
 
   # Mask comments so XML-doc references / block comments don't get scanned for

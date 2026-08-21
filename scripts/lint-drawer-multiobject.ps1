@@ -182,7 +182,7 @@ foreach ($file in $filesToScan) {
   if ($file -like '*.meta') { continue }
   $rel = Get-RelativePath $file
 
-  $rawContent = Get-Content $file
+  $rawContent = [System.IO.File]::ReadAllLines($file)
   $text = $rawContent -join "`n"
 
   # Mask comments so XML-doc / block-comment text doesn't trigger pattern matches.

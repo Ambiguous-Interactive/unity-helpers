@@ -74,8 +74,10 @@ foreach ($root in $sourceRoots) {
 
     Write-Info "Checking: $relativePath"
 
-    # Read first N lines of the file
-    $content = Get-Content -Path $file.FullName -TotalCount $linesToCheck -ErrorAction SilentlyContinue
+    # Read first N lines of the file. ReadLines is lazy, so this still stops after
+    # $linesToCheck lines, and it does not pay Get-Content's per-file pipeline cost -- which
+    # dominates on a devcontainer's 9p mount, where the reads are the whole runtime.
+    $content = @([System.IO.File]::ReadLines($file.FullName) | Select-Object -First $linesToCheck)
     if (-not $content) {
       Write-Info "  Empty or unreadable file, skipping"
       $skippedCount++

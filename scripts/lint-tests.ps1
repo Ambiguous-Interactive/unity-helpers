@@ -1320,11 +1320,10 @@ foreach ($file in $filesToScan) {
   $rel = Get-RelativePath $file
   if (Is-AllowlistedFile $rel) { continue }
 
-  # Force array semantics: Get-Content returns $null for empty files and a bare
-  # [string] for single-line files; under Set-StrictMode either of those will
-  # throw when we access .Count on non-array values. Wrapping with @(...) is the
-  # idiomatic fix and is a no-op for arrays.
-  $content = @(Get-Content $file)
+  # ReadAllLines rather than Get-Content: it always answers a string[], so the array
+  # semantics Set-StrictMode needs come for free -- Get-Content answers $null for an empty
+  # file and a bare [string] for a single-line one, and .Count throws on both.
+  $content = [System.IO.File]::ReadAllLines($file)
   $text = $content -join "`n"
 
   if ($FixNullChecks) {
