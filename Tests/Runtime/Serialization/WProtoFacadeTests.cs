@@ -52,7 +52,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // saved data.
             AssertServedAndIdentical(new FastVector2Int(1, -2));
             AssertServedAndIdentical(new FastVector3Int(3, 4, -5));
+            // A zero-initialized instance is the case where the two encoders can most easily drift:
+            // it stores a cached hash of 0 that no constructor produces, and anything mirroring the
+            // wire through GetHashCode() rather than the stored field writes bytes the formatter
+            // does not. Both ranks are covered because both carry that cache.
             AssertServedAndIdentical(default(FastVector2Int));
+            AssertServedAndIdentical(default(FastVector3Int));
+            AssertServedAndIdentical(new FastVector2Int(0, 0));
+            AssertServedAndIdentical(new FastVector3Int(0, 0, 0));
         }
 
         [Test]

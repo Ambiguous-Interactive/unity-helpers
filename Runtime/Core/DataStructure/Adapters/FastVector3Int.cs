@@ -69,6 +69,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static readonly int OriginHash = Objects.HashCode(0, 0, 0);
 
         /// <summary>
+        /// See <c>FastVector2Int.SerializedHash</c>: the stored hash, not <see cref="GetHashCode"/>.
+        /// </summary>
+        internal int SerializedHash => _hash;
+
+        /// <summary>
         /// Initializes a fast vector with explicit components and a cached hash.
         /// </summary>
         /// <param name="x">The X component.</param>

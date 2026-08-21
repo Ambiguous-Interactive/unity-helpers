@@ -406,6 +406,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         // Mirrors FastVector2Int's serialized cached hash (ProtoMember 3) for wire parity; the value
         // is recomputed by the FastVector2Int constructor on conversion, so it is not trusted on read.
+        // It reads the STORED hash, not GetHashCode(): those differ for a zero-initialized instance,
+        // and taking the observable one made this oracle write six bytes where the formatter wrote none.
         [ProtoMember(3)]
         [WProtoMember(3)]
         public int hash;
@@ -415,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 x = v.x,
                 y = v.y,
-                hash = v.GetHashCode(),
+                hash = v.SerializedHash,
             };
 
         public static implicit operator FastVector2Int(FastVector2IntSurrogate s) => new(s.x, s.y);
@@ -448,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 x = v.x,
                 y = v.y,
-                hash = v.GetHashCode(),
+                hash = v.SerializedHash,
                 z = v.z,
             };
 

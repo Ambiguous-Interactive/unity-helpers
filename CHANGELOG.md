@@ -106,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix protobuf-net writing a different payload than WallstopProto for a zero-initialized `FastVector2Int` or `FastVector3Int`. The surrogate mirrored the cached hash through `GetHashCode()` rather than the stored field, so the two encoders disagreed on the origin ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - Fix `default(FastVector2Int)` and `default(FastVector3Int)` comparing unequal to the origin they describe. An array element, an unset field or a dictionary miss did not match `new FastVector2Int(0, 0)`, so a set held the origin cell twice. Wire format is unchanged ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - Fix `default(CacheStatistics)` and `default(PoolStatistics)` comparing unequal to an all-zero snapshot, for the same reason ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - Fix `PoolStatistics` hashing the three rates it compares with a tolerance, so two snapshots that were equal could hash differently and a set held both ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).

@@ -74,6 +74,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static readonly int OriginHash = Objects.HashCode(0, 0);
 
         /// <summary>
+        /// The cached hash exactly as it is stored and written to the wire, which is deliberately
+        /// NOT <see cref="GetHashCode"/>: a zero-initialized instance stores 0 and reports the
+        /// origin's hash. Anything mirroring the serialized form has to read this, or it writes
+        /// bytes that disagree with what the formatter writes for <c>default</c>.
+        /// </summary>
+        internal int SerializedHash => _hash;
+
+        /// <summary>
         /// Initializes a new fast vector with integer components and a cached hash.
         /// </summary>
         /// <param name="x">The X component.</param>
