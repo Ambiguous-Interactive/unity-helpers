@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ATakenItemIsCountedInFlightAndPooledAgainOnRelease()
         {
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> destroyed);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed);
 
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
             Assert.AreEqual(1, pool.InFlightCount);
@@ -57,21 +57,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             // The defect this type exists for: teardown that only reaches what is IN the pool leaves
             // the checked-out item standing with whatever is driving it still running.
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> destroyed);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed);
             Assert.IsTrue(pool.TryTake(out Texture2D inFlight));
             Assert.IsTrue(pool.TryTake(out Texture2D pooled));
             Assert.IsTrue(pool.Release(pooled));
 
-            // Identity by instance id, captured while both are alive: two destroyed Unity objects
-            // compare equal to each other through the engine's null-faking operator.
-            int inFlightId = inFlight.GetInstanceID();
-            int pooledId = pooled.GetInstanceID();
+            // Identity by name, read while both are alive: two destroyed Unity objects compare
+            // equal to each other through the engine's null-faking operator, so the reference is no
+            // use afterwards. A name rather than an instance id because GetInstanceID is obsolete
+            // from Unity 6000.5 and its replacement does not exist on 2021.3.
+            string inFlightName = inFlight.name;
+            string pooledName = pooled.name;
 
             pool.Dispose();
 
             Assert.AreEqual(2, destroyed.Count);
-            CollectionAssert.Contains(destroyed, inFlightId);
-            CollectionAssert.Contains(destroyed, pooledId);
+            CollectionAssert.Contains(destroyed, inFlightName);
+            CollectionAssert.Contains(destroyed, pooledName);
             Assert.AreEqual(0, pool.InFlightCount);
             Assert.AreEqual(0, pool.IdleCount);
         }
@@ -81,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             // A destroyed item's own ending calls Release. Dispose drains before destroying, so the
             // entry is gone by the time that callback runs and the release finds nothing.
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> destroyed);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
 
             pool.Dispose();
@@ -95,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             // The line that leaks if it is guarded: the entry is Unity-null but it is still the entry,
             // and a release that returns early on it leaves one dead reference behind per use.
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> _);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> _);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
 
             Object.DestroyImmediate(taken); // UNH-SUPPRESS: destroying mid-flight is the subject
@@ -109,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void AnItemDestroyedWhilePooledIsNeverHandedOut()
         {
             // What a scene unload does: it takes the objects and leaves the pool holding them.
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> _);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> _);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
             Assert.IsTrue(pool.Release(taken));
 
@@ -123,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ReleasingSomethingThisPoolNeverHandedOutIsRefused()
         {
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> _);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> _);
             Texture2D stranger = NewTexture();
 
             Assert.IsFalse(pool.Release(stranger));
@@ -138,16 +140,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ItemsBeyondTheIdleLimitAreDestroyedRatherThanKept()
         {
-            TrackedObjectPool<Texture2D> pool = NewPool(out List<int> destroyed, maxIdle: 1);
+            TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed, maxIdle: 1);
 
             Assert.IsTrue(pool.TryTake(out Texture2D first));
             Assert.IsTrue(pool.TryTake(out Texture2D second));
-            int secondId = second.GetInstanceID();
+            string secondName = second.name;
             Assert.IsTrue(pool.Release(first));
             Assert.IsTrue(pool.Release(second));
 
             Assert.AreEqual(1, pool.IdleCount);
-            CollectionAssert.AreEqual(new[] { secondId }, destroyed);
+            CollectionAssert.AreEqual(new[] { secondName }, destroyed);
         }
 
         [Test]
@@ -182,15 +184,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsFalse(pool.TryTake(out Texture2D _));
         }
 
-        private TrackedObjectPool<Texture2D> NewPool(out List<int> destroyed, int maxIdle = 0)
+        private TrackedObjectPool<Texture2D> NewPool(out List<string> destroyed, int maxIdle = 0)
         {
-            List<int> destroyedIds = new();
-            destroyed = destroyedIds;
+            List<string> destroyedNames = new();
+            destroyed = destroyedNames;
             return new TrackedObjectPool<Texture2D>(
                 producer: NewTexture,
                 onDestroy: texture =>
                 {
-                    destroyedIds.Add(texture.GetInstanceID());
+                    destroyedNames.Add(texture.name);
                     Object.DestroyImmediate(texture); // UNH-SUPPRESS: the pool's own teardown hook
                 },
                 maxIdleCount: maxIdle
@@ -200,6 +202,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private Texture2D NewTexture()
         {
             Texture2D texture = new(1, 1);
+            // A distinct name per instance: it is the only identity that can be read before
+            // destruction and compared after it.
+            texture.name = "TrackedObjectPoolProbe" + _created.Count;
             _created.Add(texture);
             return texture;
         }

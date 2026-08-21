@@ -304,7 +304,9 @@ Four constraints. The first two were recorded backwards before being measured on
   string first.
 
 This is a fast inner loop (a 250-case fixture ran in 1.5 s), not a substitute for CI: it is one
-editor version, EditMode only, on Mono, with teardown assertions skipped. `[UnityTest]` coroutines
+editor version, EditMode only, on Mono, with teardown assertions skipped. **One editor version means
+an API this one still likes.** `Object.GetInstanceID()` compiles here on `6000.4.6f1` and is `CS0619`
+on `6000.5.2f1`, where CI treats it as an error -- so a green MCP run reddened all four playmode legs. `[UnityTest]` coroutines
 and anything needing PlayMode still belong to the Docker legs and to CI.
 
 ## Limitations
