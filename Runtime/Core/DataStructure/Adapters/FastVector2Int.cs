@@ -66,6 +66,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         // an instance indistinguishable from new FastVector2Int(0, 0), which is what its components
         // claim it is. A non-origin cell whose hash happens to be 0 merely collides with the origin,
         // and Equals settles that the same way it settles every other collision.
+        //
+        // The obvious alternative -- store the hash biased by this constant, so 0 already means the
+        // origin and no branch is needed -- is rejected because _hash is [ProtoMember(3)]. Biasing
+        // changes what a payload carries, so every value already persisted by a shipped build would
+        // read back with the wrong hash. This costs one compare and keeps that data readable.
         private static readonly int OriginHash = Objects.HashCode(0, 0);
 
         /// <summary>
