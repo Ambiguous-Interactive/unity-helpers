@@ -570,6 +570,63 @@ Diagrams:
             └────────────────────────────────┘
 ```
 
+<a id="ui-toolkit-extensions"></a>
+
+## UI Toolkit Extensions
+
+`VisualElementExtensions` answers two questions UI Toolkit leaves to the caller.
+
+### Is this element actually drawn?
+
+```csharp
+if (!menuRoot.IsShown())
+{
+    return;
+}
+```
+
+`IsShown()` walks to the root, because `display: None` removes a whole subtree: an element with its
+own `DisplayStyle.Flex` under a hidden ancestor is not drawn, and asking only the element answers
+`true`. It walks `element.hierarchy.parent` rather than `element.parent`, because the second one is
+the _logical_ tree. Measured on Unity `6000.4.6f1`, a child added to a `ScrollView` is three links
+from it in the hierarchy and one link from it logically -- and `display` applies down the hierarchy,
+so the logical walk skips containers that can hide the child.
+
+`IsShown()` reads the inline style the caller assigned, which is immediate. `IsShownResolved()`
+reads `resolvedStyle`, which takes USS into account but is produced by the panel's style pass. Both
+walk to the root: `resolvedStyle.display` is **not** inherited, so hiding an ancestor leaves every
+descendant still reporting `Flex`.
+
+### Where is keyboard focus, and did my `Focus()` do anything?
+
+```csharp
+if (!closeButton.TryFocus())
+{
+    // Focus() would have returned silently here.
+}
+
+VisualElement focused = panelRoot.FocusedElement();
+bool mine = focused.IsWithin(panelRoot);
+```
+
+`Focus()` reports nothing: called on an element with no focus controller -- one detached from a
+panel, or one that is not focusable -- it returns having done nothing. `TryFocus()` asks the panel
+afterwards and returns the answer. A descendant counts, because `delegatesFocus` makes a container
+hand focus to a child.
+
+`IsWithin()` exists because Unity's own `VisualElement.Contains` is **strict**: measured,
+`element.Contains(element)` is `false`. The question "is the focused element one of mine" has to
+answer yes when the focused element _is_ the one you own, so use `IsWithin` for that and `Contains`
+when you specifically want strict descent.
+
+| Method                      | Answers                                                              |
+| --------------------------- | -------------------------------------------------------------------- |
+| `element.IsShown()`         | Nothing on the hierarchy chain has an inline `display: None`         |
+| `element.IsShownResolved()` | The same, through `resolvedStyle` (USS included, needs a style pass) |
+| `element.IsWithin(scope)`   | `element` is `scope` or sits beneath it                              |
+| `element.FocusedElement()`  | The panel's focused element, or `null` off-panel                     |
+| `element.TryFocus()`        | Focus was requested **and** landed on it or inside it                |
+
 <a id="color-utilities"></a>
 
 ## Color Utilities

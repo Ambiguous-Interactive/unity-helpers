@@ -1099,9 +1099,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Converts a BoundsInt to a 2D Rect using X/Y and size.
         /// </summary>
-        public static Rect AsRect(this BoundsInt bounds)
+        public static Rect AsRect(this in BoundsInt bounds)
         {
-            return new Rect(bounds.x, bounds.y, bounds.size.x, bounds.size.y);
+            BoundsInt self = bounds;
+            Vector3Int size = self.size;
+            return new Rect(self.x, self.y, size.x, size.y);
         }
 
         // The sampled offset is exact in double, but `center + offset` rounds to float, and the
@@ -1502,7 +1504,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// otherwise pass NaN straight through into every channel. The channels are treated as normalized
         /// [0, 1] values, so an HDR channel above 1 is pulled *down* by a positive factor.
         /// </remarks>
-        public static Color ChangeColorBrightness(this Color color, float correctionFactor)
+        public static Color ChangeColorBrightness(this in Color color, float correctionFactor)
         {
             if (float.IsNaN(correctionFactor))
             {

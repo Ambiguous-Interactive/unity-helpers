@@ -28,13 +28,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Z dimension remains unchanged.
         /// Edge Cases: Negative padding shrinks the bounds. Size increases by 2*padding in each direction.
         /// </remarks>
-        public static BoundsInt WithPadding(this BoundsInt bounds, int xPadding, int yPadding)
+        public static BoundsInt WithPadding(this in BoundsInt bounds, int xPadding, int yPadding)
         {
-            Vector3Int size = bounds.size;
+            BoundsInt self = bounds;
+            Vector3Int size = self.size;
             return new BoundsInt(
-                bounds.xMin - xPadding,
-                bounds.yMin - yPadding,
-                bounds.zMin,
+                self.xMin - xPadding,
+                self.yMin - yPadding,
+                self.zMin,
                 size.x + 2 * xPadding,
                 size.y + 2 * yPadding,
                 size.z
@@ -87,13 +88,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Iteration order is X (innermost), then Y, then Z (outermost).
         /// </remarks>
         public static List<FastVector3Int> AllFastPositionsWithin(
-            this BoundsInt bounds,
+            this in BoundsInt bounds,
             List<FastVector3Int> buffer
         )
         {
             buffer.Clear();
-            Vector3Int min = bounds.min;
-            Vector3Int max = bounds.max;
+            BoundsInt self = bounds;
+            Vector3Int min = self.min;
+            Vector3Int max = self.max;
             for (int x = min.x; x < max.x; ++x)
             {
                 for (int y = min.y; y < max.y; ++y)
@@ -123,9 +125,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Uses half-open interval [min, max) for containment test.
         /// Edge Cases: Points on the max boundary are NOT contained.
         /// </remarks>
-        public static bool Contains(this BoundsInt bounds, FastVector3Int position)
+        public static bool Contains(this in BoundsInt bounds, FastVector3Int position)
         {
-            return bounds.Contains(position);
+            BoundsInt self = bounds;
+            return self.Contains(position);
         }
 
         /// <summary>

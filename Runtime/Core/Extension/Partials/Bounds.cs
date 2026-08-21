@@ -22,14 +22,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return gameObject.transform.position;
         }
 
-        public static Bounds Bounds(this Rect rect)
+        public static Bounds Bounds(this in Rect rect)
         {
-            return new Bounds(rect.center, rect.size);
+            Rect self = rect;
+            return new Bounds(self.center, self.size);
         }
 
-        public static Rect Rect(this Bounds bounds)
+        public static Rect Rect(this in Bounds bounds)
         {
-            return new Rect(bounds.center - bounds.extents, bounds.size);
+            Bounds self = bounds;
+            return new Rect(self.center - self.extents, self.size);
         }
 
         public static Rect GetWorldRect(this RectTransform transform)
@@ -79,14 +81,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return new Bounds(camera.transform.position, size);
         }
 
-        public static BoundsInt ExpandBounds(this BoundsInt source, BoundsInt other)
+        public static BoundsInt ExpandBounds(this in BoundsInt source, BoundsInt other)
         {
-            int xMin = Math.Min(source.xMin, other.xMin);
-            int xMax = Math.Max(source.xMax, other.xMax);
-            int yMin = Math.Min(source.yMin, other.yMin);
-            int yMax = Math.Max(source.yMax, other.yMax);
-            int zMin = Math.Min(source.zMin, other.zMin);
-            int zMax = Math.Max(source.zMax, other.zMax);
+            BoundsInt self = source;
+            int xMin = Math.Min(self.xMin, other.xMin);
+            int xMax = Math.Max(self.xMax, other.xMax);
+            int yMin = Math.Min(self.yMin, other.yMin);
+            int yMax = Math.Max(self.yMax, other.yMax);
+            int zMin = Math.Min(self.zMin, other.zMin);
+            int zMax = Math.Max(self.zMax, other.zMax);
             return new BoundsInt(xMin, yMin, zMin, xMax - xMin, yMax - yMin, zMax - zMin);
         }
 

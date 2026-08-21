@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <see cref="ColorQuantization.ToByte(float)"/>, so the result matches Unity's own
         /// <see cref="ColorUtility.ToHtmlStringRGBA(Color)"/> and the <see cref="Color32"/> the same color casts to.
         /// </remarks>
-        public static string ToHex(this Color color, bool includeAlpha = true)
+        public static string ToHex(this in Color color, bool includeAlpha = true)
         {
             byte r = ColorQuantization.ToByte(color.r);
             byte g = ColorQuantization.ToByte(color.g);
@@ -967,7 +967,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// rather than complementary - dark grays become cyan-ish, light grays become yellow.
         /// </remarks>
         public static Color GetComplement(
-            this Color source,
+            this in Color source,
             IRandom random = null,
             float variance = 0f
         )

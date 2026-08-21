@@ -9,10 +9,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class UnityExtensions
     {
-        public static bool FastIntersects(this Bounds bounds, Bounds other)
+        /*
+            Every `Bounds` / `BoundsInt` receiver below is taken by `in`, and every body that reads
+            more than one member of it opens with a single explicit local copy.
+
+            Both halves are load-bearing. By-value receivers copy 24 bytes at EVERY call site, which
+            `ErrorProne.NET.Structs` reports as `EPS06` in a consumer's build -- a warning the
+            consumer cannot fix without abandoning extension syntax (#512). `in` removes it there.
+            But Unity's `Bounds` is not a `readonly struct` and exposes no fields, so each property
+            read through an `in` parameter takes its OWN defensive copy: measured on the shipped
+            analyzer, marking `FastIntersects2D` `in` alone removed 18 call-site copies and added 4
+            defensive ones inside. One local copy is the minimum a property-only struct can be read
+            through, so these bodies pay exactly what by-value paid, at one site instead of N.
+        */
+        public static bool FastIntersects(this in Bounds bounds, Bounds other)
         {
+            Bounds self = bounds;
             // Degenerate bounds (zero volume) do not intersect
-            Vector3 sizeA = bounds.size;
+            Vector3 sizeA = self.size;
             Vector3 sizeB = other.size;
             if (
                 sizeA.x <= 0f
@@ -25,14 +39,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 return false;
             }
-            Vector3 boundsMin = bounds.min;
+            Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
             if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y || otherMax.z < boundsMin.z)
             {
                 return false;
             }
 
-            Vector3 boundsMax = bounds.max;
+            Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
             return boundsMax.x >= otherMin.x
                 && boundsMax.y >= otherMin.y
@@ -53,12 +67,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Uses half-open interval [min, max) for containment test.
         /// Edge Cases: Point on max boundary is NOT contained. Z coordinate is ignored.
         /// </remarks>
-        public static bool FastContains2D(this BoundsInt bounds, FastVector3Int position)
+        public static bool FastContains2D(this in BoundsInt bounds, FastVector3Int position)
         {
-            return position.x >= bounds.xMin
-                && position.y >= bounds.yMin
-                && position.x < bounds.xMax
-                && position.y < bounds.yMax;
+            BoundsInt self = bounds;
+            return position.x >= self.xMin
+                && position.y >= self.yMin
+                && position.x < self.xMax
+                && position.y < self.yMax;
         }
 
         /// <summary>
@@ -76,20 +91,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Edge Cases: Zero-size bounds (size <= 0 in X or Y) cannot intersect and return false.
         /// Bounds that touch at an edge are considered intersecting (inclusive). Z axis is ignored.
         /// </remarks>
-        public static bool FastIntersects2D(this BoundsInt bounds, BoundsInt other)
+        public static bool FastIntersects2D(this in BoundsInt bounds, BoundsInt other)
         {
+            BoundsInt self = bounds;
+            Vector3Int selfSize = self.size;
+            Vector3Int otherSize = other.size;
             // Zero-size bounds cannot intersect
-            if (bounds.size.x <= 0 || bounds.size.y <= 0 || other.size.x <= 0 || other.size.y <= 0)
+            if (selfSize.x <= 0 || selfSize.y <= 0 || otherSize.x <= 0 || otherSize.y <= 0)
             {
                 return false;
             }
 
-            if (other.xMax < bounds.xMin || other.yMax < bounds.yMin)
+            if (other.xMax < self.xMin || other.yMax < self.yMin)
             {
                 return false;
             }
 
-            return bounds.xMax >= other.xMin && bounds.yMax >= other.yMin;
+            return self.xMax >= other.xMin && self.yMax >= other.yMin;
         }
 
         /// <summary>
@@ -106,14 +124,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Uses closed interval [min, max] for containment test (unlike BoundsInt).
         /// Edge Cases: Points on the boundary ARE contained. Z coordinate is ignored.
         /// </remarks>
-        public static bool FastContains2D(this Bounds bounds, Vector2 position)
+        public static bool FastContains2D(this in Bounds bounds, Vector2 position)
         {
-            Vector3 min = bounds.min;
-            if (position.x < min.x || position.y < bounds.min.y)
+            Bounds self = bounds;
+            Vector3 min = self.min;
+            if (position.x < min.x || position.y < min.y)
             {
                 return false;
             }
-            Vector3 max = bounds.max;
+            Vector3 max = self.max;
             return position.x <= max.x && position.y <= max.y;
         }
 
@@ -132,16 +151,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Edge Cases: If other touches the boundary of bounds, it's still considered contained.
         /// Z axis is ignored.
         /// </remarks>
-        public static bool FastContains2D(this Bounds bounds, Bounds other)
+        public static bool FastContains2D(this in Bounds bounds, Bounds other)
         {
-            Vector3 boundsMin = bounds.min;
+            Bounds self = bounds;
+            Vector3 boundsMin = self.min;
             Vector3 otherMin = other.min;
             if (otherMin.x < boundsMin.x || otherMin.y < boundsMin.y)
             {
                 return false;
             }
 
-            Vector3 boundsMax = bounds.max;
+            Vector3 boundsMax = self.max;
             Vector3 otherMax = other.max;
             return otherMax.x <= boundsMax.x && otherMax.y <= boundsMax.y;
         }
@@ -160,16 +180,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Uses Bounds min/max properties.
         /// Edge Cases: Bounds that touch at edges are considered intersecting (inclusive). Z axis is ignored.
         /// </remarks>
-        public static bool FastIntersects2D(this Bounds bounds, Bounds other)
+        public static bool FastIntersects2D(this in Bounds bounds, Bounds other)
         {
-            Vector3 boundsMin = bounds.min;
+            Bounds self = bounds;
+            Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
             if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y)
             {
                 return false;
             }
 
-            Vector3 boundsMax = bounds.max;
+            Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
             return boundsMax.x >= otherMin.x && boundsMax.y >= otherMin.y;
         }
@@ -188,16 +209,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Unity Behavior: Uses Bounds min/max properties. Identical to FastIntersects2D.
         /// Edge Cases: Bounds that touch but don't overlap return false. Z axis is ignored.
         /// </remarks>
-        public static bool Overlaps2D(this Bounds bounds, Bounds other)
+        public static bool Overlaps2D(this in Bounds bounds, Bounds other)
         {
-            Vector3 boundsMin = bounds.min;
+            Bounds self = bounds;
+            Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
             if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y)
             {
                 return false;
             }
 
-            Vector3 boundsMax = bounds.max;
+            Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
             return boundsMax.x >= otherMin.x && boundsMax.y >= otherMin.y;
         }
@@ -210,10 +232,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Fast 3D point containment with optional tolerance and half-open semantics [min, max).
         /// A point on the max face is NOT contained.
         /// </summary>
-        public static bool FastContains3D(this Bounds bounds, Vector3 p, float tolerance = 0f)
+        public static bool FastContains3D(this in Bounds bounds, Vector3 p, float tolerance = 0f)
         {
-            Vector3 min = bounds.min;
-            Vector3 max = bounds.max;
+            Bounds self = bounds;
+            Vector3 min = self.min;
+            Vector3 max = self.max;
             return p.x >= min.x - tolerance
                 && p.x < max.x + tolerance
                 && p.y >= min.y - tolerance
@@ -226,10 +249,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Fast 3D containment test (box in box) with optional tolerance and inclusive semantics on max faces.
         /// Returns true if 'other' is fully inside or touching 'bounds' (with tolerance).
         /// </summary>
-        public static bool FastContains3D(this Bounds bounds, Bounds other, float tolerance = 0f)
+        public static bool FastContains3D(this in Bounds bounds, Bounds other, float tolerance = 0f)
         {
-            Vector3 min = bounds.min;
-            Vector3 max = bounds.max;
+            Bounds self = bounds;
+            Vector3 min = self.min;
+            Vector3 max = self.max;
             Vector3 omin = other.min;
             Vector3 omax = other.max;
             if (
@@ -253,10 +277,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Fast 3D bounds intersection with optional tolerance.
         /// Touching at faces is considered intersection (inclusive at boundaries).
         /// </summary>
-        public static bool FastIntersects3D(this Bounds a, Bounds b, float tolerance = 0f)
+        public static bool FastIntersects3D(this in Bounds a, Bounds b, float tolerance = 0f)
         {
+            Bounds self = a;
             // Degenerate bounds (zero volume) do not intersect
-            Vector3 asize = a.size;
+            Vector3 asize = self.size;
             Vector3 bsize = b.size;
             if (
                 asize.x <= 0f
@@ -269,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 return false;
             }
-            Vector3 amin = a.min;
+            Vector3 amin = self.min;
             Vector3 bmax = b.max;
             if (
                 bmax.x < amin.x - tolerance
@@ -280,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            Vector3 amax = a.max;
+            Vector3 amax = self.max;
             Vector3 bmin = b.min;
             return amax.x + tolerance >= bmin.x
                 && amax.y + tolerance >= bmin.y
@@ -293,13 +318,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Equivalent to: other.min >= bounds.min and other.max < bounds.max (with tolerance).
         /// </summary>
         public static bool FastContainsHalfOpen3D(
-            this Bounds bounds,
+            this in Bounds bounds,
             Bounds other,
             float tolerance = 0f
         )
         {
-            Vector3 min = bounds.min;
-            Vector3 max = bounds.max;
+            Bounds self = bounds;
+            Vector3 min = self.min;
+            Vector3 max = self.max;
             Vector3 omin = other.min;
             Vector3 omax = other.max;
             if (

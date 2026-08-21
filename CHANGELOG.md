@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `VisualElement.IsShown()`, `IsShownResolved()`, `IsWithin()`, `FocusedElement()` and `TryFocus()`. `Focus()` is silent when it does nothing, and Unity's own `Contains` excludes the element itself, so "did focus move" and "is the focused element mine" both had to be written by hand. See [UI Toolkit Extensions](./docs/features/utilities/math-and-extensions.md#ui-toolkit-extensions) ([#513](https://github.com/Ambiguous-Interactive/unity-helpers/issues/513)).
 - Add `Xoshiro128StarStar` and `Xoshiro256StarStar`, the first generators here whose every output bit is strong enough for `NextBool` and power-of-two masks. `Xoshiro256StarStar` also answers `NextUlong` in one state advance instead of two. See [Random Generators](./docs/features/utilities/random-generators.md) ([#510](https://github.com/Ambiguous-Interactive/unity-helpers/issues/510), [#285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/285)).
 - Add release notes to the Unity Package Manager: the package now carries its changelog section and a Changelog link, so Version History shows what changed instead of nothing ([#421](https://github.com/Ambiguous-Interactive/unity-helpers/issues/421)).
 - Add AOT protobuf support for `ValueTuple`: `Serializer.ProtoSerialize((7, 1.5f))` threw `ExecutionEngineException` on an IL2CPP player and now goes through a generated formatter. JSON of a tuple stays editor-only. Define `WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION` to opt out. See [Tuples serialize on IL2CPP](./docs/features/serialization/serialization-types.md#tuples-serialize-on-il2cpp) ([#289](https://github.com/Ambiguous-Interactive/unity-helpers/issues/289)).
@@ -84,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Take every `Bounds`, `BoundsInt`, `Rect` and `Color` extension receiver by `in`. Calling one no longer copies the struct at your call site, which `ErrorProne.NET.Structs` reported as an `EPS06` warning you could not fix without giving up extension syntax ([#512](https://github.com/Ambiguous-Interactive/unity-helpers/issues/512)).
+- Make `PooledArray<T>` and `PooledResource<T>` `readonly struct`, so reading `array`, `length` or `resource` and calling `Dispose()` no longer copies the wrapper first ([#512](https://github.com/Ambiguous-Interactive/unity-helpers/issues/512)).
 - Lower `XoroShiroRandom` to `Fair` and `RomuDuo` to `Good`. Bit 0 of `XoroShiroRandom` follows a linear recurrence of order 128, so its `NextBool()` is predictable from 128 draws; prefer `Xoshiro128StarStar` where single bits matter ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509), [#286](https://github.com/Ambiguous-Interactive/unity-helpers/issues/286)).
 - Lower `SquirrelRandom` to `Fair`. It fails PractRand at 1GB, reproducibly across four seeds; it stays a good fit for the table lookups it was designed for ([#286](https://github.com/Ambiguous-Interactive/unity-helpers/issues/286)).
 - Read cancellation-aware JSON files through a pooled scratch buffer and deserialize the pooled stream's valid segment directly. Large save files no longer allocate an extra full-payload copy before decoding ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).

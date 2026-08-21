@@ -517,9 +517,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="bounds">The bounding rectangle</param>
         /// <param name="point">The point to clamp</param>
         /// <returns>The clamped point within the rectangle</returns>
-        public static Vector2 Clamp(this Rect bounds, Vector2 point)
+        public static Vector2 Clamp(this in Rect bounds, Vector2 point)
         {
-            return bounds.Clamp(ref point);
+            // Called as a plain static rather than through extension syntax: the receiver is already
+            // a reference here, and extension syntax would report a copy that the `in` overload does
+            // not make.
+            return Clamp(in bounds, ref point);
         }
 
         /// <summary>
@@ -530,13 +533,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="bounds">The bounding rectangle</param>
         /// <param name="point">The point to clamp (modified in place)</param>
         /// <returns>The clamped point within the rectangle</returns>
-        public static Vector2 Clamp(this Rect bounds, ref Vector2 point)
+        public static Vector2 Clamp(this in Rect bounds, ref Vector2 point)
         {
+            Rect self = bounds;
             // Compute normalized axis-aligned bounds regardless of sign of width/height
-            float x0 = Mathf.Min(bounds.xMin, bounds.xMax);
-            float x1 = Mathf.Max(bounds.xMin, bounds.xMax);
-            float y0 = Mathf.Min(bounds.yMin, bounds.yMax);
-            float y1 = Mathf.Max(bounds.yMin, bounds.yMax);
+            float x0 = Mathf.Min(self.xMin, self.xMax);
+            float x1 = Mathf.Max(self.xMin, self.xMax);
+            float y0 = Mathf.Min(self.yMin, self.yMax);
+            float y1 = Mathf.Max(self.yMin, self.yMax);
 
             // If degenerate (zero area), clamp to the center point
             if (Mathf.Approximately(x0, x1) && Mathf.Approximately(y0, y1))
@@ -553,14 +557,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             // so that tests using Rect.max/Rect.min pass even when width/height are negative.
             // If width is negative, Rect.max.x == bounds.x + bounds.width is the lesser x.
             // Ensure clamped x does not exceed this value.
-            if (bounds.width < 0f && cx > bounds.max.x)
+            Vector2 selfMax = self.max;
+            if (self.width < 0f && cx > selfMax.x)
             {
-                cx = bounds.max.x;
+                cx = selfMax.x;
             }
 
-            if (bounds.height < 0f && cy > bounds.max.y)
+            if (self.height < 0f && cy > selfMax.y)
             {
-                cy = bounds.max.y;
+                cy = selfMax.y;
             }
 
             point = new Vector2(cx, cy);
@@ -656,7 +661,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="includeAlpha">Whether to include the alpha channel in the comparison.</param>
         /// <returns>True if the colors are approximately equal within the provided settings.</returns>
         public static bool Approximately(
-            this Color lhs,
+            this in Color lhs,
             Color rhs,
             float tolerance = ColorQuantization.ChannelStep,
             float delta = 0f,

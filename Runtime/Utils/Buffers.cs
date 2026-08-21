@@ -3260,7 +3260,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// }
     /// </code>
     /// </example>
-    public struct PooledArray<T> : IDisposable
+    public readonly struct PooledArray<T> : IDisposable
     {
         /// <summary>
         /// The underlying pooled array. May be larger than <see cref="length"/> when using
@@ -3578,7 +3578,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// This struct implements IDisposable to enable automatic resource return via 'using' statements.
     /// The resource is returned to its pool when Dispose is called, typically at the end of a 'using' block.
     /// </remarks>
-    public struct PooledResource<T> : IDisposable
+    public readonly struct PooledResource<T> : IDisposable
     {
         /// <summary>
         /// The pooled resource instance. Access this to use the resource.
