@@ -1,0 +1,146 @@
+{
+  "battery": {
+    "name": "PractRand",
+    "version": "0.95",
+    "archive": "PractRand-pre0.95.zip",
+    "url": "https://sourceforge.net/projects/pracrand/files/PractRand-pre0.95.zip/download",
+    "sha256": "5738c322ccb983b63fbe693f305afa2a7c73e64a80b303c9139278c453ce27b4",
+    "testCommand": "RNG_test stdin32 -tlmin 1KB -tlmax <budget> -multithreaded"
+  },
+  "measurement": {
+    "seed": "00010203-0405-0607-0809-0a0b0c0d0e0f",
+    "recorded": "2026-08-21",
+    "note": "Every outcome below was measured against PractRand 0.95 with the seed above. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault."
+  },
+  "generators": [
+    {
+      "name": "BlastCircuitRandom",
+      "quality": "Good",
+      "expected": "pass",
+      "reason": "Chaotic ARX mixer; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "DotNetRandom",
+      "quality": "Poor",
+      "expected": "fail",
+      "failsBy": null,
+      "reason": "Weak by rating, but not assertable as a control at any budget measured so far. It reflects into the host System.Random's internal state, so its stream is runtime-dependent by construction: the .NET 9 stream this host emits is not the Mono stream Unity ships. Measured clean through 16GB under .NET 9, so a pass is always reported as inconclusive rather than as a harness fault."
+    },
+    {
+      "name": "FlurryBurstRandom",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "Six-word ARX generator; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "IllusionFlow",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "Rotate/xor/add generator on a Weyl counter; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "LinearCongruentialGenerator",
+      "quality": "Poor",
+      "expected": "fail",
+      "failsBy": "4KB",
+      "firstFailingTest": "[Low8/32]FPF-14+6/16:all",
+      "reason": "Expected-failure control. Raw-state Numerical Recipes LCG: bit k has period 2^(k+1), so the low byte collapses almost immediately."
+    },
+    {
+      "name": "PcgRandom",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "PCG XSH RR 64/32; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "PhotonSpinRandom",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "SHISHUA-inspired generator; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "RomuDuo",
+      "quality": "Good",
+      "expected": "pass",
+      "reason": "ROMU multiplier with a modified duo update; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "SplitMix64",
+      "quality": "VeryGood",
+      "expected": "pass",
+      "reason": "SplitMix64 mixer; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "SquirrelRandom",
+      "quality": "Fair",
+      "expected": "fail",
+      "failsBy": "1GB",
+      "firstFailingTest": "FPF-14+6/16:all",
+      "reason": "Expected-failure control at 1GB and above. The Squirrel3 hash shows a reproducible FPF-14+6/16 deficiency at exactly 1GB across four independent seeds, matching its 'not extensively tested beyond moderate ranges' rating. Good enough for table lookups, not for a statistical battery."
+    },
+    {
+      "name": "StormDropRandom",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "Large-state ARX generator over a 1024-word ring; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "SystemRandom",
+      "quality": "Poor",
+      "expected": "fail",
+      "failsBy": "8GB",
+      "firstFailingTest": "[Low8/32]BCFN(2+1,13-0,T)",
+      "reason": "Expected-failure control. Knuth subtractive lagged-Fibonacci; survives 4GB and fails the low-byte BCFN test at 8GB, so only budgets of 8GB or more discriminate it."
+    },
+    {
+      "name": "WaveSplatRandom",
+      "quality": "Experimental",
+      "expected": "fail",
+      "failsBy": "64KB",
+      "firstFailingTest": "BCFN(2+0,13-9,T)",
+      "reason": "Expected-failure control. Single-word chaotic generator with no formal test results; fails BCFN and DC6 within the first 64KB."
+    },
+    {
+      "name": "WDoomRandom",
+      "quality": "Poor",
+      "expected": "fail",
+      "failsBy": "2KB",
+      "firstFailingTest": "BCFN",
+      "reason": "Expected-failure control. A 256-entry lookup table with period 256; it is deterministic by design and not statistically random at all."
+    },
+    {
+      "name": "WyRandom",
+      "quality": "VeryGood",
+      "expected": "pass",
+      "reason": "Wyhash-based generator; clean through 1GB with no anomalies."
+    },
+    {
+      "name": "XoroShiroRandom",
+      "quality": "Fair",
+      "expected": "fail",
+      "failsBy": "16MB",
+      "firstFailingTest": "[Low1/32]BRank(12):256(1)",
+      "reason": "Expected-failure control. xoroshiro128+ low 32 bits are linear: bit 0 has linear complexity exactly 128, which the binary rank test detects overwhelmingly by 16MB."
+    },
+    {
+      "name": "XorShiftRandom",
+      "quality": "Fair",
+      "expected": "fail",
+      "failsBy": "64KB",
+      "firstFailingTest": "BRank(12):128(1)",
+      "reason": "Expected-failure control. Classic 32-bit xorshift is a pure GF(2) linear map, so the binary rank test collapses it inside 64KB."
+    },
+    {
+      "name": "Xoshiro128StarStar",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "xoshiro128** 1.1; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+    },
+    {
+      "name": "Xoshiro256StarStar",
+      "quality": "Excellent",
+      "expected": "pass",
+      "reason": "xoshiro256** 1.0; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+    }
+  ]
+}

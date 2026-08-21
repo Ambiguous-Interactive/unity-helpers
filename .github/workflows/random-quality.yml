@@ -1,0 +1,447 @@
+name: Random Quality
+
+# cspell:ignore pracrand tlmin tlmax practrand pthread
+
+# The external, long-running statistical complement to the deterministic
+# in-repo gates. PractRand runs for minutes per generator and its verdict is a
+# statistical judgement, so this workflow is deliberately scheduled and
+# dispatch-only and is NEVER a pull-request gate. The per-PR bit-plane
+# linearity check in Tests/Runtime/Random/GeneratorBitPlaneLinearityTests.cs
+# stays the fast deterministic guard; this one is the slow empirical one.
+#
+# Expected outcomes live in scripts/random-quality/expected-outcomes.json,
+# which also pins the battery version and archive checksum.
+
+on:
+  schedule:
+    # Saturday 03:43 UTC: off-peak and deliberately off-:00, and it collides
+    # with none of the repository's other schedules.
+    - cron: "43 3 * * 6"
+  workflow_dispatch:
+    inputs:
+      byte-budget:
+        description: "Bytes fed to PractRand per generator."
+        required: false
+        default: "8GB"
+        type: choice
+        options:
+          - "1GB"
+          - "2GB"
+          - "4GB"
+          - "8GB"
+          - "16GB"
+          - "32GB"
+      seed:
+        description: "Seed GUID. Empty = the manifest's recorded seed."
+        required: false
+        default: ""
+        type: string
+      generator:
+        description: "Run a single generator. Empty = the whole inventory."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  MANIFEST: scripts/random-quality/expected-outcomes.json
+
+jobs:
+  resolve:
+    name: Resolve inventory and inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      generators: ${{ steps.resolve.outputs.generators }}
+      budget: ${{ steps.resolve.outputs.budget }}
+      budget-bytes: ${{ steps.resolve.outputs.budget-bytes }}
+      seed: ${{ steps.resolve.outputs.seed }}
+      practrand-version: ${{ steps.resolve.outputs.practrand-version }}
+      practrand-url: ${{ steps.resolve.outputs.practrand-url }}
+      practrand-sha256: ${{ steps.resolve.outputs.practrand-sha256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.306"
+
+      - name: Publish the generator host
+        run: |
+          set -eu
+          dotnet publish \
+            "Generator~/WallstopStudios.UnityHelpers.RandomQuality/WallstopStudios.UnityHelpers.RandomQuality.csproj" \
+            -c Release --nologo -v quiet \
+            -o .artifacts/random-quality/host
+
+      - name: Resolve inventory and inputs
+        id: resolve
+        env:
+          INPUT_BUDGET: ${{ inputs.byte-budget }}
+          INPUT_SEED: ${{ inputs.seed }}
+          INPUT_GENERATOR: ${{ inputs.generator }}
+        run: |
+          set -eu
+          host=".artifacts/random-quality/host/WallstopStudios.UnityHelpers.RandomQuality.dll"
+
+          budget="${INPUT_BUDGET:-}"
+          if [ -z "${budget}" ]; then
+            budget="8GB"
+          fi
+          # An explicit case both converts the token and enforces the allowlist,
+          # so an unexpected dispatch value cannot reach the command line.
+          case "${budget}" in
+            1GB) budget_bytes=1073741824 ;;
+            2GB) budget_bytes=2147483648 ;;
+            4GB) budget_bytes=4294967296 ;;
+            8GB) budget_bytes=8589934592 ;;
+            16GB) budget_bytes=17179869184 ;;
+            32GB) budget_bytes=34359738368 ;;
+            *)
+              echo "::error::Unsupported byte budget '${budget}'."
+              exit 1
+              ;;
+          esac
+
+          seed="${INPUT_SEED:-}"
+          if [ -z "${seed}" ]; then
+            seed="$(jq -r '.measurement.seed' "${MANIFEST}")"
+          fi
+          if ! printf '%s' "${seed}" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "::error::Seed '${seed}' is not a GUID."
+            exit 1
+          fi
+
+          # The host's --list is the source of truth for the inventory. A
+          # generator added there but missing from the manifest would otherwise
+          # be tested against no expectation at all, so the drift is fatal here
+          # rather than silently tolerated.
+          dotnet "${host}" --list | sort > /tmp/inventory.txt
+          jq -r '.generators[].name' "${MANIFEST}" | sort > /tmp/expected.txt
+          if ! diff -u /tmp/expected.txt /tmp/inventory.txt; then
+            echo "::error::${MANIFEST} does not match the host inventory (--list). Update the manifest."
+            exit 1
+          fi
+
+          selected="$(dotnet "${host}" --list)"
+          if [ -n "${INPUT_GENERATOR:-}" ]; then
+            if ! printf '%s\n' "${selected}" | grep -F -x -q "${INPUT_GENERATOR}"; then
+              echo "::error::Unknown generator '${INPUT_GENERATOR}'. See --list."
+              exit 1
+            fi
+            selected="${INPUT_GENERATOR}"
+          fi
+          generators="$(printf '%s\n' "${selected}" | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+
+          {
+            echo "generators=${generators}"
+            echo "budget=${budget}"
+            echo "budget-bytes=${budget_bytes}"
+            echo "seed=${seed}"
+            echo "practrand-version=$(jq -r '.battery.version' "${MANIFEST}")"
+            echo "practrand-url=$(jq -r '.battery.url' "${MANIFEST}")"
+            echo "practrand-sha256=$(jq -r '.battery.sha256' "${MANIFEST}")"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload generator host
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: random-quality-host
+          path: .artifacts/random-quality/host
+          if-no-files-found: error
+          retention-days: 7
+
+  practrand:
+    name: Build PractRand ${{ needs.resolve.outputs.practrand-version }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # PractRand is not packaged for any distribution and has no git remote;
+      # upstream ships only a SourceForge archive. It is therefore pinned by
+      # archive URL plus a SHA-256 recorded in the manifest, so a mirror serving
+      # different or corrupted bytes fails the run instead of silently changing
+      # what "the battery" means.
+      - name: Restore cached PractRand build
+        id: cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: .artifacts/random-quality/practrand
+          key: practrand-${{ runner.os }}-${{ needs.resolve.outputs.practrand-sha256 }}
+
+      - name: Build PractRand from the pinned archive
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        env:
+          PRACTRAND_URL: ${{ needs.resolve.outputs.practrand-url }}
+          PRACTRAND_SHA256: ${{ needs.resolve.outputs.practrand-sha256 }}
+        run: |
+          set -eu
+          work="$(mktemp -d)"
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+            -o "${work}/practrand.zip" "${PRACTRAND_URL}"
+          echo "${PRACTRAND_SHA256}  ${work}/practrand.zip" > "${work}/practrand.sha256"
+          sha256sum -c "${work}/practrand.sha256"
+          mkdir -p "${work}/src-tree"
+          unzip -q "${work}/practrand.zip" -d "${work}/src-tree"
+          # Upstream ships no build system; this is the documented manual build.
+          # -O3 matters: the battery is CPU-bound and an unoptimized RNG_test
+          # roughly triples the wall clock of every leg below.
+          cd "${work}/src-tree"
+          g++ -c -std=c++14 -O3 -I include -pthread \
+            src/*.cpp src/RNGs/*.cpp src/RNGs/other/*.cpp
+          g++ -std=c++14 -O3 -I include -pthread \
+            -o RNG_test tools/RNG_test.cpp ./*.o
+          mkdir -p "${GITHUB_WORKSPACE}/.artifacts/random-quality/practrand"
+          cp RNG_test "${GITHUB_WORKSPACE}/.artifacts/random-quality/practrand/"
+
+      - name: Verify the pinned battery version
+        env:
+          EXPECTED_VERSION: ${{ needs.resolve.outputs.practrand-version }}
+        run: |
+          set -eu
+          binary=".artifacts/random-quality/practrand/RNG_test"
+          chmod +x "${binary}"
+          reported="$("${binary}" --version | head -n 1)"
+          echo "${reported}"
+          if ! printf '%s' "${reported}" | grep -F -q "${EXPECTED_VERSION}"; then
+            echo "::error::RNG_test reported '${reported}', which does not name the pinned version ${EXPECTED_VERSION}."
+            exit 1
+          fi
+
+      - name: Upload PractRand binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: random-quality-practrand
+          path: .artifacts/random-quality/practrand
+          if-no-files-found: error
+          retention-days: 7
+
+  battery:
+    name: ${{ matrix.generator }} (${{ needs.resolve.outputs.budget }})
+    needs:
+      - resolve
+      - practrand
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      # The inventory is 19 generators; capping parallelism keeps this workflow
+      # from monopolising the runner pool that the Unity workflows share.
+      max-parallel: 5
+      matrix:
+        generator: ${{ fromJSON(needs.resolve.outputs.generators) }}
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.306"
+
+      - name: Download generator host
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: random-quality-host
+          path: .artifacts/random-quality/host
+
+      - name: Download PractRand binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: random-quality-practrand
+          path: .artifacts/random-quality/practrand
+
+      - name: Run the battery
+        env:
+          GENERATOR: ${{ matrix.generator }}
+          SEED: ${{ needs.resolve.outputs.seed }}
+          BUDGET: ${{ needs.resolve.outputs.budget }}
+          BUDGET_BYTES: ${{ needs.resolve.outputs.budget-bytes }}
+          PRACTRAND_VERSION: ${{ needs.resolve.outputs.practrand-version }}
+        run: |
+          set -eu
+          reports=".artifacts/random-quality/reports"
+          mkdir -p "${reports}"
+          host=".artifacts/random-quality/host/WallstopStudios.UnityHelpers.RandomQuality.dll"
+          rng_test="${GITHUB_WORKSPACE}/.artifacts/random-quality/practrand/RNG_test"
+          chmod +x "${rng_test}"
+          report="${reports}/${GENERATOR}.txt"
+          command="RNG_test stdin32 -tlmin 1KB -tlmax ${BUDGET} -multithreaded"
+          started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Deliberately NO pipefail. RNG_test halts the moment it reaches a
+          # definitive FAIL, which SIGPIPEs the generator (exit 141). For the
+          # expected-failure controls that is the correct and expected shape of
+          # the run, not an error. The pipeline status is RNG_test's own, and
+          # RNG_test exits 0 whether or not it found a failure -- so the verdict
+          # comes from parsing the report, never from a status code.
+          status=0
+          dotnet "${host}" \
+            --generator "${GENERATOR}" \
+            --seed "${SEED}" \
+            --bytes "${BUDGET_BYTES}" \
+            | "${rng_test}" stdin32 -tlmin 1KB -tlmax "${BUDGET}" -multithreaded \
+            > "${report}" 2>&1 || status=$?
+
+          finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -n \
+            --arg generator "${GENERATOR}" \
+            --arg seed "${SEED}" \
+            --arg budget "${BUDGET}" \
+            --arg bytes "${BUDGET_BYTES}" \
+            --arg command "${command}" \
+            --arg battery "PractRand ${PRACTRAND_VERSION}" \
+            --arg started "${started}" \
+            --arg finished "${finished}" \
+            --arg status "${status}" \
+            '{generator: $generator, seed: $seed, budget: $budget, bytes: $bytes,
+              command: $command, battery: $battery, started: $started,
+              finished: $finished, batteryExitCode: $status}' \
+            > "${reports}/${GENERATOR}.command.json"
+
+          echo "::group::${GENERATOR} report"
+          cat "${report}"
+          echo "::endgroup::"
+
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::RNG_test exited ${status} for ${GENERATOR}; the report is incomplete."
+            exit "${status}"
+          fi
+
+      - name: Upload per-generator report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: random-quality-report-${{ matrix.generator }}
+          path: .artifacts/random-quality/reports
+          if-no-files-found: warn
+          retention-days: 90
+
+  evaluate:
+    name: Compare against expected outcomes
+    needs:
+      - resolve
+      - battery
+    # Runs even when some battery legs failed, so a partial matrix is still
+    # compared and a missing report is reported as a mismatch rather than a
+    # silent pass. It does NOT run when resolve failed, because without a
+    # resolved budget there is no verdict to draw.
+    if: ${{ !cancelled() && needs.resolve.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
+
+      - name: Download every report
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: random-quality-report-*
+          path: .artifacts/random-quality/reports
+          merge-multiple: true
+
+      - name: Compare outcomes against the manifest
+        id: compare
+        env:
+          BUDGET: ${{ needs.resolve.outputs.budget }}
+          SEED: ${{ needs.resolve.outputs.seed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          status=0
+          node scripts/random-quality/evaluate-outcomes.mjs \
+            --manifest "${MANIFEST}" \
+            --reports .artifacts/random-quality/reports \
+            --budget "${BUDGET}" \
+            --seed "${SEED}" \
+            --command "RNG_test stdin32 -tlmin 1KB -tlmax ${BUDGET} -multithreaded" \
+            --run-url "${RUN_URL}" \
+            --out-md .artifacts/random-quality/summary.md \
+            --out-json .artifacts/random-quality/summary.json || status=$?
+          cat .artifacts/random-quality/summary.md >> "${GITHUB_STEP_SUMMARY}"
+          echo "mismatched=$([ "${status}" -eq 0 ] && echo false || echo true)" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload the complete battery report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: random-quality-report
+          path: .artifacts/random-quality
+          if-no-files-found: warn
+          retention-days: 90
+
+      # Auto-issue opening and regression checks, per issue #286. One issue is
+      # reused across runs: a recurring mismatch adds a comment rather than
+      # opening a duplicate, and a run that recovers closes it.
+      - name: Open or update the mismatch issue
+        # Only when the comparison actually produced a verdict. A crashed
+        # comparison must not be read as "recovered" and close a live issue.
+        if: ${{ always() && steps.compare.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISMATCHED: ${{ steps.compare.outputs.mismatched }}
+          BUDGET: ${{ needs.resolve.outputs.budget }}
+          SEED: ${{ needs.resolve.outputs.seed }}
+          PRACTRAND_VERSION: ${{ needs.resolve.outputs.practrand-version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE_TITLE: "Random quality battery mismatch (PractRand)"
+        run: |
+          set -eu
+          existing="$(gh issue list --state open --search "in:title Random quality battery mismatch" \
+            --json number,title \
+            --jq "[.[] | select(.title == \"${ISSUE_TITLE}\") | .number] | first // empty")"
+
+          if [ "${MISMATCHED:-false}" != "true" ]; then
+            if [ -n "${existing}" ]; then
+              gh issue comment "${existing}" --body \
+                "Recovered: every generator matched ${MANIFEST} on a ${BUDGET} run against PractRand ${PRACTRAND_VERSION} with seed \`${SEED}\`. ${RUN_URL}"
+              gh issue close "${existing}"
+            fi
+            echo "No mismatches; nothing to report."
+            exit 0
+          fi
+
+          body="$(mktemp)"
+          {
+            echo "A scheduled PractRand run disagreed with \`${MANIFEST}\`."
+            echo
+            echo "- Battery: **PractRand ${PRACTRAND_VERSION}**"
+            echo "- Seed: \`${SEED}\`"
+            echo "- Byte budget per generator: **${BUDGET}**"
+            echo "- Run: ${RUN_URL}"
+            echo
+            echo "A generator expected to PASS that failed is a statistical regression."
+            echo "A deliberate expected-failure control that PASSED is evidence the harness is broken."
+            echo
+            cat .artifacts/random-quality/summary.md
+          } > "${body}"
+
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body-file "${body}"
+            echo "Updated issue #${existing}."
+          else
+            gh issue create --title "${ISSUE_TITLE}" --label bug --body-file "${body}"
+          fi
+
+      - name: Fail the run on a mismatch
+        if: ${{ steps.compare.outputs.mismatched == 'true' }}
+        run: |
+          echo "::error::PractRand outcomes disagreed with ${MANIFEST}."
+          exit 1

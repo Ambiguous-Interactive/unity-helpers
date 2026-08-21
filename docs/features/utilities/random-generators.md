@@ -77,14 +77,14 @@ All generators implement the `IRandom` interface:
 | `PcgRandom`                   | Fast            | Excellent    | General purpose, seeded generation                            |
 | `FlurryBurstRandom`           | Fast            | Excellent    | All-around alternative to PCG                                 |
 | `IllusionFlow`                | Fast            | Excellent    | Balanced speed and quality                                    |
-| `XoroShiroRandom`             | Fast            | Good         | Bulk placement, noise seeding                                 |
-| `RomuDuo`                     | Fast            | Very Good    | Alternative to PCG                                            |
+| `XoroShiroRandom`             | Fast            | Fair         | Bulk placement; bit 0 is linear, so avoid `NextBool`          |
+| `RomuDuo`                     | Fast            | Good         | Alternative to PCG                                            |
 | `Xoshiro128StarStar`          | Not benchmarked | Excellent    | `NextBool`/low-bit masks; WebGL and other 32-bit targets      |
 | `Xoshiro256StarStar`          | Not benchmarked | Excellent    | `NextDouble`/`NextUlong`-heavy work (one advance per 64 bits) |
 | `StormDropRandom`             | Moderate        | Excellent    | Long streams from a large 1024-word state                     |
 | `XorShiftRandom`              | Moderate        | Fair         | Legacy compatibility                                          |
 | `WyRandom`                    | Moderate        | Very Good    | Hash-based scenarios                                          |
-| `SquirrelRandom`              | Moderate        | Good         | Noise-based generation                                        |
+| `SquirrelRandom`              | Moderate        | Fair         | Noise-based generation                                        |
 | `PhotonSpinRandom`            | Slow            | Excellent    | Maximum quality needed                                        |
 | `UnityRandom`                 | Slow            | Fair         | Match Unity behavior                                          |
 | `SystemRandom`                | Very Slow       | Poor         | .NET compatibility                                            |

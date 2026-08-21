@@ -874,7 +874,11 @@
         "texel",
         "devirtualize",
         "pessimization",
-        "Hankel"
+        "Hankel",
+        "tlmin",
+        "tlmax",
+        "FPF",
+        "BCFN"
       ]
     }
   ],

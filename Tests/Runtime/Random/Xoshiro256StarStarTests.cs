@@ -52,26 +52,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
-        public void NextUlongCostsOneStateAdvanceRatherThanTwo()
+        public void EveryDrawCostsExactlyOneStateAdvance()
         {
-            // The inherited AbstractRandom.NextUlong composes two NextUint calls. This generator
-            // overrides it, so a single NextUlong must consume exactly one advance -- which is
-            // observable as the state matching a peer that took one NextUint.
-            Xoshiro256StarStar viaUlong = new(Seed0, Seed1, Seed2, Seed3);
-            Xoshiro256StarStar viaUint = new(Seed0, Seed1, Seed2, Seed3);
+            // The inherited AbstractRandom.NextUlong composes two NextUint calls, so a 64-bit draw
+            // would cost two advances. This generator overrides it. Comparing a NextUint against
+            // NextUlong would only restate how NextUint is written, so both widths are measured
+            // against the published stream instead: three 32-bit draws then a 64-bit one must land on
+            // the fourth word, which holds only if each draw advanced the state exactly once.
+            Xoshiro256StarStar random = new(Seed0, Seed1, Seed2, Seed3);
 
-            ulong full = viaUlong.NextUlong();
-            uint upper = viaUint.NextUint();
+            for (int i = 0; i < 3; ++i)
+            {
+                Assert.AreEqual(
+                    (uint)(ReferenceStream[i] >> 32),
+                    random.NextUint(),
+                    $"Draw {i} diverged from the published stream."
+                );
+            }
 
             Assert.AreEqual(
-                (uint)(full >> 32),
-                upper,
-                "NextUint must be the upper half of the same single 64-bit advance."
-            );
-            Assert.AreEqual(
-                viaUlong.InternalState,
-                viaUint.InternalState,
-                "One NextUlong and one NextUint must leave the generator in the same state."
+                ReferenceStream[3],
+                random.NextUlong(),
+                "The fourth draw skipped or repeated an advance."
             );
         }
 

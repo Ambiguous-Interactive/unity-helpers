@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             "UH_RANDOM_NOISE_MAP_ITERATIONS";
 
         // The distribution tests dominate suite runtime: each loops SampleCount
-        // times across ~21 PRNG subclasses (~half a billion iterations at the
+        // times across ~23 PRNG subclasses (~half a billion iterations at the
         // historical count). The fast default keeps the MAIN suite quick while
         // staying statistically valid (see the sqrt deviation floor in
         // TestAndVerify); the weekly benchmark Random lane exports the sample

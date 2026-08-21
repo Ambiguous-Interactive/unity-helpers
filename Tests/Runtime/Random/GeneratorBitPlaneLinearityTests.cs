@@ -14,10 +14,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     /// </summary>
     /// <remarks>
     /// A sequence with linear complexity <c>c</c> makes any Hankel matrix wider than <c>c</c> rank-deficient
-    /// at exactly <c>c</c>, so the rank is an exact structural quantity rather than a statistic: the same
-    /// generator returns the same rank for every seed, and the test cannot flake. Measured separation is
-    /// wide -- linear bit planes score 2 to 128, non-linear ones never drop below 185 across four seeds --
-    /// so the threshold sits in the empty band between them.
+    /// at exactly <c>c</c>. For a linear bit plane the rank is therefore capped by the generator's state
+    /// width whatever the seed; for a non-linear one it is a random variable, with deficiency <c>k</c>
+    /// occurring at roughly <c>4^-k</c>. Measured separation is wide -- linear planes score 2 to 128,
+    /// non-linear ones never dropped below 185 of 192 over four seeds -- so the threshold sits in the empty
+    /// band between the two populations.
+    ///
+    /// The seeds here are compile-time constants, so this fixture measures one fixed stream per generator
+    /// and its result is reproducible rather than sampled. That, not seed-independence, is why it cannot
+    /// flake: seeding it randomly would turn a structural gate into a statistical one.
     ///
     /// This exists because <c>AbstractRandom.NextBool()</c> reads bit 0 and <c>Next(0, powerOfTwo)</c> masks
     /// the low bits: a generator whose low bits are linear hands out predictable coin flips.
@@ -97,16 +102,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             IRandom random = factory();
             RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(random);
-            bool claimsQuality =
-                metadata.Quality == RandomQuality.Excellent
-                || metadata.Quality == RandomQuality.VeryGood
-                || metadata.Quality == RandomQuality.Good;
-
-            if (!claimsQuality)
+            // Ratings are ordered best-first, so only ratings strictly weaker than Good are exempt.
+            // Testing that way rather than listing the strong ratings keeps Unknown -- a generator whose
+            // metadata attribute went missing -- inside the gate rather than silently outside it.
+            bool exempt = (int)metadata.Quality > (int)RandomQuality.Good;
+            if (exempt)
             {
                 Assert.Pass(
                     $"{name} is rated {metadata.QualityLabel}; the quality gate covers Good and better."
                 );
+                return;
             }
 
             int[] ranks = MeasureBitPlaneRanks(factory());

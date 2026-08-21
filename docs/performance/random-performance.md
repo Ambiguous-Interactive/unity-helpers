@@ -41,7 +41,7 @@ nondeterministic pull-request gates.
     <tr><td>StormDropRandom</td><td align="right">705,200,000</td><td data-sort-value="3">Moderate</td><td data-sort-value="1">Excellent</td><td>Large-state ARX generator over a 1024-word (4 KB) ring buffer with two 32-bit control words; author reports strong PractRand results. Not independently verified -- the upstream repository is offline.</td></tr>
     <tr><td>XorShiftRandom</td><td align="right">602,100,000</td><td data-sort-value="3">Moderate</td><td data-sort-value="4">Fair</td><td>Classic 32-bit xorshift; known to fail portions of TestU01 and PractRand, acceptable for lightweight effects only. <a href="https://doi.org/10.18637/jss.v008.i14">Marsaglia 2003</a></td></tr>
     <tr><td>WyRandom</td><td align="right">440,500,000</td><td data-sort-value="2">Slow</td><td data-sort-value="2">Very Good</td><td>Wyhash-based generator; published testing shows it clears BigCrush/PractRand with wide seed coverage. <a href="https://github.com/wangyi-fudan/wyhash">Wang Yi 2019</a></td></tr>
-    <tr><td>SquirrelRandom</td><td align="right">414,000,000</td><td data-sort-value="2">Slow</td><td data-sort-value="3">Good</td><td>Hash-based generator built on Squirrel3; good equidistribution for table lookups but not extensively tested beyond moderate ranges. <a href="https://youtu.be/LWFzPP8ZbdU?t=2673">Squirrel Eiserloh</a></td></tr>
+    <tr><td>SquirrelRandom</td><td align="right">414,000,000</td><td data-sort-value="2">Slow</td><td data-sort-value="4">Fair</td><td>Hash-based generator built on Squirrel3. Measured: fails PractRand 0.95 FPF-14+6/16 at 1GB, reproducibly across four seeds. Good equidistribution for the table lookups it was designed for; not a general-purpose stream. <a href="https://youtu.be/LWFzPP8ZbdU?t=2673">Squirrel Eiserloh</a></td></tr>
     <tr><td>PhotonSpinRandom</td><td align="right">261,100,000</td><td data-sort-value="1">Very Slow</td><td data-sort-value="1">Excellent</td><td>SHISHUA-inspired generator; independent testing (PractRand 128GB) by author indicates excellent distribution properties.</td></tr>
     <tr><td>UnityRandom</td><td align="right">87,600,000</td><td data-sort-value="1">Very Slow</td><td data-sort-value="4">Fair</td><td>Mirrors UnityEngine.Random, documented by Unity as Xorshift 128; suitable for legacy compatibility but not high-stakes simulation. <a href="https://docs.unity3d.com/ScriptReference/Random.html">UnityEngine.Random</a></td></tr>
     <tr><td>SystemRandom</td><td align="right">64,700,000</td><td data-sort-value="1">Very Slow</td><td data-sort-value="5">Poor</td><td>Reimplements the classic .NET System.Random algorithm (Knuth subtractive lagged-Fibonacci, mod 2^31-1) so its sequence is serializable and stable across runtimes. Fails modern statistical batteries. <a href="https://nullprogram.com/blog/2017/09/21/">System.Random considered harmful</a></td></tr>
@@ -86,12 +86,10 @@ nondeterministic pull-request gates.
 </table>
 <!-- RANDOM_BENCHMARKS_END -->
 
-## Not yet benchmarked
+## Generators added since the last benchmark run
 
-`Xoshiro128StarStar` and `Xoshiro256StarStar` are absent from the tables above: the generated block
-is rewritten only by a benchmark run, and none has happened since they were added. They appear on
-the next scheduled run of the [Unity Benchmarks workflow](../../.github/workflows/unity-benchmarks.yml).
-
-Their measured statistical standing does not depend on that run. Both clear the bit-plane linearity
-gate on every output bit, which `XoroShiroRandom` does not — see
-[Random Generators](../features/utilities/random-generators.md).
+The tables above are rewritten only by a benchmark run, so a generator added since the last one is
+absent until the [Unity Benchmarks workflow](../../.github/workflows/unity-benchmarks.yml) next runs.
+Absence here says nothing about quality: statistical standing is measured separately, by the
+bit-plane linearity gate on every pull request and by the scheduled PractRand battery. See
+[Random Generators](../features/utilities/random-generators.md) for the current ratings.

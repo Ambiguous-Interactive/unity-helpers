@@ -105,6 +105,7 @@ tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
 
 - `PRNG.Instance` - Thread-local default (IllusionFlow)
 - `IllusionFlow`, `PcgRandom`, `XorShiftRandom`, `XoroShiroRandom`, `SplitMix64`, `RomuDuo`, `WyRandom`
+- `Xoshiro128StarStar`, `Xoshiro256StarStar` - xoshiro\*\* scramblers; no weak output bit, so safe for `NextBool` and low-bit masks
 - `BlastCircuitRandom`, `WaveSplatRandom`, `FlurryBurstRandom`, `PhotonSpinRandom`, `StormDropRandom`, `SquirrelRandom`
 - `LinearCongruentialGenerator`, `DotNetRandom`, `SystemRandom`, `UnityRandom` (wrappers)
 - `WDoomRandom` - index-into-array generator, period 256; deterministic replays, not statistical randomness
