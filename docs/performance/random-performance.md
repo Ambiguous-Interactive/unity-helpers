@@ -89,7 +89,7 @@ nondeterministic pull-request gates.
 ## Generators added since the last benchmark run
 
 The tables above are rewritten only by a benchmark run, so a generator added since the last one is
-absent until the [Unity Benchmarks workflow](../../.github/workflows/unity-benchmarks.yml) next runs.
+absent until the `.github/workflows/unity-benchmarks.yml` workflow next runs.
 Absence here says nothing about quality: statistical standing is measured separately, by the
 bit-plane linearity gate on every pull request and by the scheduled PractRand battery. See
 [Random Generators](../features/utilities/random-generators.md) for the current ratings.
