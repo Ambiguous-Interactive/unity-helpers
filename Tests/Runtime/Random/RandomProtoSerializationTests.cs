@@ -218,6 +218,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        public void UnityRandomProtoRoundTripResumesTheEnginePosition()
+        {
+            UnityRandom random = new(4242);
+            for (int i = 0; i < 37; ++i)
+            {
+                random.NextUint();
+            }
+
+            byte[] saved = Serializer.ProtoSerialize(random);
+            uint[] expected = new uint[64];
+            for (int i = 0; i < expected.Length; ++i)
+            {
+                expected[i] = random.NextUint();
+            }
+
+            // Whatever else the project did between the save and the load.
+            for (int i = 0; i < 500; ++i)
+            {
+                _ = UnityEngine.Random.value;
+            }
+
+            UnityRandom restored = Serializer.ProtoDeserialize<UnityRandom>(saved);
+            for (int i = 0; i < expected.Length; ++i)
+            {
+                Assert.AreEqual(expected[i], restored.NextUint(), $"draw {i}");
+            }
+        }
+
+        [Test]
         public void UnityRandomWithNullSeedSerializesCorrectly()
         {
             UnityRandom random = new(null);

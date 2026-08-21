@@ -9,8 +9,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
     using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
-    /// WDoomRandom deliberately has a period of 256, so it is the one generator that does not run the
-    /// statistical suite in <c>RandomTestBase</c> -- it would fail it, by design. What is worth
+    /// WDoomRandom deliberately has a period of 1024, so it is the one generator that does not run
+    /// the statistical suite in <c>RandomTestBase</c> -- it would fail it, by design. What is worth
     /// asserting is the table, the wrap, and that a saved index restores the exact sequence.
     /// </summary>
     [TestFixture]
@@ -18,53 +18,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
     public sealed class WDoomRandomTests
     {
         [Test]
-        public void LookupTableIsAPermutationOfEveryByte()
+        public void LookupTableEntriesAreAllDistinct()
         {
-            ReadOnlySpan<byte> table = WDoomRandom.LookupTable;
-            Assert.That(table.Length, Is.EqualTo(256));
+            ReadOnlySpan<uint> table = WDoomRandom.LookupTable;
+            Assert.That(table.Length, Is.EqualTo(1024));
 
-            bool[] seen = new bool[256];
-            foreach (byte value in table)
+            HashSet<uint> seen = new(table.Length);
+            foreach (uint value in table)
             {
-                Assert.That(seen[value], Is.False, $"byte {value} appears twice");
-                seen[value] = true;
+                Assert.That(seen.Add(value), Is.True, $"entry {value} appears twice");
             }
         }
 
         [Test]
-        public void ACycleOfDrawsReturnsEveryByteExactlyOnce()
+        public void ACycleOfDrawsReturnsEveryTableEntryExactlyOnce()
         {
             WDoomRandom random = new(seedIndex: 0);
-            int[] counts = new int[256];
-            for (int i = 0; i < 256; ++i)
+            Dictionary<uint, int> counts = new(1024);
+            for (int i = 0; i < 1024; ++i)
             {
-                counts[random.NextTableByte()]++;
+                uint drawn = random.NextUint();
+                counts.TryGetValue(drawn, out int count);
+                counts[drawn] = count + 1;
             }
 
-            for (int value = 0; value < counts.Length; ++value)
+            Assert.That(counts.Count, Is.EqualTo(1024));
+            foreach (uint entry in WDoomRandom.LookupTable)
             {
-                Assert.That(
-                    counts[value],
-                    Is.EqualTo(1),
-                    $"byte {value} came out {counts[value]} times"
-                );
+                Assert.That(counts.TryGetValue(entry, out int count), Is.True, $"entry {entry}");
+                Assert.That(count, Is.EqualTo(1), $"entry {entry} came out {count} times");
             }
         }
 
         [Test]
-        public void TheSequenceRepeatsEveryTwoHundredAndFiftySixDraws()
+        public void TheSequenceRepeatsEveryThousandAndTwentyFourDraws()
         {
             WDoomRandom random = new(seedIndex: 17);
-            List<byte> first = new(256);
-            for (int i = 0; i < 256; ++i)
+            List<uint> first = new(1024);
+            for (int i = 0; i < 1024; ++i)
             {
-                first.Add(random.NextTableByte());
+                first.Add(random.NextUint());
             }
 
-            for (int i = 0; i < 256; ++i)
+            for (int i = 0; i < 1024; ++i)
             {
                 Assert.That(
-                    random.NextTableByte(),
+                    random.NextUint(),
                     Is.EqualTo(first[i]),
                     $"draw {i} of the second cycle"
                 );
@@ -74,11 +73,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
         [Test]
         public void AnyStartingIndexIsAcceptedAndWrapped()
         {
-            foreach (int seed in new[] { int.MinValue, -1, 0, 255, 256, 1_000_000, int.MaxValue })
+            foreach (int seed in new[] { int.MinValue, -1, 0, 1023, 1024, 1_000_000, int.MaxValue })
             {
                 WDoomRandom random = new(seed);
-                Assert.DoesNotThrow(() => random.NextTableByte());
                 Assert.DoesNotThrow(() => random.NextUint());
+                Assert.DoesNotThrow(() => random.NextUlong());
             }
         }
 
@@ -112,20 +111,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
         }
 
         [Test]
-        public void AUintDrawAdvancesTheIndexByFourBytes()
+        public void ADrawIsTheNextTableEntryAndAdvancesTheIndexByOne()
         {
-            WDoomRandom viaUint = new(seedIndex: 0);
-            WDoomRandom viaBytes = new(seedIndex: 0);
+            // The whole point of the uint table: one draw is one entry, so the period a caller sees
+            // is the table's length rather than a quarter of it.
+            ReadOnlySpan<uint> table = WDoomRandom.LookupTable;
+            WDoomRandom random = new(seedIndex: 0);
 
-            uint packed = viaUint.NextUint();
-            uint rebuilt = 0;
-            for (int i = 0; i < 4; ++i)
+            for (int i = 1; i <= 8; ++i)
             {
-                rebuilt = (rebuilt << 8) | viaBytes.NextTableByte();
+                Assert.That(random.NextUint(), Is.EqualTo(table[i]), $"draw {i}");
             }
-
-            Assert.That(packed, Is.EqualTo(rebuilt));
-            Assert.That(viaUint.InternalState, Is.EqualTo(viaBytes.InternalState));
         }
     }
 }

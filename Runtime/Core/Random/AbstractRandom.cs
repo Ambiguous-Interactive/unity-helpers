@@ -154,6 +154,25 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             OnAfterDeserialization();
         }
 
+        /// <summary>
+        /// Runs on the instance being written, whichever generator it turned out to be.
+        /// </summary>
+        /// <remarks>
+        /// The mirror of <see cref="OnAfterDeserialization"/>, and declared here for the same
+        /// reason: the root owns the wire shape, so a hook on a subtype runs under some readers and
+        /// writers and not others (WPROTO034). A generator whose state is not entirely in its own
+        /// fields -- <see cref="UnityRandom"/>, whose position belongs to the engine -- uses this to
+        /// put that state into a member before the member is read.
+        /// </remarks>
+        protected virtual void OnBeforeSerialization() { }
+
+        [ProtoBeforeSerialization]
+        [WProtoBeforeSerialization]
+        private void OnProtoSerialize()
+        {
+            OnBeforeSerialization();
+        }
+
         // This buffer is not serialized. Constructors allocate it for ordinary/JSON instances,
         // while the root deserialization callback repairs instances created via SkipConstructor.
         private byte[] _guidBytes;

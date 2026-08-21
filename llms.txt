@@ -108,7 +108,7 @@ tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
 - `Xoshiro128StarStar`, `Xoshiro256StarStar` - xoshiro\*\* scramblers; no weak output bit, so safe for `NextBool` and low-bit masks
 - `BlastCircuitRandom`, `WaveSplatRandom`, `FlurryBurstRandom`, `PhotonSpinRandom`, `StormDropRandom`, `SquirrelRandom`
 - `LinearCongruentialGenerator`, `DotNetRandom`, `SystemRandom`, `UnityRandom` (wrappers)
-- `WDoomRandom` - index-into-array generator, period 256; deterministic replays, not statistical randomness
+- `WDoomRandom` - index-into-array generator, period 1024; deterministic replays, not statistical randomness
 - `NativePcgRandom` - Burst/Jobs compatible
 - All implement `IRandom` with extensive API: `NextFloat()`, `NextVector2()`, `NextGaussian()`, `NextWeightedIndex()`, `Shuffle()`, `NextGuid()`
 - `PerlinNoise` - Coherent noise generation

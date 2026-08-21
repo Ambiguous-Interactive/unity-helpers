@@ -112,9 +112,9 @@
       "name": "WDoomRandom",
       "quality": "Poor",
       "expected": "fail",
-      "failsBy": "2KB",
-      "firstFailingTest": "BCFN",
-      "reason": "Expected-failure control. A 256-entry lookup table with period 256; it is deterministic by design and not statistically random at all."
+      "failsBy": "8KB",
+      "firstFailingTest": "Gap-16",
+      "reason": "Expected-failure control. A 1024-entry lookup table of 32-bit values with period 1024 draws; the stream repeats every 4KB, so Gap-16 catches it at 8KB. Deterministic by design and not statistically random at all."
     },
     {
       "name": "WyRandom",

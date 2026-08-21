@@ -15,7 +15,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     /// because that snapshot is what a save file stores. A generator that answers
     /// <see cref="IRandom.InternalState"/> with less than its live state restores something that looks
     /// plausible and diverges immediately, which is the worst shape a determinism bug can take: the load
-    /// succeeds and the run is different.
+    /// succeeds and the run is different. There are no exceptions to this: <see cref="UnityRandom"/>
+    /// was one until its snapshot learned to carry <c>UnityEngine.Random</c>'s position.
     /// </summary>
     /// <remarks>
     /// The snapshot is taken mid-stream rather than at construction. Restoring a freshly seeded generator
@@ -29,20 +30,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private const int DrawsBeforeSnapshot = 37;
         private const int ComparedDraws = 64;
 
-        /// <summary>
-        /// <see cref="UnityRandom"/> is an adapter over <c>UnityEngine.Random</c>, whose state lives in the
-        /// engine's globals. Its snapshot carries the seed it was constructed with and nothing else, so it
-        /// cannot resume a stream. Named here rather than skipped, so that the day it gains a real snapshot
-        /// this test fails and says so.
-        /// </summary>
-        private static readonly HashSet<Type> CannotResumeItsStream = new() { typeof(UnityRandom) };
-
         [Test]
         public void EveryGeneratorResumesItsStreamFromItsOwnSnapshot()
         {
             List<string> diverged = new();
             List<string> resumed = new();
-            List<string> unexpectedlyResumed = new();
 
             foreach (Type type in GeneratorTypes())
             {
@@ -81,16 +73,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     }
                 }
 
-                bool expectedToResume = !CannotResumeItsStream.Contains(type);
                 if (firstMismatch < 0)
                 {
                     resumed.Add(type.Name);
-                    if (!expectedToResume)
-                    {
-                        unexpectedlyResumed.Add(type.Name);
-                    }
                 }
-                else if (expectedToResume)
+                else
                 {
                     diverged.Add(
                         $"{type.Name} diverges at draw {firstMismatch} of {ComparedDraws}"
@@ -108,11 +95,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 "The sweep is matching fewer generators than the package ships."
             );
             Assert.IsEmpty(diverged, string.Join(Environment.NewLine, diverged));
-            Assert.IsEmpty(
-                unexpectedlyResumed,
-                $"{string.Join(", ", unexpectedlyResumed)} now resumes its stream; remove it from "
-                    + $"{nameof(CannotResumeItsStream)} so the guarantee is enforced rather than excused."
-            );
         }
 
         private static IEnumerable<Type> GeneratorTypes()

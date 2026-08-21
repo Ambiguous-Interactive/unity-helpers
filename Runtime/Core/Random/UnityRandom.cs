@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
     using System.Runtime.Serialization;
+    using System.Text;
     using System.Text.Json.Serialization;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -27,11 +28,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <item><description>Global shared state; can be modified by other code calling <c>UnityEngine.Random</c>.</description></item>
     /// <item><description>Not thread-safe and generally slower than high-performance PRNGs.</description></item>
     /// <item><description>Determinism depends on controlling Unity's global state elsewhere in your project.</description></item>
-    /// <item><description><b>A snapshot cannot resume its stream.</b> <see cref="InternalState"/> carries the
-    /// seed this instance was constructed with and nothing else, because the live position belongs to
-    /// <c>UnityEngine.Random</c>'s globals rather than to this object. Every other generator in this package
-    /// resumes exactly where its snapshot was taken; this one restarts from wherever the engine currently
-    /// is. Save a concrete PRNG instead when a save file has to reproduce a sequence.</description></item>
+    /// <item><description><b>Restoring a snapshot moves the engine.</b> The position this adapter reports
+    /// is <c>UnityEngine.Random</c>'s, so restoring it writes <c>UnityEngine.Random.state</c> back --
+    /// exactly as <c>new UnityRandom(seed)</c> already calls <c>InitState</c>. Anything else drawing from
+    /// <c>UnityEngine.Random</c> is moved with it.</description></item>
     /// </list>
     /// <para>When to use:</para>
     /// <list type="bullet">
@@ -53,6 +53,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// // Note: calling UnityEngine.Random elsewhere will affect this sequence.
     /// </code>
     /// </example>
+    /// <remarks>
+    /// <para>
+    /// <b>Snapshots resume.</b> <see cref="InternalState"/> carries the engine's live position, and a
+    /// generator rebuilt from that snapshot writes it back, so a save file reproduces the sequence the
+    /// way every other generator here does. The position travels as text produced by
+    /// <c>JsonUtility</c> from <c>UnityEngine.Random.State</c>, so this package never has to know how
+    /// many fields that struct has.
+    /// </para>
+    /// </remarks>
     [RandomGeneratorMetadata(
         RandomQuality.Fair,
         "Mirrors UnityEngine.Random, documented by Unity as Xorshift 128; suitable for legacy compatibility but not high-stakes simulation.",
@@ -76,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     return new RandomState(
                         (ulong)(_seed ?? 0),
                         gaussian: _seed != null ? 0.0 : null,
-                        payload: null,
+                        payload: EncodeEngineState(CaptureEngineState()),
                         bitBuffer: _bitBuffer,
                         bitCount: _bitCount,
                         byteBuffer: _byteBuffer,
@@ -89,6 +98,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [ProtoMember(6)]
         [WProtoMember(6)]
         private readonly int? _seed;
+
+        // The engine's position, as text. Written just before serialization rather than kept up to
+        // date, because that global moves without this object being told; read back on the way in and
+        // applied. It is a field rather than a computed property so that the serializers reach it the
+        // same way they reach every other generator's state.
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        internal string _engineState;
 
         public UnityRandom()
             : this(null) { }
@@ -108,7 +125,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             unchecked
             {
                 _seed = internalState.Gaussian != null ? (int)internalState.State1 : null;
+                _engineState = DecodeEngineState(internalState);
                 RestoreCommonState(internalState);
+                ApplyEngineState();
             }
         }
 
@@ -119,8 +138,63 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override IRandom Copy()
         {
-            // Clone from full InternalState to preserve reservoirs and cached values
+            // Clone from full InternalState to preserve reservoirs and cached values. The engine
+            // position it carries is the one being read at this instant, so writing it back is the
+            // identity -- a copy does not move the stream it is copying.
             return new UnityRandom(InternalState);
+        }
+
+        /// <inheritdoc />
+        protected override void OnBeforeSerialization()
+        {
+            _engineState = CaptureEngineState();
+        }
+
+        /// <inheritdoc />
+        protected override void OnAfterDeserialization()
+        {
+            // The protobuf path fills the field directly rather than through a constructor, so this
+            // is where a proto payload's position reaches the engine.
+            ApplyEngineState();
+        }
+
+        private static string CaptureEngineState()
+        {
+            // JsonUtility rather than the four fields it happens to have today: Random.State's
+            // layout is private, and a text round trip through public API cannot be wrong about a
+            // field count Unity is free to change.
+            return UnityEngine.JsonUtility.ToJson(UnityEngine.Random.state);
+        }
+
+        private static byte[] EncodeEngineState(string engineState)
+        {
+            return string.IsNullOrEmpty(engineState) ? null : Encoding.UTF8.GetBytes(engineState);
+        }
+
+        private static string DecodeEngineState(RandomState internalState)
+        {
+            byte[] payload = internalState._payload;
+            return payload == null || payload.Length == 0 ? null : Encoding.UTF8.GetString(payload);
+        }
+
+        private void ApplyEngineState()
+        {
+            if (string.IsNullOrEmpty(_engineState))
+            {
+                return;
+            }
+
+            try
+            {
+                UnityEngine.Random.state =
+                    UnityEngine.JsonUtility.FromJson<UnityEngine.Random.State>(_engineState);
+            }
+            catch (ArgumentException)
+            {
+                // A payload whose text does not describe an engine state leaves the engine where it
+                // is. The rest of the generator still works, which is what a save file written by a
+                // different version needs.
+            }
         }
     }
 }
