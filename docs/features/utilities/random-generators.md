@@ -74,7 +74,8 @@ restored generator resumes the exact sequence — verified for all of them by
 and restoring one **writes `UnityEngine.Random.state` back**. Anything else drawing from
 `UnityEngine.Random` is moved with it — which is the same global that `new UnityRandom(seed)` already
 resets through `InitState`. A snapshot written before 3.6 carries no position; restoring one of those
-leaves the engine exactly where it is.
+leaves the engine exactly where it is, and so does a payload that is not an engine position at all —
+assigning one would leave `UnityEngine.Random` stuck returning a single value for the rest of the run.
 
 ---
 

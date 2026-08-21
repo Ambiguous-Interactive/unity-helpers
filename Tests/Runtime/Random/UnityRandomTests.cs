@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 {
+    using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
 
@@ -64,6 +65,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             UnityRandom restored = new(snapshot);
             Assert.AreEqual(first, restored.NextUint());
+        }
+
+        [Test]
+        public void APayloadThatIsNotAnEnginePositionLeavesTheEngineAlone()
+        {
+            // JsonUtility throws only on text that is not JSON at all. Well-formed JSON that is not
+            // an engine state parses to a ZEROED state, and an all-zero xorshift state emits zeros
+            // forever -- so a foreign payload must be refused rather than applied.
+            string[] foreign =
+            {
+                "{\"foo\":1}",
+                "{}",
+                "{\"s0\":0,\"s1\":0,\"s2\":0,\"s3\":0}",
+                "not json at all",
+            };
+
+            foreach (string payload in foreign)
+            {
+                UnityEngine.Random.InitState(1234);
+                uint expected = new UnityRandom().NextUint();
+
+                UnityEngine.Random.InitState(1234);
+                UnityRandom restored = new(
+                    new RandomState(0UL, payload: Encoding.UTF8.GetBytes(payload))
+                );
+
+                Assert.AreEqual(expected, restored.NextUint(), payload);
+            }
         }
 
         [Test]

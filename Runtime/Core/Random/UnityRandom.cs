@@ -184,17 +184,40 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return;
             }
 
+            UnityEngine.Random.State parsed;
             try
             {
-                UnityEngine.Random.state =
-                    UnityEngine.JsonUtility.FromJson<UnityEngine.Random.State>(_engineState);
+                parsed = UnityEngine.JsonUtility.FromJson<UnityEngine.Random.State>(_engineState);
             }
             catch (ArgumentException)
             {
-                // A payload whose text does not describe an engine state leaves the engine where it
-                // is. The rest of the generator still works, which is what a save file written by a
-                // different version needs.
+                // Malformed text. The engine stays where it is and the rest of the generator still
+                // works, which is what a save file written by a different version needs.
+                return;
             }
+
+            // JsonUtility throws only on text that is not JSON at all. Well-formed JSON that is not
+            // an engine state -- a payload from another field, another version, or an attacker --
+            // parses to a ZEROED state, and assigning that is the worst outcome available: an
+            // all-zero xorshift state emits zeros forever. Re-serializing what was parsed and
+            // comparing it to the payload refuses exactly those, and does it without this package
+            // knowing how many fields Random.State has.
+            string round = UnityEngine.JsonUtility.ToJson(parsed);
+            if (
+                !string.Equals(round, _engineState, StringComparison.Ordinal)
+                || string.Equals(round, ZeroedEngineState, StringComparison.Ordinal)
+            )
+            {
+                return;
+            }
+
+            UnityEngine.Random.state = parsed;
         }
+
+        // What a state of nothing serializes to, computed once from the type itself rather than
+        // written out, because a literal would be a claim about a field count.
+        private static readonly string ZeroedEngineState = UnityEngine.JsonUtility.ToJson(
+            default(UnityEngine.Random.State)
+        );
     }
 }
