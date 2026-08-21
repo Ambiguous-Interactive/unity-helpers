@@ -6,7 +6,9 @@
 // verdict here depends on report parsing being right.
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -132,15 +134,7 @@ for (const generator of unmeasured) {
 // exist to make the rating falsifiable, so a rating the manifest disagrees with, or a
 // generator rated Good or better that the manifest expects to FAIL, is a contradiction
 // the repository should not be able to hold.
-const qualityOrder = [
-  "Unknown",
-  "Excellent",
-  "VeryGood",
-  "Good",
-  "Fair",
-  "Poor",
-  "Experimental",
-];
+const qualityOrder = ["Unknown", "Excellent", "VeryGood", "Good", "Fair", "Poor", "Experimental"];
 const randomSourceRoot = path.join(repoRoot, "Runtime", "Core", "Random");
 for (const generator of manifest.generators) {
   const source = path.join(randomSourceRoot, `${generator.name}.cs`);
@@ -170,6 +164,49 @@ for (const generator of manifest.generators) {
 const partial = reportsFor({});
 partial.delete("PcgRandom");
 assert.equal(statusOf(evaluate(manifest, partial, "8GB"), "PcgRandom"), "error");
+
+// Everything above imports the helpers directly, which leaves the command-line path -- the only
+// path the workflow actually uses -- unexercised. A direct-run guard that silently fails produces
+// no verdict at all, and a step that prints nothing reads exactly like a clean battery, so the CLI
+// is spawned here rather than trusted.
+{
+  const reportsDir = fs.mkdtempSync(path.join(os.tmpdir(), "random-quality-cli-"));
+  try {
+    for (const [name, text] of reportsFor({})) {
+      fs.writeFileSync(path.join(reportsDir, `${name}.txt`), text, "utf8");
+    }
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        "scripts/random-quality/evaluate-outcomes.mjs",
+        "--reports",
+        reportsDir,
+        "--budget",
+        "32GB",
+        "--seed",
+        manifest.measurement.seed
+      ],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+
+    assert.match(
+      run.stdout,
+      /mismatch-count=0/,
+      `the CLI produced no clean verdict. stdout: ${run.stdout} stderr: ${run.stderr}`
+    );
+    assert.equal(run.status, 0, `a manifest-matching run must exit 0, got ${run.status}`);
+    for (const generator of manifest.generators) {
+      assert.match(
+        run.stdout,
+        new RegExp(generator.name),
+        `${generator.name} is missing from the CLI summary`
+      );
+    }
+  } finally {
+    fs.rmSync(reportsDir, { recursive: true, force: true });
+  }
+}
 
 console.log(
   `random-quality outcomes contract: ${manifest.generators.length} generators ` +

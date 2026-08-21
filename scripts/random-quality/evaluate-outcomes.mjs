@@ -7,6 +7,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const UNIT_BYTES = {
   KB: 1024,
@@ -223,6 +224,10 @@ function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// `file://` + a raw path is not a file URL: import.meta.url percent-encodes, so a repository
+// checked out under a path containing a space silently fails this comparison, main() never runs,
+// and the step emits no verdict at all -- which reads exactly like a clean battery. pathToFileURL
+// does the encoding, matching the idiom already used in scripts/mcp/unity-mcp.mjs.
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main();
 }
