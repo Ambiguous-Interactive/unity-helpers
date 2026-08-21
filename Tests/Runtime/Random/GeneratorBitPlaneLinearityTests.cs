@@ -44,11 +44,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         // Generators whose output bits are linear by construction. Each is already rated Fair or worse
         // and documents the weakness; they are listed so the exemption is asserted rather than assumed.
+        //
+        // WDoomRandom used to be here and is not any more. Its bits were linear because its table held
+        // bytes and a uint was four of them; the table now holds whole uints drawn from SplitMix64, and
+        // the worst plane measures rank 189 against this fixture's 160 threshold. Its rating stays Poor,
+        // because linearity was never the reason for it: the period is 1024 draws, and PractRand 0.95
+        // fails it at 8KB.
         private static readonly string[] KnownLinearGenerators =
         {
             nameof(LinearCongruentialGenerator),
             nameof(XorShiftRandom),
-            nameof(WDoomRandom),
             nameof(XoroShiroRandom),
         };
 
