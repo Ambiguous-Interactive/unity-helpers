@@ -275,6 +275,20 @@ Four constraints. The first two were recorded backwards before being measured on
   plus tracked objects are not destroyed, so an editor session accumulates them.
   The same message from a test **body** means that test calls `LogAssert.Expect` itself, and it cannot
   run this way at all — leave those to CI rather than reading them as regressions.
+- **"Swallow teardown" means run it and ignore what it throws, not skip it.** Skipping `[TearDown]`
+  entirely leaks whatever a fixture restores there, and the damage lands on _other_ fixtures: one
+  sweep reported eleven failures, of which eight were `SerializationCapacityLimitTests` leaving a
+  lowered global capacity limit behind, so every later capacity came back as the element count
+  (`Expected: 32, But was: 1`). Invoke each `[TearDown]` in a `finally`, catch and discard. The
+  survivors of that fix were three fixtures needing `[OneTimeTearDown]`, which the loop still does
+  not run.
+- **A fixture that fails in a sweep and passes in isolation is a leak, not a regression.** Re-run the
+  suspect fixture alone before believing it; a sweep is the only place cross-fixture state is
+  visible, and this loop reproduces less of NUnit's isolation than the real runner does.
+- **After injecting a deliberate failure and reverting it, recompile before believing the next run.**
+  A red-green check that ends by reverting leaves the domain mid-reload, and the run straight after
+  the revert reported seven failures that a fresh compile did not reproduce. Refresh, confirm the
+  editor is idle, then measure.
 - **Check the loaded assembly is current before trusting any measurement.** The host editor has the
   Hot Reload package installed, whose whole purpose is to avoid domain reloads — so an
   `AssetDatabase.Refresh` can compile a new DLL to `Library/ScriptAssemblies` while the **loaded**
