@@ -101,6 +101,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertLegacyReadsBack("18B7EFC3D504", default(FastVector3Int));
         }
 
+        /// <summary>
+        /// A payload carrying both encodings of a component decodes the same under either reader.
+        /// </summary>
+        /// <remarks>
+        /// No encoder here writes one: the components are written as <c>sint32</c> and the
+        /// <c>int32</c> fields are a read path only. A hand-written payload can carry both, though,
+        /// and the two readers reach the components by different routes -- a switch in the formatter
+        /// and a surrogate's conversion operator -- so "whichever the reader happens to see last"
+        /// would have been two different answers to one question. Both apply the same rule: the
+        /// ZigZag field unless it is absent.
+        /// </remarks>
+        [Test]
+        public void APayloadCarryingBothEncodingsDecodesToTheZigZagOne()
+        {
+            // 08 05 = field 1, int32 5 (the retired x); 28 0E = field 5, varint 14 -> ZigZag 7.
+            byte[] both = FromHex("0805280E");
+            WProtoReader reader = new(both);
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<FastVector2Int>()
+                    .TryRead(ref reader, out FastVector2Int restored)
+            );
+            Assert.AreEqual(new FastVector2Int(7, 0), restored);
+        }
+
         // A component's cost is the number this holds, and under sint32 it follows the component's
         // DISTANCE from the origin rather than its sign: (-1, -2) is four bytes where it was
         // twenty-two. The 8,192 row is the other half of that trade -- zigzag spends the low bit on

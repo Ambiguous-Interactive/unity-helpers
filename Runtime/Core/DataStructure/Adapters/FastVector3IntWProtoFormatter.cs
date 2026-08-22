@@ -122,6 +122,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 int x = 0;
                 int y = 0;
                 int z = 0;
+                int legacyX = 0;
+                int legacyY = 0;
+                int legacyZ = 0;
 
                 while (reader.TryReadTag(out int fieldNumber, out int wireType))
                 {
@@ -159,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         }
                         case LegacyXTag when wireType == WProtoWireType.Varint:
                         {
-                            if (!reader.TryReadInt32(out x))
+                            if (!reader.TryReadInt32(out legacyX))
                             {
                                 value = default;
                                 return false;
@@ -169,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         }
                         case LegacyYTag when wireType == WProtoWireType.Varint:
                         {
-                            if (!reader.TryReadInt32(out y))
+                            if (!reader.TryReadInt32(out legacyY))
                             {
                                 value = default;
                                 return false;
@@ -179,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         }
                         case LegacyZTag when wireType == WProtoWireType.Varint:
                         {
-                            if (!reader.TryReadInt32(out z))
+                            if (!reader.TryReadInt32(out legacyZ))
                             {
                                 value = default;
                                 return false;
@@ -206,7 +209,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     return false;
                 }
 
-                value = new FastVector3Int(x, y, z);
+                // The same rule FastVector3IntSurrogate applies; see
+                // FastVector2Int.WProtoFormatter.TryRead.
+                value = new FastVector3Int(
+                    x != 0 ? x : legacyX,
+                    y != 0 ? y : legacyY,
+                    z != 0 ? z : legacyZ
+                );
                 return true;
             }
         }

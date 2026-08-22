@@ -102,6 +102,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 int x = 0;
                 int y = 0;
+                int legacyX = 0;
+                int legacyY = 0;
 
                 while (reader.TryReadTag(out int fieldNumber, out int wireType))
                 {
@@ -129,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         }
                         case LegacyXTag when wireType == WProtoWireType.Varint:
                         {
-                            if (!reader.TryReadInt32(out x))
+                            if (!reader.TryReadInt32(out legacyX))
                             {
                                 value = default;
                                 return false;
@@ -139,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         }
                         case LegacyYTag when wireType == WProtoWireType.Varint:
                         {
-                            if (!reader.TryReadInt32(out y))
+                            if (!reader.TryReadInt32(out legacyY))
                             {
                                 value = default;
                                 return false;
@@ -166,7 +168,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     return false;
                 }
 
-                value = new FastVector2Int(x, y);
+                // The same rule FastVector2IntSurrogate applies, so a payload carrying both
+                // encodings -- which no encoder here produces, but a hand-written one can --
+                // decodes to one value rather than to two that depend on which reader saw it.
+                value = new FastVector2Int(x != 0 ? x : legacyX, y != 0 ? y : legacyY);
                 return true;
             }
         }

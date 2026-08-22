@@ -390,8 +390,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     // protobuf-net cannot bind a parameterized constructor nor assign readonly fields without
     // Reflection.Emit, so it falls back to ParameterInfo.GetRequiredCustomModifiers which hits the
     // unsupported RuntimeParameterInfo::GetTypeModifiers icall. Routing these types through a
-    // mutable surrogate uses protobuf-net's working surrogate path instead. Field numbers mirror
-    // the originals exactly so the wire format is byte-identical to the pre-surrogate mono output.
+    // mutable surrogate uses protobuf-net's working surrogate path instead. Field numbers mirrored
+    // the originals exactly, so the wire format was byte-identical to the pre-surrogate mono output;
+    // the two FastVector surrogates below have since moved their components onto new numbers, and
+    // say why where they do it.
 
     // Components travel as sint32 on fields 5 and 6, where a negative coordinate costs its
     // magnitude rather than the ten bytes int32 spends sign-extending it. The int32 fields they
