@@ -703,6 +703,15 @@ h1_container_name_file="$h1_tempdir/container.name"
 h1_docker_run_pid_file="$h1_tempdir/docker-run.pid"
 h1_docker_daemon_pid_file="$h1_tempdir/docker-daemon.pid"
 h1_registration_release_file="$h1_tempdir/release-registration"
+
+# The event log's `docker run` line carries the entire containerised inner
+# script, so dumping it whole buries the handful of ordering events a failure is
+# actually about.
+h1_event_summary() {
+    grep -nE '^(docker (inspect|registration|rm|stop|client)|fake (inspect|stop) |unity )' "$h1_events" \
+        | tail -n 14 \
+        | tr '\n' '|'
+}
 h1_return_ready_file="$h1_tempdir/return-ready"
 h1_return_count_file="$h1_tempdir/return-count"
 h1_container_stopping_file="$h1_tempdir/container-stopping"
@@ -717,20 +726,26 @@ printf 'docker %s\n' "$*" >> "${FAKE_EVENT_LOG}"
 
 case "${1:-}" in
     inspect)
+        # The completion line is what the delayed-registration daemon waits on.
+        # Entry is logged above, before the answer is known, so registering on
+        # entry could still beat this inspect's own read of the name file.
+        inspect_status=0
         if [[ "${FAKE_DOCKER_INSPECT_FAIL:-0}" == "1" ]]; then
             printf 'simulated inspect failure\n' >&2
-            exit 9
-        fi
-        if [[ ! -s "${FAKE_CONTAINER_NAME_FILE}" ]]; then
+            inspect_status=9
+        elif [[ ! -s "${FAKE_CONTAINER_NAME_FILE}" ]]; then
             printf 'No such object\n' >&2
-            exit 1
-        fi
-        container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
-        if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null; then
-            printf 'true\n'
+            inspect_status=1
         else
-            printf 'false\n'
+            container_pid="$(cat "${FAKE_CONTAINER_PID_FILE}" 2>/dev/null || true)"
+            if [[ -n "${container_pid}" ]] && kill -0 "${container_pid}" 2>/dev/null; then
+                printf 'true\n'
+            else
+                printf 'false\n'
+            fi
         fi
+        printf 'fake inspect end status=%s\n' "${inspect_status}" >> "${FAKE_EVENT_LOG}"
+        exit "${inspect_status}"
         ;;
     stop)
         stop_timeout=10
@@ -816,7 +831,18 @@ case "${1:-}" in
                 # Model a daemon independent of the canceled CLI. Without this
                 # reset, the fake container inherits the client's ignored TERM.
                 trap - TERM
-                sleep 2
+                # Register only after cleanup's first inspect has finished. This
+                # phase exists to prove cleanup RETRIES across a late
+                # registration, so a registration that lands first proves
+                # nothing -- and a fixed sleep made which landed first a
+                # property of runner load, which is how it flaked (#526). The
+                # deadline only stops a hang; missing the barrier still fails
+                # the ordering assertion, which is the regression to report.
+                registration_deadline=$((SECONDS + 20))
+                while ! grep -qE '^fake inspect end ' "${FAKE_EVENT_LOG}"; do
+                    [[ "${SECONDS}" -lt "${registration_deadline}" ]] || break
+                    sleep 0.05
+                done
                 launch_fake_container
             ) &
             printf '%s\n' "$!" > "${FAKE_DOCKER_DAEMON_PID_FILE}"
@@ -1036,7 +1062,7 @@ if [[ -z "$h1_failure" ]]; then
         elif [[ "$h1_signal_phase" == "return" && "$(grep -cF -- '-returnlicense' "$h1_unity_log")" -ne 2 ]]; then
             h1_failure="return cancellation did not retry the interrupted serial return exactly once"
         elif [[ "$h1_signal_phase" != "return" && "$(grep -cF -- '-returnlicense' "$h1_unity_log")" -ne 1 ]]; then
-            h1_failure="${h1_signal_phase} cancellation did not perform exactly one serial return: $(grep -cF -- '-returnlicense' "$h1_unity_log" || true) attempts; events=$(tr '\n' '|' < "$h1_events")"
+            h1_failure="${h1_signal_phase} cancellation did not perform exactly one serial return: $(grep -cF -- '-returnlicense' "$h1_unity_log" || true) attempts; events=$(h1_event_summary)"
         elif [[ -s "$h1_pid_file" ]] && kill -0 "$(cat "$h1_pid_file")" 2>/dev/null; then
             h1_failure="${h1_signal_phase} cancellation left the TERM-resistant Unity process alive"
         elif [[ -s "$h1_descendant_pid_file" ]] && kill -0 "$(cat "$h1_descendant_pid_file")" 2>/dev/null; then
@@ -1050,7 +1076,7 @@ if [[ -z "$h1_failure" ]]; then
         elif [[ "$h1_signal_phase" == "registration" && \
                 ( -z "$first_inspect_line" || -z "$registration_line" || -z "$inspect_line" || \
                   "$first_inspect_line" -ge "$registration_line" || "$registration_line" -ge "$inspect_line" ) ]]; then
-            h1_failure="cleanup did not retry inspection across delayed daemon registration"
+            h1_failure="cleanup did not retry inspection across delayed daemon registration: first_inspect=${first_inspect_line:-none} registration=${registration_line:-none} last_inspect=${inspect_line:-none}; events=$(h1_event_summary)"
         elif [[ -z "$return_line" || -z "$remove_line" || "$return_line" -ge "$remove_line" ]]; then
             h1_failure="${h1_signal_phase} serial return was not observed before forced container removal"
         elif ! grep -Eq '^stop --timeout 12 unity-helpers-[0-9]+-[0-9]+' "$h1_docker_log"; then
