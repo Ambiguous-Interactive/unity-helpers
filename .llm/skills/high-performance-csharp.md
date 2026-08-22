@@ -256,6 +256,48 @@ current index — either iterate backwards or re-test the same index.
 
 ---
 
+## Bulk Copy Loses When the Destination Is Covariant
+
+`Array.Copy` and `List<T>.CopyTo` beat a per-element loop **only when the source and destination
+element types match exactly**. Store into an array through a covariant view -- a `BoxCollider[]`
+handed around as `Component[]` -- and the runtime re-checks the element type on **every** element,
+which costs more than the loop it replaced.
+
+Measured on Unity 6000.4.6f1 Mono, building a `BoxCollider[]` from a `List<Component>`, best of three
+trials (us):
+
+|   n | `for` loop with `as` | `List.CopyTo` | `Array.Copy` |
+| --: | -------------------: | ------------: | -----------: |
+|   5 |           **0.0878** |        0.3439 |       0.3692 |
+|  50 |           **0.6721** |        2.4317 |       2.2156 |
+| 500 |           **6.4056** |       23.3469 |      20.8070 |
+
+The bulk calls are 3.6-3.9x slower, and **the ratio is flat across sizes** -- the tell that this is
+per-element cost, not fixed overhead that amortizes. A copy that gets relatively worse as `n` grows
+is not a bulk win however it is spelled.
+
+It is also not always legal: casting `TElement[]` to `TSource[]` throws `InvalidCastException` when
+`TElement` is an **interface**, because an interface array is not a covariant view of a class array.
+
+```csharp
+// Wrong: every store re-checks the element type, and this throws for an interface TElement.
+TElement[] result = new TElement[count];
+source.CopyTo(0, (TSource[])(object)result, 0, count);
+
+// Right: the loop stores into the array's own exact element type.
+TElement[] result = new TElement[count];
+for (int i = 0; i < count; ++i)
+{
+    result[i] = source[i] as TElement;
+}
+```
+
+**When you want the bulk win, change what fills the buffer, not the copy.** Getting the source into
+a `List<TElement>` makes `CopyTo` an exact-type memmove; that is where the gain is (measured 1.15x at
+five elements rising to 1.41x at five hundred, end to end). Whether that is reachable is a separate
+question -- for Unity component queries it needs a run-time-closed generic, which IL2CPP has refused
+here before.
+
 ## Thread Safety Patterns
 
 Use conditional compilation for thread-safe vs single-threaded builds:

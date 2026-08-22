@@ -290,6 +290,25 @@ Anything else red is ours until proven otherwise. Read the annotations before
 concluding a leg is infrastructure: a `Stale pull request run for <sha>` marks a
 run the head moved past, not breakage.
 
+### Step 11: Answer review feedback with a measurement
+
+A reviewer's "could this be faster with X?" is a hypothesis, not an instruction and not a mistake.
+Measure X. Reply with the numbers. Do not accept it to be agreeable, and do not decline it from
+memory -- both are guesses wearing different clothes.
+
+Rules:
+
+- **Measure the thing asked about**, at more than one input size. A ratio that stays flat as the
+  input grows is per-item cost; a ratio that shrinks was fixed overhead. They lead to opposite
+  conclusions.
+- **Then measure one step out.** A suggestion can be wrong where it points and right about the
+  problem. Answering only the literal question hides that.
+- **Reply with the table**, and say plainly which parts you did and did not take.
+- **A win you decline needs a home.** File the issue with the numbers and the reason, and link it.
+  "Measured, rejected" that nobody wrote down gets re-asked next quarter.
+- **Record the answer where the question arose** -- a `<remarks>` block on the method, and the skill
+  that carries the general rule -- so the next reader gets the measurement instead of re-asking.
+
 ---
 
 ## Related Skills
