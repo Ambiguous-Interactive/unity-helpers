@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -137,7 +138,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                entries.RemoveAt(i);
+                // Swap-back: a bucket is an unordered set -- a query enumerates all of it --
+                // and this loop returns immediately, so shifting the tail would buy nothing on a
+                // path that runs whenever anything moves.
+                entries.RemoveAtSwapBack(i);
                 if (entries.Count == 0)
                 {
                     _grid.Remove(cell);

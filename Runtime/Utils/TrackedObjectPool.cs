@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// A pool for <see cref="UnityEngine.Object"/> instances whose lifetime ends in a callback rather
@@ -33,6 +34,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// destroyed out from under its flight is still the entry sitting in the tracking list, so removal
     /// is unconditional while returning it to the pool is not. Guarding the removal instead leaks one
     /// dead reference per use, which is the unbounded growth the list exists to prevent.
+    /// </para>
+    /// <para>
+    /// <typeparamref name="T"/> is constrained to <see cref="UnityEngine.Object"/>, so it is always a
+    /// reference type and there is no value-type case to reason about — and that constraint is what
+    /// makes the two questions above expressible at all. A pool for plain objects, whose lifetime is a
+    /// scope, is <see cref="WallstopGenericPool{T}"/>.
     /// </para>
     /// <para>
     /// Not thread-safe, because <see cref="UnityEngine.Object"/> is a main-thread type.
@@ -131,10 +138,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             T candidate = null;
             while (_idle.Count > 0)
             {
+                // The last entry, so this removal is already the cheap one.
                 int last = _idle.Count - 1;
                 T pooled = _idle[last];
                 _idle.RemoveAt(last);
-                if (pooled == null)
+                if (IsGone(pooled))
                 {
                     continue;
                 }
@@ -143,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 break;
             }
 
-            if (ReferenceEquals(candidate, null))
+            if (!WasHandedIn(candidate))
             {
                 if (_producer == null)
                 {
@@ -152,7 +160,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 candidate = _producer();
-                if (candidate == null)
+
+                // Covers both a producer that answered null and one that answered something already
+                // destroyed; neither is usable and neither should enter the tracking list.
+                if (IsGone(candidate))
                 {
                     taken = null;
                     return false;
@@ -178,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public bool Release(T taken)
         {
-            if (ReferenceEquals(taken, null))
+            if (!WasHandedIn(taken))
             {
                 return false;
             }
@@ -190,10 +201,15 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             // Unconditional, and this is the line that is easy to get wrong: a destroyed item is
-            // still the entry in this list, and skipping the removal leaks it forever.
-            _inFlight.RemoveAt(index);
+            // still the entry in this list, and skipping the removal leaks it forever. Swap-back
+            // because nothing reads this list in order -- Dispose drains all of it and IndexOfInFlight
+            // scans all of it -- so paying to shift the tail would buy nothing.
+            _inFlight.RemoveAtSwapBack(index);
 
-            if (taken == null)
+            // Reached only for something that WAS handed in, so this is asking whether it has been
+            // destroyed since -- a different question from the one above, and the reason this type
+            // exists. It is out of the pool's hands either way; it just must not be pooled.
+            if (IsGone(taken))
             {
                 return true;
             }
@@ -237,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 for (int i = 0; i < pending.Count; ++i)
                 {
                     T current = pending[i];
-                    if (current == null)
+                    if (IsGone(current))
                     {
                         continue;
                     }
@@ -245,6 +261,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _onDestroy?.Invoke(current);
                 }
             }
+        }
+
+        // The two questions this type is built on, named, because Unity's == reads as an ordinary
+        // null check and is not one: it answers true for a destroyed object as well as for a null
+        // reference. Every call site here means exactly one of these, and which one is never obvious
+        // from the operator alone.
+        private static bool WasHandedIn(T candidate)
+        {
+            return !ReferenceEquals(candidate, null);
+        }
+
+        private static bool IsGone(T candidate)
+        {
+            return candidate == null;
         }
 
         private int IndexOfInFlight(T taken)

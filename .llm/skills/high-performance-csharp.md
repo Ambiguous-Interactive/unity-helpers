@@ -228,6 +228,34 @@ private static readonly Color HighlightColor = new Color(0.3f, 0.6f, 1f);
 
 ---
 
+## Removing From a List Nobody Reads in Order
+
+`List<T>.RemoveAt(i)` shifts every element after `i`. When the list's order is not observed, use
+`IListExtensions.RemoveAtSwapBack(i)`, which moves the last element into the hole instead.
+
+```csharp
+// ✅ CORRECT - a set of checked-out items; Dispose drains all of it, lookup scans all of it
+_inFlight.RemoveAtSwapBack(index);
+
+// ❌ WRONG for the same list - pays O(n) to preserve an order nothing reads
+_inFlight.RemoveAt(index);
+```
+
+Both conditions must hold before swapping:
+
+1. **No caller observes the order** — not the enumeration, not a query result, not a test's
+   `CollectionAssert.AreEqual`. Check the tests before changing a container's removal, because the
+   order a data structure never promised is often the order a fixture asserts.
+2. **The index is not already the last one** — `RemoveAt(list.Count - 1)` shifts nothing and is
+   already O(1); swapping there is noise.
+
+Do **not** swap in a list whose order is the meaning: a stack (`_colorStack`, `_materialStack`), a
+ring buffer's contents, a breadcrumb trail, a purge queue ordered by return time, or a hull. And
+inside a **forward** loop that keeps iterating, a swap-back moves an unvisited element into the
+current index — either iterate backwards or re-test the same index.
+
+---
+
 ## Thread Safety Patterns
 
 Use conditional compilation for thread-safe vs single-threaded builds:

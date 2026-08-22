@@ -144,6 +144,24 @@ For `UnityEngine.Object`-derived types (`GameObject`, `Component`, `MonoBehaviou
 - ✅ `component != null ? component : fallback`
 - ✅ `if (_cached == null) _cached = GetComponent<T>()`
 
+**The one legitimate `ReferenceEquals`, and the rule that comes with it.** The two operators ask
+different questions: `ReferenceEquals(x, null)` asks _was anything handed in_, and `x == null` asks
+_is it gone_ — true for a destroyed object as well as for a null reference. Code that tracks Unity
+objects it did not create needs both, because an item destroyed while checked out is still the entry
+in the tracking list: removing it must not be guarded by `== null`, and re-using it must be.
+
+When you need that distinction, **name it** — an inline `ReferenceEquals` reads as a bug to every
+reader and every reviewer, and an inline `== null` reads as an ordinary null check and is not one:
+
+```csharp
+private static bool WasHandedIn(T candidate) => !ReferenceEquals(candidate, null);
+
+private static bool IsGone(T candidate) => candidate == null;
+```
+
+`where T : UnityEngine.Object` is what makes the distinction expressible: `T` is then always a
+reference type, so there is no value-type case. See `TrackedObjectPool<T>` for the worked example.
+
 ### 8. Qualify `Object` References
 
 ```csharp
