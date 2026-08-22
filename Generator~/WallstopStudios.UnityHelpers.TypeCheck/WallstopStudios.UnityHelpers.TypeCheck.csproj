@@ -96,6 +96,17 @@
     <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
     <DefineConstants Condition="'$(WallstopOdin)' == 'true'"
       >$(DefineConstants);WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</DefineConstants>
+    <!--
+      SINGLE_THREADED is the same shape of switch as the Odin one and was unguarded the same way
+      (#533). It changes declarations, not just call sites: `ReflectionHelpers` alone swaps five
+      caches between `ConcurrentDictionary` and `Dictionary` under it, each with a differently-shaped
+      cached getter. CI runs two SINGLE_THREADED legs, so a cache added without the matching branch
+      compiled clean everywhere locally and cost a full matrix run to discover.
+    -->
+    <WallstopSingleThreaded Condition="'$(WallstopSingleThreaded)' == ''"
+      >false</WallstopSingleThreaded>
+    <DefineConstants Condition="'$(WallstopSingleThreaded)' == 'true'"
+      >$(DefineConstants);SINGLE_THREADED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />

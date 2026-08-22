@@ -309,9 +309,14 @@ deliberate act, not the tail of every commit.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
   - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
     assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
-    It builds each source tree three ways, because three different branches ship: the
-    `WALLSTOP_PROTO` default, the legacy define-off fallback, and
-    `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`typecheck:unity:odin` / `typecheck:tests:odin`).
+    It builds each source tree four ways, because four different branches ship: the
+    `WALLSTOP_PROTO` default, the legacy define-off fallback,
+    `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`typecheck:unity:odin` / `typecheck:tests:odin`) and
+    `SINGLE_THREADED` (`typecheck:unity:singlethreaded` / `typecheck:tests:singlethreaded`).
+    `SINGLE_THREADED` is guarded for the same reason as Odin and was found the same way (#533): it
+    swaps declarations, not just call sites -- `ReflectionHelpers` alone moves five caches between
+    `ConcurrentDictionary` and `Dictionary` under it -- and CI runs two `SINGLE_THREADED` legs, so a
+    cache added without the matching branch passed every local gate and cost a full matrix run.
     The Odin configuration exists because Odin changes the **base class** of
     `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and `AttributeEffect`, and that branch
     compiled nowhere in automation until #347 -- which is how #275 shipped a compile break to
