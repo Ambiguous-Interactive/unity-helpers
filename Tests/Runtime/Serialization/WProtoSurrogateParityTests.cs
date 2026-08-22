@@ -234,12 +234,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// Every surrogate this package declares actually reached protobuf-net's model.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// <c>RuntimeTypeModel.Default</c> is process-global and freezes a type the first time it
         /// serializes one, so a registration can be refused rather than applied -- and a refused
         /// surrogate is silent: the type keeps serializing, with different bytes. The registrations
         /// used to share one <c>try</c>, which made a single refusal skip every one after it.
+        /// </para>
+        /// <para>
+        /// Skipped under IL2CPP because there a refusal is expected rather than a defect, and this
+        /// assertion cannot tell the two apart. protobuf-net builds its serializers by reflection
+        /// and the AOT compiler cannot emit them, so a standalone player refuses <c>Vector2</c>,
+        /// <c>Vector3</c>, <c>Rect</c>, <c>RectInt</c>, <c>Bounds</c>, <c>BoundsInt</c>,
+        /// <c>Vector2Int</c> and <c>Vector3Int</c> outright -- measured on the standalone legs,
+        /// which refuse exactly those eight. Those types are served by WallstopProto there, so
+        /// nothing encodes wrongly; the property this test is about only means something on the
+        /// backend where protobuf-net can run at all.
+        /// </para>
         /// </remarks>
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void EverySurrogateThisPackageDeclaresWasActuallyRegistered()
         {
             ProtobufUnityModel.EnsureInitialized();

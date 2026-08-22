@@ -730,12 +730,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch (Exception error)
             {
                 RegistrationFailures.Add(typeof(TReal).Name);
+#if !ENABLE_IL2CPP
+                // Reported only where protobuf-net is a path this package can actually take. Under
+                // IL2CPP it is not: it builds its serializers by reflection, which the AOT compiler
+                // cannot emit, and every type here is served by WallstopProto instead -- which is
+                // the whole reason WallstopProto exists. A refusal there is expected and inert, so
+                // logging it would put eight errors in front of every player at startup for a
+                // fallback that was never going to run. Measured: the standalone legs refuse
+                // Vector2, Vector3, Rect, RectInt, Bounds, BoundsInt, Vector2Int and Vector3Int.
                 Debug.LogError(
                     $"[UnityHelpers] protobuf-net already bound {typeof(TReal).Name}, so its "
                         + $"{typeof(TSurrogate).Name} could not be registered and the type will be "
                         + $"encoded with different bytes than this package documents. Something "
                         + $"serialized it before UnityHelpers' Serializer was first touched. {error.Message}"
                 );
+#endif
             }
         }
 
