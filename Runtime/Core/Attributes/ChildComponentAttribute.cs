@@ -815,12 +815,26 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 Scratch = null;
             }
 
-            // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
-            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-            // at runtime in player builds). It has no caller-buffer sibling, so its array still
-            // allocates; what this removes is the typed copy that followed it.
-            Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
             results.Clear();
+
+            // The non-generic Type overload has no caller-buffer sibling, so it allocates a
+            // Component[] on every assignment. Closing the generic query over the element type
+            // fills a reused buffer instead; a runtime that refuses that instantiation falls back
+            // here permanently rather than per call.
+            RelationalComponentCollector collector = RelationalComponentCollector.For(
+                elementType,
+                component
+            );
+            if (collector != null)
+            {
+                _ = collector.CollectChildrenInto(component, includeInactive, results);
+                return results;
+            }
+
+            // AOT-safe fallback: the non-generic Type overload avoids the runtime generic-method +
+            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
+            // at runtime in player builds).
+            Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
             for (int i = 0; i < matches.Length; ++i)
             {
                 results.Add(matches[i]);
