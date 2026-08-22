@@ -101,6 +101,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="tag">The wire field number.</param>
         /// <param name="type">The member's declared type.</param>
         /// <param name="isRequired">Whether <c>IsRequired</c> was set.</param>
+        /// <param name="zigZag">Whether the member asked for <c>DataFormat = ZigZag</c>.</param>
         /// <param name="surrogates">The assembly's surrogate registrations.</param>
         /// <param name="nested">The contract's wrapper-message registry.</param>
         /// <remarks>
@@ -115,6 +116,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             int tag,
             ITypeSymbol type,
             bool isRequired,
+            bool zigZag,
             SurrogateMap surrogates,
             NestedCollections nested
         )
@@ -138,7 +140,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            Shape shape = Shape.For(underlying, qualifiedUnderlying, surrogates, nested, name);
+            // ZigZag first, and it never falls through to the default shape: the caller has already
+            // refused the annotation on a type that has no such encoding, so reaching Shape.For here
+            // would mean silently writing the int32 this member explicitly declined.
+            Shape shape = zigZag
+                ? Shape.ZigZag(underlying, qualifiedUnderlying)
+                : Shape.For(underlying, qualifiedUnderlying, surrogates, nested, name);
             if (shape == null)
             {
                 return null;

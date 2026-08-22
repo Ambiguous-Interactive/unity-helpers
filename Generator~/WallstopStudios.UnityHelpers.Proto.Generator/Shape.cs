@@ -530,6 +530,68 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             };
         }
 
+        /// <summary>
+        /// Reports whether <paramref name="type"/> has a ZigZag encoding at all.
+        /// </summary>
+        /// <param name="type">The member's declared type, which may be a <c>Nullable{T}</c>.</param>
+        /// <remarks>
+        /// Only the signed integers: protobuf spells ZigZag <c>sint32</c> and <c>sint64</c>, and has
+        /// no such form for an unsigned value, a float, a string or a message. A repeated or map
+        /// member answers <c>false</c> here too, because the annotation names an element encoding
+        /// this generator does not yet emit -- and an annotation that is quietly dropped is a wire
+        /// format nobody chose.
+        /// </remarks>
+        internal static bool SupportsZigZag(ITypeSymbol type)
+        {
+            return Underlying(type).SpecialType is SpecialType.System_SByte
+                or SpecialType.System_Int16
+                or SpecialType.System_Int32
+                or SpecialType.System_Int64;
+        }
+
+        /// <summary>
+        /// The shape of a signed integer encoded as <c>sint32</c> or <c>sint64</c>.
+        /// </summary>
+        /// <param name="type">The value's type, with any <c>Nullable{T}</c> already unwrapped.</param>
+        /// <param name="qualified">Its fully qualified name.</param>
+        /// <remarks>
+        /// The presence test is the same <c>!= 0</c> the default encoding uses, and deliberately so:
+        /// ZigZag maps zero onto zero, so the field a default value would produce is the one that is
+        /// already omitted.
+        /// </remarks>
+        internal static Shape ZigZag(ITypeSymbol type, string qualified)
+        {
+            bool wide = type.SpecialType == SpecialType.System_Int64;
+            bool exact = wide || type.SpecialType == SpecialType.System_Int32;
+            string cast = wide ? "(long)" : "(int)";
+            string widened = exact ? Placeholder : cast + Placeholder;
+            return new Shape
+            {
+                WireType = Proto + ".WProtoWireType.Varint",
+                PresenceTest = Placeholder + " != 0",
+                SizeExpression =
+                    Proto
+                    + (wide ? ".WProtoSizes.ZigZag64Size(" : ".WProtoSizes.ZigZag32Size(")
+                    + widened
+                    + ")",
+                WriteMethod = wide ? "TryWriteZigZag64" : "TryWriteZigZag32",
+                ReadMethod = wide ? "TryReadZigZag64" : "TryReadZigZag32",
+                ReadLocalType = wide ? "long" : "int",
+                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
+                WriteCast = exact ? string.Empty : cast,
+            };
+        }
+
+        private static ITypeSymbol Underlying(ITypeSymbol type)
+        {
+            return
+                type is INamedTypeSymbol named
+                && named.IsGenericType
+                && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T
+                ? named.TypeArguments[0]
+                : type;
+        }
+
         private static Shape Unsigned32(string qualified, bool exact)
         {
             string widened = exact ? Placeholder : "(uint)" + Placeholder;

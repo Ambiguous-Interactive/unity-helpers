@@ -154,6 +154,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="type">The member's declared type.</param>
         /// <param name="isRequired">Whether <c>IsRequired</c> was set.</param>
         /// <param name="overwriteList">Whether <c>OverwriteList</c> was set.</param>
+        /// <param name="zigZag">Whether <c>DataFormat = ZigZag</c> was set.</param>
         /// <param name="nested">The contract's wrapper-message registry, for a nested collection.</param>
         /// <param name="ambiguous">
         /// Set when the type is both a contract and a collection and nothing says which it is, so
@@ -175,6 +176,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             ITypeSymbol type,
             bool isRequired,
             bool overwriteList,
+            bool zigZag,
             SurrogateMap surrogates,
             NestedCollections nested,
             out bool ambiguous
@@ -195,7 +197,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (isContract && Shape.IgnoresListHandling(type))
             {
                 // Explicitly a message, whatever interfaces it implements.
-                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates, nested);
+                return ScalarMember.TryCreate(
+                    name,
+                    tag,
+                    type,
+                    isRequired,
+                    zigZag,
+                    surrogates,
+                    nested
+                );
             }
 
             // Maps first: a dictionary also implements ICollection<KeyValuePair<K,V>>, and the
@@ -233,7 +243,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             if (repeated == null)
             {
-                return ScalarMember.TryCreate(name, tag, type, isRequired, surrogates, nested);
+                return ScalarMember.TryCreate(
+                    name,
+                    tag,
+                    type,
+                    isRequired,
+                    zigZag,
+                    surrogates,
+                    nested
+                );
             }
 
             if (isContract)

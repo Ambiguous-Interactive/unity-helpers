@@ -441,6 +441,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         // collection -- so the read replaces rather than appends. That is also what
                         // keeps the emitted read free of any reference to an enclosing instance.
                         true,
+                        // A wrapper's element encoding is the element type's own. The outer member's
+                        // DataFormat was refused before it reached here, because a repeated member is
+                        // not one of the shapes this generator can zigzag.
+                        false,
                         _surrogates,
                         this,
                         out bool ambiguous

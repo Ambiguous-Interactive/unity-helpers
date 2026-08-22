@@ -40,19 +40,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         // WProtoBootstrap ran. A RegisterAll() call in a setup would hide a stripped or unreached
         // bootstrap on the one leg -- standalone IL2CPP -- where it can actually happen.
 
+        // Components are sint32 on fields 5 and 6. The bytes come from protobuf-net itself, through
+        // the GridCellShape stand-in in the generator suite -- this assembly cannot ask the oracle,
+        // because protobuf-net is exactly what does not run on the IL2CPP legs these have to hold on.
         [TestCase(0, 0, "")]
-        [TestCase(1, 2, "08011002")]
-        [TestCase(-1, -2, "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF01")]
-        [TestCase(int.MaxValue, int.MinValue, "08FFFFFFFF071080808080F8FFFFFFFF01")]
+        [TestCase(1, 2, "28023004")]
+        [TestCase(-1, -2, "28013003")]
+        [TestCase(int.MaxValue, int.MinValue, "28FEFFFFFF0F30FFFFFFFF0F")]
         public void FastVector2IntMatchesProtobufNetBytes(int x, int y, string expected)
         {
             AssertRoundTrip(new FastVector2Int(x, y), expected);
         }
 
         [TestCase(0, 0, 0, "")]
-        [TestCase(1, 2, 3, "080110022003")]
-        [TestCase(-1, -2, -3, "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF0120FDFFFFFFFFFFFFFFFF01")]
-        [TestCase(int.MaxValue, 0, int.MinValue, "08FFFFFFFF072080808080F8FFFFFFFF01")]
+        [TestCase(1, 2, 3, "280230043806")]
+        [TestCase(-1, -2, -3, "280130033805")]
+        [TestCase(int.MaxValue, 0, int.MinValue, "28FEFFFFFF0F38FFFFFFFF0F")]
         public void FastVector3IntMatchesProtobufNetBytes(int x, int y, int z, string expected)
         {
             AssertRoundTrip(new FastVector3Int(x, y, z), expected);
@@ -65,10 +68,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // it bought nothing. Being well distributed it was almost always a five-byte varint plus
             // a tag: six of the ten bytes an ordinary cell cost.
             Assert.AreEqual(-1, IndexOfTag(Encode(new FastVector2Int(5, 3)), 3));
+            Assert.AreEqual(-1, IndexOfTag(Encode(new FastVector3Int(1, 2, 3)), 3));
+        }
+
+        [Test]
+        public void NeitherFastVectorWritesTheInt32FieldsItStillReads()
+        {
+            // The old field numbers are a read path and nothing else. A write that still touched
+            // them would be a payload carrying each component twice, in two encodings, and the
+            // second reader to see it would have to pick.
+            byte[] twoDimensional = Encode(new FastVector2Int(5, 3));
+            Assert.AreEqual(-1, IndexOfTag(twoDimensional, 1), "x must not be written as int32");
+            Assert.AreEqual(-1, IndexOfTag(twoDimensional, 2), "y must not be written as int32");
+            Assert.Greater(IndexOfTag(twoDimensional, 5), -1, "x belongs on 5");
+            Assert.Greater(IndexOfTag(twoDimensional, 6), -1, "y belongs on 6");
 
             byte[] threeDimensional = Encode(new FastVector3Int(1, 2, 3));
-            Assert.AreEqual(-1, IndexOfTag(threeDimensional, 3), "The cached hash is back on 3");
-            Assert.Greater(IndexOfTag(threeDimensional, 4), -1, "z must stay on tag 4");
+            Assert.AreEqual(-1, IndexOfTag(threeDimensional, 4), "z must not be written as int32");
+            Assert.Greater(IndexOfTag(threeDimensional, 7), -1, "z belongs on 7");
         }
 
         [Test]
@@ -83,17 +100,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertLegacyReadsBack("18B7EFC3D504", default(FastVector3Int));
         }
 
-        // A component's cost is the number this holds: a varint int32 sign-extends, so a negative
-        // component is ten bytes where its magnitude would be one. #527 tracks whether zigzag is
-        // worth a second wire break for grids that straddle the origin.
+        // A component's cost is the number this holds, and under sint32 it follows the component's
+        // DISTANCE from the origin rather than its sign: (-1, -2) is four bytes where it was
+        // twenty-two. The 8,192 row is the other half of that trade -- zigzag spends the low bit on
+        // the sign, so a positive value just over a varint boundary grows by one byte.
         [TestCase(0, 0, 0)]
         [TestCase(5, 3, 4)]
-        [TestCase(16383, 16383, 6)]
+        [TestCase(-1, -2, 4)]
+        [TestCase(-5, -3, 4)]
+        [TestCase(8191, 8191, 6)]
+        [TestCase(8192, 8192, 8)]
         [TestCase(16384, 16384, 8)]
-        [TestCase(-1, -2, 22)]
         public void AFastVector2IntCellCostsExactlyItsComponents(int x, int y, int expectedBytes)
         {
             Assert.AreEqual(expectedBytes, Encode(new FastVector2Int(x, y)).Length);
+        }
+
+        /// <summary>
+        /// The reason the encoding changed, as the two grids that motivated it.
+        /// </summary>
+        /// <remarks>
+        /// 1,000 cells laid out twice over the same magnitudes -- once anchored at the origin, once
+        /// centred on it. Under int32 the centred grid cost 14,690 bytes against the anchored one's
+        /// 5,870, purely because half its coordinates were negative. They are now equal, and the
+        /// number is the one the generator suite measures against protobuf-net itself.
+        /// </remarks>
+        [Test]
+        public void ACentredGridOfCellsCostsWhatAnAnchoredOneDoes()
+        {
+            Assert.AreEqual(3870, GridBytes(0, 0));
+            Assert.AreEqual(3870, GridBytes(-20, -12));
+        }
+
+        private static int GridBytes(int originX, int originY)
+        {
+            int total = 0;
+            for (int x = originX; x < originX + 40; x++)
+            {
+                for (int y = originY; y < originY + 25; y++)
+                {
+                    total += Encode(new FastVector2Int(x, y)).Length;
+                }
+            }
+
+            return total;
         }
 
         [Test]

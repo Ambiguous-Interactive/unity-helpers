@@ -1478,6 +1478,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ).SetName("TwoRootsForOneDeclaredTypeIsAnError");
         }
 
+        /// <summary>
+        /// Every type protobuf has no <c>sint</c> form for is refused rather than quietly widened.
+        /// </summary>
+        /// <remarks>
+        /// The alternative reading -- drop the annotation and encode the member the default way --
+        /// is what makes this an error instead of a warning. A dropped <c>DataFormat</c> is not a
+        /// missing optimization; it is a member encoded as the thing its author wrote down that it
+        /// was not, and the two are different bytes that no round trip in this suite would notice.
+        /// </remarks>
+        [TestCase("uint Value", TestName = "AZigZagUnsignedIntegerIsAnError")]
+        [TestCase("float Value", TestName = "AZigZagFloatIsAnError")]
+        [TestCase("string Value", TestName = "AZigZagStringIsAnError")]
+        [TestCase("bool Value", TestName = "AZigZagBoolIsAnError")]
+        [TestCase("int[] Value", TestName = "AZigZagRepeatedMemberIsAnError")]
+        public void AZigZagOnATypeWithNoSuchEncodingIsAnError(string member)
+        {
+            AssertDiagnostic(
+                "WPROTO037",
+                "Value",
+                "[WProtoContract] public sealed partial class Wrong { "
+                    + "[WProtoMember(1, DataFormat = WProtoDataFormat.ZigZag)] public "
+                    + member
+                    + "; }"
+            );
+        }
+
+        [TestCase("sbyte Value", TestName = "AZigZagSByteIsAccepted")]
+        [TestCase("short Value", TestName = "AZigZagInt16IsAccepted")]
+        [TestCase("int Value", TestName = "AZigZagInt32IsAccepted")]
+        [TestCase("long Value", TestName = "AZigZagInt64IsAccepted")]
+        [TestCase("int? Value", TestName = "AZigZagNullableInt32IsAccepted")]
+        public void AZigZagOnASignedIntegerIsAccepted(string member)
+        {
+            Assert.IsEmpty(
+                Run(
+                    "[WProtoContract] public sealed partial class Fine { "
+                        + "[WProtoMember(1, DataFormat = WProtoDataFormat.ZigZag)] public "
+                        + member
+                        + "; }"
+                )
+            );
+        }
+
         private static void AssertDiagnostic(string id, string mustName, string source)
         {
             ImmutableArray<Diagnostic> diagnostics = Run(source);

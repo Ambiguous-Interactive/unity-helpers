@@ -296,6 +296,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             TestName = "AnIsRequiredThatIsNotMirroredIsReported"
         )]
         [TestCase(
+            "[ProtoContract] [WProtoContract] partial class Zagged { "
+                + "[ProtoMember(1, DataFormat = DataFormat.ZigZag)] [WProtoMember(1)] public int A; }",
+            "'Zagged.A' differs on 'DataFormat'",
+            TestName = "ADataFormatThatIsNotMirroredIsReported"
+        )]
+        [TestCase(
+            "[ProtoContract] [WProtoContract] partial class Zagged { "
+                + "[ProtoMember(1, DataFormat = DataFormat.FixedSize)] "
+                + "[WProtoMember(1, DataFormat = WProtoDataFormat.ZigZag)] public int A; }",
+            "'Zagged.A' differs on 'DataFormat'",
+            TestName = "TwoDifferentDataFormatsAreReportedDespiteTheirDifferentEnums"
+        )]
+        [TestCase(
             "[ProtoContract] [WProtoContract] partial class Skipped { "
                 + "[ProtoIgnore] public int A; [ProtoMember(1)] [WProtoMember(1)] public int B; }",
             "'Skipped.A' differs on 'Ignore'",
@@ -1039,9 +1052,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return arguments;
         }
 
+        /// <summary>
+        /// Reduces an attribute argument to the text two mirrored annotations can be compared by.
+        /// </summary>
+        /// <remarks>
+        /// Whitespace is noise. The qualifier on an enum member is not noise but it is not a
+        /// difference either: the two serializers name the same choice through two enums --
+        /// <c>DataFormat.ZigZag</c> and <c>WProtoDataFormat.ZigZag</c> -- so comparing the written
+        /// text would report every mirrored <c>DataFormat</c> as a mismatch. The member name is what
+        /// the mirror is about, and it is compared exactly. Only a dotted chain of identifiers is
+        /// reduced this way, so a numeric literal keeps its fractional part.
+        /// </remarks>
         private static string Normalize(string expression)
         {
-            return string.Concat(expression.Where(character => !char.IsWhiteSpace(character)));
+            string bare = string.Concat(
+                expression.Where(character => !char.IsWhiteSpace(character))
+            );
+
+            int dot = bare.LastIndexOf('.');
+            if (dot < 0)
+            {
+                return bare;
+            }
+
+            return bare.Split('.').All(IsIdentifier) ? bare.Substring(dot + 1) : bare;
+        }
+
+        private static bool IsIdentifier(string text)
+        {
+            return 0 < text.Length
+                && (char.IsLetter(text[0]) || text[0] == '_')
+                && text.All(character => char.IsLetterOrDigit(character) || character == '_');
         }
 
         private static string Location(string file, SyntaxNode node)

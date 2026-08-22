@@ -58,6 +58,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public bool IsRequired { get; set; }
 
         /// <summary>
+        /// Selects the encoding a signed integer member uses.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <see cref="WProtoDataFormat.ZigZag"/> is the one alternative offered, and it changes the
+        /// bytes: a member that was <c>int32</c> and becomes <c>sint32</c> is read as a different
+        /// number by anything holding the old payload, so it is a wire break rather than a hint.
+        /// </para>
+        /// <para>
+        /// Only <c>sbyte</c>, <c>short</c>, <c>int</c> and <c>long</c> have a ZigZag encoding,
+        /// including as a <see cref="System.Nullable{T}"/>. Asking for one anywhere else is a build
+        /// error (<c>WPROTO037</c>) rather than an annotation that quietly does nothing.
+        /// </para>
+        /// </remarks>
+        public WProtoDataFormat DataFormat { get; set; }
+
+        /// <summary>
         /// Indicates whether reading a repeated member replaces the existing collection instead of
         /// appending to it.
         /// </summary>

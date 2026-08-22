@@ -2519,6 +2519,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                bool zigZag = NamedEnum(attribute, "DataFormat") == ZigZagDataFormat;
+                if (zigZag && !Shape.SupportsZigZag(type))
+                {
+                    Report(
+                        context,
+                        WProtoDiagnostics.DataFormatNotApplicable,
+                        symbol,
+                        contract.Name,
+                        symbol.Name,
+                        TypeNaming.Display(type)
+                    );
+                    failed = true;
+                    continue;
+                }
+
                 int depthRefusals = nested.DepthRefusals;
                 Member member = Member.Create(
                     contract.Name,
@@ -2527,6 +2542,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     type,
                     NamedFlag(attribute, "IsRequired"),
                     NamedFlag(attribute, "OverwriteList"),
+                    zigZag,
                     surrogates,
                     nested,
                     out bool ambiguous
@@ -2653,6 +2669,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             context.ReportDiagnostic(
                 Diagnostic.Create(descriptor, symbol.Locations.FirstOrDefault(), arguments)
             );
+        }
+
+        /// <summary>The <c>WProtoDataFormat.ZigZag</c> member's value, as it is on the wire of the attribute.</summary>
+        /// <remarks>
+        /// Compared as an integer rather than by name because that is all an enum argument is by the
+        /// time a generator sees it, and the generator cannot reference the runtime assembly the
+        /// enum is declared in.
+        /// </remarks>
+        private const int ZigZagDataFormat = 1;
+
+        private static int NamedEnum(AttributeData attribute, string name)
+        {
+            foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
+            {
+                if (argument.Key == name && argument.Value.Value is int value)
+                {
+                    return value;
+                }
+            }
+
+            return 0;
         }
 
         private static bool NamedFlag(AttributeData attribute, string name)

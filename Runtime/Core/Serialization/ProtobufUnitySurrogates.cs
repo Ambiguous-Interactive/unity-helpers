@@ -392,42 +392,71 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     // mutable surrogate uses protobuf-net's working surrogate path instead. Field numbers mirror
     // the originals exactly so the wire format is byte-identical to the pre-surrogate mono output.
 
+    // Components travel as sint32 on fields 5 and 6, where a negative coordinate costs its
+    // magnitude rather than the ten bytes int32 spends sign-extending it. The int32 fields they
+    // replace are still declared, and are read-only in practice: nothing sets them on the way out,
+    // so they are zero and protobuf-net omits them. Renumbering instead of adding was not an option
+    // -- an int32 varint read as sint32 is a different number rather than an error, so a grid saved
+    // by an earlier build would have loaded with every coordinate silently halved.
     [ProtoContract]
     [WProtoContract]
     internal partial struct FastVector2IntSurrogate
     {
+        [ProtoMember(5, DataFormat = DataFormat.ZigZag)]
+        [WProtoMember(5, DataFormat = WProtoDataFormat.ZigZag)]
+        public int x;
+
+        [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
+        [WProtoMember(6, DataFormat = WProtoDataFormat.ZigZag)]
+        public int y;
+
         [ProtoMember(1)]
         [WProtoMember(1)]
-        public int x;
+        public int legacyX;
 
         [ProtoMember(2)]
         [WProtoMember(2)]
-        public int y;
+        public int legacyY;
 
         public static implicit operator FastVector2IntSurrogate(FastVector2Int v) =>
             new() { x = v.x, y = v.y };
 
-        public static implicit operator FastVector2Int(FastVector2IntSurrogate s) => new(s.x, s.y);
+        // A payload carries one encoding or the other, never both, so "the zigzag field unless it is
+        // absent" is exactly "whichever one was written".
+        public static implicit operator FastVector2Int(FastVector2IntSurrogate s) =>
+            new(s.x != 0 ? s.x : s.legacyX, s.y != 0 ? s.y : s.legacyY);
     }
 
+    // As FastVector2IntSurrogate. The legacy z stays on tag 4, the number it had when field 3
+    // carried the cached hash, so a payload written by a build that still wrote that hash does not
+    // read it as z.
     [ProtoContract]
     [WProtoContract]
     internal partial struct FastVector3IntSurrogate
     {
+        [ProtoMember(5, DataFormat = DataFormat.ZigZag)]
+        [WProtoMember(5, DataFormat = WProtoDataFormat.ZigZag)]
+        public int x;
+
+        [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
+        [WProtoMember(6, DataFormat = WProtoDataFormat.ZigZag)]
+        public int y;
+
+        [ProtoMember(7, DataFormat = DataFormat.ZigZag)]
+        [WProtoMember(7, DataFormat = WProtoDataFormat.ZigZag)]
+        public int z;
+
         [ProtoMember(1)]
         [WProtoMember(1)]
-        public int x;
+        public int legacyX;
 
         [ProtoMember(2)]
         [WProtoMember(2)]
-        public int y;
-
-        // z keeps tag 4, the number it had when field 3 carried FastVector3Int's cached hash, so a
-        // payload written by a build that still wrote the hash does not read it as z.
+        public int legacyY;
 
         [ProtoMember(4)]
         [WProtoMember(4)]
-        public int z;
+        public int legacyZ;
 
         public static implicit operator FastVector3IntSurrogate(FastVector3Int v) =>
             new()
@@ -438,7 +467,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator FastVector3Int(FastVector3IntSurrogate s) =>
-            new(s.x, s.y, s.z);
+            new(
+                s.x != 0 ? s.x : s.legacyX,
+                s.y != 0 ? s.y : s.legacyY,
+                s.z != 0 ? s.z : s.legacyZ
+            );
     }
 
     [ProtoContract]

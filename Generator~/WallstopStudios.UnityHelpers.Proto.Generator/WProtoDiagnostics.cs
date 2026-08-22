@@ -366,6 +366,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             isEnabledByDefault: true
         );
 
+        internal static readonly DiagnosticDescriptor DataFormatNotApplicable =
+            new DiagnosticDescriptor(
+                "WPROTO037",
+                "WallstopProto DataFormat does not apply to this member",
+                "'{0}.{1}' has type '{2}' and asks for DataFormat = ZigZag, which protobuf spells sint32 and sint64 and has for no other type. Only sbyte, short, int and long -- including as a Nullable<T> -- have that encoding; an unsigned integer, a float, a string, a message, a collection and a map have none. This is an error rather than an ignored annotation because the two readings are different bytes: dropping it silently would write the int32 the member explicitly declined. Remove DataFormat, or hold the value in one of the four types that has it.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",
