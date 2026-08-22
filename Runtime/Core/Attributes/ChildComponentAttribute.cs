@@ -392,14 +392,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             using (ChildFastPathMarker.Auto())
 #endif
             {
-                using PooledResource<List<Component>> childBuffer = Buffers<Component>.List.Get(
-                    out List<Component> children
-                );
-                ChildComponentFastInvoker.Collect(
+                List<Component> children = ChildComponentFastInvoker.Collect(
                     component,
                     metadata.elementType,
-                    attribute.IncludeInactive,
-                    children
+                    attribute.IncludeInactive
                 );
 
                 int count = FilterChildren(component, metadata, children);
@@ -782,23 +778,38 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ChildComponentFastInvoker
     {
-        internal static void Collect(
+        // Reused rather than leased from a pool: assignment is main-thread-only and never nested,
+        // and the lease measured more per call than it saved. [ThreadStatic] keeps that safe if a
+        // caller ignores the main-thread rule. Each family owns its own buffer, so the three
+        // sequential passes of AssignRelationalComponents cannot collide.
+        [ThreadStatic]
+        private static List<Component> Scratch;
+
+        internal static List<Component> Collect(
             Component component,
             Type elementType,
-            bool includeInactive,
-            List<Component> results
+            bool includeInactive
         )
         {
+            List<Component> results = Scratch;
+            if (results == null)
+            {
+                results = new List<Component>();
+                Scratch = results;
+            }
+
             // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
             // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
             // at runtime in player builds). It has no caller-buffer sibling, so its array still
-            // allocates; what the caller buffer removes is the typed copy that followed it.
+            // allocates; what this removes is the typed copy that followed it.
             Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
             results.Clear();
             for (int i = 0; i < matches.Length; ++i)
             {
                 results.Add(matches[i]);
             }
+
+            return results;
         }
     }
 }

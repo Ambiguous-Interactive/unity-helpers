@@ -335,10 +335,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             FieldMetadata<SiblingComponentAttribute> metadata
         )
         {
-            using PooledResource<List<Component>> matchBuffer = Buffers<Component>.List.Get(
-                out List<Component> matches
+            List<Component> matches = SiblingComponentFastInvoker.Collect(
+                component,
+                metadata.elementType
             );
-            SiblingComponentFastInvoker.Collect(component, metadata.elementType, matches);
             return AssignComponentsFromList(component, metadata, matches);
         }
 
@@ -409,15 +409,28 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class SiblingComponentFastInvoker
     {
-        internal static void Collect(Component component, Type elementType, List<Component> results)
+        // Reused rather than leased from a pool: assignment is main-thread-only and never nested,
+        // and the lease measured more per call than the allocation it removed. [ThreadStatic] keeps
+        // that safe if a caller ignores the main-thread rule.
+        [ThreadStatic]
+        private static List<Component> Scratch;
+
+        internal static List<Component> Collect(Component component, Type elementType)
         {
+            List<Component> results = Scratch;
+            if (results == null)
+            {
+                results = new List<Component>();
+                Scratch = results;
+            }
+
             // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
             // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
             // at runtime in player builds). The List overload of the same query fills a caller
-            // buffer instead of allocating an array per call: 0.155 us against 0.524 us for five
-            // matches on Unity 6000.4.6f1 Mono.
+            // buffer instead of allocating an array per call.
             results.Clear();
             component.GetComponents(elementType, results);
+            return results;
         }
     }
 }

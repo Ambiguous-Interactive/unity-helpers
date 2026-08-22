@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Assign relational components faster. A `[SiblingComponent]` array field costs 23% less and a component with single, array and list fields 21% less, and the collection paths no longer allocate a throwaway array per call ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
+- Assign relational array fields faster: a `[SiblingComponent]` array field costs 22% less, and sibling collection fields no longer allocate per call. `List` and `HashSet` fields are unchanged ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Write `FastVector2Int` and `FastVector3Int` components as `sint32`, so a negative coordinate costs one byte instead of ten. A 1,000-cell tilemap centred on the origin falls from 14,690 to 3,870 bytes. Payloads written by 3.5.1 still read ([#527](https://github.com/Ambiguous-Interactive/unity-helpers/issues/527)).
 - Stop `FastVector2Int` and `FastVector3Int` writing their cached hash, which every reader already recomputed: a 1,000-cell tilemap falls from 14,167 to 5,870 bytes. Payloads written by 3.5.1 still read; a 3.5.1 build cannot read new ones ([#519](https://github.com/Ambiguous-Interactive/unity-helpers/issues/519)).
 - Remove an item from a `SpatialHash2D`/`SpatialHash3D` bucket by swapping the last entry into its place rather than shifting the tail. Query results were never ordered and are not now; the order two items in one cell come back in can differ from before.
