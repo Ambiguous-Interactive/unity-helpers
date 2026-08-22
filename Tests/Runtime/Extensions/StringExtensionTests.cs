@@ -999,6 +999,97 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual("hello-world-test", "hello_world_test".ToKebabCase());
         }
 
+        [TestCase(null, "")]
+        [TestCase("", "")]
+        [TestCase("   ", "")]
+        [TestCase("Hello World", "hello-world")]
+        [TestCase("  Hello   World  ", "hello-world")]
+        [TestCase("already-a-slug", "already-a-slug")]
+        [TestCase("PlayerHP_Max", "player-hp-max")]
+        [TestCase("The Quick! Brown? Fox.", "the-quick-brown-fox")]
+        [TestCase("Level 10: The Descent", "level-10-the-descent")]
+        [TestCase("---leading and trailing---", "leading-and-trailing")]
+        [TestCase("tabs\tand\nnewlines", "tabs-and-newlines")]
+        // Accents fold to their ASCII base rather than being dropped, so a word keeps its letters.
+        [TestCase("Caf\u00e9 Ol\u00e9", "cafe-ole")]
+        [TestCase("Zo\u00eb's Caf\u00e9 -- 50% Off!", "zoes-cafe-50-off")]
+        // The example the docs and the XML remarks both print, so neither can drift from it.
+        [TestCase("Caf\u00e9 Menu -- 50% Off!", "cafe-menu-50-off")]
+        // A script with no ASCII form leaves nothing behind, which callers have to expect.
+        [TestCase("\u65e5\u672c\u8a9e", "")]
+        [TestCase("emoji \ud83c\udfae here", "emoji-here")]
+        public void SlugifyProducesAUrlSafeSlug(string input, string expected)
+        {
+            Assert.AreEqual(expected, input.Slugify());
+        }
+
+        [Test]
+        public void SlugifyIsAlwaysWellFormedOrEmpty()
+        {
+            // The shape is the contract, so it is asserted over arbitrary input rather than over a
+            // list someone remembered: lowercase ASCII runs joined by single hyphens, no hyphen at
+            // either end. Lone surrogates are included because Normalize refuses them and real data
+            // contains them.
+            const string alphabet = "aZ0 -_.!?%\t\n/\\:\u00e9\u00fc\u65e5\ud83c\udfae\ud800\udc00";
+            System.Random random = new(20250822);
+            for (int iteration = 0; iteration < 2000; ++iteration)
+            {
+                int length = random.Next(0, 24);
+                char[] characters = new char[length];
+                for (int i = 0; i < length; ++i)
+                {
+                    characters[i] = alphabet[random.Next(alphabet.Length)];
+                }
+
+                string input = new(characters);
+                string slug = input.Slugify();
+                Assert.IsTrue(slug != null, $"Slugify returned null for [{input}]");
+                if (slug.Length == 0)
+                {
+                    continue;
+                }
+
+                Assert.AreNotEqual('-', slug[0], $"Leading hyphen for [{input}] -> [{slug}]");
+                Assert.AreNotEqual(
+                    '-',
+                    slug[slug.Length - 1],
+                    $"Trailing hyphen for [{input}] -> [{slug}]"
+                );
+                for (int i = 0; i < slug.Length; ++i)
+                {
+                    char current = slug[i];
+                    bool allowed =
+                        current is >= 'a' and <= 'z'
+                        || current is >= '0' and <= '9'
+                        || current == '-';
+                    Assert.IsTrue(allowed, $"Illegal '{current}' in [{input}] -> [{slug}]");
+                    Assert.IsFalse(
+                        current == '-' && slug[i - 1] == '-',
+                        $"Doubled hyphen in [{input}] -> [{slug}]"
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void SlugifyIsIdempotent()
+        {
+            // A slug re-slugged has to be itself, or a key stored and re-derived drifts.
+            string[] inputs =
+            {
+                "Hello World",
+                "Level 10: The Descent",
+                "Caf\u00e9 Ol\u00e9",
+                "---leading and trailing---",
+                "PlayerHP_Max",
+            };
+            foreach (string input in inputs)
+            {
+                string once = input.Slugify();
+                Assert.AreEqual(once, once.Slugify(), $"Slugify is not idempotent for [{input}]");
+            }
+        }
+
         [Test]
         public void ToKebabCaseEdgeCases()
         {

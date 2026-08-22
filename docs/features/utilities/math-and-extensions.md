@@ -916,6 +916,25 @@ input.ToTitleCase();   // "Xml Http Request"
 
 Smart tokenization handles mixed cases intelligently.
 
+### Slugs
+
+**Why it exists:** a case conversion is not a slug. `ToKebabCase` keeps punctuation and accents, so
+`"Café Menu -- 50% Off!"` becomes `"café-menu-50%-off!"` — not something you can put in a URL, a
+filename, or an addressable key.
+
+```csharp
+"Level 10: The Descent".Slugify();  // "level-10-the-descent"
+"Café Menu -- 50% Off!".Slugify();  // "cafe-menu-50-off"
+"PlayerHPMax".Slugify();            // "player-hp-max"
+```
+
+The result is only lowercase ASCII letters, digits and single hyphens, with no hyphen at either end.
+
+Accents fold to their ASCII base rather than being dropped, so `"Café"` keeps all four of its letters
+and slugs to `"cafe"`. Characters with no ASCII form — emoji, and ideographic scripts such as CJK —
+are removed, so **a string written entirely in such a script slugs to empty**. Check for that rather
+than assuming a non-empty input yields a non-empty slug.
+
 ### String Utilities
 
 **Levenshtein Distance (edit distance):**

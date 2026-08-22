@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.Globalization;
     using System.Text;
     using Serialization;
     using WallstopStudios.UnityHelpers.Utils;
@@ -523,6 +524,72 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 char c = word[i];
                 _ = builder.Append(char.ToLowerInvariant(c));
             }
+        }
+
+        private const char SlugSeparator = '-';
+
+        /// <summary>
+        /// Replaces accented characters with their unaccented ASCII base, leaving everything else
+        /// alone.
+        /// </summary>
+        /// <remarks>
+        /// Normalization is skipped when the string is already in Form D, and refused input is
+        /// returned unchanged rather than thrown from: <see cref="string.Normalize(NormalizationForm)"/>
+        /// throws <see cref="ArgumentException"/> on a lone surrogate, which is a shape real data
+        /// arrives in, and a slug is not worth failing a caller over.
+        /// </remarks>
+        private static string FoldDiacritics(string value)
+        {
+            string decomposed;
+            try
+            {
+                if (value.IsNormalized(NormalizationForm.FormD))
+                {
+                    decomposed = value;
+                }
+                else
+                {
+                    decomposed = value.Normalize(NormalizationForm.FormD);
+                }
+            }
+            catch (ArgumentException)
+            {
+                return value;
+            }
+
+            int firstMark = -1;
+            for (int i = 0; i < decomposed.Length; ++i)
+            {
+                if (
+                    CharUnicodeInfo.GetUnicodeCategory(decomposed[i])
+                    == UnicodeCategory.NonSpacingMark
+                )
+                {
+                    firstMark = i;
+                    break;
+                }
+            }
+
+            if (firstMark < 0)
+            {
+                return decomposed;
+            }
+
+            using PooledResource<StringBuilder> pooled = Buffers.GetStringBuilder(
+                decomposed.Length,
+                out StringBuilder builder
+            );
+            builder.Append(decomposed, 0, firstMark);
+            for (int i = firstMark; i < decomposed.Length; ++i)
+            {
+                char current = decomposed[i];
+                if (CharUnicodeInfo.GetUnicodeCategory(current) != UnicodeCategory.NonSpacingMark)
+                {
+                    builder.Append(current);
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static string ToDelimitedCase(string value, char delimiter)
@@ -1110,6 +1177,83 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public static string ToTitleCase(this string value, bool preserveSeparators = true)
         {
             return ToTitleCaseInternal(value, preserveSeparators);
+        }
+
+        /// <summary>
+        /// Converts a string to a URL- and filename-safe slug: lowercase ASCII letters and digits,
+        /// single hyphens between words, no leading or trailing hyphen.
+        /// </summary>
+        /// <param name="value">The text to slugify.</param>
+        /// <returns>
+        /// The slug, or <see cref="string.Empty"/> when the input is null, empty, or contains no
+        /// ASCII letter or digit once accents are folded.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// Word boundaries come from the same tokenizer the casing family uses, so
+        /// <c>"PlayerHPMax"</c> slugs to <c>"player-hp-max"</c> rather than to one run.
+        /// </para>
+        /// <para>
+        /// Accents are folded to their ASCII base rather than dropped, so <c>"Café"</c> keeps all
+        /// four of its letters and slugs to <c>"cafe"</c>. Characters with no ASCII form, emoji and
+        /// ideographic scripts among them, are removed, which is why a string written entirely in
+        /// such a script slugs to empty. Check for that rather than assuming a non-empty input
+        /// yields a non-empty slug.
+        /// </para>
+        /// <para>
+        /// <see cref="ToKebabCase"/> is not a substitute: it preserves punctuation and accents, so
+        /// <c>"Café Menu -- 50% Off!"</c> kebabs to <c>"café-menu-50%-off!"</c> and slugs to
+        /// <c>"cafe-menu-50-off"</c>.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// string key = "Level 10: The Descent".Slugify();   // "level-10-the-descent"
+        /// </code>
+        /// </example>
+        public static string Slugify(this string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            string delimited = ToDelimitedCase(FoldDiacritics(value), SlugSeparator);
+            if (string.IsNullOrEmpty(delimited))
+            {
+                return string.Empty;
+            }
+
+            using PooledResource<StringBuilder> pooled = Buffers.GetStringBuilder(
+                delimited.Length,
+                out StringBuilder builder
+            );
+
+            bool separatorPending = false;
+            for (int i = 0; i < delimited.Length; ++i)
+            {
+                char current = delimited[i];
+                bool isDigit = current is >= '0' and <= '9';
+                bool isLower = current is >= 'a' and <= 'z';
+                bool isUpper = current is >= 'A' and <= 'Z';
+                if (!isDigit && !isLower && !isUpper)
+                {
+                    // Every rejected run collapses to at most one separator, and a pending one is
+                    // only emitted once something survives after it, which is what trims both ends.
+                    separatorPending = 0 < builder.Length;
+                    continue;
+                }
+
+                if (separatorPending)
+                {
+                    builder.Append(SlugSeparator);
+                    separatorPending = false;
+                }
+
+                builder.Append(isUpper ? (char)(current + 32) : current);
+            }
+
+            return builder.ToString();
         }
 
         public static bool ContainsIgnoreCase(this string input, string value)

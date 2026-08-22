@@ -512,6 +512,7 @@
     {
       "name": "tech-terms",
       "words": [
+        "CJK",
         "gtk",
         "GC",
         "GFM",
