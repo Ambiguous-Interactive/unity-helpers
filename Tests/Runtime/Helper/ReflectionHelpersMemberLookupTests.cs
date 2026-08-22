@@ -505,6 +505,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         /// <summary>
+        /// A value-typed element type takes the non-generic fallback and must still be correct.
+        /// </summary>
+        /// <remarks>
+        /// This is the same branch an AOT runtime lands on when it refuses to close the generic
+        /// builder, so it is the fallback's only direct coverage.
+        /// </remarks>
+        [Test]
+        public void CreateTypedArrayFallsBackForAValueTypedElement()
+        {
+            List<object> source = new() { 7, 9, 11 };
+
+            Array built = ReflectionHelpers.CreateTypedArray(typeof(int), source, 3);
+
+            Assert.AreEqual(typeof(int[]), built.GetType());
+            Assert.AreEqual(3, built.Length);
+            Assert.AreEqual(7, built.GetValue(0));
+            Assert.AreEqual(9, built.GetValue(1));
+            Assert.AreEqual(11, built.GetValue(2));
+        }
+
+        /// <summary>
         /// An interface element type must close the builder just as a class does.
         /// </summary>
         [Test]

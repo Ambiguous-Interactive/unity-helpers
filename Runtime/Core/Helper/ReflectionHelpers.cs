@@ -1259,12 +1259,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            MethodInfo closed = BuildTypedArrayMethod.MakeGenericMethod(
-                typeof(TSource),
-                elementType
-            );
-            return (Func<List<TSource>, int, Array>)
-                Delegate.CreateDelegate(typeof(Func<List<TSource>, int, Array>), closed);
+            try
+            {
+                MethodInfo closed = BuildTypedArrayMethod.MakeGenericMethod(
+                    typeof(TSource),
+                    elementType
+                );
+                return (Func<List<TSource>, int, Array>)
+                    Delegate.CreateDelegate(typeof(Func<List<TSource>, int, Array>), closed);
+            }
+            catch (Exception)
+            {
+                // An AOT runtime that never generated this instantiation throws here rather than
+                // returning null, and the caller has a non-generic fallback that always works. A
+                // null is cached alongside the successes, so the refusal costs one attempt per
+                // element type rather than one per call. This file already carries the scar of the
+                // opposite choice: the relational fast path used to close a generic Unity method at
+                // run time and threw in player builds until it was rewritten non-generically.
+                return null;
+            }
         }
 
         private static Array BuildTypedArray<TSource, TElement>(List<TSource> source, int count)
