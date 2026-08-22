@@ -292,7 +292,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - **Do not commit**: `Library/`, `obj/`, secrets, tokens. **Do commit**: `.meta` files for all assets
 - **Verify `.asmdef` references** when adding new namespaces
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
-- PRs: clear description, link related issues (`#123`), include before/after screenshots for UI changes
+- PRs: **short, plain, and about why.** A title under ~60 characters naming the user-visible
+  effect, then a body of one `**Why:**` sentence and two to five one-line `**What:**` bullets,
+  then `Fixes #123`. No root-cause narration, no measurement logs, no validation reports --
+  those go in the commit body, the progress log, or the linked issue. Include before/after
+  screenshots for UI changes. See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
 
 ### Pushing costs a full CI matrix -- batch before you push
 

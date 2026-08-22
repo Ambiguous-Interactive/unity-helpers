@@ -169,6 +169,54 @@ review bots are **`pull_request`-triggered**, so a branch sitting on the remote
 with no pull request has proven only that `Spelling Check` passes. Opening it is
 part of shipping, not a hand-back.
 
+#### Title and body: short, plain, and about why
+
+A pull request is read by someone deciding whether to care. Write for them, and
+keep it minimal — a long pull request body is a cost the reader pays, not
+evidence of thoroughness.
+
+**Title.** One plain line, under about 60 characters, imperative mood. Name the
+user-visible effect, not the mechanism. If the branch does several things, title
+it with the one that matters most and let the body carry the rest. No lists of
+everything in the branch, no jargon, no cleverness.
+
+**Body.** Two short sections, in this order, and nothing else:
+
+```markdown
+**Why:** one or two sentences — the problem a user or the project had.
+
+**What:**
+
+- a one-line bullet per change, in plain language
+- two to five of them
+
+Fixes #123
+```
+
+Rules that keep it that way:
+
+- **Lead with why.** A reader who stops after the first sentence should still
+  know what the pull request is for.
+- **Plain language.** No root-cause narration, no measurement logs, no run IDs,
+  no session numbers. Those belong in the commit body, the progress log, or a
+  linked issue.
+- **One line per bullet.** A bullet needing a paragraph needs an issue instead.
+- **No section a reader would skip.** Never paste the diff, the test list, the CI
+  matrix, or a report of what you validated.
+- **Link, do not restate.** `Fixes #123` hands the reader the long version.
+
+Same branch, written both ways:
+
+| Verdict | Title                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Avoid   | `Stop writing a derived hash the reader recomputes, keep tag 4 for z so legacy payloads still parse, and widen the parity gate` |
+| Prefer  | `Shrink grid payloads by 60%`                                                                                                   |
+
+| Verdict | Body                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Avoid   | Six paragraphs of measurement, a byte-level trace, the golden vectors that changed, and a list of the local gates that passed. |
+| Prefer  | `**Why:** every grid cell carried a hash the reader threw away — 6 of every 10 bytes.` then three bullets and `Fixes #519`.    |
+
 The API is reachable from inside the devcontainer. `scripts/github-token.sh` is
 the only supported source of the credential and it **never prompts**: it reads a
 non-empty `$GITHUB_TOKEN` / `$GH_TOKEN` or a 0600 cache, and exits 3 with the

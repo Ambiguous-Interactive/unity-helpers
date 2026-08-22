@@ -1,10 +1,14 @@
-## Description
+<!-- Keep this short. A reader should know why this exists after one sentence. -->
 
-<!-- Provide a clear and concise description of your changes -->
+**Why:**
 
-## Related Issue
+<!-- One or two sentences: the problem a user or the project had. -->
 
-<!-- Link to the issue this PR addresses -->
+**What:**
+
+<!-- Two to five one-line bullets, plain language. Detail belongs in the linked issue. -->
+
+-
 
 Fixes #
 
