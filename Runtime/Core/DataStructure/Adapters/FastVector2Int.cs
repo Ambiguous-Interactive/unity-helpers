@@ -57,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonIgnore]
         public readonly int y;
 
-        [ProtoMember(3)]
+        // Derived from x and y, so it is not serialized. Field 3 used to carry it and, being a
+        // well-distributed 32-bit value, spent six of the ten bytes an ordinary cell encodes to.
         private readonly int _hash;
 
         // A zero-initialized instance -- default(FastVector2Int), an array element, a struct a
@@ -67,19 +68,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         // claim it is. A non-origin cell whose hash happens to be 0 merely collides with the origin,
         // and Equals settles that the same way it settles every other collision.
         //
-        // The obvious alternative -- store the hash biased by this constant, so 0 already means the
-        // origin and no branch is needed -- is rejected because _hash is [ProtoMember(3)]. Biasing
-        // changes what a payload carries, so every value already persisted by a shipped build would
-        // read back with the wrong hash. This costs one compare and keeps that data readable.
+        // The obvious alternative -- store the hash XOR'd with this constant, so 0 already means the
+        // origin and no branch is needed -- is no longer blocked by the wire, but is still rejected:
+        // static field initializers run in declaration order, so zero above would be built while
+        // OriginHash is still 0, and would then be read back XOR'd against the real value. One
+        // compare needs no such ordering to stay correct.
         private static readonly int OriginHash = Objects.HashCode(0, 0);
-
-        /// <summary>
-        /// The cached hash exactly as it is stored and written to the wire, which is deliberately
-        /// NOT <see cref="GetHashCode"/>: a zero-initialized instance stores 0 and reports the
-        /// origin's hash. Anything mirroring the serialized form has to read this, or it writes
-        /// bytes that disagree with what the formatter writes for <c>default</c>.
-        /// </summary>
-        internal int SerializedHash => _hash;
 
         /// <summary>
         /// Initializes a new fast vector with integer components and a cached hash.

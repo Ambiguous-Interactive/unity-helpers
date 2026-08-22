@@ -40,47 +40,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         // WProtoBootstrap ran. A RegisterAll() call in a setup would hide a stripped or unreached
         // bootstrap on the one leg -- standalone IL2CPP -- where it can actually happen.
 
-        [TestCase(0, 0, "18CDAFDA8B01")]
-        [TestCase(1, 2, "08011002188AC1D0EBFEFFFFFFFF01")]
-        [TestCase(-1, -2, "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF0118909EE4AB03")]
-        [TestCase(
-            int.MaxValue,
-            int.MinValue,
-            "08FFFFFFFF071080808080F8FFFFFFFF0118CADB9BC4FCFFFFFFFF01"
-        )]
+        [TestCase(0, 0, "")]
+        [TestCase(1, 2, "08011002")]
+        [TestCase(-1, -2, "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF01")]
+        [TestCase(int.MaxValue, int.MinValue, "08FFFFFFFF071080808080F8FFFFFFFF01")]
         public void FastVector2IntMatchesProtobufNetBytes(int x, int y, string expected)
         {
             AssertRoundTrip(new FastVector2Int(x, y), expected);
         }
 
-        [TestCase(0, 0, 0, "18B7EFC3D504")]
-        [TestCase(1, 2, 3, "0801100218ABEFBCB6052003")]
-        [TestCase(
-            -1,
-            -2,
-            -3,
-            "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF0118978AB5FBFBFFFFFFFF0120FDFFFFFFFFFFFFFFFF01"
-        )]
-        [TestCase(int.MaxValue, 0, int.MinValue, "08FFFFFFFF0718FEA9A1B3072080808080F8FFFFFFFF01")]
+        [TestCase(0, 0, 0, "")]
+        [TestCase(1, 2, 3, "080110022003")]
+        [TestCase(-1, -2, -3, "08FFFFFFFFFFFFFFFFFF0110FEFFFFFFFFFFFFFFFF0120FDFFFFFFFFFFFFFFFF01")]
+        [TestCase(int.MaxValue, 0, int.MinValue, "08FFFFFFFF072080808080F8FFFFFFFF01")]
         public void FastVector3IntMatchesProtobufNetBytes(int x, int y, int z, string expected)
         {
             AssertRoundTrip(new FastVector3Int(x, y, z), expected);
         }
 
         [Test]
-        public void FastVector3IntEmitsInAscendingTagOrderRatherThanDeclarationOrder()
+        public void NeitherFastVectorPutsItsDerivedHashOnTheWire()
         {
-            // Members are declared x, y, z, hash but tagged 1, 2, 4, 3, so the cached hash goes out
-            // BEFORE z. Declaration order would still parse and still round-trip while producing a
-            // payload protobuf-net has never written.
-            byte[] encoded = Encode(new FastVector3Int(1, 2, 3));
+            // The hash is a pure function of the components and is recomputed on read, so carrying
+            // it bought nothing. Being well distributed it was almost always a five-byte varint plus
+            // a tag: six of the ten bytes an ordinary cell cost.
+            Assert.AreEqual(-1, IndexOfTag(Encode(new FastVector2Int(5, 3)), 3));
 
-            int hashTagIndex = IndexOfTag(encoded, 3);
-            int zTagIndex = IndexOfTag(encoded, 4);
+            byte[] threeDimensional = Encode(new FastVector3Int(1, 2, 3));
+            Assert.AreEqual(-1, IndexOfTag(threeDimensional, 3), "The cached hash is back on 3");
+            Assert.Greater(IndexOfTag(threeDimensional, 4), -1, "z must stay on tag 4");
+        }
 
-            Assert.Greater(hashTagIndex, -1, "The cached hash field is absent");
-            Assert.Greater(zTagIndex, -1, "The z field is absent");
-            Assert.Less(hashTagIndex, zTagIndex, "Field 3 must precede field 4 on the wire");
+        [Test]
+        public void APayloadWrittenWhenTheHashWasOnTheWireStillReadsBack()
+        {
+            // Field 3 is skipped as unknown and the hash recomputed, so data a shipped build already
+            // persisted is unaffected. z keeps tag 4 for exactly this reason: were it renumbered onto
+            // the vacated 3, every legacy payload would read its hash as z.
+            AssertLegacyReadsBack("08011002188AC1D0EBFEFFFFFFFF01", new FastVector2Int(1, 2));
+            AssertLegacyReadsBack("0801100218ABEFBCB6052003", new FastVector3Int(1, 2, 3));
+            AssertLegacyReadsBack("18CDAFDA8B01", default(FastVector2Int));
+            AssertLegacyReadsBack("18B7EFC3D504", default(FastVector3Int));
+        }
+
+        // A component's cost is the number this holds: a varint int32 sign-extends, so a negative
+        // component is ten bytes where its magnitude would be one. #527 tracks whether zigzag is
+        // worth a second wire break for grids that straddle the origin.
+        [TestCase(0, 0, 0)]
+        [TestCase(5, 3, 4)]
+        [TestCase(16383, 16383, 6)]
+        [TestCase(16384, 16384, 8)]
+        [TestCase(-1, -2, 22)]
+        public void AFastVector2IntCellCostsExactlyItsComponents(int x, int y, int expectedBytes)
+        {
+            Assert.AreEqual(expectedBytes, Encode(new FastVector2Int(x, y)).Length);
         }
 
         [Test]
@@ -447,6 +460,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoReader reader = new(encoded);
             Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored));
             Assert.AreEqual(value, restored);
+        }
+
+        private static void AssertLegacyReadsBack<T>(string legacyHex, T expected)
+        {
+            byte[] legacy = FromHex(legacyHex);
+            WProtoReader reader = new(legacy);
+            Assert.IsTrue(
+                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored),
+                $"A payload carrying the retired hash field no longer reads: {legacyHex}"
+            );
+            Assert.AreEqual(expected, restored);
+            Assert.AreEqual(expected.GetHashCode(), restored.GetHashCode());
+        }
+
+        private static byte[] FromHex(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+            }
+
+            return bytes;
         }
 
         private static byte[] Encode<T>(T value)

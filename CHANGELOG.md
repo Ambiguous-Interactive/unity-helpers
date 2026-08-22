@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Stop `FastVector2Int` and `FastVector3Int` writing their cached hash, which every reader already recomputed: a 1,000-cell tilemap falls from 14,167 to 5,870 bytes. Payloads written by 3.5.1 still read; a 3.5.1 build cannot read new ones ([#519](https://github.com/Ambiguous-Interactive/unity-helpers/issues/519)).
 - Remove an item from a `SpatialHash2D`/`SpatialHash3D` bucket by swapping the last entry into its place rather than shifting the tail. Query results were never ordered and are not now; the order two items in one cell come back in can differ from before.
 - Say what has actually been measured about `IllusionFlow`, `StormDropRandom`, `PhotonSpinRandom`, `FlurryBurstRandom` and `BlastCircuitRandom`. All five are now verified clean through 8GB of PractRand 0.95 here, rather than described by an author's claim on a repository that is offline. Ratings are unchanged ([#286](https://github.com/Ambiguous-Interactive/unity-helpers/issues/286), [#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516)).
 - Take every `Bounds`, `BoundsInt`, `Rect` and `Color` extension receiver by `in`. Calling one no longer copies the struct at your call site, which `ErrorProne.NET.Structs` reported as an `EPS06` warning you could not fix without giving up extension syntax ([#512](https://github.com/Ambiguous-Interactive/unity-helpers/issues/512)).

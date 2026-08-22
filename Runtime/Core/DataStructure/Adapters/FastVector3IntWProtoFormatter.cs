@@ -37,11 +37,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     size += WProtoSizes.TagSize(2) + WProtoSizes.Int32Size(value.y);
                 }
 
-                if (value._hash != 0)
-                {
-                    size += WProtoSizes.TagSize(3) + WProtoSizes.Int32Size(value._hash);
-                }
-
                 if (value.z != 0)
                 {
                     size += WProtoSizes.TagSize(4) + WProtoSizes.Int32Size(value.z);
@@ -75,17 +70,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     }
                 }
 
-                if (value._hash != 0)
-                {
-                    if (
-                        !writer.TryWriteTag(3, WProtoWireType.Varint)
-                        || !writer.TryWriteInt32(value._hash)
-                    )
-                    {
-                        return false;
-                    }
-                }
-
                 if (value.z != 0)
                 {
                     if (
@@ -102,9 +86,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             /// <inheritdoc />
             /// <remarks>
-            /// The cached hash on the wire is read and discarded; the value is rebuilt through the
-            /// public constructor, which recomputes it. See
-            /// <see cref="FastVector2Int.WProtoFormatter.TryRead"/> for why.
+            /// The value is rebuilt through the public constructor, which recomputes the cached
+            /// hash. A payload written before the hash left the wire still carries it as field 3 and
+            /// is skipped as unknown, which is why z keeps tag 4 rather than moving onto the vacated
+            /// 3. See <see cref="FastVector2Int.WProtoFormatter.TryRead"/> for why.
             /// </remarks>
             public bool TryRead(ref WProtoReader reader, out FastVector3Int value)
             {
@@ -129,16 +114,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         case 2 when wireType == WProtoWireType.Varint:
                         {
                             if (!reader.TryReadInt32(out y))
-                            {
-                                value = default;
-                                return false;
-                            }
-
-                            break;
-                        }
-                        case 3 when wireType == WProtoWireType.Varint:
-                        {
-                            if (!reader.TryReadInt32(out _))
                             {
                                 value = default;
                                 return false;

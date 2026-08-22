@@ -36,11 +36,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     size += WProtoSizes.TagSize(2) + WProtoSizes.Int32Size(value.y);
                 }
 
-                if (value._hash != 0)
-                {
-                    size += WProtoSizes.TagSize(3) + WProtoSizes.Int32Size(value._hash);
-                }
-
                 return size;
             }
 
@@ -69,27 +64,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     }
                 }
 
-                if (value._hash != 0)
-                {
-                    if (
-                        !writer.TryWriteTag(3, WProtoWireType.Varint)
-                        || !writer.TryWriteInt32(value._hash)
-                    )
-                    {
-                        return false;
-                    }
-                }
-
                 return true;
             }
 
             /// <inheritdoc />
             /// <remarks>
-            /// The cached hash on the wire is read and discarded: the value is rebuilt through the
-            /// public constructor, which recomputes it from x and y. For any payload protobuf-net
-            /// could have written the two agree, and for a tampered one this refuses to hand back an
-            /// object whose <c>GetHashCode</c> disagrees with its <c>Equals</c> -- which would
-            /// corrupt every dictionary it was used in.
+            /// The value is rebuilt through the public constructor, which recomputes the cached hash
+            /// from x and y. A payload written before the hash left the wire still carries it as
+            /// field 3; that field is skipped as unknown, so old data reads back correctly and a
+            /// tampered one cannot hand back an object whose <c>GetHashCode</c> disagrees with its
+            /// <c>Equals</c> -- which would corrupt every dictionary it was used in.
             /// </remarks>
             public bool TryRead(ref WProtoReader reader, out FastVector2Int value)
             {
@@ -113,16 +97,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                         case 2 when wireType == WProtoWireType.Varint:
                         {
                             if (!reader.TryReadInt32(out y))
-                            {
-                                value = default;
-                                return false;
-                            }
-
-                            break;
-                        }
-                        case 3 when wireType == WProtoWireType.Varint:
-                        {
-                            if (!reader.TryReadInt32(out _))
                             {
                                 value = default;
                                 return false;

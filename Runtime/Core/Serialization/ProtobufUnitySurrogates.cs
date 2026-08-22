@@ -404,21 +404,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         [WProtoMember(2)]
         public int y;
 
-        // Mirrors FastVector2Int's serialized cached hash (ProtoMember 3) for wire parity; the value
-        // is recomputed by the FastVector2Int constructor on conversion, so it is not trusted on read.
-        // It reads the STORED hash, not GetHashCode(): those differ for a zero-initialized instance,
-        // and taking the observable one made this oracle write six bytes where the formatter wrote none.
-        [ProtoMember(3)]
-        [WProtoMember(3)]
-        public int hash;
-
         public static implicit operator FastVector2IntSurrogate(FastVector2Int v) =>
-            new()
-            {
-                x = v.x,
-                y = v.y,
-                hash = v.SerializedHash,
-            };
+            new() { x = v.x, y = v.y };
 
         public static implicit operator FastVector2Int(FastVector2IntSurrogate s) => new(s.x, s.y);
     }
@@ -435,11 +422,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         [WProtoMember(2)]
         public int y;
 
-        // FastVector3Int intentionally serializes its cached hash as ProtoMember 3 and z as
-        // ProtoMember 4 (out of order). The surrogate preserves that ordering for wire parity.
-        [ProtoMember(3)]
-        [WProtoMember(3)]
-        public int hash;
+        // z keeps tag 4, the number it had when field 3 carried FastVector3Int's cached hash, so a
+        // payload written by a build that still wrote the hash does not read it as z.
 
         [ProtoMember(4)]
         [WProtoMember(4)]
@@ -450,7 +434,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 x = v.x,
                 y = v.y,
-                hash = v.SerializedHash,
                 z = v.z,
             };
 

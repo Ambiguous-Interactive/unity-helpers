@@ -1570,6 +1570,20 @@ alternative under IL2CPP is an `ExecutionEngineException` from inside the runtim
 Hand-written formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`;
 everything else this package serializes through WallstopProto is generated from its annotations.
 
+#### Derived members are not carried
+
+`FastVector2Int` and `FastVector3Int` cache their hash. That cache is a pure function of the
+components, and both encoders recompute it on read, so it is **not** written: a 1,000-cell tilemap
+costs 5,870 bytes rather than the 14,167 it cost while the hash was on the wire. A well-distributed
+32-bit hash is a negative `int` half the time, and a negative `int32` varint sign-extends to ten
+bytes, which is why the field was larger than the components it described.
+
+Compatibility runs one way. A payload written before this change still carries the hash as field 3;
+both encoders skip it as an unknown field and recompute, so **existing saves read correctly**. The
+reverse does not hold — a 3.5.1 build handed a payload without field 3 reads a zero cache. For the
+same reason `FastVector3Int` keeps `z` on tag 4 rather than moving it onto the vacated 3: a legacy
+payload's hash would otherwise be read as `z`.
+
 ### Serving through `Serializer`
 
 `Serializer.ProtoSerialize` / `ProtoDeserialize` ask WallstopProto first when the `WALLSTOP_PROTO`
