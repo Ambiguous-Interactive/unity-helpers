@@ -70,6 +70,16 @@ const CHECKS = [
     run: "npm run lint:conditional-call-chains"
   },
   {
+    id: "concurrent-cache-fill-test",
+    name: "Concurrent cache fill linter self-test",
+    run: "npm run test:lint-concurrent-cache-fill"
+  },
+  {
+    id: "concurrent-cache-fill",
+    name: "Concurrent cache fills",
+    run: "npm run lint:concurrent-cache-fill"
+  },
+  {
     id: "bundled-assemblies",
     name: "Bundled assembly importers",
     run: "npm run lint:bundled-assemblies"

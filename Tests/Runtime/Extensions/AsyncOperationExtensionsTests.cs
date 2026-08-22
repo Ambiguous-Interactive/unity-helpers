@@ -158,6 +158,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return AsyncOperationAwaiterOnCompletedInvokesContinuationAsync().AsCoroutine();
         }
 
+        [UnityTest]
+        public IEnumerator AsyncOperationAwaiterOnCompletedInvokesEveryContinuation(
+            [Values(2, 3, 8)] int continuationCount
+        )
+        {
+            return AsyncOperationAwaiterOnCompletedInvokesEveryContinuationAsync(continuationCount)
+                .AsCoroutine();
+        }
+
         [Test]
         public void AsyncOperationAwaiterGetResultDoesNotThrow()
         {
@@ -778,6 +787,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             await Task.Yield();
 
             Assert.IsTrue(continuationInvoked);
+        }
+
+        // Every await of one operation registers its own continuation. Storing them through the
+        // dictionary's indexer meant the last registration was the only one kept, so every earlier
+        // awaiter waited forever. Registering more than one is the whole point of this case.
+        private static async Task AsyncOperationAwaiterOnCompletedInvokesEveryContinuationAsync(
+            int continuationCount
+        )
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+
+            int[] invocations = new int[continuationCount];
+            for (int index = 0; index < continuationCount; index++)
+            {
+                int captured = index;
+                awaiter.OnCompleted(() => invocations[captured]++);
+            }
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            await Task.Yield();
+
+            for (int index = 0; index < continuationCount; index++)
+            {
+                Assert.AreEqual(
+                    1,
+                    invocations[index],
+                    $"Continuation {index} of {continuationCount} ran {invocations[index]} time(s)."
+                );
+            }
         }
 
         private static async Task AsyncOperationAwaiterIsCompletedReturnsTrueWhenDoneAsync()

@@ -92,14 +92,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             try
             {
-                Func<object> factory = ReflectionHelpers.GetParameterlessConstructor(type);
-                ParameterlessFactoryCache[type] = factory;
+                Func<object> factory = ParameterlessFactoryCache.GetOrAdd(
+                    type,
+                    ReflectionHelpers.GetParameterlessConstructor(type)
+                );
                 value = factory();
                 return value != null;
             }
             catch (ArgumentException)
             {
-                UnsupportedFactoryTypes[type] = 0;
+                UnsupportedFactoryTypes.TryAdd(type, 0);
                 value = null;
                 return false;
             }

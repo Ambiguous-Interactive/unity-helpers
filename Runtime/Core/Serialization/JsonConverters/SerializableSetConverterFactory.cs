@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 {
     using System;
     using System.Collections.Generic;
-    using System.Reflection;
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -176,13 +175,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
             private static void SetItemsField(SerializableHashSet<T> set, T[] items)
             {
-                // Use reflection to set the internal _items field
-                Type type = typeof(SerializableSetBase<T, HashSet<T>>);
-                FieldInfo field = type.GetField(
-                    ItemsPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-                field?.SetValue(set, items);
+                set._items = items;
             }
         }
 
@@ -299,13 +292,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
             private static void SetItemsField(SerializableSortedSet<T> set, T[] items)
             {
-                // Use reflection to set the internal _items field
-                Type type = typeof(SerializableSetBase<T, SortedSet<T>>);
-                FieldInfo field = type.GetField(
-                    ItemsPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-                field?.SetValue(set, items);
+                set._items = items;
             }
         }
     }

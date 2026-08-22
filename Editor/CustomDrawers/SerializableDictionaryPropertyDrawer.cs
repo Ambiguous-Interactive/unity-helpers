@@ -8096,7 +8096,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Func<object> factory = TryResolveConstructorFactory(type);
             if (factory != null)
             {
-                ParameterlessConstructorCache[type] = factory;
+                factory = ParameterlessConstructorCache.GetOrAdd(type, factory);
                 object created = factory();
                 if (created != null)
                 {
@@ -8111,7 +8111,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return true;
             }
 
-            UnsupportedParameterlessTypes[type] = 0;
+            UnsupportedParameterlessTypes.TryAdd(type, 0);
             instance = null;
             return false;
         }
@@ -8160,17 +8160,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 object created = Activator.CreateInstance(type, nonPublic: true);
                 if (created != null)
                 {
-                    ParameterlessConstructorCache[type] = () =>
-                    {
-                        try
+                    ParameterlessConstructorCache.TryAdd(
+                        type,
+                        () =>
                         {
-                            return Activator.CreateInstance(type, nonPublic: true);
+                            try
+                            {
+                                return Activator.CreateInstance(type, nonPublic: true);
+                            }
+                            catch
+                            {
+                                return null;
+                            }
                         }
-                        catch
-                        {
-                            return null;
-                        }
-                    };
+                    );
                     instance = created;
                     return true;
                 }
@@ -8183,17 +8186,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             try
             {
                 object uninitialized = FormatterServices.GetUninitializedObject(type);
-                ParameterlessConstructorCache[type] = () =>
-                {
-                    try
+                ParameterlessConstructorCache.TryAdd(
+                    type,
+                    () =>
                     {
-                        return FormatterServices.GetUninitializedObject(type);
+                        try
+                        {
+                            return FormatterServices.GetUninitializedObject(type);
+                        }
+                        catch
+                        {
+                            return null;
+                        }
                     }
-                    catch
-                    {
-                        return null;
-                    }
-                };
+                );
                 instance = uninitialized;
                 return uninitialized != null;
             }

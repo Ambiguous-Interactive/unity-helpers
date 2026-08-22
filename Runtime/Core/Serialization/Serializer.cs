@@ -1325,18 +1325,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            if (ExplicitProtobufRootCache.TryGetValue(declared, out Type existing))
+            // Checking then storing lets two threads registering different roots for the same declared
+            // type both pass the check and both store; GetOrAdd makes the winner the value everyone sees,
+            // so the loser reports the conflict instead of silently overwriting it.
+            Type existing = ExplicitProtobufRootCache.GetOrAdd(declared, root);
+            if (existing != root)
             {
-                if (existing != root)
-                {
-                    throw new InvalidOperationException(
-                        $"A different root {existing.FullName} is already registered for {declared.FullName}"
-                    );
-                }
+                throw new InvalidOperationException(
+                    $"A different root {existing.FullName} is already registered for {declared.FullName}"
+                );
             }
 
-            ExplicitProtobufRootCache[declared] = root;
-            ProtobufRootCache[declared] = root;
+            // An explicit registration must replace whatever inference cached earlier rather than
+            // losing to it, so this one write is deliberately not a fill-after-miss.
+            ProtobufRootCache[declared] = root; // concurrent-overwrite: registration beats inference
 
             // A declared type has one root, and both serializers have to agree on which. Without
             // this, WallstopProto would keep serving IRandom through the root this package declares
@@ -2031,11 +2033,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return explicitRoot;
             }
 
-            if (ProtobufRootCache.TryGetValue(declared, out Type cached))
-            {
-                return cached == NoRootMarker ? null : cached;
-            }
+            // The answer depends only on the declared type's attributes and the types its assembly
+            // declares, so it is deterministic and a lost race stores an equal value. Filling through
+            // GetOrAdd rather than the indexer keeps that true of the cache as well: exactly one
+            // computed root is stored and every caller receives it.
+            Type resolved = ProtobufRootCache.GetOrAdd(
+                declared,
+                static declaredType => ComputeProtobufRootType(declaredType)
+            );
+            return resolved == NoRootMarker ? null : resolved;
+        }
 
+        private static Type ComputeProtobufRootType(Type declared)
+        {
             // If declared itself is an abstract [ProtoContract] base with [ProtoInclude]s, prefer it.
             // An abstract contract without includes cannot construct a valid root on its own; require
             // explicit registration instead of letting protobuf-net report version-specific decode errors.
@@ -2078,9 +2088,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     {
                         case 1:
                         {
-                            Type root = candidates[0];
-                            ProtobufRootCache[declared] = root;
-                            return root;
+                            return candidates[0];
                         }
                         case > 1:
                         {
@@ -2098,9 +2106,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
                             if (includeCandidates.Count == 1)
                             {
-                                Type root = includeCandidates[0];
-                                ProtobufRootCache[declared] = root;
-                                return root;
+                                return includeCandidates[0];
                             }
 
                             break;
@@ -2113,8 +2119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            ProtobufRootCache[declared] = NoRootMarker;
-            return null;
+            return NoRootMarker;
         }
 
         /// <summary>
@@ -3195,33 +3200,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 options,
                 static _ => new ConcurrentDictionary<Type, Type>()
             );
-            if (resolved.TryGetValue(runtimeType, out Type cached))
-            {
-                return cached;
-            }
+            // The state-taking overload keeps the factory static, so the converter list reaches it
+            // without a closure allocation on every miss.
+            return resolved.GetOrAdd(
+                runtimeType,
+                static (type, converterList) => ComputeRuntimeWriteType(type, converterList),
+                converters
+            );
+        }
 
-            Type answer = runtimeType;
+        private static Type ComputeRuntimeWriteType(
+            Type runtimeType,
+            IList<JsonConverter> converters
+        )
+        {
+            int converterCount = converters.Count;
             for (Type candidate = runtimeType; candidate != null; candidate = candidate.BaseType)
             {
-                bool claimed = false;
                 for (int index = 0; index < converterCount; index++)
                 {
                     if (converters[index].CanConvert(candidate))
                     {
-                        claimed = true;
-                        break;
+                        return candidate;
                     }
-                }
-
-                if (claimed)
-                {
-                    answer = candidate;
-                    break;
                 }
             }
 
-            resolved[runtimeType] = answer;
-            return answer;
+            return runtimeType;
         }
 
         private static string SerializeValueAotSafe(

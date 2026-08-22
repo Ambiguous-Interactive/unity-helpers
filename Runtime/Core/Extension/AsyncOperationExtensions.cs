@@ -56,7 +56,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             /// <param name="continuation">The action to invoke when the operation completes.</param>
             public void OnCompleted(Action continuation)
             {
-                Continuations[_operation] = continuation;
+                if (continuation == null)
+                {
+                    return;
+                }
+
+                // Every await of the same operation registers here. Storing through the indexer made
+                // the second registration overwrite the first, so the first awaiter never resumed;
+                // combining leaves every awaiter's continuation to run.
+                Continuations.AddOrUpdate(
+                    _operation,
+                    static (_, added) => added,
+                    static (_, existing, added) => existing + added,
+                    continuation
+                );
 
                 Action<AsyncOperation> handler = CachedHandler;
                 if (!Handlers.TryAdd(_operation, handler))
@@ -64,7 +77,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return;
                 }
 
-                Handlers[_operation] = handler;
                 _operation.completed += handler;
             }
 

@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Deserialize a `SerializableDictionary`, `SerializableSortedDictionary`, `SerializableHashSet` or `SerializableSortedSet` from JSON without reflection: the converters looked their backing fields up on every read, costing 1.5 us of a 17.6 us 16-entry read ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Stop `[ChildComponent]` and `[ParentComponent]` collection fields allocating a `Component[]` on every assignment, so a scene full of components no longer builds garbage during `Awake` ([#534](https://github.com/Ambiguous-Interactive/unity-helpers/issues/534), [#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Assign relational array fields faster: a `[SiblingComponent]` array field costs 22% less, and sibling collection fields no longer allocate per call. `List` and `HashSet` fields are unchanged ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Write `FastVector2Int` and `FastVector3Int` components as `sint32`, so a negative coordinate costs one byte instead of ten. A 1,000-cell tilemap centred on the origin falls from 14,690 to 3,870 bytes. Payloads written by 3.5.1 still read ([#527](https://github.com/Ambiguous-Interactive/unity-helpers/issues/527)).
@@ -116,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix a second `await` of the same `AsyncOperation` stopping the first one resuming. Two coroutines or tasks awaiting one `SceneManager.LoadSceneAsync` handle now both continue; previously only the last to register did.
 - Fix one refused protobuf surrogate registration disabling every registration after it, so `Vector3`, `Color` and `Bounds` silently encoded with different bytes. Each is now independent and names the type it could not register.
 - Fix `UnityRandom` losing its position when saved: its snapshot now carries `UnityEngine.Random`'s state, so a restored generator resumes the exact sequence instead of continuing from wherever the engine is. Restoring writes that global back. See [Random Generators](./docs/features/utilities/random-generators.md#saving-and-restoring-a-generator) ([#521](https://github.com/Ambiguous-Interactive/unity-helpers/issues/521)).
 - Fix protobuf-net writing a different payload than WallstopProto for a zero-initialized `FastVector2Int` or `FastVector3Int`. The surrogate mirrored the cached hash through `GetHashCode()` rather than the stored field, so the two encoders disagreed on the origin ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).

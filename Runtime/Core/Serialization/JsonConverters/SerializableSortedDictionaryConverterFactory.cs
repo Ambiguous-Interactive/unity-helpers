@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 {
     using System;
-    using System.Reflection;
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -187,20 +186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 TValue[] values
             )
             {
-                // Use reflection to set the internal _keys and _values fields
-                Type baseType = typeof(SerializableSortedDictionaryBase<TKey, TValue, TValue>);
-
-                FieldInfo keysField = baseType.GetField(
-                    KeysPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-                FieldInfo valuesField = baseType.GetField(
-                    ValuesPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-
-                keysField?.SetValue(dict, keys);
-                valuesField?.SetValue(dict, values);
+                dict._keys = keys;
+                dict._values = values;
             }
         }
 
@@ -326,20 +313,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 TValueCache[] values
             )
             {
-                // Use reflection to set the internal _keys and _values fields
-                Type baseType = typeof(SerializableSortedDictionaryBase<TKey, TValue, TValueCache>);
-
-                FieldInfo keysField = baseType.GetField(
-                    KeysPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-                FieldInfo valuesField = baseType.GetField(
-                    ValuesPropertyName,
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-
-                keysField?.SetValue(dict, keys);
-                valuesField?.SetValue(dict, values);
+                dict._keys = keys;
+                dict._values = values;
             }
         }
     }
