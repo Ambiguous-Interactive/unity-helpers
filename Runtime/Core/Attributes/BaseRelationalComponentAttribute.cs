@@ -121,6 +121,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 BindingFlags.NonPublic | BindingFlags.Static
             );
 
+        /// <summary>
+        /// Largest backing array a reused scratch list keeps between calls.
+        /// </summary>
+        /// <remarks>
+        /// Matches the bound the pooled JSON reads use. A one-off huge hierarchy query must not
+        /// leave its backing array parked for the lifetime of the process.
+        /// </remarks>
+        internal const int MaximumRetainedScratchCapacity = 4_096;
+
         internal enum FieldKind : byte
         {
             Single = 0,

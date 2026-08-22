@@ -769,11 +769,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal static void Release(List<Component> results)
         {
-            if (results != null && Scratch == null)
+            if (results == null || Scratch != null)
             {
-                results.Clear();
-                Scratch = results;
+                return;
             }
+
+            results.Clear();
+            if (MaximumRetainedScratchCapacity < results.Capacity)
+            {
+                results.Capacity = 0;
+            }
+
+            Scratch = results;
         }
     }
 }
