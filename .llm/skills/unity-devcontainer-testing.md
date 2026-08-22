@@ -282,6 +282,20 @@ Four constraints. The first two were recorded backwards before being measured on
   (`Expected: 32, But was: 1`). Invoke each `[TearDown]` in a `finally`, catch and discard. The
   survivors of that fix were three fixtures needing `[OneTimeTearDown]`, which the loop still does
   not run.
+- **The loop does not run `[OneTimeSetUp]` either, and that is not only a missing fixture field.**
+  A fixture whose one-time setup establishes _process-global_ state fails in ways that look like the
+  code under test is broken. Session 214 spent a round on this: two protobuf fixtures ask
+  `ProtoBuf.Serializer` directly and depend on `ProtobufUnityModel`'s surrogate registrations having
+  happened, so under this loop protobuf-net answered with each type's own contract instead of its
+  surrogate and reported a byte-parity "failure" in green code. Invoke `[OneTimeSetUp]` once per
+  fixture, or wake the global explicitly before the sweep.
+- **A probe that serializes is a probe that mutates the editor.** `RuntimeTypeModel.Default` is
+  process-global and freezes a type the first time it serializes one, so a diagnostic
+  `ProtoBuf.Serializer.Serialize<T>` call poisons the model for every later run in that domain --
+  including the surrogate registrations, which then cannot be applied. The first sweep after such a
+  probe measures the poisoned model and reports it as fact. `EditorUtility.RequestScriptReload()`
+  between experiments is the reset; treat any protobuf measurement taken after a serializing probe
+  as void.
 - **A fixture that fails in a sweep and passes in isolation is a leak, not a regression.** Re-run the
   suspect fixture alone before believing it; a sweep is the only place cross-fixture state is
   visible, and this loop reproduces less of NUnit's isolation than the real runner does.
