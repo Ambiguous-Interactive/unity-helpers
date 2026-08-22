@@ -375,7 +375,10 @@ $mdFiles | ForEach-Object {
     # one-element array. Without this, `.Length` would yield character count and
     # `$lines[$index]` would return a [char], which the regex engine would coerce
     # to a single-character string and silently miss every match.
-    $lines = @(Get-Content -LiteralPath $file)
+    # ReadAllLines rather than Get-Content, whose per-file pipeline cost is ~12x here and dominates
+    # on the devcontainer's 9p mount (#486). Both split on CR, LF and CRLF and drop the trailing
+    # empty element, so the line numbering this check reports is unchanged.
+    $lines = @([System.IO.File]::ReadAllLines($file))
     $lineCount = $lines.Length
     $linkDefinitions = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::OrdinalIgnoreCase)
     $inFence = $false
