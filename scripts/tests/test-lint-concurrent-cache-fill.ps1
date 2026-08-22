@@ -11,7 +11,10 @@
       Dictionary -- the false positive that made the first raw sweep four times too big.
     - Exits 1 for that same write in the `#else` branch, so the preprocessor tracking cannot be
       passing by simply ignoring every conditional.
-    - Exits 0 for a write marked `// concurrent-overwrite:`.
+    - Exits 0 for a write marked `// concurrent-overwrite:`, whether the marker is on the write
+      line or anywhere in the contiguous comment block above it.
+    - Exits 1 when the marker is separated from the write by a blank line, so the exemption cannot
+      be inherited from an unrelated comment further up the file.
     - Finds a cache whose generic argument list csharpier wrapped onto several lines.
 
 .PARAMETER VerboseOutput
@@ -197,6 +200,46 @@ namespace Fixture
 }
 '@
 
+$markedOverwriteBlockAbove = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static void Register(Type type, string name)
+        {
+            // concurrent-overwrite: an explicit registration must replace whatever inference
+            // cached earlier, and that reason does not fit on the write line.
+            Names[type] = name;
+        }
+    }
+}
+'@
+
+$markerSeparatedByBlankLine = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static void Register(Type type, string name)
+        {
+            // concurrent-overwrite: this comment belongs to something else entirely.
+
+            Names[type] = name;
+        }
+    }
+}
+'@
+
 $wrappedDeclaration = @'
 namespace Fixture
 {
@@ -227,6 +270,8 @@ try {
     Assert-Lint -TestName 'Indexer fill inside SINGLE_THREADED passes' -Source $singleThreadedBranch -ExpectedExitCode 0
     Assert-Lint -TestName 'Indexer fill in the #else branch still fails' -Source $elseBranchFill -ExpectedExitCode 1
     Assert-Lint -TestName 'Marked deliberate overwrite passes' -Source $markedOverwrite -ExpectedExitCode 0
+    Assert-Lint -TestName 'Marker in the comment block above passes' -Source $markedOverwriteBlockAbove -ExpectedExitCode 0
+    Assert-Lint -TestName 'Marker cut off by a blank line does not exempt' -Source $markerSeparatedByBlankLine -ExpectedExitCode 1
     Assert-Lint -TestName 'Wrapped generic declaration is still found' -Source $wrappedDeclaration -ExpectedExitCode 1
 
     Write-Host "[test-lint-concurrent-cache-fill] $script:TestsPassed passed, $script:TestsFailed failed." -ForegroundColor Cyan

@@ -20,11 +20,14 @@
     every caller. TryAdd is the equivalent when the value is already computed and constant.
 
     A deliberate last-writer-wins overwrite is legitimate -- an explicit registration that must
-    replace an inferred answer, for instance. Mark those with a trailing or preceding
+    replace an inferred answer, or a working factory that must replace one already cached and known
+    to fail. Mark those with
 
         // concurrent-overwrite: <why this write must win>
 
-    which documents the intent at the site and exempts the line here.
+    on the write line, or anywhere in the contiguous comment block immediately above it. The whole
+    block is searched rather than one line, because a reason worth writing rarely fits on one and
+    the marker should not dictate where the sentence breaks.
 
     Writes inside a `#if SINGLE_THREADED` branch are skipped: under that define the field is a
     plain Dictionary and the indexer is the only way to fill it. A sweep that does not track
@@ -134,8 +137,14 @@ foreach ($file in @($files | Sort-Object)) {
                 continue
             }
 
+            # The write line plus the contiguous `//` comment block above it. One line of lookback
+            # would force a multi-line reason to break in whatever place puts the marker last.
             $context = $line
-            if ($i -gt 0) { $context = $lines[$i - 1] + "`n" + $context }
+            for ($back = $i - 1; $back -ge 0; $back--) {
+                $above = $lines[$back].Trim()
+                if (-not $above.StartsWith('//')) { break }
+                $context = $above + "`n" + $context
+            }
             if ($context -like "*$exemptionMarker*") {
                 $exempted++
                 continue

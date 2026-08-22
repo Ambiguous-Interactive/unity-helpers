@@ -340,9 +340,24 @@ plain `Dictionary` and there is no race to lose.
 
 `scripts/lint-concurrent-cache-fill.ps1` enforces this. It tracks preprocessor state, so the
 `SINGLE_THREADED` form does not trip it, and a deliberate last-writer-wins overwrite is exempted by
-a `// concurrent-overwrite: <why>` comment on the write line or the line above it. Do not reach for
-that marker to silence a fill -- it is for a write that _must_ replace an earlier answer, such as an
-explicit registration overriding what inference cached.
+a `// concurrent-overwrite: <why>` comment on the write line or anywhere in the contiguous comment
+block above it. Do not reach for that marker to silence a fill -- it is for a write that _must_
+replace an earlier answer, such as an explicit registration overriding what inference cached.
+
+**The linter only catches one direction, and the other one is easier to get wrong.** It flags an
+indexer write that should have been `GetOrAdd`. Nothing flags a `GetOrAdd`/`TryAdd` that should have
+stayed an overwrite, and converting one is silent and permanent. The test is not "is the value
+deterministic" but **"can this key already hold something this write is meant to replace?"**
+
+Session 217 nearly shipped exactly that. `SerializableDictionaryPropertyDrawer` caches a constructor
+factory, and when that factory returns `null` it falls back to `Activator` and **overwrites the cache
+with the working factory**. Converted to `TryAdd`, the overwrite became a no-op, the broken factory
+stayed cached, and every later call took the cache hit and returned `false` -- so the first call
+worked and the rest did not. Two questions catch it:
+
+- Does an early `TryGetValue` return before this line? If so a hit is impossible and a fill is safe.
+- Does any path reach this line _after_ something already stored under the same key? If so it is an
+  overwrite, whatever it looks like.
 
 ### A monitor around a cache read is the whole call when the answer is "nothing to do"
 

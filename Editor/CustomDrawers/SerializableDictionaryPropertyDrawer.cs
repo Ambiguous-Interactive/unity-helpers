@@ -8160,20 +8160,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 object created = Activator.CreateInstance(type, nonPublic: true);
                 if (created != null)
                 {
-                    ParameterlessConstructorCache.TryAdd(
-                        type,
-                        () =>
+                    // concurrent-overwrite: the caller reaches here only after a resolved
+                    // constructor factory returned null, and that factory is already cached. This
+                    // must replace it, or every later call takes the cache hit and fails forever.
+                    ParameterlessConstructorCache[type] = () =>
+                    {
+                        try
                         {
-                            try
-                            {
-                                return Activator.CreateInstance(type, nonPublic: true);
-                            }
-                            catch
-                            {
-                                return null;
-                            }
+                            return Activator.CreateInstance(type, nonPublic: true);
                         }
-                    );
+                        catch
+                        {
+                            return null;
+                        }
+                    };
                     instance = created;
                     return true;
                 }
@@ -8186,20 +8186,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             try
             {
                 object uninitialized = FormatterServices.GetUninitializedObject(type);
-                ParameterlessConstructorCache.TryAdd(
-                    type,
-                    () =>
+                // concurrent-overwrite: replaces a resolved constructor factory that returned null,
+                // for the same reason as the Activator branch above.
+                ParameterlessConstructorCache[type] = () =>
+                {
+                    try
                     {
-                        try
-                        {
-                            return FormatterServices.GetUninitializedObject(type);
-                        }
-                        catch
-                        {
-                            return null;
-                        }
+                        return FormatterServices.GetUninitializedObject(type);
                     }
-                );
+                    catch
+                    {
+                        return null;
+                    }
+                };
                 instance = uninitialized;
                 return uninitialized != null;
             }
