@@ -311,6 +311,37 @@ private static readonly ConcurrentDictionary<Type, object> Cache = new();
 #endif
 ```
 
+### Populating a cache must be atomic
+
+Memoizing into a `ConcurrentDictionary` with `TryGetValue`, then building on a miss, then storing
+through the **indexer** is not atomic. Two callers racing a first use each build, and each returns a
+different instance than the one that ends up cached. When the build has a side effect -- a probe
+call, a registration, a log -- it happens twice.
+
+```csharp
+// WRONG: last-write-wins, and the value you return may not be the value that was cached
+if (!Cache.TryGetValue(key, out Value cached))
+{
+    cached = Build(key);
+    Cache[key] = cached;
+}
+return cached;
+
+// RIGHT: one winner, and every caller gets it. The state-taking overload keeps the
+// lambda `static`, so no closure is allocated for the argument the factory needs.
+return Cache.GetOrAdd(key, static (k, arg) => Build(k, arg), argument);
+```
+
+`GetOrAdd`'s factory may still run more than once under contention -- that is documented and
+unavoidable -- but only one result is ever stored and returned, which is the property that matters.
+
+Keep the plain `TryGetValue`-then-indexer form **only** under `SINGLE_THREADED`, where the field is a
+plain `Dictionary` and there is no race to lose.
+
+A guard the factory cannot express -- "only build when I have a live probe" -- still belongs in front
+of `GetOrAdd`, because a factory handed a bad argument would cache a refusal for a reason that has
+nothing to do with the key.
+
 For primitives, use `Volatile` or `Interlocked`:
 
 ```csharp
@@ -332,7 +363,8 @@ Before submitting any code, verify:
 
 - [ ] No LINQ in hot paths
 - [ ] No closures capturing variables
-- [ ] All temporary collections use `Buffers<T>`
+- [ ] All temporary collections use `Buffers<T>` (hand-rolling a `[ThreadStatic]` scratch instead is
+      a call-site-specific optimization, not a default -- see below)
 - [ ] All temporary arrays use appropriate pool
 - [ ] No reflection on code we control (use `internal` + `[InternalsVisibleTo]`)
 - [ ] Value types used where appropriate
@@ -343,6 +375,24 @@ Before submitting any code, verify:
 - [ ] No duplicated code - extract common patterns to abstractions
 
 ---
+
+## A Pool Lease Is the Default; a Hand-Rolled Scratch Needs Its Own Number
+
+`Buffers<T>` is the default for a temporary collection. Replacing it with a `[ThreadStatic]` list is
+an optimization, and its result **does not transfer between call sites** -- measured both ways in
+this repository, on the same editor, in the same family of methods:
+
+| call site                     | whole call |                               `Buffers<T>` lease vs `[ThreadStatic]` |
+| ----------------------------- | ---------: | -------------------------------------------------------------------: |
+| sibling relational assignment |    ~1.0 µs |                                    lease **7% slower** (session 215) |
+| child relational assignment   |    ~4.7 µs | lease **2% faster**, 0.976-0.983x over three orderings (session 216) |
+
+The lease's cost is roughly fixed, so it is a large fraction of a cheap call and a negligible one of
+an expensive call. That is the whole explanation, and it is why "we hand-rolled a scratch in the
+neighbouring method" is not a reason to hand-roll one here.
+
+So: reach for `Buffers<T>`. Specialize only with a number for **that** call site, run in more than
+one ordering, and leave the number in a comment where the next reader will find it.
 
 ## Related Skills
 

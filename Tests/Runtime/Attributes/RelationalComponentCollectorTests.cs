@@ -134,6 +134,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 frontier = next;
             }
 
+            // These attributes default to IncludeInactive, and IncludeInactive=false forces the slow
+            // path, so the fast path only ever runs with inactive objects INCLUDED. Both senses of
+            // inactive are here -- a deactivated GameObject and a disabled behaviour -- because that
+            // is where the two query overloads would diverge if they were going to.
+            GameObject inactiveChild = Track(
+                new GameObject("CollectorInactiveChild", typeof(SpriteRenderer))
+            );
+            inactiveChild.transform.SetParent(frontier);
+            inactiveChild.SetActive(false);
+
+            GameObject disabledChild = Track(
+                new GameObject("CollectorDisabledChild", typeof(SpriteRenderer))
+            );
+            disabledChild.transform.SetParent(frontier);
+            disabledChild.GetComponent<SpriteRenderer>().enabled = false;
+
             return root.GetComponent<ExpectChildSpriteRenderers>();
         }
 
@@ -150,6 +166,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 frontier = ancestor.transform;
             }
 
+            // One ancestor carries a disabled renderer, for the same reason the child hierarchy has
+            // one: the fast path only ever runs with inactive components included.
+            GameObject disabledAncestor = Track(
+                new GameObject("CollectorDisabledAncestor", typeof(SpriteRenderer))
+            );
+            disabledAncestor.transform.SetParent(frontier);
+            disabledAncestor.GetComponent<SpriteRenderer>().enabled = false;
+
             GameObject leaf = Track(
                 new GameObject(
                     "CollectorLeaf",
@@ -157,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                     typeof(ExpectParentSpriteRenderers)
                 )
             );
-            leaf.transform.SetParent(frontier);
+            leaf.transform.SetParent(disabledAncestor.transform);
             return leaf.GetComponent<ExpectParentSpriteRenderers>();
         }
 

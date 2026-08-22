@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using System.Reflection;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Utils;
     using static RelationalComponentProcessor;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
@@ -29,6 +30,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// site, where per-field overhead dominates -- the whole-call A/B is 1.030x for children and
     /// 1.007x for parents, best of three in one domain. The allocation is the win here; the clock
     /// is not.
+    ///
+    /// The scratch buffer is a <see cref="Buffers{T}"/> lease rather than the <c>[ThreadStatic]</c>
+    /// list the sibling, child and parent fast invokers each hand-roll. That looks inconsistent with
+    /// them and is measured: here the lease is 0.976-0.983x of the hand-rolled buffer across three
+    /// orderings (pooled first, scratch first, interleaved), so specializing bought nothing. Session
+    /// 215's opposite finding -- a lease costing 7% -- was on the sibling path, a ~1 us call where
+    /// the same fixed lease cost is a far larger fraction than it is in this ~4.7 us one. Neither
+    /// result generalizes to the other call site; measure before copying either.
     ///
     /// This construct is the one the relational fast path reverted once, so it is fail-soft in both
     /// places it can fail. Construction is guarded, and construction also <em>invokes</em> every
@@ -85,14 +94,29 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return cached;
             }
 
+            // A miss needs a live probe, and GetOrAdd cannot express that: handed a null one its
+            // factory would cache a refusal permanently for a reason that has nothing to do with
+            // this runtime. So the miss is filtered here and the store below is still atomic.
             if (probe == null)
             {
                 return null;
             }
 
+#if SINGLE_THREADED
             RelationalComponentCollector created = Create(elementType, probe);
             Collectors[elementType] = created;
             return created;
+#else
+            // GetOrAdd rather than an indexer store after the miss: the indexer is last-write-wins,
+            // so two threads racing a first use could each build and probe a collector and each
+            // return a different instance than the one that ends up cached. The state-taking
+            // overload keeps the lambda static, so no closure is allocated for `probe`.
+            return Collectors.GetOrAdd(
+                elementType,
+                static (type, live) => Create(type, live),
+                probe
+            );
+#endif
         }
 
         /// <summary>
@@ -158,28 +182,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private sealed class TypedCollector<TElement> : RelationalComponentCollector
             where TElement : Component
         {
-            // Detached while in use so a re-entrant call gets its own buffer, matching the family's
-            // other scratch buffers. Assignment is main-thread-only; [ThreadStatic] keeps it correct
-            // if that ever stops being true.
-            [ThreadStatic]
-            private static List<TElement> Scratch;
-
             internal override int CollectChildrenInto(
                 Component source,
                 bool includeInactive,
                 List<Component> destination
             )
             {
-                List<TElement> buffer = Rent();
-                try
-                {
-                    source.GetComponentsInChildren(includeInactive, buffer);
-                    return Drain(buffer, destination);
-                }
-                finally
-                {
-                    Return(buffer);
-                }
+                using PooledResource<List<TElement>> lease = Buffers<TElement>.List.Get(
+                    out List<TElement> buffer
+                );
+                source.GetComponentsInChildren(includeInactive, buffer);
+                return Drain(buffer, destination);
             }
 
             internal override int CollectParentsInto(
@@ -188,16 +201,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 List<Component> destination
             )
             {
-                List<TElement> buffer = Rent();
-                try
-                {
-                    source.GetComponentsInParent(includeInactive, buffer);
-                    return Drain(buffer, destination);
-                }
-                finally
-                {
-                    Return(buffer);
-                }
+                using PooledResource<List<TElement>> lease = Buffers<TElement>.List.Get(
+                    out List<TElement> buffer
+                );
+                source.GetComponentsInParent(includeInactive, buffer);
+                return Drain(buffer, destination);
             }
 
             private static int Drain(List<TElement> buffer, List<Component> destination)
@@ -209,38 +217,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 return count;
-            }
-
-            private static List<TElement> Rent()
-            {
-                List<TElement> results = Scratch;
-                if (results == null)
-                {
-                    results = new List<TElement>();
-                }
-                else
-                {
-                    Scratch = null;
-                    results.Clear();
-                }
-
-                return results;
-            }
-
-            private static void Return(List<TElement> results)
-            {
-                if (results == null || Scratch != null)
-                {
-                    return;
-                }
-
-                results.Clear();
-                if (MaximumRetainedScratchCapacity < results.Capacity)
-                {
-                    results.Capacity = 0;
-                }
-
-                Scratch = results;
             }
         }
     }
