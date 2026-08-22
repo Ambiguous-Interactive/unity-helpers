@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// it.
     /// </summary>
     /// <remarks>
-    /// The plain neighbour is not filler: both encodings have to survive in one message, and a
+    /// The plain neighbor is not filler: both encodings have to survive in one message, and a
     /// generator that applied the annotation to the whole contract rather than to the member that
     /// carries it would pass every test that used only annotated members.
     /// </remarks>
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(5, DataFormat = WProtoDataFormat.ZigZag)]
         public int? MaybeInt32;
 
-        /// <summary>The neighbour that keeps protobuf's default <c>int32</c>.</summary>
+        /// <summary>The neighbor that keeps protobuf's default <c>int32</c>.</summary>
         [ProtoMember(6)]
         [WProtoMember(6)]
         public int Plain;

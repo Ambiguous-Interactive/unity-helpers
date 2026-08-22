@@ -111,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix one refused protobuf surrogate registration disabling every registration after it, so `Vector3`, `Color` and `Bounds` silently encoded with different bytes. Each is now independent and names the type it could not register.
 - Fix `UnityRandom` losing its position when saved: its snapshot now carries `UnityEngine.Random`'s state, so a restored generator resumes the exact sequence instead of continuing from wherever the engine is. Restoring writes that global back. See [Random Generators](./docs/features/utilities/random-generators.md#saving-and-restoring-a-generator) ([#521](https://github.com/Ambiguous-Interactive/unity-helpers/issues/521)).
 - Fix protobuf-net writing a different payload than WallstopProto for a zero-initialized `FastVector2Int` or `FastVector3Int`. The surrogate mirrored the cached hash through `GetHashCode()` rather than the stored field, so the two encoders disagreed on the origin ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - Fix `default(FastVector2Int)` and `default(FastVector3Int)` comparing unequal to the origin they describe. An array element, an unset field or a dictionary miss did not match `new FastVector2Int(0, 0)`, so a set held the origin cell twice. Wire format is unchanged ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).

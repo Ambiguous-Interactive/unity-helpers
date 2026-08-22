@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -121,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </summary>
         /// <remarks>
         /// 1,000 cells laid out twice over the same magnitudes -- once anchored at the origin, once
-        /// centred on it. Under int32 the centred grid cost 14,690 bytes against the anchored one's
+        /// centered on it. Under int32 the centered grid cost 14,690 bytes against the anchored one's
         /// 5,870, purely because half its coordinates were negative. They are now equal, and the
         /// number is the one the generator suite measures against protobuf-net itself.
         /// </remarks>
@@ -417,6 +418,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void EveryFormatterAgreesWithTheVendoredOracle()
         {
+            // Without its surrogate registered, protobuf-net does not refuse FastVector2Int -- it
+            // encodes the type's own contract, on the int32 fields the surrogate retired. See
+            // WProtoFacadeTests.APortedTypeIsServedAndMatchesProtobufNetByteForByte.
+            ProtobufUnityModel.EnsureInitialized();
             int checks = 0;
             int[] components = { 0, 1, -1, 300, -300, int.MaxValue, int.MinValue };
 

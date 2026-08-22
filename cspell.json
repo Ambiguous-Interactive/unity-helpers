@@ -860,6 +860,7 @@
         "Cim",
         "varint",
         "varints",
+        "sint",
         "zigzag",
         "MSVC",
         "vswhere",

@@ -230,6 +230,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
         }
 
+        /// <summary>
+        /// Every surrogate this package declares actually reached protobuf-net's model.
+        /// </summary>
+        /// <remarks>
+        /// <c>RuntimeTypeModel.Default</c> is process-global and freezes a type the first time it
+        /// serializes one, so a registration can be refused rather than applied -- and a refused
+        /// surrogate is silent: the type keeps serializing, with different bytes. The registrations
+        /// used to share one <c>try</c>, which made a single refusal skip every one after it.
+        /// </remarks>
+        [Test]
+        public void EverySurrogateThisPackageDeclaresWasActuallyRegistered()
+        {
+            ProtobufUnityModel.EnsureInitialized();
+            Assert.IsEmpty(
+                ProtobufUnityModel.RegistrationFailures,
+                "protobuf-net had already bound these types, so they now encode with bytes this "
+                    + "package does not document: "
+                    + string.Join(", ", ProtobufUnityModel.RegistrationFailures)
+            );
+        }
+
         [Test]
         public void EveryRegisteredSurrogateIsGated()
         {

@@ -1584,6 +1584,58 @@ reverse does not hold — a 3.5.1 build handed a payload without field 3 reads a
 same reason `FastVector3Int` keeps `z` on tag 4 rather than moving it onto the vacated 3: a legacy
 payload's hash would otherwise be read as `z`.
 
+#### DataFormat: what a negative number costs
+
+Protobuf's default `int32` encodes a negative value by sign-extending it to 64 bits, so `-1` costs
+**ten bytes** where `1` costs one. `sint32` — ZigZag — maps `-1` onto `1` and `-2` onto `3`, so the
+width follows the value's distance from zero rather than which side of zero it sits on. Ask for it
+per member:
+
+```csharp
+[WProtoContract]
+public sealed partial class Cell
+{
+    [WProtoMember(1, DataFormat = WProtoDataFormat.ZigZag)]
+    public int X;
+
+    [WProtoMember(2, DataFormat = WProtoDataFormat.ZigZag)]
+    public int Y;
+}
+```
+
+It is available on `sbyte`, `short`, `int` and `long`, including as a `Nullable<T>`. Anywhere else —
+an unsigned integer, a `float`, a `string`, a message, a collection — protobuf has no such encoding
+and the annotation is a build error (`WPROTO037`) rather than an annotation that quietly does
+nothing. `ProtoBuf.DataFormat.ZigZag` is the protobuf-net spelling of the same thing, and the two
+produce identical bytes.
+
+**It is a wire break, not a hint.** A varint written as `int32` and read as `sint32` is a _different
+number_, not a failure, so changing an existing member's `DataFormat` silently rewrites every value
+already saved. Give the member a new field number and keep reading the old one instead — which is
+what `FastVector2Int` and `FastVector3Int` do below.
+
+**It is a trade, not a free win.** ZigZag spends the low bit on the sign, so a large positive value
+can cost one byte more: a component in `8192..16383` is three bytes as `sint32` and two as `int32`.
+That is the price of nine bytes saved on every negative one.
+
+#### Grid coordinates ride on ZigZag
+
+`FastVector2Int` and `FastVector3Int` write their components as `sint32`, on fields 5, 6 and 7.
+Measured over a 1,000-cell 40x25 grid, twice, against protobuf-net:
+
+| grid                   | `int32`      | `sint32`    |
+| ---------------------- | ------------ | ----------- |
+| anchored at the origin | 5,870 bytes  | 3,870 bytes |
+| centered on the origin | 14,690 bytes | 3,870 bytes |
+
+The centered grid used to cost 2.5x the anchored one for the same magnitudes, purely because half its
+coordinates were negative. The two are now equal, which is the property being bought.
+
+The `int32` fields 1, 2 and 4 are **still read**, so a grid saved by an earlier build loads
+unchanged. They are never written — the components moved to new field numbers precisely so that a
+legacy payload is decoded rather than reinterpreted. Fields 5 through 7 are one-byte keys just as 1
+and 2 are, so the compatibility costs nothing on the wire.
+
 ### Serving through `Serializer`
 
 `Serializer.ProtoSerialize` / `ProtoDeserialize` ask WallstopProto first when the `WALLSTOP_PROTO`

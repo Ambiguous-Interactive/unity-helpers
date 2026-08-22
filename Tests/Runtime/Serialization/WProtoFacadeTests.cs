@@ -50,6 +50,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // FastVector2Int and friends already have formatters, so the facade serves them -- and
             // the bytes have to equal what protobuf-net would have written, or the swap changes
             // saved data.
+            //
+            // The oracle has to be woken first, and here that is load-bearing rather than a
+            // formality: without its surrogate registered, protobuf-net does not refuse
+            // FastVector2Int the way it refuses Vector2 -- it silently encodes the type's own
+            // contract instead, on the int32 fields the surrogate retired. This assertion then
+            // fails for a reason that has nothing to do with the code under test, and used to pass
+            // only because some earlier fixture happened to touch Serializer first.
+            ProtobufUnityModel.EnsureInitialized();
             AssertServedAndIdentical(new FastVector2Int(1, -2));
             AssertServedAndIdentical(new FastVector3Int(3, 4, -5));
             // A zero-initialized instance is the case where the two encoders can most easily drift:

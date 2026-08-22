@@ -90,8 +90,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// The grid the change was made for, measured rather than predicted.
         /// </summary>
         /// <remarks>
-        /// Two 40x25 grids of 1,000 cells each -- one anchored at the origin, one centred on it.
-        /// Under <c>int32</c> the centred one cost 2.5x the anchored one for the same magnitudes,
+        /// Two 40x25 grids of 1,000 cells each -- one anchored at the origin, one centered on it.
+        /// Under <c>int32</c> the centered one cost 2.5x the anchored one for the same magnitudes,
         /// because half its coordinates were negative and a negative <c>int32</c> sign-extends to
         /// ten bytes. Under <c>sint32</c> the two are identical, which is the property being bought:
         /// a cell's cost follows its distance from the origin rather than which side of it it sits.
@@ -100,9 +100,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ACentredGridCostsWhatAnAnchoredOneDoes()
         {
             int anchored = GridBytes(0, 0);
-            int centred = GridBytes(-20, -12);
+            int centered = GridBytes(-20, -12);
 
-            Assert.AreEqual(anchored, centred, "sign must not decide a cell's cost");
+            Assert.AreEqual(anchored, centered, "sign must not decide a cell's cost");
             Assert.AreEqual(3870, anchored, "the measured component cost of 1,000 cells");
         }
 
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 yield return new ZigZagContract { Int8 = value };
             }
 
-            // Every member at once, so no member's encoding depends on its neighbours being default.
+            // Every member at once, so no member's encoding depends on its neighbors being default.
             yield return new ZigZagContract
             {
                 Int32 = -12345,
