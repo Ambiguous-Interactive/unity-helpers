@@ -303,6 +303,23 @@ Four constraints. The first two were recorded backwards before being measured on
 - **`result.Log` does not format.** `result.Log("{0:E3}", x)` prints the literal `{0:E3}`. Build the
   string first.
 
+**To benchmark rather than assert, bind a delegate — never `Invoke` in the loop.**
+`MethodInfo.Invoke` costs far more than any method worth measuring, so a reflection-driven loop
+reports reflection. `System.Delegate.CreateDelegate` gives a direct call:
+
+```csharp
+System.Func<ulong> draw = (System.Func<ulong>)System.Delegate.CreateDelegate(
+    typeof(System.Func<ulong>), instance, method);   // then loop on draw()
+```
+
+Two things that follow, both learned by getting them wrong first. The sandbox has **no `Stopwatch`**
+and `DateTime.UtcNow` has a ~0.5 ms floor, so the inner loop needs enough iterations (20M for a
+single-digit-nanosecond call) that elapsed time swamps it — otherwise the run fabricates a speedup.
+And the delegate's own call overhead sits in **every** cell, so a ratio between two cells is
+compressed toward 1: report such a ratio as a **lower bound**, not an estimate. Session 213 measured
+`NextUlong` against `NextUint` this way across eight generators and the control landed exactly where
+the algorithm predicted, which is what makes the shape trustworthy.
+
 This is a fast inner loop (a 250-case fixture ran in 1.5 s), not a substitute for CI: it is one
 editor version, EditMode only, on Mono, with teardown assertions skipped. **One editor version means
 an API this one still likes.** `Object.GetInstanceID()` compiles here on `6000.4.6f1` and is `CS0619`
