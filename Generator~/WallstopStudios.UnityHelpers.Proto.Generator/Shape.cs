@@ -543,10 +543,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal static bool SupportsZigZag(ITypeSymbol type)
         {
-            return Underlying(type).SpecialType is SpecialType.System_SByte
-                or SpecialType.System_Int16
-                or SpecialType.System_Int32
-                or SpecialType.System_Int64;
+            return Underlying(type).SpecialType
+                is SpecialType.System_SByte
+                    or SpecialType.System_Int16
+                    or SpecialType.System_Int32
+                    or SpecialType.System_Int64;
         }
 
         /// <summary>
