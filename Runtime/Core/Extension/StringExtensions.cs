@@ -1233,10 +1233,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int i = 0; i < delimited.Length; ++i)
             {
                 char current = delimited[i];
-                bool isDigit = current is >= '0' and <= '9';
-                bool isLower = current is >= 'a' and <= 'z';
-                bool isUpper = current is >= 'A' and <= 'Z';
-                if (!isDigit && !isLower && !isUpper)
+                bool isAsciiAlphanumeric =
+                    current is >= '0' and <= '9'
+                    || current is >= 'a' and <= 'z'
+                    || current is >= 'A' and <= 'Z';
+                if (!isAsciiAlphanumeric)
                 {
                     // Every rejected run collapses to at most one separator, and a pending one is
                     // only emitted once something survives after it, which is what trims both ends.
@@ -1250,7 +1251,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     separatorPending = false;
                 }
 
-                builder.Append(isUpper ? (char)(current + 32) : current);
+                // Invariant specifically, not ToLower(): under tr-TR, 'I' lowercases to the
+                // dotless '\u0131', which is not ASCII and would break what this method promises.
+                builder.Append(char.ToLowerInvariant(current));
             }
 
             return builder.ToString();

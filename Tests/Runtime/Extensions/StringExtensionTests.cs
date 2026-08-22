@@ -1072,6 +1072,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void SlugifyIsAsciiUnderATurkishCulture()
+        {
+            // The one culture that makes lowercasing not a no-op for ASCII: tr-TR maps 'I' to the
+            // dotless '\u0131', which is not ASCII. A slug built with ToLower() rather than
+            // ToLowerInvariant() would emit it and break the guarantee the method documents.
+            System.Globalization.CultureInfo original = System
+                .Threading
+                .Thread
+                .CurrentThread
+                .CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture =
+                    new System.Globalization.CultureInfo("tr-TR");
+                Assert.AreEqual("hill", "HILL".Slugify());
+                Assert.AreEqual("instance-id", "InstanceID".Slugify());
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = original;
+            }
+        }
+
+        [Test]
         public void SlugifyIsIdempotent()
         {
             // A slug re-slugged has to be itself, or a key stored and re-derived drifts.
