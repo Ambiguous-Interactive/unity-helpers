@@ -289,6 +289,16 @@ Four constraints. The first two were recorded backwards before being measured on
   happened, so under this loop protobuf-net answered with each type's own contract instead of its
   surrogate and reported a byte-parity "failure" in green code. Invoke `[OneTimeSetUp]` once per
   fixture, or wake the global explicitly before the sweep.
+- **One run is not a result, and the wrong answer looks like a good one.** The clock floor is only
+  half the problem; run-to-run variance on this editor is large enough to invent a result outright.
+  Session 215 measured a relational change with one 100k-iteration run per shape and reported
+  **-23% / -8% / -21%**. Best-of-three re-runs gave **-22% / parity / -5%** -- and the middle figure
+  had the sign wrong: that path was 7% _slower_, a regression the single run reported as an 8% win
+  and would have shipped. Take **best of three trials** on each side, and gate each measurement on
+  the loaded assembly actually being the variant under test -- probe for a member only that variant
+  has and refuse to print numbers otherwise. For a before/after, that means checking the old sources
+  out (`git checkout main -- Runtime Tests`), confirming the _old_ symbol is the loaded one, and
+  measuring it the same way rather than trusting a figure recorded earlier.
 - **The allocation counters read zero, whatever the code allocates.** Both
   `GC.GetAllocatedBytesForCurrentThread()` and a `GC.GetTotalMemory(false)` delta returned **0** for
   a control that allocated 64 KB in 64 arrays on `6000.4.6f1`. They are not implemented on this
