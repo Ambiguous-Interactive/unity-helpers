@@ -237,8 +237,15 @@ or a **passing test reports as failed**:
   `catch` that assumes any exception is a failure turns every `Assert.Pass` test red — with the pass
   message as the "error" (`ConstructorWithNullComparerDoesNotThrow: Does not throw.`).
 - **Treat `InconclusiveException` / `IgnoreException` as skips**, not failures.
-- **Skip `[Values]` tests rather than run them.** They carry `[Test]` with parameters and no
-  `[TestCase]`; the real runner expands them and this loop cannot.
+- **Skip `[Values]` and `[TestCaseSource]` tests rather than run them.** They carry `[Test]` with
+  parameters and no inline `[TestCase]`; the real runner expands them and this loop cannot.
+  **A skip count is not a coverage statement, and reading it as one is how this loop lies.**
+  Session 217 reported `JsonConverterFuzzTests: 19 pass / 0 fail / 8 skip` and concluded from it
+  that the fixture "does not reach" the path under test. It reaches it: all eight skipped
+  methods are `[TestCaseSource(nameof(Targets))]`, and `Targets` is exactly the list of types
+  the change touched. The pass line counted the fixture's incidental cases and none of its real
+  ones. Before drawing any conclusion from a fixture, **list what was skipped and why** — a
+  target-driven fixture can have its entire meaningful coverage inside the skip bucket.
 
 Two whole categories cannot run here at all, and neither is a regression: a fixture whose body calls
 `LogAssert.Expect` (`No log scope is available`), and an Editor **drawer** test, which needs a real
