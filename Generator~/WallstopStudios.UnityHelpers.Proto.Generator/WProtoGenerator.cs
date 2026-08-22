@@ -2519,7 +2519,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                bool zigZag = NamedEnum(attribute, "DataFormat") == ZigZagDataFormat;
+                bool zigZag = AsksForZigZag(attribute);
                 if (zigZag && !Shape.SupportsZigZag(type))
                 {
                     Report(
@@ -2671,25 +2671,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
         }
 
-        /// <summary>The <c>WProtoDataFormat.ZigZag</c> member's value, as it is on the wire of the attribute.</summary>
+        /// <summary>
+        /// Reports whether the attribute asks for <c>DataFormat = ZigZag</c>.
+        /// </summary>
         /// <remarks>
-        /// Compared as an integer rather than by name because that is all an enum argument is by the
-        /// time a generator sees it, and the generator cannot reference the runtime assembly the
-        /// enum is declared in.
+        /// The member's value is read off the enum's <b>own declaration</b> rather than compared
+        /// against a constant here. An enum argument arrives as its underlying integer, so a
+        /// hard-coded <c>1</c> would work right up until someone renumbered
+        /// <c>WProtoDataFormat</c> -- after which every annotated member would silently go back to
+        /// writing <c>int32</c>, which is a different payload and not a build error. The generator
+        /// cannot reference the runtime assembly, but it can read the symbol the argument is typed
+        /// as, which is the same declaration.
         /// </remarks>
-        private const int ZigZagDataFormat = 1;
-
-        private static int NamedEnum(AttributeData attribute, string name)
+        private static bool AsksForZigZag(AttributeData attribute)
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
-                if (argument.Key == name && argument.Value.Value is int value)
+                if (argument.Key != "DataFormat" || argument.Value.Value == null)
                 {
-                    return value;
+                    continue;
+                }
+
+                if (argument.Value.Type is not INamedTypeSymbol format)
+                {
+                    continue;
+                }
+
+                foreach (ISymbol member in format.GetMembers("ZigZag"))
+                {
+                    if (
+                        member is IFieldSymbol { HasConstantValue: true } declared
+                        && Equals(declared.ConstantValue, argument.Value.Value)
+                    )
+                    {
+                        return true;
+                    }
                 }
             }
 
-            return 0;
+            return false;
         }
 
         private static bool NamedFlag(AttributeData attribute, string name)
