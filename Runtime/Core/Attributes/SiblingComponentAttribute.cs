@@ -339,7 +339,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 component,
                 metadata.elementType
             );
-            return AssignComponentsFromList(component, metadata, matches);
+            try
+            {
+                return AssignComponentsFromList(component, metadata, matches);
+            }
+            finally
+            {
+                SiblingComponentFastInvoker.Release(matches);
+            }
         }
 
         private static bool AssignComponentsFromList(
@@ -409,9 +416,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class SiblingComponentFastInvoker
     {
-        // Reused rather than leased from a pool: assignment is main-thread-only and never nested,
-        // and the lease measured more per call than the allocation it removed. [ThreadStatic] keeps
-        // that safe if a caller ignores the main-thread rule.
+        // Handed out and detached, so a re-entrant call gets its own list rather than refilling the
+        // one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
+        // GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
+        // Reused rather than pool-leased because the lease measured more per call than the
+        // allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -421,7 +430,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (results == null)
             {
                 results = new List<Component>();
-                Scratch = results;
+            }
+            else
+            {
+                Scratch = null;
             }
 
             // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
@@ -431,6 +443,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             results.Clear();
             component.GetComponents(elementType, results);
             return results;
+        }
+
+        internal static void Release(List<Component> results)
+        {
+            if (results != null && Scratch == null)
+            {
+                results.Clear();
+                Scratch = results;
+            }
         }
     }
 }

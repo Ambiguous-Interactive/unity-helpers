@@ -397,11 +397,22 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     metadata.elementType,
                     attribute.IncludeInactive
                 );
-
-                int count = FilterChildren(component, metadata, children);
-                count = EnsureBreadthFirstOrder(component, metadata, children, count);
-                assignedAny = AssignChildComponentsFromList(component, metadata, children, count);
-                return true;
+                try
+                {
+                    int count = FilterChildren(component, metadata, children);
+                    count = EnsureBreadthFirstOrder(component, metadata, children, count);
+                    assignedAny = AssignChildComponentsFromList(
+                        component,
+                        metadata,
+                        children,
+                        count
+                    );
+                    return true;
+                }
+                finally
+                {
+                    ChildComponentFastInvoker.Release(children);
+                }
             }
         }
 
@@ -778,10 +789,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ChildComponentFastInvoker
     {
-        // Reused rather than leased from a pool: assignment is main-thread-only and never nested,
-        // and the lease measured more per call than it saved. [ThreadStatic] keeps that safe if a
-        // caller ignores the main-thread rule. Each family owns its own buffer, so the three
-        // sequential passes of AssignRelationalComponents cannot collide.
+        // Handed out and detached, so a re-entrant call gets its own list rather than refilling the
+        // one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
+        // GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
+        // Reused rather than pool-leased because the lease measured more per call than the
+        // allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
+        // Each family owns its own buffer, so the three sequential passes of
+        // AssignRelationalComponents cannot collide either.
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -795,7 +809,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (results == null)
             {
                 results = new List<Component>();
-                Scratch = results;
+            }
+            else
+            {
+                Scratch = null;
             }
 
             // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
@@ -810,6 +827,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return results;
+        }
+
+        internal static void Release(List<Component> results)
+        {
+            if (results != null && Scratch == null)
+            {
+                results.Clear();
+                Scratch = results;
+            }
         }
     }
 }
