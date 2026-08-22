@@ -289,6 +289,13 @@ Four constraints. The first two were recorded backwards before being measured on
   happened, so under this loop protobuf-net answered with each type's own contract instead of its
   surrogate and reported a byte-parity "failure" in green code. Invoke `[OneTimeSetUp]` once per
   fixture, or wake the global explicitly before the sweep.
+- **The allocation counters read zero, whatever the code allocates.** Both
+  `GC.GetAllocatedBytesForCurrentThread()` and a `GC.GetTotalMemory(false)` delta returned **0** for
+  a control that allocated 64 KB in 64 arrays on `6000.4.6f1`. They are not implemented on this
+  Mono, so an allocation probe built on either reports "0 B/call" for code that allocates on every
+  call -- a clean, confident, entirely fabricated result. Time is measurable here; allocation is
+  not. Always run a control that allocates a known amount and check the counter moved before
+  believing any allocation number, and leave allocation gates to the Docker legs and CI.
 - **A probe that serializes is a probe that mutates the editor.** `RuntimeTypeModel.Default` is
   process-global and freezes a type the first time it serializes one, so a diagnostic
   `ProtoBuf.Serializer.Serialize<T>` call poisons the model for every later run in that domain --

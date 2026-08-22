@@ -169,53 +169,61 @@ review bots are **`pull_request`-triggered**, so a branch sitting on the remote
 with no pull request has proven only that `Spelling Check` passes. Opening it is
 part of shipping, not a hand-back.
 
-#### Title and body: short, plain, and about why
+#### Title and body: short and plain
 
-A pull request is read by someone deciding whether to care. Write for them, and
-keep it minimal — a long pull request body is a cost the reader pays, not
-evidence of thoroughness.
+Someone reads the pull request to decide if it affects them. Write for that
+person. Say what changed and why. Say nothing else.
 
-**Title.** One plain line, under about 60 characters, imperative mood. Name the
-user-visible effect, not the mechanism. If the branch does several things, title
-it with the one that matters most and let the body carry the rest. No lists of
-everything in the branch, no jargon, no cleverness.
+**Title.** One line, 50 characters or fewer, imperative mood. Name the effect
+the user sees, not the mechanism. Do not join two changes with "and" -- title
+the one that matters most and let the body carry the rest.
 
-**Body.** Two short sections, in this order, and nothing else:
+**Body.** Copy this template. Add nothing to it.
 
 ```markdown
-**Why:** one or two sentences — the problem a user or the project had.
+**Why:** <the problem, in one sentence>
 
 **What:**
 
-- a one-line bullet per change, in plain language
-- two to five of them
+- <one change, one line>
+- <two to five bullets>
 
 Fixes #123
 ```
 
-Rules that keep it that way:
+| Limit            | Value         |
+| ---------------- | ------------- |
+| Title            | 50 characters |
+| `**Why:**`       | 1 sentence    |
+| `**What:**`      | 2 to 5 lines  |
+| Words per bullet | 12            |
 
-- **Lead with why.** A reader who stops after the first sentence should still
-  know what the pull request is for.
-- **Plain language.** No root-cause narration, no measurement logs, no run IDs,
-  no session numbers. Those belong in the commit body, the progress log, or a
-  linked issue.
-- **One line per bullet.** A bullet needing a paragraph needs an issue instead.
-- **No section a reader would skip.** Never paste the diff, the test list, the CI
-  matrix, or a report of what you validated.
-- **Link, do not restate.** `Fixes #123` hands the reader the long version.
+Write short sentences. Use the active voice. Use common words. Give a number
+only when the number is the point (`60% smaller`, `2x faster`).
 
-Same branch, written both ways:
+**Never put these in a pull request:** root causes, measurements, run IDs,
+session numbers, CI results, a list of what you validated, byte traces, the
+diff, or the file list. They go in the commit body, the progress log, or the
+linked issue.
+
+Count the title before you send it. Nine of the twelve titles before this rule
+existed were over 60 characters, so count rather than judge:
+
+```bash
+printf '%s' "$TITLE" | wc -c # 50 or fewer
+```
+
+The same branch, written both ways:
 
 | Verdict | Title                                                                                                                           |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Avoid   | `Stop writing a derived hash the reader recomputes, keep tag 4 for z so legacy payloads still parse, and widen the parity gate` |
 | Prefer  | `Shrink grid payloads by 60%`                                                                                                   |
 
-| Verdict | Body                                                                                                                           |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Avoid   | Six paragraphs of measurement, a byte-level trace, the golden vectors that changed, and a list of the local gates that passed. |
-| Prefer  | `**Why:** every grid cell carried a hash the reader threw away — 6 of every 10 bytes.` then three bullets and `Fixes #519`.    |
+| Verdict | Body                                                                                                                 |
+| ------- | -------------------------------------------------------------------------------------------------------------------- |
+| Avoid   | Six paragraphs of measurement, a byte-level trace, the golden vectors that changed, and the local gates that passed. |
+| Prefer  | `**Why:** every grid cell carried a hash the reader threw away.` then three bullets and `Fixes #519`.                |
 
 The API is reachable from inside the devcontainer. `scripts/github-token.sh` is
 the only supported source of the credential and it **never prompts**: it reads a

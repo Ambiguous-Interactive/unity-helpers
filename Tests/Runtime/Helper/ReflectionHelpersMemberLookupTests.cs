@@ -420,5 +420,103 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 );
             }
         }
+
+        /// <summary>
+        /// The returned array's element type must be the requested one, not the source list's.
+        /// </summary>
+        /// <remarks>
+        /// A caller assigns the result straight into a typed field, so a <c>Component[]</c> where a
+        /// <c>BoxCollider[]</c> was asked for fails at the assignment rather than here.
+        /// </remarks>
+        [Test]
+        public void CreateTypedArrayReturnsTheRequestedElementType()
+        {
+            GameObject host = Track(new GameObject("TypedArrayHost"));
+            List<Component> source = new()
+            {
+                host.AddComponent<BoxCollider>(),
+                host.AddComponent<BoxCollider>(),
+            };
+
+            Array built = ReflectionHelpers.CreateTypedArray(typeof(BoxCollider), source, 2);
+
+            Assert.AreEqual(typeof(BoxCollider[]), built.GetType());
+            Assert.AreEqual(2, built.Length);
+            Assert.AreSame(source[0], built.GetValue(0));
+            Assert.AreSame(source[1], built.GetValue(1));
+        }
+
+        [Test]
+        [TestCase(0, 0, TestName = "CreateTypedArrayCountZero")]
+        [TestCase(1, 1, TestName = "CreateTypedArrayCountPartial")]
+        [TestCase(2, 2, TestName = "CreateTypedArrayCountExact")]
+        [TestCase(9, 2, TestName = "CreateTypedArrayCountAboveLength")]
+        [TestCase(-1, 0, TestName = "CreateTypedArrayCountNegative")]
+        public void CreateTypedArrayClampsCount(int requested, int expected)
+        {
+            GameObject host = Track(new GameObject("TypedArrayClampHost"));
+            List<Component> source = new()
+            {
+                host.AddComponent<BoxCollider>(),
+                host.AddComponent<BoxCollider>(),
+            };
+
+            Array built = ReflectionHelpers.CreateTypedArray(
+                typeof(BoxCollider),
+                source,
+                requested
+            );
+
+            Assert.AreEqual(expected, built.Length);
+        }
+
+        /// <summary>
+        /// A degenerate argument must produce an empty array rather than throw.
+        /// </summary>
+        [Test]
+        public void CreateTypedArrayHandlesNullArguments()
+        {
+            Array fromNullList = ReflectionHelpers.CreateTypedArray<Component>(
+                typeof(BoxCollider),
+                null,
+                4
+            );
+            Assert.AreEqual(typeof(BoxCollider[]), fromNullList.GetType());
+            Assert.AreEqual(0, fromNullList.Length);
+
+            Array fromNullType = ReflectionHelpers.CreateTypedArray(null, new List<Component>(), 0);
+            Assert.AreEqual(0, fromNullType.Length);
+        }
+
+        /// <summary>
+        /// An item the requested element type cannot hold becomes null, never an exception.
+        /// </summary>
+        [Test]
+        public void CreateTypedArrayWritesNullForAMismatchedItem()
+        {
+            GameObject host = Track(new GameObject("TypedArrayMismatchHost"));
+            List<Component> source = new() { host.AddComponent<BoxCollider>(), host.transform };
+
+            Array built = ReflectionHelpers.CreateTypedArray(typeof(BoxCollider), source, 2);
+
+            Assert.AreEqual(typeof(BoxCollider[]), built.GetType());
+            Assert.AreSame(source[0], built.GetValue(0));
+            Assert.IsTrue(built.GetValue(1) == null);
+        }
+
+        /// <summary>
+        /// An interface element type must close the builder just as a class does.
+        /// </summary>
+        [Test]
+        public void CreateTypedArraySupportsAnInterfaceElementType()
+        {
+            GameObject host = Track(new GameObject("TypedArrayInterfaceHost"));
+            List<Component> source = new() { host.AddComponent<TestInterfaceComponent>() };
+
+            Array built = ReflectionHelpers.CreateTypedArray(typeof(ITestInterface), source, 1);
+
+            Assert.AreEqual(typeof(ITestInterface[]), built.GetType());
+            Assert.AreSame(source[0], built.GetValue(0));
+        }
     }
 }

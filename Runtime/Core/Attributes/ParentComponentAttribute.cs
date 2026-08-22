@@ -249,13 +249,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                             filterDisabledComponents: false
                                         );
 
-                                Array correctTypedArray = field.arrayCreator(filteredCount);
-                                for (int i = 0; i < filteredCount; ++i)
-                                {
-                                    correctTypedArray.SetValue(parentComponents[i], i);
-                                }
-
-                                field.SetValue(component, correctTypedArray);
+                                field.SetValue(
+                                    component,
+                                    CreateTypedArray(
+                                        field.elementType,
+                                        parentComponents,
+                                        filteredCount
+                                    )
+                                );
                                 foundParent = filteredCount > 0;
                                 break;
                             }
@@ -423,88 +424,88 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             using (ParentFastPathMarker.Auto())
 #endif
             {
-                Array parents = ParentComponentFastInvoker.GetArray(
+                using PooledResource<List<Component>> parentBuffer = Buffers<Component>.List.Get(
+                    out List<Component> parents
+                );
+                ParentComponentFastInvoker.Collect(
                     root,
                     metadata.elementType,
-                    attribute.IncludeInactive
+                    attribute.IncludeInactive,
+                    parents
                 );
 
-                Array filtered = FilterParentArray(metadata, parents);
-                assignedAny = AssignParentComponentsFromArray(component, metadata, filtered);
+                int count = FilterParents(metadata, parents);
+                assignedAny = AssignParentComponentsFromList(component, metadata, parents, count);
                 return true;
             }
         }
 
-        private static Array FilterParentArray(
+        /// <summary>
+        /// Applies <see cref="BaseRelationalComponentAttribute.MaxCount"/> in place and reports how
+        /// many leading entries of <paramref name="source"/> survive.
+        /// </summary>
+        /// <remarks>
+        /// Compaction only runs when a count limit is set, which is what the array-building version
+        /// of this filter did: without a limit it returned its input untouched, destroyed entries
+        /// included.
+        /// </remarks>
+        private static int FilterParents(
             FieldMetadata<ParentComponentAttribute> metadata,
-            Array source
+            List<Component> source
         )
         {
-            Type elementType = metadata.elementType;
-            if (source == null || source.Length == 0)
+            if (source == null || source.Count == 0)
             {
-                return Array.CreateInstance(elementType, 0);
+                return 0;
             }
 
             int maxCount = metadata.attribute.MaxCount;
             if (maxCount <= 0)
             {
-                return source;
+                return source.Count;
             }
 
-            int limit = Math.Min(maxCount, source.Length);
-            Array staged = Array.CreateInstance(elementType, limit);
+            int limit = Math.Min(maxCount, source.Count);
             int writeIndex = 0;
 
-            for (int i = 0; i < source.Length && writeIndex < limit; ++i)
+            for (int i = 0; i < source.Count && writeIndex < limit; ++i)
             {
-                Component candidate = source.GetValue(i) as Component;
+                Component candidate = source[i];
                 if (candidate == null)
                 {
                     continue;
                 }
 
-                staged.SetValue(candidate, writeIndex++);
+                source[writeIndex++] = candidate;
             }
 
-            if (writeIndex == staged.Length)
-            {
-                return staged;
-            }
-
-            Array result = Array.CreateInstance(elementType, writeIndex);
-            if (writeIndex > 0)
-            {
-                Array.Copy(staged, 0, result, 0, writeIndex);
-            }
-
-            return result;
+            return writeIndex;
         }
 
-        private static bool AssignParentComponentsFromArray(
+        private static bool AssignParentComponentsFromList(
             Component component,
             FieldMetadata<ParentComponentAttribute> metadata,
-            Array parents
+            List<Component> parents,
+            int count
         )
         {
-            if (parents == null)
+            if (parents == null || count < 0)
             {
-                parents = Array.CreateInstance(metadata.elementType, 0);
+                count = 0;
             }
-
-            int count = parents.Length;
+            else if (count > parents.Count)
+            {
+                count = parents.Count;
+            }
 
             switch (metadata.kind)
             {
                 case FieldKind.Array:
                 {
-                    Array instance = metadata.arrayCreator(count);
-                    for (int i = 0; i < count; ++i)
-                    {
-                        instance.SetValue(parents.GetValue(i), i);
-                    }
-
-                    metadata.SetValue(component, instance);
+                    metadata.SetValue(
+                        component,
+                        CreateTypedArray(metadata.elementType, parents, count)
+                    );
                     return count > 0;
                 }
                 case FieldKind.List:
@@ -521,7 +522,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                     for (int i = 0; i < count; ++i)
                     {
-                        list.Add(parents.GetValue(i));
+                        list.Add(parents[i]);
                     }
 
                     return count > 0;
@@ -541,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                     for (int i = 0; i < count; ++i)
                     {
-                        metadata.hashSetAdder(hashSet, parents.GetValue(i));
+                        metadata.hashSetAdder(hashSet, parents[i]);
                     }
 
                     return count > 0;
@@ -719,16 +720,23 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ParentComponentFastInvoker
     {
-        internal static Array GetArray(Component component, Type elementType, bool includeInactive)
+        internal static void Collect(
+            Component component,
+            Type elementType,
+            bool includeInactive,
+            List<Component> results
+        )
         {
             // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
             // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-            // at runtime in player builds). GetComponentsInParent(Type, bool) returns only
-            // elementType instances; copy them into a typed array the caller can assign.
+            // at runtime in player builds). It has no caller-buffer sibling, so its array still
+            // allocates; what the caller buffer removes is the typed copy that followed it.
             Component[] matches = component.GetComponentsInParent(elementType, includeInactive);
-            Array typed = Array.CreateInstance(elementType, matches.Length);
-            Array.Copy(matches, typed, matches.Length);
-            return typed;
+            results.Clear();
+            for (int i = 0; i < matches.Length; ++i)
+            {
+                results.Add(matches[i]);
+            }
         }
     }
 }

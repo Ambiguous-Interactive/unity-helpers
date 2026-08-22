@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
     using System;
     using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using ProtoBuf;
     using ProtoBuf.Meta;
     using UnityEngine;
@@ -652,6 +653,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// the wrong bytes, and because a test needs to be able to assert that the answer is none.
         /// </remarks>
         internal static readonly List<string> RegistrationFailures = new List<string>();
+
+        // Wraps the list by reference, so it reflects what the static constructor adds after this
+        // field initializer runs. Handing the same instance out every call keeps the public
+        // accessor allocation-free.
+        private static readonly ReadOnlyCollection<string> RefusedView =
+            new ReadOnlyCollection<string>(RegistrationFailures);
+
+        /// <summary>
+        /// The types whose surrogate was refused, as a view a caller cannot mutate.
+        /// </summary>
+        internal static IReadOnlyList<string> Refused => RefusedView;
 
         static ProtobufUnityModel()
         {

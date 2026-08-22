@@ -123,8 +123,9 @@ declare -a missing_header_list=()
 # Extract year from copyright header
 get_header_year() {
     local file="$1"
-    local first_line
-    first_line=$(head -1 -- "$file" 2>/dev/null || echo "")
+    local first_line=""
+    # A builtin read replaces a fork plus an exec of head, once per tracked .cs file.
+    IFS= read -r first_line < "$file" 2>/dev/null || true
 
     # Match pattern: // MIT License - Copyright (c) YYYY ...
     if [[ "$first_line" =~ Copyright\ \(c\)\ ([0-9]{4}) ]]; then

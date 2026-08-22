@@ -392,6 +392,37 @@ Notes
 - If you define your own DTOs, they will continue to work; surrogates simply make Unity structs first-class.
 - Keep using [ProtoContract]/[ProtoMember] and stable field numbers for your own types.
 
+### Checking the surrogates took effect
+
+protobuf-net's type model is process-global, and it freezes a type the first time anything
+serializes one. If another package -- or your own code calling `ProtoBuf.Serializer` directly --
+reaches `Vector3` before this package's `Serializer` is first touched, the surrogate for it can no
+longer be applied. The type still serializes. It just writes a different byte layout, with no
+exception, which is exactly the failure a save file cannot survive.
+
+Ask before you write the first save:
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Serialization;
+
+if (!Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refused))
+{
+    // Write JSON this session rather than protobuf bytes a later build reads differently.
+    Debug.LogError($"Protobuf surrogates missing for: {string.Join(", ", refused)}");
+}
+```
+
+- The method wakes the registration itself, so it is safe to call first thing.
+- A refusal **cannot be repaired**: protobuf-net will not re-bind a frozen type. Fix the order
+  instead -- touch `Serializer` during startup, before anything else serializes.
+- `ProtoSerialize` does **not** refuse for an affected type. Refusing would break a game whose
+  bytes are self-consistent within one build, and would break every IL2CPP game outright. The
+  method reports so you can choose; it never changes the model.
+- Under IL2CPP it always reports ready. protobuf-net builds its serializers by reflection, which an
+  AOT compiler cannot emit, so these types are encoded by [WallstopProto](#wallstopproto-the-reflection-free-wire-layer-preview)
+  there and a refused registration changes nothing you can observe.
+
 ### ⚠️ IL2CPP and Code Stripping Warning
 
 **Critical for IL2CPP builds (WebGL, iOS, Android, Consoles):**

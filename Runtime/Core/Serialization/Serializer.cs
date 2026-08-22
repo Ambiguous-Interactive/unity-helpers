@@ -339,6 +339,62 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             object
         > ProtoDeserializeTypeFromROSFast;
 
+        /// <summary>
+        /// Reports whether protobuf serialization will write the byte layout this package documents.
+        /// </summary>
+        /// <param name="refusedTypes">
+        /// The names of the types whose surrogate was refused. Empty when the method returns true.
+        /// </param>
+        /// <returns>True when every surrogate this package declares is in effect.</returns>
+        /// <remarks>
+        /// <para>
+        /// <c>ProtoBuf.Meta.RuntimeTypeModel.Default</c> is process-global and freezes a type the
+        /// first time anything serializes one. If another package -- or your own code calling
+        /// <c>ProtoBuf.Serializer</c> directly -- reaches a type such as <see cref="Vector3"/>
+        /// before this package's <see cref="Serializer"/> is first touched, the surrogate for it can
+        /// no longer be applied. The type still serializes, with a different byte layout and no
+        /// exception, which is why a game that stores protobuf saves wants to ask this before it
+        /// writes its first one.
+        /// </para>
+        /// <para>
+        /// A refusal cannot be repaired: protobuf-net will not re-bind a frozen type. Fix the order
+        /// instead -- touch <see cref="Serializer"/> during startup, before anything else
+        /// serializes -- or fall back to JSON for that session. This method reports; it never
+        /// changes the model.
+        /// </para>
+        /// <para>
+        /// Under IL2CPP this always reports ready. protobuf-net builds its serializers by
+        /// reflection, which an AOT compiler cannot emit, so these types are encoded by
+        /// WallstopProto there and a refused registration changes nothing you can observe.
+        /// </para>
+        /// Null handling: <paramref name="refusedTypes"/> is never null.
+        /// Thread-safety: safe to call from any thread once initialization has completed.
+        /// </remarks>
+        /// <example>
+        /// <code><![CDATA[
+        /// if (!Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refused))
+        /// {
+        ///     Debug.LogError($"Refusing to autosave: {string.Join(", ", refused)} would encode wrongly.");
+        ///     return;
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes)
+        {
+            // The failures are recorded by a static constructor, so an accessor that does not wake
+            // it can report "ready" purely because nothing has run yet. That ordering trap is the
+            // one that caused the defect this reports on, so the wake-up belongs here rather than
+            // in a caller's documentation.
+            ProtobufUnityModel.EnsureInitialized();
+#if ENABLE_IL2CPP
+            refusedTypes = Array.Empty<string>();
+            return true;
+#else
+            refusedTypes = ProtobufUnityModel.Refused;
+            return refusedTypes.Count == 0;
+#endif
+        }
+
         static Serializer()
         {
             // Initialize protobuf surrogates and any other serialization bootstrapping here
@@ -2766,12 +2822,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             // A type-level [JsonConverter] tells STJ/the converter how to serialize the type without
             // the metadata path, so it is safe under AOT and we must not second-guess its output.
-            if (
-                type.IsDefined(
-                    typeof(JsonConverterAttribute),
-                    inherit: false
-                )
-            )
+            if (type.IsDefined(typeof(JsonConverterAttribute), inherit: false))
             {
                 return false;
             }

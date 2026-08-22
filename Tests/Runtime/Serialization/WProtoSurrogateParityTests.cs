@@ -264,6 +264,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        /// <summary>
+        /// The public accessor must answer the same question the internal list does, and must wake
+        /// the static constructor itself.
+        /// </summary>
+        /// <remarks>
+        /// The accessor exists so a game can refuse to write a save it will not read back. Its whole
+        /// hazard is the ordering trap that caused the defect it reports on: the failures are
+        /// recorded by a static constructor, so an accessor that does not trigger it reports "ready"
+        /// purely because nothing has run yet.
+        /// </remarks>
+        [Test]
+        public void ProtobufSurrogatesReadyAgreesWithTheRecordedFailures()
+        {
+            bool ready = Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
+
+            Assert.IsTrue(refusedTypes != null, "The refused list must never be null.");
+#if ENABLE_IL2CPP
+            Assert.IsTrue(
+                ready,
+                "Under IL2CPP these types are encoded by WallstopProto, so a refused protobuf-net "
+                    + "registration changes nothing a consumer can observe."
+            );
+            Assert.IsEmpty(refusedTypes);
+#else
+            Assert.AreEqual(
+                ProtobufUnityModel.RegistrationFailures.Count == 0,
+                ready,
+                "The public answer disagreed with the recorded failures."
+            );
+            CollectionAssert.AreEqual(ProtobufUnityModel.RegistrationFailures, refusedTypes);
+#endif
+        }
+
+        /// <summary>
+        /// Reading the report must not let a caller edit it.
+        /// </summary>
+        [Test]
+        public void ProtobufSurrogatesReadyHandsOutAReadOnlyList()
+        {
+            Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
+
+            Assert.IsFalse(
+                refusedTypes is List<string>,
+                "The accessor handed out the mutable backing list, so a caller could rewrite the "
+                    + "package's own record of what failed."
+            );
+        }
+
         [Test]
         public void EveryRegisteredSurrogateIsGated()
         {
