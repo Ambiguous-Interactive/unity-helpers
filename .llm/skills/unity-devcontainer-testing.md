@@ -299,13 +299,21 @@ Four constraints. The first two were recorded backwards before being measured on
   has and refuse to print numbers otherwise. For a before/after, that means checking the old sources
   out (`git checkout main -- Runtime Tests`), confirming the _old_ symbol is the loaded one, and
   measuring it the same way rather than trusting a figure recorded earlier.
-- **The allocation counters read zero, whatever the code allocates.** Both
-  `GC.GetAllocatedBytesForCurrentThread()` and a `GC.GetTotalMemory(false)` delta returned **0** for
-  a control that allocated 64 KB in 64 arrays on `6000.4.6f1`. They are not implemented on this
-  Mono, so an allocation probe built on either reports "0 B/call" for code that allocates on every
-  call -- a clean, confident, entirely fabricated result. Time is measurable here; allocation is
-  not. Always run a control that allocates a known amount and check the counter moved before
-  believing any allocation number, and leave allocation gates to the Docker legs and CI.
+- **Allocation is not measurable here, and the reason is not the one recorded first.** Session 215
+  said the counters "are not implemented on this Mono"; session 216 refuted that. They are
+  **quantized to heap blocks**: on `6000.4.6f1`, `Profiler.GetMonoUsedSizeLong()` and
+  `GC.GetTotalMemory(false)` both read **0** for a 64 KB control and both read **134,361,088** for a
+  64 MB one -- which also over-reports 2x, because a block is what grew.
+
+  Two further instruments were then refuted **by their own controls**: `GC.CollectionCount(0)` reads
+  **0** for 500k tiny allocations, because Boehm keeps no generational counts; and a heap-delta A/B
+  over 3M calls put the _non-allocating_ control at a **174 MB** delta, larger than the allocating
+  path's 59 MB, because editor background activity swamps the signal.
+
+  So: time is measurable here, allocation is not. **Always run a control that allocates a known
+  amount and refuse to believe any allocation number whose control did not move** -- that one habit
+  caught all three of these. Leave allocation gates to the Docker legs and CI.
+
 - **A probe that serializes is a probe that mutates the editor.** `RuntimeTypeModel.Default` is
   process-global and freezes a type the first time it serializes one, so a diagnostic
   `ProtoBuf.Serializer.Serialize<T>` call poisons the model for every later run in that domain --
