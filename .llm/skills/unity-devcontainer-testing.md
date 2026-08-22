@@ -266,6 +266,24 @@ Four constraints. The first two were recorded backwards before being measured on
   surfaces as a bare `NullReferenceException` from the sandbox with no line number, so it reads like a
   logic bug in the script rather than a failed lookup — name every lookup and report which one was
   null before using any of them.
+  The two-argument `GetMethod(name, flags)` does not return `null` for an overloaded method — it
+  **throws `AmbiguousMatchException`**, which the bridge reports as `UNEXPECTED_ERROR: Command was
+executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSerialize` both do this.
+  Arity matching avoids both failure modes, but only if the arity is the _right_ one: selecting
+  `JsonSerialize` on `ps.Length >= 1` picked a five-parameter overload and cost a round to
+  `TargetParameterCountException`. Pin the return type too when overloads differ by it.
+- **A second edit in the same session may not auto-compile, and the refresh that forces it kills its
+  own command.** The first write of a session was picked up on its own within ~90 s; a later one was
+  still not compiled after ~110 s with `IsCompiling: false`. A `RunCommand` whose whole body is
+  `AssetDatabase.Refresh()` fixes it, but that command **times out rather than returning**, because
+  the domain reload it triggers unloads the sandbox assembly that would have answered. That timeout
+  is the success signal; re-issue the real command afterwards. Discriminate from a busy editor with
+  `Unity_ManageEditor GetState` as always.
+- **Gate every measurement on a member only the variant under test declares, and print the gate.**
+  This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
+  _absence_ of `_cacheLock`, and refused to print numbers otherwise. Absence matters as much as
+  presence: a stale assembly that still has the old field is exactly the one whose numbers would be
+  reported as the new result.
 - **A `CommonTestBase` fixture runs fine; only its teardown does not.** Both `[SetUp]` methods
   (`BaseSetUp` and the fixture's own) return normally. `[TearDown] TearDown` throws
   `InvalidOperationException: No log scope is available`, because `LogAssert.NoUnexpectedReceived()`

@@ -338,6 +338,29 @@ unavoidable -- but only one result is ever stored and returned, which is the pro
 Keep the plain `TryGetValue`-then-indexer form **only** under `SINGLE_THREADED`, where the field is a
 plain `Dictionary` and there is no race to lose.
 
+`scripts/lint-concurrent-cache-fill.ps1` enforces this. It tracks preprocessor state, so the
+`SINGLE_THREADED` form does not trip it, and a deliberate last-writer-wins overwrite is exempted by
+a `// concurrent-overwrite: <why>` comment on the write line or the line above it. Do not reach for
+that marker to silence a fill -- it is for a write that _must_ replace an earlier answer, such as an
+explicit registration overriding what inference cached.
+
+### A monitor around a cache read is the whole call when the answer is "nothing to do"
+
+A `lock` costs ~15 ns more than a `ConcurrentDictionary` read, which is nothing beside the work most
+callers then do -- and everything beside the work a caller does when the cached answer is `false`.
+`RelationalComponentAssigner.HasRelationalAssignments` was the case: `AssignHierarchy` asks it once
+per component, and in a real scene most components have no relational field, so for them the lookup
+_is_ the call. Measured on 6000.4.6f1, best of three:
+
+| shape                              |    cost |
+| ---------------------------------- | ------: |
+| `lock` + `Dictionary.TryGetValue`  | 23.1 ns |
+| `ConcurrentDictionary.TryGetValue` |  7.7 ns |
+
+That 15.4 ns was **26%** of a non-relational component, and removing it took `AssignHierarchy` over
+601 such components from 59.7 to 41.5 ns each. Before assuming a lock is negligible, ask what the
+call does when the cache says "no".
+
 A guard the factory cannot express -- "only build when I have a live probe" -- still belongs in front
 of `GetOrAdd`, because a factory handed a bad argument would cache a refusal for a reason that has
 nothing to do with the key.
