@@ -3,6 +3,8 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
+    using System;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using PropertyAttribute = UnityEngine.PropertyAttribute;
@@ -11,6 +13,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class MiscRuntimeAttributeTests
     {
+        /// <summary>
+        /// Every inspector attribute this package ships accepts fields and nothing else.
+        /// </summary>
+        /// <remarks>
+        /// Nothing in the package reads a C# property: <c>WGroupLayoutBuilder</c> lays out Unity
+        /// <c>SerializedProperty</c> paths, which exist for serialized fields only, and every
+        /// drawer is reached the same way. An attribute that advertises a target it cannot serve
+        /// compiles, reads as correct, and draws nothing -- which is what
+        /// <see cref="WGroupAttribute"/> and <see cref="WGroupEndAttribute"/> did (#550).
+        /// <para>
+        /// Discovered from the assembly rather than listed, so an inspector attribute added later
+        /// is covered the day it is written. The attributes derived from
+        /// <see cref="PropertyAttribute"/> inherit their targets from it and are asserted here so a
+        /// future explicit declaration cannot quietly widen them.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void EveryInspectorAttributeTargetsFieldsOnly()
+        {
+            List<Type> inspectorAttributes = new()
+            {
+                typeof(WGroupAttribute),
+                typeof(WGroupEndAttribute),
+            };
+            foreach (Type candidate in typeof(WGroupAttribute).Assembly.GetTypes())
+            {
+                if (typeof(PropertyAttribute).IsAssignableFrom(candidate) && !candidate.IsAbstract)
+                {
+                    inspectorAttributes.Add(candidate);
+                }
+            }
+
+            Assert.Greater(
+                inspectorAttributes.Count,
+                2,
+                "the assembly sweep found no PropertyAttribute-derived attributes, so this proves nothing"
+            );
+
+            List<string> widened = new();
+            foreach (Type attributeType in inspectorAttributes)
+            {
+                AttributeUsageAttribute usage = (AttributeUsageAttribute)
+                    Attribute.GetCustomAttribute(
+                        attributeType,
+                        typeof(AttributeUsageAttribute),
+                        inherit: true
+                    );
+
+                if (usage == null || (usage.ValidOn & ~AttributeTargets.Field) != 0)
+                {
+                    widened.Add($"{attributeType.Name} -> {usage?.ValidOn.ToString() ?? "<none>"}");
+                }
+            }
+
+            CollectionAssert.IsEmpty(
+                widened,
+                "an inspector attribute may only be applied to a field, because that is all the package reads"
+            );
+        }
+
         [Test]
         public void EnumDisplayNameAttributeStoresProvidedName()
         {

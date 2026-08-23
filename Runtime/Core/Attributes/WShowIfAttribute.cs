@@ -112,6 +112,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </code>
     /// </example>
     [Preserve]
+    // Fields only, declared rather than inherited: UnityEngine.PropertyAttribute allows
+    // AttributeTargets.Property as well, and nothing in this package reads a C# property --
+    // every drawer is reached through a Unity SerializedProperty, which exists for serialized
+    // fields only. Inheriting the base's targets also let them drift with the editor version.
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class WShowIfAttribute : PropertyAttribute
     {
         /// <summary>

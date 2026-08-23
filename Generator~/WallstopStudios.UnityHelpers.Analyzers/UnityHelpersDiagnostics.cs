@@ -38,5 +38,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>
+        /// A Unity-serialized field that resolves onto a collection of collections, which Unity
+        /// drops entirely and silently.
+        /// </summary>
+        /// <remarks>
+        /// The declaration compiles, the Inspector renders it, and edits made there survive until
+        /// the next reload -- so the failure presents as data that "does not save" rather than as a
+        /// serialization error. The nesting is usually not visible at the declaration either: a
+        /// <c>SerializableDictionary&lt;string, List&lt;Foo&gt;&gt;</c> reads as one collection and
+        /// becomes <c>List&lt;Foo&gt;[]</c> only once its backing array is substituted (#548).
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor NestedCollectionIsNotSerialized =
+            new DiagnosticDescriptor(
+                "WUH002",
+                "Unity does not serialize a nested collection",
+                "'{0}' resolves onto '{1}', a collection whose elements are themselves '{2}'. Unity serializes neither, and reports nothing: the asset keeps the outer structure and loses every inner value, while the Inspector goes on accepting edits that vanish on reload. Wrap the inner collection in a serializable class -- 'SerializableList<T>' ships for exactly this -- so the outer collection holds a class rather than another collection.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

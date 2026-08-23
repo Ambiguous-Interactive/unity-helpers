@@ -194,6 +194,39 @@ bool b = random.NextBool();                   // 50% true/false
 bool weighted = random.NextBool(0.75f);       // 75% true
 ```
 
+### Ranges a Designer Authored
+
+`Next(min, max)` and `NextFloat(min, max)` throw when `max <= min`, which is the right contract for a
+computed range. It is the wrong one for two `[SerializeField]` floats: collapsing both ends onto the
+same value is the obvious way to ask for _no_ spread, so an inspector's most natural "turn this off"
+gesture is exactly the input those overloads reject. And these draws usually sit inside a coroutine
+or a periodic tick, where an exception ends the loop **permanently** — the system it drove just stops
+existing, with one line in the console.
+
+```csharp
+[SerializeField] private float _minSpawnDelay = 3f;
+[SerializeField] private float _maxSpawnDelay = 3f;   // authored equal: no spread
+
+// Throws, and the coroutine never runs again.
+yield return new WaitForSeconds(random.NextFloat(_minSpawnDelay, _maxSpawnDelay));
+
+// Answers 3f, and the spawner keeps spawning.
+yield return new WaitForSeconds(random.NextFloatInRange(_minSpawnDelay, _maxSpawnDelay));
+```
+
+| Method                         | Empty range answers |
+| ------------------------------ | ------------------- |
+| `NextIntInRange(low, high)`    | `low`               |
+| `NextFloatInRange(low, high)`  | `low`               |
+| `NextDoubleInRange(low, high)` | `low`               |
+
+**They answer the low bound, not zero.** These are a _range_, not a scatter: an author who writes
+`3 .. 3` means three seconds. A symmetric `[-s, s]` whose collapse genuinely is zero is a different
+shape and keeps its own guard. A `null` generator answers the low bound too, so a field that has not
+been wired up yet degrades to the authored minimum rather than throwing.
+
+Use the throwing overloads for a range your code computed; use these for one a human typed.
+
 ### Vector Generation
 
 ```csharp

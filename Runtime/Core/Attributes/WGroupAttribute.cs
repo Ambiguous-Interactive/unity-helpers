@@ -55,11 +55,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// }
     /// </code>
     /// </example>
-    [AttributeUsage(
-        AttributeTargets.Field | AttributeTargets.Property,
-        AllowMultiple = true,
-        Inherited = true
-    )]
+    // Fields only: the sole consumer, WGroupLayoutBuilder, lays out Unity SerializedProperty paths,
+    // which exist for serialized fields and never for a C# property. Declaring Property let the
+    // mistake compile and reach nothing.
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true, Inherited = true)]
     public sealed class WGroupAttribute : Attribute
     {
         /// <summary>

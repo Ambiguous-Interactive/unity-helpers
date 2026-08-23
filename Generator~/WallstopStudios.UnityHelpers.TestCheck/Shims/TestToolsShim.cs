@@ -71,3 +71,45 @@ namespace UnityEngine.TestTools
         public void Reset() { }
     }
 }
+
+// The allocation constraints live in their own namespace in the real framework, and a fixture that
+// asserts a method allocates nothing binds against all three of these members.
+namespace UnityEngine.TestTools.Constraints
+{
+    using NUnit.Framework.Constraints;
+
+    /// <summary>Constrains a delegate by whether running it allocates managed memory.</summary>
+    public sealed class AllocatingGCMemoryConstraint : Constraint
+    {
+        /// <inheritdoc />
+        public override ConstraintResult ApplyTo<TActual>(TActual actual)
+        {
+            return new ConstraintResult(this, actual, true);
+        }
+    }
+
+    /// <summary>Entry point for the allocation constraints. See <c>UnityEngine.TestTools.Constraints.Is</c>.</summary>
+    public class Is : NUnit.Framework.Is
+    {
+        /// <summary>Constrains a delegate to allocate managed memory.</summary>
+        /// <returns>The constraint.</returns>
+        public static AllocatingGCMemoryConstraint AllocatingGCMemory()
+        {
+            return new AllocatingGCMemoryConstraint();
+        }
+    }
+
+    /// <summary>Continues a constraint chain, so that <c>Is.Not.AllocatingGCMemory()</c> binds.</summary>
+    public static class ConstraintExtensions
+    {
+        /// <summary>Constrains a delegate to allocate managed memory.</summary>
+        /// <param name="chain">The expression being continued.</param>
+        /// <returns>The constraint.</returns>
+        public static AllocatingGCMemoryConstraint AllocatingGCMemory(
+            this ConstraintExpression chain
+        )
+        {
+            return new AllocatingGCMemoryConstraint();
+        }
+    }
+}

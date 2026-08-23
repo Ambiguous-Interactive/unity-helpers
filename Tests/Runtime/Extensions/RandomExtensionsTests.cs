@@ -18,6 +18,106 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private static readonly SystemRandom DeterministicRandom = new(1234);
 
+        /// <summary>
+        /// The authored-range draws answer the low bound wherever the throwing overload raises.
+        /// </summary>
+        /// <remarks>
+        /// Collapsing a serialized min/max pair is how a designer asks for "no spread", and these
+        /// draws live in coroutines and periodic ticks, where the exception the strict overload
+        /// raises ends the loop for the rest of the level (#546).
+        /// </remarks>
+        [TestCase(3f, 3f, TestName = "NextFloatInRangeCollapsed")]
+        [TestCase(5f, 2f, TestName = "NextFloatInRangeInverted")]
+        [TestCase(0f, 0f, TestName = "NextFloatInRangeZero")]
+        [TestCase(-4f, -4f, TestName = "NextFloatInRangeNegative")]
+        [TestCase(1f, float.NaN, TestName = "NextFloatInRangeNotANumber")]
+        public void NextFloatInRangeAnswersTheLowBoundInsteadOfThrowing(float low, float high)
+        {
+            SystemRandom rng = new(7);
+
+            Assert.AreEqual(low, rng.NextFloatInRange(low, high));
+            Assert.AreEqual(low, ((IRandom)null).NextFloatInRange(low, high));
+        }
+
+        [TestCase(3, 3, TestName = "NextIntInRangeCollapsed")]
+        [TestCase(5, 2, TestName = "NextIntInRangeInverted")]
+        [TestCase(0, 0, TestName = "NextIntInRangeZero")]
+        [TestCase(-4, -4, TestName = "NextIntInRangeNegative")]
+        [TestCase(int.MaxValue, int.MinValue, TestName = "NextIntInRangeExtremes")]
+        public void NextIntInRangeAnswersTheLowBoundInsteadOfThrowing(int low, int high)
+        {
+            SystemRandom rng = new(7);
+
+            Assert.AreEqual(low, rng.NextIntInRange(low, high));
+            Assert.AreEqual(low, ((IRandom)null).NextIntInRange(low, high));
+        }
+
+        [TestCase(3d, 3d, TestName = "NextDoubleInRangeCollapsed")]
+        [TestCase(5d, 2d, TestName = "NextDoubleInRangeInverted")]
+        [TestCase(0d, 0d, TestName = "NextDoubleInRangeZero")]
+        [TestCase(1d, double.NaN, TestName = "NextDoubleInRangeNotANumber")]
+        public void NextDoubleInRangeAnswersTheLowBoundInsteadOfThrowing(double low, double high)
+        {
+            SystemRandom rng = new(7);
+
+            Assert.AreEqual(low, rng.NextDoubleInRange(low, high));
+            Assert.AreEqual(low, ((IRandom)null).NextDoubleInRange(low, high));
+        }
+
+        /// <summary>
+        /// A range that is not empty still draws from it, so the softened contract costs nothing
+        /// where the strict one already worked.
+        /// </summary>
+        [Test]
+        public void AnInRangeDrawStaysInsideANonEmptyRange()
+        {
+            SystemRandom rng = new(11);
+
+            for (int i = 0; i < 512; ++i)
+            {
+                float sampled = rng.NextFloatInRange(2f, 5f);
+                Assert.GreaterOrEqual(sampled, 2f);
+                Assert.Less(sampled, 5f);
+
+                int integral = rng.NextIntInRange(2, 5);
+                Assert.GreaterOrEqual(integral, 2);
+                Assert.Less(integral, 5);
+
+                double precise = rng.NextDoubleInRange(2d, 5d);
+                Assert.GreaterOrEqual(precise, 2d);
+                Assert.Less(precise, 5d);
+            }
+        }
+
+        /// <summary>
+        /// The strict overloads keep raising, because a computed range that inverts is a bug.
+        /// </summary>
+        [Test]
+        public void TheStrictOverloadsStillRefuseAnEmptyRange()
+        {
+            SystemRandom rng = new(13);
+
+            Assert.Throws<ArgumentException>(() => rng.NextFloat(3f, 3f));
+            Assert.Throws<ArgumentException>(() => rng.Next(3, 3));
+            Assert.Throws<ArgumentException>(() => rng.NextDouble(3d, 3d));
+        }
+
+        /// <summary>
+        /// The message names the two values, so a designer's inspector entry reaches the console.
+        /// </summary>
+        [Test]
+        public void TheStrictOverloadNamesBothBoundsInItsMessage()
+        {
+            SystemRandom rng = new(17);
+
+            ArgumentException raised = Assert.Throws<ArgumentException>(() =>
+                rng.NextFloat(7f, 4f)
+            );
+
+            StringAssert.Contains("7", raised.Message);
+            StringAssert.Contains("4", raised.Message);
+        }
+
         [Test]
         public void NextOfExceptThrowsWhenCollectionEmpty()
         {

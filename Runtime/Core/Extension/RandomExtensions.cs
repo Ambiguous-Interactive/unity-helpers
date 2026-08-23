@@ -26,6 +26,82 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static class RandomExtensions
     {
         /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the two bounds are equal, inverted, or not a number.
+        /// </summary>
+        /// <remarks>
+        /// This is for an <b>authored</b> range -- two serialized fields a designer fills in -- not a
+        /// computed one. Collapsing both ends onto the same value is how an inspector asks for "no
+        /// spread", so the natural way to turn a spread off is exactly the input
+        /// <see cref="IRandom.NextFloat(float, float)"/> rejects. That overload stays the default,
+        /// because a computed range that inverts is a bug worth surfacing; these draws usually sit
+        /// inside a coroutine or a periodic tick, where an exception ends the loop permanently and
+        /// the system it drove simply stops existing.
+        /// <para>
+        /// The answer is the <b>low</b> bound rather than zero: a collapsed range is still a range,
+        /// so <c>3 .. 3</c> means three, not nothing. A symmetric scatter whose collapse genuinely
+        /// is zero is a different shape and keeps its own guard.
+        /// </para>
+        /// </remarks>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static float NextFloatInRange(this IRandom random, float low, float high)
+        {
+            if (random == null || !(high > low))
+            {
+                return low;
+            }
+
+            return random.NextFloat(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the two bounds are equal or inverted.
+        /// </summary>
+        /// <remarks>
+        /// The <see cref="NextFloatInRange"/> remarks apply unchanged: this exists for an authored
+        /// pair of bounds, it answers the low bound rather than zero, and
+        /// <see cref="IRandom.Next(int, int)"/> remains the right contract for a computed range.
+        /// </remarks>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static int NextIntInRange(this IRandom random, int low, int high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.Next(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the two bounds are equal, inverted, or not a number.
+        /// </summary>
+        /// <remarks>
+        /// The <see cref="NextFloatInRange"/> remarks apply unchanged: this exists for an authored
+        /// pair of bounds, it answers the low bound rather than zero, and
+        /// <see cref="IRandom.NextDouble(double, double)"/> remains the right contract for a
+        /// computed range.
+        /// </remarks>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static double NextDoubleInRange(this IRandom random, double low, double high)
+        {
+            if (random == null || !(high > low))
+            {
+                return low;
+            }
+
+            return random.NextDouble(low, high);
+        }
+
+        /// <summary>
         /// Returns an index sampled from the provided weights (unnormalized). Negative weights are treated as zero.
         /// </summary>
         public static int NextWeightedIndex(this IRandom random, IReadOnlyList<float> weights)

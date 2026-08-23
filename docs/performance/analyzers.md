@@ -1,7 +1,7 @@
 # Performance Analyzers (`WUH###`)
 
-Unity Helpers ships a Roslyn analyzer that reports performance footguns in code that already
-compiles and already works. It runs on your code as well as the package's, because the shapes it
+Unity Helpers ships a Roslyn analyzer that reports footguns in code that already compiles and, for
+the most part, already works. It runs on your code as well as the package's, because the shapes it
 finds are not specific to either.
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
@@ -68,6 +68,49 @@ finds the key. Same defect.
   the compilation's language version and stays silent above C# 10.
 - A method named `GetOrAdd` on a type that is not in the list above. Your own cache type is yours.
 
+## `WUH002` — a nested collection Unity does not serialize
+
+Unity's serializer flattens a `List<T>` or a `T[]` into a repeated field, and it will not do that
+twice. A field that resolves onto a collection **of collections** is dropped in full, with no error
+and no warning: the asset records the outer structure and none of the inner values, and the
+Inspector goes on accepting edits that vanish on the next reload.
+
+```csharp
+// WUH002: backs onto List<Foo>[], so every value is lost on save.
+[SerializeField] private SerializableDictionary<string, List<Foo>> _byTier;
+
+// Saves: the outer array now holds a class, which Unity does serialize.
+[SerializeField] private SerializableDictionary<string, SerializableList<Foo>> _byTier;
+```
+
+[`SerializableList<T>`](../features/serialization/serialization-types.md) ships for exactly this. It
+is a `[Serializable]` class wrapping one `List<T>`, which is the layer of indirection Unity needs.
+
+### Why the declaration does not look nested
+
+`SerializableDictionary<string, List<Foo>>` names one collection. The second appears only when its
+backing `TValueCache[]` is substituted, two base classes further up. So the analyzer does not match
+the declaration's syntax — it asks the symbol what Unity will actually serialize, walking the
+serialized instance fields of the field's type and of theirs. That covers every adapter this package
+ships, any it adds later, and a wrapper of your own, with no list to keep in sync.
+
+### Where it looks
+
+Any field Unity will serialize:
+
+- one carrying `[SerializeField]`, wherever it appears, or
+- a public instance field on a type deriving from `UnityEngine.Object`.
+
+### What it deliberately does not report
+
+- A public field on a plain class that has no `[SerializeField]`. It may never reach Unity's
+  serializer at all, and an ordinary algorithm's `List<List<int>>` is not a serialization bug.
+- Anything marked `[NonSerialized]`, `static`, or `const`.
+- A collection of `UnityEngine.Object` references. Those are serialized as references to a separate
+  asset, so the nesting never happens.
+- A multi-dimensional array. Unity serializes `int[,]` at no nesting at all, so reporting it here
+  would name the wrong cause.
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -86,6 +129,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers"
     RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
     <Rule Id="WUH001" Action="None" />
+    <Rule Id="WUH002" Action="None" />
   </Rules>
 </RuleSet>
 ```
