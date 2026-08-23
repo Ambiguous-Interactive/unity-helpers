@@ -72,8 +72,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         /// <summary>
-        /// The predicate reads as free, so it has to be.
+        /// Somewhere the recorder can see it, the predicate allocates nothing.
         /// </summary>
+        /// <remarks>
+        /// The control runs FIRST and decides whether this platform can be measured at all. On an
+        /// IL2CPP standalone player the sink below allocates nothing the recorder reports, so the
+        /// control does not move -- and a "did not allocate" verdict from an instrument that cannot
+        /// see allocation is not a pass, it is the absence of a measurement. This skips there
+        /// rather than claiming a result, and asserts for real on the Mono players and the editor.
+        /// </remarks>
         [UnityTest]
         public IEnumerator IsDontDestroyOnLoadAllocatesNothingOnceTheSceneIsKnown()
         {
@@ -92,10 +99,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             yield return null;
 
+            if (!RecorderCanSeeAnAllocation())
+            {
+                Assert.Ignore(
+                    "GC allocation recording is inert on this player, so a 'did not allocate' "
+                        + "verdict would prove nothing"
+                );
+            }
+
             Assert.That(
                 () =>
                 {
-                    for (int i = 0; i < 256; ++i)
+                    for (int i = 0; i < AllocationProbeIterations; ++i)
                     {
                         if (resident.IsDontDestroyOnLoad() || !persistent.IsDontDestroyOnLoad())
                         {
@@ -104,24 +119,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     }
                 },
                 Is.Not.AllocatingGCMemory(),
-                "the answer comes from a cached scene handle, so no managed string is marshalled"
-            );
-
-            // Control: the recorder has to be able to see an allocation at this scale, or the
-            // assertion above is measuring nothing and reads as a pass either way.
-            Assert.That(
-                () =>
-                {
-                    for (int i = 0; i < 256; ++i)
-                    {
-                        GC.KeepAlive(new string('x', 8));
-                    }
-                },
-                Is.AllocatingGCMemory(),
-                "if this fails, the recorder is inert and the assertion above proves nothing"
+                "the answer comes from a cached scene, so no managed string is marshalled"
             );
 
             yield return null;
+        }
+
+        private const int AllocationProbeIterations = 256;
+
+        /// <summary>
+        /// Sink for the control's allocations, so nothing can prove them dead and remove them.
+        /// </summary>
+        private static string _allocationSink;
+
+        /// <summary>
+        /// Whether an allocation this test can definitely cause is one the recorder reports.
+        /// </summary>
+        private static bool RecorderCanSeeAnAllocation()
+        {
+            try
+            {
+                Assert.That(
+                    () =>
+                    {
+                        for (int i = 0; i < AllocationProbeIterations; ++i)
+                        {
+                            // Length varies and the result escapes to a static, so this cannot be
+                            // constant-folded or elided.
+                            _allocationSink = new string('x', 8 + (i & 7));
+                        }
+                    },
+                    Is.AllocatingGCMemory()
+                );
+                return true;
+            }
+            catch (AssertionException)
+            {
+                return false;
+            }
         }
     }
 }

@@ -132,6 +132,12 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 
 ### Additional Technical Rules
 
+- **Run the control FIRST, and let it decide whether the platform can be measured.** An allocation
+  assertion needs an instrument that can see an allocation; on an IL2CPP standalone player it cannot,
+  so `Is.Not.AllocatingGCMemory()` there is the absence of a measurement rather than a pass. Assert
+  the control moves, and `Assert.Ignore` when it does not, instead of asserting the subject and
+  hoping. A control asserted _after_ the subject turns an unmeasurable platform into a red build
+  (session 220, two gated IL2CPP legs).
 - **Order every comparison left-to-right: use only `<` and `<=`.** `index >= 0` becomes
   `0 <= index`, `a > b` becomes `b < a`, and a range reads as one line of number line:
   `0 <= sum && sum < max`. Swap the operands, not the meaning -- and check for side effects before
