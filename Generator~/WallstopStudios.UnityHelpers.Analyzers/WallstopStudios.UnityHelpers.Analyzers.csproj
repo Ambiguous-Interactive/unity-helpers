@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The package's GENERAL-PURPOSE Roslyn analyzers, as opposed to the WallstopProto source generator
+    next door.
+
+    They are separate assemblies because they answer to different things. Every `WPROTO###`
+    diagnostic is about a serialization contract, is an error, and exists because the alternative is
+    an exception from inside a shipped player. A `WUH###` diagnostic is about code that is already
+    correct (an allocation, a misuse, a footgun) and is capped at a warning so that taking a
+    package upgrade can never fail a consumer's build. Shipping the second family inside an assembly
+    called `Proto.Generator` would have made the error code lie about what it covers.
+
+    Everything else here mirrors the generator project deliberately: netstandard2.0 and Roslyn 3.8
+    are what Unity 2021.3 can load, and the deterministic/ContinuousIntegrationBuild pair is what
+    makes the committed DLL byte-comparable against a fresh build of its sources.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsPackable>false</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <AssemblyName>WallstopStudios.UnityHelpers.Analyzers</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers.Analyzers</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <DebugType>none</DebugType>
+    <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">true</CopyAnalyzerPayload>
+    <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''"
+      >$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
+    <!-- RS2008 wants an AnalyzerReleases ledger, which is for analyzer packages published on NuGet
+         with a release cadence; these ship inside the package they belong to. RS1032 objects to
+         multi-clause diagnostic messages, and those messages are the whole point: a diagnostic that
+         reports a footgun has to say what to do instead. -->
+    <NoWarn>$(NoWarn);RS2008;RS1032</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference
+      Include="Microsoft.CodeAnalysis.Analyzers"
+      Version="3.3.4"
+      PrivateAssets="all"
+    />
+  </ItemGroup>
+
+  <Target
+    Name="CopyAnalyzerToPackage"
+    AfterTargets="Build"
+    Condition="'$(CopyAnalyzerPayload)' == 'true'"
+  >
+    <MakeDir
+      Directories="$(AnalyzerPayloadOutputDir)"
+      Condition="!Exists('$(AnalyzerPayloadOutputDir)')"
+    />
+    <Copy
+      SourceFiles="$(TargetPath)"
+      DestinationFolder="$(AnalyzerPayloadOutputDir)"
+      SkipUnchangedFiles="true"
+    />
+    <Message Importance="high" Text="Analyzer payload -&gt; $(AnalyzerPayloadOutputDir)" />
+  </Target>
+</Project>

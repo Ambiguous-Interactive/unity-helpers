@@ -77,7 +77,19 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 14. For forbidden patterns and alternatives, see [forbidden-patterns reference](./references/forbidden-patterns.md)
 15. All editor mutation paths must follow the complete undo policy (see [editor-undo-complete](./skills/editor-undo-complete.md)); classify paths as Tier A/B/C and never claim full reversal for Tier C file/reimport side effects
 16. `AssetPostprocessor` callbacks MUST defer non-trivial work through `AssetPostprocessorDeferral.Schedule` to avoid `SendMessage cannot be called...` warnings during Unity's import phase — and deferral is **necessary, not sufficient**: a deferred `LoadAllAssetsAtPath` still deserializes the asset and still runs the consumer's `OnValidate`, so never answer a metadata question with a load (see [asset-postprocessor-safety](./skills/asset-postprocessor-safety.md))
-17. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic (see [untrusted-payload-limits](./skills/untrusted-payload-limits.md))
+17. **The package ships TWO analyzer assemblies, and a new diagnostic has to pick the right one.**
+    `WPROTO###` (`Generator~/WallstopStudios.UnityHelpers.Proto.Generator`) reports a serialization
+    contract that cannot be honoured, so it is an **error** -- the alternative is an exception from
+    inside a shipped player. `WUH###`
+    (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
+    that already works, so it is **on by default, capped at `DiagnosticSeverity.Warning`, and
+    suppressible**: taking a package upgrade must never fail a consumer's build. Putting a
+    general-purpose rule in the `WPROTO` family makes the error code lie about its scope. Both DLLs
+    are committed under `Runtime/Analyzers`, both are byte-compared against a fresh
+    `dotnet build -c Release` of their sources in CI (SDK pinned to 9.0.306), and **an edit to
+    either one is not finished until you rebuild it** -- CSharpier reformatting the source is enough
+    to change the deterministic bytes. See [analyzers](../docs/performance/analyzers.md)
+18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic (see [untrusted-payload-limits](./skills/untrusted-payload-limits.md))
 
 ### Documentation Rules
 

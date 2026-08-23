@@ -1,11 +1,12 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
+namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 {
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.IO;
     using System.Linq;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
@@ -14,18 +15,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
     /// <summary>
     /// Pins the one cache-fill rule a source linter cannot enforce: a method group handed to a
-    /// concurrent cache's factory allocates a delegate on every call, cache hit included.
+    /// lookup's value factory allocates a delegate on every call, hits included.
     /// </summary>
     /// <remarks>
     /// The negative cases carry the weight here. The whole reason this is an analyzer rather than a
     /// regex is that <c>GetOrAdd(key, Factory)</c> and <c>GetOrAdd(key, cachedFactory)</c> are the
-    /// same token in argument position, so a test suite that only proved the positive would not
+    /// same token in argument position, so a suite that only proved the positive would not
     /// distinguish this from the casing heuristic it exists to replace (#538).
     /// </remarks>
     [TestFixture]
     public sealed class CacheFactoryAnalyzerTests
     {
-        private const string DiagnosticId = "WPROTO038";
+        private const string DiagnosticId = "WUH001";
+
+        /// <summary>
+        /// The package's own dictionary extensions, declared here so the fixtures are hermetic.
+        /// </summary>
+        /// <remarks>
+        /// A stub can drift from what it stands for, so
+        /// <see cref="TheStubbedExtensionsMatchTheOnesThePackageShips"/> reads the real source and
+        /// fails if these names or that namespace stop existing.
+        /// </remarks>
+        private const string PackageDictionaryExtensions =
+            @"namespace WallstopStudios.UnityHelpers.Core.Extension
+              {
+                  using System;
+                  using System.Collections.Generic;
+
+                  public static class DictionaryExtensions
+                  {
+                      public static V GetOrAdd<K, V>(this IDictionary<K, V> d, K key, Func<V> f) => f();
+                      public static V GetOrAdd<K, V>(this IDictionary<K, V> d, K key, Func<K, V> f) => f(key);
+                      public static V GetOrElse<K, V>(this IReadOnlyDictionary<K, V> d, K key, Func<V> f) => f();
+                      public static V AddOrUpdate<K, V>(this IDictionary<K, V> d, K key, Func<K, V> c, Func<K, V, V> u) => c(key);
+                  }
+              }";
 
         [Test]
         public void AMethodGroupFactoryIsReported()
@@ -44,8 +68,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A plain <c>Dictionary</c> has no factory-taking member in the BCL, so it reaches the same
+        /// defect only through this package's extensions -- which is exactly why they are covered.
+        /// </summary>
+        [TestCase(
+            "a Dictionary through GetOrAdd",
+            @"private static readonly Dictionary<string, int> Cache = new Dictionary<string, int>();
+              private static int Create(string key) => key.Length;
+              public static int Get(string key) => Cache.GetOrAdd(key, Create);"
+        )]
+        [TestCase(
+            "a Dictionary through GetOrElse, which does not even add",
+            @"private static readonly Dictionary<string, int> Cache = new Dictionary<string, int>();
+              private static int Create() => 7;
+              public static int Get(string key) => Cache.GetOrElse(key, Create);"
+        )]
+        [TestCase(
+            "an IDictionary through AddOrUpdate",
+            @"private static int Create(string key) => key.Length;
+              private static int Update(string key, int existing) => existing + 1;
+              public static int Get(IDictionary<string, int> cache, string key) =>
+                  cache.AddOrUpdate(key, Create, Update);"
+        )]
+        [TestCase(
+            "the extension called in unreduced form",
+            @"private static readonly Dictionary<string, int> Cache = new Dictionary<string, int>();
+              private static int Create(string key) => key.Length;
+              public static int Get(string key) =>
+                  WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions.GetOrAdd(Cache, key, Create);"
+        )]
+        public void AMethodGroupThroughThePackagesOwnExtensionsIsReported(string shape, string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.IsNotEmpty(reported, shape + " must be reported");
+            Assert.IsTrue(
+                reported.All(diagnostic => diagnostic.Id == DiagnosticId),
+                shape + " must report only WUH001"
+            );
+        }
+
+        /// <summary>
         /// Every shape session 217 measured at zero or near-zero bytes per call, and the shapes the
-        /// three fixed sites were rewritten into.
+        /// fixed sites were rewritten into.
         /// </summary>
         [TestCase(
             "a cached delegate field",
@@ -134,11 +198,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
               public static int Get(string key) => Store.GetOrAdd(key, Create);"
         )]
         [TestCase(
+            "a consumer extension class that merely spells the member GetOrAdd",
+            @"public static int Get(Dictionary<string, int> cache, string key) =>
+                  Other.Ext.GetOrAdd(cache, key, Create);
+              private static int Create(string key) => key.Length;"
+        )]
+        [TestCase(
             "an unrelated method taking a delegate",
             @"private static bool Match(string value) => value.Length > 0;
               public static string Get(List<string> values) => values.Find(Match);"
         )]
-        public void AMethodGroupOutsideACacheFillIsNotReported(string shape, string body)
+        public void AMethodGroupOutsideAFactoryTakingLookupIsNotReported(string shape, string body)
         {
             Assert.IsEmpty(Analyze(body), shape + " must not be reported");
         }
@@ -171,9 +241,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// the safety without discovering it, but never able to fail their build.
         /// </summary>
         /// <remarks>
-        /// Every other diagnostic in this assembly is an error, because the alternative is an
-        /// exception from inside a shipped player. This one reports an allocation in code that is
-        /// otherwise correct, so a warning is the ceiling and turning it off has to work.
+        /// A WallstopProto diagnostic is an error, because the alternative is an exception from
+        /// inside a shipped player. A WUH diagnostic reports an allocation in code that is otherwise
+        /// correct, so a warning is the ceiling and turning it off has to work.
         /// </remarks>
         [Test]
         public void TheDiagnosticIsOnByDefaultSuppressibleAndNeverAboveAWarning()
@@ -209,6 +279,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// The stub above stands in for real shipped code, so it has to keep standing for it.
+        /// </summary>
+        /// <remarks>
+        /// The analyzer matches on a namespace and a type name that live in
+        /// <c>Runtime/Core/Extension/DictionaryExtensions.cs</c>. Renaming either would make the
+        /// analyzer silently stop covering the package's own dictionaries while every test here kept
+        /// passing against the stub, which is the one way this suite could lie.
+        /// </remarks>
+        [Test]
+        public void TheStubbedExtensionsMatchTheOnesThePackageShips()
+        {
+            string repoRoot = FindRepositoryRoot();
+            string shipped = Path.Combine(
+                repoRoot,
+                "Runtime",
+                "Core",
+                "Extension",
+                "DictionaryExtensions.cs"
+            );
+            Assert.IsTrue(File.Exists(shipped), $"expected the shipped extensions at {shipped}");
+
+            string source = File.ReadAllText(shipped);
+            StringAssert.Contains(
+                "namespace WallstopStudios.UnityHelpers.Core.Extension",
+                source,
+                "the analyzer matches this namespace by name"
+            );
+            StringAssert.Contains(
+                "class DictionaryExtensions",
+                source,
+                "the analyzer matches this type by name"
+            );
+            foreach (string method in new[] { "GetOrAdd", "GetOrElse", "AddOrUpdate" })
+            {
+                StringAssert.Contains(
+                    $" {method}<K, V>(",
+                    source,
+                    $"the analyzer covers {method}, so it has to still be there"
+                );
+            }
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
         private static Diagnostic Single(string body)
         {
             ImmutableArray<Diagnostic> reported = Analyze(body);
@@ -232,9 +363,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
         /// <param name="language">Language version the fixture is parsed at.</param>
         /// <param name="reportedAs">
-        /// What the compilation says about WPROTO038 -- <see cref="ReportDiagnostic.Default"/> for a
-        /// consumer who configures nothing, or anything else for the ruleset / <c>.editorconfig</c>
-        /// entry they would write, expressed as the option Roslyn resolves both of them to.
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
         /// </param>
         /// <returns>Everything the analyzer reported.</returns>
         private static ImmutableArray<Diagnostic> Analyze(
@@ -248,9 +380,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 + "using System.Collections.Generic;\n"
                 + "using System.Collections.Concurrent;\n"
                 + "using System.Runtime.CompilerServices;\n"
+                + "using WallstopStudios.UnityHelpers.Core.Extension;\n"
+                + "namespace Other { public static class Ext { public static int GetOrAdd<K, V>(this Dictionary<K, V> d, K k, Func<K, int> f) => f(k); } }\n"
                 + "namespace Consumer { public static class Subject { "
                 + body
-                + " } }";
+                + " } }\n"
+                + PackageDictionaryExtensions;
 
             List<MetadataReference> references = new List<MetadataReference>();
             foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())

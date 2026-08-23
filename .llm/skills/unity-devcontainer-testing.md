@@ -393,7 +393,7 @@ and anything needing PlayMode still belong to the Docker legs and to CI.
 ### The editor compiles what `typecheck:unity` cannot, and an empty console proves nothing
 
 `npm run typecheck:unity` compiles `Runtime/**` only -- not `Editor/`, not `Tests/`. The MCP editor
-compiles all three. When session 218 shipped the `WPROTO038` analyzer, the local typecheck was clean
+compiles all three. When session 218 shipped the `WUH001` analyzer, the local typecheck was clean
 and the editor found a real site in `Editor/Utils/WButton/`, in an assembly no local gate builds.
 **If a change adds or changes an analyzer, the editor is the only local place its Editor-assembly
 findings exist**.

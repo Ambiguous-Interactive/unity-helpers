@@ -1,5 +1,10 @@
 name: WallstopProto Generator
 
+# Also gates the WUH### analyzers, which ship as a second compiler input from
+# `Generator~/WallstopStudios.UnityHelpers.Analyzers`. The workflow keeps its original name
+# because branch protection selects required checks by name, and renaming it would silently make
+# the required check disappear rather than fail.
+
 on:
   push:
     branches:
@@ -60,6 +65,32 @@ jobs:
             exit 1
           fi
           echo "Shipped analyzer is byte-identical to a fresh build of its sources."
+
+      - name: Build the WUH analyzers to a scratch directory
+        # Second shipped compiler input, same rules. The WUH### family reports footguns in code that
+        # already works and is capped at a warning, so it lives in its own assembly rather than
+        # inside one called Proto.Generator, where the error code would have lied about its scope.
+        run: |
+          dotnet build "Generator~/WallstopStudios.UnityHelpers.Analyzers/WallstopStudios.UnityHelpers.Analyzers.csproj" \
+            -c Release --nologo -p:AnalyzerPayloadOutputDir="$RUNNER_TEMP/analyzers"
+
+      - name: Verify the shipped WUH analyzers match their sources
+        run: |
+          set -euo pipefail
+          built="$RUNNER_TEMP/analyzers/WallstopStudios.UnityHelpers.Analyzers.dll"
+          shipped="Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll"
+          if ! cmp -s "$built" "$shipped"; then
+            echo "::error::$shipped does not match a build of the sources beside it. Rebuild it:"
+            echo "  dotnet build \"Generator~/WallstopStudios.UnityHelpers.Analyzers/WallstopStudios.UnityHelpers.Analyzers.csproj\" -c Release"
+            echo "(the build copies its own output into Runtime/Analyzers)"
+            exit 1
+          fi
+          echo "Shipped WUH analyzers are byte-identical to a fresh build of their sources."
+
+      - name: Test the WUH analyzers
+        # Through npm so the command has exactly one definition, which is also the one a
+        # developer runs locally.
+        run: npm run test:analyzers
 
       - name: Verify where the analyzer is placed
         # Unity scopes an analyzer by its nearest enclosing asmdef. Under an editor-only one it

@@ -370,8 +370,11 @@ included. 400,000 warm hits per shape on 6000.4.6f1, control moved 30.6 MB:
   capture (`CS8820`), so the expensive shape stops compiling. That sweep found five capturing
   factories in `Runtime` and two in `Editor` that nothing else reported.
 - **Never pass a method group.** C# 9 does not cache the conversion (C# 11 does), so
-  `GetOrAdd(key, Build)` allocates every call. Hold it in a `static readonly Func<...>`. No linter
-  can catch this -- it is lexically identical to a local holding a delegate.
+  `GetOrAdd(key, Build)` allocates every call. Hold it in a `static readonly Func<...>`. No source
+  linter can catch this -- it is lexically identical to a local holding a delegate -- so the shipped
+  **`WUH001`** analyzer does, with the semantic model. It covers `ConcurrentDictionary`,
+  `ConditionalWeakTable` and this package's own `DictionaryExtensions`
+  (`GetOrAdd`/`GetOrElse`/`AddOrUpdate`), which is how a plain `Dictionary` is reached.
 
 **Measure the capture in a method, not a loop.** The first run of that table read **0 B/call** for
 the capturing lambda, because a captured _local_ beside the loop gets one display class. Real code

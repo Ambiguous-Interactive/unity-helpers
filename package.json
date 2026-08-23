@@ -204,6 +204,7 @@
     "test:build-lock-action-input-parser": "node scripts/tests/test-build-lock-action-input-parser.js",
     "test:read-stdin-sync": "node scripts/tests/test-read-stdin-sync.js",
     "test:analyzer-placement": "node scripts/tests/test-analyzer-placement.js",
+    "test:analyzers": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Analyzers.Tests/WallstopStudios.UnityHelpers.Analyzers.Tests.csproj\" -c Release --nologo",
     "test:asset-postprocessor-reachability": "node scripts/tests/test-asset-postprocessor-reachability.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",

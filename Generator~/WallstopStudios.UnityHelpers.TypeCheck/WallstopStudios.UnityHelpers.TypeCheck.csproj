@@ -117,6 +117,9 @@
     </PackageReference>
     <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. -->
     <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <!-- The general-purpose WUH### analyzers ship in the same folder and Unity loads both,
+         so both have to be loaded here or a local gate covers less than the editor does. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
     <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
   </ItemGroup>
   <ItemGroup>

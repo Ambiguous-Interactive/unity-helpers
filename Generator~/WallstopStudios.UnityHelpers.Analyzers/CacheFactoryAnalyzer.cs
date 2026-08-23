@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-namespace WallstopStudios.UnityHelpers.Proto.Generator
+namespace WallstopStudios.UnityHelpers.Analyzers
 {
     using System.Collections.Immutable;
     using Microsoft.CodeAnalysis;
@@ -10,8 +10,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using Microsoft.CodeAnalysis.Operations;
 
     /// <summary>
-    /// Reports a method group handed to a concurrent cache's fill factory, which allocates a
-    /// delegate on every call rather than only on a miss.
+    /// Reports a method group handed to a lookup's value factory, which allocates a delegate on
+    /// every call rather than only when the factory runs.
     /// </summary>
     /// <remarks>
     /// This is the half of the cache-fill rules a source linter cannot enforce.
@@ -19,8 +19,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// these methods <c>static</c>, so the compiler itself rejects a capture. A method group is not
     /// decidable that way: <c>GetOrAdd(key, CreateAccessors)</c> and <c>GetOrAdd(key, factory)</c>
     /// are both a bare identifier in argument position, and telling them apart needs symbol
-    /// resolution. A casing heuristic would be wrong the first time a field is named
-    /// <c>Factory</c> (#538).
+    /// resolution (#538).
     /// </remarks>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class CacheFactoryAnalyzer : DiagnosticAnalyzer
@@ -38,28 +37,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const int FirstLanguageVersionThatCachesMethodGroups = 1100;
 
         /// <summary>
-        /// Cache types whose fill factories run on every lookup rather than once. Matched on
-        /// <see cref="ISymbol.MetadataName"/>, which carries the arity, so a consumer type that
-        /// merely shares the name is not caught.
+        /// Types whose value factories run per lookup rather than once, matched on
+        /// <see cref="ISymbol.MetadataName"/> so the arity is part of the match and a consumer type
+        /// that merely shares a name is not caught.
         /// </summary>
-        private static readonly ImmutableHashSet<string> CacheTypes = ImmutableHashSet.Create(
-            "System.Collections.Concurrent.ConcurrentDictionary`2",
-            "System.Runtime.CompilerServices.ConditionalWeakTable`2"
-        );
+        /// <remarks>
+        /// <c>Dictionary&lt;K, V&gt;</c> is absent because the BCL gives it no factory-taking
+        /// member. It is still covered: this package's own
+        /// <c>DictionaryExtensions.GetOrAdd/GetOrElse/AddOrUpdate</c> extend <c>IDictionary</c> and
+        /// <c>IReadOnlyDictionary</c>, so a plain <c>Dictionary</c> reaches the same defect through
+        /// them, and that extension class is in this list for exactly that reason.
+        /// </remarks>
+        private static readonly ImmutableHashSet<string> FactoryTakingTypes =
+            ImmutableHashSet.Create(
+                "System.Collections.Concurrent.ConcurrentDictionary`2",
+                "System.Runtime.CompilerServices.ConditionalWeakTable`2",
+                "WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions"
+            );
 
         /// <summary>
-        /// Members of <see cref="CacheTypes"/> that take a factory. A name absent from one of those
-        /// types simply never matches, so the set is shared rather than split per type.
+        /// Members of <see cref="FactoryTakingTypes"/> that take a value factory. A name absent from
+        /// one of those types simply never matches, so the set is shared rather than split per type.
         /// </summary>
-        private static readonly ImmutableHashSet<string> CacheFillMethods = ImmutableHashSet.Create(
-            "GetOrAdd",
-            "AddOrUpdate",
-            "GetValue"
-        );
+        /// <remarks>
+        /// <c>GetOrElse</c> adds nothing to the dictionary, but it takes the same
+        /// <c>Func&lt;V&gt;</c> and rebuilds it on the calls that find the key -- which is every call
+        /// the lookup is written for.
+        /// </remarks>
+        private static readonly ImmutableHashSet<string> FactoryTakingMethods =
+            ImmutableHashSet.Create("GetOrAdd", "GetOrElse", "AddOrUpdate", "GetValue");
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            ImmutableArray.Create(WProtoDiagnostics.CacheFactoryAllocatesPerCall);
+            ImmutableArray.Create(UnityHelpersDiagnostics.CacheFactoryAllocatesPerCall);
 
         /// <inheritdoc />
         public override void Initialize(AnalysisContext context)
@@ -86,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             IInvocationOperation invocation = (IInvocationOperation)context.Operation;
             IMethodSymbol target = invocation.TargetMethod;
-            if (target == null || !IsCacheFill(target))
+            if (target == null || !IsFactoryTakingLookup(target))
             {
                 return;
             }
@@ -100,9 +110,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // A method group in argument position arrives as an IDelegateCreationOperation
-                // whose Target is the method reference -- NOT as an IConversionOperation, which is
-                // what an unwrap written from the C# spec rather than from the operation tree would
+                // A method group in argument position arrives as an IDelegateCreationOperation whose
+                // Target is the method reference -- NOT as an IConversionOperation, which is what an
+                // unwrap written from the C# specification rather than from the operation tree would
                 // look for, and which finds nothing at all. A `static` lambda reaches the same node
                 // with an IAnonymousFunctionOperation target, so unwrapping does not widen what is
                 // reported.
@@ -131,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 context.ReportDiagnostic(
                     Diagnostic.Create(
-                        WProtoDiagnostics.CacheFactoryAllocatesPerCall,
+                        UnityHelpersDiagnostics.CacheFactoryAllocatesPerCall,
                         value.Syntax.GetLocation(),
                         methodReference.Method.Name,
                         target.Name
@@ -140,20 +150,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
-        private static bool IsCacheFill(IMethodSymbol method)
+        private static bool IsFactoryTakingLookup(IMethodSymbol method)
         {
-            if (!CacheFillMethods.Contains(method.Name))
+            if (!FactoryTakingMethods.Contains(method.Name))
             {
                 return false;
             }
 
-            INamedTypeSymbol containing = method.ContainingType?.OriginalDefinition;
+            // An extension method called in reduced form (`dictionary.GetOrAdd(...)`) reports the
+            // static class that declares it, which is what the list holds -- but only through
+            // ReducedFrom, because the reduced symbol hides the receiver parameter that the
+            // argument-to-parameter mapping below still has to line up with.
+            IMethodSymbol declared = method.ReducedFrom ?? method;
+            INamedTypeSymbol containing = declared.ContainingType?.OriginalDefinition;
             if (containing == null || containing.ContainingNamespace == null)
             {
                 return false;
             }
 
-            return CacheTypes.Contains(
+            return FactoryTakingTypes.Contains(
                 containing.ContainingNamespace.ToDisplayString() + "." + containing.MetadataName
             );
         }

@@ -17,10 +17,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-const analyzerDll = path.join(
-  root,
-  "Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll"
-);
+// Every DLL the package ships as a compiler input. Two families, two assemblies: the WallstopProto
+// source generator, and the general-purpose WUH### analyzers. Both are subject to every contract
+// below, and a new one added to Runtime/Analyzers without being listed here would be governed by
+// none of them.
+const analyzerDlls = fs
+  .readdirSync(path.join(root, "Runtime/Analyzers"))
+  .filter((name) => name.endsWith(".dll"))
+  .map((name) => path.join(root, "Runtime/Analyzers", name))
+  .sort();
 let passed = 0;
 
 function check(description, condition, detail) {
@@ -56,54 +61,68 @@ function isEditorOnly(asmdefPath) {
   return platforms.length === 1 && platforms[0] === "Editor";
 }
 
-check("the shipped analyzer exists", fs.existsSync(analyzerDll), analyzerDll);
+check("at least one analyzer ships", analyzerDlls.length > 0, "Runtime/Analyzers is empty");
 
-const metaPath = `${analyzerDll}.meta`;
-check("the analyzer has a .meta sidecar", fs.existsSync(metaPath), metaPath);
+for (const analyzerDll of analyzerDlls) {
+  const label = path.relative(root, analyzerDll);
 
-const meta = fs.readFileSync(metaPath, "utf8");
-check(
-  "the .meta labels it RoslynAnalyzer",
-  /labels:\s*\r?\n\s*-\s*RoslynAnalyzer\b/.test(meta),
-  "without the label Unity loads it as a plain managed plugin, not a compiler input"
-);
-check(
-  "the .meta disables every platform",
-  /Any:\s*\r?\n\s*enabled:\s*0/.test(meta) && /Editor:\s*\r?\n\s*enabled:\s*0/.test(meta),
-  "an analyzer enabled for a platform would be copied into player builds"
-);
+  const metaPath = `${analyzerDll}.meta`;
+  check(`${label} has a .meta sidecar`, fs.existsSync(metaPath), metaPath);
 
-const asmdef = governingAsmdef(analyzerDll);
-check("an .asmdef governs the analyzer's folder", asmdef !== null, "found none");
-check(
-  "the governing assembly is not editor-only",
-  !isEditorOnly(asmdef),
-  `${path.relative(root, asmdef)} restricts includePlatforms to Editor, so no consumer runtime ` +
-    "assembly can reference it and the generator would never run on consumer code"
-);
+  const meta = fs.readFileSync(metaPath, "utf8");
+  check(
+    `${label} is labelled RoslynAnalyzer`,
+    /labels:\s*\r?\n\s*-\s*RoslynAnalyzer\b/.test(meta),
+    "without the label Unity loads it as a plain managed plugin, not a compiler input"
+  );
+  check(
+    `${label} disables every platform`,
+    /Any:\s*\r?\n\s*enabled:\s*0/.test(meta) && /Editor:\s*\r?\n\s*enabled:\s*0/.test(meta),
+    "an analyzer enabled for a platform would be copied into player builds"
+  );
 
-// A second copy anywhere Unity imports would shadow the shipped one with an auto-generated .meta
-// that carries no label, and the generator would silently stop running.
-const strays = [];
-(function walk(directory) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name.startsWith(".") || entry.name.endsWith("~")) {
-      continue;
+  const asmdef = governingAsmdef(analyzerDll);
+  check(`an .asmdef governs ${label}`, asmdef !== null, "found none");
+  check(
+    `the assembly governing ${label} is not editor-only`,
+    !isEditorOnly(asmdef),
+    `${path.relative(root, asmdef)} restricts includePlatforms to Editor, so no consumer runtime ` +
+      "assembly can reference it and the analyzer would never run on consumer code"
+  );
+
+  // A second copy anywhere Unity imports would shadow the shipped one with an auto-generated .meta
+  // that carries no label, and the analyzer would silently stop running.
+  const strays = [];
+  (function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".") || entry.name.endsWith("~")) {
+        continue;
+      }
+
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name === path.basename(analyzerDll) && full !== analyzerDll) {
+        strays.push(path.relative(root, full));
+      }
     }
+  })(root);
 
-    const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      walk(full);
-    } else if (entry.name === path.basename(analyzerDll) && full !== analyzerDll) {
-      strays.push(path.relative(root, full));
-    }
-  }
-})(root);
+  check(
+    `no second copy of ${label} is anywhere Unity imports`,
+    strays.length === 0,
+    strays.join(", ")
+  );
 
-check(
-  "no second copy of the analyzer is anywhere Unity imports",
-  strays.length === 0,
-  strays.join(", ")
-);
+  // Each shipped analyzer needs a project that builds it, or the committed DLL has no sources and
+  // the byte-comparison gate in CI has nothing to compare against.
+  const projectName = path.basename(analyzerDll, ".dll");
+  const projectFile = path.join(root, "Generator~", projectName, `${projectName}.csproj`);
+  check(
+    `${label} is built by a project in Generator~`,
+    fs.existsSync(projectFile),
+    `expected ${path.relative(root, projectFile)}`
+  );
+}
 
 process.stdout.write(`Analyzer placement contract passed (${passed} checks).\n`);

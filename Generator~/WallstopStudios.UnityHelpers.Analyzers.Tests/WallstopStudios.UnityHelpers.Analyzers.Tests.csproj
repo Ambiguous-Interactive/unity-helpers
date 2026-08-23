@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Contract tests for the WUH### analyzer family.
+
+    These run the analyzer against compilations built in-memory, so they need a MODERN Roslyn
+    (4.11) even though the analyzer itself targets 3.8 for Unity 2021.3. That mismatch is the point
+    of the language-version guard the analyzer carries and this suite pins: the fixtures parse at an
+    explicit LanguageVersion rather than whatever the host compiler defaults to.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>WallstopStudios.UnityHelpers.Analyzers.Tests</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers.Analyzers.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CopyAnalyzerPayload=false so running the tests never rewrites the committed DLL they exist
+         to validate. -->
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.Analyzers/WallstopStudios.UnityHelpers.Analyzers.csproj">
+      <Properties>CopyAnalyzerPayload=false</Properties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+</Project>
