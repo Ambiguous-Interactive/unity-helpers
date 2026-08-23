@@ -90,18 +90,14 @@ function scriptPathsIn(commands) {
   return found;
 }
 
-/** Leaf commands the registry ultimately executes, npm indirection resolved. */
-function registryLeafCommands() {
-  return CHECKS.flatMap((check) => {
-    const npmScript = check.run.match(/^npm run ([\w:.-]+)$/);
-    return npmScript ? expandNpmScript(npmScript[1]) : [check.run];
-  });
-}
-
-/** The same, for the contract-test registry `validate:tests:fast` delegates to. */
-function contractCheckLeafCommands() {
-  const contractChecks = require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS;
-  return contractChecks.flatMap((check) => {
+/**
+ * Leaf commands a registry ultimately executes, npm indirection resolved.
+ *
+ * @param {{id: string, name: string, run: string}[]} checks Registry entries.
+ * @returns {string[]} The shell commands they bottom out in.
+ */
+function leafCommands(checks) {
+  return checks.flatMap((check) => {
     const npmScript = check.run.match(/^npm run ([\w:.-]+)$/);
     return npmScript ? expandNpmScript(npmScript[1]) : [check.run];
   });
@@ -468,12 +464,12 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   ]);
 
   const reachable = new Set([
-    ...scriptPathsIn(registryLeafCommands()),
+    ...scriptPathsIn(leafCommands(CHECKS)),
     // Local Gates runs these two aggregates; anything they already cover need not be repeated.
     // `validate:tests` reaches its fast half through a sibling REGISTRY rather than a chain of npm
     // scripts (#505), so expanding the npm script alone stops at `node scripts/run-contract-tests.js`
     // and every check behind it reads as an orphan.
-    ...scriptPathsIn(contractCheckLeafCommands()),
+    ...scriptPathsIn(leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)),
     ...scriptPathsIn(expandNpmScript("validate:tests")),
     ...scriptPathsIn(expandNpmScript("typecheck:unity"))
   ]);
@@ -520,7 +516,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
 // Exported so scripts/tests/test-run-contract-tests.js can make the same "is this claim true"
 // assertions against the sibling registry without a second copy of the mention-stripping rules --
 // every one of which exists because a shape produced a false "this owner runs it".
-module.exports = { expandNpmScript, scriptPathsIn, fileInvokes, filesInvoking };
+module.exports = { expandNpmScript, scriptPathsIn, leafCommands, fileInvokes, filesInvoking };
 
 if (require.main === module) {
   console.log("Testing scripts/run-repo-lint.js...\n");

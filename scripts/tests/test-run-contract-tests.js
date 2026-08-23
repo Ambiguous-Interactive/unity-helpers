@@ -20,7 +20,7 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const runnerPath = path.join(repoRoot, "scripts", "run-contract-tests.js");
 const { CHECKS, runChecks } = require(runnerPath);
 const repoLintChecks = require(path.join(repoRoot, "scripts", "run-repo-lint.js")).CHECKS;
-const { expandNpmScript, scriptPathsIn, filesInvoking } = require(
+const { expandNpmScript, scriptPathsIn, leafCommands, filesInvoking } = require(
   path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js")
 );
 const packageScripts = JSON.parse(
@@ -50,14 +50,6 @@ async function runQueuedTests() {
       failedTests.push(test.name);
     }
   }
-}
-
-/** Leaf commands a registry ultimately executes, npm indirection resolved. */
-function registryLeafCommands(checks) {
-  return checks.flatMap((check) => {
-    const npmScript = check.run.match(/^npm run ([\w:.-]+)$/);
-    return npmScript ? expandNpmScript(npmScript[1]) : [check.run];
-  });
 }
 
 runTest("every check has a unique, non-empty id and name", () => {
@@ -181,8 +173,8 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   ]);
 
   const reachable = new Set([
-    ...scriptPathsIn(registryLeafCommands(CHECKS)),
-    ...scriptPathsIn(registryLeafCommands(repoLintChecks)),
+    ...scriptPathsIn(leafCommands(CHECKS)),
+    ...scriptPathsIn(leafCommands(repoLintChecks)),
     ...scriptPathsIn(expandNpmScript("validate:tests:hook-regressions")),
     ...scriptPathsIn(expandNpmScript("validate:local")),
     ...scriptPathsIn(expandNpmScript("typecheck:unity"))
