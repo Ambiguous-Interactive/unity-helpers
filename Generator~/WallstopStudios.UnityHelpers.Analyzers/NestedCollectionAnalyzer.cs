@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             outerSequence = null;
             innerSequence = null;
-            if (type == null || depth >= MaxSerializationDepth)
+            if (type == null || MaxSerializationDepth <= depth)
             {
                 return false;
             }

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// General-purpose helpers such as JSON formatting, input filtering, and scene membership checks.
@@ -45,16 +46,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         /// <remarks>
         /// Only consulted before any DontDestroyOnLoad object has been seen; after that the
-        /// positive handle answers everything. Four covers an additive main-plus-level-plus-UI
-        /// layout without recycling, and a linear scan of four ints is cheaper than a hash.
+        /// DontDestroyOnLoad scene answers everything on its own. Four covers an additive
+        /// main-plus-level-plus-UI layout without recycling, and a linear scan of four is cheaper
+        /// than a hash.
         /// </remarks>
-        private const int KnownSceneHandleCapacity = 4;
+        private const int KnownSceneCapacity = 4;
 
-        private static int _dontDestroyOnLoadSceneHandle;
-        private static readonly int[] SceneHandlesKnownNotDontDestroyOnLoad = new int[
-            KnownSceneHandleCapacity
+        /// <remarks>
+        /// Scenes rather than handles, deliberately. <c>Scene.handle</c> is an <c>int</c> up to
+        /// Unity 6000.4 and a <c>SceneHandle</c> from 6000.5, where the conversion to <c>int</c> is
+        /// obsolete-as-an-error -- so caching the handle compiles here and fails there. The
+        /// <see cref="Scene"/> struct compares by that same handle on every version, and
+        /// <see cref="Scene.IsValid"/> replaces the "is it zero" test.
+        /// </remarks>
+        private static Scene _dontDestroyOnLoadScene;
+        private static readonly Scene[] ScenesKnownNotDontDestroyOnLoad = new Scene[
+            KnownSceneCapacity
         ];
-        private static int _nextKnownSceneHandleSlot;
+        private static int _nextKnownSceneSlot;
 
         /// <summary>
         /// Determines if a GameObject is in the DontDestroyOnLoad scene.
@@ -62,14 +71,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Allocation-free once the scene has been seen. Reading <c>Scene.name</c> marshals a fresh
         /// managed string out of native memory on every call, and this predicate reads cheap enough
-        /// to end up in <c>Update</c>, so the answer is cached against the scene's handle -- a value
+        /// to end up in <c>Update</c>, so the answer is cached against the scene itself -- a value
         /// type whose comparison costs nothing.
         /// <para>
-        /// The DontDestroyOnLoad scene is unique and its handle is stable for the session, so once
-        /// that handle is known it answers for every scene at once and nothing else is consulted.
-        /// Until then -- in a game that has no persistent object, or before it is created -- a small
-        /// set of handles already known NOT to be it does the same job, so additively loaded scenes
-        /// do not take turns evicting each other.
+        /// The DontDestroyOnLoad scene is unique and stable for the session, so once it is known it
+        /// answers for every scene at once and nothing else is consulted. Until then -- in a game
+        /// that has no persistent object, or before it is created -- a small set of scenes already
+        /// known NOT to be it does the same job, so additively loaded scenes do not take turns
+        /// evicting each other.
         /// </para>
         /// </remarks>
         public static bool IsDontDestroyOnLoad(this GameObject gameObjectToCheck)
@@ -80,19 +89,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             Scene scene = gameObjectToCheck.scene;
-            int handle = scene.handle;
 
-            int dontDestroyOnLoadHandle = _dontDestroyOnLoadSceneHandle;
-            if (dontDestroyOnLoadHandle != 0)
+            if (_dontDestroyOnLoadScene.IsValid())
             {
-                return handle == dontDestroyOnLoadHandle;
+                return scene == _dontDestroyOnLoadScene;
             }
 
-            if (handle != 0)
+            if (scene.IsValid())
             {
-                foreach (int known in SceneHandlesKnownNotDontDestroyOnLoad)
+                foreach (Scene known in ScenesKnownNotDontDestroyOnLoad)
                 {
-                    if (known == handle)
+                    if (known == scene)
                     {
                         return false;
                     }
@@ -105,41 +112,36 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 StringComparison.Ordinal
             );
 
-            if (handle == 0)
+            if (!scene.IsValid())
             {
                 return isDontDestroyOnLoad;
             }
 
             if (isDontDestroyOnLoad)
             {
-                _dontDestroyOnLoadSceneHandle = handle;
+                _dontDestroyOnLoadScene = scene;
             }
             else
             {
-                SceneHandlesKnownNotDontDestroyOnLoad[_nextKnownSceneHandleSlot] = handle;
-                _nextKnownSceneHandleSlot =
-                    (_nextKnownSceneHandleSlot + 1) % KnownSceneHandleCapacity;
+                ScenesKnownNotDontDestroyOnLoad[_nextKnownSceneSlot] = scene;
+                WallMath.WrappedAdd(ref _nextKnownSceneSlot, 1, KnownSceneCapacity);
             }
 
             return isDontDestroyOnLoad;
         }
 
         /// <remarks>
-        /// A scene handle is unique for the lifetime of the player, but statics survive entering
-        /// play mode when the project disables domain reload, and the next session's scenes start
-        /// numbering again. Clearing here -- the earliest point every play session reaches -- keeps
-        /// a stale handle from answering for a scene that merely reuses its number.
+        /// A scene is unique for the lifetime of the player, but statics survive entering play mode
+        /// when the project disables domain reload, and the next session's scenes start numbering
+        /// again. Clearing here -- the earliest point every play session reaches -- keeps a stale
+        /// entry from answering for a scene that merely reuses its handle.
         /// </remarks>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSceneResidencyCache()
         {
-            _dontDestroyOnLoadSceneHandle = 0;
-            _nextKnownSceneHandleSlot = 0;
-            Array.Clear(
-                SceneHandlesKnownNotDontDestroyOnLoad,
-                0,
-                SceneHandlesKnownNotDontDestroyOnLoad.Length
-            );
+            _dontDestroyOnLoadScene = default;
+            _nextKnownSceneSlot = 0;
+            Array.Clear(ScenesKnownNotDontDestroyOnLoad, 0, ScenesKnownNotDontDestroyOnLoad.Length);
         }
     }
 }

@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return !string.IsNullOrEmpty(fieldName)
                 && fieldName.StartsWith(BackingFieldPrefix, StringComparison.Ordinal)
                 && fieldName.EndsWith(BackingFieldSuffix, StringComparison.Ordinal)
-                && fieldName.Length > BackingFieldPrefix.Length + BackingFieldSuffix.Length;
+                && BackingFieldPrefix.Length + BackingFieldSuffix.Length < fieldName.Length;
         }
 
         /// <summary>

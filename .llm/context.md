@@ -132,6 +132,20 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 
 ### Additional Technical Rules
 
+- **Order every comparison left-to-right: use only `<` and `<=`.** `index >= 0` becomes
+  `0 <= index`, `a > b` becomes `b < a`, and a range reads as one line of number line:
+  `0 <= sum && sum < max`. Swap the operands, not the meaning -- and check for side effects before
+  swapping, because swapping changes evaluation order. New and edited code follows this; the
+  repo-wide sweep of the remaining ~2,900 sites is
+  [#554](https://github.com/Ambiguous-Interactive/unity-helpers/issues/554).
+- **`Scene.handle` is an `int` up to Unity 6000.4 and a `SceneHandle` from 6000.5**, where the
+  implicit conversion to `int` is obsolete-as-an-**error**. Compare `Scene` values (`==`,
+  `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses
+  2021.3 reference assemblies and the MCP editor is on 6000.4, so it cost a full Unity matrix run to
+  find. Same class as [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
+- **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`,
+  `WrappedIncrement` and `PositiveMod` already exist; `(i + 1) % capacity` is a re-implementation
+  that also gets the negative case wrong.
 - **Never compare against a magic sentinel; test for the valid range.** `index != -1` becomes
   `index >= 0` and `index == -1` becomes `index < 0`. The comparison then says what it means, and it
   refuses a value that is invalid for a reason the sentinel does not cover. Swept to zero across

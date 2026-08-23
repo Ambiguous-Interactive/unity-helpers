@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             // Not "high <= low": that is false when either bound is NaN, and the strict overload
             // would then answer NaN rather than raise.
-            if (random == null || !(high > low))
+            if (random == null || !(low < high))
             {
                 return low;
             }
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             // Not "high <= low": that is false when either bound is NaN, and the strict overload
             // would then answer NaN rather than raise.
-            if (random == null || !(high > low))
+            if (random == null || !(low < high))
             {
                 return low;
             }

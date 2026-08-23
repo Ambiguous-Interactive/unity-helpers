@@ -306,8 +306,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         _isDraggingToSelectSprites = false;
 
                         if (
-                            _spriteSelectionDragStartIndex >= 0
-                            && _spriteSelectionDragCurrentIndex >= 0
+                            0 <= _spriteSelectionDragStartIndex
+                            && 0 <= _spriteSelectionDragCurrentIndex
                         )
                         {
                             int start = Mathf.Min(

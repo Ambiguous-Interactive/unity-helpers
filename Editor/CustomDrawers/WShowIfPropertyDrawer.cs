@@ -790,7 +790,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 indices.Clear();
 
                 int bracket = raw.IndexOf('[');
-                if (bracket >= 0)
+                if (0 <= bracket)
                 {
                     name = raw.Substring(0, bracket);
                     int cursor = bracket;

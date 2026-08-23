@@ -71,10 +71,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
             int headIndex = BuildPowerSortPlusRuns(runs, nodes);
 
-            for (int nodeIndex = headIndex; nodeIndex >= 0; nodeIndex = nodes[nodeIndex].next)
+            for (int nodeIndex = headIndex; 0 <= nodeIndex; nodeIndex = nodes[nodeIndex].next)
             {
                 int nextIndex = nodes[nodeIndex].next;
-                if (nextIndex >= 0)
+                if (0 <= nextIndex)
                 {
                     PowerSortPlusPushCandidate(heap, nodes, nodeIndex, nextIndex);
                 }
@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int nextIndex = right.next;
             left.next = nextIndex;
-            if (nextIndex >= 0)
+            if (0 <= nextIndex)
             {
                 nodes[nextIndex].prev = leftIndex;
             }
@@ -198,11 +198,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             right.next = -1;
             right.version++;
 
-            if (left.prev >= 0)
+            if (0 <= left.prev)
             {
                 PowerSortPlusPushCandidate(heap, nodes, left.prev, leftIndex);
             }
-            if (left.next >= 0)
+            if (0 <= left.next)
             {
                 PowerSortPlusPushCandidate(heap, nodes, leftIndex, left.next);
             }
