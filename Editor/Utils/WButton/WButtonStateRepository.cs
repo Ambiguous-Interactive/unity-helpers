@@ -17,6 +17,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             WButtonTargetState
         > TargetStates = new();
 
+        // Held rather than written as a method group at the call site: C# does not cache a
+        // method-group conversion before C# 11, and Unity is on C# 9, so `GetValue(target,
+        // CreateState)` builds a new callback on every lookup, hit included (WPROTO038). The caller
+        // sits behind `WButtonGUI`'s own context cache, so this is a miss-path lookup rather than a
+        // per-repaint one -- the fix is the idiom, not a measured frame-time win.
+        private static readonly ConditionalWeakTable<
+            UnityEngine.Object,
+            WButtonTargetState
+        >.CreateValueCallback StateFactory = CreateState;
+
         internal static WButtonTargetState GetOrCreate(UnityEngine.Object target)
         {
             if (target == null)
@@ -24,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 throw new ArgumentNullException(nameof(target));
             }
 
-            return TargetStates.GetValue(target, CreateState);
+            return TargetStates.GetValue(target, StateFactory);
         }
 
         private static WButtonTargetState CreateState(UnityEngine.Object target)

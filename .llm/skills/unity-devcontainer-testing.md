@@ -390,6 +390,26 @@ an API this one still likes.** `Object.GetInstanceID()` compiles here on `6000.4
 on `6000.5.2f1`, where CI treats it as an error -- so a green MCP run reddened all four playmode legs. `[UnityTest]` coroutines
 and anything needing PlayMode still belong to the Docker legs and to CI.
 
+### The editor compiles what `typecheck:unity` cannot, and an empty console proves nothing
+
+`npm run typecheck:unity` compiles `Runtime/**` only -- not `Editor/`, not `Tests/`. The MCP editor
+compiles all three. When session 218 shipped the `WPROTO038` analyzer, the local typecheck was clean
+and the editor found a real site in `Editor/Utils/WButton/`, in an assembly no local gate builds.
+**If a change adds or changes an analyzer, the editor is the only local place its Editor-assembly
+findings exist.**
+
+Reading that console needs a control, and the failure mode is quiet: the first read after a forced
+recompile came back with **zero entries**, which looks exactly like "the package is clean". It was
+not evidence of anything -- the console had been cleared and the assemblies had not been rebuilt yet.
+What made the reading real was writing a file with the offending shape into `Editor/`, seeing the
+console report it _and_ the pre-existing site, then deleting the probe and watching both disappear.
+**An empty Unity console is the absence of a measurement, not a passing one.**
+
+One correction to the refresh trap recorded above: the timeout is _a_ success signal, not _the_
+success signal. A `RunCommand` whose body is `AssetDatabase.Refresh` timed out on one call and
+**returned normally** on the next, and the second one had still recompiled -- the console timestamps
+moved. Discriminate on the console timestamps, not on how the tool call ended.
+
 ## Limitations
 
 - `WaitForEndOfFrame` does not work in batch mode (PlayMode tests)
