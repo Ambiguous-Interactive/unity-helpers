@@ -338,15 +338,18 @@ install_node_deps() {
     if check_command node; then
         echo ""
         print_info "Installed tools:"
-        if node "$REPO_ROOT/scripts/run-prettier.js" --version >/dev/null 2>&1; then
-            print_success "  prettier: $(node "$REPO_ROOT/scripts/run-prettier.js" --version)"
-        fi
-        if node "$REPO_ROOT/scripts/run-node-bin.js" markdownlint --version >/dev/null 2>&1; then
-            print_success "  markdownlint-cli: $(node "$REPO_ROOT/scripts/run-node-bin.js" markdownlint --version)"
-        fi
-        if node "$REPO_ROOT/scripts/run-node-bin.js" cspell --version >/dev/null 2>&1; then
-            print_success "  cspell: $(node "$REPO_ROOT/scripts/run-node-bin.js" cspell --version)"
-        fi
+        # One spawn per tool, not two. `cspell --version` costs 8.13 s in this devcontainer --
+        # entirely process start-up -- so running it once to test and once to print doubled it.
+        report_tool_version() {
+            tool_label="$1"
+            shift
+            if tool_version="$("$@" --version 2>/dev/null)"; then
+                print_success "  ${tool_label}: ${tool_version}"
+            fi
+        }
+        report_tool_version "prettier" node "$REPO_ROOT/scripts/run-prettier.js"
+        report_tool_version "markdownlint-cli" node "$REPO_ROOT/scripts/run-node-bin.js" markdownlint
+        report_tool_version "cspell" node "$REPO_ROOT/scripts/run-node-bin.js" cspell
     fi
 }
 

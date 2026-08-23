@@ -181,13 +181,13 @@ try {
         exit 1
     }
 
+    # There is deliberately NO `cspell --version` reachability probe here. Measured on this
+    # devcontainer, `cspell --version` and `cspell stdin` over two words cost the SAME 8.13 s: it is
+    # all process start-up and none of it is spelling. So the probe doubled the cost of every run of
+    # this validator, and `scripts/tests/test-validate-lint-error-codes.ps1` runs it nine times.
+    # It also proved nothing new -- run-node-bin.js already exits 127 with an actionable message when
+    # the package or its bin entry is absent, and the roundtrip below surfaces that exit code.
     $nodeBinRunner = Join-Path $PSScriptRoot 'run-node-bin.js'
-    $cspellVersionOutput = & $NodeCommand $nodeBinRunner cspell --version 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-ErrorMsg "cspell is not installed in this repository (exit $LASTEXITCODE). Run 'npm install'."
-        Write-Host ($cspellVersionOutput | Out-String) -ForegroundColor DarkGray
-        exit 1
-    }
 
     # ── Roundtrip harvested prefixes through cspell ───────────────────────────
     # We feed "<PREFIX>001" (not just "<PREFIX>") because the real-world token
@@ -219,7 +219,14 @@ try {
     }
 
     if ($exitCode -ne 0 -and $unknownPrefixes.Count -eq 0) {
-        Write-ErrorMsg "cspell prefix roundtrip failed without parseable unknown-word output (exit $exitCode)."
+        # 127 is run-node-bin.js's "not installed" exit; name that case rather than reporting it as
+        # unparseable output, because it is the one a contributor hits and the fix is one command.
+        if ($exitCode -eq 127) {
+            Write-ErrorMsg "cspell is not installed in this repository. Run 'npm install' on the same host that runs git hooks."
+        }
+        else {
+            Write-ErrorMsg "cspell prefix roundtrip failed without parseable unknown-word output (exit $exitCode)."
+        }
         Write-Host ($output | Out-String) -ForegroundColor DarkGray
         exit 1
     }
