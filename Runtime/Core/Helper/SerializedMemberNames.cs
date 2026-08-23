@@ -31,6 +31,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string BackingFieldSuffix = ">k__BackingField";
 
 #if !SINGLE_THREADED
+        // Held rather than written at the call site: a method group in argument position builds a
+        // new delegate on every call, cache hits included, which is what WUH001 reports.
+        private static readonly Func<string, string> BackingFieldNameFactory =
+            BuildBackingFieldName;
+
         private static readonly ConcurrentDictionary<string, string> BackingFieldNames = new(
             StringComparer.Ordinal
         );
@@ -60,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
 #if !SINGLE_THREADED
-            return BackingFieldNames.GetOrAdd(propertyName, BuildBackingFieldName);
+            return BackingFieldNames.GetOrAdd(propertyName, BackingFieldNameFactory);
 #else
             if (!BackingFieldNames.TryGetValue(propertyName, out string cached))
             {
