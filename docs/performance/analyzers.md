@@ -46,10 +46,17 @@ Measured on Unity 6000.4.6f1 over 400,000 warm-cache hits, against a control tha
 
 - `ConcurrentDictionary<K, V>.GetOrAdd` and `.AddOrUpdate`
 - `ConditionalWeakTable<K, V>.GetValue`
-- This package's own [`DictionaryExtensions`](../features/utilities/math-and-extensions.md)
-  `GetOrAdd`, `GetOrElse` and `AddOrUpdate`, which extend `IDictionary` and `IReadOnlyDictionary` —
-  so a plain `Dictionary<K, V>` is covered through them, even though the BCL gives it no
-  factory-taking member of its own.
+- **Every** delegate-taking member of this package's own
+  [`DictionaryExtensions`](../features/utilities/math-and-extensions.md) — `GetOrAdd`, `GetOrElse`,
+  `AddOrUpdate`, `TryAdd`, `Merge`, `Difference` and `Reverse` — which extend `IDictionary` and
+  `IReadOnlyDictionary`, so a plain `Dictionary<K, V>` is covered through them even though the BCL
+  gives it no factory-taking member of its own.
+
+That second bullet is matched by **parameter type, not by method name**. A name list was tried first
+and was the wrong shape: it named three members and missed `TryAdd`, whose creator runs only when the
+key is absent — exactly the defect — along with three more that take an optional `Func` creator.
+Matching the delegate parameter means the next factory-taking extension is covered the day it is
+written.
 
 `GetOrElse` never adds anything, but it takes the same `Func<V>` and rebuilds it on every call that
 finds the key. Same defect.

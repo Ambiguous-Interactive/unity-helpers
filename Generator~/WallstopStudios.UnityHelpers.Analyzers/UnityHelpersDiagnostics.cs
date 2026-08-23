@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH001",
                 "Lookup factory method group allocates on every call",
-                "'{0}' is passed to '{1}' as a method group, which builds a new delegate on every call -- including the lookups that hit, which this call exists to make cheap. Measured at 106 bytes per call over 400,000 warm hits. Hold it in a 'static readonly' delegate field and pass that field, or use an overload that takes the state separately with a 'static' lambda.",
+                "'{0}' is passed to '{1}' as a method group, so a new delegate is built on every call -- including the calls that never invoke it, which is every lookup that already has the key. Measured at 106 bytes per call over 400,000 warm hits. Hold it in a 'static readonly' delegate field and pass that field, or use an overload that takes the state separately with a 'static' lambda.",
                 "Performance",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true

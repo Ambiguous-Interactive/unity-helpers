@@ -37,35 +37,45 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const int FirstLanguageVersionThatCachesMethodGroups = 1100;
 
         /// <summary>
-        /// Types whose value factories run per lookup rather than once, matched on
-        /// <see cref="ISymbol.MetadataName"/> so the arity is part of the match and a consumer type
-        /// that merely shares a name is not caught.
+        /// BCL types with a factory-taking member, matched on <see cref="ISymbol.MetadataName"/> so
+        /// the arity is part of the match and a consumer type sharing a name is not caught.
         /// </summary>
         /// <remarks>
-        /// <c>Dictionary&lt;K, V&gt;</c> is absent because the BCL gives it no factory-taking
-        /// member. It is still covered: this package's own
-        /// <c>DictionaryExtensions.GetOrAdd/GetOrElse/AddOrUpdate</c> extend <c>IDictionary</c> and
-        /// <c>IReadOnlyDictionary</c>, so a plain <c>Dictionary</c> reaches the same defect through
-        /// them, and that extension class is in this list for exactly that reason.
+        /// These are name-gated by <see cref="BclFactoryTakingMethods"/>, because the types also
+        /// carry plenty of members that take a delegate for unrelated reasons.
         /// </remarks>
-        private static readonly ImmutableHashSet<string> FactoryTakingTypes =
+        private static readonly ImmutableHashSet<string> BclFactoryTakingTypes =
             ImmutableHashSet.Create(
                 "System.Collections.Concurrent.ConcurrentDictionary`2",
-                "System.Runtime.CompilerServices.ConditionalWeakTable`2",
-                "WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions"
+                "System.Runtime.CompilerServices.ConditionalWeakTable`2"
             );
 
         /// <summary>
-        /// Members of <see cref="FactoryTakingTypes"/> that take a value factory. A name absent from
-        /// one of those types simply never matches, so the set is shared rather than split per type.
+        /// Members of <see cref="BclFactoryTakingTypes"/> that take a value factory.
+        /// </summary>
+        private static readonly ImmutableHashSet<string> BclFactoryTakingMethods =
+            ImmutableHashSet.Create("GetOrAdd", "AddOrUpdate", "GetValue");
+
+        /// <summary>
+        /// This package's own extension types, where EVERY delegate-typed parameter counts and no
+        /// member name is consulted.
         /// </summary>
         /// <remarks>
-        /// <c>GetOrElse</c> adds nothing to the dictionary, but it takes the same
-        /// <c>Func&lt;V&gt;</c> and rebuilds it on the calls that find the key -- which is every call
-        /// the lookup is written for.
+        /// A name list was the first shape here and it was the wrong one. It carried
+        /// <c>GetOrAdd</c>, <c>GetOrElse</c> and <c>AddOrUpdate</c>, and review found <c>TryAdd</c>
+        /// missing -- whose <c>creator</c> runs only when the key is absent, which is precisely the
+        /// defect. A sweep of the same file then found three more (<c>Merge</c>,
+        /// <c>Difference</c>, <c>Reverse</c>, each taking an optional <c>Func</c> creator). Matching
+        /// the delegate parameter instead of the name closes the class permanently, so the next
+        /// factory-taking extension added to this package is covered the day it is written rather
+        /// than the day someone notices.
+        /// <c>Dictionary&lt;K, V&gt;</c> reaches all of this through these extensions; the BCL gives
+        /// it no factory-taking member of its own.
         /// </remarks>
-        private static readonly ImmutableHashSet<string> FactoryTakingMethods =
-            ImmutableHashSet.Create("GetOrAdd", "GetOrElse", "AddOrUpdate", "GetValue");
+        private static readonly ImmutableHashSet<string> PackageFactoryTakingTypes =
+            ImmutableHashSet.Create(
+                "WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions"
+            );
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -152,15 +162,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static bool IsFactoryTakingLookup(IMethodSymbol method)
         {
-            if (!FactoryTakingMethods.Contains(method.Name))
-            {
-                return false;
-            }
-
             // An extension method called in reduced form (`dictionary.GetOrAdd(...)`) reports the
-            // static class that declares it, which is what the list holds -- but only through
-            // ReducedFrom, because the reduced symbol hides the receiver parameter that the
-            // argument-to-parameter mapping below still has to line up with.
+            // static class that declares it only through ReducedFrom.
             IMethodSymbol declared = method.ReducedFrom ?? method;
             INamedTypeSymbol containing = declared.ContainingType?.OriginalDefinition;
             if (containing == null || containing.ContainingNamespace == null)
@@ -168,9 +171,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            return FactoryTakingTypes.Contains(
-                containing.ContainingNamespace.ToDisplayString() + "." + containing.MetadataName
-            );
+            string fullName =
+                containing.ContainingNamespace.ToDisplayString() + "." + containing.MetadataName;
+
+            if (PackageFactoryTakingTypes.Contains(fullName))
+            {
+                return true;
+            }
+
+            return BclFactoryTakingTypes.Contains(fullName)
+                && BclFactoryTakingMethods.Contains(method.Name);
         }
     }
 }

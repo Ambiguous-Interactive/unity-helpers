@@ -48,6 +48,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                       public static V GetOrAdd<K, V>(this IDictionary<K, V> d, K key, Func<K, V> f) => f(key);
                       public static V GetOrElse<K, V>(this IReadOnlyDictionary<K, V> d, K key, Func<V> f) => f();
                       public static V AddOrUpdate<K, V>(this IDictionary<K, V> d, K key, Func<K, V> c, Func<K, V, V> u) => c(key);
+                      public static V TryAdd<K, V>(this IDictionary<K, V> d, K key, Func<K, V> c) => c(key);
+                      public static Dictionary<K, V> Merge<K, V>(this IReadOnlyDictionary<K, V> l, IReadOnlyDictionary<K, V> r, Func<Dictionary<K, V>> c = null) => c();
+                      public static Dictionary<K, V> ToDictionary<K, V>(this IReadOnlyDictionary<K, V> d) => null;
                   }
               }";
 
@@ -89,6 +92,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               private static int Update(string key, int existing) => existing + 1;
               public static int Get(IDictionary<string, int> cache, string key) =>
                   cache.AddOrUpdate(key, Create, Update);"
+        )]
+        [TestCase(
+            "TryAdd, whose creator runs only when the key is absent",
+            @"private static readonly Dictionary<string, int> Cache = new Dictionary<string, int>();
+              private static int Create(string key) => key.Length;
+              public static int Get(string key) => Cache.TryAdd(key, Create);"
+        )]
+        [TestCase(
+            "Merge, whose optional creator is a delegate parameter like any other",
+            @"private static Dictionary<string, int> Create() => new Dictionary<string, int>();
+              public static Dictionary<string, int> Get(
+                  IReadOnlyDictionary<string, int> a,
+                  IReadOnlyDictionary<string, int> b) => a.Merge(b, Create);"
         )]
         [TestCase(
             "the extension called in unreduced form",
@@ -204,6 +220,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               private static int Create(string key) => key.Length;"
         )]
         [TestCase(
+            "a package extension member that takes no delegate at all",
+            @"public static Dictionary<string, int> Get(IReadOnlyDictionary<string, int> d) =>
+                  d.ToDictionary();"
+        )]
+        [TestCase(
             "an unrelated method taking a delegate",
             @"private static bool Match(string value) => value.Length > 0;
               public static string Get(List<string> values) => values.Find(Match);"
@@ -312,7 +333,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 source,
                 "the analyzer matches this type by name"
             );
-            foreach (string method in new[] { "GetOrAdd", "GetOrElse", "AddOrUpdate" })
+            foreach (string method in new[] { "GetOrAdd", "GetOrElse", "AddOrUpdate", "TryAdd" })
             {
                 StringAssert.Contains(
                     $" {method}<K, V>(",
