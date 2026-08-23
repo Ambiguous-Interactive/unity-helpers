@@ -1548,7 +1548,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 Func<object, object[], object> awakeInfo = AwakeMethodsByType.GetOrAdd(
                     script.GetType(),
-                    type =>
+                    static type =>
                     {
                         MethodInfo[] methods = type.GetMethods(
                             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic

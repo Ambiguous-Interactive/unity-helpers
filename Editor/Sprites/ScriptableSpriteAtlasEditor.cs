@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     using EditorGUI.IndentLevelScope indentScope = new();
                     SerializedObject serializedConfig = _serializedConfigs.GetOrAdd(
                         config,
-                        newConfig => new SerializedObject(newConfig)
+                        static newConfig => new SerializedObject(newConfig)
                     );
                     serializedConfig.Update();
                     EditorGUI.BeginChangeCheck();

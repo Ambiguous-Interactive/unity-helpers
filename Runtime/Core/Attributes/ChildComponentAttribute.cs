@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             FieldMetadata<ChildComponentAttribute>[] fields = FieldsByType.GetOrAdd(
                 component.GetType(),
-                type => GetFieldMetadata<ChildComponentAttribute>(type)
+                static type => GetFieldMetadata<ChildComponentAttribute>(type)
             );
             AssignChildComponents(component, fields);
         }
@@ -315,7 +315,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal static FieldMetadata<ChildComponentAttribute>[] GetOrCreateFields(Type type)
         {
-            return FieldsByType.GetOrAdd(type, t => GetFieldMetadata<ChildComponentAttribute>(t));
+            return FieldsByType.GetOrAdd(
+                type,
+                static t => GetFieldMetadata<ChildComponentAttribute>(t)
+            );
         }
 
         private static bool TryAssignChildSingleFast(

@@ -788,7 +788,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         {
             return cache.GetOrAdd(
                 componentType,
-                type =>
+                static type =>
                 {
                     FieldInfo[] fields = type.GetFields(
                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
@@ -818,7 +818,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             List<FieldInfo> listFields = ListFieldsByType.GetOrAdd(
                 componentType,
-                type =>
+                static type =>
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();
@@ -883,7 +883,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             RequireComponent[] required = RequiredComponentsByType.GetOrAdd(
                 componentType,
-                type => type.GetAllAttributesSafe<RequireComponent>(inherit: true)
+                static type => type.GetAllAttributesSafe<RequireComponent>(inherit: true)
             );
 
             if (required.Length <= 0)
@@ -934,7 +934,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             List<FieldInfo> stringFields = StringFieldsByType.GetOrAdd(
                 componentType,
-                type =>
+                static type =>
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();
@@ -969,7 +969,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             List<FieldInfo> objFields = ObjectFieldsByType.GetOrAdd(
                 componentType,
-                type =>
+                static type =>
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();

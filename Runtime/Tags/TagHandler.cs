@@ -718,8 +718,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             uint currentCount = _tagCount.AddOrUpdate(
                 effectTag,
-                _ => 1U,
-                (_, existing) => existing + 1
+                static _ => 1U,
+                static (_, existing) => existing + 1
             );
             if (currentCount == 1)
             {

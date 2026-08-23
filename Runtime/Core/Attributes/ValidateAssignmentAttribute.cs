@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             return FieldsByType.GetOrAdd(
                 objectType,
-                type =>
+                static type =>
                 {
                     FieldInfo[] allFields = type.GetFields(
                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic

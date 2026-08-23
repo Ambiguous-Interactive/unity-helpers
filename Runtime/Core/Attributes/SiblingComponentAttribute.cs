@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             FieldMetadata<SiblingComponentAttribute>[] fields = FieldsByType.GetOrAdd(
                 component.GetType(),
-                type => GetFieldMetadata<SiblingComponentAttribute>(type)
+                static type => GetFieldMetadata<SiblingComponentAttribute>(type)
             );
             AssignSiblingComponents(component, fields);
         }
@@ -281,7 +281,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal static FieldMetadata<SiblingComponentAttribute>[] GetOrCreateFields(Type type)
         {
-            return FieldsByType.GetOrAdd(type, t => GetFieldMetadata<SiblingComponentAttribute>(t));
+            return FieldsByType.GetOrAdd(
+                type,
+                static t => GetFieldMetadata<SiblingComponentAttribute>(t)
+            );
         }
 
         private static bool TryAssignSingleSibling(

@@ -401,7 +401,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 Mathf.RoundToInt(c.g / (float)bucketSize),
                                 Mathf.RoundToInt(c.b / (float)bucketSize)
                             );
-                            buckets.AddOrUpdate(bucket, _ => 0, (_, value) => value + 1);
+                            buckets.AddOrUpdate(
+                                bucket,
+                                static _ => 0,
+                                static (_, value) => value + 1
+                            );
                             hasSamples = true;
                         }
                     }
@@ -420,7 +424,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 Mathf.RoundToInt(c.g / (float)bucketSize),
                                 Mathf.RoundToInt(c.b / (float)bucketSize)
                             );
-                            buckets.AddOrUpdate(bucket, _ => 0, (_, value) => value + 1);
+                            buckets.AddOrUpdate(
+                                bucket,
+                                static _ => 0,
+                                static (_, value) => value + 1
+                            );
                             hasSamples = true;
                         }
                     }
@@ -796,7 +804,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             Mathf.RoundToInt(pixel.b * 255 / bucketSize)
                         );
 
-                        cache.AddOrUpdate(bucket, _ => 0, (_, value) => value + 1);
+                        cache.AddOrUpdate(bucket, static _ => 0, static (_, value) => value + 1);
                         hasSamples = true;
                     }
 
@@ -817,7 +825,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             Mathf.RoundToInt(pixel.b * 255 / bucketSize)
                         );
 
-                        cache.AddOrUpdate(bucket, _ => 0, (_, value) => value + 1);
+                        cache.AddOrUpdate(bucket, static _ => 0, static (_, value) => value + 1);
                         hasSamples = true;
                     }
 
@@ -838,7 +846,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             Mathf.RoundToInt(pixel.b * 255 / bucketSize)
                         );
 
-                        cache.AddOrUpdate(bucket, _ => 0, (_, value) => value + 1);
+                        cache.AddOrUpdate(bucket, static _ => 0, static (_, value) => value + 1);
                         hasSamples = true;
                     }
 

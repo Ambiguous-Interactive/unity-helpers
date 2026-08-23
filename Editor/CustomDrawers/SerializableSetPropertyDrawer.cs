@@ -1814,7 +1814,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            bool state = _rowFoldoutStates.GetOrAdd(foldoutKey, _ => true);
+            bool state = _rowFoldoutStates.GetOrAdd(foldoutKey, static _ => true);
             element.isExpanded = state;
             return state;
         }

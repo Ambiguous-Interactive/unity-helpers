@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return null;
             }
 
-            return Cache.GetOrAdd(value, key => new StringWrapper(key));
+            return Cache.GetOrAdd(value, static key => new StringWrapper(key));
         }
 
         /// <summary>

@@ -627,6 +627,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             > TypeAccessors = new();
 
+            // C# 9 does not cache a method-group conversion, so passing CreateAccessors directly
+            // allocated a delegate on every GetAccessors call -- cache hit included.
+            private static readonly Func<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > CreateAccessorsFactory = CreateAccessors;
+
             /// <summary>
             /// Gets or creates cached accessors for the specified collection type.
             /// </summary>
@@ -642,7 +659,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object> OnAfterDeserialize
             ) GetAccessors(Type collectionType)
             {
-                return TypeAccessors.GetOrAdd(collectionType, CreateAccessors);
+                return TypeAccessors.GetOrAdd(collectionType, CreateAccessorsFactory);
             }
 
             private static (
@@ -768,7 +785,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 return WrapperAccessors.GetOrAdd(
                     wrapperType,
-                    t => CreateWrapperAccessors(t, isSet)
+                    static (type, forSet) => CreateWrapperAccessors(type, forSet),
+                    isSet
                 );
             }
 
@@ -1074,12 +1092,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 BindingFlags.NonPublic | BindingFlags.Static
             );
 
+        // C# 9 does not cache a method-group conversion, so passing the method directly allocated a
+        // delegate on every call -- cache hit included. These hold the one instance.
+        private static readonly Func<
+            Type,
+            Func<object, byte[]>
+        > SpecialCollectionSerializerFactory = BuildSpecialCollectionSerializer;
+        private static readonly Func<
+            Type,
+            Func<byte[], object>
+        > SpecialCollectionDeserializerFactory = BuildSpecialCollectionDeserializer;
+
         internal static byte[] SerializeSpecialCollection<T>(T input)
         {
             Type type = typeof(T);
             Func<object, byte[]> serializer = SpecialCollectionSerializers.GetOrAdd(
                 type,
-                BuildSpecialCollectionSerializer
+                SpecialCollectionSerializerFactory
             );
             return serializer(input);
         }
@@ -1089,7 +1118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Type type = typeof(T);
             Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(
                 type,
-                BuildSpecialCollectionDeserializer
+                SpecialCollectionDeserializerFactory
             );
             return (T)deserializer(data);
         }

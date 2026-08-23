@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     return name;
                 }
-                return namesDict.GetOrAdd(key, enumValue => enumValue.ToString("G"));
+                return namesDict.GetOrAdd(key, static enumValue => enumValue.ToString("G"));
             }
 
             return value.ToString("G");
@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     return name;
                 }
-                return namesDict.GetOrAdd(key, enumValue => enumValue.ToString("G"));
+                return namesDict.GetOrAdd(key, static enumValue => enumValue.ToString("G"));
             }
 
             return value.ToString("G");

@@ -154,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
             return RunningLabelByCountCache.GetOrAdd(
                 count,
-                c => "Running (" + GetCachedIntString(c) + ")"
+                static c => "Running (" + GetCachedIntString(c) + ")"
             );
         }
 

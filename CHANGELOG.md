@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Stop the serializer allocating a delegate on every collection serialize. Four cache lookups built their factory per call rather than reusing one, costing 106-116 bytes each time, cache hit included ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Assign a hierarchy 30% faster when most of its components have no relational fields: `AssignHierarchy` took a lock per component just to answer "does this type have any", costing 59.7 ns per component against 41.5 ns now ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Deserialize a `SerializableDictionary`, `SerializableSortedDictionary`, `SerializableHashSet` or `SerializableSortedSet` from JSON without reflection: the converters looked their backing fields up on every read, costing 1.5 us of a 17.6 us 16-entry read ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Stop `[ChildComponent]` and `[ParentComponent]` collection fields allocating a `Component[]` on every assignment, so a scene full of components no longer builds garbage during `Awake` ([#534](https://github.com/Ambiguous-Interactive/unity-helpers/issues/534), [#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).

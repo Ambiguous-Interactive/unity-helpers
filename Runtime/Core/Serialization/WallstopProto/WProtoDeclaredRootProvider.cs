@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             where TDeclared : class
             where TRoot : TDeclared
         {
-            Entry entry = Roots.GetOrAdd(typeof(TDeclared), _ => new Entry());
+            Entry entry = Roots.GetOrAdd(typeof(TDeclared), static _ => new Entry());
             entry.Declared = typeof(TRoot);
             Formatters<TDeclared>.Value = new WProtoDeclaredRootFormatter<TDeclared, TRoot>();
         }
@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            Roots.GetOrAdd(declared, _ => new Entry()).Claimed = root;
+            Roots.GetOrAdd(declared, static _ => new Entry()).Claimed = root;
         }
 
         /// <summary>

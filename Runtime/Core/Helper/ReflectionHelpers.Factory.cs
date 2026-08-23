@@ -1219,7 +1219,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return (Func<TInstance, TValue>)
                     TypedPropertyGetters.GetOrAdd(
                         key,
-                        _ => BuildTypedPropertyGetter<TInstance, TValue>(property)
+                        static cacheKey =>
+                            BuildTypedPropertyGetter<TInstance, TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedPropertyGetters.TryGetValue(key, out Delegate del))
@@ -1248,7 +1249,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return (Action<TInstance, TValue>)
                     TypedPropertySetters.GetOrAdd(
                         key,
-                        _ => BuildTypedPropertySetter<TInstance, TValue>(property)
+                        static cacheKey =>
+                            BuildTypedPropertySetter<TInstance, TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedPropertySetters.TryGetValue(key, out Delegate del))
@@ -1271,7 +1273,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return (Func<TValue>)
                     TypedStaticPropertyGetters.GetOrAdd(
                         key,
-                        _ => BuildTypedStaticPropertyGetter<TValue>(property)
+                        static cacheKey => BuildTypedStaticPropertyGetter<TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedStaticPropertyGetters.TryGetValue(key, out Delegate del))
@@ -1294,7 +1296,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return (Action<TValue>)
                     TypedStaticPropertySetters.GetOrAdd(
                         key,
-                        _ => BuildTypedStaticPropertySetter<TValue>(property)
+                        static cacheKey => BuildTypedStaticPropertySetter<TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedStaticPropertySetters.TryGetValue(key, out Delegate del))

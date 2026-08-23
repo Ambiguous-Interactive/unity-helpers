@@ -162,16 +162,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 _classNameLookup.AddOrUpdate(
                     classInfo.Name,
-                    _ => new List<AnalyzerClassInfo> { classInfo },
-                    (_, existing) =>
+                    static (_, info) => new List<AnalyzerClassInfo> { info },
+                    static (_, existing, info) =>
                     {
                         lock (existing)
                         {
-                            existing.Add(classInfo);
+                            existing.Add(info);
                         }
 
                         return existing;
-                    }
+                    },
+                    classInfo
                 );
             }
         }
@@ -595,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             // Use cached regex pattern to avoid repeated compilation
             Regex directPattern = NewExpressionPatternCache.GetOrAdd(
                 methodName,
-                name => new Regex(
+                static name => new Regex(
                     @"new\s+" + Regex.Escape(name) + @"\s*$",
                     RegexOptions.Compiled | RegexOptions.RightToLeft
                 )

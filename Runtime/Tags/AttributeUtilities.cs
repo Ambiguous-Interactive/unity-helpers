@@ -879,7 +879,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             return AttributeFields.GetOrAdd(
                 type,
-                inputType =>
+                static inputType =>
                 {
                     // Try to use cached field names first
                     AttributeMetadataCache cache = AttributeMetadataCache.Instance;
@@ -947,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             return OptimizedAttributeFields.GetOrAdd(
                 type,
-                inputType =>
+                static inputType =>
                 {
                     // Try to use cached field names first
                     AttributeMetadataCache cache = AttributeMetadataCache.Instance;

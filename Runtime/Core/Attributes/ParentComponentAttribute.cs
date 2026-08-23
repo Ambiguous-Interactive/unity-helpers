@@ -139,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             FieldMetadata<ParentComponentAttribute>[] fields = FieldsByType.GetOrAdd(
                 component.GetType(),
-                type => GetFieldMetadata<ParentComponentAttribute>(type)
+                static type => GetFieldMetadata<ParentComponentAttribute>(type)
             );
             AssignParentComponents(component, fields);
         }
@@ -393,7 +393,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal static FieldMetadata<ParentComponentAttribute>[] GetOrCreateFields(Type type)
         {
-            return FieldsByType.GetOrAdd(type, t => GetFieldMetadata<ParentComponentAttribute>(t));
+            return FieldsByType.GetOrAdd(
+                type,
+                static t => GetFieldMetadata<ParentComponentAttribute>(t)
+            );
         }
 
         private static bool TryAssignParentCollectionFast(

@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 ? throw new ArgumentNullException(nameof(comparer))
                 : SortedSetCache.GetOrAdd(
                     comparer,
-                    inComparer => new WallstopGenericPool<SortedSet<T>>(
+                    static inComparer => new WallstopGenericPool<SortedSet<T>>(
                         () => new SortedSet<T>(inComparer),
                         onRelease: set => set.Clear()
                     )
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 ? throw new ArgumentNullException(nameof(comparer))
                 : HashSetCache.GetOrAdd(
                     comparer,
-                    inComparer => new WallstopGenericPool<HashSet<T>>(
+                    static inComparer => new WallstopGenericPool<HashSet<T>>(
                         () => new HashSet<T>(inComparer),
                         onRelease: set => set.Clear()
                     )
@@ -959,7 +959,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 ? throw new ArgumentNullException(nameof(comparer))
                 : DictionaryCache.GetOrAdd(
                     comparer,
-                    inComparer => new WallstopGenericPool<Dictionary<TKey, TValue>>(
+                    static inComparer => new WallstopGenericPool<Dictionary<TKey, TValue>>(
                         () => new Dictionary<TKey, TValue>(inComparer),
                         onRelease: dictionary => dictionary.Clear()
                     )
@@ -981,7 +981,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 ? throw new ArgumentNullException(nameof(comparer))
                 : SortedDictionaryCache.GetOrAdd(
                     comparer,
-                    inComparer => new WallstopGenericPool<SortedDictionary<TKey, TValue>>(
+                    static inComparer => new WallstopGenericPool<SortedDictionary<TKey, TValue>>(
                         () => new SortedDictionary<TKey, TValue>(inComparer),
                         onRelease: dictionary => dictionary.Clear()
                     )

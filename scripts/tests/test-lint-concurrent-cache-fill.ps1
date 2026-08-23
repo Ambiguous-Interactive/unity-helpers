@@ -16,6 +16,11 @@
     - Exits 1 when the marker is separated from the write by a blank line, so the exemption cannot
       be inherited from an unrelated comment further up the file.
     - Finds a cache whose generic argument list csharpier wrapped onto several lines.
+    - Exits 1 for a non-`static` lambda handed to GetOrAdd, and 0 once it is `static`.
+    - Exits 0 for a nested lambda inside the constructed value, which is not a cache factory and
+      cannot be `static` when it closes over the factory's own parameter.
+    - Exits 0 for a cache factory whose value type carries a comma inside a generic argument list,
+      which an earlier draft split as if it were an argument separator.
 
 .PARAMETER VerboseOutput
     Show verbose per-test diagnostics.
@@ -240,6 +245,97 @@ namespace Fixture
 }
 '@
 
+$nonStaticFactory = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static string Get(Type type)
+        {
+            return Names.GetOrAdd(type, t => t.FullName);
+        }
+    }
+}
+'@
+
+$staticFactory = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static string Get(Type type)
+        {
+            return Names.GetOrAdd(type, static t => t.FullName);
+        }
+    }
+}
+'@
+
+$nestedLambdaInValue = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+
+    internal sealed class Holder<T>
+    {
+        internal Holder(Func<T> make, Action<T> onRelease) { }
+    }
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<
+            IComparer<int>,
+            Holder<SortedSet<int>>
+        > Pools = new();
+
+        internal static Holder<SortedSet<int>> Get(IComparer<int> comparer)
+        {
+            return Pools.GetOrAdd(
+                comparer,
+                static inComparer => new Holder<SortedSet<int>>(
+                    () => new SortedSet<int>(inComparer),
+                    onRelease: set => set.Clear()
+                )
+            );
+        }
+    }
+}
+'@
+
+$genericCommaInValueType = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<
+            Type,
+            Dictionary<string, int>
+        > Maps = new();
+
+        internal static Dictionary<string, int> Get(Type type)
+        {
+            return Maps.GetOrAdd(type, static _ => new Dictionary<string, int>());
+        }
+    }
+}
+'@
+
 $wrappedDeclaration = @'
 namespace Fixture
 {
@@ -273,6 +369,10 @@ try {
     Assert-Lint -TestName 'Marker in the comment block above passes' -Source $markedOverwriteBlockAbove -ExpectedExitCode 0
     Assert-Lint -TestName 'Marker cut off by a blank line does not exempt' -Source $markerSeparatedByBlankLine -ExpectedExitCode 1
     Assert-Lint -TestName 'Wrapped generic declaration is still found' -Source $wrappedDeclaration -ExpectedExitCode 1
+    Assert-Lint -TestName 'Non-static cache factory fails' -Source $nonStaticFactory -ExpectedExitCode 1
+    Assert-Lint -TestName 'Static cache factory passes' -Source $staticFactory -ExpectedExitCode 0
+    Assert-Lint -TestName 'Nested lambda inside the value is not a factory' -Source $nestedLambdaInValue -ExpectedExitCode 0
+    Assert-Lint -TestName 'Comma inside a generic value type is not an argument split' -Source $genericCommaInValueType -ExpectedExitCode 0
 
     Write-Host "[test-lint-concurrent-cache-fill] $script:TestsPassed passed, $script:TestsFailed failed." -ForegroundColor Cyan
     if ($script:TestsFailed -gt 0) { exit 1 }

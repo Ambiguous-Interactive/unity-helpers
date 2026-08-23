@@ -85,10 +85,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 bool isNull = currentValue == null;
                 string nullKey = label.text;
-                GUIContent nullLabel = NullableLabelCache.GetOrAdd(
-                    nullKey,
-                    () => new GUIContent($"{label.text} (Null)", label.tooltip)
-                );
+                // Drawn every IMGUI repaint. A lambda here captures `label`, so the closure and its
+                // delegate allocate on every draw even when the cache hits; this is main-thread-only,
+                // so the plain lookup is both allocation-free and simpler.
+                if (!NullableLabelCache.TryGetValue(nullKey, out GUIContent nullLabel))
+                {
+                    nullLabel = new GUIContent($"{label.text} (Null)", label.tooltip);
+                    NullableLabelCache[nullKey] = nullLabel;
+                }
                 bool newIsNull = EditorGUILayout.Toggle(nullLabel, isNull);
                 if (newIsNull)
                 {
@@ -302,7 +306,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     object elementValue = value.GetValue(elementIndex);
                     GUIContent elementLabel = ElementLabelCache.GetOrAdd(
                         elementIndex,
-                        idx => new GUIContent($"Element {idx}")
+                        static idx => new GUIContent($"Element {idx}")
                     );
                     EditorGUI.BeginChangeCheck();
                     object updatedElement = DrawElementField(

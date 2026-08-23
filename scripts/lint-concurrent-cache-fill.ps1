@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Fails when a ConcurrentDictionary field is written through its indexer.
+    Fails when a cache is filled non-atomically, or through a factory that allocates every call.
 
 .DESCRIPTION
     The shape this catches is a cache filled after a miss:
@@ -34,6 +34,20 @@
     preprocessor state reports this problem four times bigger than it is -- 53 of the 71 raw hits
     when this was first swept were exactly that false positive.
 
+    The second rule: a lambda passed to GetOrAdd / AddOrUpdate / GetOrCreateValue / GetValue must be
+    `static`. A lambda that captures compiles to a display-class allocation plus a delegate
+    allocation on **every call**, cache hit included; a non-capturing one is cached by the compiler
+    in a static field and allocates once. Marking them `static` does not make them cheaper -- it
+    makes the compiler **reject** the capture (CS8820), so the cheap case is the only one that
+    compiles. Session 217 swept the tree this way and the compiler found five capturing factories in
+    Runtime and two in Editor that nothing else would have reported.
+
+    Not covered, because it is not lexically decidable: a method-group argument
+    (`GetOrAdd(key, CreateThing)`) is indistinguishable from a local holding a delegate, and C# 9
+    does not cache method-group conversions -- so that also allocates per call. Three such sites were
+    found by hand in Serializer.cs and replaced with cached `static readonly` fields. If a fourth
+    appears, only review will catch it.
+
 .NOTES
     Source-based on purpose: it has to run on a plain ubuntu-latest with no Unity and no compiled
     assembly, and the shape is lexical.
@@ -47,6 +61,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $scanRoots = @('Runtime', 'Editor', 'Styles')
 $exemptionMarker = 'concurrent-overwrite:'
+$factoryCalls = @('GetOrAdd', 'AddOrUpdate', 'GetOrCreateValue', 'GetValue')
 
 function Write-Info($message) {
     if ($VerboseOutput) { Write-Host "[lint-concurrent-cache-fill] $message" -ForegroundColor Cyan }
@@ -156,10 +171,81 @@ foreach ($file in @($files | Sort-Object)) {
     }
 }
 
-Write-Info "Scanned $scanned file(s) declaring a ConcurrentDictionary; skipped $skippedSingleThreaded write(s) inside SINGLE_THREADED branches; $exempted deliberate overwrite(s) exempted."
+# Rule two: every lambda handed to a cache factory must be `static`, so a capture is a compile
+# error rather than a per-call allocation nobody measures.
+$lambdaChecked = 0
+$callPattern = '\.\s*(?:' + ($factoryCalls -join '|') + ')\s*(?:<[^;{}()]*>)?\s*\('
+foreach ($file in @($files | Sort-Object)) {
+    $text = [System.IO.File]::ReadAllText($file)
+    if ($text -notmatch $callPattern) { continue }
+
+    $relative = $file.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+    foreach ($call in [regex]::Matches($text, $callPattern)) {
+        $open = $text.IndexOf('(', $call.Index + $call.Length - 1)
+        if ($open -lt 0) { continue }
+
+        # Walk the balanced argument list, then test each top-level argument.
+        $depth = 0
+        $close = -1
+        for ($i = $open; $i -lt $text.Length; $i++) {
+            $c = $text[$i]
+            if ($c -eq '(') { $depth++ }
+            elseif ($c -eq ')') {
+                $depth--
+                if ($depth -eq 0) { $close = $i; break }
+            }
+        }
+        if ($close -lt 0) { continue }
+
+        # Every `=>` at paren-depth 0 inside the argument list is a top-level lambda argument.
+        # Keying off the arrow rather than splitting on commas sidesteps generic argument lists --
+        # `WallstopGenericPool<Dictionary<TKey, TValue>>` carries a comma that no comma-splitter
+        # ignoring angle brackets can tell from an argument separator, and an earlier draft of this
+        # rule reported four false positives in Buffers.cs for exactly that reason. Depth also
+        # excludes a nested lambda such as `onRelease: set => set.Clear()`, which is an argument to
+        # the value being constructed, not to the cache.
+        $depth = 0
+        for ($i = $open + 1; $i -lt $close; $i++) {
+            $c = $text[$i]
+            if ($c -eq '(' -or $c -eq '[' -or $c -eq '{') { $depth++; continue }
+            if ($c -eq ')' -or $c -eq ']' -or $c -eq '}') { $depth--; continue }
+            if ($depth -ne 0) { continue }
+            if ($c -ne '=' -or $i + 1 -ge $close -or $text[$i + 1] -ne '>') { continue }
+
+            $lambdaChecked++
+
+            # Walk back over the parameter list: either a balanced `(...)` or a bare identifier.
+            $j = $i - 1
+            while ($j -ge 0 -and [char]::IsWhiteSpace($text[$j])) { $j-- }
+            if ($j -ge 0 -and $text[$j] -eq ')') {
+                $paramDepth = 0
+                while ($j -ge 0) {
+                    if ($text[$j] -eq ')') { $paramDepth++ }
+                    elseif ($text[$j] -eq '(') {
+                        $paramDepth--
+                        if ($paramDepth -eq 0) { break }
+                    }
+                    $j--
+                }
+                $j--
+            } else {
+                while ($j -ge 0 -and ($text[$j] -match '[\w]')) { $j-- }
+            }
+            while ($j -ge 0 -and [char]::IsWhiteSpace($text[$j])) { $j-- }
+
+            if ($j -ge 5 -and $text.Substring($j - 5, 6) -eq 'static') { continue }
+
+            $line = ($text.Substring(0, $i) -split "`n").Count
+            Write-Host "::error file=$relative,line=$line::A lambda handed to a cache factory must be 'static'. Without it a capture compiles to a display-class plus a delegate allocated on every call, cache hit included, and nothing reports it. Add 'static'; if the compiler then rejects it (CS8820) the capture was real -- pass the captured value through the state-taking overload instead."
+            $failed = $true
+        }
+    }
+}
+
+Write-Info "Scanned $scanned file(s) declaring a ConcurrentDictionary; skipped $skippedSingleThreaded write(s) inside SINGLE_THREADED branches; $exempted deliberate overwrite(s) exempted; checked $lambdaChecked cache-factory lambda(s)."
 
 if ($failed) {
     exit 1
 }
 
-Write-Host "[lint-concurrent-cache-fill] OK: every ConcurrentDictionary fill is atomic ($scanned file(s) scanned, $exempted exempted)." -ForegroundColor Green
+Write-Host "[lint-concurrent-cache-fill] OK: every ConcurrentDictionary fill is atomic and every cache-factory lambda is static ($scanned file(s) scanned, $exempted exempted, $lambdaChecked lambda(s) checked)." -ForegroundColor Green

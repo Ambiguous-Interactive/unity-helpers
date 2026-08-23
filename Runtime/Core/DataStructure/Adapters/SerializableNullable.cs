@@ -417,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             Type valueType = arguments[0];
             return ConverterCache.GetOrAdd(
                 valueType,
-                value =>
+                static value =>
                 {
                     Type converterType =
                         typeof(SerializableNullableJsonConverter<>).MakeGenericType(value);
