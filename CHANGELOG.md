@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WPROTO038`, a warning when a method group is passed as the factory to `ConcurrentDictionary.GetOrAdd`, `AddOrUpdate` or `ConditionalWeakTable.GetValue`. C# rebuilds that delegate on every lookup, cache hits included. See [The generator](./docs/features/serialization/serialization.md#the-generator) ([#538](https://github.com/Ambiguous-Interactive/unity-helpers/issues/538)).
 - Add `Serializer.ProtobufSurrogatesReady()`, which reports whether protobuf will write the byte layout this package documents, and names the types it will not. A game can check it before its first save instead of reading a startup log. See [Checking the surrogates took effect](./docs/features/serialization/serialization.md#checking-the-surrogates-took-effect) ([#531](https://github.com/Ambiguous-Interactive/unity-helpers/issues/531)).
 - Add `ReflectionHelpers.CreateTypedArray()`, which builds an array whose element type is known only at run time about twice as fast as `Array.CreateInstance` plus `Array.SetValue` ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Add `string.Slugify()`, which produces a URL- and filename-safe key: lowercase ASCII, single hyphens, accents folded so `"Café"` is `"cafe"`. `ToKebabCase` keeps punctuation and accents and is not a substitute. See [Slugs](./docs/features/utilities/math-and-extensions.md#slugs) ([#386](https://github.com/Ambiguous-Interactive/unity-helpers/issues/386)).

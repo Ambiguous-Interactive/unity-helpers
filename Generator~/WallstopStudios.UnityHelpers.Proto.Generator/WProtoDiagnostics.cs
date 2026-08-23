@@ -384,5 +384,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
+
+        /// <summary>
+        /// A method group handed to a cache factory allocates a delegate on every call, cache hit
+        /// included, on every C# version Unity ships.
+        /// </summary>
+        /// <remarks>
+        /// Not a WallstopProto rule, but this is the only analyzer the package loads into a Unity
+        /// compilation, and the shape is invisible without a semantic model: `GetOrAdd(key, Factory)`
+        /// and `GetOrAdd(key, cachedFactory)` are the same token in argument position, so the source
+        /// linter that enforces the rest of the cache-fill rules cannot tell them apart (#538).
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor CacheFactoryAllocatesPerCall =
+            new DiagnosticDescriptor(
+                "WPROTO038",
+                "Cache factory method group allocates on every lookup",
+                "'{0}' is passed to '{1}' as a method group, which builds a new delegate on every call -- including the cache hits this lookup exists to make cheap. Measured at 106 bytes per call over 400,000 warm hits. Hold it in a 'static readonly' delegate field and pass that field, or use the state-taking overload with a 'static' lambda.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

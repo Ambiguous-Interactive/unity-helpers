@@ -27,6 +27,7 @@ Invoke these skills for specific tasks.
 | [documentation-consistency](./documentation-consistency.md) | When writing or reviewing documentation |
 | [editor-api-rules](./editor-api-rules.md) | Forbidden Editor APIs and value handling rules |
 | [editor-caching-patterns](./editor-caching-patterns.md) | Caching strategies for Editor code |
+| [editor-interaction-patterns](./editor-interaction-patterns.md) | Editor UI mechanics - progress, undo, dialogs, drag-drop |
 | [editor-multi-object-editing](./editor-multi-object-editing.md) | Multi-object editing patterns and undo support for editor code |
 | [editor-singleton-patterns](./editor-singleton-patterns.md) | Singleton asset management patterns for Editor code |
 | [editor-undo-complete](./editor-undo-complete.md) | Complete undo policy for editor tooling with enforceable scope boundaries |
@@ -59,6 +60,7 @@ Invoke these skills for specific tasks.
 | [search-codebase](./search-codebase.md) | Finding code, files, or patterns |
 | [self-regulate-changes](./self-regulate-changes.md) | Know when to stop: risk scoring and hard caps for cascading changes |
 | [serialization-safety](./serialization-safety.md) | Serializer exception contract - every entry point throws SerializationFailureException or has a Try sibling |
+| [serialized-property-names](./serialized-property-names.md) | Reaching serialized properties from tests without string literals |
 | [ship-changes](./ship-changes.md) | End-to-end workflow for shipping changes: validate, review, version, changelog, commit |
 | [test-data-driven](./test-data-driven.md) | Data-driven testing with TestCase and TestCaseSource |
 | [test-naming-conventions](./test-naming-conventions.md) | Test method and TestName naming rules |
@@ -85,6 +87,7 @@ Invoke these skills for specific tasks.
 | [performance-audit](./performance-audit.md) | Reviewing performance-sensitive code |
 | [profile-debug-performance](./profile-debug-performance.md) | Profiling, debugging, measuring performance |
 | [refactor-to-zero-alloc](./refactor-to-zero-alloc.md) | Converting allocating code to zero-allocation |
+| [unity-frame-loop](./unity-frame-loop.md) | Per-frame callbacks, update managers, coroutine cost |
 | [unity-performance-patterns](./unity-performance-patterns.md) | Unity-specific optimizations (APIs, pooling) |
 | [use-array-pool](./use-array-pool.md) | Working with temporary arrays |
 | [use-pooling](./use-pooling.md) | Working with temporary collections |
@@ -96,6 +99,7 @@ Invoke these skills for specific tasks.
 | [add-inspector-attribute](./add-inspector-attribute.md) | Improving editor UX with attributes |
 | [debug-il2cpp](./debug-il2cpp.md) | IL2CPP build issues or AOT errors |
 | [devcontainer-volume-permissions](./devcontainer-volume-permissions.md) | Docker volume permission fixes for non-root devcontainer users |
+| [discriminated-union-examples](./discriminated-union-examples.md) | Worked OneOf/FastOneOf examples |
 | [github-actions-script-pattern](./github-actions-script-pattern.md) | Extract GHA logic to testable scripts |
 | [github-pages](./github-pages.md) | GitHub Pages, Jekyll, markdown link format |
 | [github-pages-theming](./github-pages-theming.md) | GitHub Pages CSS theming, Jekyll theme customization |

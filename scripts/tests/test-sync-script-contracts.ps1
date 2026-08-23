@@ -272,15 +272,21 @@ function Run-AgentValidationContractTests {
     'test:pre-push-changed-files'
   )
   $expectedHookRegressionScript = @($heavyHookTests | ForEach-Object { "npm run $_" }) -join ' && '
-  $hookTestsAreSplit =
-    $hookRegressionScript -ceq $expectedHookRegressionScript -and
-    @($heavyHookTests | Where-Object {
-        $fastTestScript -match "npm run $([regex]::Escape($_))(?:\s|$)"
-      }).Count -eq 0
+  # The fast aggregate is a concurrent REGISTRY rather than a chain (#505), so what it contains is
+  # asserted against that registry by scripts/tests/test-run-contract-tests.js. What belongs here is
+  # the delegation itself: a chain reappearing in package.json is how the registry would stop
+  # describing what runs.
+  $fastTestsDelegateToRunner = $fastTestScript -ceq 'node scripts/run-contract-tests.js'
   Write-TestResult `
-    -TestName 'Heavy synthetic hook regressions are split out of the fast test aggregate' `
+    -TestName 'The fast test aggregate delegates to the concurrent contract runner' `
+    -Passed $fastTestsDelegateToRunner `
+    -Message "validate:tests:fast = $fastTestScript"
+
+  $hookTestsAreSplit = $hookRegressionScript -ceq $expectedHookRegressionScript
+  Write-TestResult `
+    -TestName 'Heavy synthetic hook regressions are their own aggregate' `
     -Passed $hookTestsAreSplit `
-    -Message "fast = $fastTestScript; hook regressions = $hookRegressionScript"
+    -Message "hook regressions = $hookRegressionScript"
 
   $expectedFullTestScript = 'npm run validate:tests:fast && npm run validate:tests:hook-regressions'
   $fullTestsComposeBothAggregates = $fullTestScript -ceq $expectedFullTestScript

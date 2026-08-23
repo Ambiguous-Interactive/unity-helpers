@@ -705,10 +705,21 @@ jobs:
 
   # GATED STANDALONE tier: the expensive IL2CPP player legs. `needs: unity-tests`
   # means any failure in the fast tier (a compile error in an editmode leg, a mass
-  # runtime failure in any editmode/playmode leg) SKIPS this whole job -- the
-  # ~30-min-each standalone builds never start on a fundamentally-broken PR. On a
-  # green fast tier this runs exactly as before; measured tier handoff is about one
-  # second, so the failure gate costs negligible wall-clock. The steps are intentionally identical to
+  # runtime failure in any editmode/playmode leg) SKIPS this whole job, so the
+  # standalone builds never start on a fundamentally-broken PR.
+  #
+  # THE GATE IS MEASURED, NOT ASSUMED (#457). The handoff itself is about a second,
+  # but on shared self-hosted runners the tier boundary strands a median 4.3
+  # runner-minutes per run that reaches this tier, and skipping the tier saves the
+  # four legs' ~10 runner-minutes. Whether that trades well depends on how often a
+  # red run is a red FAST tier rather than one of the modes the gate cannot help
+  # with (supersession #332, build-lock #356/#411, runner-preflight #415, an OS kill
+  # #353). Classified over the 60 completed runs of 2026-08-20..23 by which job
+  # failed first: 31 red, of which 29 first failed in an editmode or playmode leg
+  # and 2 first failed here. That is 94% of failures and 48% of all runs -- none of
+  # the four other modes appeared at all -- so the gate returns roughly 290
+  # runner-minutes for the 133 it costs. Keep it, and re-measure before removing it.
+  # The steps are intentionally identical to
   # unity-tests -- the `matrix.test-mode == 'standalone'` inline conditionals select
   # the IL2CPP provisioning profile, the Debug C++ config (Release ICEs MSVC
   # 14.51.36231 on the generated test C++ -- see run-ci-tests.ps1 for the

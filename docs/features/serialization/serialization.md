@@ -1123,6 +1123,24 @@ and matching `[WProtoMember]` field numbers to port the type. If a contract is d
 through a surrogate, root marshal, or hand-written formatter, suppress `WPROTO030` around its
 `[ProtoContract]` declaration.
 
+One diagnostic in this assembly is not about serialization at all. `WPROTO038` warns when a **method
+group** is passed as the factory to `ConcurrentDictionary.GetOrAdd`, `ConcurrentDictionary.AddOrUpdate`
+or `ConditionalWeakTable.GetValue`:
+
+```csharp
+// WPROTO038: a new Func<Type, Accessors> on every call, cache hits included.
+return TypeAccessors.GetOrAdd(collectionType, CreateAccessors);
+
+// No allocation on a hit: the delegate is built once.
+private static readonly Func<Type, Accessors> AccessorFactory = CreateAccessors;
+return TypeAccessors.GetOrAdd(collectionType, AccessorFactory);
+```
+
+C# does not cache a method-group conversion until C# 11, and Unity pins C# 9 on every version this
+package supports, so the delegate is rebuilt on every lookup -- measured at 106 bytes per call over
+400,000 warm hits. The analyzer stays silent on a compiler that does cache it, and on a `static`
+lambda or a delegate held in a field or local. Suppress it if a particular lookup is genuinely cold.
+
 #### Contracts that hold other contracts
 
 A `[WProtoMember]` whose type is another contract is written as a nested message, and a contract may
