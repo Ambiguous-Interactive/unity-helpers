@@ -394,6 +394,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// compilation, and the shape is invisible without a semantic model: `GetOrAdd(key, Factory)`
         /// and `GetOrAdd(key, cachedFactory)` are the same token in argument position, so the source
         /// linter that enforces the rest of the cache-fill rules cannot tell them apart (#538).
+        /// <para>
+        /// <b>Opt-out, and a warning at the very most.</b> A consumer who has taken on this package
+        /// should get the safety without having to discover it, so this is on by default like the
+        /// rest of the family. What it must never do is fail their build: every other diagnostic
+        /// here is an error because the alternative is an exception from inside a shipped player,
+        /// and this one reports an allocation in code that is otherwise correct. A warning is
+        /// therefore the ceiling, and a consumer who does not want it turns it off in a ruleset or
+        /// <c>.editorconfig</c>.
+        /// </para>
         /// </remarks>
         internal static readonly DiagnosticDescriptor CacheFactoryAllocatesPerCall =
             new DiagnosticDescriptor(

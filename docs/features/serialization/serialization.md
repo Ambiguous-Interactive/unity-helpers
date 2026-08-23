@@ -1139,7 +1139,26 @@ return TypeAccessors.GetOrAdd(collectionType, AccessorFactory);
 C# does not cache a method-group conversion until C# 11, and Unity pins C# 9 on every version this
 package supports, so the delegate is rebuilt on every lookup -- measured at 106 bytes per call over
 400,000 warm hits. The analyzer stays silent on a compiler that does cache it, and on a `static`
-lambda or a delegate held in a field or local. Suppress it if a particular lookup is genuinely cold.
+lambda or a delegate held in a field or local.
+
+**`WPROTO038` is on by default, and a warning is as far as it goes.** Every other diagnostic here is
+an error, because a contract that cannot be serialized would otherwise throw from inside a shipped
+player. This one reports an allocation in code that is otherwise correct, so it never fails a build:
+you get told, and you decide. Suppress it at a call site whose lookup is genuinely cold, or turn the
+whole rule off in `Assets/Default.ruleset`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RuleSet Name="Project analyzer rules" ToolsVersion="15.0">
+  <Rules AnalyzerId="WallstopStudios.UnityHelpers.Proto.Generator"
+    RuleNamespace="WallstopStudios.UnityHelpers.Proto.Generator">
+    <Rule Id="WPROTO038" Action="None" />
+  </Rules>
+</RuleSet>
+```
+
+or with `dotnet_diagnostic.WPROTO038.severity = none` in `.editorconfig`. If your project turns
+warnings into errors, that is the switch to reach for.
 
 #### Contracts that hold other contracts
 

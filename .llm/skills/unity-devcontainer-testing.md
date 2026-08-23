@@ -396,7 +396,7 @@ and anything needing PlayMode still belong to the Docker legs and to CI.
 compiles all three. When session 218 shipped the `WPROTO038` analyzer, the local typecheck was clean
 and the editor found a real site in `Editor/Utils/WButton/`, in an assembly no local gate builds.
 **If a change adds or changes an analyzer, the editor is the only local place its Editor-assembly
-findings exist.**
+findings exist**.
 
 Reading that console needs a control, and the failure mode is quiet: the first read after a forced
 recompile came back with **zero entries**, which looks exactly like "the package is clean". It was

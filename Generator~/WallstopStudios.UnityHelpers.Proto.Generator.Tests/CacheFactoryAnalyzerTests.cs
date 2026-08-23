@@ -166,6 +166,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsEmpty(Analyze(source, LanguageVersion.CSharp11));
         }
 
+        /// <summary>
+        /// The consumer contract: on by default, so a project that has taken on this package gets
+        /// the safety without discovering it, but never able to fail their build.
+        /// </summary>
+        /// <remarks>
+        /// Every other diagnostic in this assembly is an error, because the alternative is an
+        /// exception from inside a shipped player. This one reports an allocation in code that is
+        /// otherwise correct, so a warning is the ceiling and turning it off has to work.
+        /// </remarks>
+        [Test]
+        public void TheDiagnosticIsOnByDefaultSuppressibleAndNeverAboveAWarning()
+        {
+            DiagnosticDescriptor descriptor =
+                new CacheFactoryAnalyzer().SupportedDiagnostics.Single(candidate =>
+                    candidate.Id == DiagnosticId
+                );
+
+            Assert.IsTrue(
+                descriptor.IsEnabledByDefault,
+                "a consumer using this package should get the safety without asking for it"
+            );
+            Assert.AreEqual(
+                DiagnosticSeverity.Warning,
+                descriptor.DefaultSeverity,
+                "a warning is the ceiling; an error would fail a build over an allocation"
+            );
+
+            const string offending =
+                @"private static readonly ConcurrentDictionary<string, int> Cache =
+                      new ConcurrentDictionary<string, int>();
+                  private static int Create(string key) => key.Length;
+                  public static int Get(string key) => Cache.GetOrAdd(key, Create);";
+
+            Assert.IsNotEmpty(
+                Analyze(offending, LanguageVersion.CSharp9, ReportDiagnostic.Default),
+                "a consumer who configures nothing must still be told"
+            );
+            Assert.IsEmpty(
+                Analyze(offending, LanguageVersion.CSharp9, ReportDiagnostic.Suppress),
+                "and one who does not want it must be able to turn it off"
+            );
+        }
+
         private static Diagnostic Single(string body)
         {
             ImmutableArray<Diagnostic> reported = Analyze(body);
@@ -179,6 +222,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         private static ImmutableArray<Diagnostic> Analyze(string body, LanguageVersion language)
+        {
+            return Analyze(body, language, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="language">Language version the fixture is parsed at.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about WPROTO038 -- <see cref="ReportDiagnostic.Default"/> for a
+        /// consumer who configures nothing, or anything else for the ruleset / <c>.editorconfig</c>
+        /// entry they would write, expressed as the option Roslyn resolves both of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            LanguageVersion language,
+            ReportDiagnostic reportedAs
+        )
         {
             string source =
                 "using System;\n"
@@ -202,7 +265,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "ConsumerAssembly",
                 new[] { CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(language)) },
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
             );
 
             // A fixture that does not compile would report nothing and read as a pass, which is the
