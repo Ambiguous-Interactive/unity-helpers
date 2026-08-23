@@ -27,43 +27,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     {
         /// <summary>
         /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
-        /// when the two bounds are equal, inverted, or not a number.
+        /// when the range is empty.
         /// </summary>
         /// <remarks>
         /// This is for an <b>authored</b> range -- two serialized fields a designer fills in -- not a
         /// computed one. Collapsing both ends onto the same value is how an inspector asks for "no
-        /// spread", so the natural way to turn a spread off is exactly the input
-        /// <see cref="IRandom.NextFloat(float, float)"/> rejects. That overload stays the default,
-        /// because a computed range that inverts is a bug worth surfacing; these draws usually sit
-        /// inside a coroutine or a periodic tick, where an exception ends the loop permanently and
-        /// the system it drove simply stops existing.
+        /// spread", so the natural way to turn a spread off is exactly the input the strict overload
+        /// rejects. That overload stays the default, because a computed range that inverts is a bug
+        /// worth surfacing; these draws usually sit inside a coroutine or a periodic tick, where an
+        /// exception ends the loop permanently and the system it drove simply stops existing.
         /// <para>
         /// The answer is the <b>low</b> bound rather than zero: a collapsed range is still a range,
         /// so <c>3 .. 3</c> means three, not nothing. A symmetric scatter whose collapse genuinely
         /// is zero is a different shape and keeps its own guard.
         /// </para>
-        /// </remarks>
-        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
-        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
-        /// <param name="high">Exclusive upper bound.</param>
-        public static float NextFloatInRange(this IRandom random, float low, float high)
-        {
-            if (random == null || !(high > low))
-            {
-                return low;
-            }
-
-            return random.NextFloat(low, high);
-        }
-
-        /// <summary>
-        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
-        /// when the two bounds are equal or inverted.
-        /// </summary>
-        /// <remarks>
-        /// The <see cref="NextFloatInRange"/> remarks apply unchanged: this exists for an authored
-        /// pair of bounds, it answers the low bound rather than zero, and
-        /// <see cref="IRandom.Next(int, int)"/> remains the right contract for a computed range.
         /// </remarks>
         /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
         /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
@@ -80,19 +57,119 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         /// <summary>
         /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
-        /// when the two bounds are equal, inverted, or not a number.
+        /// when the range is empty. See <see cref="NextIntInRange"/> for why this is not the default.
         /// </summary>
-        /// <remarks>
-        /// The <see cref="NextFloatInRange"/> remarks apply unchanged: this exists for an authored
-        /// pair of bounds, it answers the low bound rather than zero, and
-        /// <see cref="IRandom.NextDouble(double, double)"/> remains the right contract for a
-        /// computed range.
-        /// </remarks>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static uint NextUintInRange(this IRandom random, uint low, uint high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.NextUint(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static short NextShortInRange(this IRandom random, short low, short high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.NextShort(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static byte NextByteInRange(this IRandom random, byte low, byte high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.NextByte(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static long NextLongInRange(this IRandom random, long low, long high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.NextLong(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static ulong NextUlongInRange(this IRandom random, ulong low, ulong high)
+        {
+            if (random == null || high <= low)
+            {
+                return low;
+            }
+
+            return random.NextUlong(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty or either bound is not a number. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
+        /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
+        /// <param name="high">Exclusive upper bound.</param>
+        public static float NextFloatInRange(this IRandom random, float low, float high)
+        {
+            // Not "high <= low": that is false when either bound is NaN, and the strict overload
+            // would then answer NaN rather than raise.
+            if (random == null || !(high > low))
+            {
+                return low;
+            }
+
+            return random.NextFloat(low, high);
+        }
+
+        /// <summary>
+        /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
+        /// when the range is empty or either bound is not a number. See <see cref="NextIntInRange"/> for why this is not the default.
+        /// </summary>
         /// <param name="random">Generator to draw from. A null generator yields <paramref name="low"/>.</param>
         /// <param name="low">Inclusive lower bound, and the answer whenever the range is empty.</param>
         /// <param name="high">Exclusive upper bound.</param>
         public static double NextDoubleInRange(this IRandom random, double low, double high)
         {
+            // Not "high <= low": that is false when either bound is NaN, and the strict overload
+            // would then answer NaN rather than raise.
             if (random == null || !(high > low))
             {
                 return low;

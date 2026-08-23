@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Reflection;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
@@ -19,49 +20,148 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private static readonly SystemRandom DeterministicRandom = new(1234);
 
         /// <summary>
-        /// The authored-range draws answer the low bound wherever the throwing overload raises.
+        /// Every ranged draw on <see cref="IRandom"/> has a sibling that answers the low bound
+        /// where the strict one raises.
         /// </summary>
         /// <remarks>
         /// Collapsing a serialized min/max pair is how a designer asks for "no spread", and these
         /// draws live in coroutines and periodic ticks, where the exception the strict overload
-        /// raises ends the loop for the rest of the level (#546).
+        /// raises ends the loop for the rest of the level (#546). Driven off the shipped surface
+        /// rather than a list, so a ranged draw added to <see cref="IRandom"/> later without its
+        /// sibling fails here.
+        /// <para>
+        /// A range is identified by its parameter <b>names</b>, not by its shape:
+        /// <c>NextGaussian(double mean, double stdDev)</c> and
+        /// <c>NextEnumExcept(T exception1, T exception2)</c> both take two same-typed arguments and
+        /// neither is a range. The first version of this test matched on shape and reported both.
+        /// </para>
+        /// <para>
+        /// Scope is <see cref="IRandom"/> itself. The composed ranged draws in
+        /// <see cref="RandomExtensions"/> -- <c>NextVector2Int(min, max)</c>,
+        /// <c>NextVector3Int(min, max)</c>, <c>NextAngle(min, max)</c> -- throw on a collapsed range
+        /// too, and are tracked separately because naming their siblings collides with the existing
+        /// <c>NextVector2InRange(range, origin)</c>.
+        /// </para>
         /// </remarks>
-        [TestCase(3f, 3f, TestName = "NextFloatInRangeCollapsed")]
-        [TestCase(5f, 2f, TestName = "NextFloatInRangeInverted")]
-        [TestCase(0f, 0f, TestName = "NextFloatInRangeZero")]
-        [TestCase(-4f, -4f, TestName = "NextFloatInRangeNegative")]
-        [TestCase(1f, float.NaN, TestName = "NextFloatInRangeNotANumber")]
-        public void NextFloatInRangeAnswersTheLowBoundInsteadOfThrowing(float low, float high)
+        [Test]
+        public void EveryRangedDrawHasANonThrowingSibling()
         {
-            SystemRandom rng = new(7);
+            List<string> missing = new();
+            int ranged = 0;
+            foreach (MethodInfo strict in typeof(IRandom).GetMethods())
+            {
+                ParameterInfo[] parameters = strict.GetParameters();
+                if (
+                    parameters.Length != 2
+                    || !string.Equals(parameters[0].Name, "min", StringComparison.Ordinal)
+                    || !string.Equals(parameters[1].Name, "max", StringComparison.Ordinal)
+                    || parameters[0].ParameterType != parameters[1].ParameterType
+                    || parameters[0].ParameterType != strict.ReturnType
+                )
+                {
+                    continue;
+                }
 
-            Assert.AreEqual(low, rng.NextFloatInRange(low, high));
-            Assert.AreEqual(low, ((IRandom)null).NextFloatInRange(low, high));
+                ranged++;
+                string expected =
+                    strict.Name == nameof(IRandom.Next)
+                        ? "NextIntInRange"
+                        : strict.Name + "InRange";
+                MethodInfo sibling = typeof(RandomExtensions).GetMethod(
+                    expected,
+                    new[] { typeof(IRandom), strict.ReturnType, strict.ReturnType }
+                );
+                if (sibling == null)
+                {
+                    missing.Add($"{strict.ReturnType.Name} {strict.Name} -> {expected}");
+                }
+            }
+
+            Assert.AreEqual(
+                8,
+                ranged,
+                "the sweep must find every ranged draw; a different count means the predicate stopped matching"
+            );
+            CollectionAssert.IsEmpty(
+                missing,
+                "a ranged draw without a non-throwing sibling leaves an authored min/max pair able to kill a coroutine"
+            );
         }
 
-        [TestCase(3, 3, TestName = "NextIntInRangeCollapsed")]
-        [TestCase(5, 2, TestName = "NextIntInRangeInverted")]
-        [TestCase(0, 0, TestName = "NextIntInRangeZero")]
-        [TestCase(-4, -4, TestName = "NextIntInRangeNegative")]
-        [TestCase(int.MaxValue, int.MinValue, TestName = "NextIntInRangeExtremes")]
-        public void NextIntInRangeAnswersTheLowBoundInsteadOfThrowing(int low, int high)
+        /// <summary>
+        /// The empty range answers the low bound, for every type, however it is empty.
+        /// </summary>
+        [Test]
+        public void AnEmptyRangeAnswersTheLowBound()
         {
             SystemRandom rng = new(7);
 
-            Assert.AreEqual(low, rng.NextIntInRange(low, high));
-            Assert.AreEqual(low, ((IRandom)null).NextIntInRange(low, high));
+            Assert.AreEqual(3, rng.NextIntInRange(3, 3));
+            Assert.AreEqual(5, rng.NextIntInRange(5, 2));
+            Assert.AreEqual(-4, rng.NextIntInRange(-4, -4));
+            Assert.AreEqual(int.MaxValue, rng.NextIntInRange(int.MaxValue, int.MinValue));
+
+            Assert.AreEqual(3u, rng.NextUintInRange(3u, 3u));
+            Assert.AreEqual(5u, rng.NextUintInRange(5u, 2u));
+            Assert.AreEqual(uint.MaxValue, rng.NextUintInRange(uint.MaxValue, 0u));
+
+            Assert.AreEqual((short)3, rng.NextShortInRange(3, 3));
+            Assert.AreEqual((short)-4, rng.NextShortInRange(-4, -9));
+            Assert.AreEqual(short.MaxValue, rng.NextShortInRange(short.MaxValue, short.MinValue));
+
+            Assert.AreEqual((byte)3, rng.NextByteInRange(3, 3));
+            Assert.AreEqual((byte)9, rng.NextByteInRange(9, 4));
+            Assert.AreEqual(byte.MaxValue, rng.NextByteInRange(byte.MaxValue, 0));
+
+            Assert.AreEqual(3L, rng.NextLongInRange(3L, 3L));
+            Assert.AreEqual(5L, rng.NextLongInRange(5L, 2L));
+            Assert.AreEqual(long.MaxValue, rng.NextLongInRange(long.MaxValue, long.MinValue));
+
+            Assert.AreEqual(3ul, rng.NextUlongInRange(3ul, 3ul));
+            Assert.AreEqual(5ul, rng.NextUlongInRange(5ul, 2ul));
+            Assert.AreEqual(ulong.MaxValue, rng.NextUlongInRange(ulong.MaxValue, 0ul));
+
+            Assert.AreEqual(3f, rng.NextFloatInRange(3f, 3f));
+            Assert.AreEqual(5f, rng.NextFloatInRange(5f, 2f));
+            Assert.AreEqual(0f, rng.NextFloatInRange(0f, 0f));
+            Assert.AreEqual(-4f, rng.NextFloatInRange(-4f, -4f));
+
+            Assert.AreEqual(3d, rng.NextDoubleInRange(3d, 3d));
+            Assert.AreEqual(5d, rng.NextDoubleInRange(5d, 2d));
+            Assert.AreEqual(-4d, rng.NextDoubleInRange(-4d, -4d));
         }
 
-        [TestCase(3d, 3d, TestName = "NextDoubleInRangeCollapsed")]
-        [TestCase(5d, 2d, TestName = "NextDoubleInRangeInverted")]
-        [TestCase(0d, 0d, TestName = "NextDoubleInRangeZero")]
-        [TestCase(1d, double.NaN, TestName = "NextDoubleInRangeNotANumber")]
-        public void NextDoubleInRangeAnswersTheLowBoundInsteadOfThrowing(double low, double high)
+        /// <summary>
+        /// A NaN bound makes <c>high &lt;= low</c> false, so the strict overload would answer NaN
+        /// rather than raise. Only the floating-point siblings can hit this.
+        /// </summary>
+        [Test]
+        public void ANotANumberBoundAnswersTheLowBound()
         {
             SystemRandom rng = new(7);
 
-            Assert.AreEqual(low, rng.NextDoubleInRange(low, high));
-            Assert.AreEqual(low, ((IRandom)null).NextDoubleInRange(low, high));
+            Assert.AreEqual(1f, rng.NextFloatInRange(1f, float.NaN));
+            Assert.IsNaN(rng.NextFloatInRange(float.NaN, 5f));
+            Assert.AreEqual(1d, rng.NextDoubleInRange(1d, double.NaN));
+            Assert.IsNaN(rng.NextDoubleInRange(double.NaN, 5d));
+        }
+
+        /// <summary>
+        /// A generator that has not been wired up yet degrades to the authored minimum.
+        /// </summary>
+        [Test]
+        public void ANullGeneratorAnswersTheLowBound()
+        {
+            IRandom absent = null;
+
+            Assert.AreEqual(2, absent.NextIntInRange(2, 9));
+            Assert.AreEqual(2u, absent.NextUintInRange(2u, 9u));
+            Assert.AreEqual((short)2, absent.NextShortInRange(2, 9));
+            Assert.AreEqual((byte)2, absent.NextByteInRange(2, 9));
+            Assert.AreEqual(2L, absent.NextLongInRange(2L, 9L));
+            Assert.AreEqual(2ul, absent.NextUlongInRange(2ul, 9ul));
+            Assert.AreEqual(2f, absent.NextFloatInRange(2f, 9f));
+            Assert.AreEqual(2d, absent.NextDoubleInRange(2d, 9d));
         }
 
         /// <summary>
@@ -69,19 +169,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// where the strict one already worked.
         /// </summary>
         [Test]
-        public void AnInRangeDrawStaysInsideANonEmptyRange()
+        public void ANonEmptyRangeStillDrawsFromIt()
         {
             SystemRandom rng = new(11);
 
             for (int i = 0; i < 512; ++i)
             {
+                Assert.That(rng.NextIntInRange(2, 5), Is.InRange(2, 4));
+                Assert.That(rng.NextUintInRange(2u, 5u), Is.InRange(2u, 4u));
+                Assert.That(rng.NextShortInRange(2, 5), Is.InRange((short)2, (short)4));
+                Assert.That(rng.NextByteInRange(2, 5), Is.InRange((byte)2, (byte)4));
+                Assert.That(rng.NextLongInRange(2L, 5L), Is.InRange(2L, 4L));
+                Assert.That(rng.NextUlongInRange(2ul, 5ul), Is.InRange(2ul, 4ul));
+
                 float sampled = rng.NextFloatInRange(2f, 5f);
                 Assert.GreaterOrEqual(sampled, 2f);
                 Assert.Less(sampled, 5f);
-
-                int integral = rng.NextIntInRange(2, 5);
-                Assert.GreaterOrEqual(integral, 2);
-                Assert.Less(integral, 5);
 
                 double precise = rng.NextDoubleInRange(2d, 5d);
                 Assert.GreaterOrEqual(precise, 2d);
@@ -97,8 +200,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             SystemRandom rng = new(13);
 
-            Assert.Throws<ArgumentException>(() => rng.NextFloat(3f, 3f));
             Assert.Throws<ArgumentException>(() => rng.Next(3, 3));
+            Assert.Throws<ArgumentException>(() => rng.NextUint(3u, 3u));
+            Assert.Throws<ArgumentException>(() => rng.NextShort(3, 3));
+            Assert.Throws<ArgumentException>(() => rng.NextByte(3, 3));
+            Assert.Throws<ArgumentException>(() => rng.NextLong(3L, 3L));
+            Assert.Throws<ArgumentException>(() => rng.NextUlong(3ul, 3ul));
+            Assert.Throws<ArgumentException>(() => rng.NextFloat(3f, 3f));
             Assert.Throws<ArgumentException>(() => rng.NextDouble(3d, 3d));
         }
 
