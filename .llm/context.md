@@ -132,6 +132,16 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 
 ### Additional Technical Rules
 
+- **Never compare against a magic sentinel; test for the valid range.** `index != -1` becomes
+  `index >= 0` and `index == -1` becomes `index < 0`. The comparison then says what it means, and it
+  refuses a value that is invalid for a reason the sentinel does not cover. Swept to zero across
+  `Runtime/` and `Editor/` in session 220; owner review, PR #551.
+- **An auto-property's data is serialized under `<Name>k__BackingField`, not `Name`.** Any lookup
+  that resolves a member the author NAMED -- a `[WShowIf]` condition, a value source -- must try the
+  source name first and `SerializedMemberNames.BackingFieldFor(name)` second, or it silently falls
+  through to reading the live C# member and stops seeing un-applied Inspector edits. `[field: Attr]`
+  puts an attribute on that backing field, so `AttributeTargets.Field` does not exclude a serialized
+  property (#550).
 - When editing `.gitignore`, validate with `git check-ignore -v <path>` and run `pwsh -NoProfile -File scripts/lint-gitignore-docs.ps1`
 - When adding abbreviations, add them to `cspell.json` (see [cspell dictionary categories](#cspell-dictionary-quick-reference))
 - When introducing ANY new all-caps token or acronym in a skill/doc/script (lint error code, new abbreviation, new API name), add it to the correct cspell dictionary category before committing. `npm run agent:preflight` catches this before pre-commit; the `validate-lint-error-codes` contract enforces lint-error-code families permanently

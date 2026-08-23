@@ -326,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int separatorIndex = path.LastIndexOf('.');
-            string leaf = separatorIndex == -1 ? path : path.Substring(separatorIndex + 1);
+            string leaf = separatorIndex < 0 ? path : path.Substring(separatorIndex + 1);
             string backingLeaf = SerializedMemberNames.BackingFieldFor(leaf);
             if (string.Equals(leaf, backingLeaf, StringComparison.Ordinal))
             {
@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string backingPath =
-                separatorIndex == -1
+                separatorIndex < 0
                     ? backingLeaf
                     : path.Substring(0, separatorIndex + 1) + backingLeaf;
             return serializedObject.FindProperty(backingPath);
@@ -396,7 +396,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 int separatorIndex = propertyPath.LastIndexOf('.');
                 string siblingPath =
-                    separatorIndex == -1
+                    separatorIndex < 0
                         ? conditionField
                         : propertyPath.Substring(0, separatorIndex + 1) + conditionField;
                 resolvedProperty = FindPropertyOrBackingField(serializedObject, siblingPath);
@@ -794,10 +794,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     name = raw.Substring(0, bracket);
                     int cursor = bracket;
-                    while (cursor < raw.Length && (cursor = raw.IndexOf('[', cursor)) != -1)
+                    while (cursor < raw.Length && (cursor = raw.IndexOf('[', cursor)) >= 0)
                     {
                         int endBracket = raw.IndexOf(']', cursor + 1);
-                        if (endBracket == -1)
+                        if (endBracket < 0)
                         {
                             break;
                         }

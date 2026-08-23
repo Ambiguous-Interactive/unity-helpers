@@ -186,6 +186,7 @@
     "test:normalize-container-git-config": "bash scripts/tests/test-normalize-container-git-config.sh",
     "test:lint-dependabot": "pwsh -NoProfile -File scripts/tests/test-lint-dependabot.ps1 -VerboseOutput",
     "test:lint-duplicate-usings": "pwsh -NoProfile -File scripts/tests/test-lint-duplicate-usings.ps1 -VerboseOutput",
+    "test:lint-preserve-attributes": "pwsh -NoProfile -File scripts/tests/test-lint-preserve-attributes.ps1 -VerboseOutput",
     "test:lint-concurrent-cache-fill": "pwsh -NoProfile -File scripts/tests/test-lint-concurrent-cache-fill.ps1 -VerboseOutput",
     "test:lint-pwsh-invocations": "pwsh -NoProfile -File scripts/tests/test-lint-pwsh-invocations.ps1 -VerboseOutput",
     "test:lint-workflow-run-expression-length": "pwsh -NoProfile -File scripts/tests/test-lint-workflow-run-expression-length.ps1 -VerboseOutput",

@@ -4,10 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
-#else
-    using System.Collections.Generic;
 #endif
 
     /// <summary>
@@ -30,12 +30,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string BackingFieldPrefix = "<";
         private const string BackingFieldSuffix = ">k__BackingField";
 
-#if !SINGLE_THREADED
         // Held rather than written at the call site: a method group in argument position builds a
         // new delegate on every call, cache hits included, which is what WUH001 reports.
         private static readonly Func<string, string> BackingFieldNameFactory =
             BuildBackingFieldName;
 
+        // One call site for both, because DictionaryExtensions.GetOrAdd already covers
+        // IDictionary -- and dispatches to ConcurrentDictionary's own overload when that is what it
+        // is handed. Only the field's type needs the define.
+#if !SINGLE_THREADED
         private static readonly ConcurrentDictionary<string, string> BackingFieldNames = new(
             StringComparer.Ordinal
         );
@@ -64,17 +67,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return propertyName;
             }
 
-#if !SINGLE_THREADED
             return BackingFieldNames.GetOrAdd(propertyName, BackingFieldNameFactory);
-#else
-            if (!BackingFieldNames.TryGetValue(propertyName, out string cached))
-            {
-                cached = BuildBackingFieldName(propertyName);
-                BackingFieldNames[propertyName] = cached;
-            }
-
-            return cached;
-#endif
         }
 
         /// <summary>
@@ -96,6 +89,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="fieldName">Field name, possibly a backing field.</param>
         /// <param name="propertyName">The property name when one was recovered.</param>
         /// <returns><c>true</c> when <paramref name="fieldName"/> was a backing field.</returns>
+        /// <remarks>
+        /// The <c>Substring</c> below cannot throw, and the guard above is what makes that true
+        /// rather than the shape of the input: <see cref="IsBackingField"/> has already established
+        /// that the name starts with the prefix, ends with the suffix, and is STRICTLY longer than
+        /// the two combined -- so the offset is in range and the length is at least one. The length
+        /// test is the load-bearing one; without it <c>"&lt;&gt;k__BackingField"</c> would ask for a
+        /// zero-length name and anything shorter for a negative one.
+        /// </remarks>
         public static bool TryGetPropertyName(string fieldName, out string propertyName)
         {
             if (!IsBackingField(fieldName))

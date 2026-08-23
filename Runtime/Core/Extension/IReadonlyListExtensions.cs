@@ -668,7 +668,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (length == 0)
             {
-                if (startIndex != -1 || count != 0)
+                if (startIndex >= 0 || count != 0)
                 {
                     throw new ArgumentOutOfRangeException(nameof(startIndex));
                 }

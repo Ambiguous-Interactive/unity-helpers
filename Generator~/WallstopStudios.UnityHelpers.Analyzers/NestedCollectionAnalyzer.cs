@@ -51,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static void AnalyzeField(SymbolAnalysisContext context)
         {
             IFieldSymbol field = (IFieldSymbol)context.Symbol;
-            if (!IsUnitySerializedField(field))
+            if (!IsUnitySerializedField(field, containerIsSerialized: false))
             {
                 return;
             }
@@ -96,13 +96,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </summary>
         /// <remarks>
         /// An explicit <c>[SerializeField]</c> is decisive wherever it appears. A public field is
-        /// only decisive on a type Unity itself instantiates, because a public field on a plain
-        /// class may never reach Unity's serializer -- and a diagnostic that fires on an ordinary
-        /// algorithm's <c>public List&lt;List&lt;int&gt;&gt; grid</c> would be simply wrong. That
-        /// gate trades a false positive for a false negative, which is the correct direction for a
-        /// rule that is on by default.
+        /// decisive only once Unity is known to be serializing the type that holds it, because a
+        /// public field on a plain class may never reach Unity's serializer -- and a diagnostic
+        /// that fires on an ordinary algorithm's <c>public List&lt;List&lt;int&gt;&gt; grid</c>
+        /// would be simply wrong.
+        /// <para>
+        /// <paramref name="containerIsSerialized"/> is what carries that knowledge down the walk.
+        /// At a top-level declaration it is false and the containing type must derive from
+        /// <c>UnityEngine.Object</c>; once the walk has stepped into a <c>[Serializable]</c> type
+        /// reached from a serialized field, Unity serializes that type's public fields too and the
+        /// flag says so. Without it the analyzer silently skipped every public field of a nested
+        /// DTO, which is the ordinary way to write one.
+        /// </para>
         /// </remarks>
-        private static bool IsUnitySerializedField(IFieldSymbol field)
+        private static bool IsUnitySerializedField(IFieldSymbol field, bool containerIsSerialized)
         {
             if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared)
             {
@@ -129,8 +136,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return true;
             }
 
-            return field.DeclaredAccessibility == Accessibility.Public
-                && DerivesFromUnityObject(field.ContainingType);
+            if (field.DeclaredAccessibility != Accessibility.Public)
+            {
+                return false;
+            }
+
+            // A public field is serialized wherever Unity is already serializing the type that
+            // holds it. At the top level that has to be established -- hence the UnityEngine.Object
+            // test -- but inside a [Serializable] type the walk has already established it, and
+            // requiring the test again there skipped every public field of a nested DTO.
+            return containerIsSerialized || DerivesFromUnityObject(field.ContainingType);
         }
 
         /// <summary>
@@ -192,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     {
                         if (
                             !(member is IFieldSymbol candidate)
-                            || !IsUnitySerializedField(candidate)
+                            || !IsUnitySerializedField(candidate, containerIsSerialized: true)
                         )
                         {
                             continue;

@@ -306,8 +306,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         _isDraggingToSelectSprites = false;
 
                         if (
-                            _spriteSelectionDragStartIndex != -1
-                            && _spriteSelectionDragCurrentIndex != -1
+                            _spriteSelectionDragStartIndex >= 0
+                            && _spriteSelectionDragCurrentIndex >= 0
                         )
                         {
                             int start = Mathf.Min(
@@ -576,8 +576,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             if (
                 !_isDraggingToSelectSprites
-                || _spriteSelectionDragStartIndex == -1
-                || _spriteSelectionDragCurrentIndex == -1
+                || _spriteSelectionDragStartIndex < 0
+                || _spriteSelectionDragCurrentIndex < 0
             )
             {
                 ClearSpriteSelectionHighlight();

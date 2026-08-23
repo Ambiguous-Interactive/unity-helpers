@@ -71,6 +71,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(name, recovered, "a name that is not a backing field comes back as-is");
         }
 
+        /// <summary>
+        /// No input reaches the substring with an out-of-range offset or length.
+        /// </summary>
+        /// <remarks>
+        /// The recovery does arithmetic on two lengths, so the answer to "are those indices
+        /// absolutely valid" has to be a test rather than a reading. The names below are the ones
+        /// that get the arithmetic closest to the edge: the empty property name, a name one
+        /// character shorter than the affixes it would need, and the affixes overlapping.
+        /// </remarks>
+        [TestCase("<>k__BackingField", TestName = "EmptyPropertyName")]
+        [TestCase("<k__BackingField", TestName = "PrefixRunsIntoSuffix")]
+        [TestCase(">k__BackingField", TestName = "SuffixAlone")]
+        [TestCase("<", TestName = "PrefixAlone")]
+        [TestCase("<>", TestName = "AffixesOnly")]
+        [TestCase("k__BackingField", TestName = "SuffixWithoutBrackets")]
+        [TestCase("<<A>k__BackingField>k__BackingField", TestName = "DoublyWrapped")]
+        [TestCase("<A>k__BackingField<B>k__BackingField", TestName = "TwoConcatenated")]
+        public void NoNameMakesTheRecoveryThrow(string name)
+        {
+            string recovered = null;
+            Assert.DoesNotThrow(() =>
+                SerializedMemberNames.TryGetPropertyName(name, out recovered)
+            );
+            Assert.DoesNotThrow(() => SerializedMemberNames.IsBackingField(name));
+            Assert.DoesNotThrow(() => SerializedMemberNames.BackingFieldFor(name));
+
+            if (SerializedMemberNames.IsBackingField(name))
+            {
+                Assert.IsTrue(
+                    !string.IsNullOrEmpty(recovered),
+                    "a name accepted as a backing field must yield a non-empty property name"
+                );
+            }
+        }
+
+        /// <summary>
+        /// A name one character too short is refused, which is what keeps the arithmetic in range.
+        /// </summary>
+        [Test]
+        public void TheShortestAcceptedNameIsExactlyOneCharacterOfProperty()
+        {
+            const string tooShort = "<>k__BackingField";
+            string shortest = SerializedMemberNames.BackingFieldFor("A");
+
+            Assert.AreEqual(
+                tooShort.Length + 1,
+                shortest.Length,
+                "one character of property name is one character longer than the affixes alone"
+            );
+            Assert.IsFalse(
+                SerializedMemberNames.IsBackingField(tooShort),
+                "a zero-length property name is not a backing field"
+            );
+            Assert.IsTrue(SerializedMemberNames.IsBackingField(shortest));
+            Assert.IsTrue(SerializedMemberNames.TryGetPropertyName(shortest, out string recovered));
+            Assert.AreEqual("A", recovered);
+        }
+
         [Test]
         public void TranslatingIsIdempotentAndRoundTrips()
         {

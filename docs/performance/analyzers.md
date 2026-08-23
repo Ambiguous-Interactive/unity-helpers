@@ -99,12 +99,16 @@ ships, any it adds later, and a wrapper of your own, with no list to keep in syn
 Any field Unity will serialize:
 
 - one carrying `[SerializeField]`, wherever it appears, or
-- a public instance field on a type deriving from `UnityEngine.Object`.
+- a public instance field on a type deriving from `UnityEngine.Object`, or
+- a public instance field of a `[Serializable]` type the walk reached from one of those. A DTO
+  written the ordinary way — `[Serializable]`, public fields, no `[SerializeField]` anywhere — is
+  exactly what a dictionary value usually is, and Unity serializes its public fields.
 
 ### What it deliberately does not report
 
-- A public field on a plain class that has no `[SerializeField]`. It may never reach Unity's
-  serializer at all, and an ordinary algorithm's `List<List<int>>` is not a serialization bug.
+- A public field on a plain class that has no `[SerializeField]`, where nothing has established
+  that Unity serializes the containing type. It may never reach Unity's serializer at all, and an
+  ordinary algorithm's `List<List<int>>` is not a serialization bug.
 - Anything marked `[NonSerialized]`, `static`, or `const`.
 - A collection of `UnityEngine.Object` references. Those are serialized as references to a separate
   asset, so the nesting never happens.

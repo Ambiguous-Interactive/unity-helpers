@@ -355,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
                 WButtonParameterMetadata metadata = new(parameter, index);
                 parameters[index] = metadata;
-                if (metadata.IsCancellationToken && tokenIndex == -1)
+                if (metadata.IsCancellationToken && tokenIndex < 0)
                 {
                     tokenIndex = index;
                 }

@@ -23,7 +23,11 @@ const fs = require("fs");
 const path = require("path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const RUNTIME_ROOT = path.join(REPO_ROOT, "Runtime");
+// Overridable so the self-test can point the scan at a fixture tree. Nothing in CI sets it, so the
+// default is the only path that ships.
+const RUNTIME_ROOT = process.env.PRESERVE_ATTRIBUTES_ROOT
+  ? path.resolve(process.env.PRESERVE_ATTRIBUTES_ROOT)
+  : path.join(REPO_ROOT, "Runtime");
 
 /**
  * Attribute types that are read reflectively but are NOT ours to annotate, with the reason.
@@ -94,25 +98,83 @@ function findDeclarations(files) {
   const declarations = new Map();
   for (const file of files) {
     const text = fs.readFileSync(file, "utf8");
-    const pattern =
-      /((?:^[ \t]*\[[^\]]*\][ \t]*\r?\n)*)^[ \t]*(?:public|internal)[^\r\n]*?\bclass\s+([A-Za-z0-9_]+Attribute)\b/gm;
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const declarationLine = text.slice(
-        match.index,
-        text.indexOf("\n", match.index + match[0].length)
-      );
+    const lines = text.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const declaration =
+        /^[ \t]*(?:public|internal)[^\r\n]*?\bclass\s+([A-Za-z0-9_]+Attribute)\b/.exec(
+          lines[index]
+        );
+      if (declaration === null) {
+        continue;
+      }
+
       const baseMatch = /:\s*([A-Za-z0-9_]+)/.exec(
-        declarationLine.slice(match[0].length - match[2].length)
+        lines[index].slice(lines[index].indexOf(declaration[1]) + declaration[1].length)
       );
-      declarations.set(match[2], {
+      declarations.set(declaration[1], {
         file: path.relative(REPO_ROOT, file),
-        preserved: /\[\s*Preserve\s*(?:\(|\])/.test(match[1]),
+        preserved: attributeBlockAbove(lines, index).some((line) =>
+          /\[\s*Preserve\s*(?:\(|\])/.test(line)
+        ),
         baseType: baseMatch ? baseMatch[1] : null
       });
     }
   }
   return declarations;
+}
+
+/**
+ * The attribute block immediately above `index`, read upwards.
+ *
+ * A run of single-line `[...]` lines is NOT the shape to match, and assuming it was is how this
+ * check reported a missing [Preserve] on a declaration that carries one. Two ordinary things break
+ * that run: a comment between two attributes, and an attribute csharpier has wrapped across several
+ * lines. Both are read here, along with blank lines, so the block is what a compiler would consider
+ * to apply to the declaration.
+ */
+function attributeBlockAbove(lines, index) {
+  const block = [];
+  let depth = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const line = lines[cursor];
+    const trimmed = line.trim();
+
+    if (depth > 0) {
+      block.push(line);
+      depth += countUnescaped(line, "]") - countUnescaped(line, "[");
+      continue;
+    }
+
+    if (
+      trimmed === "" ||
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("/*")
+    ) {
+      continue;
+    }
+
+    if (trimmed.endsWith("]")) {
+      block.push(line);
+      const closing = countUnescaped(line, "]");
+      const opening = countUnescaped(line, "[");
+      depth = closing - opening;
+      continue;
+    }
+
+    break;
+  }
+  return block;
+}
+
+function countUnescaped(line, character) {
+  let count = 0;
+  for (const candidate of line) {
+    if (candidate === character) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function main() {

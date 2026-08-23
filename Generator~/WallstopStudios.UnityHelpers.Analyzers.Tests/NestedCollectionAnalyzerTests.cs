@@ -182,6 +182,64 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         }
 
         /// <summary>
+        /// A public field of a nested <c>[Serializable]</c> type is serialized, and must be walked.
+        /// </summary>
+        /// <remarks>
+        /// A DTO written the ordinary way -- <c>[Serializable]</c> with public fields and no
+        /// <c>[SerializeField]</c> anywhere -- is exactly what a dictionary value or a list element
+        /// usually is. Gating public fields on "the containing type derives from UnityEngine.Object"
+        /// is right at a top-level declaration and wrong one step in, where the walk has already
+        /// established that Unity is serializing the type.
+        /// </remarks>
+        [Test]
+        public void APublicFieldOfANestedSerializableTypeIsReported()
+        {
+            Diagnostic reported = Single(
+                @"[Serializable] public sealed class Dto { public List<List<int>> rows; }
+                  [SerializeField] private Dto _dto;"
+            );
+
+            Assert.AreEqual(DiagnosticId, reported.Id);
+            StringAssert.Contains("_dto", reported.GetMessage());
+        }
+
+        [TestCase(
+            "SerializableDictionary<string, Dto> _byName;",
+            TestName = "ThroughADictionaryValue"
+        )]
+        [TestCase("SerializableList<Dto> _all;", TestName = "ThroughTheListWrapper")]
+        [TestCase("Dto[] _many;", TestName = "ThroughAnArray")]
+        [TestCase("List<Dto> _list;", TestName = "ThroughAList")]
+        public void NestingInsideAPublicFieldOfADtoIsFoundThroughEveryContainer(string declaration)
+        {
+            Diagnostic reported = Single(
+                @"[Serializable] public sealed class Dto { public List<List<int>> rows; }
+                  [SerializeField] private " + declaration
+            );
+
+            Assert.AreEqual(DiagnosticId, reported.Id);
+        }
+
+        /// <summary>
+        /// The relaxation must not leak back out to a top-level public field on a plain class.
+        /// </summary>
+        [Test]
+        public void APublicFieldOfAPlainClassIsStillNotReported()
+        {
+            Assert.IsEmpty(
+                AnalyzeInPlainClass("public List<List<int>> Grid;"),
+                "a plain class's public field may never reach Unity's serializer"
+            );
+            Assert.IsEmpty(
+                Analyze(
+                    @"[Serializable] public sealed class Dto { public List<List<int>> rows; }
+                      [NonSerialized] public Dto Skipped;"
+                ),
+                "and [NonSerialized] still wins, one level in or not"
+            );
+        }
+
+        /// <summary>
         /// A type that contains itself must not send the walk round forever.
         /// </summary>
         [Test]

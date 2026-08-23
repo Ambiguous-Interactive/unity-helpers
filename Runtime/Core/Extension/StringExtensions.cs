@@ -1372,7 +1372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int count = 0;
             int index = 0;
 
-            while ((index = input.IndexOf(substring, index, StringComparison.Ordinal)) != -1)
+            while ((index = input.IndexOf(substring, index, StringComparison.Ordinal)) >= 0)
             {
                 ++count;
                 index += substring.Length;

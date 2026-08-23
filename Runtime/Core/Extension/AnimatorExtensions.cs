@@ -60,9 +60,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 TriggerHashesByController.Add(controller, triggerHashes);
             }
 
-            for (int i = 0; i < triggerHashes.Length; ++i)
+            foreach (int triggerHash in triggerHashes)
             {
-                animator.ResetTrigger(triggerHashes[i]);
+                animator.ResetTrigger(triggerHash);
             }
         }
 
@@ -70,9 +70,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             AnimatorControllerParameter[] parameters = animator.parameters;
             int triggerCount = 0;
-            for (int i = 0; i < parameters.Length; ++i)
+            foreach (AnimatorControllerParameter parameter in parameters)
             {
-                if (parameters[i].type == AnimatorControllerParameterType.Trigger)
+                if (parameter.type == AnimatorControllerParameterType.Trigger)
                 {
                     triggerCount++;
                 }
@@ -85,9 +85,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int[] hashes = new int[triggerCount];
             int next = 0;
-            for (int i = 0; i < parameters.Length; ++i)
+            foreach (AnimatorControllerParameter parameter in parameters)
             {
-                AnimatorControllerParameter parameter = parameters[i];
                 if (parameter.type == AnimatorControllerParameterType.Trigger)
                 {
                     hashes[next++] = parameter.nameHash;

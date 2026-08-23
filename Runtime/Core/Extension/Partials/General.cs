@@ -40,8 +40,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private const string DontDestroyOnLoadSceneName = "DontDestroyOnLoad";
 
+        /// <summary>
+        /// How many scenes can answer from the negative cache before it starts recycling entries.
+        /// </summary>
+        /// <remarks>
+        /// Only consulted before any DontDestroyOnLoad object has been seen; after that the
+        /// positive handle answers everything. Four covers an additive main-plus-level-plus-UI
+        /// layout without recycling, and a linear scan of four ints is cheaper than a hash.
+        /// </remarks>
+        private const int KnownSceneHandleCapacity = 4;
+
         private static int _dontDestroyOnLoadSceneHandle;
-        private static int _sceneHandleKnownNotDontDestroyOnLoad;
+        private static readonly int[] SceneHandlesKnownNotDontDestroyOnLoad = new int[
+            KnownSceneHandleCapacity
+        ];
+        private static int _nextKnownSceneHandleSlot;
 
         /// <summary>
         /// Determines if a GameObject is in the DontDestroyOnLoad scene.
@@ -50,8 +63,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Allocation-free once the scene has been seen. Reading <c>Scene.name</c> marshals a fresh
         /// managed string out of native memory on every call, and this predicate reads cheap enough
         /// to end up in <c>Update</c>, so the answer is cached against the scene's handle -- a value
-        /// type whose comparison costs nothing. The name is consulted only for a handle neither
-        /// cache has seen.
+        /// type whose comparison costs nothing.
+        /// <para>
+        /// The DontDestroyOnLoad scene is unique and its handle is stable for the session, so once
+        /// that handle is known it answers for every scene at once and nothing else is consulted.
+        /// Until then -- in a game that has no persistent object, or before it is created -- a small
+        /// set of handles already known NOT to be it does the same job, so additively loaded scenes
+        /// do not take turns evicting each other.
+        /// </para>
         /// </remarks>
         public static bool IsDontDestroyOnLoad(this GameObject gameObjectToCheck)
         {
@@ -62,16 +81,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Scene scene = gameObjectToCheck.scene;
             int handle = scene.handle;
+
+            int dontDestroyOnLoadHandle = _dontDestroyOnLoadSceneHandle;
+            if (dontDestroyOnLoadHandle != 0)
+            {
+                return handle == dontDestroyOnLoadHandle;
+            }
+
             if (handle != 0)
             {
-                if (handle == _dontDestroyOnLoadSceneHandle)
+                foreach (int known in SceneHandlesKnownNotDontDestroyOnLoad)
                 {
-                    return true;
-                }
-
-                if (handle == _sceneHandleKnownNotDontDestroyOnLoad)
-                {
-                    return false;
+                    if (known == handle)
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -81,16 +105,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 StringComparison.Ordinal
             );
 
-            if (handle != 0)
+            if (handle == 0)
             {
-                if (isDontDestroyOnLoad)
-                {
-                    _dontDestroyOnLoadSceneHandle = handle;
-                }
-                else
-                {
-                    _sceneHandleKnownNotDontDestroyOnLoad = handle;
-                }
+                return isDontDestroyOnLoad;
+            }
+
+            if (isDontDestroyOnLoad)
+            {
+                _dontDestroyOnLoadSceneHandle = handle;
+            }
+            else
+            {
+                SceneHandlesKnownNotDontDestroyOnLoad[_nextKnownSceneHandleSlot] = handle;
+                _nextKnownSceneHandleSlot =
+                    (_nextKnownSceneHandleSlot + 1) % KnownSceneHandleCapacity;
             }
 
             return isDontDestroyOnLoad;
@@ -106,7 +134,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static void ResetSceneResidencyCache()
         {
             _dontDestroyOnLoadSceneHandle = 0;
-            _sceneHandleKnownNotDontDestroyOnLoad = 0;
+            _nextKnownSceneHandleSlot = 0;
+            Array.Clear(
+                SceneHandlesKnownNotDontDestroyOnLoad,
+                0,
+                SceneHandlesKnownNotDontDestroyOnLoad.Length
+            );
         }
     }
 }

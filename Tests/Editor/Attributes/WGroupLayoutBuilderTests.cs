@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils.WGroup;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -42,6 +43,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             UnityHelpersSettings.instance.WGroupFoldoutsStartCollapsed =
                 _previousWGroupStartCollapsed;
             base.TearDown();
+        }
+
+        /// <summary>
+        /// Grouping declared through <c>[field:]</c> on serialized auto-properties.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="WGroupAttribute"/> targets fields only, and this is why that is not the
+        /// restriction it looks like: <c>[field: WGroup(...)]</c> puts the attribute on the
+        /// compiler-generated backing field, which is a field, and is the member Unity serializes.
+        /// So a property whose data is serialized groups exactly like a field, and a property whose
+        /// data is not serialized -- which the layout has no path to draw -- is refused at compile
+        /// time instead of silently doing nothing (#550).
+        /// <para>
+        /// Mirrors <see cref="InfiniteAutoIncludeTerminatesAtEndAttribute"/> exactly, one attribute
+        /// target over, so a difference here is a difference in the target and not in the setup.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void GroupingWorksThroughABackingFieldAttribute()
+        {
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0
+            );
+
+            BackingFieldGroupAsset asset = CreateScriptableObject<BackingFieldGroupAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+
+            SerializedProperty scriptProperty = serializedObject.FindProperty("m_Script");
+            string scriptPath = scriptProperty != null ? scriptProperty.propertyPath : null;
+
+            WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, scriptPath);
+
+            Assert.IsTrue(
+                layout.TryGetGroup("Stats", out WGroupDefinition statsGroup),
+                "a group declared with [field: WGroup] must exist"
+            );
+            Assert.That(
+                statsGroup.PropertyPaths,
+                Is.EqualTo(
+                    new[]
+                    {
+                        SerializedMemberNames.BackingFieldFor(
+                            nameof(BackingFieldGroupAsset.Primary)
+                        ),
+                        SerializedMemberNames.BackingFieldFor(
+                            nameof(BackingFieldGroupAsset.Secondary)
+                        ),
+                        SerializedMemberNames.BackingFieldFor(
+                            nameof(BackingFieldGroupAsset.Tertiary)
+                        ),
+                    }
+                ),
+                "the group must hold the serialized paths, which are the backing-field names"
+            );
         }
 
         [Test]
