@@ -76,8 +76,21 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
                 return Fail($"Unknown generator '{generatorName}'. Use --list for exact names.");
             }
 
+            bool sixtyFourBit = false;
+            if (TryOption(args, "--width", out string widthText))
+            {
+                if (string.Equals(widthText, "64", StringComparison.Ordinal))
+                {
+                    sixtyFourBit = true;
+                }
+                else if (!string.Equals(widthText, "32", StringComparison.Ordinal))
+                {
+                    return Fail($"Invalid --width '{widthText}'. Expected 32 or 64.");
+                }
+            }
+
             using Stream destination = Console.OpenStandardOutput();
-            Write(random, byteCount, destination);
+            Write(random, byteCount, sixtyFourBit, destination);
             return 0;
         }
 
@@ -149,9 +162,19 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
             }
         }
 
-        private static void Write(IRandom random, long byteCount, Stream destination)
+        // The 64-bit width exists because NextUlong is not NextUint rearranged for every generator.
+        // Five of them answer it from one raw 64-bit word, so half of that word reaches a caller only
+        // through NextDouble and NextLong -- bits no 32-bit stream ever carries. Feed this to
+        // `RNG_test stdin64`.
+        private static void Write(
+            IRandom random,
+            long byteCount,
+            bool sixtyFourBit,
+            Stream destination
+        )
         {
             byte[] buffer = new byte[OutputBufferSize];
+            int sampleWidth = sixtyFourBit ? sizeof(ulong) : sizeof(uint);
             long remaining = byteCount;
             while (0 < remaining)
             {
@@ -159,8 +182,8 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
                 int offset = 0;
                 while (offset < count)
                 {
-                    uint sample = random.NextUint();
-                    int sampleBytes = Math.Min(sizeof(uint), count - offset);
+                    ulong sample = sixtyFourBit ? random.NextUlong() : random.NextUint();
+                    int sampleBytes = Math.Min(sampleWidth, count - offset);
                     for (int index = 0; index < sampleBytes; index++)
                     {
                         buffer[offset + index] = (byte)(sample >> (index * 8));

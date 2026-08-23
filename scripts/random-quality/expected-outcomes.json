@@ -125,11 +125,10 @@
     },
     {
       "name": "XoroShiroRandom",
-      "quality": "Fair",
-      "expected": "fail",
-      "failsBy": "16MB",
-      "firstFailingTest": "[Low1/32]BRank(12):256(1)",
-      "reason": "Expected-failure control. xoroshiro128+ low 32 bits are linear: bit 0 has linear complexity exactly 128, which the binary rank test detects overwhelmingly by 16MB."
+      "quality": "Good",
+      "expected": "pass",
+      "cleanThrough": "8GB",
+      "reason": "xoroshiro128+ returning the high 32 bits; clean through 8GB with no anomalies. It was an expected-failure control while it returned the LOW half, whose bit 0 has linear complexity exactly 128 and which fails [Low1/32]BRank(12):256(1) by 16MB. Both halves of the same algorithm were measured against this battery, so this pass is paired with the failure it replaced rather than standing alone."
     },
     {
       "name": "XorShiftRandom",

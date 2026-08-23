@@ -34,9 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <para>Cons:</para>
     /// <list type="bullet">
     /// <item><description>Not cryptographically secure.</description></item>
-    /// <item><description>Bit 0 of the returned value satisfies a linear recurrence of order 128 over GF(2), so
-    /// <see cref="AbstractRandom.NextBool"/> and power-of-two masks are predictable from 128 observations. Prefer
-    /// <see cref="Xoshiro128StarStar"/> or <see cref="PcgRandom"/> where single bits matter.</description></item>
+    /// <item><description>The 64-bit word this generator computes has weak low bits, so a 64-bit draw costs two
+    /// state advances rather than one. Prefer <see cref="Xoshiro256StarStar"/> for
+    /// <see cref="AbstractRandom.NextUlong()"/>- or <see cref="AbstractRandom.NextDouble"/>-heavy work.</description></item>
     /// </list>
     /// <para>When to use:</para>
     /// <list type="bullet">
@@ -64,8 +64,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </code>
     /// </example>
     [RandomGeneratorMetadata(
-        RandomQuality.Fair,
-        "xoroshiro128+, returning the low 32 bits -- the half its authors document as linear. Measured: bit 0 has linear complexity exactly 128, so NextBool is predictable from 128 draws. Prefer Xoshiro128StarStar or PcgRandom where single bits matter.",
+        RandomQuality.Good,
+        "xoroshiro128+, returning the high 32 bits -- the half its authors recommend. The discarded low half is linear (bit 0 has linear complexity exactly 128); no output bit of the returned half is. A 64-bit draw costs two state advances, because a + scrambler has no strong 64-bit word to return.",
         "Blackman & Vigna 2018",
         "https://prng.di.unimi.it/xoroshiro128plus.c"
     )]
@@ -144,7 +144,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _s0 = Rotl(s0, 24) ^ s1 ^ (s1 << 16);
                 _s1 = Rotl(s1, 37);
 
-                return (uint)result;
+                // The high half. xoroshiro128+ carries its weakness in the LOW bits -- bit 0 is a pure
+                // GF(2) recurrence of order 128 -- and there is no scrambled 64-bit word to override
+                // NextUlong with, so the strong half is the whole fix.
+                return (uint)(result >> 32);
             }
         }
 

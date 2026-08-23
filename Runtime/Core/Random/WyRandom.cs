@@ -100,8 +100,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
+                return (uint)NextWord();
+            }
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
                 _state += Prime0;
-                return (uint)Mum(_state ^ Prime1, _state);
+                return Mum(_state ^ Prime1, _state);
             }
         }
 

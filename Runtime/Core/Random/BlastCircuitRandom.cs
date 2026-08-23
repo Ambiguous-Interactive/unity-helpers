@@ -135,6 +135,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
+                return (uint)NextWord();
+            }
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
                 ulong mix = _a ^ _b;
 
                 _a += Increment;
@@ -142,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _c = _d;
                 _d = RotateLeft(_d, 21) + mix;
 
-                return (uint)mix;
+                return mix;
             }
         }
 

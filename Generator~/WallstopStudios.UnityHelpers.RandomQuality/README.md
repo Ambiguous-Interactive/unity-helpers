@@ -13,6 +13,15 @@ dotnet run --project Generator~/WallstopStudios.UnityHelpers.RandomQuality \
   | RNG_test stdin32
 ```
 
+`--width 64` emits `NextUlong()` draws for `RNG_test stdin64` instead of `NextUint()` draws for
+`stdin32`. It exists because `NextUlong` is not `NextUint` rearranged on every generator:
+`BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar` answer it from one
+raw 64-bit word, so half of that word reaches a caller only through `NextDouble` and `NextLong` and
+appears in no 32-bit stream. The scheduled workflow and
+[`expected-outcomes.json`](../../scripts/random-quality/expected-outcomes.json) cover the 32-bit
+width only; the 64-bit width is a manual instrument, tracked on
+[#544](https://github.com/Ambiguous-Interactive/unity-helpers/issues/544).
+
 Use `--list` for the explicit generator inventory. `UnityRandom` is deliberately absent because its
 state belongs to a live Unity player; the standalone host cannot reproduce that engine-owned stream.
 `NativePcgRandom` is deliberately absent because it is a Unity-native value type rather than an

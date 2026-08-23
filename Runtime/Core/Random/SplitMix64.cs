@@ -8,6 +8,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
+    using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using ProtoBuf;
@@ -96,6 +97,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
+                return (uint)NextWord();
+            }
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
                 _state += 0x9E3779B97F4A7C15UL;
 
                 ulong z = _state;
@@ -103,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
                 z ^= z >> 31;
 
-                return (uint)z;
+                return z;
             }
         }
 

@@ -187,6 +187,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override ulong NextUlong()
         {
+            return NextWord();
+        }
+
+        public override uint NextUint()
+        {
+            unchecked
+            {
+                return (uint)(NextWord() >> 32);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
             unchecked
             {
                 ulong result = Rotl(_s1 * 5UL, 7) * 9UL;
@@ -200,14 +214,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _s3 = Rotl(_s3, 45);
 
                 return result;
-            }
-        }
-
-        public override uint NextUint()
-        {
-            unchecked
-            {
-                return (uint)(NextUlong() >> 32);
             }
         }
 

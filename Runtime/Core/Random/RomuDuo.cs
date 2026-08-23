@@ -127,10 +127,24 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
+                return (uint)NextWord();
+            }
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
                 ulong xp = _x;
                 _x = 15241094284759029579UL * _y;
                 _y = Rol64(_y, 27) + xp;
-                return (uint)xp;
+                return xp;
             }
         }
 

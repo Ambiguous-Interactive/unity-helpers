@@ -92,7 +92,7 @@ All generators implement the `IRandom` interface:
 | `PcgRandom`                   | Fast            | Excellent    | General purpose, seeded generation                            |
 | `FlurryBurstRandom`           | Fast            | Excellent    | All-around alternative to PCG                                 |
 | `IllusionFlow`                | Fast            | Excellent    | Balanced speed and quality                                    |
-| `XoroShiroRandom`             | Fast            | Fair         | Bulk placement; bit 0 is linear, so avoid `NextBool`          |
+| `XoroShiroRandom`             | Fast            | Good         | Bulk placement, shuffles, procedural noise                    |
 | `RomuDuo`                     | Fast            | Good         | Alternative to PCG                                            |
 | `Xoshiro128StarStar`          | Not benchmarked | Excellent    | `NextBool`/low-bit masks; WebGL and other 32-bit targets      |
 | `Xoshiro256StarStar`          | Not benchmarked | Excellent    | `NextDouble`/`NextUlong`-heavy work (one advance per 64 bits) |
@@ -110,8 +110,21 @@ All generators implement the `IRandom` interface:
 harness yet; their speed rows fill in the next time
 [Random Performance](../../performance/random-performance.md) is regenerated. Both are rated
 `Excellent`: the `**` scrambler leaves no weak output bit, so unlike the `+` scramblers they are
-safe for `NextBool` and low-bit masks. `Xoshiro256StarStar` is the only generator here that
-overrides `NextUlong`, costing one state advance per 64-bit draw instead of two.
+safe for `NextBool` and low-bit masks.
+
+### One state advance per 64-bit draw
+
+`NextUlong()`, and therefore `NextLong()`, `NextDouble()` and `NextUlong(max)`, used to cost **two**
+state advances on every generator: the shared base class built a 64-bit value out of two 32-bit
+draws. `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar` each
+compute a whole 64-bit word internally, so they now answer a 64-bit draw with one advance and return
+that word directly -- measured at **2.49x** on Unity 6000.4.6f1 (Mono), 1.32 ns against 3.28 ns.
+
+`XoroShiroRandom` deliberately does not: xoroshiro128+ is a `+` scrambler with no strong 64-bit word
+to hand back, so it keeps composing a 64-bit draw out of two strong halves.
+
+A generator that answers 64-bit draws in one advance produces a **different sequence** for the same
+seed than 3.5.1 did. See [Seeded streams that moved](#seeded-streams-that-moved).
 
 For detailed benchmarks, see [Random Performance](../../performance/random-performance.md).
 
@@ -136,6 +149,22 @@ for (int i = 0; i < 10; i++)
 // Different seed = different sequence
 PcgRandom different = new PcgRandom(seed: 67890);
 ```
+
+### Seeded streams that moved
+
+Reproducibility is a promise about a _given version_. Two corrections in this release change what
+some generators return for a seed they were already given, so a replay, a saved procedural world or
+a golden test recorded under 3.5.1 will not reproduce with them:
+
+| generator                                                 | what moved                                              | why                                                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `XoroShiroRandom`                                         | **every** draw                                          | It returned the linear low half of its word and now returns the strong high half.                                   |
+| `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` | `NextUlong`, `NextLong`, `NextDouble`, `NextUlong(max)` | One state advance per 64-bit draw instead of two. `NextUint`, `Next`, `NextBool` and `NextFloat` are **unchanged**. |
+| `Xoshiro256StarStar`                                      | nothing                                                 | Added in this same unreleased cycle.                                                                                |
+
+Every other generator is untouched. If you need the old stream, pin the package version that
+produced it -- a save format that must survive a generator change should record the drawn values, or
+the generator's `InternalState`, rather than a seed.
 
 ---
 

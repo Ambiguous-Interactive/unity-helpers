@@ -33,7 +33,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const int Dimension = 192;
         private const int WordsPerRow = Dimension / 64;
-        private const int OutputBitCount = 32;
+        private const int UintBitCount = 32;
+        private const int UlongBitCount = 64;
 
         // Any value strictly between the worst non-linear generator (185) and the best linear one (128)
         // separates the two populations; this sits in the middle of that band.
@@ -50,11 +51,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         // the worst plane measures rank 189 against this fixture's 160 threshold. Its rating stays Poor,
         // because linearity was never the reason for it: the period is 1024 draws, and PractRand 0.95
         // fails it at 8KB.
+        //
+        // XoroShiroRandom left for a different reason: the linear half is still there, it is simply not
+        // returned any more. xoroshiro128+ computes a 64-bit word whose bit 0 is a GF(2) recurrence of
+        // order 128, and the generator used to return the low half of it; it now returns the high half,
+        // which is the half its authors recommend and which this fixture measures as non-linear.
         private static readonly string[] KnownLinearGenerators =
         {
             nameof(LinearCongruentialGenerator),
             nameof(XorShiftRandom),
-            nameof(XoroShiroRandom),
         };
 
         private static IEnumerable<TestCaseData> EveryGenerator()
@@ -119,13 +124,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 return;
             }
 
-            int[] ranks = MeasureBitPlaneRanks(factory());
-            for (int bit = 0; bit < OutputBitCount; ++bit)
+            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), false);
+            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), true);
+        }
+
+        private static void AssertNoLinearPlane(
+            string name,
+            string qualityLabel,
+            IRandom random,
+            bool sixtyFourBit
+        )
+        {
+            int[] ranks = MeasureBitPlaneRanks(random, sixtyFourBit);
+            string source = sixtyFourBit ? nameof(IRandom.NextUlong) : nameof(IRandom.NextUint);
+            for (int bit = 0; bit < ranks.Length; ++bit)
             {
                 Assert.GreaterOrEqual(
                     ranks[bit],
                     MinimumBitPlaneRank,
-                    $"{name} is rated {metadata.QualityLabel}, but bit {bit} of its output satisfies a "
+                    $"{name} is rated {qualityLabel}, but bit {bit} of {source}() satisfies a "
                         + $"linear recurrence of order {ranks[bit]} over GF(2): {ranks[bit]} of {Dimension} "
                         + "independent rows. Every future value of that bit is predictable from that many "
                         + "observations. Either return a scrambled half of the word, or lower the rating "
@@ -157,9 +174,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                         + "ordered best-first, so a larger value is a weaker rating."
                 );
 
-                int[] ranks = MeasureBitPlaneRanks(factory());
+                int[] ranks = MeasureBitPlaneRanks(factory(), false);
                 int worst = int.MaxValue;
-                for (int bit = 0; bit < OutputBitCount; ++bit)
+                for (int bit = 0; bit < ranks.Length; ++bit)
                 {
                     worst = Math.Min(worst, ranks[bit]);
                 }
@@ -173,17 +190,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        private static int[] MeasureBitPlaneRanks(IRandom random)
+        // NextUlong() is measured as well as NextUint() because for four generators it is no longer the
+        // same bits rearranged. They answer it from one raw 64-bit word, so its high half reaches a caller
+        // through NextDouble (the top 53 bits) and NextLong without ever appearing in a NextUint draw.
+        private static int[] MeasureBitPlaneRanks(IRandom random, bool sixtyFourBit)
         {
-            uint[] draws = new uint[2 * Dimension];
+            ulong[] draws = new ulong[2 * Dimension];
             for (int i = 0; i < draws.Length; ++i)
             {
-                draws[i] = random.NextUint();
+                draws[i] = sixtyFourBit ? random.NextUlong() : random.NextUint();
             }
 
-            int[] ranks = new int[OutputBitCount];
+            int[] ranks = new int[sixtyFourBit ? UlongBitCount : UintBitCount];
             ulong[] rows = new ulong[Dimension * WordsPerRow];
-            for (int bit = 0; bit < OutputBitCount; ++bit)
+            for (int bit = 0; bit < ranks.Length; ++bit)
             {
                 ranks[bit] = BitPlaneRank(draws, bit, rows);
             }
@@ -192,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         // Rank over GF(2) of the Hankel matrix whose row i is bits [i, i + Dimension) of one bit plane.
-        private static int BitPlaneRank(uint[] draws, int bit, ulong[] rows)
+        private static int BitPlaneRank(ulong[] draws, int bit, ulong[] rows)
         {
             Array.Clear(rows, 0, rows.Length);
             for (int row = 0; row < Dimension; ++row)
@@ -200,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 int offset = row * WordsPerRow;
                 for (int column = 0; column < Dimension; ++column)
                 {
-                    if (((draws[row + column] >> bit) & 1U) != 0U)
+                    if (((draws[row + column] >> bit) & 1UL) != 0UL)
                     {
                         rows[offset + (column >> 6)] |= 1UL << (column & 63);
                     }

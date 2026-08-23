@@ -14,6 +14,11 @@ stream from an explicit generator, GUID seed and byte count. Long PractRand/Test
 scheduled reporting with pinned tools and expected weak-generator failures; they are not suitable as
 nondeterministic pull-request gates.
 
+> The `NextUlong`, `NextLong` and `NextDouble` columns below predate the one-advance-per-64-bit-draw
+> change to `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar`, which
+> is measured at 2.49x on Unity 6000.4.6f1 (Mono). They refresh the next time
+> `RandomPerformanceTests.Benchmark` runs.
+
 <!-- RANDOM_BENCHMARKS_START -->
 
 ## Summary (fastest first)
@@ -35,7 +40,7 @@ nondeterministic pull-request gates.
     <tr><td>SplitMix64</td><td align="right">1,052,300,000</td><td data-sort-value="5">Very Fast</td><td data-sort-value="2">Very Good</td><td>Well-known SplitMix64 mixer; passes TestU01 BigCrush and PractRand up to large data sizes in literature. <a href="https://prng.di.unimi.it/splitmix64.c">Vigna 2014</a></td></tr>
     <tr><td>FlurryBurstRandom</td><td align="right">923,200,000</td><td data-sort-value="4">Fast</td><td data-sort-value="1">Excellent</td><td>Six-word ARX-style generator tuned for all-around use. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author reports TestU01 BigCrush passes; that run cannot be checked -- the upstream repository is offline.</td></tr>
     <tr><td>PcgRandom</td><td align="right">897,900,000</td><td data-sort-value="4">Fast</td><td data-sort-value="1">Excellent</td><td>PCG XSH RR 64/32 variant; passes TestU01 BigCrush and PractRand in published results. <a href="https://www.pcg-random.org/paper.html">O&#39;Neill 2014</a></td></tr>
-    <tr><td>XoroShiroRandom</td><td align="right">754,700,000</td><td data-sort-value="4">Fast</td><td data-sort-value="4">Fair</td><td>xoroshiro128+, returning the low 32 bits -- the half its authors document as linear. Measured: bit 0 has linear complexity exactly 128, so NextBool is predictable from 128 draws. Prefer Xoshiro128StarStar or PcgRandom where single bits matter. <a href="https://prng.di.unimi.it/xoroshiro128plus.c">Blackman &amp; Vigna 2018</a></td></tr>
+    <tr><td>XoroShiroRandom</td><td align="right">754,700,000</td><td data-sort-value="4">Fast</td><td data-sort-value="3">Good</td><td>xoroshiro128+, returning the high 32 bits -- the half its authors recommend. The discarded low half is linear (bit 0 has linear complexity exactly 128); no output bit of the returned half is. A 64-bit draw costs two state advances, because a + scrambler has no strong 64-bit word to return. <a href="https://prng.di.unimi.it/xoroshiro128plus.c">Blackman &amp; Vigna 2018</a></td></tr>
     <tr><td>IllusionFlow</td><td align="right">754,500,000</td><td data-sort-value="4">Fast</td><td data-sort-value="1">Excellent</td><td>Five-word rotate/xor/add generator driven by a 32-bit Weyl counter, and the generator PRNG.Instance returns. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author reports 64GB; that run cannot be checked -- the upstream repository is offline.</td></tr>
     <tr><td>RomuDuo</td><td align="right">750,100,000</td><td data-sort-value="4">Fast</td><td data-sort-value="3">Good</td><td>ROMU multiplier with a modified duo update; returns the low 32 bits of the 64-bit product. Not the published romuDuo or romuDuoJr, so their measured results do not transfer. <a href="https://romu-random.org/code.c">Overton 2020</a></td></tr>
     <tr><td>StormDropRandom</td><td align="right">705,200,000</td><td data-sort-value="3">Moderate</td><td data-sort-value="1">Excellent</td><td>Large-state ARX generator over a 1024-word (4 KB) ring buffer with two 32-bit control words. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author&#39;s own results cannot be checked -- the upstream repository is offline.</td></tr>
