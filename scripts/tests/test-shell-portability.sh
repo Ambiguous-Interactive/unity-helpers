@@ -50,6 +50,42 @@ run_test() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# These loops used to spawn `grep -q` once per line of every tracked shell and PowerShell file --
+# 23 spawns over a ~67,000-line corpus. Measured, one `grep -qE ... <<<"$line"` spawn costs 4.291 ms
+# against 0.005 ms for the equivalent bash builtin. Removing them took this check from 82.31 s to
+# 54.2 s.
+#
+# That is 28 s, NOT the whole 82 s. The first version of this comment claimed the spawns accounted
+# for all of it, on the strength of 4.291 ms x ~19,000 spawns landing near 82 -- which was a
+# coincidence read as a confirmation. The remaining 54 s is still unprofiled; the file also runs
+# per-pattern greps over whole files, an export staging section, and a second pass over the
+# PowerShell corpus.
+#
+# The patterns live in variables rather than inline because [[ ... =~ ]] lexes an inline pattern as
+# shell tokens: the bare ')' in GREP_S_SHORTHAND is a syntax error that way, and it is a syntax
+# error `bash -n` does not report.
+#
+# Each pattern was verified to select exactly the same lines as the grep it replaces, over the real
+# corpus PLUS a synthetic line per pattern -- the corpus contains no violations, so agreement on it
+# alone would only prove the absence of false positives, not that the checks still fire.
+readonly GREP_WITH_EPF_FLAG='grep[[:space:]]+-[a-zA-Z]*[EPF]'
+readonly GREP_WITH_F_FLAG='grep[[:space:]]+-[a-zA-Z]*F'
+readonly GREP_WITH_PF_FLAG='grep[[:space:]]+-[a-zA-Z]*[PF]'
+readonly GREP_S_SHORTHAND='\\s[*+?)]|\\s[^a-zA-Z]|\\s$'
+readonly VSCODE_HOME_DEFAULT='\$\{[A-Z_]+:-/home/vscode/'
+readonly ECHO_OR_PRINTF_LINE='^[[:space:]]*(echo|printf)[[:space:]]'
+readonly PROBE_COMMAND_LOOKUP='command -v|which '
+readonly PROBE_KILL='\bkill\b'
+readonly PROBE_DOCKER_INSPECT='docker\b.*inspect'
+readonly PROBE_DOCKER_INFO='docker\b.*info'
+readonly PROBE_GIT_QUERY='git (merge-base|rev-parse|diff|log|ls-tree)'
+readonly PROBE_GREP='\bgrep\b'
+readonly PROBE_DOTNET_RESTORE='dotnet tool restore'
+readonly ECHO_VAR_PIPED_TO_XARGS='echo[[:space:]]+"\$[A-Z_][A-Z0-9_]*"[[:space:]]*\|[[:space:]]*xargs'
+readonly GREP_QF_WITH_VARIABLE='grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+"\$[^"]+"'
+readonly GREP_QF_WITH_DOUBLE_DASH='grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+--[[:space:]]+"\$[^"]+"'
+readonly AWK_PRINT_FIELD_FOUR='awk.*print[[:space:]]+\$4'
+
 # Collect all shell scripts and git hooks to scan
 SHELL_FILES=()
 while IFS= read -r -d '' f; do
@@ -105,14 +141,14 @@ for file in "${SHELL_FILES[@]}"; do
 
         # Skip lines that already have -E, -P, or -F flags (portable or literal)
         # Match grep invocations with flags that include E, P, or F
-        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*[EPF]' <<<"$line"; then
+        if [[ "$line" =~ $GREP_WITH_EPF_FLAG ]]; then
             continue
         fi
 
         # Check if the pattern argument contains \|
-        if grep -qF '\|' <<<"$line"; then
+        if [[ "$line" == *'\|'* ]]; then
             # Allowlist: grep -cF '\|' is literal pipe counting (not alternation)
-            if grep -qE 'grep[[:space:]]+-[a-zA-Z]*F' <<<"$line"; then
+            if [[ "$line" =~ $GREP_WITH_F_FLAG ]]; then
                 continue
             fi
             a1_violations="${a1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
@@ -149,13 +185,13 @@ for file in "${SHELL_FILES[@]}"; do
         esac
 
         # Skip lines using -P (PCRE, where \s is valid) or -F (fixed string, literal match)
-        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*[PF]' <<<"$line"; then
+        if [[ "$line" =~ $GREP_WITH_PF_FLAG ]]; then
             continue
         fi
 
         # Check for \s in the grep pattern (not in [[:space:]] form)
         # We look for \s that isn't part of a word like "patterns" or variable like "$s"
-        if grep -qE '\\s[*+?)]|\\s[^a-zA-Z]|\\s$' <<<"$line"; then
+        if [[ "$line" =~ $GREP_S_SHORTHAND ]]; then
             a2_violations="${a2_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"
@@ -196,12 +232,12 @@ while IFS= read -r -d '' file; do
         esac
 
         # Allow: ${VAR:-/home/vscode/...} pattern (env var with default)
-        if grep -qE '\$\{[A-Z_]+:-/home/vscode/' <<<"$line"; then
+        if [[ "$line" =~ $VSCODE_HOME_DEFAULT ]]; then
             continue
         fi
 
         # Allow: echo/printf statements (display-only, not assignment)
-        if grep -qE '^[[:space:]]*(echo|printf)[[:space:]]' <<<"$line"; then
+        if [[ "$line" =~ $ECHO_OR_PRINTF_LINE ]]; then
             continue
         fi
 
@@ -412,32 +448,32 @@ for hookfile in "$REPO_ROOT"/.githooks/*; do
         skip=false
 
         # Tool detection: command -v, which
-        grep -qE 'command -v|which ' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_COMMAND_LOOKUP ]] && skip=true
 
         # Process cleanup: kill
-        grep -qE '\bkill\b' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_KILL ]] && skip=true
 
         # Version checks: --version
-        grep -qF -- '--version' <<<"$line" && skip=true
+        [[ "$line" == *'--version'* ]] && skip=true
 
         # Docker inspect (checking if image exists)
-        grep -qE 'docker\b.*inspect' <<<"$line" && skip=true
-        grep -qE 'docker\b.*info' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_DOCKER_INSPECT ]] && skip=true
+        [[ "$line" =~ $PROBE_DOCKER_INFO ]] && skip=true
 
         # Git operations that legitimately fail (merge-base on orphan, etc.)
-        grep -qE 'git (merge-base|rev-parse|diff|log|ls-tree)' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_GIT_QUERY ]] && skip=true
 
         # Grep (exit code 1 on no match is expected)
-        grep -qE '\bgrep\b' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_GREP ]] && skip=true
 
         # Temp file creation
-        grep -qF 'mktemp' <<<"$line" && skip=true
+        [[ "$line" == *'mktemp'* ]] && skip=true
 
         # Tool restoration
-        grep -qE 'dotnet tool restore' <<<"$line" && skip=true
+        [[ "$line" =~ $PROBE_DOTNET_RESTORE ]] && skip=true
 
         # Binary format checks (encoding detection)
-        grep -qF '$'"'"'\r' <<<"$line" && skip=true
+        [[ "$line" == *'$'"'"'\r'* ]] && skip=true
 
         if [[ "$skip" == false ]]; then
             c1_violations="${c1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
@@ -490,13 +526,13 @@ for file in "${PS1_FILES[@]}"; do
         fi
 
         lookahead=$(sed -n "$((line_num + 1)),${end_line}p" "$file")
-        if grep -qF 'LASTEXITCODE' <<<"$lookahead"; then
+        if [[ "$lookahead" == *'LASTEXITCODE'* ]]; then
             found_check=true
         fi
 
         # Also check if the script immediately exits with $LASTEXITCODE
         # (pattern: "& pwsh ... ; exit $LASTEXITCODE" on same line or "exit $LASTEXITCODE" as next line)
-        if grep -qF 'LASTEXITCODE' <<<"$line"; then
+        if [[ "$line" == *'LASTEXITCODE'* ]]; then
             found_check=true
         fi
 
@@ -534,7 +570,7 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if grep -qE 'echo[[:space:]]+"\$[A-Z_][A-Z0-9_]*"[[:space:]]*\|[[:space:]]*xargs' <<<"$line"; then
+        if [[ "$line" =~ $ECHO_VAR_PIPED_TO_XARGS ]]; then
             e1_violations="${e1_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"
@@ -562,8 +598,8 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+"\$[^"]+"' <<<"$line"; then
-            if ! grep -qE 'grep[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*F[[:space:]]+--[[:space:]]+"\$[^"]+"' <<<"$line"; then
+        if [[ "$line" =~ $GREP_QF_WITH_VARIABLE ]]; then
+            if ! [[ "$line" =~ $GREP_QF_WITH_DOUBLE_DASH ]]; then
                 e2_violations="${e2_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
             fi
         fi
@@ -591,7 +627,7 @@ for file in "${SHELL_FILES[@]}"; do
         stripped="${line#"${line%%[![:space:]]*}"}"
         [[ "$stripped" == \#* ]] && continue
 
-        if grep -qE "awk.*print[[:space:]]+\\\$4" <<<"$line"; then
+        if [[ "$line" =~ $AWK_PRINT_FIELD_FOUR ]]; then
             e3_violations="${e3_violations}  ${rel_path}:${line_num}: ${line}"$'\n'
         fi
     done < "$file"

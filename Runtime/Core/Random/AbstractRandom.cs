@@ -399,11 +399,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public long NextLong()
         {
-            uint upper = NextUint();
-            uint lower = NextUint();
             unchecked
             {
-                return (long)((((ulong)upper << 32) | lower) & 0x7FFFFFFFFFFFFFFF);
+                // Through NextUlong, not two NextUint draws of its own: a generator that answers a
+                // 64-bit draw in one state advance has to be asked for one. This composed the pair
+                // inline and so was the only 64-bit entry point the overrides could not reach.
+                return (long)(NextUlong() & 0x7FFFFFFFFFFFFFFF);
             }
         }
 
