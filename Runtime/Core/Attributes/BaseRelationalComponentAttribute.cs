@@ -1031,6 +1031,19 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     return buffer;
                 }
 
+                // isInterface is true for any element type that is not sealed, so it covers the
+                // ordinary base-class collection field -- Collider2D[], Renderer[] -- as well as a
+                // genuine interface. Unity's own type query already resolves a base class
+                // polymorphically, so for those the scan below reproduces the same answer after
+                // fetching every component on the object and running a reflection type test on each.
+                // The single-component path has always tried the typed query first; this is the
+                // collection path catching up.
+                if (!elementType.IsInterface)
+                {
+                    component.GetComponents(elementType, buffer);
+                    return buffer;
+                }
+
                 component.GetComponents(typeof(Component), buffer);
                 int writeIndex = 0;
                 int count = buffer.Count;

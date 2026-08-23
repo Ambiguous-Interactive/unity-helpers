@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Relational collection fields typed as a base component -- `Collider2D[]`, `Renderer[]` -- no longer fetch every component on the object and type-test each one. Unity's own query already resolves a base class, so assignment of a component with three such fields is 9% faster ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - `Animator.ResetTriggers()` no longer allocates. It read `Animator.parameters`, which builds a new array and new element objects on every read -- 53.5 bytes per call for a three-parameter controller. The trigger hashes are now read once per controller ([#549](https://github.com/Ambiguous-Interactive/unity-helpers/issues/549)).
 - `GameObject.IsDontDestroyOnLoad()` no longer allocates. It read `Scene.name`, which marshals a fresh managed string every call, and the signature reads cheap enough to end up in `Update`. The answer now comes from the scene's handle ([#549](https://github.com/Ambiguous-Interactive/unity-helpers/issues/549)).
 - `WGroup`, `WGroupEnd`, `WShowIf`, `WReadOnly`, `WValueDropDown`, `WEnumToggleButtons`, `IntDropDown` and `StringInList` now accept fields only. They advertised properties, which nothing in the package reads, so the attribute compiled and drew nothing. Move any such attribute onto the backing field ([#550](https://github.com/Ambiguous-Interactive/unity-helpers/issues/550)).

@@ -286,6 +286,23 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   the domain reload it triggers unloads the sandbox assembly that would have answered. That timeout
   is the success signal; re-issue the real command afterwards. Discriminate from a busy editor with
   `Unity_ManageEditor GetState` as always.
+- **The cheaper recipe for that, measured over seven commands in session 220: just send the command
+  twice.** Every command issued after an edit timed out, and the _identical_ retry returned
+  immediately with the new assembly loaded -- no `AssetDatabase.Refresh()`, no domain reload, no
+  wait. `GetState` reported `IsCompiling: false` both before and after the timeout, so it does not
+  discriminate here: the first call is what makes the editor notice the changed files, and it dies
+  doing it. Send, expect the timeout, send again. Reach for the `Refresh` body only if a _second_
+  retry still runs against a stale assembly, which it did not once.
+- **A question about Unity's own metadata has exactly one arbiter, and it is not `typecheck:unity`.**
+  Session 220 asked whether `[WShowIf]` on a C# property compiles. The typecheck gate said no
+  (`CS0592`, "only valid on 'field' declarations") and that was **wrong for every editor CI runs**:
+  its reference assemblies are the community `UnityEngine.Modules` **2021.3.33**, where
+  `UnityEngine.PropertyAttribute` is `AttributeTargets.Field`, while on `6000.4.6f1` it is
+  `Property, Field`. Six package attributes inherit that declaration, so the gate's answer inverted
+  the finding and a wrong conclusion was written up before the editor refuted it. Signatures are
+  safe to check locally; anything resolved out of Unity's own attributes, defaults or metadata has
+  to be read in a real editor. Tracked as
+  [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
 - **Gate every measurement on a member only the variant under test declares, and print the gate.**
   This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
   _absence_ of `_cacheLock`, and refused to print numbers otherwise. Absence matters as much as
