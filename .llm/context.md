@@ -310,6 +310,29 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   body, the progress log, or the linked issue. Include before/after screenshots for UI changes.
   See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
 
+### Re-running local aggregates costs your session -- CI runs them anyway
+
+The rule above is about not wasting CI. This one is its opposite number, and session 218 got it
+wrong: it re-ran `lint:repo`, `validate:tests` and `typecheck:unity` after nearly every change, and
+forced Unity **clean rebuilds at ~5 minutes each** to sweep an assembly that a `rg` over the same
+directory had already answered. CI runs those exact gates on the push. Spending an hour proving
+locally what the matrix will prove anyway buys nothing and costs the next issue.
+
+- **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
+  Run the aggregate ONCE, before the push, not after each commit.
+- **Prefer the cheap instrument that answers the question.** A `rg` for the shape, a single
+  `--only <id>`, one `dotnet test --filter` -- before a whole-tree rebuild. Reach for the expensive
+  one when the cheap one is genuinely inconclusive, and say which you used.
+- **A Unity clean rebuild is a last resort**, not a routine sweep. `AssetDatabase.Refresh` alone is
+  usually enough; `RequestScriptCompilationOptions.CleanBuildCache` recompiles everything.
+- **When you skip a gate, name what is unverified** rather than implying parity. "Runtime is
+  analyzer-swept with a control; Editor is grep-checked only" is a useful sentence. "All clean" when
+  one of the three was a grep is not.
+- Costs, measured 2026-08-23: `agent:preflight` 2.9 s, `validate:prepush` 1.3 s,
+  `validate:tests:fast` ~150 s, `lint:repo` ~300 s, `typecheck:unity` minutes, a Unity clean rebuild
+  ~5 min. The three checks that dominate the contract suite are tracked on
+  [#540](https://github.com/Ambiguous-Interactive/unity-helpers/issues/540).
+
 ### Pushing costs a full CI matrix -- batch before you push
 
 **Every push to the remote triggers the whole CI matrix**, including four Unity editor versions in

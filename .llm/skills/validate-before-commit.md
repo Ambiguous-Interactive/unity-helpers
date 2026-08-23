@@ -304,6 +304,13 @@ pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
 
 The `npm run validate:local` command runs these checks:
 
+> **Run this list once, before the push -- not after every commit.** CI runs the same gates. The
+> edit loop is `npm run agent:preflight` (2.9 s) plus the one targeted check for what you touched
+> (`node scripts/run-contract-tests.js --only <id>`, `node scripts/run-repo-lint.js --only <id>`,
+> `dotnet test --filter`). Reach for the cheapest instrument that answers the question -- a `rg` for
+> the shape beats a whole-tree rebuild -- and when you skip a gate, **name what is unverified**
+> rather than reporting it as clean.
+
 1. **validate:content** — Documentation and formatting
    - `lint:docs` — Markdown links (no backtick `.md` refs)
    - `lint:markdown` — Markdownlint rules
