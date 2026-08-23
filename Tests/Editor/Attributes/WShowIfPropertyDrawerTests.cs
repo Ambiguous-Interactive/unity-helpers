@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -20,6 +21,135 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Integration")]
     public sealed class WShowIfPropertyDrawerTests : CommonTestBase
     {
+        /// <summary>
+        /// A condition naming an auto-property serialized through <c>[field: SerializeField]</c>.
+        /// </summary>
+        /// <remarks>
+        /// Unity stores that property as <c>&lt;AutoPropertyCondition&gt;k__BackingField</c>, so
+        /// <c>FindProperty("AutoPropertyCondition")</c> -- the name the author wrote and the only
+        /// one anybody would write -- resolves to nothing.
+        /// <para>
+        /// This case passes with or without the backing-field lookup, because the drawer falls back
+        /// to reading the live C# member and a property resolves there. It pins the behaviour
+        /// rather than proving the fix;
+        /// <see cref="AnUnappliedInspectorEditOnAnAutoPropertyIsWhatTheConditionReads"/> is the one
+        /// that goes red without it (#550).
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void ConditionResolvesAnAutoPropertyBackedByASerializedField()
+        {
+            TestContainer container = CreateScriptableObject<TestContainer>();
+            using SerializedObjectTracker serializedObject = new();
+
+            WShowIfPropertyDrawer drawer = CreateDrawer(
+                new WShowIfAttribute(nameof(TestContainer.AutoPropertyCondition))
+            );
+
+            container.AutoPropertyCondition = false;
+            SerializedProperty dependentProperty = RefreshProperty(
+                serializedObject,
+                container,
+                nameof(TestContainer.autoPropertyDependent)
+            );
+            Assert.False(
+                InvokeShouldShow(drawer, dependentProperty),
+                "an auto-property condition that is false must hide the field"
+            );
+
+            container.AutoPropertyCondition = true;
+            dependentProperty = RefreshProperty(
+                serializedObject,
+                container,
+                nameof(TestContainer.autoPropertyDependent)
+            );
+            Assert.True(
+                InvokeShouldShow(drawer, dependentProperty),
+                "an auto-property condition that is true must show the field"
+            );
+        }
+
+        /// <summary>
+        /// The condition is read from the SERIALIZED state, not from the live object.
+        /// </summary>
+        /// <remarks>
+        /// This is the assertion that distinguishes the fix from what was already happening. The
+        /// drawer has a reflection fallback that reads the live C# member, and for an auto-property
+        /// that fallback resolves -- so a test that only toggles the property passes either way.
+        /// What it cannot do is see an inspector edit that has not been applied to the object yet,
+        /// which is the state a drawer is repainted in. Writing the backing property WITHOUT
+        /// <c>ApplyModifiedProperties</c> leaves the live value false and the serialized value
+        /// true, so only a lookup that found the backing field answers true here (#550).
+        /// </remarks>
+        [Test]
+        public void AnUnappliedInspectorEditOnAnAutoPropertyIsWhatTheConditionReads()
+        {
+            TestContainer container = CreateScriptableObject<TestContainer>();
+            container.AutoPropertyCondition = false;
+
+            using SerializedObjectTracker serializedObject = new();
+            SerializedProperty dependentProperty = RefreshProperty(
+                serializedObject,
+                container,
+                nameof(TestContainer.autoPropertyDependent)
+            );
+
+            WShowIfPropertyDrawer drawer = CreateDrawer(
+                new WShowIfAttribute(nameof(TestContainer.AutoPropertyCondition))
+            );
+
+            Assert.False(
+                InvokeShouldShow(drawer, dependentProperty),
+                "precondition: both the live and serialized values are false"
+            );
+
+            SerializedProperty backing = serializedObject.Current.FindProperty(
+                SerializedMemberNames.BackingFieldFor(nameof(TestContainer.AutoPropertyCondition))
+            );
+            Assert.IsTrue(
+                backing != null,
+                "Unity serializes the auto-property under its backing field name"
+            );
+
+            backing.boolValue = true;
+
+            Assert.False(
+                container.AutoPropertyCondition,
+                "the edit must NOT be applied, or this proves nothing"
+            );
+            Assert.True(
+                InvokeShouldShow(drawer, dependentProperty),
+                "the drawer must read the pending serialized edit, which only the backing-field lookup reaches"
+            );
+        }
+
+        /// <summary>
+        /// The source name is tried first, so nothing that resolved before resolves differently.
+        /// </summary>
+        [Test]
+        public void ASourceNameStillWinsOverTheBackingFieldSpelling()
+        {
+            TestContainer container = CreateScriptableObject<TestContainer>();
+            using SerializedObjectTracker serializedObject = new();
+
+            WShowIfPropertyDrawer drawer = CreateDrawer(
+                new WShowIfAttribute(nameof(TestContainer.boolCondition))
+            );
+
+            container.boolCondition = true;
+            container.AutoPropertyCondition = false;
+            SerializedProperty dependentProperty = RefreshProperty(
+                serializedObject,
+                container,
+                nameof(TestContainer.boolDependent)
+            );
+
+            Assert.True(
+                InvokeShouldShow(drawer, dependentProperty),
+                "a plain field condition must not be diverted to a backing field"
+            );
+        }
+
         [Test]
         public void BoolConditionHidesFieldWhenFalse()
         {

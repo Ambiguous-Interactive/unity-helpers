@@ -306,6 +306,40 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
         }
 
+        /// <summary>
+        /// Resolves a serialized-property path, accepting a property's source name where the data
+        /// actually lives on its compiler-generated backing field.
+        /// </summary>
+        /// <remarks>
+        /// The source name is tried first, so a real field named exactly like some other type's
+        /// property still wins, and nothing that resolved before resolves differently now.
+        /// </remarks>
+        private static SerializedProperty FindPropertyOrBackingField(
+            SerializedObject serializedObject,
+            string path
+        )
+        {
+            SerializedProperty resolved = serializedObject.FindProperty(path);
+            if (resolved != null || string.IsNullOrEmpty(path))
+            {
+                return resolved;
+            }
+
+            int separatorIndex = path.LastIndexOf('.');
+            string leaf = separatorIndex == -1 ? path : path.Substring(separatorIndex + 1);
+            string backingLeaf = SerializedMemberNames.BackingFieldFor(leaf);
+            if (string.Equals(leaf, backingLeaf, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string backingPath =
+                separatorIndex == -1
+                    ? backingLeaf
+                    : path.Substring(0, separatorIndex + 1) + backingLeaf;
+            return serializedObject.FindProperty(backingPath);
+        }
+
         private static bool TryGetConditionProperty(
             SerializedProperty property,
             string conditionField,
@@ -342,7 +376,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return conditionProperty != null;
             }
 
-            SerializedProperty resolvedProperty = serializedObject.FindProperty(conditionField);
+            SerializedProperty resolvedProperty = FindPropertyOrBackingField(
+                serializedObject,
+                conditionField
+            );
             if (resolvedProperty != null)
             {
                 EditorCacheHelper.AddToBoundedCache(
@@ -362,7 +399,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     separatorIndex == -1
                         ? conditionField
                         : propertyPath.Substring(0, separatorIndex + 1) + conditionField;
-                resolvedProperty = serializedObject.FindProperty(siblingPath);
+                resolvedProperty = FindPropertyOrBackingField(serializedObject, siblingPath);
                 if (resolvedProperty != null)
                 {
                     EditorCacheHelper.AddToBoundedCache(
@@ -535,6 +572,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (memberInfo == null)
             {
                 memberInfo = type.GetMethod(memberName, flags, null, Type.EmptyTypes, null);
+            }
+
+            // An auto-property marked [field: SerializeField] is serialized through a backing field
+            // whose name nobody writes by hand, so the source name is tried first and this second.
+            if (memberInfo == null)
+            {
+                memberInfo = type.GetField(
+                    SerializedMemberNames.BackingFieldFor(memberName),
+                    flags
+                );
             }
 
             if (memberInfo != null)

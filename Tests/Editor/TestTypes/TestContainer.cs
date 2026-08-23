@@ -16,6 +16,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WShowIf(nameof(boolCondition))]
         public int boolDependent;
 
+        // Serialized through the compiler-generated backing field, so the name the condition below
+        // spells is NOT the name Unity stores it under (#550).
+        [field: SerializeField]
+        public bool AutoPropertyCondition { get; set; }
+
+        [WShowIf(nameof(AutoPropertyCondition))]
+        public int autoPropertyDependent;
+
         public ModifierDurationType durationType = ModifierDurationType.Instant;
 
         public int durationAmount;

@@ -39,11 +39,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// private IEnumerable&lt;string&gt; BuildStateList() => cachedStates;
     /// </code>
     /// </example>
-    // Fields only, declared rather than inherited: UnityEngine.PropertyAttribute allows
-    // AttributeTargets.Property as well, and nothing in this package reads a C# property --
-    // every drawer is reached through a Unity SerializedProperty, which exists for serialized
-    // fields only. Inheriting the base's targets also let them drift with the editor version.
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
+    // Declared rather than inherited, so the accepted targets are this package's decision instead
+    // of drifting with whatever UnityEngine.PropertyAttribute declares in a given editor version.
+    // Property is included because a property's data can genuinely be serialized -- through
+    // [field: SerializeField], where the attribute lands on the backing field, and through Odin,
+    // which draws a property directly. It is NOT an invitation to decorate a computed property
+    // nothing serializes: that reaches no drawer, and WUH003 reports it.
+    [AttributeUsage(
+        AttributeTargets.Field | AttributeTargets.Property,
+        AllowMultiple = false,
+        Inherited = true
+    )]
     public sealed class StringInListAttribute : PropertyAttribute
     {
         private static readonly string[] Empty = Array.Empty<string>();

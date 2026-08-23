@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using Sirenix.OdinInspector.Editor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
 
     /// <summary>
@@ -123,6 +124,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (method != null && method.ReturnType != typeof(void))
             {
                 return method;
+            }
+
+            // An auto-property marked [field: SerializeField] holds its data on a backing field
+            // whose name nobody writes by hand. The source name is tried first, above.
+            string backingFieldName = SerializedMemberNames.BackingFieldFor(memberName);
+            if (!string.Equals(backingFieldName, memberName, StringComparison.Ordinal))
+            {
+                return type.GetField(backingFieldName, ShowIfConditionEvaluator.MemberBindingFlags);
             }
 
             return null;

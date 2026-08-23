@@ -14,23 +14,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     public sealed class MiscRuntimeAttributeTests
     {
         /// <summary>
-        /// Every inspector attribute this package ships accepts fields and nothing else.
+        /// Every inspector attribute declares its own targets rather than inheriting them.
         /// </summary>
         /// <remarks>
-        /// Nothing in the package reads a C# property: <c>WGroupLayoutBuilder</c> lays out Unity
-        /// <c>SerializedProperty</c> paths, which exist for serialized fields only, and every
-        /// drawer is reached the same way. An attribute that advertises a target it cannot serve
-        /// compiles, reads as correct, and draws nothing -- which is what
-        /// <see cref="WGroupAttribute"/> and <see cref="WGroupEndAttribute"/> did (#550).
+        /// <see cref="PropertyAttribute"/> declares <c>Property | Field</c> on Unity 6 and
+        /// <c>Field</c> in the 2021.3 reference assemblies, so an attribute that declares nothing
+        /// has targets that move with the editor version rather than with this package's intent.
+        /// Six of these inherited exactly that (#550).
+        /// <para>
+        /// Property is a legitimate target: a property's data really can be serialized, through
+        /// <c>[field: SerializeField]</c> and through Odin. <see cref="WGroupAttribute"/> and
+        /// <see cref="WGroupEndAttribute"/> are the exception -- they have no Odin drawer and their
+        /// layout builder walks Unity <c>SerializedProperty</c> paths, which exist for fields only,
+        /// so a property placement reaches nothing and is refused.
+        /// </para>
         /// <para>
         /// Discovered from the assembly rather than listed, so an inspector attribute added later
-        /// is covered the day it is written. The attributes derived from
-        /// <see cref="PropertyAttribute"/> inherit their targets from it and are asserted here so a
-        /// future explicit declaration cannot quietly widen them.
+        /// is covered the day it is written.
         /// </para>
         /// </remarks>
         [Test]
-        public void EveryInspectorAttributeTargetsFieldsOnly()
+        public void EveryInspectorAttributeDeclaresItsOwnTargets()
         {
             List<Type> inspectorAttributes = new()
             {
@@ -51,9 +55,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 "the assembly sweep found no PropertyAttribute-derived attributes, so this proves nothing"
             );
 
-            List<string> widened = new();
+            List<string> inherited = new();
+            List<string> wrongTargets = new();
             foreach (Type attributeType in inspectorAttributes)
             {
+                if (
+                    Attribute.GetCustomAttribute(
+                        attributeType,
+                        typeof(AttributeUsageAttribute),
+                        inherit: false
+                    ) == null
+                )
+                {
+                    inherited.Add(attributeType.Name);
+                    continue;
+                }
+
                 AttributeUsageAttribute usage = (AttributeUsageAttribute)
                     Attribute.GetCustomAttribute(
                         attributeType,
@@ -61,15 +78,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         inherit: true
                     );
 
-                if (usage == null || (usage.ValidOn & ~AttributeTargets.Field) != 0)
+                AttributeTargets allowed =
+                    attributeType == typeof(WGroupAttribute)
+                    || attributeType == typeof(WGroupEndAttribute)
+                        ? AttributeTargets.Field
+                        : AttributeTargets.Field | AttributeTargets.Property;
+
+                if ((usage.ValidOn & ~allowed) != 0)
                 {
-                    widened.Add($"{attributeType.Name} -> {usage?.ValidOn.ToString() ?? "<none>"}");
+                    wrongTargets.Add($"{attributeType.Name} -> {usage.ValidOn}");
                 }
             }
 
             CollectionAssert.IsEmpty(
-                widened,
-                "an inspector attribute may only be applied to a field, because that is all the package reads"
+                inherited,
+                "an inspector attribute that declares no AttributeUsage inherits targets that move with the editor version"
+            );
+            CollectionAssert.IsEmpty(
+                wrongTargets,
+                "an inspector attribute may only target the members its drawers can reach"
             );
         }
 
