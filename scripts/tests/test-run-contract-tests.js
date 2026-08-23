@@ -14,6 +14,7 @@
 const assert = require("assert");
 const { spawnSync } = require("child_process");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
@@ -132,6 +133,46 @@ runTest("runChecks runs every check even after one fails", async () => {
     ["ok-first:true", "boom:false", "ok-last:true"],
     "a failure must not stop the checks after it, and results stay in registry order"
   );
+});
+
+runTest("an exclusive check never overlaps another", async () => {
+  // The property the registry's `exclusive` flag claims, asserted by observation rather than by
+  // reading the scheduler. Each check records the interval it ran in; the exclusive one must not
+  // intersect any other.
+  const marker = path.join(os.tmpdir(), `exclusive-probe-${process.pid}`);
+  const stamp = (id) =>
+    `date +%s%N | sed "s/^/${id} /" >> ${marker}; sleep 0.4; ` +
+    `date +%s%N | sed "s/^/${id} /" >> ${marker}`;
+
+  fs.rmSync(marker, { force: true });
+  await runChecks(
+    [
+      { id: "a", name: "a", run: stamp("a") },
+      { id: "solo", name: "solo", run: stamp("solo"), exclusive: true },
+      { id: "b", name: "b", run: stamp("b") },
+      { id: "c", name: "c", run: stamp("c") }
+    ],
+    4
+  );
+
+  const spans = new Map();
+  for (const line of fs.readFileSync(marker, "utf8").trim().split(/\r?\n/)) {
+    const [id, at] = line.split(" ");
+    const span = spans.get(id) || [];
+    span.push(Number(at));
+    spans.set(id, span);
+  }
+  fs.rmSync(marker, { force: true });
+
+  const solo = spans.get("solo");
+  assert.ok(solo && solo.length === 2, "the exclusive check must have run");
+  for (const [id, span] of spans) {
+    if (id === "solo") {
+      continue;
+    }
+    const overlaps = span[0] <= solo[1] && solo[0] <= span[1];
+    assert.ok(!overlaps, `${id} overlapped the exclusive check: ${span} vs ${solo}`);
+  }
 });
 
 runTest("--only with an unknown id fails instead of passing vacuously", () => {

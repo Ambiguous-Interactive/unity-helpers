@@ -7,8 +7,10 @@
 // devcontainer on eight cores, that chain took 9 m 52 s of wall clock for roughly four CPU-minutes
 // of work (#505, #425): every link paid an `npm run` start-up, most of them a `pwsh -NoProfile`
 // start-up on top of it, and all of them waited for the one before. Nothing about the suite required
-// that order -- these are independent processes that read the tree and write only into per-run
-// temporary directories, which is why the same runner Repo Lint uses applies unchanged.
+// that order. Almost all of them are independent processes that read the tree and write only
+// into per-run temporary directories, which is why the same runner Repo Lint uses applies. The
+// exception is real and is marked `exclusive` below rather than assumed away: one check
+// rewrites the working tree, and it took a one-in-five flake to find it.
 //
 // Two properties this keeps that the chain did not have:
 //   * every check runs even after one fails, so a run reports the whole contract state in one go
@@ -203,7 +205,12 @@ const CHECKS = [
   {
     id: "npm-package-changelog",
     name: "npm package changelog",
-    run: "npm run test:npm-package-changelog"
+    run: "npm run test:npm-package-changelog",
+    // Rewrites the real package.json and drops canary files into the working tree to drive
+    // the validator, restoring both in a `finally`. Every other check reads that
+    // package.json -- npm itself does, to resolve `npm run` -- so this one cannot share the
+    // machine with them.
+    exclusive: true
   },
   { id: "release-tools", name: "Release tooling", run: "npm run test:release-tools" },
   { id: "perf-tools", name: "Performance report tooling", run: "npm run test:perf-tools" },

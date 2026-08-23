@@ -151,19 +151,42 @@ function runCheck(check) {
  * not reorder itself run to run; the folds are written in completion order, which is what makes the
  * log show progress rather than arriving all at once.
  *
- * @param {{id: string, name: string, run: string}[]} checks Registry entries to execute.
+ * @param {{id: string, name: string, run: string, exclusive?: boolean}[]} checks Entries.
  * @param {number} [jobs] Maximum checks to run at once. Defaults to one worker per core.
  * @returns {Promise<{id: string, name: string, ok: boolean, seconds: number}[]>} One per check.
  */
 async function runChecks(checks, jobs = defaultJobs()) {
   const results = new Array(checks.length);
+
+  // A check marked `exclusive` mutates shared repository state and runs with nothing beside it.
+  // This is not a theoretical hazard: `test-npm-package-changelog.ps1` rewrites the real
+  // package.json and drops canary files into the working tree, restoring both in a `finally`.
+  // Inside that window every other check sees the mutated tree -- and since every check in this
+  // registry is launched through `npm run`, npm itself reads that package.json to resolve the
+  // script. Measured: one run in five failed `sync-script-contracts` with "package.json files
+  // entries the validator forbids: pr-description.md", which is that canary rather than anything
+  // wrong with package.json.
+  //
+  // They run FIRST and serially, so the pool that follows sees a restored tree instead of racing
+  // the restore.
+  const exclusiveIndexes = [];
+  const sharedIndexes = [];
+  checks.forEach((check, index) => {
+    (check.exclusive ? exclusiveIndexes : sharedIndexes).push(index);
+  });
+
+  for (const index of exclusiveIndexes) {
+    results[index] = await runCheck(checks[index]);
+  }
+
   let next = 0;
   const worker = async () => {
-    for (let index = next++; index < checks.length; index = next++) {
+    for (let cursor = next++; cursor < sharedIndexes.length; cursor = next++) {
+      const index = sharedIndexes[cursor];
       results[index] = await runCheck(checks[index]);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(jobs, checks.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(jobs, sharedIndexes.length) }, worker));
   return results;
 }
 

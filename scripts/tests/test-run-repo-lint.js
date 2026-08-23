@@ -469,7 +469,9 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     // `validate:tests` reaches its fast half through a sibling REGISTRY rather than a chain of npm
     // scripts (#505), so expanding the npm script alone stops at `node scripts/run-contract-tests.js`
     // and every check behind it reads as an orphan.
-    ...scriptPathsIn(leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)),
+    ...scriptPathsIn(
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+    ),
     ...scriptPathsIn(expandNpmScript("validate:tests")),
     ...scriptPathsIn(expandNpmScript("typecheck:unity"))
   ]);

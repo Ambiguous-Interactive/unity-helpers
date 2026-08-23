@@ -316,7 +316,13 @@ The `npm run validate:local` command runs these checks:
 
 3. **eol:check** — Line endings (CRLF, no BOM)
 
-4. **validate:tests:fast** — Fast repository contract tests; exhaustive synthetic hook fixtures stay in CI
+4. **validate:tests:fast** — Fast repository contract tests, run concurrently by
+   `scripts/run-contract-tests.js` (~2.5 min, was ~10 as a serial chain); exhaustive synthetic hook
+   fixtures stay in CI. **Adding a check means adding a registry entry, not appending `&&` to the npm
+   script** — a contract test fails if the chain comes back. If a check mutates the working tree
+   (rewrites a tracked file, drops a canary), mark it `exclusive: true` or it will flake every other
+   check intermittently. **Never pipe the runner's output through `tail`**: it captures each check's
+   full output into a fold, and that fold is the only thing that names a failing assertion
 
 5. **lint:csharp-naming** — C# naming conventions
 
