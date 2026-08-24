@@ -143,6 +143,11 @@ const CHECKS = [
     run: "npm run lint:comparison-direction"
   },
   {
+    id: "shipped-analyzers",
+    name: "Shipped analyzer assemblies match their sources",
+    run: "npm run verify:shipped-analyzers"
+  },
+  {
     id: "meta-exclusions",
     name: "Meta lint exclusions",
     run: "bash scripts/tests/test-lint-meta-exclusions.sh"

@@ -142,10 +142,7 @@ runTest("fix: keeps a rewrite inside its interpolation hole", () => {
   // The operand scan used to walk out of the hole and swallow the literal, producing
   // `Write($"...{b}" < a)`. It compiled nowhere, which is the only reason it was caught.
   assert.strictEqual(fixed('Write($"x: {a > b}");'), 'Write($"x: {b < a}");');
-  assert.strictEqual(
-    fixed('Write($"{a > b} and {c >= d}");'),
-    'Write($"{b < a} and {d <= c}");'
-  );
+  assert.strictEqual(fixed('Write($"{a > b} and {c >= d}");'), 'Write($"{b < a} and {d <= c}");');
 });
 
 runTest("fix: refuses a comparison that spans more than one line", () => {

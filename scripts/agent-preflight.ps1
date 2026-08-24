@@ -2245,6 +2245,40 @@ if ($csharpierTargets.Count -gt 0) {
         Pop-Location
     }
 
+    # The two analyzer DLLs are committed and CI compares them byte-for-byte against a Release build
+    # of the sources beside them, so an analyzer edit without a rebuild is a ~10 minute round trip to
+    # discover -- and CSharpier reformatting the source is enough to trigger it. Gated on the sources
+    # actually changing, because the check costs a Release build of both projects.
+    $analyzerSourceTargets = @($csharpTargets | Where-Object {
+            $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or
+            $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*'
+        })
+    if ($analyzerSourceTargets.Count -gt 0) {
+        Write-Host '[agent-preflight] Rebuilding the shipped analyzer assemblies (their sources changed)...' -ForegroundColor Blue
+        Push-Location $repoRoot
+        try {
+            $analyzerArgs = @('scripts/verify-shipped-analyzers.js')
+            if ($Fix) {
+                $analyzerArgs += '--fix'
+            }
+            & node @analyzerArgs
+            if ($LASTEXITCODE -ne 0) {
+                $failureCount++
+            }
+            elseif ($Fix) {
+                # --name-only -z, not --porcelain: the helper splits on NUL and porcelain would
+                # hand back " M <path>" rather than a path.
+                $rebuilt = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--name-only', '-z', '--', 'Runtime/Analyzers'))
+                if ($rebuilt.Count -gt 0) {
+                    $null = Add-PathsToGitIndexWithRetry -RepoRoot $repoRoot -Paths $rebuilt -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'shipped analyzer rebuild'
+                }
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+
     $regionViolations = New-Object System.Collections.Generic.List[string]
     $regionViolationSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
