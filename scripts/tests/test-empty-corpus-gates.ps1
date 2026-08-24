@@ -88,6 +88,20 @@ try {
     Write-TestResult "$($gate.Name) fails when its corpus is absent" ($exitCode -ne 0) "Expected a non-zero exit with no Runtime/Editor/Tests present. Exit: $exitCode. Output: $($output | Out-String)"
   }
 
+  # audit-license-years.sh derives its corpus from `git ls-files`, so it gets its own shape:
+  # zero files used to print "All files have correct copyright years!".
+  $auditScript = Join-Path $scratchRoot 'scripts/audit-license-years.sh'
+  $previousLocation = Get-Location
+  try {
+    Set-Location -LiteralPath $scratchRoot
+    $output = & bash $auditScript --summary *>&1
+    $exitCode = $LASTEXITCODE
+  }
+  finally {
+    Set-Location -LiteralPath $previousLocation
+  }
+  Write-TestResult 'audit-license-years fails when no .cs files are audited' ($exitCode -ne 0) "Expected a non-zero exit with an empty corpus. Exit: $exitCode. Output: $($output | Out-String)"
+
   # dependabot's config is a single file rather than a tree, so it gets its own shape: deleting the
   # config used to skip the schema check and report success.
   $dependabotScript = Join-Path $scratchRoot 'scripts/lint-dependabot.ps1'
