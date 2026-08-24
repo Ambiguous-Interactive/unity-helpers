@@ -285,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (isSeparator)
                 {
-                    if (currentKind == CaseTokenKind.Word && buffer.Length > 0)
+                    if (currentKind == CaseTokenKind.Word && 0 < buffer.Length)
                     {
                         tokens.Add(CreateWordToken(buffer.ToString()));
                         buffer.Clear();
@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                     if (currentKind != CaseTokenKind.Separator)
                     {
-                        if (currentKind == CaseTokenKind.Separator && buffer.Length > 0)
+                        if (currentKind == CaseTokenKind.Separator && 0 < buffer.Length)
                         {
                             tokens.Add(
                                 new CaseToken(
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 CharacterCategory category = CategorizeChar(current);
 
-                if (currentKind == CaseTokenKind.Separator && buffer.Length > 0)
+                if (currentKind == CaseTokenKind.Separator && 0 < buffer.Length)
                 {
                     tokens.Add(
                         new CaseToken(
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     currentKind = CaseTokenKind.Word;
                     lastCategory = CharacterCategory.None;
                 }
-                else if (ShouldStartNewWord(category, lastCategory, value, i) && buffer.Length > 0)
+                else if (ShouldStartNewWord(category, lastCategory, value, i) && 0 < buffer.Length)
                 {
                     tokens.Add(CreateWordToken(buffer.ToString()));
                     buffer.Clear();
@@ -351,13 +351,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            if (currentKind == CaseTokenKind.Separator && buffer.Length > 0)
+            if (currentKind == CaseTokenKind.Separator && 0 < buffer.Length)
             {
                 tokens.Add(
                     new CaseToken(CaseTokenKind.Separator, buffer.ToString(), false, false, false)
                 );
             }
-            else if (currentKind == CaseTokenKind.Word && buffer.Length > 0)
+            else if (currentKind == CaseTokenKind.Word && 0 < buffer.Length)
             {
                 tokens.Add(CreateWordToken(buffer.ToString()));
             }
@@ -694,7 +694,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (!allowDigitLetterContinuation && !allowNumericContinuation && previousWasWord)
                 {
-                    if (stringBuilder.Length > 0 && stringBuilder[^1] != delimiter)
+                    if (0 < stringBuilder.Length && stringBuilder[^1] != delimiter)
                     {
                         _ = stringBuilder.Append(delimiter);
                     }
@@ -885,7 +885,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         _ = stringBuilder.Append(token.Value);
                     }
-                    else if (stringBuilder.Length > 0 && stringBuilder[^1] != ' ')
+                    else if (0 < stringBuilder.Length && stringBuilder[^1] != ' ')
                     {
                         _ = stringBuilder.Append(' ');
                     }
@@ -921,7 +921,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     else if (
                         shouldInsertSpace
-                        && stringBuilder.Length > 0
+                        && 0 < stringBuilder.Length
                         && stringBuilder[^1] != ' '
                     )
                     {
@@ -1266,7 +1266,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            return input.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+            return 0 <= input.IndexOf(value, StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool EqualsIgnoreCase(this string input, string value)
@@ -1517,10 +1517,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int len = s.Length;
             int padding = 0;
-            if (len > 0 && s[len - 1] == '=')
+            if (0 < len && s[len - 1] == '=')
             {
                 padding = 1;
-                if (len > 1 && s[len - 2] == '=')
+                if (1 < len && s[len - 2] == '=')
                 {
                     padding = 2;
                 }
@@ -1607,7 +1607,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int estimated = 0;
-            if (count > 1 && input.Length > 0)
+            if (1 < count && 0 < input.Length)
             {
                 int maxMultiplier = int.MaxValue / input.Length;
                 if (count <= maxMultiplier)
@@ -1650,7 +1650,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (WordSeparators.Contains(current))
                 {
-                    if (currentWord.Length > 0)
+                    if (0 < currentWord.Length)
                     {
                         words.Add(currentWord.ToString());
                         currentWord.Clear();
@@ -1658,12 +1658,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     continue;
                 }
 
-                if (char.IsUpper(current) && i > 0)
+                if (char.IsUpper(current) && 0 < i)
                 {
                     char previous = input[i - 1];
                     if (!char.IsUpper(previous) && !WordSeparators.Contains(previous))
                     {
-                        if (currentWord.Length > 0)
+                        if (0 < currentWord.Length)
                         {
                             words.Add(currentWord.ToString());
                             currentWord.Clear();
@@ -1671,7 +1671,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     else if (i + 1 < input.Length && char.IsLower(input[i + 1]))
                     {
-                        if (currentWord.Length > 0)
+                        if (0 < currentWord.Length)
                         {
                             words.Add(currentWord.ToString());
                             currentWord.Clear();
@@ -1682,7 +1682,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 _ = currentWord.Append(current);
             }
 
-            if (currentWord.Length > 0)
+            if (0 < currentWord.Length)
             {
                 words.Add(currentWord.ToString());
             }

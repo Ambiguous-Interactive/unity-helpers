@@ -185,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if UNITY_EDITOR
                     WarnDuplicateSingletonAssets(type, entry);
 #endif
-                    return candidates.Count > 0;
+                    return 0 < candidates.Count;
                 }
             }
 
@@ -200,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         TryAddCandidate(candidates, candidate);
                     }
 
-                    if (candidates.Count > 0)
+                    if (0 < candidates.Count)
                     {
                         return true;
                     }

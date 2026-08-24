@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             get
             {
                 long total = HitCount + MissCount;
-                return total > 0 ? HitCount / (double)total : 0.0;
+                return 0 < total ? HitCount / (double)total : 0.0;
             }
         }
 

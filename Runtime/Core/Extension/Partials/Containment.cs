@@ -48,9 +48,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
-            return boundsMax.x >= otherMin.x
-                && boundsMax.y >= otherMin.y
-                && boundsMax.z >= otherMin.z;
+            return otherMin.x <= boundsMax.x
+                && otherMin.y <= boundsMax.y
+                && otherMin.z <= boundsMax.z;
         }
 
         /// <summary>
@@ -70,8 +70,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public static bool FastContains2D(this in BoundsInt bounds, FastVector3Int position)
         {
             BoundsInt self = bounds;
-            return position.x >= self.xMin
-                && position.y >= self.yMin
+            return self.xMin <= position.x
+                && self.yMin <= position.y
                 && position.x < self.xMax
                 && position.y < self.yMax;
         }
@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            return self.xMax >= other.xMin && self.yMax >= other.yMin;
+            return other.xMin <= self.xMax && other.yMin <= self.yMax;
         }
 
         /// <summary>
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
-            return boundsMax.x >= otherMin.x && boundsMax.y >= otherMin.y;
+            return otherMin.x <= boundsMax.x && otherMin.y <= boundsMax.y;
         }
 
         /// <summary>
@@ -221,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Vector3 boundsMax = self.max;
             Vector3 otherMin = other.min;
-            return boundsMax.x >= otherMin.x && boundsMax.y >= otherMin.y;
+            return otherMin.x <= boundsMax.x && otherMin.y <= boundsMax.y;
         }
 
         // =========================
@@ -237,11 +237,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Bounds self = bounds;
             Vector3 min = self.min;
             Vector3 max = self.max;
-            return p.x >= min.x - tolerance
+            return min.x - tolerance <= p.x
                 && p.x < max.x + tolerance
-                && p.y >= min.y - tolerance
+                && min.y - tolerance <= p.y
                 && p.y < max.y + tolerance
-                && p.z >= min.z - tolerance
+                && min.z - tolerance <= p.z
                 && p.z < max.z + tolerance;
         }
 
@@ -307,9 +307,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Vector3 amax = self.max;
             Vector3 bmin = b.min;
-            return amax.x + tolerance >= bmin.x
-                && amax.y + tolerance >= bmin.y
-                && amax.z + tolerance >= bmin.z;
+            return bmin.x <= amax.x + tolerance
+                && bmin.y <= amax.y + tolerance
+                && bmin.z <= amax.z + tolerance;
         }
 
         /// <summary>

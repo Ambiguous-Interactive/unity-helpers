@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             T candidate = null;
-            while (_idle.Count > 0)
+            while (0 < _idle.Count)
             {
                 // The last entry, so this removal is already the cheap one.
                 int last = _idle.Count - 1;
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _onRelease?.Invoke(taken);
 
-            if (_maxIdleCount > 0 && _idle.Count >= _maxIdleCount)
+            if (0 < _maxIdleCount && _maxIdleCount <= _idle.Count)
             {
                 _onDestroy?.Invoke(taken);
                 return true;

@@ -306,7 +306,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int segmentStart = startIndex - count + 1;
-            for (int i = startIndex; i >= segmentStart; --i)
+            for (int i = startIndex; segmentStart <= i; --i)
             {
                 if (comparer.Equals(readonlyList[i], element))
                 {
@@ -364,7 +364,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(readonlyList));
             }
 
-            return readonlyList.IndexOf(element, 0, readonlyList.Count, comparer) >= 0;
+            return 0 <= readonlyList.IndexOf(element, 0, readonlyList.Count, comparer);
         }
 
         /// <summary>
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(readonlyList));
             }
 
-            if ((uint)index >= (uint)readonlyList.Count)
+            if ((uint)readonlyList.Count <= (uint)index)
             {
                 value = default;
                 return false;
@@ -648,12 +648,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static void ValidateForwardSegment(int length, int startIndex, int count)
         {
-            if ((uint)startIndex > (uint)length)
+            if ((uint)length < (uint)startIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(startIndex));
             }
 
-            if (count < 0 || startIndex > length - count)
+            if (count < 0 || length - count < startIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(count));
             }
@@ -676,12 +676,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if ((uint)startIndex >= (uint)length)
+            if ((uint)length <= (uint)startIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(startIndex));
             }
 
-            if (count > startIndex + 1)
+            if (startIndex + 1 < count)
             {
                 throw new ArgumentOutOfRangeException(nameof(count));
             }

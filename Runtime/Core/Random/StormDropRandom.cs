@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             EnsureElements();
 
-            if (payload != null && payload.Length >= ElementByteSize)
+            if (payload != null && ElementByteSize <= payload.Length)
             {
                 Buffer.BlockCopy(payload, 0, _elements, 0, ElementByteSize);
                 return;

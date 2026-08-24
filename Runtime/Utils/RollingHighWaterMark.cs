@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 lock (_lock)
                 {
                     _windowSeconds =
-                        value > 0f ? value : PoolPurgeSettings.DefaultRollingWindowSeconds;
+                        0f < value ? value : PoolPurgeSettings.DefaultRollingWindowSeconds;
                 }
             }
         }
@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         public RollingHighWaterMark(float windowSeconds)
         {
             _windowSeconds =
-                windowSeconds > 0f ? windowSeconds : PoolPurgeSettings.DefaultRollingWindowSeconds;
+                0f < windowSeconds ? windowSeconds : PoolPurgeSettings.DefaultRollingWindowSeconds;
             _cachedPeak = 0;
             _samples = new CyclicBuffer<Sample>(MaxSampleCount);
             _peakDeque = new CyclicBuffer<Sample>(MaxSampleCount);
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _runningSum += value;
 
             // Update peak deque: maintain strictly decreasing invariant
-            while (_peakDeque.Count > 0 && _peakDeque[_peakDeque.Count - 1].Value <= value)
+            while (0 < _peakDeque.Count && _peakDeque[_peakDeque.Count - 1].Value <= value)
             {
                 _peakDeque.TryPopBack(out _);
             }
@@ -253,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float cutoff = currentTime - _windowSeconds;
 
-            while (_samples.Count > 0 && _samples[0].Time < cutoff)
+            while (0 < _samples.Count && _samples[0].Time < cutoff)
             {
                 _samples.TryPopFront(out Sample expired);
                 _runningSum -= expired.Value;
@@ -276,12 +276,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             float oldestSampleTime = _samples[0].Time;
-            while (_peakDeque.Count > 0 && _peakDeque[0].Time < oldestSampleTime)
+            while (0 < _peakDeque.Count && _peakDeque[0].Time < oldestSampleTime)
             {
                 _peakDeque.TryPopFront(out _);
             }
 
-            _cachedPeak = _peakDeque.Count > 0 ? _peakDeque[0].Value : 0;
+            _cachedPeak = 0 < _peakDeque.Count ? _peakDeque[0].Value : 0;
         }
     }
 
@@ -455,7 +455,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 lock (_lock)
                 {
-                    return _lastRentalTime > _lastReturnTime ? _lastRentalTime : _lastReturnTime;
+                    return _lastReturnTime < _lastRentalTime ? _lastRentalTime : _lastReturnTime;
                 }
             }
         }
@@ -621,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _currentlyRented++;
                 _totalRentalCount++;
 
-                if (_previousRentalTime > 0f && currentTime >= _previousRentalTime)
+                if (0f < _previousRentalTime && _previousRentalTime <= currentTime)
                 {
                     float interRentalTime = currentTime - _previousRentalTime;
                     _totalInterRentalTimeSeconds += interRentalTime;
@@ -631,7 +631,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _previousRentalTime = currentTime;
                 _lastRentalTime = currentTime;
 
-                if (_currentlyRented > _peakConcurrentRentals)
+                if (_peakConcurrentRentals < _currentlyRented)
                 {
                     _peakConcurrentRentals = _currentlyRented;
                 }
@@ -641,8 +641,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _currentlyRented
                 );
                 if (
-                    _spikeThresholdMultiplier > 0f
-                    && _currentlyRented > average * _spikeThresholdMultiplier
+                    0f < _spikeThresholdMultiplier
+                    && average * _spikeThresholdMultiplier < _currentlyRented
                 )
                 {
                     _lastSpikeTime = currentTime;
@@ -660,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                if (_currentlyRented > 0)
+                if (0 < _currentlyRented)
                 {
                     _currentlyRented--;
                 }
@@ -729,7 +729,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             MemoryPressureLevel pressureLevel
         )
         {
-            if (pressureLevel >= MemoryPressureLevel.High)
+            if (MemoryPressureLevel.High <= pressureLevel)
             {
                 return effectiveMinRetainCount;
             }
@@ -742,31 +742,31 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 buffer = _bufferMultiplier;
                 rentalsPerMin = _cachedRentalsPerMinute;
-                lastAccess = _lastRentalTime > _lastReturnTime ? _lastRentalTime : _lastReturnTime;
+                lastAccess = _lastReturnTime < _lastRentalTime ? _lastRentalTime : _lastReturnTime;
             }
 
-            if (rentalsPerMin >= HighFrequencyThreshold)
+            if (HighFrequencyThreshold <= rentalsPerMin)
             {
                 buffer *= HighFrequencyBufferBoost;
             }
 
             if (pressureLevel == MemoryPressureLevel.Medium)
             {
-                buffer = buffer > MediumPressureBufferCap ? MediumPressureBufferCap : buffer;
+                buffer = MediumPressureBufferCap < buffer ? MediumPressureBufferCap : buffer;
             }
             else if (pressureLevel == MemoryPressureLevel.Low)
             {
-                buffer = buffer > LowPressureBufferCap ? LowPressureBufferCap : buffer;
+                buffer = LowPressureBufferCap < buffer ? LowPressureBufferCap : buffer;
             }
 
             float unusedThresholdSeconds = UnusedPoolThresholdMinutes * SecondsPerMinute;
-            if (lastAccess > 0f && (currentTime - lastAccess) >= unusedThresholdSeconds)
+            if (0f < lastAccess && unusedThresholdSeconds <= (currentTime - lastAccess))
             {
                 return effectiveMinRetainCount;
             }
 
             int bufferedSize = (int)(rollingPeak * buffer);
-            return bufferedSize > effectiveMinRetainCount ? bufferedSize : effectiveMinRetainCount;
+            return effectiveMinRetainCount < bufferedSize ? bufferedSize : effectiveMinRetainCount;
         }
 
         /// <summary>
@@ -790,8 +790,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 float effectiveIdleTimeout = baseIdleTimeoutSeconds;
                 if (
                     _cachedRentalsPerMinute <= LowFrequencyThreshold
-                    && _cachedRentalsPerMinute > 0f
-                    && _totalRentalCount > 0
+                    && 0f < _cachedRentalsPerMinute
+                    && 0 < _totalRentalCount
                 )
                 {
                     effectiveIdleTimeout = baseIdleTimeoutSeconds * LowFrequencyTimeoutMultiplier;
@@ -802,10 +802,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (pressureLevel < MemoryPressureLevel.Medium)
                 {
                     bool isActive =
-                        baseIdleTimeoutSeconds > 0f
+                        0f < baseIdleTimeoutSeconds
                         && (currentTime - _lastRentalTime) < baseIdleTimeoutSeconds;
                     int warmFloor = isActive ? warmRetainCount : 0;
-                    effectiveMinRetain = warmFloor > minRetainCount ? warmFloor : minRetainCount;
+                    effectiveMinRetain = minRetainCount < warmFloor ? warmFloor : minRetainCount;
                 }
 
                 // Comfortable size
@@ -814,7 +814,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     comfortableSize = effectiveMinRetain;
                 }
-                else if (pressureLevel >= MemoryPressureLevel.High)
+                else if (MemoryPressureLevel.High <= pressureLevel)
                 {
                     comfortableSize = effectiveMinRetain;
                 }
@@ -823,7 +823,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     int rollingPeak = _rollingHighWaterMark.GetPeak(currentTime);
                     float buffer = _bufferMultiplier;
 
-                    if (_cachedRentalsPerMinute >= HighFrequencyThreshold)
+                    if (HighFrequencyThreshold <= _cachedRentalsPerMinute)
                     {
                         buffer *= HighFrequencyBufferBoost;
                     }
@@ -831,17 +831,17 @@ namespace WallstopStudios.UnityHelpers.Utils
                     if (pressureLevel == MemoryPressureLevel.Medium)
                     {
                         buffer =
-                            buffer > MediumPressureBufferCap ? MediumPressureBufferCap : buffer;
+                            MediumPressureBufferCap < buffer ? MediumPressureBufferCap : buffer;
                     }
                     else if (pressureLevel == MemoryPressureLevel.Low)
                     {
-                        buffer = buffer > LowPressureBufferCap ? LowPressureBufferCap : buffer;
+                        buffer = LowPressureBufferCap < buffer ? LowPressureBufferCap : buffer;
                     }
 
                     float unusedThresholdSeconds = UnusedPoolThresholdMinutes * SecondsPerMinute;
                     float lastAccess =
-                        _lastRentalTime > _lastReturnTime ? _lastRentalTime : _lastReturnTime;
-                    if (lastAccess > 0f && (currentTime - lastAccess) >= unusedThresholdSeconds)
+                        _lastReturnTime < _lastRentalTime ? _lastRentalTime : _lastReturnTime;
+                    if (0f < lastAccess && unusedThresholdSeconds <= (currentTime - lastAccess))
                     {
                         comfortableSize = effectiveMinRetain;
                     }
@@ -849,7 +849,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     {
                         int bufferedSize = (int)(rollingPeak * buffer);
                         comfortableSize =
-                            bufferedSize > effectiveMinRetain ? bufferedSize : effectiveMinRetain;
+                            effectiveMinRetain < bufferedSize ? bufferedSize : effectiveMinRetain;
                     }
                 }
 
@@ -857,10 +857,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bool inHysteresis = false;
                 if (useIntelligent)
                 {
-                    bool ignoreForPressure = pressureLevel >= MemoryPressureLevel.High;
+                    bool ignoreForPressure = MemoryPressureLevel.High <= pressureLevel;
                     if (
                         !ignoreForPressure
-                        && _lastSpikeTime > 0f
+                        && 0f < _lastSpikeTime
                         && currentTime - _lastSpikeTime < _hysteresisSeconds
                     )
                     {
@@ -928,7 +928,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             MemoryPressureLevel pressureLevel
         )
         {
-            if (pressureLevel >= MemoryPressureLevel.Medium)
+            if (MemoryPressureLevel.Medium <= pressureLevel)
             {
                 return minRetainCount;
             }
@@ -940,9 +940,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             bool isActive =
-                idleTimeoutSeconds > 0f && (currentTime - lastRental) < idleTimeoutSeconds;
+                0f < idleTimeoutSeconds && (currentTime - lastRental) < idleTimeoutSeconds;
             int warmFloor = isActive ? warmRetainCount : 0;
-            return warmFloor > minRetainCount ? warmFloor : minRetainCount;
+            return minRetainCount < warmFloor ? warmFloor : minRetainCount;
         }
 
         /// <summary>
@@ -972,7 +972,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                return _cachedRentalsPerMinute >= HighFrequencyThreshold;
+                return HighFrequencyThreshold <= _cachedRentalsPerMinute;
             }
         }
 
@@ -985,7 +985,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                return _cachedRentalsPerMinute <= LowFrequencyThreshold && _totalRentalCount > 0;
+                return _cachedRentalsPerMinute <= LowFrequencyThreshold && 0 < _totalRentalCount;
             }
         }
 
@@ -999,14 +999,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             lock (_lock)
             {
                 float lastAccess =
-                    _lastRentalTime > _lastReturnTime ? _lastRentalTime : _lastReturnTime;
+                    _lastReturnTime < _lastRentalTime ? _lastRentalTime : _lastReturnTime;
                 if (lastAccess <= 0f)
                 {
                     return false;
                 }
 
                 float unusedThresholdSeconds = UnusedPoolThresholdMinutes * SecondsPerMinute;
-                return (currentTime - lastAccess) >= unusedThresholdSeconds;
+                return unusedThresholdSeconds <= (currentTime - lastAccess);
             }
         }
 
@@ -1019,7 +1019,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                if (_cachedRentalsPerMinute >= HighFrequencyThreshold)
+                if (HighFrequencyThreshold <= _cachedRentalsPerMinute)
                 {
                     return _bufferMultiplier * HighFrequencyBufferBoost;
                 }
@@ -1040,8 +1040,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 if (
                     _cachedRentalsPerMinute <= LowFrequencyThreshold
-                    && _cachedRentalsPerMinute > 0f
-                    && _totalRentalCount > 0
+                    && 0f < _cachedRentalsPerMinute
+                    && 0 < _totalRentalCount
                 )
                 {
                     return baseIdleTimeoutSeconds * LowFrequencyTimeoutMultiplier;
@@ -1063,9 +1063,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 UpdateFrequencyTrackingLocked(currentTime);
 
                 float lastAccess =
-                    _lastRentalTime > _lastReturnTime ? _lastRentalTime : _lastReturnTime;
+                    _lastReturnTime < _lastRentalTime ? _lastRentalTime : _lastReturnTime;
                 float averageInterRentalTime =
-                    _interRentalCount > 0
+                    0 < _interRentalCount
                         ? (float)(_totalInterRentalTimeSeconds / _interRentalCount)
                         : 0f;
 
@@ -1074,12 +1074,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                     averageInterRentalTimeSeconds: averageInterRentalTime,
                     lastAccessTime: lastAccess,
                     totalRentalCount: _totalRentalCount,
-                    isHighFrequency: _cachedRentalsPerMinute >= HighFrequencyThreshold,
+                    isHighFrequency: HighFrequencyThreshold <= _cachedRentalsPerMinute,
                     isLowFrequency: _cachedRentalsPerMinute <= LowFrequencyThreshold
-                        && _totalRentalCount > 0,
-                    isUnused: lastAccess > 0f
-                        && (currentTime - lastAccess)
-                            >= UnusedPoolThresholdMinutes * SecondsPerMinute
+                        && 0 < _totalRentalCount,
+                    isUnused: 0f < lastAccess
+                        && UnusedPoolThresholdMinutes * SecondsPerMinute
+                            <= (currentTime - lastAccess)
                 );
             }
         }
@@ -1135,9 +1135,9 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float windowElapsed = currentTime - _windowStartTime;
 
-            if (windowElapsed >= DefaultFrequencyWindowSeconds)
+            if (DefaultFrequencyWindowSeconds <= windowElapsed)
             {
-                if (windowElapsed > 0f)
+                if (0f < windowElapsed)
                 {
                     _cachedRentalsPerMinute =
                         _rentalCountThisWindow * (SecondsPerMinute / DefaultFrequencyWindowSeconds);
@@ -1146,7 +1146,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _rentalCountThisWindow = incrementRental ? 1 : 0;
                 _windowStartTime = currentTime;
             }
-            else if (windowElapsed > 0f)
+            else if (0f < windowElapsed)
             {
                 float estimatedMinuteRate =
                     _rentalCountThisWindow * (SecondsPerMinute / windowElapsed);

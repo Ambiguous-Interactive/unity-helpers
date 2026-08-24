@@ -106,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static int TrailingDigitRunStart(string name)
         {
             int index = name.Length;
-            while (index > 0 && IsAsciiDigit(name[index - 1]))
+            while (0 < index && IsAsciiDigit(name[index - 1]))
             {
                 --index;
             }

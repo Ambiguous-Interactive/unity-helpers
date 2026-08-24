@@ -74,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Enabled = enabled;
             IdleTimeoutSeconds = null;
             MinRetainCount = null;
-            WarmRetainCount = warmRetainCount >= 0 ? warmRetainCount : null;
+            WarmRetainCount = 0 <= warmRetainCount ? warmRetainCount : null;
         }
 
         /// <summary>
@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Enabled = enabled;
             IdleTimeoutSeconds = idleTimeoutSeconds;
             MinRetainCount = null;
-            WarmRetainCount = warmRetainCount >= 0 ? warmRetainCount : null;
+            WarmRetainCount = 0 <= warmRetainCount ? warmRetainCount : null;
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Enabled = enabled;
             IdleTimeoutSeconds = idleTimeoutSeconds;
             MinRetainCount = minRetainCount;
-            WarmRetainCount = warmRetainCount >= 0 ? warmRetainCount : null;
+            WarmRetainCount = 0 <= warmRetainCount ? warmRetainCount : null;
         }
     }
 }

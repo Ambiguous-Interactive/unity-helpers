@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return floor;
             }
 
-            return statedCapacity > ceiling ? ceiling : statedCapacity;
+            return ceiling < statedCapacity ? ceiling : statedCapacity;
         }
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             int floor = deliveredCount < 0 ? 0 : deliveredCount;
             int ceiling = _maximumRestoredCapacity < floor ? floor : _maximumRestoredCapacity;
-            if (statedCapacity > ceiling)
+            if (ceiling < statedCapacity)
             {
                 capacity = 0;
                 return false;

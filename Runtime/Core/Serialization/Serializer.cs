@@ -1192,7 +1192,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int capacity = wrapper.Capacity;
             if (capacity <= 0)
             {
-                capacity = itemCount > 0 ? itemCount : Deque<T>.DefaultCapacity;
+                capacity = 0 < itemCount ? itemCount : Deque<T>.DefaultCapacity;
             }
 
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
@@ -1209,7 +1209,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             T[] items = null;
             int count = input.Count;
-            if (count > 0)
+            if (0 < count)
             {
                 items = new T[count];
                 for (int i = 0; i < count; i++)
@@ -1273,7 +1273,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 for (int i = 0; i < itemCount; i++)
                 {
                     int candidate = wrapper.Elements[i] + 1;
-                    if (candidate > capacity)
+                    if (capacity < candidate)
                     {
                         capacity = candidate;
                     }
@@ -2728,7 +2728,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             using Utils.PooledResource<PooledArrayBufferWriter> lease =
                 PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter bufferWriter);
-            if (sizeHint > 0)
+            if (0 < sizeHint)
             {
                 bufferWriter.Preallocate(sizeHint);
             }
@@ -3490,8 +3490,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 int read;
                 while (
-                    (read = await input.ReadAsync(buffer, 0, bufferLease.length, cancellationToken))
-                    > 0
+                    0
+                    < (
+                        read = await input.ReadAsync(
+                            buffer,
+                            0,
+                            bufferLease.length,
+                            cancellationToken
+                        )
+                    )
                 )
                 {
                     stream.Write(buffer, 0, read);
@@ -3733,7 +3740,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int newLen = (int)value;
             EnsureCapacity(newLen);
             _length = newLen;
-            if (_position > _length)
+            if (_length < _position)
             {
                 _position = _length;
             }
@@ -3745,7 +3752,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             EnsureCapacity(endPos);
             Array.Copy(buffer, offset, _buffer, _position, count);
             _position = endPos;
-            if (endPos > _length)
+            if (_length < endPos)
             {
                 _length = endPos;
             }
@@ -3757,7 +3764,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             EnsureCapacity(endPos);
             _buffer[_position] = value;
             _position = endPos;
-            if (endPos > _length)
+            if (_length < endPos)
             {
                 _length = endPos;
             }
@@ -3765,7 +3772,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private void EnsureCapacity(int required)
         {
-            if (_buffer.Length >= required)
+            if (required <= _buffer.Length)
             {
                 return;
             }
@@ -3781,7 +3788,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 newSize = newSize < 1024 ? newSize * 2 : newSize + (newSize >> 1);
             }
             byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
-            if (_length > 0)
+            if (0 < _length)
             {
                 Array.Copy(_buffer, newBuf, _length);
             }
@@ -3812,7 +3819,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 buffer = new byte[_length];
             }
 
-            if (_length > 0)
+            if (0 < _length)
             {
                 Array.Copy(_buffer, buffer, _length);
             }
@@ -3827,7 +3834,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             EnsureCapacity(endPos);
             buffer.CopyTo(new Span<byte>(_buffer, _position, count));
             _position = endPos;
-            if (endPos > _length)
+            if (_length < endPos)
             {
                 _length = endPos;
             }
@@ -3877,7 +3884,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 sizeHint = 1;
             }
             int required = _written + sizeHint;
-            if (_buffer.Length >= required)
+            if (required <= _buffer.Length)
             {
                 return;
             }
@@ -3889,7 +3896,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
-            if (_written > 0)
+            if (0 < _written)
             {
                 Buffer.BlockCopy(_buffer, 0, newBuf, 0, _written);
             }
@@ -3927,7 +3934,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 buffer = new byte[_written];
             }
-            if (_written > 0)
+            if (0 < _written)
             {
                 Buffer.BlockCopy(_buffer, 0, buffer, 0, _written);
             }
@@ -4018,7 +4025,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 throw new ArgumentNullException(nameof(buffer));
             }
 
-            if ((uint)offset > buffer.Length || (uint)count > buffer.Length - offset)
+            if (buffer.Length < (uint)offset || buffer.Length - offset < (uint)count)
             {
                 throw new ArgumentOutOfRangeException();
             }
@@ -4027,7 +4034,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 return 0;
             }
-            if (count > remaining)
+            if (remaining < count)
             {
                 count = remaining;
             }
@@ -4047,7 +4054,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             int toCopy = destination.Length;
-            if (toCopy > remaining)
+            if (remaining < toCopy)
             {
                 toCopy = remaining;
             }
@@ -4069,7 +4076,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public override int ReadByte()
         {
-            if (_position >= _length)
+            if (_length <= _position)
             {
                 return -1;
             }

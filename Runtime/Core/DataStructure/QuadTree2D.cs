@@ -346,8 +346,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 int entryIndex = source[i];
                 Vector2 position = entries[entryIndex].position;
-                bool east = position.x > centerX;
-                bool north = position.y >= centerY;
+                bool east = centerX < position.x;
+                bool north = centerY <= position.y;
                 int quadrant = east
                     ? north
                         ? 1
@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 starts[q] = running;
                 next[q] = running;
                 running += counts[q];
-                if (counts[q] > maxChildCount)
+                if (maxChildCount < counts[q])
                 {
                     maxChildCount = counts[q];
                 }
@@ -380,8 +380,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 int entryIndex = source[i];
                 Vector2 position = entries[entryIndex].position;
-                bool east = position.x > centerX;
-                bool north = position.y >= centerY;
+                bool east = centerX < position.x;
+                bool north = centerY <= position.y;
                 int quadrant = east
                     ? north
                         ? 1
@@ -494,7 +494,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         Entry entry = entries[indices[i]];
                         float squareDistance = (entry.position - position).sqrMagnitude;
-                        if (squareDistance > rangeSquared)
+                        if (rangeSquared < squareDistance)
                         {
                             continue;
                         }
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 0; i < childNodes.Length; ++i)
                 {
                     QuadTreeNode child = childNodes[i];
-                    if (child is not null && child._count > 0)
+                    if (child is not null && 0 < child._count)
                     {
                         childrenBuffer.Add(child);
                     }
@@ -658,7 +658,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 SortChildrenByDistance(childrenBuffer, position);
-                for (int i = childrenBuffer.Count - 1; i >= 0; --i)
+                for (int i = childrenBuffer.Count - 1; 0 <= i; --i)
                 {
                     nodeBuffer.Push(childrenBuffer[i]);
                 }
@@ -716,7 +716,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 QuadTreeNode value = nodes[i];
                 float valueDistance = GetSqrDistance(value, searchPosition);
                 int j = i - 1;
-                while (j >= 0 && valueDistance < GetSqrDistance(nodes[j], searchPosition))
+                while (0 <= j && valueDistance < GetSqrDistance(nodes[j], searchPosition))
                 {
                     nodes[j + 1] = nodes[j];
                     --j;

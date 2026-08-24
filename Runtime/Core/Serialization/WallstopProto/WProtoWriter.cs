@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (
                 fieldNumber <= 0
-                || fieldNumber > WProtoWireType.MaxFieldNumber
+                || WProtoWireType.MaxFieldNumber < fieldNumber
                 || !WProtoWireType.IsDefined(wireType)
             )
             {
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int index = start;
-            while (value >= 0x80UL)
+            while (0x80UL <= value)
             {
                 _buffer[index++] = (byte)(value | 0x80UL);
                 value >>= 7;
@@ -277,7 +277,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // Subtract rather than add: `prefixSize + value.Length` overflows int for a span near
             // int.MaxValue, and a wrapped comparison would let the prefix through and then refuse
             // the payload -- the orphaned prefix this method exists to prevent.
-            if (_faulted || value.Length > Remaining - prefixSize)
+            if (_faulted || Remaining - prefixSize < value.Length)
             {
                 _faulted = true;
                 return false;
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             int byteCount = WProtoSizes.Utf8ByteCount(value);
             int prefixSize = WProtoSizes.Varint32Size((uint)byteCount);
-            if (_faulted || byteCount > Remaining - prefixSize)
+            if (_faulted || Remaining - prefixSize < byteCount)
             {
                 _faulted = true;
                 return false;
@@ -514,7 +514,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out WProtoLengthToken token
         )
         {
-            if (nested && _depth >= WProtoReader.MaxNestingDepth)
+            if (nested && WProtoReader.MaxNestingDepth <= _depth)
             {
                 _faulted = true;
                 token = default;
@@ -599,9 +599,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int prefixSize = WProtoSizes.Varint32Size((uint)length);
 
             int prefixDelta = prefixSize - reservedPrefixSize;
-            if (prefixDelta > 0)
+            if (0 < prefixDelta)
             {
-                if (prefixDelta > _buffer.Length - _position)
+                if (_buffer.Length - _position < prefixDelta)
                 {
                     _faulted = true;
                     return false;
@@ -626,7 +626,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             uint remaining = (uint)length;
             int index = prefixStart;
-            while (remaining >= 0x80u)
+            while (0x80u <= remaining)
             {
                 _buffer[index++] = (byte)(remaining | 0x80u);
                 remaining >>= 7;
@@ -639,7 +639,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReserve(int count, out int start)
         {
-            if (_faulted || count > _buffer.Length - _position)
+            if (_faulted || _buffer.Length - _position < count)
             {
                 _faulted = true;
                 start = 0;

@@ -229,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     component,
                                     CreateTypedArray(metadata.elementType, cache, filteredCount)
                                 );
-                                foundChild = filteredCount > 0;
+                                foundChild = 0 < filteredCount;
                                 break;
                             }
                             case FieldKind.List:
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                 if (list == null)
                                 {
                                     int initialCapacity =
-                                        metadata.attribute.MaxCount > 0
+                                        0 < metadata.attribute.MaxCount
                                             ? metadata.attribute.MaxCount
                                             : 0;
                                     list = metadata.listCreator(initialCapacity);
@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     }
                                 );
 
-                                foundChild = added > 0;
+                                foundChild = 0 < added;
                                 break;
                             }
                             case FieldKind.HashSet:
@@ -275,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                 else
                                 {
                                     int initialCapacity =
-                                        metadata.attribute.MaxCount > 0
+                                        0 < metadata.attribute.MaxCount
                                             ? metadata.attribute.MaxCount
                                             : 0;
                                     instance = metadata.hashSetCreator(initialCapacity);
@@ -294,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     }
                                 );
 
-                                foundChild = added > 0;
+                                foundChild = 0 < added;
                                 break;
                             }
                             default:
@@ -381,7 +381,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
         {
             ChildComponentAttribute attribute = metadata.attribute;
-            if (metadata.isInterface || filters.RequiresPostProcessing || attribute.MaxDepth > 0)
+            if (metadata.isInterface || filters.RequiresPostProcessing || 0 < attribute.MaxDepth)
             {
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
                 ChildFallbackMarker.Begin();
@@ -451,7 +451,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return source.Count;
             }
 
-            int limit = maxCount > 0 ? Math.Min(maxCount, source.Count) : source.Count;
+            int limit = 0 < maxCount ? Math.Min(maxCount, source.Count) : source.Count;
             int writeIndex = 0;
 
             for (int i = 0; i < source.Count && writeIndex < limit; ++i)
@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     position++;
                 }
 
-                if (position >= list.Count)
+                if (list.Count <= position)
                 {
                     grouped.Remove(transform);
                     positions.Remove(transform);
@@ -560,7 +560,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
             }
 
-            if (writeIndex < length && grouped.Count > 0)
+            if (writeIndex < length && 0 < grouped.Count)
             {
                 foreach (KeyValuePair<Transform, List<Component>> pair in grouped)
                 {
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         ++writeIndex;
                         position++;
                     }
-                    if (writeIndex >= length)
+                    if (length <= writeIndex)
                     {
                         break;
                     }
@@ -597,7 +597,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            for (int i = groupedListLeases.Count - 1; i >= 0; --i)
+            for (int i = groupedListLeases.Count - 1; 0 <= i; --i)
             {
                 groupedListLeases[i].Dispose();
             }
@@ -615,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 count = 0;
             }
-            else if (count > components.Count)
+            else if (components.Count < count)
             {
                 count = components.Count;
             }
@@ -628,7 +628,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         component,
                         CreateTypedArray(metadata.elementType, components, count)
                     );
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.List:
                 {
@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         list.Add(components[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.HashSet:
                 {
@@ -667,7 +667,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         metadata.hashSetAdder(hashSet, components[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 default:
                 {
@@ -742,7 +742,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             ChildComponentAttribute attribute = metadata.attribute;
-            int maxAssignments = attribute.MaxCount > 0 ? attribute.MaxCount : int.MaxValue;
+            int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
             int added = 0;
 
             using PooledResource<List<Component>> componentBuffer = Buffers<Component>.List.Get(
@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     }
 
                     added++;
-                    if (added >= maxAssignments)
+                    if (maxAssignments <= added)
                     {
                         return added;
                     }

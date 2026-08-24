@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            bool resetAfterAdd = _entries.Count > 0 && _remaining.Count == 0;
+            bool resetAfterAdd = 0 < _entries.Count && _remaining.Count == 0;
             for (int i = 0; i < tickets; ++i)
             {
                 _entries.Add(item);

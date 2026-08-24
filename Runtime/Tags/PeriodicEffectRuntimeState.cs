@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Indicates whether the runtime has executed the maximum allowed ticks for the definition.
         /// </summary>
-        internal bool IsComplete => definition.maxTicks > 0 && ExecutedTicks >= definition.maxTicks;
+        internal bool IsComplete => 0 < definition.maxTicks && definition.maxTicks <= ExecutedTicks;
 
         /// <summary>
         /// The absolute timestamp (in seconds) when the next tick should execute.

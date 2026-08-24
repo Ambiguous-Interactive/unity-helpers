@@ -778,7 +778,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 initialDelay += SampleInitialJitter(interval);
             }
 
-            if (initialDelay > 0f)
+            if (0f < initialDelay)
             {
                 yield return WaitForDelay(initialDelay);
             }
@@ -1204,7 +1204,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     phiArgument = -1;
                 }
-                else if (phiArgument > 1)
+                else if (1 < phiArgument)
                 {
                     phiArgument = 1;
                 }

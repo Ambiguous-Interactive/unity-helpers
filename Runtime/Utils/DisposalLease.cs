@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return;
                 }
 
-                if (required > _generations.Length)
+                if (_generations.Length < required)
                 {
                     int capacity = _generations.Length * 2;
                     while (capacity < required)

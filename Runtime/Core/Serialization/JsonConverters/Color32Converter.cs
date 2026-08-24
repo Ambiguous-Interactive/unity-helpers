@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         private static byte ReadByte(ref Utf8JsonReader reader)
         {
             int v = reader.GetInt32();
-            if ((uint)v > 255u)
+            if (255u < (uint)v)
             {
                 throw new JsonException("Color32 channel out of range");
             }

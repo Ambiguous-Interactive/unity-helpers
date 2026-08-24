@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 int maxWordLength;
-                if (wordList.Count > 0)
+                if (0 < wordList.Count)
                 {
                     maxWordLength = wordList[0].Length;
                     for (int i = 1; i < wordList.Count; ++i)
@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         // Recursive collection without allocations
         private void Collect(int node, List<string> results, int maxResults, StringBuilder builder)
         {
-            if (results.Count >= maxResults)
+            if (maxResults <= results.Count)
             {
                 return;
             }
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (_isWord[node])
             {
                 results.Add(builder.ToString());
-                if (results.Count >= maxResults)
+                if (maxResults <= results.Count)
                 {
                     return;
                 }
@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 builder.Append(_chars[child]);
                 Collect(child, results, maxResults, builder);
                 builder.Length--;
-                if (results.Count >= maxResults)
+                if (maxResults <= results.Count)
                 {
                     return;
                 }
@@ -563,7 +563,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         // Recursive collection without extra allocations
         private void Collect(int node, List<T> results, int maxResults)
         {
-            if (results.Count >= maxResults)
+            if (maxResults <= results.Count)
             {
                 return;
             }
@@ -571,7 +571,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (_hasValue[node])
             {
                 results.Add(_values[node]);
-                if (results.Count >= maxResults)
+                if (maxResults <= results.Count)
                 {
                     return;
                 }
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             for (int child = _firstChild[node]; child != Poison; child = _nextSibling[child])
             {
                 Collect(child, results, maxResults);
-                if (results.Count >= maxResults)
+                if (maxResults <= results.Count)
                 {
                     return;
                 }
@@ -623,7 +623,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
 
                 // Initialize with root node
-                if (_trie._nodeCount >= 1)
+                if (1 <= _trie._nodeCount)
                 {
                     _stack.Push(0);
                 }

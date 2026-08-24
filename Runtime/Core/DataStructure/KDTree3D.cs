@@ -171,15 +171,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minZ = position.z;
                 }
-                if (position.x > maxX)
+                if (maxX < position.x)
                 {
                     maxX = position.x;
                 }
-                if (position.y > maxY)
+                if (maxY < position.y)
                 {
                     maxY = position.y;
                 }
-                if (position.z > maxZ)
+                if (maxZ < position.z)
                 {
                     maxZ = position.z;
                 }
@@ -283,15 +283,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minZ = pz;
                 }
-                if (px > maxX)
+                if (maxX < px)
                 {
                     maxX = px;
                 }
-                if (py > maxY)
+                if (maxY < py)
                 {
                     maxY = py;
                 }
-                if (pz > maxZ)
+                if (maxZ < pz)
                 {
                     maxZ = pz;
                 }
@@ -382,15 +382,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minZ = pz;
                 }
-                if (px > maxX)
+                if (maxX < px)
                 {
                     maxX = px;
                 }
-                if (py > maxY)
+                if (maxY < py)
                 {
                     maxY = py;
                 }
-                if (pz > maxZ)
+                if (maxZ < pz)
                 {
                     maxZ = pz;
                 }
@@ -426,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         i++;
                     }
 
-                    while (i <= j && axisValues[span[j]] > pivot)
+                    while (i <= j && pivot < axisValues[span[j]])
                     {
                         j--;
                     }
@@ -445,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                if (k >= i)
+                if (i <= k)
                 {
                     left = i;
                     continue;
@@ -463,18 +463,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float midValue = axisValues[span[mid]];
             float rightValue = axisValues[span[right]];
 
-            if (leftValue > midValue)
+            if (midValue < leftValue)
             {
                 (span[left], span[mid]) = (span[mid], span[left]);
                 (leftValue, midValue) = (midValue, leftValue);
             }
 
-            if (midValue > rightValue)
+            if (rightValue < midValue)
             {
                 (span[mid], span[right]) = (span[right], span[mid]);
                 (midValue, rightValue) = (rightValue, midValue);
 
-                if (leftValue > midValue)
+                if (midValue < leftValue)
                 {
                     (span[left], span[mid]) = (span[mid], span[left]);
                     (leftValue, midValue) = (midValue, leftValue);
@@ -497,7 +497,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 float currentValue = axisValues[currentIndex];
                 int j = i - 1;
 
-                while (j >= 0 && axisValues[span[j]] > currentValue)
+                while (0 <= j && currentValue < axisValues[span[j]])
                 {
                     span[j + 1] = span[j];
                     j--;
@@ -681,7 +681,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                                         elementIndex,
                                         position
                                     );
-                                    if (squareDistance > minimumRangeSquared)
+                                    if (minimumRangeSquared < squareDistance)
                                     {
                                         elementsInRange.Add(values[elementIndex]);
                                     }
@@ -696,7 +696,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         {
                             int elementIndex = indices[i];
                             float squareDistance = GetDistanceSquared(elementIndex, position);
-                            if (squareDistance > rangeSquared)
+                            if (rangeSquared < squareDistance)
                             {
                                 continue;
                             }
@@ -714,13 +714,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 KdTreeNode left = currentNode.left;
-                if (left is not null && left._count > 0 && bounds.Intersects(left.boundary))
+                if (left is not null && 0 < left._count && bounds.Intersects(left.boundary))
                 {
                     nodesToVisit.Push(left);
                 }
 
                 KdTreeNode right = currentNode.right;
-                if (right is not null && right._count > 0 && bounds.Intersects(right.boundary))
+                if (right is not null && 0 < right._count && bounds.Intersects(right.boundary))
                 {
                     nodesToVisit.Push(right);
                 }
@@ -783,13 +783,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 // Once we've reached an internal node that intersects the query,
                 // visit both non-empty children and rely on per-point checks.
                 KdTreeNode left = currentNode.left;
-                if (left is not null && left._count > 0)
+                if (left is not null && 0 < left._count)
                 {
                     nodesToVisit.Push(left);
                 }
 
                 KdTreeNode right = currentNode.right;
-                if (right is not null && right._count > 0)
+                if (right is not null && 0 < right._count)
                 {
                     nodesToVisit.Push(right);
                 }
@@ -862,7 +862,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 float rightDistance = (right.boundary.center - position).sqrMagnitude;
                 if (leftDistance < rightDistance)
                 {
-                    if (right._count > 0)
+                    if (0 < right._count)
                     {
                         nodeBuffer.Push(right);
                     }
@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else
                 {
-                    if (left._count > 0)
+                    if (0 < left._count)
                     {
                         nodeBuffer.Push(left);
                     }
@@ -915,7 +915,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            if (neighborCandidates.Count > 1)
+            if (1 < neighborCandidates.Count)
             {
                 neighborCandidates.Sort(NeighborComparer.Instance);
             }

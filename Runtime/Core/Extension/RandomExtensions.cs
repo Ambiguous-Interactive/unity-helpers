@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double total = 0;
             for (int i = 0; i < weights.Count; i++)
             {
-                if (weights[i] > 0)
+                if (0 < weights[i])
                 {
                     total += weights[i];
                 }
@@ -852,7 +852,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 float lengthSquared = x * x + y * y + z * z;
                 if (
                     !float.IsFinite(lengthSquared)
-                    || lengthSquared > 1f
+                    || 1f < lengthSquared
                     || lengthSquared < MinLengthSquared
                 )
                 {
@@ -1479,7 +1479,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public static bool NextBool(this IRandom random, float probability)
         {
-            if (probability < 0f || probability > 1f)
+            if (probability < 0f || 1f < probability)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(probability),
@@ -1592,7 +1592,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (items is IReadOnlyList<T> itemsList)
             {
-                if (count > itemsList.Count)
+                if (itemsList.Count < count)
                 {
                     throw new ArgumentException(
                         "Count cannot exceed the number of items",
@@ -1613,7 +1613,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> materializedList);
             materializedList.AddRange(items);
 
-            if (count > materializedList.Count)
+            if (materializedList.Count < count)
             {
                 throw new ArgumentException(
                     "Count cannot exceed the number of items",

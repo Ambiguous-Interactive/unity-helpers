@@ -40,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             double frameMilliseconds = 1000d / fps;
-            return frameMilliseconds > 0
+            return 0 < frameMilliseconds
                 && frameMilliseconds <= TimeSpan.MaxValue.TotalMilliseconds;
         }
 
@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         private bool CanSelfUpdate()
         {
-            return _updatesSelf && _computed.Length > 1 && CanPlayTimed(_fps);
+            return _updatesSelf && 1 < _computed.Length && CanPlayTimed(_fps);
         }
 
         private void StartSelfUpdate()
@@ -229,12 +229,12 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             // clamp it BEFORE checking the frame advance condition. This prevents rapid "catch-up"
             // animation that makes the preview appear to run at too high FPS.
             // Allow at most one frame of lag before resetting to current time.
-            if (elapsed - _lastTick > deltaTime + deltaTime)
+            if (deltaTime + deltaTime < elapsed - _lastTick)
             {
                 _lastTick = elapsed - deltaTime;
             }
 
-            if (!force && _lastTick + deltaTime > elapsed)
+            if (!force && elapsed < _lastTick + deltaTime)
             {
                 return;
             }
@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         private void Render(int index)
         {
-            if (index < 0 || index >= _computed.Length)
+            if (index < 0 || _computed.Length <= index)
             {
                 return;
             }
@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 }
 
                 int layerFrameCount = layerFrames.Length;
-                if (layerFrameCount > frameCount)
+                if (frameCount < layerFrameCount)
                 {
                     frameCount = layerFrameCount;
                 }
@@ -411,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                         overallMinX = spriteMinX;
                     }
 
-                    if (spriteMaxX > overallMaxX)
+                    if (overallMaxX < spriteMaxX)
                     {
                         overallMaxX = spriteMaxX;
                     }
@@ -421,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                         overallMinY = spriteMinY;
                     }
 
-                    if (spriteMaxY > overallMaxY)
+                    if (overallMaxY < spriteMaxY)
                     {
                         overallMaxY = spriteMaxY;
                     }
@@ -533,7 +533,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                             rowMin = x;
                         }
 
-                        if (x > rowMax)
+                        if (rowMax < x)
                         {
                             rowMax = x;
                         }
@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                         minY = y;
                     }
 
-                    if (y > maxY)
+                    if (maxY < y)
                     {
                         maxY = y;
                     }
@@ -559,7 +559,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                         minX = rowMin;
                     }
 
-                    if (rowMax > maxX)
+                    if (maxX < rowMax)
                     {
                         maxX = rowMax;
                     }
@@ -689,7 +689,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 pixelCutoff
             );
 
-            if (spriteWidth * spriteHeight >= ParallelBlendThreshold)
+            if (ParallelBlendThreshold <= spriteWidth * spriteHeight)
             {
                 Parallel.For(0, spriteHeight, job.Execute);
                 return;
@@ -778,7 +778,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             int spriteRowOffset = spriteRow * spriteWidth;
             float targetY = baseY + spriteRow;
             int bufferY = Mathf.FloorToInt(targetY);
-            if (bufferY < 0 || bufferY >= bufferHeight)
+            if (bufferY < 0 || bufferHeight <= bufferY)
             {
                 return;
             }
@@ -794,13 +794,13 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     continue;
                 }
 
-                if (spriteAlpha > 1f)
+                if (1f < spriteAlpha)
                 {
                     spriteAlpha = 1f;
                 }
 
                 int bufferX = Mathf.FloorToInt(baseX + spriteColumn);
-                if (bufferX < 0 || bufferX >= bufferWidth)
+                if (bufferX < 0 || bufferWidth <= bufferX)
                 {
                     continue;
                 }
@@ -826,7 +826,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     continue;
                 }
 
-                if (outAlpha > 1f)
+                if (1f < outAlpha)
                 {
                     outAlpha = 1f;
                 }
@@ -854,7 +854,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         )
         {
             Sprite[] frames = layer.frames;
-            if (frames == null || frameIndex < 0 || frameIndex >= frames.Length)
+            if (frames == null || frameIndex < 0 || frames.Length <= frameIndex)
             {
                 sprite = null;
                 return false;
@@ -868,7 +868,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private static Vector2 GetPixelOffset(in AnimatedSpriteLayer layer, int frameIndex)
         {
             Vector2[] offsets = layer.perFramePixelOffsets;
-            if (offsets == null || frameIndex < 0 || frameIndex >= offsets.Length)
+            if (offsets == null || frameIndex < 0 || offsets.Length <= frameIndex)
             {
                 return Vector2.zero;
             }

@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             List<Entry> entries = bucket.Entries;
 
-            for (int i = entries.Count - 1; i >= 0; i--)
+            for (int i = entries.Count - 1; 0 <= i; i--)
             {
                 Entry entry = entries[i];
                 if (!entry.position.Equals(position) || !_comparer.Equals(entry.item, item))
@@ -306,11 +306,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             {
                                 Vector3 pos = entry.position;
                                 if (
-                                    pos.x >= min.x
+                                    min.x <= pos.x
                                     && pos.x <= max.x
-                                    && pos.y >= min.y
+                                    && min.y <= pos.y
                                     && pos.y <= max.y
-                                    && pos.z >= min.z
+                                    && min.z <= pos.z
                                     && pos.z <= max.z
                                 )
                                 {
@@ -342,11 +342,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             {
                                 Vector3 pos = entry.position;
                                 if (
-                                    pos.x >= min.x
+                                    min.x <= pos.x
                                     && pos.x <= max.x
-                                    && pos.y >= min.y
+                                    && min.y <= pos.y
                                     && pos.y <= max.y
-                                    && pos.z >= min.z
+                                    && min.z <= pos.z
                                     && pos.z <= max.z
                                 )
                                 {

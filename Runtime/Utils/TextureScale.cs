@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // Determine optimal thread count
             int cores = Mathf.Min(SystemInfo.processorCount, newHeight);
 
-            if (cores > 1)
+            if (1 < cores)
             {
                 // Parallel processing
                 int slice = newHeight / cores;
@@ -390,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     // because dividing its alpha out would be 0 / 0. Keeping its RGB means a fully
                     // transparent image survives a resample instead of collapsing to black.
                     Color fallback =
-                        blended.a > 0f
+                        0f < blended.a
                             ? default
                             : BilinearSample(
                                 source,

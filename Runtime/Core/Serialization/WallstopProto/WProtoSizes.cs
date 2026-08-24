@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static int Varint64Size(ulong value)
         {
             int size = 1;
-            while (value >= 0x80UL)
+            while (0x80UL <= value)
             {
                 value >>= 7;
                 size++;
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TagSize(int fieldNumber)
         {
-            if (fieldNumber <= 0 || fieldNumber > WProtoWireType.MaxFieldNumber)
+            if (fieldNumber <= 0 || WProtoWireType.MaxFieldNumber < fieldNumber)
             {
                 return 0;
             }
@@ -275,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return 0;
             }
 
-            if (_messageDepth >= WProtoReader.MaxNestingDepth)
+            if (WProtoReader.MaxNestingDepth <= _messageDepth)
             {
                 throw new InvalidOperationException(
                     $"WallstopProto refused to measure past {WProtoReader.MaxNestingDepth} levels of "

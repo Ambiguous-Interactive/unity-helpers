@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 double candidate = (low + high) * 0.5d;
                 double expectedAttempts = EstimateExpectedAttempts(candidate);
-                if (expectedAttempts > targetExpectedAttempts)
+                if (targetExpectedAttempts < expectedAttempts)
                 {
                     low = candidate;
                 }

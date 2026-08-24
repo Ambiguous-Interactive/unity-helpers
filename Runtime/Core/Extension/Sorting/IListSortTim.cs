@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static int ComputeTimSortMinRun(int length)
         {
             int remainder = 0;
-            while (length >= 64)
+            while (64 <= length)
             {
                 remainder |= length & 1;
                 length >>= 1;
@@ -97,10 +97,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            while (runStack.Count > 1)
+            while (1 < runStack.Count)
             {
                 int size = runStack.Count;
-                if (size >= 3)
+                if (3 <= size)
                 {
                     (int startA, int lengthA) = runStack[size - 3];
                     (int startB, int lengthB) = runStack[size - 2];
@@ -139,11 +139,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            while (runStack.Count > 1)
+            while (1 < runStack.Count)
             {
                 int size = runStack.Count;
                 int index = size - 2;
-                if (size >= 3 && runStack[size - 3].length < runStack[size - 1].length)
+                if (3 <= size && runStack[size - 3].length < runStack[size - 1].length)
                 {
                     index = size - 3;
                 }

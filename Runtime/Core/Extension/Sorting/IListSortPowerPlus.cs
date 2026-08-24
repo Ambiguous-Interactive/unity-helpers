@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int activeRuns = runs.Count;
-            while (activeRuns > 1)
+            while (1 < activeRuns)
             {
                 if (
                     !PowerSortPlusTryPopValidCandidate(
@@ -92,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 )
                 {
                     int fallbackLeft = headIndex;
-                    int fallbackRight = fallbackLeft >= 0 ? nodes[fallbackLeft].next : -1;
+                    int fallbackRight = 0 <= fallbackLeft ? nodes[fallbackLeft].next : -1;
                     if (fallbackLeft < 0 || fallbackRight < 0)
                     {
                         break;
@@ -253,12 +253,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out PowerSortPlusCandidate candidate
         )
         {
-            while (heap.Count > 0)
+            while (0 < heap.Count)
             {
                 PowerSortPlusCandidate top = PowerSortPlusPop(heap);
                 if (
-                    top.leftIndex >= 0
-                    && top.rightIndex >= 0
+                    0 <= top.leftIndex
+                    && 0 <= top.rightIndex
                     && nodes[top.leftIndex].active
                     && nodes[top.rightIndex].active
                     && nodes[top.leftIndex].version == top.leftVersion
@@ -282,7 +282,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             PowerSortPlusCandidate result = heap[0];
             heap[0] = heap[lastIndex];
             heap.RemoveAt(lastIndex);
-            if (heap.Count > 0)
+            if (0 < heap.Count)
             {
                 PowerSortPlusSiftDown(heap, 0);
             }
@@ -291,10 +291,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static void PowerSortPlusSiftUp(List<PowerSortPlusCandidate> heap, int index)
         {
-            while (index > 0)
+            while (0 < index)
             {
                 int parent = (index - 1) >> 1;
-                if (PowerSortPlusCompare(heap[index], heap[parent]) >= 0)
+                if (0 <= PowerSortPlusCompare(heap[index], heap[parent]))
                 {
                     break;
                 }
@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (true)
             {
                 int left = (index << 1) + 1;
-                if (left >= count)
+                if (count <= left)
                 {
                     break;
                 }

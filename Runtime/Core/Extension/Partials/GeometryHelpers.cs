@@ -200,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector2 currentWorld = worldPositions[firstIndex];
             bool includeFirstCandidate = false;
 
-            while (availableCount > 0)
+            while (0 < availableCount)
             {
                 if (!includeFirstCandidate && step == 5)
                 {
@@ -277,7 +277,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     grid.CellToWorld(hull[step - 2])
                 );
                 ++step;
-                if (step > maxSteps)
+                if (maxSteps < step)
                 {
                     break;
                 }
@@ -437,7 +437,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector2 currentPoint = firstPoint;
             bool includeFirstCandidate = false;
 
-            while (availableCount > 0)
+            while (0 < availableCount)
             {
                 if (!includeFirstCandidate && step == 5)
                 {
@@ -504,7 +504,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 currentPoint = nextPoint;
                 previousAngle = CalculateAngle(hull[step - 1], hull[step - 2]);
                 ++step;
-                if (step > maxSteps)
+                if (maxSteps < step)
                 {
                     break;
                 }
@@ -680,7 +680,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 Vector2 current = points[currentIndex];
                 hull.Add(current);
-                if (membershipFlags != null && membershipFlags.Length > currentIndex)
+                if (membershipFlags != null && currentIndex < membershipFlags.Length)
                 {
                     membershipFlags[currentIndex] = true;
                 }
@@ -720,7 +720,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         candidate,
                         point
                     );
-                    if (relation > ConvexHullRelationEpsilon)
+                    if (ConvexHullRelationEpsilon < relation)
                     {
                         candidateIndex = i;
                         continue;
@@ -730,7 +730,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         float candidateDistance = (candidate - current).sqrMagnitude;
                         float pointDistance = (point - current).sqrMagnitude;
-                        if (pointDistance > candidateDistance)
+                        if (candidateDistance < pointDistance)
                         {
                             candidateIndex = i;
                         }
@@ -759,7 +759,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
 
                     SortIndicesByDistance(points, current, scratchIndices, scratchDistances);
-                    if (scratchIndices.Count > 0)
+                    if (0 < scratchIndices.Count)
                     {
                         foreach (int index in scratchIndices)
                         {
@@ -769,7 +769,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             }
 
                             hull.Add(points[index]);
-                            if (membershipFlags != null && membershipFlags.Length > index)
+                            if (membershipFlags != null && index < membershipFlags.Length)
                             {
                                 membershipFlags[index] = true;
                             }
@@ -778,13 +778,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 currentIndex = candidateIndex;
-                if (++guard > guardMax)
+                if (guardMax < ++guard)
                 {
                     break;
                 }
             } while (currentIndex != startIndex);
 
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }
@@ -832,7 +832,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 hull.Add(points[currentIndex]);
-                if (membershipFlags != null && membershipFlags.Length > currentIndex)
+                if (membershipFlags != null && currentIndex < membershipFlags.Length)
                 {
                     membershipFlags[currentIndex] = true;
                 }
@@ -872,7 +872,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         candidate,
                         point
                     );
-                    if (relation > ConvexHullRelationEpsilon)
+                    if (ConvexHullRelationEpsilon < relation)
                     {
                         candidateIndex = i;
                         continue;
@@ -884,7 +884,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             candidate - worldPositions[currentIndex]
                         ).sqrMagnitude;
                         float pointDistance = (point - worldPositions[currentIndex]).sqrMagnitude;
-                        if (pointDistance > candidateDistance)
+                        if (candidateDistance < pointDistance)
                         {
                             candidateIndex = i;
                         }
@@ -918,7 +918,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         scratchIndices,
                         scratchDistances
                     );
-                    if (scratchIndices.Count > 0)
+                    if (0 < scratchIndices.Count)
                     {
                         foreach (int index in scratchIndices)
                         {
@@ -928,7 +928,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             }
 
                             hull.Add(points[index]);
-                            if (membershipFlags != null && membershipFlags.Length > index)
+                            if (membershipFlags != null && index < membershipFlags.Length)
                             {
                                 membershipFlags[index] = true;
                             }
@@ -937,13 +937,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 currentIndex = candidateIndex;
-                if (++guard > guardMax)
+                if (guardMax < ++guard)
                 {
                     break;
                 }
             } while (currentIndex != startIndex);
 
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }
@@ -1077,7 +1077,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 neighborDistances[storedCount] = candidateDistance;
                 int insertPosition = storedCount;
                 while (
-                    insertPosition > 0 && candidateDistance < neighborDistances[insertPosition - 1]
+                    0 < insertPosition && candidateDistance < neighborDistances[insertPosition - 1]
                 )
                 {
                     neighborDistances[insertPosition] = neighborDistances[insertPosition - 1];
@@ -1091,14 +1091,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (candidateDistance >= neighborDistances[storedCount - 1])
+            if (neighborDistances[storedCount - 1] <= candidateDistance)
             {
                 return;
             }
 
             int replacePosition = storedCount - 1;
             while (
-                replacePosition > 0 && candidateDistance < neighborDistances[replacePosition - 1]
+                0 < replacePosition && candidateDistance < neighborDistances[replacePosition - 1]
             )
             {
                 neighborDistances[replacePosition] = neighborDistances[replacePosition - 1];

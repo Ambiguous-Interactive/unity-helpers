@@ -788,8 +788,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (!filters.RequiresPostProcessing)
             {
-                int maxCount = attribute.MaxCount > 0 ? attribute.MaxCount : int.MaxValue;
-                if (componentCount > maxCount)
+                int maxCount = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
+                if (maxCount < componentCount)
                 {
                     components.RemoveRange(maxCount, componentCount - maxCount);
                     return maxCount;
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             int writeIndex = 0;
-            int maxAssignments = attribute.MaxCount > 0 ? attribute.MaxCount : int.MaxValue;
+            int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
 
             if (isInterface)
             {
@@ -816,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     {
                         components[writeIndex++] = candidate;
 
-                        if (writeIndex >= maxAssignments)
+                        if (maxAssignments <= writeIndex)
                         {
                             break;
                         }
@@ -833,7 +833,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     {
                         components[writeIndex++] = candidate;
 
-                        if (writeIndex >= maxAssignments)
+                        if (maxAssignments <= writeIndex)
                         {
                             break;
                         }

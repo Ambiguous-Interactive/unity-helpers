@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int rightIndex = rightLength - 1;
                 int dest = rightEnd;
 
-                while (leftIndex >= leftStart && rightIndex >= 0)
+                while (leftStart <= leftIndex && 0 <= rightIndex)
                 {
                     if (0 < comparer.Compare(array[leftIndex], buffer[rightIndex]))
                     {
@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     dest--;
                 }
 
-                while (rightIndex >= 0)
+                while (0 <= rightIndex)
                 {
                     array[dest] = buffer[rightIndex];
                     rightIndex--;
@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         // A descending run is reversed to become ascending, so it may only hold strictly
                         // descending elements: reversing a pair that compares equal would reorder them.
-                        if (nextCompare > 0)
+                        if (0 < nextCompare)
                         {
                             index++;
                             continue;
@@ -206,18 +206,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (start >= count - 1)
+            if (count - 1 <= start)
             {
                 return count - start;
             }
 
             int runEnd = start + 1;
             int compare = comparer.Compare(array[runEnd], array[runEnd - 1]);
-            bool ascending = compare >= 0;
+            bool ascending = 0 <= compare;
 
             if (ascending)
             {
-                while (runEnd < count && comparer.Compare(array[runEnd], array[runEnd - 1]) >= 0)
+                while (runEnd < count && 0 <= comparer.Compare(array[runEnd], array[runEnd - 1]))
                 {
                     runEnd++;
                 }
@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int candidate = indices[i];
                 T candidateValue = array[candidate];
                 int j = i - 1;
-                while (j >= 0 && comparer.Compare(array[indices[j]], candidateValue) > 0)
+                while (0 <= j && 0 < comparer.Compare(array[indices[j]], candidateValue))
                 {
                     indices[j + 1] = indices[j];
                     j--;
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (left >= right)
+            if (right <= left)
             {
                 return;
             }
@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 T key = array[i];
                 int j = i - 1;
-                while (j >= left && 0 < comparer.Compare(array[j], key))
+                while (left <= j && 0 < comparer.Compare(array[j], key))
                 {
                     array[j + 1] = array[j];
                     j--;
@@ -303,12 +303,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            for (int i = (length >> 1) - 1; i >= 0; --i)
+            for (int i = (length >> 1) - 1; 0 <= i; --i)
             {
                 SiftDown(array, start, length, i, comparer);
             }
 
-            for (int i = length - 1; i > 0; --i)
+            for (int i = length - 1; 0 < i; --i)
             {
                 SortSwap(array, start, start + i);
                 SiftDown(array, start, i, 0, comparer);
@@ -327,7 +327,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (true)
             {
                 int child = (root << 1) + 1;
-                if (child >= length)
+                if (length <= child)
                 {
                     return;
                 }
@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     child = rightChild;
                 }
 
-                if (comparer.Compare(array[start + root], array[start + child]) >= 0)
+                if (0 <= comparer.Compare(array[start + root], array[start + child]))
                 {
                     return;
                 }
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static int FloorLog2(int value)
         {
             int result = 0;
-            while (value > 1)
+            while (1 < value)
             {
                 value >>= 1;
                 result++;

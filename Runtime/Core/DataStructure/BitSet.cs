@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            if (index >= _capacity)
+            if (_capacity <= index)
             {
                 EnsureCapacity(index + 1);
             }
@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryClear(int index)
         {
-            if (index < 0 || index >= _capacity)
+            if (index < 0 || _capacity <= index)
             {
                 return false;
             }
@@ -184,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            if (index >= _capacity)
+            if (_capacity <= index)
             {
                 EnsureCapacity(index + 1);
             }
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(int index, out bool value)
         {
-            if (index < 0 || index >= _capacity)
+            if (index < 0 || _capacity <= index)
             {
                 value = false;
                 return false;
@@ -258,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             // Clear any bits beyond new capacity in the last element
             int remainingBits = newCapacity & BitsPerLongMask;
-            if (remainingBits != 0 && newArraySize > 0)
+            if (remainingBits != 0 && 0 < newArraySize)
             {
                 ulong mask = (1UL << remainingBits) - 1;
                 _bits[newArraySize - 1] &= mask;
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public void TrimExcess(int minimumCapacity = DefaultCapacity)
         {
             int highestSetBit = -1;
-            for (int i = _capacity - 1; i >= 0; i--)
+            for (int i = _capacity - 1; 0 <= i; i--)
             {
                 if (TryGet(i, out bool value) && value)
                 {
@@ -299,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             // Clear any bits beyond capacity in the last element
             int remainingBits = _capacity & BitsPerLongMask;
-            if (remainingBits != 0 && _bits.Length > 0)
+            if (remainingBits != 0 && 0 < _bits.Length)
             {
                 ulong mask = (1UL << remainingBits) - 1;
                 _bits[^1] &= mask;
@@ -326,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             // Clear any bits beyond capacity in the last element
             int remainingBits = _capacity & BitsPerLongMask;
-            if (remainingBits != 0 && _bits.Length > 0)
+            if (remainingBits != 0 && 0 < _bits.Length)
             {
                 ulong mask = (1UL << remainingBits) - 1;
                 _bits[^1] &= mask;
@@ -352,7 +352,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            if (shift >= _capacity)
+            if (_capacity <= shift)
             {
                 ClearAll();
                 return;
@@ -393,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            if (shift >= _capacity)
+            if (_capacity <= shift)
             {
                 ClearAll();
                 return;
@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            if (other._capacity > _capacity)
+            if (_capacity < other._capacity)
             {
                 Resize(other._capacity);
             }
@@ -541,7 +541,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            if (other._capacity > _capacity)
+            if (_capacity < other._capacity)
             {
                 Resize(other._capacity);
             }

@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             // Degenerate: all points are colinear → return endpoints (or all if requested)
-            if (points.Count >= 2)
+            if (2 <= points.Count)
             {
                 Vector3Int first = points[0];
                 Vector3Int last = points[^1];
@@ -228,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             foreach (Vector3Int p in points)
             {
-                while (lower.Count >= 2)
+                while (2 <= lower.Count)
                 {
                     long cross = Turn(lower[^2], lower[^1], p);
                     bool isRightTurn = cross < 0;
@@ -243,10 +243,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 lower.Add(p);
             }
 
-            for (int i = points.Count - 1; i >= 0; --i)
+            for (int i = points.Count - 1; 0 <= i; --i)
             {
                 Vector3Int p = points[i];
-                while (upper.Count >= 2)
+                while (2 <= upper.Count)
                 {
                     long cross = Turn(upper[^2], upper[^1], p);
                     bool isRightTurn = cross < 0;
@@ -270,7 +270,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(upper[i]);
             }
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }
@@ -311,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             // Degenerate: all points are colinear → return endpoints (or all if requested)
-            if (points.Count >= 2)
+            if (2 <= points.Count)
             {
                 FastVector3Int first = points[0];
                 FastVector3Int last = points[^1];
@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             foreach (FastVector3Int p in points)
             {
-                while (lower.Count >= 2)
+                while (2 <= lower.Count)
                 {
                     long cross = Turn(lower[^2], lower[^1], p);
                     bool isRightTurn = cross < 0;
@@ -362,10 +362,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 lower.Add(p);
             }
 
-            for (int i = points.Count - 1; i >= 0; --i)
+            for (int i = points.Count - 1; 0 <= i; --i)
             {
                 FastVector3Int p = points[i];
-                while (upper.Count >= 2)
+                while (2 <= upper.Count)
                 {
                     long cross = Turn(upper[^2], upper[^1], p);
                     bool isRightTurn = cross < 0;
@@ -392,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(upper[i]);
             }
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }
@@ -501,7 +501,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         {
                             min = w;
                         }
-                        if (w.x > max.x || (w.x == max.x && w.y > max.y))
+                        if (max.x < w.x || (w.x == max.x && max.y < w.y))
                         {
                             max = w;
                         }
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 // Phase 1: Find the most counterclockwise point
                 FastVector3Int candidate =
-                    points[0] == current && points.Count > 1 ? points[1] : points[0];
+                    points[0] == current && 1 < points.Count ? points[1] : points[0];
                 for (int i = 0; i < points.Count; ++i)
                 {
                     FastVector3Int p = points[i];
@@ -533,7 +533,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         continue;
                     }
                     long rel = Cross(current, candidate, p);
-                    if (rel > 0)
+                    if (0 < rel)
                     {
                         // p is more counterclockwise
                         candidate = p;
@@ -543,7 +543,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         // p is collinear with candidate, prefer the farther one
                         long distCandidate = DistanceSquared(current, candidate);
                         long distP = DistanceSquared(current, p);
-                        if (distP > distCandidate)
+                        if (distCandidate < distP)
                         {
                             candidate = p;
                         }
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
 
-                    if (colinear.Count > 0)
+                    if (0 < colinear.Count)
                     {
                         // Sort by distance and add all (excluding duplicates)
                         using PooledArray<float> distancesRes = SystemArrayPool<float>.Get(
@@ -615,19 +615,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     current = candidate;
                 }
 
-                if (++guard > guardMax)
+                if (guardMax < ++guard)
                 {
                     break;
                 }
             } while (current != start);
 
             // Close loop: remove duplicate last if present
-            if (hull.Count > 1 && hull[0] == hull[^1])
+            if (1 < hull.Count && hull[0] == hull[^1])
             {
                 hull.RemoveAt(hull.Count - 1);
             }
 
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 // Final pruning of any accidental colinear triples
                 PruneColinearOnHull(hull);
@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; hull.Count > 2 && i < hull.Count; ++i)
+                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
                 {
                     int prevIndex = (i - 1 + hull.Count) % hull.Count;
                     int nextIndex = (i + 1) % hull.Count;
@@ -723,7 +723,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; hull.Count > 2 && i < hull.Count; ++i)
+                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
                 {
                     int prevIndex = (i - 1 + hull.Count) % hull.Count;
                     int nextIndex = (i + 1) % hull.Count;

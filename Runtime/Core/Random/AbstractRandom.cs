@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 int attempts = 0;
                 while (lo < t)
                 {
-                    if (++attempts > MaxRejectionAttempts32)
+                    if (MaxRejectionAttempts32 < ++attempts)
                     {
                         // Prevent infinite loop: fall back to modulo (small bias) rather than hang
                         return r % max;
@@ -465,12 +465,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 ulong sample = NextUlong();
                 ulong productLow = unchecked(sample * max);
-                if (productLow >= threshold)
+                if (threshold <= productLow)
                 {
                     return MulHi64(sample, max);
                 }
 
-                if (++attempts > MaxRejectionAttempts64)
+                if (MaxRejectionAttempts64 < ++attempts)
                 {
                     // Failsafe: fall back to modulo to avoid hanging indefinitely.
                     return sample % max;
@@ -631,7 +631,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     return value;
                 }
-                if (++attempts > MaxRejectionAttempts64)
+                if (MaxRejectionAttempts64 < ++attempts)
                 {
                     // Transparent fallback: pick a finite value inside [min, max)
                     if (double.IsPositiveInfinity(max))
@@ -664,7 +664,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             do
             {
                 randomBits = NextUlong();
-                if (++attempts > MaxDoubleBitAttempts)
+                if (MaxDoubleBitAttempts < ++attempts)
                 {
                     // Force a finite value by clearing exponent bits
                     randomBits &= ~exponentMask;
@@ -699,7 +699,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 x = 2 * NextDouble() - 1;
                 y = 2 * NextDouble() - 1;
                 square = x * x + y * y;
-                if (++attempts > MaxGaussianAttempts)
+                if (MaxGaussianAttempts < ++attempts)
                 {
                     // Fallback to Box-Muller without rejection to avoid infinite loop
                     double u1 = NextDouble();
@@ -967,7 +967,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     }
 
                     unique[uniqueCount++] = exclusion;
-                    if (uniqueCount >= enumCount)
+                    if (enumCount <= uniqueCount)
                     {
                         ThrowAllEnumValuesExcluded<T>(enumCount);
                     }
@@ -985,7 +985,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
 
                 set.Add(exclusion);
-                if (set.Count >= enumCount)
+                if (enumCount <= set.Count)
                 {
                     ThrowAllEnumValuesExcluded<T>(enumCount);
                 }
@@ -1093,7 +1093,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            if (excludedCount >= enumValues.Length)
+            if (enumValues.Length <= excludedCount)
             {
                 exclusions.Clear();
                 ThrowAllEnumValuesExcluded<T>(enumValues.Length);
@@ -1434,7 +1434,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                         frequency *= lacunarity;
                     }
 
-                    if (noiseHeight > maxNoiseHeight)
+                    if (maxNoiseHeight < noiseHeight)
                     {
                         maxNoiseHeight = noiseHeight;
                     }

@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         )
         {
             float coordinate = ((destinationIndex + 0.5f) * ratio) - 0.5f;
-            if (!(coordinate > 0f))
+            if (!(0f < coordinate))
             {
                 return 0f;
             }
@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static int NearestSourceIndex(int destinationIndex, float ratio, int maxSourceIndex)
         {
             float center = (destinationIndex + 0.5f) * ratio;
-            if (!(center > 0f))
+            if (!(0f < center))
             {
                 return 0;
             }
@@ -129,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static Color Unpremultiply(Color premultiplied, Color transparentFallback)
         {
             float alpha = premultiplied.a;
-            if (!(alpha > 0f))
+            if (!(0f < alpha))
             {
                 return new Color(
                     transparentFallback.r,

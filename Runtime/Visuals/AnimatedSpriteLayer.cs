@@ -185,13 +185,13 @@ namespace WallstopStudios.UnityHelpers.Visuals
             int index = 0;
             foreach (Vector2 offset in worldSpaceOffsets)
             {
-                if (index >= frames.Length)
+                if (frames.Length <= index)
                 {
                     break;
                 }
 
                 Sprite frame = frames[index];
-                if (frame != null && frame.pixelsPerUnit > 0f)
+                if (frame != null && 0f < frame.pixelsPerUnit)
                 {
                     offsets.Add(offset * frame.pixelsPerUnit);
                 }

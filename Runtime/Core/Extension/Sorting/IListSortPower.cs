@@ -75,13 +75,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int bufferLength = count / 2 + 1;
             using PooledArray<T> tempLease = SystemArrayPool<T>.Get(bufferLength, out T[] buffer);
 
-            while (runs.Count > 1)
+            while (1 < runs.Count)
             {
                 mergedRuns.Clear();
                 int runCount = runs.Count;
                 for (int i = 0; i < runCount; i += 2)
                 {
-                    if (i + 1 >= runCount)
+                    if (runCount <= i + 1)
                     {
                         mergedRuns.Add(runs[i]);
                         continue;

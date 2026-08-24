@@ -171,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int size = EstimateItemSizeBytes(type);
-            isLarge = size >= LargeObjectHeapThreshold;
+            isLarge = LargeObjectHeapThreshold <= size;
             LohCache.TryAdd(type, isLarge);
             return isLarge;
         }

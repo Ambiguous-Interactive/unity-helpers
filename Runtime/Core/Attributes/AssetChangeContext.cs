@@ -32,8 +32,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         public IReadOnlyList<string> DeletedAssetPaths { get; }
 
-        public bool HasCreatedAssets => CreatedAssetPaths.Count > 0;
+        public bool HasCreatedAssets => 0 < CreatedAssetPaths.Count;
 
-        public bool HasDeletedAssets => DeletedAssetPaths.Count > 0;
+        public bool HasDeletedAssets => 0 < DeletedAssetPaths.Count;
     }
 }

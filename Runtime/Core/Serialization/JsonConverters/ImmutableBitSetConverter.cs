@@ -66,21 +66,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     // by naming an index. The claim is clamped; the index is refused out loud,
                     // because dropping it would change the set the caller gets back.
                     if (
-                        required > int.MaxValue
+                        int.MaxValue < required
                         || !SerializationCapacityLimits.TryAccept((int)required, 0, out int _)
                     )
                     {
                         throw new JsonException(
                             SerializationCapacityLimits.Refusal(
                                 nameof(ImmutableBitSet),
-                                required > int.MaxValue ? int.MaxValue : (int)required
+                                int.MaxValue < required ? int.MaxValue : (int)required
                             )
                         );
                     }
 
                     int finalCapacity = SerializationCapacityLimits.Clamp(capacity, (int)required);
 
-                    BitSet bitset = new(finalCapacity > 0 ? finalCapacity : 64);
+                    BitSet bitset = new(0 < finalCapacity ? finalCapacity : 64);
                     if (indices != null)
                     {
                         for (int i = 0; i < indices.Count; i++)

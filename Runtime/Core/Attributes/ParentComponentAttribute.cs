@@ -257,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                         filteredCount
                                     )
                                 );
-                                foundParent = filteredCount > 0;
+                                foundParent = 0 < filteredCount;
                                 break;
                             }
                             case FieldKind.List:
@@ -315,7 +315,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     instance.Add(parentComponents[i]);
                                 }
 
-                                foundParent = filteredCount > 0;
+                                foundParent = 0 < filteredCount;
                                 break;
                             }
                             case FieldKind.HashSet:
@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     field.hashSetAdder(instance, parentComponents[i]);
                                 }
 
-                                foundParent = filteredCount > 0;
+                                foundParent = 0 < filteredCount;
                                 break;
                             }
                             default:
@@ -411,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (
                 metadata.isInterface
                 || filters.RequiresPostProcessing
-                || attribute.MaxDepth > 0
+                || 0 < attribute.MaxDepth
                 || root == null
             )
             {
@@ -503,7 +503,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 count = 0;
             }
-            else if (count > parents.Count)
+            else if (parents.Count < count)
             {
                 count = parents.Count;
             }
@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         component,
                         CreateTypedArray(metadata.elementType, parents, count)
                     );
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.List:
                 {
@@ -535,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         list.Add(parents[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.HashSet:
                 {
@@ -555,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         metadata.hashSetAdder(hashSet, parents[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 default:
                 {
@@ -578,7 +578,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 // For interfaces, we need to manually traverse the hierarchy
                 Transform current = root;
                 int depth = 0;
-                int maxDepth = attribute.MaxDepth > 0 ? attribute.MaxDepth : int.MaxValue;
+                int maxDepth = 0 < attribute.MaxDepth ? attribute.MaxDepth : int.MaxValue;
 
                 using PooledResource<List<Component>> parentComponentBuffer =
                     Buffers<Component>.List.Get(out List<Component> components);
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             );
 
             // Filter by depth if needed
-            if (attribute.MaxDepth > 0)
+            if (0 < attribute.MaxDepth)
             {
                 foreach (Component comp in allParents)
                 {
@@ -640,7 +640,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 || metadata.isInterface
                 || filters.RequiresPostProcessing
                 || metadata.attribute.IncludeInactive
-                || metadata.attribute.MaxDepth > 0
+                || 0 < metadata.attribute.MaxDepth
             )
             {
                 parentComponent = null;
@@ -669,7 +669,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             Transform current = root;
             int depth = 0;
-            int maxDepth = attribute.MaxDepth > 0 ? attribute.MaxDepth : int.MaxValue;
+            int maxDepth = 0 < attribute.MaxDepth ? attribute.MaxDepth : int.MaxValue;
 
             bool needsScratch = isInterface || filters.RequiresPostProcessing;
             List<Component> components = null;

@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     List<Vector2> points = new(current);
                     // Preserve closed-loop paths as originally authored by ensuring the last point
                     // matches the first when applicable (Unity may omit the duplicate end point).
-                    if (points.Count > 0)
+                    if (0 < points.Count)
                     {
                         Vector2 first = points[0];
                         Vector2 last = points[^1];

@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             return s;
                         }
                     }
-                    if (buildIndex >= 0)
+                    if (0 <= buildIndex)
                     {
                         Scene s = SceneManager.GetSceneByBuildIndex(buildIndex);
                         if (s.IsValid())

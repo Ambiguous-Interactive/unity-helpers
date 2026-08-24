@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     lt++;
                     i++;
                 }
-                else if (compare > 0)
+                else if (0 < compare)
                 {
                     SortSwap(array, i, gt);
                     gt--;

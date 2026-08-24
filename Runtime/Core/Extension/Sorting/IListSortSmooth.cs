@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    if (SmoothSortLeonardoNumbers[pshift - 1] >= last - head)
+                    if (last - head <= SmoothSortLeonardoNumbers[pshift - 1])
                     {
                         SmoothSortTrinkle(array, head, p, pshift, false, comparer);
                     }
@@ -174,20 +174,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             T value = array[head];
 
-            while (pshift > 1)
+            while (1 < pshift)
             {
                 int right = head - 1;
                 int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
 
                 if (
-                    comparer.Compare(value, array[left]) >= 0
-                    && comparer.Compare(value, array[right]) >= 0
+                    0 <= comparer.Compare(value, array[left])
+                    && 0 <= comparer.Compare(value, array[right])
                 )
                 {
                     break;
                 }
 
-                if (comparer.Compare(array[left], array[right]) >= 0)
+                if (0 <= comparer.Compare(array[left], array[right]))
                 {
                     array[head] = array[left];
                     head = left;
@@ -224,13 +224,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     break;
                 }
 
-                if (!isTrusty && pshift > 1)
+                if (!isTrusty && 1 < pshift)
                 {
                     int right = head - 1;
                     int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
                     if (
-                        comparer.Compare(array[right], array[stepson]) >= 0
-                        || comparer.Compare(array[left], array[stepson]) >= 0
+                        0 <= comparer.Compare(array[right], array[stepson])
+                        || 0 <= comparer.Compare(array[left], array[stepson])
                     )
                     {
                         break;

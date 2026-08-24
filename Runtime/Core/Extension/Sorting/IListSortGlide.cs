@@ -82,13 +82,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            while (runs.Count > 1)
+            while (1 < runs.Count)
             {
                 nextRuns.Clear();
                 int i = 0;
                 while (i < runs.Count)
                 {
-                    if (i + 1 >= runs.Count)
+                    if (runs.Count <= i + 1)
                     {
                         nextRuns.Add(runs[i]);
                         break;
@@ -149,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int rightWins = 0;
             T[] leftBuffer = buffer;
 
-            while (leftRemaining > 0 && rightRemaining > 0)
+            while (0 < leftRemaining && 0 < rightRemaining)
             {
                 if (comparer.Compare(leftBuffer[leftIndex], array[rightIndex]) <= 0)
                 {
@@ -166,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     leftWins = 0;
                 }
 
-                if (leftWins >= GlideGallopTrigger && rightRemaining > 0)
+                if (GlideGallopTrigger <= leftWins && 0 < rightRemaining)
                 {
                     leftWins = 0;
                     T key = array[rightIndex];
@@ -177,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         key,
                         comparer
                     );
-                    if (advance > 0)
+                    if (0 < advance)
                     {
                         for (int k = 0; k < advance; ++k)
                         {
@@ -190,12 +190,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
                 }
-                else if (rightWins >= GlideGallopTrigger && leftRemaining > 0)
+                else if (GlideGallopTrigger <= rightWins && 0 < leftRemaining)
                 {
                     rightWins = 0;
                     T key = leftBuffer[leftIndex];
                     int advance = GlideGallopLeft(array, rightIndex, rightRemaining, key, comparer);
-                    if (advance > 0)
+                    if (0 < advance)
                     {
                         for (int k = 0; k < advance; ++k)
                         {
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            while (leftRemaining > 0)
+            while (0 < leftRemaining)
             {
                 array[dest++] = leftBuffer[leftIndex++];
                 leftRemaining--;

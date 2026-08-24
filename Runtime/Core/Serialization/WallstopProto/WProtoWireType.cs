@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the wire type is defined; otherwise <c>false</c>.</returns>
         public static bool IsDefined(int wireType)
         {
-            return wireType >= Varint && wireType <= Fixed32;
+            return Varint <= wireType && wireType <= Fixed32;
         }
     }
 }

@@ -352,7 +352,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
                 }
-                if (total > 0f)
+                if (0f < total)
                 {
                     r /= total;
                     g /= total;
@@ -759,7 +759,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            if (totalWeight > 0f)
+            if (0f < totalWeight)
             {
                 r /= totalWeight;
                 g /= totalWeight;
@@ -768,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return new Color(r, g, b, a);
             }
 
-            if (count > 0)
+            if (0 < count)
             {
                 return new Color(plainR / count, plainG / count, plainB / count, plainA / count);
             }
@@ -907,19 +907,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             // First convert to XYZ
             double r =
-                rgb.r > 0.04045 ? Mathf.Pow((rgb.r + 0.055f) / 1.055f, 2.4f) : rgb.r / 12.92f;
+                0.04045 < rgb.r ? Mathf.Pow((rgb.r + 0.055f) / 1.055f, 2.4f) : rgb.r / 12.92f;
             double g =
-                rgb.g > 0.04045 ? Mathf.Pow((rgb.g + 0.055f) / 1.055f, 2.4f) : rgb.g / 12.92f;
+                0.04045 < rgb.g ? Mathf.Pow((rgb.g + 0.055f) / 1.055f, 2.4f) : rgb.g / 12.92f;
             double b =
-                rgb.b > 0.04045 ? Mathf.Pow((rgb.b + 0.055f) / 1.055f, 2.4f) : rgb.b / 12.92f;
+                0.04045 < rgb.b ? Mathf.Pow((rgb.b + 0.055f) / 1.055f, 2.4f) : rgb.b / 12.92f;
 
             double x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
             double y = r * 0.2126 + g * 0.7152 + b * 0.0722;
             double z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
 
-            x = x > 0.008856 ? Mathf.Pow((float)x, 1f / 3f) : 7.787 * x + 16f / 116f;
-            y = y > 0.008856 ? Mathf.Pow((float)y, 1f / 3f) : 7.787 * y + 16f / 116f;
-            z = z > 0.008856 ? Mathf.Pow((float)z, 1f / 3f) : 7.787 * z + 16f / 116f;
+            x = 0.008856 < x ? Mathf.Pow((float)x, 1f / 3f) : 7.787 * x + 16f / 116f;
+            y = 0.008856 < y ? Mathf.Pow((float)y, 1f / 3f) : 7.787 * y + 16f / 116f;
+            z = 0.008856 < z ? Mathf.Pow((float)z, 1f / 3f) : 7.787 * z + 16f / 116f;
 
             return new LABColor(116 * y - 16, 500 * (x - y), 200 * (y - z));
         }
@@ -934,17 +934,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double y3 = y * y * y;
             double z3 = z * z * z;
 
-            x = 0.95047 * (x3 > 0.008856 ? x3 : (x - 16.0 / 116.0) / 7.787);
-            y = y3 > 0.008856 ? y3 : (y - 16.0 / 116.0) / 7.787;
-            z = 1.08883 * (z3 > 0.008856 ? z3 : (z - 16.0 / 116.0) / 7.787);
+            x = 0.95047 * (0.008856 < x3 ? x3 : (x - 16.0 / 116.0) / 7.787);
+            y = 0.008856 < y3 ? y3 : (y - 16.0 / 116.0) / 7.787;
+            z = 1.08883 * (0.008856 < z3 ? z3 : (z - 16.0 / 116.0) / 7.787);
 
             double r = x * 3.2406 + y * -1.5372 + z * -0.4986;
             double g = x * -0.9689 + y * 1.8758 + z * 0.0415;
             double b2 = x * 0.0557 + y * -0.2040 + z * 1.0570;
 
-            r = r > 0.0031308 ? 1.055 * Mathf.Pow((float)r, 1 / 2.4f) - 0.055 : 12.92 * r;
-            g = g > 0.0031308 ? 1.055 * Mathf.Pow((float)g, 1 / 2.4f) - 0.055 : 12.92 * g;
-            b2 = b2 > 0.0031308 ? 1.055 * Mathf.Pow((float)b2, 1 / 2.4f) - 0.055 : 12.92 * b2;
+            r = 0.0031308 < r ? 1.055 * Mathf.Pow((float)r, 1 / 2.4f) - 0.055 : 12.92 * r;
+            g = 0.0031308 < g ? 1.055 * Mathf.Pow((float)g, 1 / 2.4f) - 0.055 : 12.92 * g;
+            b2 = 0.0031308 < b2 ? 1.055 * Mathf.Pow((float)b2, 1 / 2.4f) - 0.055 : 12.92 * b2;
 
             return new Color(
                 Mathf.Clamp01((float)r),

@@ -40,27 +40,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return RandomSpeedBucket.Unknown;
             }
 
-            if (ratio >= 0.95d)
+            if (0.95d <= ratio)
             {
                 return RandomSpeedBucket.Fastest;
             }
 
-            if (ratio >= 0.75d)
+            if (0.75d <= ratio)
             {
                 return RandomSpeedBucket.VeryFast;
             }
 
-            if (ratio >= 0.55d)
+            if (0.55d <= ratio)
             {
                 return RandomSpeedBucket.Fast;
             }
 
-            if (ratio >= 0.35d)
+            if (0.35d <= ratio)
             {
                 return RandomSpeedBucket.Moderate;
             }
 
-            if (ratio >= 0.2d)
+            if (0.2d <= ratio)
             {
                 return RandomSpeedBucket.Slow;
             }

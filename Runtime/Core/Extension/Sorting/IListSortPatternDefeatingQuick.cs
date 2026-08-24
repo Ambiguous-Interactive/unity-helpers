@@ -79,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             where TComparer : IComparer<T>
         {
             const int insertionThreshold = 16;
-            while (right - left > insertionThreshold)
+            while (insertionThreshold < right - left)
             {
                 if (depthLimit == 0)
                 {
@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (leftSize < rightSize)
                 {
-                    if (leftSize > 0)
+                    if (0 < leftSize)
                     {
                         PatternDefeatingQuickSortRange(
                             array,
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    if (rightSize > 0)
+                    if (0 < rightSize)
                     {
                         PatternDefeatingQuickSortRange(
                             array,
@@ -161,12 +161,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     i++;
                 }
 
-                while (i <= j && comparer.Compare(array[j], pivot) > 0)
+                while (i <= j && 0 < comparer.Compare(array[j], pivot))
                 {
                     j--;
                 }
 
-                if (i > j)
+                if (j < i)
                 {
                     break;
                 }
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int pivotStart = pivotPosition;
             int pivotEnd = pivotPosition;
 
-            while (pivotStart > left && comparer.Compare(array[pivotStart - 1], pivot) == 0)
+            while (left < pivotStart && comparer.Compare(array[pivotStart - 1], pivot) == 0)
             {
                 pivotStart--;
             }

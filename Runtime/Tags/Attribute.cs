@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         internal void CalculateCurrentValue()
         {
             float calculatedValue = _baseValue;
-            if (_modifications.Count > 0)
+            if (0 < _modifications.Count)
             {
                 ApplyModificationsInOrder(ModificationAction.Addition, ref calculatedValue);
                 ApplyModificationsInOrder(ModificationAction.Multiplication, ref calculatedValue);

@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 && YamRotateHalves(array, start, length, mid, buffer)
             )
             {
-                if (state.sequenceScore > YamSequenceScoreMin)
+                if (YamSequenceScoreMin < state.sequenceScore)
                 {
                     state.sequenceScore--;
                 }
@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int leftIndex = leftEnd;
             int rightIndex = start + length - 1;
 
-            while (comparer.Compare(array[rightIndex], array[leftIndex]) > 0)
+            while (0 < comparer.Compare(array[rightIndex], array[leftIndex]))
             {
                 rightIndex--;
             }
@@ -190,9 +190,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int head = buffer.Length - 1;
             int bufferCount = YamFillBuffer(array, buffer, leftEnd + 1, rightIndex, head);
 
-            while (rightIndex > leftEnd)
+            while (leftEnd < rightIndex)
             {
-                if (comparer.Compare(array[leftIndex], buffer[head]) > 0)
+                if (0 < comparer.Compare(array[leftIndex], buffer[head]))
                 {
                     array[rightIndex--] = array[leftIndex--];
                 }
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             while (true)
             {
-                if (comparer.Compare(array[leftIndex], buffer[head]) > 0)
+                if (0 < comparer.Compare(array[leftIndex], buffer[head]))
                 {
                     array[rightIndex--] = array[leftIndex--];
                     if (leftIndex < start)
@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int leftIndex = leftEnd;
             int rightIndex = start + length - 1;
 
-            if (comparer.Compare(array[rightIndex], array[leftIndex]) > 0)
+            if (0 < comparer.Compare(array[rightIndex], array[leftIndex]))
             {
                 rightIndex -= YamCountAtLeast(
                     array,
@@ -267,11 +267,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int gallopCounter = 0;
             bool lastWasLeft = true;
 
-            while (rightIndex > leftEnd)
+            while (leftEnd < rightIndex)
             {
-                if (comparer.Compare(array[leftIndex], buffer[head]) > 0)
+                if (0 < comparer.Compare(array[leftIndex], buffer[head]))
                 {
-                    if (gallopCounter >= YamGallopThreshold)
+                    if (YamGallopThreshold <= gallopCounter)
                     {
                         int lowerBound = leftIndex - (rightIndex - leftEnd - 1);
                         int copyCount = YamCountGreater(
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    if (gallopCounter >= YamGallopThreshold)
+                    if (YamGallopThreshold <= gallopCounter)
                     {
                         int lowerBound = head + 1 - (rightIndex - leftEnd);
                         int copyCount = YamCountAtLeast(
@@ -330,11 +330,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            while (bufferCount > 0)
+            while (0 < bufferCount)
             {
-                if (comparer.Compare(array[leftIndex], buffer[head]) > 0)
+                if (0 < comparer.Compare(array[leftIndex], buffer[head]))
                 {
-                    if (gallopCounter >= YamGallopThreshold)
+                    if (YamGallopThreshold <= gallopCounter)
                     {
                         int copyCount = YamCountGreater(
                             array,
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    if (gallopCounter >= YamGallopThreshold)
+                    if (YamGallopThreshold <= gallopCounter)
                     {
                         int lowerBound = head - bufferCount + 1;
                         int copyCount = YamCountAtLeast(
@@ -474,13 +474,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int span = index - lowerBound + 1;
             int probe = 1;
             int count = 0;
-            while (count < span && comparer.Compare(array[index - count], target) > floor)
+            while (count < span && floor < comparer.Compare(array[index - count], target))
             {
                 count += probe;
                 probe <<= 1;
             }
 
-            if (count > span)
+            if (span < count)
             {
                 count = span;
             }
@@ -490,7 +490,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (low <= high)
             {
                 int middle = low + ((high - low) >> 1);
-                if (comparer.Compare(array[middle], target) > floor)
+                if (floor < comparer.Compare(array[middle], target))
                 {
                     high = middle - 1;
                 }
@@ -518,7 +518,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     state.sequenceScore++;
                 }
             }
-            else if (bufferCount > half - threshold && state.sequenceScore > YamSequenceScoreMin)
+            else if (half - threshold < bufferCount && YamSequenceScoreMin < state.sequenceScore)
             {
                 state.sequenceScore--;
             }

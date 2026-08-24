@@ -64,7 +64,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 Vector2 vj = polygon[j];
 
                 // Check if the edge crosses the horizontal ray through the point
-                if ((vi.y < point.y && vj.y >= point.y) || (vj.y < point.y && vi.y >= point.y))
+                if ((vi.y < point.y && point.y <= vj.y) || (vj.y < point.y && point.y <= vi.y))
                 {
                     // Calculate x-coordinate of edge intersection with horizontal ray at point.y
                     float intersectX = vi.x + (point.y - vi.y) / (vj.y - vi.y) * (vj.x - vi.x);
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             // Create a coordinate system on the plane
             // Find two orthogonal vectors in the plane
             Vector3 tangent;
-            if (Mathf.Abs(planeNormal.x) > 0.9f)
+            if (0.9f < Mathf.Abs(planeNormal.x))
             {
                 tangent = Vector3.Cross(planeNormal, Vector3.up).normalized;
             }

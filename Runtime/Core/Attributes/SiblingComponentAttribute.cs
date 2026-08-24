@@ -175,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                         filteredCount
                                     )
                                 );
-                                foundSibling = filteredCount > 0;
+                                foundSibling = 0 < filteredCount;
                                 break;
                             }
                             case FieldKind.List:
@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     instance.Add(components[i]);
                                 }
 
-                                foundSibling = filteredCount > 0;
+                                foundSibling = 0 < filteredCount;
                                 break;
                             }
                             case FieldKind.HashSet:
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     metadata.hashSetAdder(instance, components[i]);
                                 }
 
-                                foundSibling = filteredCount > 0;
+                                foundSibling = 0 < filteredCount;
                                 break;
                             }
                             default:
@@ -368,7 +368,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         component,
                         CreateTypedArray(metadata.elementType, components, count)
                     );
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.List:
                 {
@@ -387,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         instance.Add(components[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 case FieldKind.HashSet:
                 {
@@ -407,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         metadata.hashSetAdder(hashSet, components[i]);
                     }
 
-                    return count > 0;
+                    return 0 < count;
                 }
                 default:
                 {

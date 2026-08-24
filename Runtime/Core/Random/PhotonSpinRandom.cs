@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             uint packedIndex = (uint)state2;
             _hasPrimed = (packedIndex & 0x80000000U) != 0;
             _index = (int)(packedIndex & 0x7FFFFFFF);
-            if (_index < 0 || _index > BlockSize)
+            if (_index < 0 || BlockSize < _index)
             {
                 _index = BlockSize;
             }
@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override uint NextUint()
         {
-            if (_index >= BlockSize)
+            if (BlockSize <= _index)
             {
                 GenerateBlock();
             }
@@ -315,7 +315,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             EnsureElements();
 
-            if (payload != null && payload.Length >= ElementByteSize)
+            if (payload != null && ElementByteSize <= payload.Length)
             {
                 Buffer.BlockCopy(payload, 0, _elements, 0, ElementByteSize);
                 return;
@@ -326,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private void NormalizeIndex()
         {
-            if (_index < 0 || _index > BlockSize)
+            if (_index < 0 || BlockSize < _index)
             {
                 _index = BlockSize;
             }

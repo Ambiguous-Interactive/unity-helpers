@@ -27,14 +27,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             const int bitShift = 10; // 2^10 = 1024
             // Use bit shifting to determine the order without precision loss
-            while (workingValue >= 1024 && order < ByteSizes.Length - 1)
+            while (1024 <= workingValue && order < ByteSizes.Length - 1)
             {
                 workingValue >>= bitShift;
                 ++order;
             }
 
             // Check if we still have a value >= 1024 after exhausting all units
-            if (workingValue >= 1024)
+            if (1024 <= workingValue)
             {
                 throw new ArgumentException($"Too many bytes! Cannot parse {bytes}");
             }

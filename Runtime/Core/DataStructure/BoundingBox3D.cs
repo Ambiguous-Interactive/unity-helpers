@@ -30,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [JsonConstructor]
         public BoundingBox3D(Vector3 min, Vector3 max)
         {
-            if (min.x > max.x || min.y > max.y || min.z > max.z)
+            if (max.x < min.x || max.y < min.y || max.z < min.z)
             {
                 throw new ArgumentException("Min must be less than or equal to max on all axes.");
             }
@@ -115,15 +115,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             Vector3 localMax = max;
-            if (point.x >= localMax.x)
+            if (localMax.x <= point.x)
             {
                 localMax.x = NextFloat(point.x);
             }
-            if (point.y >= localMax.y)
+            if (localMax.y <= point.y)
             {
                 localMax.y = NextFloat(point.y);
             }
-            if (point.z >= localMax.z)
+            if (localMax.z <= point.z)
             {
                 localMax.z = NextFloat(point.z);
             }
@@ -207,9 +207,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public bool Contains(Vector3 point)
         {
-            return point.x >= min.x
-                && point.y >= min.y
-                && point.z >= min.z
+            return min.x <= point.x
+                && min.y <= point.y
+                && min.z <= point.z
                 && point.x < max.x
                 && point.y < max.y
                 && point.z < max.z;
@@ -226,9 +226,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return min.x <= other.min.x
                 && min.y <= other.min.y
                 && min.z <= other.min.z
-                && max.x >= other.max.x
-                && max.y >= other.max.y
-                && max.z >= other.max.z;
+                && other.max.x <= max.x
+                && other.max.y <= max.y
+                && other.max.z <= max.z;
         }
 
         public BoundingBox3D? Intersection(BoundingBox3D other)
@@ -257,11 +257,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public bool Intersects(BoundingBox3D other)
         {
             return min.x < other.max.x
-                && max.x > other.min.x
+                && other.min.x < max.x
                 && min.y < other.max.y
-                && max.y > other.min.y
+                && other.min.y < max.y
                 && min.z < other.max.z
-                && max.z > other.min.z;
+                && other.min.z < max.z;
         }
 
         /// <summary>
@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int bits = BitConverter.SingleToInt32Bits(value);
-            bits = value > 0f ? bits + 1 : bits - 1;
+            bits = 0f < value ? bits + 1 : bits - 1;
             return BitConverter.Int32BitsToSingle(bits);
         }
     }

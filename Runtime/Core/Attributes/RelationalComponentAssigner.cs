@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         current,
                         out AttributeMetadataCache.RelationalFieldMetadata[] fields
                     )
-                    && fields.Length > 0
+                    && 0 < fields.Length
                 )
                 {
                     return true;

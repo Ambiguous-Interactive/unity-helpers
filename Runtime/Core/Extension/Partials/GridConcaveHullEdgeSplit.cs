@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 ++iterations;
-                if (iterations > maxIterations)
+                if (maxIterations < iterations)
                 {
                     // Safety: avoid runaway refinement by flushing remaining edges to concave set
                     concaveHullEdges.AddRange(data);
@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
 
-                    if (reverseIndex >= 0)
+                    if (0 <= reverseIndex)
                     {
                         HullEdge reversed = new(
                             concaveHullEdges[reverseIndex].to,
@@ -388,7 +388,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     minX = x;
                 }
 
-                if (x > maxX)
+                if (maxX < x)
                 {
                     maxX = x;
                 }
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     minY = y;
                 }
 
-                if (y > maxY)
+                if (maxY < y)
                 {
                     maxY = y;
                 }
@@ -541,7 +541,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         maybeChosen = candidate;
                     }
                 }
-                if (!maybeChosen.HasValue || smallestAngle > angleThreshold)
+                if (!maybeChosen.HasValue || angleThreshold < smallestAngle)
                 {
                     concaveHullEdges.Add(edge);
                     continue;
@@ -582,7 +582,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 ++iterations;
-                if (iterations > maxIterations)
+                if (maxIterations < iterations)
                 {
                     concaveHullEdges.AddRange(data);
                     break;
@@ -622,7 +622,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             break;
                         }
                     }
-                    if (reverseIndex >= 0)
+                    if (0 <= reverseIndex)
                     {
                         HullEdgeV2 reversed = new(
                             concaveHullEdges[reverseIndex].to,

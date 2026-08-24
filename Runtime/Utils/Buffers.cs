@@ -337,8 +337,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bool useLru =
                     allowEviction
                     && WaitInstructionUseLruEviction
-                    && WaitInstructionMaxDistinctEntries > 0;
-                if (useLru && cache.Count >= WaitInstructionMaxDistinctEntries)
+                    && 0 < WaitInstructionMaxDistinctEntries;
+                if (useLru && WaitInstructionMaxDistinctEntries <= cache.Count)
                 {
                     if (order.First != null)
                     {
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int hits = Interlocked.Increment(ref limitHits);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             int maxEntries = WaitInstructionMaxDistinctEntries;
-            if (maxEntries > 0 && (hits == 1 || hits % WaitInstructionLimitWarningInterval == 0))
+            if (0 < maxEntries && (hits == 1 || hits % WaitInstructionLimitWarningInterval == 0))
             {
                 Debug.LogWarning(
                     $"[Buffers] {cacheName} cache reached the configured limit of {maxEntries} unique wait instructions. Consider using Buffers.TryGet... or increasing Buffers.WaitInstructionMaxDistinctEntries."
@@ -658,7 +658,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         public float QuantizationStepSeconds { get; }
 
-        public bool IsQuantized => QuantizationStepSeconds > 0f;
+        public bool IsQuantized => 0f < QuantizationStepSeconds;
 
         public bool IsLruEnabled { get; }
 
@@ -1312,7 +1312,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
             }
             int warmCount = _pool.Count;
-            if (warmCount > _peakSize)
+            if (_peakSize < warmCount)
             {
                 _peakSize = warmCount;
             }
@@ -1375,7 +1375,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _usageTracker.RecordRent(currentTime);
 
             T rented;
-            if (_pool.Count > 0)
+            if (0 < _pool.Count)
             {
                 int lastIndex = _pool.Count - 1;
                 rented = _pool[lastIndex].Value;
@@ -1386,7 +1386,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 rented = _producer();
                 // Update peak size when creating a new item (tracks total items in circulation)
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
-                if (totalInCirculation > _peakSize)
+                if (_peakSize < totalInCirculation)
                 {
                     _peakSize = totalInCirculation;
                 }
@@ -1413,7 +1413,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _usageTracker.RecordReturn(currentTime);
 
             int currentCount = _pool.Count;
-            if (currentCount > _peakSize)
+            if (_peakSize < currentCount)
             {
                 _peakSize = currentCount;
             }
@@ -1436,7 +1436,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            if (currentTime - _lastPeriodicPurge >= PurgeIntervalSeconds)
+            if (PurgeIntervalSeconds <= currentTime - _lastPeriodicPurge)
             {
                 _lastPeriodicPurge = currentTime;
                 PurgeInternal(false, currentTime);
@@ -1498,7 +1498,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             int purged = 0;
 
-            for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
+            for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
@@ -1510,7 +1510,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             // Track as a full purge operation since this bypasses MaxPurgesPerOperation
-            if (purged > 0)
+            if (0 < purged)
             {
                 _fullPurgeOperations++;
             }
@@ -1572,7 +1572,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             int purged = 0;
 
-            for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
+            for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
@@ -1586,7 +1586,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // Clear pending flag since we're doing a full purge
             _hasPendingPurges = false;
 
-            if (purged > 0)
+            if (0 < purged)
             {
                 _fullPurgeOperations++;
             }
@@ -1605,7 +1605,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int minRetain = MinRetainCount;
             int purged = 0;
 
-            for (int i = _pool.Count - 1; i >= 0 && purged < count && _pool.Count > minRetain; i--)
+            for (int i = _pool.Count - 1; 0 <= i && purged < count && minRetain < _pool.Count; i--)
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
@@ -1645,7 +1645,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // memory pressure (which self-throttles via interval).
             if (!isExplicit && !forceFullPurge)
             {
-                bool hasPurgeCriteria = IdleTimeoutSeconds > 0f || MaxPoolSize > 0;
+                bool hasPurgeCriteria = 0f < IdleTimeoutSeconds || 0 < MaxPoolSize;
                 if (!hasPurgeCriteria && !_hasPendingPurges)
                 {
                     MemoryPressureMonitor.Update();
@@ -1667,7 +1667,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 int configuredMaxPoolSize = MaxPoolSize;
                 bool appearsOverCapacity =
-                    configuredMaxPoolSize > 0 && _pool.Count > configuredMaxPoolSize;
+                    0 < configuredMaxPoolSize && configuredMaxPoolSize < _pool.Count;
 
                 if (
                     !appearsOverCapacity
@@ -1707,9 +1707,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             int comfortableSize = purgeParams.ComfortableSize;
             bool inHysteresis = purgeParams.InHysteresis;
 
-            bool hasIdleTimeout = effectiveIdleTimeout > 0f;
-            bool hasMaxSize = maxSize > 0;
-            bool hasMaxPurgesLimit = maxPurgesLimit > 0;
+            bool hasIdleTimeout = 0f < effectiveIdleTimeout;
+            bool hasMaxSize = 0 < maxSize;
+            bool hasMaxPurgesLimit = 0 < maxPurgesLimit;
 
             if (inHysteresis && !hasIdleTimeout)
             {
@@ -1734,14 +1734,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                         break;
                     }
 
-                    if (hasMaxPurgesLimit && expiredCount >= maxPurgesLimit)
+                    if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
                     {
                         hitPurgeLimit = true;
                         moreEligibleItems = true;
                         break;
                     }
 
-                    if ((currentTime - _pool[i].ReturnTime) >= effectiveIdleTimeout)
+                    if (effectiveIdleTimeout <= (currentTime - _pool[i].ReturnTime))
                     {
                         expiredCount++;
                     }
@@ -1755,7 +1755,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 // Phase 2: remove from pool, then invoke callbacks
                 // Callbacks are invoked after removal to prevent reentrancy issues
                 // (a callback calling Get() on this pool would see stale entries otherwise).
-                if (expiredCount > 0)
+                if (0 < expiredCount)
                 {
                     T[] expiredValues = new T[expiredCount];
                     for (int i = 0; i < expiredCount; i++)
@@ -1780,13 +1780,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 // Mixed-criteria path: back-to-front iteration for capacity + explicit purges
                 for (
                     int i = _pool.Count - 1;
-                    i >= 0
-                        && (isExplicit || hasIdleTimeout || _pool.Count > comfortableSize)
-                        && _pool.Count > effectiveMinRetain;
+                    0 <= i
+                        && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                        && effectiveMinRetain < _pool.Count;
                     i--
                 )
                 {
-                    if (hasMaxPurgesLimit && purged >= maxPurgesLimit)
+                    if (hasMaxPurgesLimit && maxPurgesLimit <= purged)
                     {
                         hitPurgeLimit = true;
                         moreEligibleItems = true;
@@ -1797,13 +1797,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                     PurgeReason reason = PurgeReason.Explicit;
                     bool shouldPurge = false;
 
-                    if (hasIdleTimeout && (currentTime - entry.ReturnTime) >= effectiveIdleTimeout)
+                    if (hasIdleTimeout && effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
                     {
                         reason = PurgeReason.IdleTimeout;
                         shouldPurge = true;
                         _idleTimeoutPurges++;
                     }
-                    else if (!inHysteresis && hasMaxSize && _pool.Count > maxSize)
+                    else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
                     {
                         reason = PurgeReason.CapacityExceeded;
                         shouldPurge = true;
@@ -1840,7 +1840,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             else
             {
                 _hasPendingPurges = false;
-                if (purged > 0)
+                if (0 < purged)
                 {
                     _fullPurgeOperations++;
                 }
@@ -1851,7 +1851,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // fast-path skip for healthy pools in tight Rent/Return loops; correctness for
             // over-capacity pools is maintained by the upstream over-capacity bypass, which
             // lets returns at the same tick re-enter the scan as needed.
-            if (currentTime > _lastAutoPurgeTime)
+            if (_lastAutoPurgeTime < currentTime)
             {
                 _lastAutoPurgeTime = currentTime;
             }
@@ -1864,7 +1864,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int minRetain = MinRetainCount;
             int purged = 0;
 
-            for (int i = _pool.Count - 1; i >= 0 && _pool.Count > minRetain; i--)
+            for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
@@ -1876,7 +1876,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _hasPendingPurges = false;
-            if (purged > 0)
+            if (0 < purged)
             {
                 _fullPurgeOperations++;
             }
@@ -2272,7 +2272,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
             }
             int warmCount = _pool.Count;
-            if (warmCount > _peakSize)
+            if (_peakSize < warmCount)
             {
                 _peakSize = warmCount;
             }
@@ -2339,7 +2339,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                if (_pool.Count > 0)
+                if (0 < _pool.Count)
                 {
                     int lastIndex = _pool.Count - 1;
                     T pooled = _pool[lastIndex].Value;
@@ -2354,7 +2354,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // Update peak size when creating a new item (tracks total items in circulation)
             int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
             int peak = _peakSize;
-            while (totalInCirculation > peak)
+            while (peak < totalInCirculation)
             {
                 int original = Interlocked.CompareExchange(ref _peakSize, totalInCirculation, peak);
                 if (original == peak)
@@ -2388,7 +2388,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 int currentCount = _pool.Count;
                 int peak = _peakSize;
-                while (currentCount > peak)
+                while (peak < currentCount)
                 {
                     int original = Interlocked.CompareExchange(ref _peakSize, currentCount, peak);
                     if (original == peak)
@@ -2422,7 +2422,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float lastPurge = Volatile.Read(ref _lastPeriodicPurge);
 
-            if (currentTime - lastPurge >= interval)
+            if (interval <= currentTime - lastPurge)
             {
                 float original = Interlocked.CompareExchange(
                     ref _lastPeriodicPurge,
@@ -2503,7 +2503,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
+                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
                 {
                     toPurge.Add(_pool[i]);
                     _pool.RemoveAt(i);
@@ -2511,7 +2511,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int purged = toPurge.Count;
-            if (purged > 0)
+            if (0 < purged)
             {
                 Interlocked.Add(ref _purgeCount, purged);
                 // Track as a full purge operation since this bypasses MaxPurgesPerOperation
@@ -2584,7 +2584,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                for (int i = _pool.Count - 1; i >= 0 && _pool.Count > effectiveMinRetain; i--)
+                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
                 {
                     toPurge.Add(_pool[i]);
                     _pool.RemoveAt(i);
@@ -2595,7 +2595,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Volatile.Write(ref _hasPendingPurges, 0);
 
             int purged = toPurge.Count;
-            if (purged > 0)
+            if (0 < purged)
             {
                 Interlocked.Add(ref _purgeCount, purged);
                 Interlocked.Increment(ref _fullPurgeOperations);
@@ -2627,7 +2627,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 for (
                     int i = _pool.Count - 1;
-                    i >= 0 && toPurge.Count < count && _pool.Count > minRetain;
+                    0 <= i && toPurge.Count < count && minRetain < _pool.Count;
                     i--
                 )
                 {
@@ -2637,7 +2637,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int purged = toPurge.Count;
-            if (purged > 0)
+            if (0 < purged)
             {
                 Interlocked.Add(ref _purgeCount, purged);
             }
@@ -2677,7 +2677,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             // Fast-path: no purge criteria configured and not an explicit/forced purge.
             if (!isExplicit && !forceFullPurge)
             {
-                bool hasPurgeCriteria = IdleTimeoutSeconds > 0f || MaxPoolSize > 0;
+                bool hasPurgeCriteria = 0f < IdleTimeoutSeconds || 0 < MaxPoolSize;
                 if (!hasPurgeCriteria && Volatile.Read(ref _hasPendingPurges) == 0)
                 {
                     MemoryPressureMonitor.Update();
@@ -2703,7 +2703,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int configuredMaxPoolSize = MaxPoolSize;
                 int sizeHint = _pool.Count;
                 bool appearsOverCapacity =
-                    configuredMaxPoolSize > 0 && sizeHint > configuredMaxPoolSize;
+                    0 < configuredMaxPoolSize && configuredMaxPoolSize < sizeHint;
 
                 if (!appearsOverCapacity)
                 {
@@ -2744,9 +2744,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             int comfortableSize = purgeParams.ComfortableSize;
             bool inHysteresis = purgeParams.InHysteresis;
 
-            bool hasIdleTimeout = effectiveIdleTimeout > 0f;
-            bool hasMaxSize = maxSize > 0;
-            bool hasMaxPurgesLimit = maxPurgesLimit > 0;
+            bool hasIdleTimeout = 0f < effectiveIdleTimeout;
+            bool hasMaxSize = 0 < maxSize;
+            bool hasMaxPurgesLimit = 0 < maxPurgesLimit;
 
             if (inHysteresis && !hasIdleTimeout)
             {
@@ -2775,7 +2775,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             break;
                         }
 
-                        if (hasMaxPurgesLimit && expiredCount >= maxPurgesLimit)
+                        if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
                         {
                             hitPurgeLimit = true;
                             moreEligibleItems = true;
@@ -2783,7 +2783,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         }
 
                         PooledEntry entry = _pool[i];
-                        if ((currentTime - entry.ReturnTime) >= effectiveIdleTimeout)
+                        if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
                         {
                             entriesToPurge ??= new List<PooledEntry>();
                             purgeReasons ??= new List<PurgeReason>();
@@ -2798,7 +2798,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         }
                     }
 
-                    if (expiredCount > 0)
+                    if (0 < expiredCount)
                     {
                         _pool.RemoveRange(0, expiredCount);
                         purgeCount += expiredCount;
@@ -2809,13 +2809,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                     // Mixed-criteria path: back-to-front iteration
                     for (
                         int i = _pool.Count - 1;
-                        i >= 0
-                            && (isExplicit || hasIdleTimeout || _pool.Count > comfortableSize)
-                            && _pool.Count > effectiveMinRetain;
+                        0 <= i
+                            && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                            && effectiveMinRetain < _pool.Count;
                         i--
                     )
                     {
-                        if (hasMaxPurgesLimit && purgeCount >= maxPurgesLimit)
+                        if (hasMaxPurgesLimit && maxPurgesLimit <= purgeCount)
                         {
                             hitPurgeLimit = true;
                             moreEligibleItems = true;
@@ -2828,14 +2828,14 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                         if (
                             hasIdleTimeout
-                            && (currentTime - entry.ReturnTime) >= effectiveIdleTimeout
+                            && effectiveIdleTimeout <= (currentTime - entry.ReturnTime)
                         )
                         {
                             reason = PurgeReason.IdleTimeout;
                             shouldPurge = true;
                             Interlocked.Increment(ref _idleTimeoutPurges);
                         }
-                        else if (!inHysteresis && hasMaxSize && _pool.Count > maxSize)
+                        else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
                         {
                             reason = PurgeReason.CapacityExceeded;
                             shouldPurge = true;
@@ -2868,7 +2868,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             else
             {
                 Volatile.Write(ref _hasPendingPurges, 0);
-                if (purgeCount > 0)
+                if (0 < purgeCount)
                 {
                     Interlocked.Increment(ref _fullPurgeOperations);
                 }
@@ -2925,7 +2925,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                for (int i = _pool.Count - 1; i >= 0 && _pool.Count > minRetain; i--)
+                for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
                 {
                     toPurge.Add(_pool[i]);
                     _pool.RemoveAt(i);
@@ -2935,7 +2935,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Volatile.Write(ref _hasPendingPurges, 0);
 
             int purged = toPurge.Count;
-            if (purged > 0)
+            if (0 < purged)
             {
                 Interlocked.Add(ref _purgeCount, purged);
                 Interlocked.Increment(ref _fullPurgeOperations);

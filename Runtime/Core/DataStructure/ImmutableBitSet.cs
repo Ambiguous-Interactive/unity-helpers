@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(int index, out bool value)
         {
-            if (index < 0 || index >= _capacity || _bits == null)
+            if (index < 0 || _capacity <= index || _bits == null)
             {
                 value = false;
                 return false;
@@ -263,7 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public BitSet ToBitSet()
         {
-            BitSet result = new(_capacity > 0 ? _capacity : 64);
+            BitSet result = new(0 < _capacity ? _capacity : 64);
             if (_bits == null || _capacity <= 0)
             {
                 return result;

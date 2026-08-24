@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static int LargerDimension(int largest, int dimension)
         {
-            return dimension > largest ? dimension : largest;
+            return largest < dimension ? dimension : largest;
         }
 
         /// <summary>

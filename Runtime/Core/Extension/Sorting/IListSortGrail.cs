@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (left >= right)
+            if (right <= left)
             {
                 return;
             }

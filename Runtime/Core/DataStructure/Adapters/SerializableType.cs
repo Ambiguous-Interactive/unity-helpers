@@ -898,9 +898,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             SerializableTypeDescriptor[] source = _descriptors;
             int keyLength = key.Length;
-            if (keyLength > 1)
+            if (1 < keyLength)
             {
-                for (int length = keyLength - 1; length > 0; length--)
+                for (int length = keyLength - 1; 0 < length; length--)
                 {
                     string parentKey = key.Substring(0, length);
                     if (FilterCache.TryGetValue(parentKey, out SerializableTypeDescriptor[] parent))
@@ -1067,7 +1067,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     bool hasDuplicates = false;
                     foreach (KeyValuePair<string, int> pair in displayCounts)
                     {
-                        if (pair.Value > 1)
+                        if (1 < pair.Value)
                         {
                             hasDuplicates = true;
                             break;
@@ -1198,7 +1198,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
 
                 int backtickIndex = fullName.IndexOf('`');
-                if (backtickIndex >= 0)
+                if (0 <= backtickIndex)
                 {
                     fullName = fullName.Substring(0, backtickIndex);
                 }
@@ -1209,7 +1209,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 Type[] arguments = type.GetGenericArguments();
                 for (int index = 0; index < arguments.Length; index++)
                 {
-                    if (index > 0)
+                    if (0 < index)
                     {
                         builder.Append(", ");
                     }

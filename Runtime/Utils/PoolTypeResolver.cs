@@ -744,7 +744,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 // Open generic: List<> or Dictionary<,>
                 string name = type.Name;
                 int backtickIndex = name.IndexOf('`');
-                if (backtickIndex >= 0)
+                if (0 <= backtickIndex)
                 {
                     name = name.Substring(0, backtickIndex);
                 }
@@ -773,7 +773,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 // Closed generic: List<int> or Dictionary<string, int>
                 string name = type.Name;
                 int backtickIndex = name.IndexOf('`');
-                if (backtickIndex >= 0)
+                if (0 <= backtickIndex)
                 {
                     name = name.Substring(0, backtickIndex);
                 }
@@ -786,7 +786,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 sb.Append('<');
                 for (int i = 0; i < args.Length; i++)
                 {
-                    if (i > 0)
+                    if (0 < i)
                     {
                         sb.Append(", ");
                     }

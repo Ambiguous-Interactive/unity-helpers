@@ -125,57 +125,57 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             int pressureScore = 0;
 
-            if (memoryRatio >= CriticalMemoryRatio)
+            if (CriticalMemoryRatio <= memoryRatio)
             {
                 pressureScore += CriticalMemoryScoreContribution;
             }
-            else if (memoryRatio >= HighMemoryRatio)
+            else if (HighMemoryRatio <= memoryRatio)
             {
                 pressureScore += HighMemoryScoreContribution;
             }
-            else if (memoryRatio >= MediumMemoryRatio)
+            else if (MediumMemoryRatio <= memoryRatio)
             {
                 pressureScore += MediumMemoryScoreContribution;
             }
-            else if (memoryRatio >= LowMemoryRatio)
+            else if (LowMemoryRatio <= memoryRatio)
             {
                 pressureScore += LowMemoryScoreContribution;
             }
 
-            if (gcRateMultiplier >= HighGCRateMultiplier)
+            if (HighGCRateMultiplier <= gcRateMultiplier)
             {
                 pressureScore += HighGCRateScoreContribution;
             }
-            else if (gcRateMultiplier >= 1f)
+            else if (1f <= gcRateMultiplier)
             {
                 pressureScore += MediumGCRateScoreContribution;
             }
 
-            if (growthRateMultiplier >= HighGrowthRateMultiplier)
+            if (HighGrowthRateMultiplier <= growthRateMultiplier)
             {
                 pressureScore += HighGrowthRateScoreContribution;
             }
-            else if (growthRateMultiplier >= 1f)
+            else if (1f <= growthRateMultiplier)
             {
                 pressureScore += MediumGrowthRateScoreContribution;
             }
 
-            if (pressureScore >= CriticalScoreThreshold)
+            if (CriticalScoreThreshold <= pressureScore)
             {
                 return MemoryPressureLevel.Critical;
             }
 
-            if (pressureScore >= HighScoreThreshold)
+            if (HighScoreThreshold <= pressureScore)
             {
                 return MemoryPressureLevel.High;
             }
 
-            if (pressureScore >= MediumScoreThreshold)
+            if (MediumScoreThreshold <= pressureScore)
             {
                 return MemoryPressureLevel.Medium;
             }
 
-            if (pressureScore >= LowScoreThreshold)
+            if (LowScoreThreshold <= pressureScore)
             {
                 return MemoryPressureLevel.Low;
             }
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             set =>
                 Volatile.Write(
                     ref _memoryPressureThresholdBytes,
-                    value > 0 ? value : DefaultMemoryPressureThresholdBytes
+                    0 < value ? value : DefaultMemoryPressureThresholdBytes
                 );
         }
 
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             set =>
                 Volatile.Write(
                     ref _checkIntervalSeconds,
-                    value > 0f ? value : DefaultCheckIntervalSeconds
+                    0f < value ? value : DefaultCheckIntervalSeconds
                 );
         }
 
@@ -256,7 +256,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             set =>
                 Volatile.Write(
                     ref _gcCollectionRateThreshold,
-                    value > 0f ? value : DefaultGCCollectionRateThreshold
+                    0f < value ? value : DefaultGCCollectionRateThreshold
                 );
         }
 
@@ -274,7 +274,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             set =>
                 Volatile.Write(
                     ref _memoryGrowthRateThreshold,
-                    value > 0 ? value : DefaultMemoryGrowthRateThreshold
+                    0 < value ? value : DefaultMemoryGrowthRateThreshold
                 );
         }
 
@@ -421,60 +421,60 @@ namespace WallstopStudios.UnityHelpers.Utils
             int pressureScore = 0;
 
             long threshold = MemoryPressureThresholdBytes;
-            if (threshold > 0)
+            if (0 < threshold)
             {
                 float memoryRatio = (float)totalMemory / threshold;
 
-                if (memoryRatio >= CriticalMemoryRatio)
+                if (CriticalMemoryRatio <= memoryRatio)
                 {
                     pressureScore += CriticalMemoryScoreContribution;
                 }
-                else if (memoryRatio >= HighMemoryRatio)
+                else if (HighMemoryRatio <= memoryRatio)
                 {
                     pressureScore += HighMemoryScoreContribution;
                 }
-                else if (memoryRatio >= MediumMemoryRatio)
+                else if (MediumMemoryRatio <= memoryRatio)
                 {
                     pressureScore += MediumMemoryScoreContribution;
                 }
-                else if (memoryRatio >= LowMemoryRatio)
+                else if (LowMemoryRatio <= memoryRatio)
                 {
                     pressureScore += LowMemoryScoreContribution;
                 }
             }
 
-            if (previousGCCount > 0)
+            if (0 < previousGCCount)
             {
                 int gcDelta = gcCount - previousGCCount;
-                if (gcDelta > 0)
+                if (0 < gcDelta)
                 {
                     float gcRate = gcDelta / elapsed;
                     float gcRateThreshold = GCCollectionRateThreshold;
 
-                    if (gcRate >= gcRateThreshold * HighGCRateMultiplier)
+                    if (gcRateThreshold * HighGCRateMultiplier <= gcRate)
                     {
                         pressureScore += HighGCRateScoreContribution;
                     }
-                    else if (gcRate >= gcRateThreshold)
+                    else if (gcRateThreshold <= gcRate)
                     {
                         pressureScore += MediumGCRateScoreContribution;
                     }
                 }
             }
 
-            if (previousMemory > 0)
+            if (0 < previousMemory)
             {
                 long memoryDelta = totalMemory - previousMemory;
-                if (memoryDelta > 0)
+                if (0 < memoryDelta)
                 {
                     float growthRate = memoryDelta / elapsed;
                     long growthThreshold = MemoryGrowthRateThreshold;
 
-                    if (growthRate >= growthThreshold * HighGrowthRateMultiplier)
+                    if (growthThreshold * HighGrowthRateMultiplier <= growthRate)
                     {
                         pressureScore += HighGrowthRateScoreContribution;
                     }
-                    else if (growthRate >= growthThreshold)
+                    else if (growthThreshold <= growthRate)
                     {
                         pressureScore += MediumGrowthRateScoreContribution;
                     }
@@ -482,19 +482,19 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             MemoryPressureLevel level;
-            if (pressureScore >= CriticalScoreThreshold)
+            if (CriticalScoreThreshold <= pressureScore)
             {
                 level = MemoryPressureLevel.Critical;
             }
-            else if (pressureScore >= HighScoreThreshold)
+            else if (HighScoreThreshold <= pressureScore)
             {
                 level = MemoryPressureLevel.High;
             }
-            else if (pressureScore >= MediumScoreThreshold)
+            else if (MediumScoreThreshold <= pressureScore)
             {
                 level = MemoryPressureLevel.Medium;
             }
-            else if (pressureScore >= LowScoreThreshold)
+            else if (LowScoreThreshold <= pressureScore)
             {
                 level = MemoryPressureLevel.Low;
             }

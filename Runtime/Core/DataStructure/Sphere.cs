@@ -179,9 +179,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 float sizeY = bounds.max.y - bounds.min.y;
                 float sizeZ = bounds.max.z - bounds.min.z;
                 float maxSize =
-                    sizeX > sizeY
-                        ? (sizeX > sizeZ ? sizeX : sizeZ)
-                        : (sizeY > sizeZ ? sizeY : sizeZ);
+                    sizeY < sizeX
+                        ? (sizeZ < sizeX ? sizeX : sizeZ)
+                        : (sizeZ < sizeY ? sizeY : sizeZ);
 
                 // If bounds is tiny and min is inside sphere, consider it overlapping
                 if (maxSize < 1e-5f)
@@ -202,15 +202,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // Find the corner farthest from the sphere center by choosing the coordinate with max absolute distance
             float absMinX = toMinX < 0 ? -toMinX : toMinX;
             float absMaxX = toMaxX < 0 ? -toMaxX : toMaxX;
-            float farthestX = absMinX > absMaxX ? toMinX : toMaxX;
+            float farthestX = absMaxX < absMinX ? toMinX : toMaxX;
 
             float absMinY = toMinY < 0 ? -toMinY : toMinY;
             float absMaxY = toMaxY < 0 ? -toMaxY : toMaxY;
-            float farthestY = absMinY > absMaxY ? toMinY : toMaxY;
+            float farthestY = absMaxY < absMinY ? toMinY : toMaxY;
 
             float absMinZ = toMinZ < 0 ? -toMinZ : toMinZ;
             float absMaxZ = toMaxZ < 0 ? -toMaxZ : toMaxZ;
-            float farthestZ = absMinZ > absMaxZ ? toMinZ : toMaxZ;
+            float farthestZ = absMaxZ < absMinZ ? toMinZ : toMaxZ;
 
             float farthestDistanceSquared =
                 farthestX * farthestX + farthestY * farthestY + farthestZ * farthestZ;

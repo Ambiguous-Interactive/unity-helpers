@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             get
             {
-                if (index < 0 || index >= _count)
+                if (index < 0 || _count <= index)
                 {
                     throw new IndexOutOfRangeException(
                         $"{index} is outside of bounds [0, {_count})"
@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             set
             {
-                if (index < 0 || index >= _count)
+                if (index < 0 || _count <= index)
                 {
                     throw new IndexOutOfRangeException(
                         $"{index} is outside of bounds [0, {_count})"
@@ -346,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void Clear()
         {
-            if (_count > 0)
+            if (0 < _count)
             {
                 if (_head < _tail)
                 {
@@ -389,7 +389,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 throw new ArgumentNullException(nameof(array));
             }
-            if (arrayIndex < 0 || arrayIndex > array.Length)
+            if (arrayIndex < 0 || array.Length < arrayIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(arrayIndex));
             }
@@ -431,7 +431,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public void TrimExcess()
         {
             int threshold = (int)(_items.Length * 0.9);
-            if (_count >= threshold)
+            if (threshold <= _count)
             {
                 return;
             }
@@ -485,7 +485,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (capacity <= 0)
             {
-                capacity = itemCount > 0 ? itemCount : DefaultCapacity;
+                capacity = 0 < itemCount ? itemCount : DefaultCapacity;
             }
 
             // A serialized capacity is a claim, not data: a payload carrying no items can ask for a
@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int growth = currentCapacity + (currentCapacity >> 1);
             int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
 
-            if ((uint)newCapacity > 0X7FFFFFC7)
+            if (0X7FFFFFC7 < (uint)newCapacity)
             {
                 newCapacity = 0X7FFFFFC7;
             }
@@ -542,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             T[] newItems = new T[newCapacity];
-            if (_count > 0)
+            if (0 < _count)
             {
                 if (_head < _tail)
                 {

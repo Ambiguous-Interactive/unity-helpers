@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             get
             {
-                if (index < 0 || index >= _count)
+                if (index < 0 || _count <= index)
                 {
                     throw new IndexOutOfRangeException(
                         $"{index} is outside of bounds [0, {_count})"
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <returns>True if the index is valid, false otherwise.</returns>
         public bool TryGet(int index, out T result)
         {
-            if (index < 0 || index >= _count)
+            if (index < 0 || _count <= index)
             {
                 result = default;
                 return false;
@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             // Floyd's heap construction algorithm - O(n)
-            for (int i = (_count - 1) >> 1; i >= 0; i--)
+            for (int i = (_count - 1) >> 1; 0 <= i; i--)
             {
                 HeapifyDown(i);
             }
@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             T root = _items[0];
             _count--;
-            if (_count > 0)
+            if (0 < _count)
             {
                 _items[0] = _items[_count];
                 HeapifyDown(0);
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 throw new ArgumentNullException(nameof(array));
             }
-            if (arrayIndex < 0 || arrayIndex > array.Length)
+            if (arrayIndex < 0 || array.Length < arrayIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(arrayIndex));
             }
@@ -408,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <returns>True if the index was valid and the update succeeded, false otherwise.</returns>
         public bool TryUpdatePriority(int index, T newValue)
         {
-            if (index < 0 || index >= _count)
+            if (index < 0 || _count <= index)
             {
                 return false;
             }
@@ -422,7 +422,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 // Priority increased (smaller value in min-heap), bubble up
                 HeapifyUp(index);
             }
-            else if (comparison > 0)
+            else if (0 < comparison)
             {
                 // Priority decreased (larger value in min-heap), bubble down
                 HeapifyDown(index);
@@ -435,12 +435,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private void HeapifyUp(int index)
         {
             T item = _items[index];
-            while (index > 0)
+            while (0 < index)
             {
                 int parentIndex = (index - 1) >> 1;
                 T parent = _items[parentIndex];
 
-                if (_comparer.Compare(item, parent) >= 0)
+                if (0 <= _comparer.Compare(item, parent))
                 {
                     break;
                 }
@@ -492,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
 
             // Handle overflow by capping at Array.MaxLength
-            if ((uint)newCapacity > 0X7FFFFFC7) // Array.MaxLength
+            if (0X7FFFFFC7 < (uint)newCapacity) // Array.MaxLength
             {
                 newCapacity = 0X7FFFFFC7;
             }

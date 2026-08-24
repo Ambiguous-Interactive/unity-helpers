@@ -280,17 +280,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     minZ = position.z;
                 }
 
-                if (position.x > maxX)
+                if (maxX < position.x)
                 {
                     maxX = position.x;
                 }
 
-                if (position.y > maxY)
+                if (maxY < position.y)
                 {
                     maxY = position.y;
                 }
 
-                if (position.z > maxZ)
+                if (maxZ < position.z)
                 {
                     maxZ = position.z;
                 }
@@ -384,9 +384,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 int entryIndex = source[i];
                 Vector3 position = entries[entryIndex].position;
-                bool east = position.x >= centerX;
-                bool north = position.y >= centerY;
-                bool up = position.z >= centerZ;
+                bool east = centerX <= position.x;
+                bool north = centerY <= position.y;
+                bool up = centerZ <= position.z;
                 int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
                 counts[octant]++;
             }
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 starts[q] = running;
                 next[q] = running;
                 running += counts[q];
-                if (counts[q] > maxChildCount)
+                if (maxChildCount < counts[q])
                 {
                     maxChildCount = counts[q];
                 }
@@ -414,9 +414,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 int entryIndex = source[i];
                 Vector3 position = entries[entryIndex].position;
-                bool east = position.x >= centerX;
-                bool north = position.y >= centerY;
-                bool up = position.z >= centerZ;
+                bool east = centerX <= position.x;
+                bool north = centerY <= position.y;
+                bool up = centerZ <= position.z;
                 int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
                 int destination = next[octant]++;
                 temp[destination] = entryIndex;
@@ -593,7 +593,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                                 {
                                     Entry entry = entries[indices[i]];
                                     float squareDistance = (entry.position - position).sqrMagnitude;
-                                    if (squareDistance > minimumRangeSquared)
+                                    if (minimumRangeSquared < squareDistance)
                                     {
                                         elementsInRange.Add(entry.value);
                                     }
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         {
                             Entry entry = entries[indices[i]];
                             float squareDistance = (entry.position - position).sqrMagnitude;
-                            if (squareDistance > rangeSquared)
+                            if (rangeSquared < squareDistance)
                             {
                                 continue;
                             }
@@ -878,17 +878,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     minZ = p.z;
                 }
 
-                if (p.x > maxX)
+                if (maxX < p.x)
                 {
                     maxX = p.x;
                 }
 
-                if (p.y > maxY)
+                if (maxY < p.y)
                 {
                     maxY = p.y;
                 }
 
-                if (p.z > maxZ)
+                if (maxZ < p.z)
                 {
                     maxZ = p.z;
                 }
@@ -953,9 +953,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return containerMin.x <= contentMin.x
                 && containerMin.y <= contentMin.y
                 && containerMin.z <= contentMin.z
-                && containerMax.x >= contentMax.x
-                && containerMax.y >= contentMax.y
-                && containerMax.z >= contentMax.z;
+                && contentMax.x <= containerMax.x
+                && contentMax.y <= containerMax.y
+                && contentMax.z <= containerMax.z;
         }
 
         private static bool ClosedIntersects(Bounds closedQuery, BoundingBox3D nodeBoundary)
@@ -964,11 +964,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Vector3 nodeMax = ComputeClosedMax(nodeMin, nodeBoundary.max);
             Vector3 queryMin = closedQuery.min;
             Vector3 queryMax = closedQuery.max;
-            return nodeMax.x >= queryMin.x
+            return queryMin.x <= nodeMax.x
                 && nodeMin.x <= queryMax.x
-                && nodeMax.y >= queryMin.y
+                && queryMin.y <= nodeMax.y
                 && nodeMin.y <= queryMax.y
-                && nodeMax.z >= queryMin.z
+                && queryMin.z <= nodeMax.z
                 && nodeMin.z <= queryMax.z;
         }
 #endif
@@ -991,7 +991,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int bits = BitConverter.SingleToInt32Bits(value);
-            bits = value > 0f ? bits - 1 : bits + 1;
+            bits = 0f < value ? bits - 1 : bits + 1;
             return BitConverter.Int32BitsToSingle(bits);
         }
 
@@ -1025,13 +1025,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             float currentWorstDistanceSquared = float.PositiveInfinity;
 
-            while (nodeHeap.Count > 0)
+            while (0 < nodeHeap.Count)
             {
                 NodeDistance best = PopNode(nodeHeap);
 
                 if (
-                    bestNeighbors.Count >= count
-                    && best._distanceSquared >= currentWorstDistanceSquared
+                    count <= bestNeighbors.Count
+                    && currentWorstDistanceSquared <= best._distanceSquared
                 )
                 {
                     break;
@@ -1045,7 +1045,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     for (int i = 0; i < childNodes.Length; ++i)
                     {
                         OctTreeNode child = childNodes[i];
-                        if (child is not null && child._count > 0)
+                        if (child is not null && 0 < child._count)
                         {
                             PushNode(nodeHeap, child, position);
                         }
@@ -1076,7 +1076,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         continue;
                     }
 
-                    if (distanceSquared >= currentWorstDistanceSquared)
+                    if (currentWorstDistanceSquared <= distanceSquared)
                     {
                         continue;
                     }
@@ -1096,7 +1096,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            if (bestNeighbors.Count > 1)
+            if (1 < bestNeighbors.Count)
             {
                 bestNeighbors.Sort(EntryDistanceComparer.Instance);
             }
@@ -1115,7 +1115,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 heap.Add(entry);
                 int index = heap.Count - 1;
 
-                while (index > 0)
+                while (0 < index)
                 {
                     int parent = (index - 1) >> 1;
                     NodeDistance parentEntry = heap[parent];
@@ -1143,7 +1143,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 while (true)
                 {
                     int left = (index << 1) + 1;
-                    if (left >= count)
+                    if (count <= left)
                     {
                         break;
                     }
@@ -1163,7 +1163,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     index = smallest;
                 }
 
-                if (count > 0)
+                if (0 < count)
                 {
                     heap[index] = last;
                 }
@@ -1177,7 +1177,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 0; i < candidates.Count; ++i)
                 {
                     float distance = candidates[i].distanceSquared;
-                    if (distance > worst)
+                    if (worst < distance)
                     {
                         worst = distance;
                     }
@@ -1198,7 +1198,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 1; i < candidates.Count; ++i)
                 {
                     float candidateDistance = candidates[i].distanceSquared;
-                    if (candidateDistance > worstDistance)
+                    if (worstDistance < candidateDistance)
                     {
                         worstDistance = candidateDistance;
                         worstIndex = i;

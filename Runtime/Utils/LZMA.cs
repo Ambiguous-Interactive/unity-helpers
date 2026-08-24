@@ -82,7 +82,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     throw new Exception("Invalid LZMA length header.");
                 }
 
-                if (fileLength == 0 && inStream.Position >= inStream.Length)
+                if (fileLength == 0 && inStream.Length <= inStream.Position)
                 {
                     throw new Exception("Failed to decompress LZMA data. No payload present.");
                 }
@@ -181,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     throw new Exception("Invalid LZMA length header.");
                 }
 
-                if (fileLength == 0 && inStream.Position >= inStream.Length)
+                if (fileLength == 0 && inStream.Length <= inStream.Position)
                 {
                     throw new Exception("Failed to decompress LZMA data. No payload present.");
                 }

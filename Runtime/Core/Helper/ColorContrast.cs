@@ -84,17 +84,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             float luminance = RelativeLuminance(background);
             float againstBlack = (luminance + LuminanceOffset) / LuminanceOffset;
             float againstWhite = (1f + LuminanceOffset) / (luminance + LuminanceOffset);
-            return againstBlack >= againstWhite ? Color.black : Color.white;
+            return againstWhite <= againstBlack ? Color.black : Color.white;
         }
 
         private static float Linearize(float channel)
         {
-            if (!(channel > 0f))
+            if (!(0f < channel))
             {
                 return 0f;
             }
 
-            if (channel >= 1f)
+            if (1f <= channel)
             {
                 return 1f;
             }

@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             // Try to load from cache first
             AttributeMetadataCache cache = AttributeMetadataCache.Instance;
-            if (cache != null && cache.AllAttributeNames.Length > 0)
+            if (cache != null && 0 < cache.AllAttributeNames.Length)
             {
                 AllAttributeNames = cache.AllAttributeNames;
                 return AllAttributeNames;

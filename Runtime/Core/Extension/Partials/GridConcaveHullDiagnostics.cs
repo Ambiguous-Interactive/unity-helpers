@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             internal void IncrementAxisPathInsertions(int amount)
             {
-                if (amount > 0)
+                if (0 < amount)
                 {
                     AxisPathInsertions += amount;
                 }
@@ -94,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             internal void MaybeRecordFrontierSize(int size)
             {
-                if (size > MaxFrontierSize)
+                if (MaxFrontierSize < size)
                 {
                     MaxFrontierSize = size;
                 }
@@ -243,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static bool ShouldRepairConcaveCorners(float angleThreshold)
         {
-            return angleThreshold >= ConcaveCornerRepairThresholdDegrees;
+            return ConcaveCornerRepairThresholdDegrees <= angleThreshold;
         }
 
         private static void MaybeRepairConcaveCorners(
@@ -311,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             bool inserted;
             do
             {
-                if (iterationCount++ >= iterationGuardLimit)
+                if (iterationGuardLimit <= iterationCount++)
                 {
 #if ENABLE_CONCAVE_HULL_STATS
                     throw new InvalidOperationException(
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         axisPathBuffer
                     );
 #endif
-                    if (foundPath && axisPathBuffer.Count > 2)
+                    if (foundPath && 2 < axisPathBuffer.Count)
                     {
                         int insertIndex = nextIndex;
                         bool insertedWaypoint = false;
@@ -453,7 +453,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             frontier.Enqueue(start);
             parents[start] = start;
 
-            while (frontier.Count > 0)
+            while (0 < frontier.Count)
             {
 #if ENABLE_CONCAVE_HULL_STATS
                 stats?.MaybeRecordFrontierSize(frontier.Count);
@@ -735,7 +735,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     continue;
                 }
 
-                if (insertIndex >= hull.Count)
+                if (hull.Count <= insertIndex)
                 {
                     hull.Add(waypoint);
                 }
@@ -842,7 +842,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     minX = point.x;
                 }
 
-                if (point.x > maxX)
+                if (maxX < point.x)
                 {
                     maxX = point.x;
                 }
@@ -852,13 +852,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     minY = point.y;
                 }
 
-                if (point.y > maxY)
+                if (maxY < point.y)
                 {
                     maxY = point.y;
                 }
             }
 
-            for (int i = hull.Count - 1; i >= 0; --i)
+            for (int i = hull.Count - 1; 0 <= i; --i)
             {
                 FastVector3Int vertex = hull[i];
                 if (HasSharedAxisNeighbor(vertex, originalPoints))

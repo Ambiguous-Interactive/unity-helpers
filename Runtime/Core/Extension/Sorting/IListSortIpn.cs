@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             where TComparer : IComparer<T>
         {
             const int insertionThreshold = 32;
-            while (right - left > insertionThreshold)
+            while (insertionThreshold < right - left)
             {
                 if (depthLimit == 0)
                 {

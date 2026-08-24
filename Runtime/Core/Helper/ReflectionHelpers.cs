@@ -1200,7 +1200,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 count = 0;
             }
-            else if (count > source.Count)
+            else if (source.Count < count)
             {
                 count = source.Count;
             }

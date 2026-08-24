@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 int startIndex = projectRoot.EndsWith("/", StringComparison.OrdinalIgnoreCase)
                     ? projectRoot.Length
                     : projectRoot.Length + 1;
-                return absolutePath.Length > startIndex ? absolutePath[startIndex..] : string.Empty;
+                return startIndex < absolutePath.Length ? absolutePath[startIndex..] : string.Empty;
             }
 
             return string.Empty;
@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 packageCacheMarker,
                 StringComparison.OrdinalIgnoreCase
             );
-            if (packageCacheIndex >= 0)
+            if (0 <= packageCacheIndex)
             {
                 // Extract the portion after "Library/PackageCache/{packageFolder}/"
                 string afterCache = absolutePath[(packageCacheIndex + packageCacheMarker.Length)..];
@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 // The package folder may have version suffix like "com.package@1.0.0"
                 // Find the first separator after the package folder name
                 int firstSlash = afterCache.IndexOf('/');
-                if (firstSlash > 0)
+                if (0 < firstSlash)
                 {
                     string pathInsidePackage = afterCache[(firstSlash + 1)..];
                     if (!string.IsNullOrEmpty(packageId))
@@ -361,7 +361,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 packagesMarker,
                 StringComparison.OrdinalIgnoreCase
             );
-            if (packagesIndex >= 0)
+            if (0 <= packagesIndex)
             {
                 return "Packages/" + absolutePath[(packagesIndex + packagesMarker.Length)..];
             }

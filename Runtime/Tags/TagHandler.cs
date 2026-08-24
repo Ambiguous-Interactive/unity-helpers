@@ -629,7 +629,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 target.Clear();
             }
 
-            if (_effectHandles.Count > 0)
+            if (0 < _effectHandles.Count)
             {
                 int estimatedCapacity = Math.Min(_effectHandles.Count, 8);
                 foreach (EffectHandle handle in _effectHandles.Values)

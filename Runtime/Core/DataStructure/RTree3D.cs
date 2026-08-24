@@ -206,17 +206,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     minZ = min.z;
                 }
 
-                if (max.x > maxX)
+                if (maxX < max.x)
                 {
                     maxX = max.x;
                 }
 
-                if (max.y > maxY)
+                if (maxY < max.y)
                 {
                     maxY = max.y;
                 }
 
-                if (max.z > maxZ)
+                if (maxZ < max.z)
                 {
                     maxZ = max.z;
                 }
@@ -241,9 +241,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float rangeX = maxX - minX;
             float rangeY = maxY - minY;
             float rangeZ = maxZ - minZ;
-            float inverseRangeX = rangeX > float.Epsilon ? 1f / rangeX : 0f;
-            float inverseRangeY = rangeY > float.Epsilon ? 1f / rangeY : 0f;
-            float inverseRangeZ = rangeZ > float.Epsilon ? 1f / rangeZ : 0f;
+            float inverseRangeX = float.Epsilon < rangeX ? 1f / rangeX : 0f;
+            float inverseRangeY = float.Epsilon < rangeY ? 1f / rangeY : 0f;
+            float inverseRangeZ = float.Epsilon < rangeZ ? 1f / rangeZ : 0f;
 
             for (int i = 0; i < elementCount; ++i)
             {
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 data._sortKey = ComposeSortKey(mortonKey, quantizedX, quantizedY, quantizedZ);
             }
 
-            if (elementCount > 1)
+            if (1 < elementCount)
             {
                 RadixSort(elementData, elementCount);
             }
@@ -273,7 +273,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 currentLevel.Add(RTreeNode.CreateLeaf(elementData, startIndex, count));
             }
 
-            while (currentLevel.Count > 1)
+            while (1 < currentLevel.Count)
             {
                 using PooledResource<List<RTreeNode>> nextLevelResource =
                     Buffers<RTreeNode>.List.Get(out List<RTreeNode> nextLevel);
@@ -289,7 +289,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 currentLevel.AddRange(nextLevel);
             }
 
-            RTreeNode head = currentLevel.Count > 0 ? currentLevel[0] : RTreeNode.CreateEmpty();
+            RTreeNode head = 0 < currentLevel.Count ? currentLevel[0] : RTreeNode.CreateEmpty();
 
             _head = head;
             _bounds = _head.boundary;
@@ -465,13 +465,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 );
             float currentWorstDistanceSquared = float.PositiveInfinity;
 
-            while (nodeHeap.Count > 0)
+            while (0 < nodeHeap.Count)
             {
                 NodeDistance best = PopNode(nodeHeap);
 
                 if (
-                    candidates.Count >= count
-                    && best._distanceSquared >= currentWorstDistanceSquared
+                    count <= candidates.Count
+                    && currentWorstDistanceSquared <= best._distanceSquared
                 )
                 {
                     break;
@@ -484,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     for (int i = 0; i < childNodes.Length; ++i)
                     {
                         RTreeNode child = childNodes[i];
-                        if (child._count > 0)
+                        if (0 < child._count)
                         {
                             PushNode(nodeHeap, child, position);
                         }
@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         continue;
                     }
 
-                    if (distanceSquared >= currentWorstDistanceSquared)
+                    if (currentWorstDistanceSquared <= distanceSquared)
                     {
                         nearestNeighborsSet.Remove(value);
                         continue;
@@ -552,7 +552,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             heap.Add(entry);
             int index = heap.Count - 1;
 
-            while (index > 0)
+            while (0 < index)
             {
                 int parent = (index - 1) >> 1;
                 NodeDistance parentEntry = heap[parent];
@@ -580,7 +580,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             while (true)
             {
                 int left = (index << 1) + 1;
-                if (left >= count)
+                if (count <= left)
                 {
                     break;
                 }
@@ -600,7 +600,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 index = smallest;
             }
 
-            if (count > 0)
+            if (0 < count)
             {
                 heap[index] = last;
             }
@@ -614,7 +614,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             for (int i = 0; i < list.Count; ++i)
             {
                 float distance = list[i].distanceSquared;
-                if (distance > worst)
+                if (worst < distance)
                 {
                     worst = distance;
                 }
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             for (int i = 1; i < list.Count; ++i)
             {
                 float distance = list[i].distanceSquared;
-                if (distance > worstDistance)
+                if (worstDistance < distance)
                 {
                     worstDistance = distance;
                     worstIndex = i;
@@ -751,7 +751,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return 0;
             }
 
-            if (normalized >= 1f)
+            if (1f <= normalized)
             {
                 return 1023;
             }

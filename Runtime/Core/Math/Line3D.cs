@@ -263,7 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             float g0 = G(0f);
             float g1 = G(1f);
-            if (g0 >= 0f)
+            if (0f <= g0)
             {
                 return from;
             }
@@ -278,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             {
                 float m = 0.5f * (a + b);
                 float gm = G(m);
-                if (gm > 0f)
+                if (0f < gm)
                 {
                     b = m;
                 }
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             // X axis
             if (Mathf.Abs(d.x) < 1e-8f)
             {
-                if (from.x < bounds.min.x || from.x > bounds.max.x)
+                if (from.x < bounds.min.x || bounds.max.x < from.x)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -330,13 +330,13 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 float inv = 1f / d.x;
                 float t1 = (bounds.min.x - from.x) * inv;
                 float t2 = (bounds.max.x - from.x) * inv;
-                if (t1 > t2)
+                if (t2 < t1)
                 {
                     (t1, t2) = (t2, t1);
                 }
                 enter = Mathf.Max(enter, t1);
                 exit = Mathf.Min(exit, t2);
-                if (enter > exit)
+                if (exit < enter)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             // Y axis
             if (Mathf.Abs(d.y) < 1e-8f)
             {
-                if (from.y < bounds.min.y || from.y > bounds.max.y)
+                if (from.y < bounds.min.y || bounds.max.y < from.y)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -359,13 +359,13 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 float inv = 1f / d.y;
                 float t1 = (bounds.min.y - from.y) * inv;
                 float t2 = (bounds.max.y - from.y) * inv;
-                if (t1 > t2)
+                if (t2 < t1)
                 {
                     (t1, t2) = (t2, t1);
                 }
                 enter = Mathf.Max(enter, t1);
                 exit = Mathf.Min(exit, t2);
-                if (enter > exit)
+                if (exit < enter)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -376,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             // Z axis
             if (Mathf.Abs(d.z) < 1e-8f)
             {
-                if (from.z < bounds.min.z || from.z > bounds.max.z)
+                if (from.z < bounds.min.z || bounds.max.z < from.z)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -388,13 +388,13 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 float inv = 1f / d.z;
                 float t1 = (bounds.min.z - from.z) * inv;
                 float t2 = (bounds.max.z - from.z) * inv;
-                if (t1 > t2)
+                if (t2 < t1)
                 {
                     (t1, t2) = (t2, t1);
                 }
                 enter = Mathf.Max(enter, t1);
                 exit = Mathf.Min(exit, t2);
-                if (enter > exit)
+                if (exit < enter)
                 {
                     tEnter = enter;
                     tExit = exit;
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             tEnter = enter;
             tExit = exit;
-            return exit >= 0f && enter <= 1f && exit >= enter;
+            return 0f <= exit && enter <= 1f && enter <= exit;
         }
 
         /// <summary>

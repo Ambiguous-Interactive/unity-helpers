@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public WProtoReader(ReadOnlySpan<byte> buffer, in WProtoReader parent)
         {
-            bool exhausted = parent._malformed || parent._depth >= MaxNestingDepth;
+            bool exhausted = parent._malformed || MaxNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
             _depth = exhausted ? MaxNestingDepth : parent._depth + 1;
             _position = 0;
@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public int Remaining => _buffer.Length - _position;
 
         /// <summary>Indicates whether every byte has been consumed.</summary>
-        public bool End => _position >= _buffer.Length;
+        public bool End => _buffer.Length <= _position;
 
         /// <summary>
         /// Indicates whether any read has failed. Once set, it stays set and refuses later reads.
@@ -196,7 +196,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (wide > uint.MaxValue)
+            if (uint.MaxValue < wide)
             {
                 _malformed = true;
                 value = 0;
@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int index = _position;
             for (int shift = 0; shift < WProtoSizes.MaxVarintBytes; shift++)
             {
-                if (index >= _buffer.Length)
+                if (_buffer.Length <= index)
                 {
                     _malformed = true;
                     value = 0;
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 // The tenth byte carries only the single highest bit of a 64-bit value; anything
                 // else set there is an overlong encoding, not a large number.
-                if (shift == WProtoSizes.MaxVarintBytes - 1 && current > 0x01)
+                if (shift == WProtoSizes.MaxVarintBytes - 1 && 0x01 < current)
                 {
                     _malformed = true;
                     value = 0;
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryReadMessage(out WProtoReader nested)
         {
-            if (_depth >= MaxNestingDepth)
+            if (MaxNestingDepth <= _depth)
             {
                 _malformed = true;
                 nested = new WProtoReader(default, MaxNestingDepth);
@@ -632,7 +632,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out T value
         )
         {
-            if (formatter == null || _malformed || _depth >= MaxNestingDepth)
+            if (formatter == null || _malformed || MaxNestingDepth <= _depth)
             {
                 _malformed = true;
                 value = default;
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out T value
         )
         {
-            if (formatter == null || _malformed || _depth >= MaxNestingDepth)
+            if (formatter == null || _malformed || MaxNestingDepth <= _depth)
             {
                 _malformed = true;
                 value = default;
@@ -715,7 +715,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             // A length above int.MaxValue cannot address a span, and one above what is left is a
             // truncated or hostile payload. Both are malformed, not merely large.
-            if (raw > int.MaxValue || raw > (uint)Remaining)
+            if (int.MaxValue < raw || (uint)Remaining < raw)
             {
                 _malformed = true;
                 length = 0;
@@ -791,7 +791,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private bool TrySkipGroup(int groupFieldNumber, int depth)
         {
-            if (depth >= MaxNestingDepth)
+            if (MaxNestingDepth <= depth)
             {
                 _malformed = true;
                 return false;
@@ -830,7 +830,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryConsume(int count, out int start)
         {
-            if (_malformed || count < 0 || count > _buffer.Length - _position)
+            if (_malformed || count < 0 || _buffer.Length - _position < count)
             {
                 _malformed = true;
                 start = 0;

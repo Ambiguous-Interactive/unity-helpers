@@ -169,11 +169,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minY = min.y;
                 }
-                if (max.x > maxX)
+                if (maxX < max.x)
                 {
                     maxX = max.x;
                 }
-                if (max.y > maxY)
+                if (maxY < max.y)
                 {
                     maxY = max.y;
                 }
@@ -211,10 +211,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             float rangeX = maxX - minX;
             float rangeY = maxY - minY;
-            float inverseRangeX = rangeX > float.Epsilon ? 1f / rangeX : 0f;
-            float inverseRangeY = rangeY > float.Epsilon ? 1f / rangeY : 0f;
+            float inverseRangeX = float.Epsilon < rangeX ? 1f / rangeX : 0f;
+            float inverseRangeY = float.Epsilon < rangeY ? 1f / rangeY : 0f;
 
-            if (elementCount > 0)
+            if (0 < elementCount)
             {
                 ref ElementData elementRef = ref elementData[0];
                 for (int i = 0; i < elementCount; ++i)
@@ -230,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            if (elementCount > 1)
+            if (1 < elementCount)
             {
                 RadixSort(elementData, elementCount);
             }
@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 currentLevel.Add(RTreeNode.CreateLeaf(elementData, startIndex, count));
             }
 
-            while (currentLevel.Count > 1)
+            while (1 < currentLevel.Count)
             {
                 using PooledResource<List<RTreeNode>> nextLevelResource =
                     Buffers<RTreeNode>.List.Get(out List<RTreeNode> nextLevel);
@@ -452,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 0; i < childNodes.Length; ++i)
                 {
                     RTreeNode child = childNodes[i];
-                    if (child is not null && child._count > 0)
+                    if (child is not null && 0 < child._count)
                     {
                         childrenCopy.Add(child);
                     }
@@ -464,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 SortChildrenByDistance(childrenCopy, position);
-                for (int i = childrenCopy.Count - 1; i >= 0; --i)
+                for (int i = childrenCopy.Count - 1; 0 <= i; --i)
                 {
                     stack.Push(childrenCopy[i]);
                 }
@@ -489,7 +489,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
 
                     nearestIndices.Add(i);
-                    if (nearestNeighborsSet.Count >= count)
+                    if (count <= nearestNeighborsSet.Count)
                     {
                         break;
                     }
@@ -522,10 +522,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 RTreeNode value = nodes[i];
                 float valueDistance = GetNodeSqrDistance(value, searchPosition);
                 int j = i - 1;
-                while (j >= 0)
+                while (0 <= j)
                 {
                     RTreeNode previous = nodes[j];
-                    if (valueDistance >= GetNodeSqrDistance(previous, searchPosition))
+                    if (GetNodeSqrDistance(previous, searchPosition) <= valueDistance)
                     {
                         break;
                     }
@@ -554,10 +554,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int currentIndex = indices[i];
                 float currentDistance = GetElementSqrDistance(elements[currentIndex], position);
                 int j = i - 1;
-                while (j >= 0)
+                while (0 <= j)
                 {
                     int previousIndex = indices[j];
-                    if (currentDistance >= GetElementSqrDistance(elements[previousIndex], position))
+                    if (GetElementSqrDistance(elements[previousIndex], position) <= currentDistance)
                     {
                         break;
                     }
@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return 0;
             }
 
-            if (normalized >= 1f)
+            if (1f <= normalized)
             {
                 return 65535;
             }

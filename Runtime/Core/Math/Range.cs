@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         [JsonConstructor]
         public Range(T min, T max, bool startInclusive = true, bool endInclusive = true)
         {
-            if (min.CompareTo(max) > 0)
+            if (0 < min.CompareTo(max))
             {
                 throw new ArgumentException($"min ({min}) must be <= max ({max})");
             }

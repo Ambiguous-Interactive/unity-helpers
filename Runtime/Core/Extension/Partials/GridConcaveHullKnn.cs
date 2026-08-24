@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return hull;
                 }
 
-                if (attemptNearestNeighbors >= maximumNearestNeighbors)
+                if (maximumNearestNeighbors <= attemptNearestNeighbors)
                 {
                     return BuildConvexHullJarvisFallback(
                         dataSet,
@@ -261,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return hull;
                 }
 
-                if (attemptNearestNeighbors >= maximumNearestNeighbors)
+                if (maximumNearestNeighbors <= attemptNearestNeighbors)
                 {
                     return BuildGridConvexHullJarvisFallback(
                         dataSet,
@@ -423,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static void RemovePoints<T>(List<T> source, List<T> toRemove)
         {
-            for (int i = toRemove.Count - 1; i >= 0; --i)
+            for (int i = toRemove.Count - 1; 0 <= i; --i)
             {
                 _ = source.Remove(toRemove[i]);
             }

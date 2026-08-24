@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 );
             }
 
-            if (a >= 0f)
+            if (0f <= a)
             {
                 throw new ArgumentException(
                     $"Expected a negative coefficient A (downward parabola), but found: {a:0.00}."
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             // Verify that x=Length is an intercept: A*Length^2 + B*Length = 0
             float valueAtLength = a * length * length + b * length;
-            if (Math.Abs(valueAtLength) > 1e-5f)
+            if (1e-5f < Math.Abs(valueAtLength))
             {
                 throw new ArgumentException(
                     $"Coefficients do not produce a parabola with intercept at x={length:0.00}. "
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// <returns>True if x is within valid range, false otherwise.</returns>
         public bool TryGetValueAt(float x, out float y)
         {
-            if (x < 0f || x > Length)
+            if (x < 0f || Length < x)
             {
                 y = float.NaN;
                 return false;
@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// <returns>True if t is within valid range, false otherwise.</returns>
         public bool TryGetValueAtNormalized(float t, out float y)
         {
-            if (t < 0f || t > 1f)
+            if (t < 0f || 1f < t)
             {
                 y = float.NaN;
                 return false;

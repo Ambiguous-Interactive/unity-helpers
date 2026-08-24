@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             _upButton.SetEnabled(
                 !_currentDirectory.Equals(_assetsFullPath, StringComparison.OrdinalIgnoreCase)
                     && parentDirectory != null
-                    && parentDirectory.FullName.Length >= _projectRootPath.Length
+                    && _projectRootPath.Length <= parentDirectory.FullName.Length
             );
             BuildBreadcrumbs();
             // Persist relative path (scoped) if persistence is enabled
@@ -465,7 +465,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                         foreach (string f in Directory.EnumerateFiles(_currentDirectory))
                         {
                             string ext = Path.GetExtension(f);
-                            if (_filterExtensions.Count > 0 && !_filterExtensions.Contains(ext))
+                            if (0 < _filterExtensions.Count && !_filterExtensions.Contains(ext))
                             {
                                 continue;
                             }
@@ -547,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         private void BindRow(VisualElement row, int index)
         {
-            if (index < 0 || index >= _items.Count)
+            if (index < 0 || _items.Count <= index)
             {
                 return;
             }
@@ -699,7 +699,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
             // Remove trailing separator if exists
             if (
-                _breadcrumbBar.childCount > 0
+                0 < _breadcrumbBar.childCount
                 && _breadcrumbBar.ElementAt(_breadcrumbBar.childCount - 1) is Label
             )
             {

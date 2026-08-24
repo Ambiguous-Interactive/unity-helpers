@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 estimate = 4;
             }
-            else if (estimate > Ips4oMaxBucketCount)
+            else if (Ips4oMaxBucketCount < estimate)
             {
                 estimate = Ips4oMaxBucketCount;
             }
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int i = 1; i < bucketCount; ++i)
             {
                 int index = i * sampleSize / bucketCount;
-                if (index >= sampleSize)
+                if (sampleSize <= index)
                 {
                     index = sampleSize - 1;
                 }
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (low < high)
             {
                 int mid = (low + high) >> 1;
-                if (comparer.Compare(value, pivots[mid]) > 0)
+                if (0 < comparer.Compare(value, pivots[mid]))
                 {
                     low = mid + 1;
                 }

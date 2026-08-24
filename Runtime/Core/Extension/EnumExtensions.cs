@@ -793,7 +793,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             // domain) still measures its true width. Both operands come from the same
             // 64-bit key space, so the difference is exact whenever it fits the cap below.
             ulong span = unchecked(maxKey - minKey);
-            if (span >= (ulong)MaximumArrayLength)
+            if ((ulong)MaximumArrayLength <= span)
             {
                 minValue = 0;
                 arrayLength = 0;

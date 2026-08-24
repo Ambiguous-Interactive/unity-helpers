@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <returns>True if x is valid, false otherwise.</returns>
         public bool TryFind(int x, out int representative)
         {
-            if (x < 0 || x >= _parent.Length)
+            if (x < 0 || _parent.Length <= x)
             {
                 representative = -1;
                 return false;
@@ -134,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _parent[rootX] = rootY;
             }
-            else if (_rank[rootX] > _rank[rootY])
+            else if (_rank[rootY] < _rank[rootX])
             {
                 _parent[rootY] = rootX;
             }

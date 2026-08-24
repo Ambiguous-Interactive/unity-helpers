@@ -203,13 +203,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             int localINext = _inext;
             int localINextP = _inextp;
             int index1;
-            if ((index1 = localINext + 1) >= SeedArraySize)
+            if (SeedArraySize <= (index1 = localINext + 1))
             {
                 index1 = 1;
             }
 
             int index2;
-            if ((index2 = localINextP + 1) >= SeedArraySize)
+            if (SeedArraySize <= (index2 = localINextP + 1))
             {
                 index2 = 1;
             }

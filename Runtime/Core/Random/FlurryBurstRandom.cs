@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _d = (uint)state2;
 
             byte[] payload = internalState._payload;
-            if (payload != null && payload.Length >= sizeof(uint) * 2)
+            if (payload != null && sizeof(uint) * 2 <= payload.Length)
             {
                 _e = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, sizeof(uint)));
                 _f = BinaryPrimitives.ReadUInt32LittleEndian(

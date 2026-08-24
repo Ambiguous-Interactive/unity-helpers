@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
 
                 while (
-                    remainingActionBudget > 0 && dispatcher._actions.TryDequeue(out Action action)
+                    0 < remainingActionBudget && dispatcher._actions.TryDequeue(out Action action)
                 )
                 {
                     remainingActionBudget--;
@@ -531,7 +531,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private bool TryEnqueueInternal(Action action)
         {
             int newCount = Interlocked.Increment(ref _pendingActionCount);
-            if (maxPendingActions > 0 && newCount > maxPendingActions)
+            if (0 < maxPendingActions && maxPendingActions < newCount)
             {
                 Interlocked.Decrement(ref _pendingActionCount);
                 return false;

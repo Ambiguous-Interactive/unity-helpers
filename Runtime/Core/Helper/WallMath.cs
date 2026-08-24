@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             long bits = BitConverter.DoubleToInt64Bits(value);
-            bits += value > 0d ? -1L : 1L;
+            bits += 0d < value ? -1L : 1L;
             return BitConverter.Int64BitsToDouble(bits);
         }
 
@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             int bits = BitConverter.SingleToInt32Bits(value);
-            bits += value > 0f ? -1 : 1;
+            bits += 0f < value ? -1 : 1;
             return BitConverter.Int32BitsToSingle(bits);
         }
 
@@ -393,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             long start = value.PositiveMod(max);
             long step = increment.PositiveMod(max);
             long sum = start + step;
-            if (sum < 0 || sum >= max)
+            if (sum < 0 || max <= sum)
             {
                 sum -= max;
             }
@@ -558,12 +558,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             // If width is negative, Rect.max.x == bounds.x + bounds.width is the lesser x.
             // Ensure clamped x does not exceed this value.
             Vector2 selfMax = self.max;
-            if (self.width < 0f && cx > selfMax.x)
+            if (self.width < 0f && selfMax.x < cx)
             {
                 cx = selfMax.x;
             }
 
-            if (self.height < 0f && cy > selfMax.y)
+            if (self.height < 0f && selfMax.y < cy)
             {
                 cy = selfMax.y;
             }

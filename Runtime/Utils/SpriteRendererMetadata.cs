@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             get
             {
-                for (int i = _materialStack.Count - 1; i >= 0; --i)
+                for (int i = _materialStack.Count - 1; 0 <= i; --i)
                 {
                     yield return _materialStack[i].material;
                 }
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             get
             {
-                for (int i = _colorStack.Count - 1; i >= 0; --i)
+                for (int i = _colorStack.Count - 1; 0 <= i; --i)
                 {
                     yield return _colorStack[i].color;
                 }

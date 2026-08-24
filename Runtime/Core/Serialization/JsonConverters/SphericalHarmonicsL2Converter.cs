@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                                     break;
                                 }
 
-                                if (i >= 27)
+                                if (27 <= i)
                                 {
                                     throw new JsonException(
                                         "Too many coefficients for SphericalHarmonicsL2"

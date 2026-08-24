@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int firstPoint = 0;
             int lastPoint = points.Count - 1;
 
-            while (lastPoint > firstPoint && points[firstPoint] == points[lastPoint])
+            while (firstPoint < lastPoint && points[firstPoint] == points[lastPoint])
             {
                 lastPoint--;
             }
@@ -132,14 +132,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         points[lastPoint],
                         points[index]
                     );
-                    if (distance > maxDistance)
+                    if (maxDistance < distance)
                     {
                         maxDistance = distance;
                         indexFarthest = index;
                     }
                 }
 
-                if (maxDistance > tolerance && indexFarthest != 0)
+                if (tolerance < maxDistance && indexFarthest != 0)
                 {
                     //Add the largest point that exceeds the tolerance
                     pointIndexesToKeep.Add(indexFarthest);
@@ -209,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int pointCount = points?.Count ?? 0;
             buffer ??= new List<Vector2>(pointCount);
             buffer.Clear();
-            if (pointCount > 0 && buffer.Capacity < pointCount)
+            if (0 < pointCount && buffer.Capacity < pointCount)
             {
                 buffer.Capacity = pointCount;
             }
@@ -253,14 +253,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     points[startIndex],
                     points[endIndex]
                 );
-                if (distance > maxDistance)
+                if (maxDistance < distance)
                 {
                     maxIndex = i;
                     maxDistance = distance;
                 }
             }
 
-            if (maxDistance > epsilon)
+            if (epsilon < maxDistance)
             {
                 SimplifyRecursive(points, startIndex, maxIndex, epsilon, buffer);
                 SimplifyRecursive(points, maxIndex, endIndex, epsilon, buffer);

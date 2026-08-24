@@ -210,9 +210,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
                 case EffectStackingMode.Stack:
                 {
-                    if (existingHandles is { Count: > 0 } && effect.maximumStacks > 0)
+                    if (existingHandles is { Count: > 0 } && 0 < effect.maximumStacks)
                     {
-                        while (existingHandles.Count >= effect.maximumStacks)
+                        while (effect.maximumStacks <= existingHandles.Count)
                         {
                             EffectHandle oldestHandle = existingHandles[0];
                             RemoveEffect(oldestHandle);
@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             RemoveAllEffects();
 
-            if (_handlesByStackKey.Count > 0)
+            if (0 < _handlesByStackKey.Count)
             {
                 using PooledResource<List<EffectStackKey>> stackKeysResource =
                     Buffers<EffectStackKey>.List.Get(out List<EffectStackKey> stackKeys);
@@ -914,7 +914,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             if (instancedCosmeticData != null)
             {
-                if (instancedCosmeticData.Count > 0)
+                if (0 < instancedCosmeticData.Count)
                 {
                     _instancedCosmeticEffects.Add(handle, instancedCosmeticLease);
                 }
@@ -1093,7 +1093,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<CosmeticEffectData> cosmeticData = cosmeticLease.resource;
             if (cosmeticData != null)
             {
-                for (int i = cosmeticData.Count - 1; i >= 0; --i)
+                for (int i = cosmeticData.Count - 1; 0 <= i; --i)
                 {
                     cosmeticData[i] = null;
                 }

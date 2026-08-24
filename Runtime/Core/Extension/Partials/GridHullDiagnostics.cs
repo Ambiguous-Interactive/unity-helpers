@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 return 0;
             }
-            return area > 0d ? 1 : -1;
+            return 0d < area ? 1 : -1;
         }
 
         private static bool IsPointInsideConvexHull(
@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int side = requiredSide;
                 if (side == 0)
                 {
-                    side = relation > 0f ? 1 : -1;
+                    side = 0f < relation ? 1 : -1;
                     requiredSide = side;
                 }
                 if (relation * side < -ConvexHullRelationEpsilon)
@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return 0;
             }
 
-            return twiceArea > 0d ? 1 : -1;
+            return 0d < twiceArea ? 1 : -1;
         }
 
         private static int DetermineConvexHullOrientation(
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return 0;
             }
 
-            return twiceArea > 0d ? 1 : -1;
+            return 0d < twiceArea ? 1 : -1;
         }
 
         private static bool IsPointInsideConvexHull(
@@ -290,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int side = requiredSide;
                 if (side == 0)
                 {
-                    side = relation > 0f ? 1 : -1;
+                    side = 0f < relation ? 1 : -1;
                     requiredSide = side;
                 }
 
@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int side = requiredSide;
                 if (side == 0)
                 {
-                    side = relation > 0f ? 1 : -1;
+                    side = 0f < relation ? 1 : -1;
                     requiredSide = side;
                 }
 

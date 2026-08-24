@@ -165,7 +165,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 int attempts = 0;
                 while (lo < t)
                 {
-                    if (++attempts > MaxRejectionAttempts32)
+                    if (MaxRejectionAttempts32 < ++attempts)
                     {
                         // Prevent infinite loop: fall back to modulo (small bias) rather than hang
                         return r % max;

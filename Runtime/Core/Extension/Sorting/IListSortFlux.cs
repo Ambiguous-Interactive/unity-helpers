@@ -76,12 +76,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 m1 = left + 1;
             }
-            if (m2 >= right)
+            if (right <= m2)
             {
                 m2 = right - 1;
             }
 
-            if (comparer.Compare(array[m1], array[m2]) > 0)
+            if (0 < comparer.Compare(array[m1], array[m2]))
             {
                 SortSwap(array, m1, m2);
             }
@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             T pivot1 = array[left];
             T pivot2 = array[right];
-            if (comparer.Compare(pivot1, pivot2) > 0)
+            if (0 < comparer.Compare(pivot1, pivot2))
             {
                 (pivot1, pivot2) = (pivot2, pivot1);
                 array[left] = pivot1;
@@ -109,9 +109,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     SortSwap(array, i, lt);
                     lt++;
                 }
-                else if (comparer.Compare(array[i], pivot2) > 0)
+                else if (0 < comparer.Compare(array[i], pivot2))
                 {
-                    while (i < gt && comparer.Compare(array[gt], pivot2) > 0)
+                    while (i < gt && 0 < comparer.Compare(array[gt], pivot2))
                     {
                         gt--;
                     }

@@ -1365,7 +1365,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int estimatedSize = PoolSizeEstimator.EstimateItemSizeBytes(type);
-            return estimatedSize >= LargeObjectThresholdBytes;
+            return LargeObjectThresholdBytes <= estimatedSize;
         }
 
         private static PoolPurgeEffectiveOptions BuildEffectiveOptions(
@@ -1724,7 +1724,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             set =>
                 Volatile.Write(
                     ref _budgetEnforcementIntervalSeconds,
-                    value > 0f ? value : DefaultBudgetEnforcementIntervalSeconds
+                    0f < value ? value : DefaultBudgetEnforcementIntervalSeconds
                 );
         }
 
@@ -1743,7 +1743,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 long total = 0;
                 lock (RegistryLock)
                 {
-                    for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                    for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                     {
                         if (!RegisteredPools[i].TryGetTarget(out IPurgeable pool))
                         {
@@ -1806,7 +1806,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (RegistryLock)
             {
-                for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                 {
                     if (
                         !RegisteredPools[i].TryGetTarget(out IPurgeable target)
@@ -1841,7 +1841,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (RegistryLock)
             {
-                for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                 {
                     if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
                     {
@@ -1900,7 +1900,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (RegistryLock)
             {
-                for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                 {
                     if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
                     {
@@ -1966,7 +1966,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 BudgetEnforcementPools.Clear();
 
-                for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                 {
                     if (!RegisteredPools[i].TryGetTarget(out IPurgeable pool))
                     {
@@ -1993,7 +1993,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 long remaining = excess;
 
-                for (int i = 0; i < BudgetEnforcementPools.Count && remaining > 0; i++)
+                for (int i = 0; i < BudgetEnforcementPools.Count && 0 < remaining; i++)
                 {
                     IPoolStatistics pool = BudgetEnforcementPools[i];
                     int poolCount = pool.CurrentPooledCount;
@@ -2086,7 +2086,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (RegistryLock)
             {
-                for (int i = RegisteredPools.Count - 1; i >= 0; i--)
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                 {
                     if (!RegisteredPools[i].TryGetTarget(out IPurgeable pool))
                     {
@@ -2105,7 +2105,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         {
                             oldestAccessTime = accessTime;
                         }
-                        if (accessTime > newestAccessTime)
+                        if (newestAccessTime < accessTime)
                         {
                             newestAccessTime = accessTime;
                         }
@@ -2163,7 +2163,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 float keyTime = key.LastAccessTime;
                 int j = i - 1;
 
-                while (j >= 0 && pools[j].LastAccessTime > keyTime)
+                while (0 <= j && keyTime < pools[j].LastAccessTime)
                 {
                     pools[j + 1] = pools[j];
                     j--;
@@ -2213,13 +2213,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// A value greater than 1.0 indicates the budget is exceeded.
         /// </summary>
         public float BudgetUtilization =>
-            GlobalMaxPooledItems > 0 ? (float)TotalPooledItems / GlobalMaxPooledItems : 0f;
+            0 < GlobalMaxPooledItems ? (float)TotalPooledItems / GlobalMaxPooledItems : 0f;
 
         /// <summary>
         /// Gets whether the current total exceeds the configured budget.
         /// </summary>
         public bool IsBudgetExceeded =>
-            GlobalMaxPooledItems > 0 && TotalPooledItems > GlobalMaxPooledItems;
+            0 < GlobalMaxPooledItems && GlobalMaxPooledItems < TotalPooledItems;
 
         /// <summary>
         /// Creates a new global pool statistics snapshot.

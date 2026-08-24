@@ -61,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (left >= right)
+            if (right <= left)
             {
                 return;
             }
@@ -101,12 +101,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int rightTrim = right;
-            while (rightTrim >= mid + 1 && comparer.Compare(array[mid], array[rightTrim]) <= 0)
+            while (mid + 1 <= rightTrim && comparer.Compare(array[mid], array[rightTrim]) <= 0)
             {
                 rightTrim--;
             }
 
-            if (leftTrim > mid || rightTrim < mid + 1)
+            if (mid < leftTrim || rightTrim < mid + 1)
             {
                 return;
             }

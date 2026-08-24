@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                         else
                         {
-                            if (nextCompare >= 0)
+                            if (0 <= nextCompare)
                             {
                                 index++;
                                 continue;
@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     else
                     {
-                        for (int i = runEnd; i >= runStart; --i)
+                        for (int i = runEnd; runStart <= i; --i)
                         {
                             JessePatienceInsert(
                                 descendingPiles,
@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 using PooledArray<T> outputLease = SystemArrayPool<T>.Get(count, out T[] output);
                 int outputIndex = 0;
-                while (heap.Count > 0)
+                while (0 < heap.Count)
                 {
                     JesseCursor<T> cursor = heap[0];
                     output[outputIndex] = cursor.Peek();
@@ -152,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         heap.RemoveAt(heap.Count - 1);
                     }
 
-                    if (heap.Count > 0)
+                    if (0 < heap.Count)
                     {
                         JesseHeapSiftDown(heap, 0, comparer);
                     }
@@ -296,10 +296,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            while (index > 0)
+            while (0 < index)
             {
                 int parent = (index - 1) >> 1;
-                if (comparer.Compare(heap[index].Peek(), heap[parent].Peek()) >= 0)
+                if (0 <= comparer.Compare(heap[index].Peek(), heap[parent].Peek()))
                 {
                     return;
                 }
@@ -329,7 +329,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             public bool MoveNext()
             {
                 Index--;
-                return Index >= 0;
+                return 0 <= Index;
             }
         }
     }

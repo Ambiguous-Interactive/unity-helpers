@@ -213,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             EnsureInitialized();
             _useJitter = true;
-            if (maxJitterSeconds > 0f)
+            if (0f < maxJitterSeconds)
             {
                 _jitterMaxSeconds = maxJitterSeconds;
             }
@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 ratio = 0f;
             }
-            else if (ratio > 1f)
+            else if (1f < ratio)
             {
                 ratio = 1f;
             }
@@ -269,11 +269,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return this;
             }
             _allowGrowth = true;
-            if (factor > 1f)
+            if (1f < factor)
             {
                 _growthFactor = factor;
             }
-            if (maxSize > 0)
+            if (0 < maxSize)
             {
                 _maxGrowthSize = maxSize;
             }
@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public CacheBuilder<TKey, TValue> ThrashThreshold(float evictionsPerSecond)
         {
             EnsureInitialized();
-            if (evictionsPerSecond > 0f)
+            if (0f < evictionsPerSecond)
             {
                 _thrashThresholdEvictionsPerSecond = evictionsPerSecond;
             }

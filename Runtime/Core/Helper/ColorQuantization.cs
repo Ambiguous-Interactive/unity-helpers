@@ -73,12 +73,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ToByte(float normalized)
         {
-            if (!(normalized > 0f))
+            if (!(0f < normalized))
             {
                 return byte.MinValue;
             }
 
-            if (normalized >= 1f)
+            if (1f <= normalized)
             {
                 return byte.MaxValue;
             }
@@ -104,12 +104,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ToThresholdByte(float cutoff)
         {
-            if (!(cutoff > 0f))
+            if (!(0f < cutoff))
             {
                 return byte.MinValue;
             }
 
-            if (cutoff >= 1f)
+            if (1f <= cutoff)
             {
                 return byte.MaxValue;
             }

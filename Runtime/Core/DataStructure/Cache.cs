@@ -223,7 +223,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // can hold the expected number of items without requiring growth.
             // Clamp to prevent excessive initial allocations while respecting MaximumSize as upper bound.
             int requestedInitialCapacity =
-                options.InitialCapacity > 0 ? options.InitialCapacity : options.MaximumSize;
+                0 < options.InitialCapacity ? options.InitialCapacity : options.MaximumSize;
 
             // Clamp to reasonable bounds: at least 1, at most min(MaxReasonableInitialCapacity, MaximumSize)
             int maxInitialCapacity = Math.Min(
@@ -465,8 +465,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // Evict until we have room for the new weight
             while (
                 _options.Weigher != null
-                && _currentWeight + weight > _options.MaximumWeight
-                && _count > 0
+                && _options.MaximumWeight < _currentWeight + weight
+                && 0 < _count
             )
             {
                 if (_options.AllowGrowth && ShouldGrow())
@@ -514,7 +514,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _count++;
             _currentWeight += weight;
 
-            if (_count > _peakSize)
+            if (_peakSize < _count)
             {
                 _peakSize = _count;
             }
@@ -783,7 +783,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            if (percentage > 1f)
+            if (1f < percentage)
             {
                 percentage = 1f;
             }
@@ -792,7 +792,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             try
             {
                 int toEvict = (int)(_count * percentage);
-                for (int i = 0; i < toEvict && _count > 0; i++)
+                for (int i = 0; i < toEvict && 0 < _count; i++)
                 {
                     EvictOne(EvictionReason.Capacity);
                 }
@@ -817,7 +817,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
-                while (_count > newCapacity)
+                while (newCapacity < _count)
                 {
                     EvictOne(EvictionReason.Capacity);
                 }
@@ -854,7 +854,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             float ttl;
 
-            if (explicitTtl.HasValue && explicitTtl.Value > 0f)
+            if (explicitTtl.HasValue && 0f < explicitTtl.Value)
             {
                 ttl = explicitTtl.Value;
             }
@@ -862,7 +862,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 ttl = _options.ExpireAfter(key, value);
             }
-            else if (_options.ExpireAfterWriteSeconds > 0f)
+            else if (0f < _options.ExpireAfterWriteSeconds)
             {
                 ttl = _options.ExpireAfterWriteSeconds;
             }
@@ -871,10 +871,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return float.MaxValue;
             }
 
-            if (_options.UseJitter && ttl > 0f)
+            if (_options.UseJitter && 0f < ttl)
             {
                 float maxJitter =
-                    _options.JitterMaxSeconds > 0f ? _options.JitterMaxSeconds : ttl * 0.1f;
+                    0f < _options.JitterMaxSeconds ? _options.JitterMaxSeconds : ttl * 0.1f;
                 ttl += Random.NextFloat(0f, maxJitter);
             }
 
@@ -889,7 +889,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return true;
             }
 
-            if (_options.ExpireAfterAccessSeconds > 0f)
+            if (0f < _options.ExpireAfterAccessSeconds)
             {
                 float slidingExpiration =
                     _entries[index].AccessTime + _options.ExpireAfterAccessSeconds;
@@ -906,7 +906,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             _entries[index].AccessTime = currentTime;
 
-            if (_options.ExpireAfterAccessSeconds > 0f)
+            if (0f < _options.ExpireAfterAccessSeconds)
             {
                 _entries[index].ExpirationTime = currentTime + _options.ExpireAfterAccessSeconds;
             }
@@ -937,7 +937,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             // First, grow internal array if needed and possible (before eviction check)
             // We need to grow if count has reached capacity AND we haven't reached MaximumSize yet
-            if (_options.Weigher == null && _count >= _capacity && _capacity < _options.MaximumSize)
+            if (_options.Weigher == null && _capacity <= _count && _capacity < _options.MaximumSize)
             {
                 GrowTowardsMaximumSize();
             }
@@ -945,7 +945,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // For weighted caches, evict based on weight
             if (_options.Weigher != null)
             {
-                if (_currentWeight + incomingWeight > _options.MaximumWeight)
+                if (_options.MaximumWeight < _currentWeight + incomingWeight)
                 {
                     if (_options.AllowGrowth && ShouldGrow())
                     {
@@ -961,7 +961,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             // For non-weighted caches, evict based on count vs MaximumSize
             // Only evict if we've reached the maximum allowed size (not just internal capacity)
-            if (_count >= _options.MaximumSize)
+            if (_options.MaximumSize <= _count)
             {
                 if (_options.AllowGrowth && ShouldGrow())
                 {
@@ -1009,13 +1009,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private bool ShouldGrow()
         {
-            if (_options.MaxGrowthSize > 0 && _capacity >= _options.MaxGrowthSize)
+            if (0 < _options.MaxGrowthSize && _options.MaxGrowthSize <= _capacity)
             {
                 return false;
             }
 
             float currentTime = _timeProvider();
-            if (currentTime - _lastEvictionTime > ThrashWindowSeconds)
+            if (ThrashWindowSeconds < currentTime - _lastEvictionTime)
             {
                 _recentEvictionCount = 0;
                 _lastEvictionTime = currentTime;
@@ -1023,13 +1023,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             float evictionsPerSecond =
                 _recentEvictionCount / Math.Max(0.001f, currentTime - _lastEvictionTime);
-            return evictionsPerSecond >= _options.ThrashThresholdEvictionsPerSecond;
+            return _options.ThrashThresholdEvictionsPerSecond <= evictionsPerSecond;
         }
 
         private void Grow()
         {
             int newCapacity = (int)(_capacity * _options.GrowthFactor);
-            if (_options.MaxGrowthSize > 0)
+            if (0 < _options.MaxGrowthSize)
             {
                 newCapacity = Math.Min(newCapacity, _options.MaxGrowthSize);
             }
@@ -1380,7 +1380,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             RemoveFromProbation(index);
             AddToProtected(index);
 
-            if (_protectedCount > _protectedCapacity)
+            if (_protectedCapacity < _protectedCount)
             {
                 DemoteFromProtected();
             }

@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             get
             {
-                if (index < 0 || index >= _count)
+                if (index < 0 || _count <= index)
                 {
                     throw new IndexOutOfRangeException(
                         $"{index} is outside of bounds [0, {_count})"
@@ -152,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryAdd(int value)
         {
-            if (value < 0 || value >= _sparse.Length)
+            if (value < 0 || _sparse.Length <= value)
             {
                 return false;
             }
@@ -176,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryRemove(int value)
         {
-            if (value < 0 || value >= _sparse.Length || !Contains(value))
+            if (value < 0 || _sparse.Length <= value || !Contains(value))
             {
                 return false;
             }
@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int value)
         {
-            if (value < 0 || value >= _sparse.Length)
+            if (value < 0 || _sparse.Length <= value)
             {
                 return false;
             }
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public bool TryGet(int index, out int value)
         {
-            if (index < 0 || index >= _count)
+            if (index < 0 || _count <= index)
             {
                 value = default;
                 return false;
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 throw new ArgumentNullException(nameof(array));
             }
-            if (arrayIndex < 0 || arrayIndex > array.Length)
+            if (arrayIndex < 0 || array.Length < arrayIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(arrayIndex));
             }
@@ -333,7 +333,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _pooledArray = default;
 
                 // Rent array and populate on first use
-                if (count > 0)
+                if (0 < count)
                 {
                     _pooledArray = SystemArrayPool<T>.Get(count, out T[] temp);
                     for (int i = 0; i < count; i++)
@@ -406,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             get
             {
-                if (index < 0 || index >= _count)
+                if (index < 0 || _count <= index)
                 {
                     throw new IndexOutOfRangeException(
                         $"{index} is outside of bounds [0, {_count})"
@@ -450,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentNullException(nameof(element));
             }
 
-            if (_nextIndex >= _elements.Length)
+            if (_elements.Length <= _nextIndex)
             {
                 return false; // Capacity reached
             }
@@ -525,7 +525,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public bool TryGet(int index, out T element)
         {
-            if (index < 0 || index >= _count)
+            if (index < 0 || _count <= index)
             {
                 element = default;
                 return false;
@@ -544,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 throw new ArgumentNullException(nameof(array));
             }
-            if (arrayIndex < 0 || arrayIndex > array.Length)
+            if (arrayIndex < 0 || array.Length < arrayIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(arrayIndex));
             }

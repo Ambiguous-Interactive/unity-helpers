@@ -170,11 +170,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minY = position.y;
                 }
-                if (position.x > maxX)
+                if (maxX < position.x)
                 {
                     maxX = position.x;
                 }
-                if (position.y > maxY)
+                if (maxY < position.y)
                 {
                     maxY = position.y;
                 }
@@ -273,11 +273,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minY = position.y;
                 }
-                if (position.x > maxX)
+                if (maxX < position.x)
                 {
                     maxX = position.x;
                 }
-                if (position.y > maxY)
+                if (maxY < position.y)
                 {
                     maxY = position.y;
                 }
@@ -356,11 +356,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     minY = position.y;
                 }
-                if (position.x > maxX)
+                if (maxX < position.x)
                 {
                     maxX = position.x;
                 }
-                if (position.y > maxY)
+                if (maxY < position.y)
                 {
                     maxY = position.y;
                 }
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             i++;
                         }
 
-                        while (i <= j && entries[span[j]].position.x > pivot)
+                        while (i <= j && pivot < entries[span[j]].position.x)
                         {
                             j--;
                         }
@@ -420,7 +420,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             i++;
                         }
 
-                        while (i <= j && entries[span[j]].position.y > pivot)
+                        while (i <= j && pivot < entries[span[j]].position.y)
                         {
                             j--;
                         }
@@ -440,7 +440,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                if (k >= i)
+                if (i <= k)
                 {
                     left = i;
                     continue;
@@ -464,18 +464,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float midValue = GetAxis(entries[span[mid]], axis);
             float rightValue = GetAxis(entries[span[right]], axis);
 
-            if (leftValue > midValue)
+            if (midValue < leftValue)
             {
                 (span[left], span[mid]) = (span[mid], span[left]);
                 (leftValue, midValue) = (midValue, leftValue);
             }
 
-            if (midValue > rightValue)
+            if (rightValue < midValue)
             {
                 (span[mid], span[right]) = (span[right], span[mid]);
                 (midValue, rightValue) = (rightValue, midValue);
 
-                if (leftValue > midValue)
+                if (midValue < leftValue)
                 {
                     (span[left], span[mid]) = (span[mid], span[left]);
                     (leftValue, midValue) = (midValue, leftValue);
@@ -500,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     float currentValue = entries[currentIndex].position.x;
                     int j = i - 1;
 
-                    while (j >= 0 && entries[span[j]].position.x > currentValue)
+                    while (0 <= j && currentValue < entries[span[j]].position.x)
                     {
                         span[j + 1] = span[j];
                         j--;
@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     float currentValue = entries[currentIndex].position.y;
                     int j = i - 1;
 
-                    while (j >= 0 && entries[span[j]].position.y > currentValue)
+                    while (0 <= j && currentValue < entries[span[j]].position.y)
                     {
                         span[j + 1] = span[j];
                         j--;
@@ -622,7 +622,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         Entry entry = entries[indices[i]];
                         float squareDistance = (entry.position - position).sqrMagnitude;
-                        if (squareDistance > rangeSquared)
+                        if (rangeSquared < squareDistance)
                         {
                             continue;
                         }
@@ -639,7 +639,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 KdTreeNode left = currentNode.left;
-                if (left is not null && left._count > 0 && bounds.FastIntersects2D(left.boundary))
+                if (left is not null && 0 < left._count && bounds.FastIntersects2D(left.boundary))
                 {
                     nodesToVisit.Push(left);
                 }
@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 KdTreeNode right = currentNode.right;
                 if (
                     right is not null
-                    && right._count > 0
+                    && 0 < right._count
                     && bounds.FastIntersects2D(right.boundary)
                 )
                 {
@@ -709,7 +709,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 KdTreeNode left = currentNode.left;
-                if (left is not null && left._count > 0 && bounds.FastIntersects2D(left.boundary))
+                if (left is not null && 0 < left._count && bounds.FastIntersects2D(left.boundary))
                 {
                     nodesToVisit.Push(left);
                 }
@@ -717,7 +717,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 KdTreeNode right = currentNode.right;
                 if (
                     right is not null
-                    && right._count > 0
+                    && 0 < right._count
                     && bounds.FastIntersects2D(right.boundary)
                 )
                 {

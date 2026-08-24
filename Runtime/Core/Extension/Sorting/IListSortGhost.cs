@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int i;
             int j;
-            while (gap > 15)
+            while (15 < gap)
             {
                 gap = (gap >> 5) + (gap >> 3);
                 i = gap;
@@ -71,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     T element = array[i];
                     j = i;
-                    while (j >= gap && 0 < comparer.Compare(array[j - gap], element))
+                    while (gap <= j && 0 < comparer.Compare(array[j - gap], element))
                     {
                         array[j] = array[j - gap];
                         j -= gap;
@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 T element = array[i];
                 j = i;
 
-                while (j > 0 && 0 < comparer.Compare(array[gap], element))
+                while (0 < j && 0 < comparer.Compare(array[gap], element))
                 {
                     array[j] = array[gap];
                     j = gap;

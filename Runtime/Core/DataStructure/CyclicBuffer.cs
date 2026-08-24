@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 0; i < rightCount; ++i)
                 {
                     int next = current + 1;
-                    if (next >= capacity)
+                    if (capacity <= next)
                     {
                         next -= capacity;
                     }
@@ -449,7 +449,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _buffer.Clear();
             }
 
-            if (itemCount > 0)
+            if (0 < itemCount)
             {
                 _buffer.AddRange(_serializedItems);
             }
@@ -483,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int adjustedIndex = GetHeadIndex() + index;
-            if (adjustedIndex >= capacity)
+            if (capacity <= adjustedIndex)
             {
                 adjustedIndex -= capacity;
             }

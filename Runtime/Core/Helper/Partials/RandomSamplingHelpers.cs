@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0d;
             }
 
-            if (double.IsPositiveInfinity(value) || value >= 1d)
+            if (double.IsPositiveInfinity(value) || 1d <= value)
             {
                 return LargestDoubleLessThanOne;
             }
@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0f;
             }
 
-            if (float.IsPositiveInfinity(value) || value >= 1f)
+            if (float.IsPositiveInfinity(value) || 1f <= value)
             {
                 return LargestFloatLessThanOne;
             }

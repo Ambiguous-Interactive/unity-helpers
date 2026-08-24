@@ -700,7 +700,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             int removed = RemoveWhereInternal(match);
-            if (removed > 0)
+            if (0 < removed)
             {
                 // Remove matching items from tracked new items
                 _newItemsOrder?.RemoveAll(match);

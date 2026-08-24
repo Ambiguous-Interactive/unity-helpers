@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             //check which side of line AB the point P is on
             float cross = (b.x - a.x) * (point.y - a.y) - (point.x - a.x) * (b.y - a.y);
-            return cross > 0f;
+            return 0f < cross;
         }
 
         /// <summary>

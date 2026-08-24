@@ -229,11 +229,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <exception cref="ArgumentOutOfRangeException">Thrown when indexA or indexB are outside the valid range [0, Count).</exception>
         public static void Swap<T>(this IList<T> list, int indexA, int indexB)
         {
-            if (indexA < 0 || indexA >= list.Count)
+            if (indexA < 0 || list.Count <= indexA)
             {
                 throw new ArgumentOutOfRangeException(nameof(indexA));
             }
-            if (indexB < 0 || indexB >= list.Count)
+            if (indexB < 0 || list.Count <= indexB)
             {
                 throw new ArgumentOutOfRangeException(nameof(indexB));
             }
@@ -401,7 +401,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int count = list.Count;
             if (list is T[] array)
             {
-                for (int i = count - 1; i >= 0; --i)
+                for (int i = count - 1; 0 <= i; --i)
                 {
                     if (predicate(array[i]))
                     {
@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            for (int i = count - 1; i >= 0; --i)
+            for (int i = count - 1; 0 <= i; --i)
             {
                 if (predicate(list[i]))
                 {

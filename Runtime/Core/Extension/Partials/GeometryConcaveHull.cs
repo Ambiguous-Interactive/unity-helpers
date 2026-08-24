@@ -355,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
             points.AddRange(pointsSet);
             int pointCount = points.Count;
-            List<Vector2> hull = new(pointCount > 0 ? pointCount + 1 : 0);
+            List<Vector2> hull = new(0 < pointCount ? pointCount + 1 : 0);
             if (pointCount == 0)
             {
                 return hull;
@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         min = w;
                     }
-                    if (w.x > max.x || (Mathf.Approximately(w.x, max.x) && w.y > max.y))
+                    if (max.x < w.x || (Mathf.Approximately(w.x, max.x) && max.y < w.y))
                     {
                         max = w;
                     }
@@ -423,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 Vector2 candidate =
-                    points[0] == current && points.Count > 1 ? points[1] : points[0];
+                    points[0] == current && 1 < points.Count ? points[1] : points[0];
                 for (int i = 0; i < points.Count; ++i)
                 {
                     Vector2 p = points[i];
@@ -437,7 +437,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         p
                     );
                     double tolerance = ComputeAreaTolerance(current, candidate, p);
-                    if (rel > tolerance)
+                    if (tolerance < rel)
                     {
                         candidate = p;
                     }
@@ -445,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         float distCandidate = (candidate - current).sqrMagnitude;
                         float distP = (p - current).sqrMagnitude;
-                        if (distP > distCandidate)
+                        if (distCandidate < distP)
                         {
                             candidate = p;
                         }
@@ -476,7 +476,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             colinear.Add(p);
                         }
                     }
-                    if (colinear.Count > 0)
+                    if (0 < colinear.Count)
                     {
                         SortByDistanceAscending(colinear, current);
                         using PooledResource<HashSet<Vector2>> hullSetRes =
@@ -504,17 +504,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     current = candidate;
                 }
 
-                if (++guard > guardMax)
+                if (guardMax < ++guard)
                 {
                     break;
                 }
             } while (current != start);
 
-            if (hull.Count > 1 && hull[0] == hull[^1])
+            if (1 < hull.Count && hull[0] == hull[^1])
             {
                 hull.RemoveAt(hull.Count - 1);
             }
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }
@@ -532,7 +532,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; hull.Count > 2 && i < hull.Count; ++i)
+                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
                 {
                     int prev = (i - 1 + hull.Count) % hull.Count;
                     int next = (i + 1) % hull.Count;
@@ -553,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            while (hull.Count >= 3)
+            while (3 <= hull.Count)
             {
                 int count = hull.Count;
                 if (AreApproximatelyColinear(hull[count - 3], hull[count - 2], hull[count - 1]))
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            while (hull.Count >= 3)
+            while (3 <= hull.Count)
             {
                 int count = hull.Count;
                 FastVector3Int a = hull[count - 3];
@@ -600,14 +600,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             points.Sort(Vector2LexicographicalComparison);
             DeduplicateSortedVector2(points);
             int pointCount = points.Count;
-            List<Vector2> hull = new(pointCount > 0 ? pointCount : 0);
+            List<Vector2> hull = new(0 < pointCount ? pointCount : 0);
             if (pointCount <= 1)
             {
                 hull.AddRange(points);
                 return hull;
             }
 
-            if (pointCount >= 2)
+            if (2 <= pointCount)
             {
                 Vector2 first = points[0];
                 Vector2 last = points[^1];
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     else
                     {
                         hull.Add(points[0]);
-                        if (points.Count > 1)
+                        if (1 < points.Count)
                         {
                             hull.Add(points[^1]);
                         }
@@ -648,7 +648,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             foreach (Vector2 p in points)
             {
-                while (lower.Count >= 2)
+                while (2 <= lower.Count)
                 {
                     Vector2 a = lower[^2];
                     Vector2 b = lower[^1];
@@ -666,10 +666,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 lower.Add(p);
             }
 
-            for (int i = points.Count - 1; i >= 0; --i)
+            for (int i = points.Count - 1; 0 <= i; --i)
             {
                 Vector2 p = points[i];
-                while (upper.Count >= 2)
+                while (2 <= upper.Count)
                 {
                     Vector2 a = upper[^2];
                     Vector2 b = upper[^1];
@@ -701,7 +701,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(upper[i]);
             }
-            if (!includeColinearPoints && hull.Count > 2)
+            if (!includeColinearPoints && 2 < hull.Count)
             {
                 PruneColinearOnHull(hull);
             }

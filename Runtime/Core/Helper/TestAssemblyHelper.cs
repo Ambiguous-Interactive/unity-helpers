@@ -72,12 +72,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             if (
-                value.IndexOf(".Tests", Comparison) >= 0
-                || value.IndexOf(".Test", Comparison) >= 0
-                || value.IndexOf("Tests.", Comparison) >= 0
-                || value.IndexOf("Tests_", Comparison) >= 0
-                || value.IndexOf("Test.", Comparison) >= 0
-                || value.IndexOf("Test_", Comparison) >= 0
+                0 <= value.IndexOf(".Tests", Comparison)
+                || 0 <= value.IndexOf(".Test", Comparison)
+                || 0 <= value.IndexOf("Tests.", Comparison)
+                || 0 <= value.IndexOf("Tests_", Comparison)
+                || 0 <= value.IndexOf("Test.", Comparison)
+                || 0 <= value.IndexOf("Test_", Comparison)
             )
             {
                 return true;
@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return true;
             }
 
-            if (value.IndexOf("Test", Comparison) >= 0)
+            if (0 <= value.IndexOf("Test", Comparison))
             {
                 return true;
             }
