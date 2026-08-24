@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using ProtoBuf;
     using UnityEngine;
@@ -244,52 +245,58 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             results.Clear();
 
-            using PooledResource<Dictionary<int, List<int>>> dictResource = DictionaryBuffer<
-                int,
-                List<int>
-            >.Dictionary.Get(out Dictionary<int, List<int>> setMap);
-            using PooledResource<List<PooledResource<List<int>>>> scratchLeaseResource = Buffers<
-                PooledResource<List<int>>
-            >.List.Get(out List<PooledResource<List<int>>> scratchLeases);
-
-            for (int i = 0; i < _parent.Length; i++)
+            int elementCount = _parent.Length;
+            if (elementCount == 0)
             {
-                if (!TryFind(i, out int root))
-                {
-                    continue;
-                }
-
-                if (!setMap.TryGetValue(root, out List<int> scratch))
-                {
-                    PooledResource<List<int>> lease = Buffers<int>.List.Get(out scratch);
-                    scratchLeases.Add(lease);
-                    setMap[root] = scratch;
-                }
-                scratch.Add(i);
+                return results;
             }
 
-            foreach (List<int> scratch in setMap.Values)
+            // A root is an index into _parent, so a dense array indexed by root answers "which
+            // result list is this set's" without hashing -- and the element goes straight into its
+            // destination, where the previous shape gathered every element into a per-root scratch
+            // list and then copied all of them a second time. The slot holds resultIndex + 1 so a
+            // zero-filled array already means "unseen" and no sentinel fill pass is needed.
+            int[] rootToResult = ArrayPool<int>.Shared.Rent(elementCount);
+            try
             {
-                if (!reuseStack.TryPop(out List<int> destination))
+                Array.Clear(rootToResult, 0, elementCount);
+
+                for (int i = 0; i < elementCount; i++)
                 {
-                    destination = new List<int>(scratch.Count);
-                }
-                else
-                {
-                    destination.Clear();
-                    if (destination.Capacity < scratch.Count)
+                    if (!TryFind(i, out int root))
                     {
-                        destination.Capacity = scratch.Count;
+                        continue;
                     }
+
+                    int slot = rootToResult[root];
+                    List<int> destination;
+                    if (0 < slot)
+                    {
+                        destination = results[slot - 1];
+                    }
+                    else
+                    {
+                        if (reuseStack.TryPop(out destination))
+                        {
+                            destination.Clear();
+                        }
+                        else
+                        {
+                            destination = new List<int>();
+                        }
+
+                        results.Add(destination);
+                        rootToResult[root] = results.Count;
+                    }
+
+                    destination.Add(i);
                 }
-
-                destination.AddRange(scratch);
-                results.Add(destination);
             }
-
-            for (int i = 0; i < scratchLeases.Count; ++i)
+            finally
             {
-                scratchLeases[i].Dispose();
+                // Cleared on rent rather than on return: the clear only has to cover the prefix
+                // this call uses, and the pool hands back arrays at least that long.
+                ArrayPool<int>.Shared.Return(rootToResult, clearArray: false);
             }
 
             return results;

@@ -96,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `DisjointSet.TryGetAllSets()` is 2.4x-3.2x faster and allocates no temporary lists. It gathered every element into a per-root scratch list and then copied all of them a second time; elements now go straight into their result list, found through a dense index rather than a hash lookup ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - `Serializer.ProtoSerialize(value, ref buffer)` no longer allocates a second full payload for the `Serializable` collection types. The overload exists so a per-frame serialize allocates nothing ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Serializing a `SerializableDictionary` or `SerializableHashSet` no longer resolves its protobuf wrapper type by reflection on every call; the type and its constructor are resolved once per element type ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Writing a `WGuid` to JSON no longer allocates a 36-character string per value, and reading an `AnimationCurve` keyframe no longer boxes its `weightedMode` ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
