@@ -151,6 +151,15 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses
   2021.3 reference assemblies and the MCP editor is on 6000.4, so it cost a full Unity matrix run to
   find. Same class as [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
+- **`UnityEngine.Object` declares `implicit operator bool`, so no `Component`-shaped expression is
+  ever a type error in a boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A
+  `bool`-returning method that ends `return FindTheThing(...);` compiles, converts the found object
+  to `true`, and **discards it**. Read a `bool` method with an `out` parameter as one unit: if a path
+  returns without writing the `out`, the caller gets a stale value and the compiler will not say so,
+  because definite-assignment is satisfied by any earlier write -- including one a failed filter has
+  since invalidated. That shipped in 3.5.1: every single relational field with
+  `IncludeInactive = false` bound the disabled candidate ahead of the enabled one
+  ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`,
   `WrappedIncrement` and `PositiveMod` already exist; `(i + 1) % capacity` is a re-implementation
   that also gets the negative case wrong.
