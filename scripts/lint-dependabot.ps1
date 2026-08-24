@@ -281,8 +281,10 @@ if ($filesToCheck.Count -eq 0) {
     if (Test-Path $defaultPath) {
         $filesToCheck += $defaultPath
     } else {
-        Write-Warning "dependabot.yml not found at: $defaultPath — skipping schema check."
-        exit 0
+        # This repository ships .github/dependabot.yml, so its absence is a deletion to notice
+        # rather than a check to skip (#556).
+        Write-Host "[lint-dependabot] ERROR: dependabot.yml not found at: $defaultPath. If it was removed deliberately, retire this linter in the same commit." -ForegroundColor Red
+        exit 1
     }
 }
 

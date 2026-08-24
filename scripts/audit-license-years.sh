@@ -392,6 +392,11 @@ if [[ "$OUTPUT_MODE" != "csv" ]]; then
             done
         fi
         exit 1
+    elif [[ $total_files -eq 0 ]]; then
+        # A walk that found no C# files means the corpus moved or `git ls-files` returned nothing,
+        # not that every header is correct (#556).
+        echo "ERROR: no .cs files were audited, so a pass here would mean nothing."
+        exit 1
     else
         echo "All files have correct copyright years!"
         exit 0

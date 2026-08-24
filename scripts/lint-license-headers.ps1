@@ -52,8 +52,10 @@ $skippedCount = 0
 foreach ($root in $sourceRoots) {
   $rootPath = Join-Path -Path $PSScriptRoot -ChildPath "..\$root"
   if (-not (Test-Path $rootPath)) {
-    Write-Info "Skipping $root (directory not found)"
-    continue
+    # Renaming or moving a source root used to silence this check for that whole tree, and the
+    # skip was only visible under -VerboseOutput (#556).
+    Write-ErrorMsg "Source root not found: $root. If it moved, update `$sourceRoots in the same commit."
+    exit 1
   }
 
   # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse, which builds a FileInfo per
@@ -120,6 +122,11 @@ Write-Info "Summary:"
 Write-Info "  Files checked: $checkedCount"
 Write-Info "  Files skipped: $skippedCount"
 Write-Info "  Violations: $($violations.Count)"
+
+if ($checkedCount -eq 0) {
+  Write-ErrorMsg "No files were checked. The scan found nothing under $($sourceRoots -join ', '), so a pass here would mean nothing."
+  exit 1
+}
 
 if ($violations.Count -gt 0) {
   Write-ErrorMsg ""

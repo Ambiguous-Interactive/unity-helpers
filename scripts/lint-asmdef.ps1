@@ -301,8 +301,10 @@ $asmdefFilesToValidate = @()
 foreach ($root in $sourceRoots) {
   $rootPath = Join-Path -Path $repoRoot -ChildPath $root
   if (-not (Test-Path $rootPath)) {
-    Write-Info "Skipping $root (directory not found)"
-    continue
+    # Renaming a source root used to remove that whole tree from the scan, and the skip was only
+    # visible under -VerboseOutput (#556).
+    Write-ErrorMsg "Source root not found: $root. If it moved, update `$sourceRoots in the same commit."
+    exit 1
   }
 
   $asmdefFiles = Get-ChildItem -Path $rootPath -Filter "*.asmdef" -Recurse -File | Where-Object {

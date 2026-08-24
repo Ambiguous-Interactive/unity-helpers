@@ -219,8 +219,16 @@ function Get-FilesToScan {
 
 $filesToScan = @(Get-FilesToScan -StagedOnly:$StagedOnly -Paths $Paths)
 if ($filesToScan.Count -eq 0) {
-  Write-Info 'No C# files to scan.'
-  exit 0
+  # An explicit filter that matches nothing is ordinary -- agent:preflight passes the changed files
+  # and there may be none. A whole-tree scan that finds nothing is not: it means the walk broke
+  # (#556).
+  if ($StagedOnly -or ($Paths -and 0 -lt $Paths.Count)) {
+    Write-Info 'No C# files to scan (the supplied filter matched nothing).'
+    exit 0
+  }
+
+  Write-Host '[lint-duplicate-usings] ERROR: the repository-wide scan found no C# files, so a pass here would mean nothing.' -ForegroundColor Red
+  exit 1
 }
 
 Write-Info "Scanning $($filesToScan.Count) C# file(s) for duplicate using directives..."

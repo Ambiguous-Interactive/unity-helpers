@@ -162,7 +162,9 @@ $files = @()
 foreach ($scanRoot in $scanRoots) {
     $rootPath = Join-Path $repoRoot $scanRoot
     if (-not (Test-Path -LiteralPath $rootPath)) {
-        continue
+        # Renaming a scan root used to remove it from the check silently (#556).
+        Write-Host "[lint-conditional-call-chains] ERROR: scan root not found: $scanRoot. If it moved, update `$scanRoots in the same commit." -ForegroundColor Red
+        exit 1
     }
     $files += @(Get-ChildItem -LiteralPath $rootPath -Recurse -File -Filter '*.cs' | ForEach-Object { $_.FullName })
 }
@@ -170,8 +172,10 @@ foreach ($scanRoot in $scanRoots) {
 $unparsed = 0
 $conditionalMethods = @(Get-ConditionalMethods -Files @($files | Sort-Object) -UnparsedCount ([ref]$unparsed))
 if ($conditionalMethods.Count -eq 0) {
-    Write-Host "[lint-conditional-call-chains] OK: no [Conditional] methods found." -ForegroundColor Green
-    exit 0
+    # This repository declares [Conditional] methods, so finding none means the scan stopped
+    # working, not that the code is clean (#556).
+    Write-Host "[lint-conditional-call-chains] ERROR: no [Conditional] methods found across $($files.Count) file(s). The scan matched nothing, so a pass here would mean nothing." -ForegroundColor Red
+    exit 1
 }
 
 $conditionalNames = [System.Collections.Generic.HashSet[string]]::new(

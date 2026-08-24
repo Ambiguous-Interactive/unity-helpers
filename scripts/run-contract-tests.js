@@ -72,6 +72,11 @@ const CHECKS = [
     run: "npm run test:extract-code-samples"
   },
   {
+    id: "empty-corpus-gates",
+    name: "Empty-corpus gate self-test",
+    run: "npm run test:empty-corpus-gates"
+  },
+  {
     id: "lint-comparison-direction",
     name: "Comparison-direction linter self-test",
     run: "npm run test:lint-comparison-direction"

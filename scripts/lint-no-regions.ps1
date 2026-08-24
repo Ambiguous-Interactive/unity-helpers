@@ -84,7 +84,11 @@ function Get-FilesToCheck {
 
   $files = @()
   foreach ($root in $sourceRoots) {
-    if (-not (Test-Path $root)) { continue }
+    # Renaming a source root used to remove that whole tree from the scan silently (#556).
+    if (-not (Test-Path $root)) {
+      Write-Host "[lint-no-regions] ERROR: source root not found: $root. If it moved, update `$sourceRoots in the same commit." -ForegroundColor Red
+      exit 1
+    }
     # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse -Include, which enumerates
     # everything and post-filters. Measured on this repository's 1643 C# files over the
     # devcontainer's 9p mount: 0.8 s against 28.5 s. Sorted because the walk order is the
