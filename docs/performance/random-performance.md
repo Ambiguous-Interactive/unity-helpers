@@ -98,3 +98,13 @@ absent until the `.github/workflows/unity-benchmarks.yml` workflow next runs.
 Absence here says nothing about quality: statistical standing is measured separately, by the
 bit-plane linearity gate on every pull request and by the scheduled PractRand battery. See
 [Random Generators](../features/utilities/random-generators.md) for the current ratings.
+
+The battery runs **both stream widths**. `NextUlong` is no longer `NextUint` rearranged: five
+generators answer a 64-bit draw from one raw word, so half of it reaches a caller only through
+`NextDouble`, `NextLong` and `NextUlong(max)` and appears in no 32-bit draw. Even the generators
+that do build `NextUlong` from two `NextUint` draws pack them high-word-first and write
+little-endian, so their 64-bit stream is the 32-bit one with each adjacent word pair swapped.
+`SystemRandom` is the proof that this is not a redundant measurement: it fails the 32-bit battery at
+exactly 8GB and is clean through 8GB at 64-bit. Every "clean through 8GB" above is the 32-bit
+figure; the 64-bit outcomes are recorded per generator in
+`scripts/random-quality/expected-outcomes.json`.

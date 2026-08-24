@@ -227,7 +227,7 @@ jobs:
           retention-days: 7
 
   battery:
-    name: ${{ matrix.generator }} (${{ needs.resolve.outputs.budget }})
+    name: ${{ matrix.generator }} ${{ matrix.width }}-bit (${{ needs.resolve.outputs.budget }})
     needs:
       - resolve
       - practrand
@@ -235,11 +235,20 @@ jobs:
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      # The inventory is 19 generators; capping parallelism keeps this workflow
-      # from monopolising the runner pool that the Unity workflows share.
+      # The inventory is 19 generators at two widths; capping parallelism keeps
+      # this workflow from monopolising the runner pool that the Unity workflows
+      # share. The matrix is generator x width rather than 19 jobs doing twice
+      # the work, so one slow width cannot hold the other's report hostage.
       max-parallel: 5
       matrix:
         generator: ${{ fromJSON(needs.resolve.outputs.generators) }}
+        # 32 alone was the whole battery until #544. NextUlong is no longer
+        # NextUint rearranged: five generators answer it from one raw word whose
+        # high half reaches a caller only through NextDouble, NextLong and
+        # NextUlong(max), and the rest pack two NextUint draws high-word-first
+        # and write little-endian, so even their 64-bit stream is the 32-bit one
+        # with each adjacent word pair swapped.
+        width: ["32", "64"]
     steps:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -261,19 +270,22 @@ jobs:
       - name: Run the battery
         env:
           GENERATOR: ${{ matrix.generator }}
+          WIDTH: ${{ matrix.width }}
           SEED: ${{ needs.resolve.outputs.seed }}
           BUDGET: ${{ needs.resolve.outputs.budget }}
           BUDGET_BYTES: ${{ needs.resolve.outputs.budget-bytes }}
           PRACTRAND_VERSION: ${{ needs.resolve.outputs.practrand-version }}
         run: |
           set -eu
-          reports=".artifacts/random-quality/reports"
+          # One directory per width: the evaluator matches a report to a generator by FILENAME, so
+          # two widths in one directory would silently overwrite each other.
+          reports=".artifacts/random-quality/reports/${WIDTH}"
           mkdir -p "${reports}"
           host=".artifacts/random-quality/host/WallstopStudios.UnityHelpers.RandomQuality.dll"
           rng_test="${GITHUB_WORKSPACE}/.artifacts/random-quality/practrand/RNG_test"
           chmod +x "${rng_test}"
           report="${reports}/${GENERATOR}.txt"
-          command="RNG_test stdin32 -tlmin 1KB -tlmax ${BUDGET} -multithreaded"
+          command="RNG_test stdin${WIDTH} -tlmin 1KB -tlmax ${BUDGET} -multithreaded"
           started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           # Deliberately NO pipefail. RNG_test halts the moment it reaches a
@@ -287,12 +299,14 @@ jobs:
             --generator "${GENERATOR}" \
             --seed "${SEED}" \
             --bytes "${BUDGET_BYTES}" \
-            | "${rng_test}" stdin32 -tlmin 1KB -tlmax "${BUDGET}" -multithreaded \
+            --width "${WIDTH}" \
+            | "${rng_test}" "stdin${WIDTH}" -tlmin 1KB -tlmax "${BUDGET}" -multithreaded \
             > "${report}" 2>&1 || status=$?
 
           finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           jq -n \
             --arg generator "${GENERATOR}" \
+            --arg width "${WIDTH}" \
             --arg seed "${SEED}" \
             --arg budget "${BUDGET}" \
             --arg bytes "${BUDGET_BYTES}" \
@@ -301,17 +315,17 @@ jobs:
             --arg started "${started}" \
             --arg finished "${finished}" \
             --arg status "${status}" \
-            '{generator: $generator, seed: $seed, budget: $budget, bytes: $bytes,
+            '{generator: $generator, width: $width, seed: $seed, budget: $budget, bytes: $bytes,
               command: $command, battery: $battery, started: $started,
               finished: $finished, batteryExitCode: $status}' \
             > "${reports}/${GENERATOR}.command.json"
 
-          echo "::group::${GENERATOR} report"
+          echo "::group::${GENERATOR} ${WIDTH}-bit report"
           cat "${report}"
           echo "::endgroup::"
 
           if [ "${status}" -ne 0 ]; then
-            echo "::error::RNG_test exited ${status} for ${GENERATOR}; the report is incomplete."
+            echo "::error::RNG_test exited ${status} for ${GENERATOR} at ${WIDTH}-bit; the report is incomplete."
             exit "${status}"
           fi
 
@@ -319,7 +333,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: random-quality-report-${{ matrix.generator }}
+          name: random-quality-report-${{ matrix.width }}-${{ matrix.generator }}
           path: .artifacts/random-quality/reports
           if-no-files-found: warn
           retention-days: 90
@@ -350,6 +364,8 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      # merge-multiple flattens the artifact NAME, not the paths inside it, and every artifact
+      # carries its reports under a `<width>/` directory -- so the two widths stay separated.
       - name: Download every report
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -366,15 +382,24 @@ jobs:
         run: |
           set -eu
           status=0
-          node scripts/random-quality/evaluate-outcomes.mjs \
-            --manifest "${MANIFEST}" \
-            --reports .artifacts/random-quality/reports \
-            --budget "${BUDGET}" \
-            --seed "${SEED}" \
-            --command "RNG_test stdin32 -tlmin 1KB -tlmax ${BUDGET} -multithreaded" \
-            --run-url "${RUN_URL}" \
-            --out-md .artifacts/random-quality/summary.md \
-            --out-json .artifacts/random-quality/summary.json || status=$?
+          : > .artifacts/random-quality/summary.md
+          # Both widths are compared even when one disagrees, so a run reports its whole state in
+          # one go. `status` accumulates rather than short-circuits for the same reason -- and the
+          # loop cannot use `set -e` to exit, because a mismatch is a verdict, not a crash.
+          for width in 32 64; do
+            node scripts/random-quality/evaluate-outcomes.mjs \
+              --manifest "${MANIFEST}" \
+              --reports ".artifacts/random-quality/reports/${width}" \
+              --budget "${BUDGET}" \
+              --seed "${SEED}" \
+              --width "${width}" \
+              --command "RNG_test stdin${width} -tlmin 1KB -tlmax ${BUDGET} -multithreaded" \
+              --run-url "${RUN_URL}" \
+              --out-md ".artifacts/random-quality/summary-${width}.md" \
+              --out-json ".artifacts/random-quality/summary-${width}.json" || status=$?
+            cat ".artifacts/random-quality/summary-${width}.md" >> .artifacts/random-quality/summary.md
+            printf '\n' >> .artifacts/random-quality/summary.md
+          done
           cat .artifacts/random-quality/summary.md >> "${GITHUB_STEP_SUMMARY}"
           echo "mismatched=$([ "${status}" -eq 0 ] && echo false || echo true)" >> "${GITHUB_OUTPUT}"
 

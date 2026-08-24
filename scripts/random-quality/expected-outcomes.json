@@ -5,152 +5,317 @@
     "archive": "PractRand-pre0.95.zip",
     "url": "https://sourceforge.net/projects/pracrand/files/PractRand-pre0.95.zip/download",
     "sha256": "5738c322ccb983b63fbe693f305afa2a7c73e64a80b303c9139278c453ce27b4",
-    "testCommand": "RNG_test stdin32 -tlmin 1KB -tlmax <budget> -multithreaded"
+    "testCommand": "RNG_test stdin<width> -tlmin 1KB -tlmax <budget> -multithreaded"
   },
   "measurement": {
     "seed": "00010203-0405-0607-0809-0a0b0c0d0e0f",
-    "recorded": "2026-08-21",
-    "note": "Every outcome below was measured against PractRand 0.95 with the seed above. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault. cleanThrough is its mirror for a generator expected to pass: the largest length at which a clean run was actually observed. It exists because a pass is only evidence at a depth where something worse would have been caught -- SystemRandom, rated Poor here, is clean through 4GB and only fails at 8GB, so the 1GB evidence these entries used to carry distinguished nothing. scripts/tests/test-random-quality-outcomes.mjs refuses a pass recorded shallower than the deepest control's failsBy."
+    "recorded": "2026-08-21 (32-bit), 2026-08-24 (64-bit)",
+    "note": "Every outcome below was measured against PractRand 0.95 with the seed above, at the width it is recorded under. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault. cleanThrough is its mirror for a generator expected to pass: the largest length at which a clean run was actually observed. It exists because a pass is only evidence at a depth where something worse would have been caught, and scripts/tests/test-random-quality-outcomes.mjs refuses a pass recorded shallower than that width's deepest control. The two widths are nested rather than split into two entries per name because the contract test asserts host --list order and uniqueness by name. They are NOT redundant: five generators answer a 64-bit draw from one raw word, so half of it reaches a caller only through NextDouble, NextLong and NextUlong(max) and appears in no 32-bit draw at all; and for the generators that do build NextUlong from two NextUint draws the host still packs them high-word-first and writes little-endian, so the 64-bit stream is the 32-bit one with each adjacent word pair SWAPPED. SystemRandom is the proof: it fails 32-bit at exactly 8GB and is clean through 8GB at 64-bit."
   },
   "generators": [
     {
       "name": "BlastCircuitRandom",
       "quality": "Good",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "Chaotic ARX mixer; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Chaotic ARX mixer; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Chaotic ARX mixer; clean through 8GB with 1 anomaly line and no failure."
+        }
+      }
     },
     {
       "name": "DotNetRandom",
       "quality": "Poor",
-      "expected": "fail",
-      "failsBy": null,
-      "reason": "Weak by rating, but not assertable as a control at any budget measured so far. It reflects into the host System.Random's internal state, so its stream is runtime-dependent by construction: the .NET 9 stream this host emits is not the Mono stream Unity ships. Measured clean through 16GB under .NET 9, so a pass is always reported as inconclusive rather than as a harness fault."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": null,
+          "reason": "Weak by rating, but not assertable as a control at any budget measured so far. It reflects into the host System.Random's internal state, so its stream is runtime-dependent by construction: the .NET 9 stream this host emits is not the Mono stream Unity ships. Measured clean through 16GB under .NET 9, so a pass is always reported as inconclusive rather than as a harness fault."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": null,
+          "reason": "Clean through 8GB. Same caveat as the 32-bit width: it reflects into the host System.Random, so the stream is runtime-dependent by construction and a pass is reported as inconclusive rather than as a harness fault."
+        }
+      }
     },
     {
       "name": "FlurryBurstRandom",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "Six-word ARX generator; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Six-word ARX generator; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Six-word ARX generator; clean through 8GB."
+        }
+      }
     },
     {
       "name": "IllusionFlow",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "Rotate/xor/add generator on a Weyl counter; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Rotate/xor/add generator on a Weyl counter; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB."
+        }
+      }
     },
     {
       "name": "LinearCongruentialGenerator",
       "quality": "Poor",
-      "expected": "fail",
-      "failsBy": "4KB",
-      "firstFailingTest": "[Low8/32]FPF-14+6/16:all",
-      "reason": "Expected-failure control. Raw-state Numerical Recipes LCG: bit k has period 2^(k+1), so the low byte collapses almost immediately."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "4KB",
+          "reason": "Expected-failure control. Raw-state Numerical Recipes LCG: bit k has period 2^(k+1), so the low byte collapses almost immediately."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": "4KB",
+          "reason": "Fails by 4KB, the same depth as the 32-bit width -- a truncated LCG is linear in every word."
+        }
+      }
     },
     {
       "name": "PcgRandom",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "PCG XSH RR 64/32; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "PCG XSH RR 64/32; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB."
+        }
+      }
     },
     {
       "name": "PhotonSpinRandom",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "SHISHUA-inspired generator; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "SHISHUA-inspired generator; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB."
+        }
+      }
     },
     {
       "name": "RomuDuo",
       "quality": "Good",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "ROMU multiplier with a modified duo update; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "ROMU multiplier with a modified duo update; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB with no anomalies."
+        }
+      }
     },
     {
       "name": "SplitMix64",
       "quality": "VeryGood",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "SplitMix64 mixer; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "SplitMix64 mixer; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB."
+        }
+      }
     },
     {
       "name": "SquirrelRandom",
       "quality": "Fair",
-      "expected": "fail",
-      "failsBy": "1GB",
-      "firstFailingTest": "FPF-14+6/16:all",
-      "reason": "Expected-failure control at 1GB and above. The Squirrel3 hash shows a reproducible FPF-14+6/16 deficiency at exactly 1GB across four independent seeds, matching its 'not extensively tested beyond moderate ranges' rating. Good enough for table lookups, not for a statistical battery."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "1GB",
+          "reason": "Expected-failure control at 1GB and above. The Squirrel3 hash shows a reproducible FPF-14+6/16 deficiency at exactly 1GB across four independent seeds, matching its 'not extensively tested beyond moderate ranges' rating. Good enough for table lookups, not for a statistical battery."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": "1GB",
+          "reason": "Fails by 1GB, the same depth as the 32-bit width."
+        }
+      }
     },
     {
       "name": "StormDropRandom",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "Large-state ARX generator over a 1024-word ring; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Large-state ARX generator over a 1024-word ring; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB."
+        }
+      }
     },
     {
       "name": "SystemRandom",
       "quality": "Poor",
-      "expected": "fail",
-      "failsBy": "8GB",
-      "firstFailingTest": "[Low8/32]BCFN(2+1,13-0,T)",
-      "reason": "Expected-failure control. Knuth subtractive lagged-Fibonacci; survives 4GB and fails the low-byte BCFN test at 8GB, so only budgets of 8GB or more discriminate it."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "8GB",
+          "reason": "Expected-failure control. Knuth subtractive lagged-Fibonacci; survives 4GB and fails the low-byte BCFN test at 8GB, so only budgets of 8GB or more discriminate it."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": null,
+          "reason": "Clean through 8GB, where the 32-bit width fails at exactly 8GB. Its NextUlong is the base implementation -- two NextUint draws packed high-word-first and written little-endian -- so this stream is the 32-bit one with each adjacent word pair SWAPPED, not the same bytes. The 32-bit failure is at the deepest block only, and the swap perturbs it away. Rated Poor, so a pass here is reported as inconclusive rather than as a harness fault."
+        }
+      }
     },
     {
       "name": "WaveSplatRandom",
       "quality": "Experimental",
-      "expected": "fail",
-      "failsBy": "64KB",
-      "firstFailingTest": "BCFN(2+0,13-9,T)",
-      "reason": "Expected-failure control. Single-word chaotic generator with no formal test results; fails BCFN and DC6 within the first 64KB."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "64KB",
+          "reason": "Expected-failure control. Single-word chaotic generator with no formal test results; fails BCFN and DC6 within the first 64KB."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": "32KB",
+          "reason": "Fails by 32KB, one block EARLIER than the 32-bit width's 64KB."
+        }
+      }
     },
     {
       "name": "WDoomRandom",
       "quality": "Poor",
-      "expected": "fail",
-      "failsBy": "8KB",
-      "firstFailingTest": "Gap-16",
-      "reason": "Expected-failure control. A 1024-entry lookup table of 32-bit values with period 1024 draws; the stream repeats every 4KB, so Gap-16 catches it at 8KB. Deterministic by design and not statistically random at all."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "8KB",
+          "reason": "Expected-failure control. A 1024-entry lookup table of 32-bit values with period 1024 draws; the stream repeats every 4KB, so Gap-16 catches it at 8KB. Deterministic by design and not statistically random at all."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": "8KB",
+          "reason": "Fails by 8KB, the same depth as the 32-bit width."
+        }
+      }
     },
     {
       "name": "WyRandom",
       "quality": "VeryGood",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "Wyhash-based generator; clean through 8GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Wyhash-based generator; clean through 8GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB."
+        }
+      }
     },
     {
       "name": "XoroShiroRandom",
       "quality": "Good",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "xoroshiro128+ returning the high 32 bits; clean through 8GB with no anomalies. It was an expected-failure control while it returned the LOW half, whose bit 0 has linear complexity exactly 128 and which fails [Low1/32]BRank(12):256(1) by 16MB. Both halves of the same algorithm were measured against this battery, so this pass is paired with the failure it replaced rather than standing alone."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "xoroshiro128+ returning the high 32 bits; clean through 8GB with no anomalies. It was an expected-failure control while it returned the LOW half, whose bit 0 has linear complexity exactly 128 and which fails [Low1/32]BRank(12):256(1) by 16MB. Both halves of the same algorithm were measured against this battery, so this pass is paired with the failure it replaced rather than standing alone."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB. This is the half the generator returns since #509 replaced the linear low half of xoroshiro128+."
+        }
+      }
     },
     {
       "name": "XorShiftRandom",
       "quality": "Fair",
-      "expected": "fail",
-      "failsBy": "64KB",
-      "firstFailingTest": "BRank(12):128(1)",
-      "reason": "Expected-failure control. Classic 32-bit xorshift is a pure GF(2) linear map, so the binary rank test collapses it inside 64KB."
+      "widths": {
+        "32": {
+          "expected": "fail",
+          "failsBy": "64KB",
+          "reason": "Expected-failure control. Classic 32-bit xorshift is a pure GF(2) linear map, so the binary rank test collapses it inside 64KB."
+        },
+        "64": {
+          "expected": "fail",
+          "failsBy": "64KB",
+          "reason": "Fails by 64KB, the same depth as the 32-bit width."
+        }
+      }
     },
     {
       "name": "Xoshiro128StarStar",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "xoshiro128** 1.1; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "xoshiro128** 1.1; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Clean through 8GB."
+        }
+      }
     },
     {
       "name": "Xoshiro256StarStar",
       "quality": "Excellent",
-      "expected": "pass",
-      "cleanThrough": "8GB",
-      "reason": "xoshiro256** 1.0; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "xoshiro256** 1.0; the ** scrambler leaves no weak bit. Clean through 1GB with no anomalies."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": "8GB",
+          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB."
+        }
+      }
     }
   ]
 }

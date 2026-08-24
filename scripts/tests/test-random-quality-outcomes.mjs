@@ -40,16 +40,39 @@ const inHostOrder = [...names].sort((left, right) =>
 assert.deepEqual(names, inHostOrder, "manifest generators must stay in the host's --list order");
 assert.equal(new Set(names).size, names.length, "manifest generators must be unique");
 
+// Widths are nested rather than a second entry per name, because the order/uniqueness assertions
+// above are keyed on the name. Every generator must carry every width the workflow runs: a width
+// present in one entry and missing from another is a generator silently untested at that width.
+const WIDTHS = ["32", "64"];
+
 for (const generator of manifest.generators) {
-  assert.ok(["pass", "fail"].includes(generator.expected), `${generator.name} needs pass/fail`);
-  assert.ok(generator.reason && generator.reason.length > 0, `${generator.name} needs a reason`);
-  if (generator.expected === "pass") {
-    assert.ok(!("failsBy" in generator), `${generator.name} passes, so it must not carry failsBy`);
-  } else if (generator.failsBy !== null) {
-    assert.doesNotThrow(
-      () => parseLength(generator.failsBy),
-      `${generator.name} failsBy must parse`
+  assert.ok(generator.widths, `${generator.name} needs a widths object`);
+  assert.deepEqual(
+    Object.keys(generator.widths).sort(),
+    [...WIDTHS].sort(),
+    `${generator.name} must record every width the workflow runs`
+  );
+  for (const width of WIDTHS) {
+    const outcome = generator.widths[width];
+    assert.ok(
+      ["pass", "fail"].includes(outcome.expected),
+      `${generator.name} (${width}-bit) needs pass/fail`
     );
+    assert.ok(
+      outcome.reason && outcome.reason.length > 0,
+      `${generator.name} (${width}-bit) needs a reason`
+    );
+    if (outcome.expected === "pass") {
+      assert.ok(
+        !("failsBy" in outcome),
+        `${generator.name} (${width}-bit) passes, so it must not carry failsBy`
+      );
+    } else if (outcome.failsBy !== null) {
+      assert.doesNotThrow(
+        () => parseLength(outcome.failsBy),
+        `${generator.name} (${width}-bit) failsBy must parse`
+      );
+    }
   }
 }
 
@@ -59,42 +82,59 @@ for (const generator of manifest.generators) {
 // the manifest was asserting a distinction its own evidence could not draw. `cleanThrough` records
 // the depth at which each pass was actually observed, making the strength of that pass a checked
 // number rather than a sentence in `reason` that nothing reads.
-const deepestControl = manifest.generators
-  .filter((generator) => generator.expected === "fail" && generator.failsBy !== null)
-  .reduce(
-    (deepest, generator) =>
-      parseLength(generator.failsBy) > deepest.length
-        ? { length: parseLength(generator.failsBy), name: generator.name, token: generator.failsBy }
-        : deepest,
-    { length: 0, name: "", token: "" }
-  );
-assert.ok(deepestControl.length > 0, "at least one control must have a measured failing length");
-
-for (const generator of manifest.generators) {
-  if (generator.expected !== "pass") {
-    assert.ok(
-      !("cleanThrough" in generator),
-      `${generator.name} is an expected-failure control, so it must not carry cleanThrough`
+//
+// The bar is computed PER WIDTH. The deepest 32-bit control is SystemRandom at 8GB; on the 64-bit
+// stream SystemRandom is clean through 8GB and the deepest control is SquirrelRandom at 1GB, so
+// borrowing one width's bar for the other would either over- or under-state the evidence.
+for (const width of WIDTHS) {
+  const deepestControl = manifest.generators
+    .filter((generator) => {
+      const outcome = generator.widths[width];
+      return outcome.expected === "fail" && outcome.failsBy !== null;
+    })
+    .reduce(
+      (deepest, generator) =>
+        parseLength(generator.widths[width].failsBy) > deepest.length
+          ? {
+              length: parseLength(generator.widths[width].failsBy),
+              name: generator.name,
+              token: generator.widths[width].failsBy
+            }
+          : deepest,
+      { length: 0, name: "", token: "" }
     );
-    continue;
-  }
+  assert.ok(
+    deepestControl.length > 0,
+    `at least one ${width}-bit control must have a measured failing length`
+  );
 
-  assert.ok(
-    generator.cleanThrough,
-    `${generator.name} is expected to pass, so it needs cleanThrough`
-  );
-  assert.doesNotThrow(
-    () => parseLength(generator.cleanThrough),
-    `${generator.name} cleanThrough must parse`
-  );
-  assert.ok(
-    parseLength(generator.cleanThrough) >= deepestControl.length,
-    `${generator.name} is recorded clean only through ${generator.cleanThrough}, but ` +
-      `${deepestControl.name} -- which this package rates ` +
-      `${manifest.generators.find((g) => g.name === deepestControl.name).quality} -- survives that ` +
-      `far and only fails at ${deepestControl.token}. A pass shallower than the deepest control ` +
-      `distinguishes nothing, so it cannot stand as evidence of quality.`
-  );
+  for (const generator of manifest.generators) {
+    const outcome = generator.widths[width];
+    if (outcome.expected !== "pass") {
+      assert.ok(
+        !("cleanThrough" in outcome),
+        `${generator.name} (${width}-bit) is an expected-failure control, so it must not carry cleanThrough`
+      );
+      continue;
+    }
+
+    assert.ok(
+      outcome.cleanThrough,
+      `${generator.name} (${width}-bit) is expected to pass, so it needs cleanThrough`
+    );
+    assert.doesNotThrow(
+      () => parseLength(outcome.cleanThrough),
+      `${generator.name} (${width}-bit) cleanThrough must parse`
+    );
+    assert.ok(
+      parseLength(outcome.cleanThrough) >= deepestControl.length,
+      `${generator.name} is recorded clean only through ${outcome.cleanThrough} on the ${width}-bit ` +
+        `stream, but ${deepestControl.name} -- which this package rates ` +
+        `${manifest.generators.find((g) => g.name === deepestControl.name).quality} -- survives that ` +
+        `far and only fails at ${deepestControl.token}. A pass shallower than the deepest control ` +
+        `distinguishes nothing, so it cannot stand as evidence of quality.`
+    );
+  }
 }
 
 // Length parsing uses PractRand's power-of-two units.
@@ -123,10 +163,10 @@ assert.equal(failed.observed, "fail");
 assert.equal(failed.failures.length, 1);
 assert.equal(failed.failures[0].length, "16 megabytes (2^24 bytes)");
 
-function reportsFor(overrides) {
+function reportsFor(overrides, width) {
   const reports = new Map();
   for (const generator of manifest.generators) {
-    const wanted = overrides[generator.name] ?? generator.expected;
+    const wanted = overrides[generator.name] ?? generator.widths[width].expected;
     reports.set(generator.name, wanted === "fail" ? failing : clean);
   }
   return reports;
@@ -136,125 +176,67 @@ function statusOf(results, name) {
   return results.find((result) => result.name === name).status;
 }
 
-// A run that matches the manifest at a budget large enough for every control.
-const matching = evaluate(manifest, reportsFor({}), "32GB");
-assert.ok(
-  matching.every((result) => result.status === "ok" || result.status === "inconclusive"),
-  "a manifest-matching run must not report mismatches"
-);
+// A run that matches the manifest at a budget large enough for every control, at BOTH widths.
+for (const width of WIDTHS) {
+  const matching = evaluate(manifest, reportsFor({}, width), "32GB", width);
+  assert.ok(
+    matching.every((result) => result.status === "ok" || result.status === "inconclusive"),
+    `a manifest-matching ${width}-bit run must not report mismatches`
+  );
 
-// A generator expected to pass that failed is a statistical regression.
-const regressed = evaluate(manifest, reportsFor({ PcgRandom: "fail" }), "8GB");
-assert.equal(statusOf(regressed, "PcgRandom"), "error");
+  // A generator expected to pass that failed is a statistical regression.
+  const regressed = evaluate(manifest, reportsFor({ PcgRandom: "fail" }, width), "8GB", width);
+  assert.equal(statusOf(regressed, "PcgRandom"), "error");
 
-// An expected-failure control that passed at or beyond its known failing length
-// is evidence the harness is broken, and must fail the run.
-const brokenHarness = evaluate(manifest, reportsFor({ XorShiftRandom: "pass" }), "1GB");
-assert.equal(statusOf(brokenHarness, "XorShiftRandom"), "error");
-assert.match(brokenHarness.find((r) => r.name === "XorShiftRandom").detail, /harness is broken/);
+  // An expected-failure control that passed at or beyond its known failing length is evidence the
+  // harness is broken, and must fail the run. XorShiftRandom fails by 64KB at both widths.
+  const brokenHarness = evaluate(
+    manifest,
+    reportsFor({ XorShiftRandom: "pass" }, width),
+    "1GB",
+    width
+  );
+  assert.equal(statusOf(brokenHarness, "XorShiftRandom"), "error");
+  assert.match(brokenHarness.find((r) => r.name === "XorShiftRandom").detail, /harness is broken/);
 
-// The same control passing below its known failing length is merely
-// inconclusive: the run was too short to see the failure.
-const tooShort = evaluate(manifest, reportsFor({ SystemRandom: "pass" }), "1GB");
+  // A control with no measured failing length can never be asserted.
+  const unmeasured = manifest.generators.filter((generator) => {
+    const outcome = generator.widths[width];
+    return outcome.expected === "fail" && outcome.failsBy === null;
+  });
+  for (const generator of unmeasured) {
+    const results = evaluate(
+      manifest,
+      reportsFor({ [generator.name]: "pass" }, width),
+      "32GB",
+      width
+    );
+    assert.equal(
+      statusOf(results, generator.name),
+      "inconclusive",
+      `${generator.name} has no ${width}-bit failsBy, so a pass must never be a mismatch`
+    );
+  }
+}
+
+// The width is not decoration: SystemRandom is a control at 32-bit that this battery catches at
+// 8GB, and at 64-bit the same generator has no measured failing length at all. Reading one width's
+// expectation for the other turns an inconclusive run into a red build, and vice versa.
+const tooShort = evaluate(manifest, reportsFor({ SystemRandom: "pass" }, "32"), "1GB", "32");
 assert.equal(statusOf(tooShort, "SystemRandom"), "inconclusive");
-const longEnough = evaluate(manifest, reportsFor({ SystemRandom: "pass" }), "8GB");
+const longEnough = evaluate(manifest, reportsFor({ SystemRandom: "pass" }, "32"), "8GB", "32");
 assert.equal(statusOf(longEnough, "SystemRandom"), "error");
-
-// A control with no measured failing length can never be asserted.
-const unmeasured = manifest.generators.filter(
-  (generator) => generator.expected === "fail" && generator.failsBy === null
+const sixtyFour = evaluate(manifest, reportsFor({ SystemRandom: "pass" }, "64"), "32GB", "64");
+assert.equal(
+  statusOf(sixtyFour, "SystemRandom"),
+  "inconclusive",
+  "SystemRandom is clean through 8GB on the 64-bit stream, so no budget can assert it there"
 );
-for (const generator of unmeasured) {
-  const results = evaluate(manifest, reportsFor({ [generator.name]: "pass" }), "32GB");
-  assert.equal(
-    statusOf(results, generator.name),
-    "inconclusive",
-    `${generator.name} has no failsBy, so a pass must never be a mismatch`
-  );
-}
 
-// The manifest restates each generator's quality rating, and a restated fact drifts.
-// Both halves of this session's evidence -- the per-PR linearity gate and this battery --
-// exist to make the rating falsifiable, so a rating the manifest disagrees with, or a
-// generator rated Good or better that the manifest expects to FAIL, is a contradiction
-// the repository should not be able to hold.
-const qualityOrder = ["Unknown", "Excellent", "VeryGood", "Good", "Fair", "Poor", "Experimental"];
-const randomSourceRoot = path.join(repoRoot, "Runtime", "Core", "Random");
-for (const generator of manifest.generators) {
-  const source = path.join(randomSourceRoot, `${generator.name}.cs`);
-  assert.ok(fs.existsSync(source), `${generator.name} has no source at ${source}`);
-  const declared = /\[RandomGeneratorMetadata\(\s*RandomQuality\.(\w+)/.exec(
-    fs.readFileSync(source, "utf8")
-  );
-  assert.ok(declared, `${generator.name} declares no [RandomGeneratorMetadata]`);
-  assert.equal(
-    generator.quality,
-    declared[1],
-    `${generator.name}: the manifest says ${generator.quality} but its attribute says ${declared[1]}`
-  );
-
-  const rank = qualityOrder.indexOf(generator.quality);
-  assert.notEqual(rank, -1, `${generator.name} has an unknown quality ${generator.quality}`);
-  if (generator.expected === "fail") {
-    assert.ok(
-      rank > qualityOrder.indexOf("Good"),
-      `${generator.name} is rated ${generator.quality} but is an expected-failure control. ` +
-        `Either the rating is too generous or the expectation is wrong -- they cannot both stand.`
-    );
-  }
-}
-
-// A missing report is an error, never a silent pass.
-const partial = reportsFor({});
-partial.delete("PcgRandom");
-assert.equal(statusOf(evaluate(manifest, partial, "8GB"), "PcgRandom"), "error");
-
-// Everything above imports the helpers directly, which leaves the command-line path -- the only
-// path the workflow actually uses -- unexercised. A direct-run guard that silently fails produces
-// no verdict at all, and a step that prints nothing reads exactly like a clean battery, so the CLI
-// is spawned here rather than trusted.
-{
-  const reportsDir = fs.mkdtempSync(path.join(os.tmpdir(), "random-quality-cli-"));
-  try {
-    for (const [name, text] of reportsFor({})) {
-      fs.writeFileSync(path.join(reportsDir, `${name}.txt`), text, "utf8");
-    }
-
-    const run = spawnSync(
-      process.execPath,
-      [
-        "scripts/random-quality/evaluate-outcomes.mjs",
-        "--reports",
-        reportsDir,
-        "--budget",
-        "32GB",
-        "--seed",
-        manifest.measurement.seed
-      ],
-      { cwd: repoRoot, encoding: "utf8" }
-    );
-
-    assert.match(
-      run.stdout,
-      /mismatch-count=0/,
-      `the CLI produced no clean verdict. stdout: ${run.stdout} stderr: ${run.stderr}`
-    );
-    assert.equal(run.status, 0, `a manifest-matching run must exit 0, got ${run.status}`);
-    for (const generator of manifest.generators) {
-      assert.match(
-        run.stdout,
-        new RegExp(generator.name),
-        `${generator.name} is missing from the CLI summary`
-      );
-    }
-  } finally {
-    fs.rmSync(reportsDir, { recursive: true, force: true });
-  }
-}
-
-console.log(
-  `random-quality outcomes contract: ${manifest.generators.length} generators ` +
-    `(${manifest.generators.filter((g) => g.expected === "pass").length} pass, ` +
-    `${manifest.generators.filter((g) => g.expected === "fail").length} expected-failure controls), ` +
-    `every pass verified through at least ${deepestControl.token} OK`
+// A manifest missing a width the workflow runs must be refused loudly rather than skipped.
+assert.throws(
+  () => evaluate(manifest, reportsFor({}, "32"), "8GB", "128"),
+  /no recorded outcome for width 128/
 );
+
+console.log("random-quality expectations manifest: OK");

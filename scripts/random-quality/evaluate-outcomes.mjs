@@ -58,15 +58,36 @@ function readArg(argv, name, fallback) {
   return argv[index + 1];
 }
 
-export function evaluate(manifest, reports, budgetToken) {
+/**
+ * The manifest records one outcome per generator PER WIDTH. `NextUlong` is not `NextUint`
+ * rearranged: five generators answer it from one raw word whose high half appears in no 32-bit
+ * draw, and even the ones that do build it from two `NextUint` draws are packed high-word-first
+ * and written little-endian, so the 64-bit stream is the 32-bit one with each adjacent word pair
+ * swapped. `SystemRandom` is the proof -- it fails 32-bit at exactly 8GB and is clean through 8GB
+ * at 64-bit -- which is why a shared `expected` would be wrong (#544).
+ */
+export function outcomeFor(generator, width) {
+  const outcome = generator.widths ? generator.widths[String(width)] : undefined;
+  if (outcome === undefined) {
+    throw new Error(
+      `${generator.name} has no recorded outcome for width ${width}. ` +
+        `The manifest must carry every width the workflow runs.`
+    );
+  }
+  return outcome;
+}
+
+export function evaluate(manifest, reports, budgetToken, width) {
   const budgetBytes = parseLength(budgetToken);
   const results = [];
   for (const generator of manifest.generators) {
+    const outcome = outcomeFor(generator, width);
     const report = reports.get(generator.name);
     if (report === undefined) {
       results.push({
         name: generator.name,
-        expected: generator.expected,
+        width,
+        expected: outcome.expected,
         observed: "missing",
         status: "error",
         detail: "No PractRand report was produced for this generator."
@@ -76,22 +97,24 @@ export function evaluate(manifest, reports, budgetToken) {
     const { observed, failures, lastLength } = classifyReport(report);
     const base = {
       name: generator.name,
+      width,
       quality: generator.quality,
-      expected: generator.expected,
+      expected: outcome.expected,
       observed,
       reachedLength: lastLength,
       failures: failures.slice(0, 5)
     };
-    if (observed === generator.expected) {
+    if (observed === outcome.expected) {
       results.push({ ...base, status: "ok", detail: "Outcome matches the manifest." });
       continue;
     }
-    if (generator.expected === "pass") {
+    if (outcome.expected === "pass") {
       results.push({
         ...base,
         status: "error",
         detail:
           `${generator.name} is expected to pass ${manifest.battery.name} ${manifest.battery.version} ` +
+          `on the ${width}-bit stream ` +
           `but failed at ${lastLength || "an unrecorded length"}. This is a statistical regression in the generator.`
       });
       continue;
@@ -101,15 +124,14 @@ export function evaluate(manifest, reports, budgetToken) {
     // failure is known to appear; otherwise the run simply could not see it.
     // A control with no measured failsBy has never been caught by this battery,
     // so no budget can turn its pass into evidence of a broken harness.
-    const failsByBytes = generator.failsBy
-      ? parseLength(generator.failsBy)
-      : Number.POSITIVE_INFINITY;
+    const failsByBytes = outcome.failsBy ? parseLength(outcome.failsBy) : Number.POSITIVE_INFINITY;
     if (budgetBytes >= failsByBytes) {
       results.push({
         ...base,
         status: "error",
         detail:
-          `${generator.name} is a deliberate expected-failure control that must fail by ${generator.failsBy}, ` +
+          `${generator.name} is a deliberate expected-failure control that must fail by ${outcome.failsBy} ` +
+          `on the ${width}-bit stream, ` +
           `but it PASSED a ${budgetToken} run. A weak generator passing is evidence the harness is broken, ` +
           `not that the generator improved.`
       });
@@ -118,8 +140,8 @@ export function evaluate(manifest, reports, budgetToken) {
     results.push({
       ...base,
       status: "inconclusive",
-      detail: generator.failsBy
-        ? `${generator.name} only fails at ${generator.failsBy}; a ${budgetToken} budget is too short to ` +
+      detail: outcome.failsBy
+        ? `${generator.name} only fails at ${outcome.failsBy}; a ${budgetToken} budget is too short to ` +
           `discriminate it. Raise the byte budget to assert this control.`
         : `${generator.name} has no measured failing length, so this battery cannot discriminate it at any ` +
           `budget. Recorded as inconclusive by design; see the manifest reason.`
@@ -131,11 +153,12 @@ export function evaluate(manifest, reports, budgetToken) {
 export function renderMarkdown(manifest, results, context) {
   const icons = { ok: "OK", error: "MISMATCH", inconclusive: "INCONCLUSIVE" };
   const lines = [
-    `# Random quality battery report`,
+    `# Random quality battery report (${context.width}-bit stream)`,
     "",
     `- Battery: **${manifest.battery.name} ${manifest.battery.version}** (\`${manifest.battery.sha256}\`)`,
     `- Source: ${manifest.battery.url}`,
     `- Seed: \`${context.seed}\``,
+    `- Stream width: **${context.width}-bit**`,
     `- Byte budget per generator: **${context.budget}**`,
     `- Command: \`${context.command}\``,
     `- Run: ${context.runUrl || "(local)"}`,
@@ -170,6 +193,7 @@ function main() {
   const budget = readArg(argv, "--budget");
   const seed = readArg(argv, "--seed");
   const command = readArg(argv, "--command", "RNG_test stdin32");
+  const width = readArg(argv, "--width", "32");
   const runUrl = readArg(argv, "--run-url", "");
   const outMarkdown = readArg(argv, "--out-md", "");
   const outJson = readArg(argv, "--out-json", "");
@@ -192,7 +216,7 @@ function main() {
   const unlisted = [...reports.keys()].filter(
     (name) => !manifest.generators.some((generator) => generator.name === name)
   );
-  const results = evaluate(manifest, reports, budget);
+  const results = evaluate(manifest, reports, budget, width);
   for (const name of unlisted) {
     results.push({
       name,
@@ -204,14 +228,14 @@ function main() {
     });
   }
 
-  const markdown = renderMarkdown(manifest, results, { seed, budget, command, runUrl });
+  const markdown = renderMarkdown(manifest, results, { seed, budget, command, runUrl, width });
   if (outMarkdown) {
     fs.writeFileSync(outMarkdown, `${markdown}\n`, "utf8");
   }
   if (outJson) {
     fs.writeFileSync(
       outJson,
-      `${JSON.stringify({ manifest: manifest.battery, seed, budget, results }, null, 2)}\n`,
+      `${JSON.stringify({ manifest: manifest.battery, seed, budget, width, results }, null, 2)}\n`,
       "utf8"
     );
   }
