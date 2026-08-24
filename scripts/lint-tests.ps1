@@ -1306,7 +1306,15 @@ if ($Paths -and $Paths.Count -gt 0) {
   foreach ($p in $Paths) {
     $candidatePath = $p -replace '\\','/'
     if ($candidatePath -notlike '*.cs') { continue }
-    $full = [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $candidatePath))
+    # IsPathRooted first: `Join-Path '/repo' '/abs/path'` yields '/repo/abs/path', so joining an
+    # absolute caller path unconditionally mangles it into one that does not exist -- and the file
+    # is then skipped silently, which is the failure this whole change set is about. Resolve-Path,
+    # which this replaced, handled both forms.
+    $full = if ([System.IO.Path]::IsPathRooted($candidatePath)) {
+      [System.IO.Path]::GetFullPath($candidatePath)
+    } else {
+      [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $candidatePath))
+    }
     if ([System.IO.File]::Exists($full)) {
       $filesToScanList.Add($full)
     } else {
