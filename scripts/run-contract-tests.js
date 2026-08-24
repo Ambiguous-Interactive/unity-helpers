@@ -67,6 +67,11 @@ const CHECKS = [
     run: "npm run test:lint-preserve-attributes"
   },
   {
+    id: "lint-comparison-direction",
+    name: "Comparison-direction linter self-test",
+    run: "npm run test:lint-comparison-direction"
+  },
+  {
     id: "lint-concurrent-cache-fill",
     name: "Concurrent cache fill linter self-test",
     run: "npm run test:lint-concurrent-cache-fill"

@@ -138,6 +138,11 @@ const CHECKS = [
     run: "node scripts/lint-preserve-attributes.js"
   },
   {
+    id: "comparison-direction",
+    name: "Left-to-right comparisons",
+    run: "npm run lint:comparison-direction"
+  },
+  {
     id: "meta-exclusions",
     name: "Meta lint exclusions",
     run: "bash scripts/tests/test-lint-meta-exclusions.sh"
