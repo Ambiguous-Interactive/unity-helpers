@@ -957,12 +957,16 @@ foreach ($file in $targets) {
     }
 }
 
-# PWS005: a script that declares [string[]]$Paths must also declare a
+# PWS005: a script that declares ANY [string[]] parameter must also declare a
 # ValueFromRemainingArguments sibling. `pwsh -File <script> -Paths a b c` binds ONLY `a` and
 # silently drops the rest, so a multi-file invocation lints one file and reports success -- the
 # worst shape a gate can fail in, and the shape `.llm/context.md` documents for lint-tests.ps1.
 # Found in six scripts at once (session 221); the pattern was already written down in
 # .llm/skills/bash-pwsh-invocation.md and nothing enforced it.
+#
+# The rule originally matched the parameter NAMED `Paths`, which is not what makes -File binding
+# drop arguments -- the array-ness is. Four more scripts carried the same latent defect under
+# other names (#556).
 foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File)) {
     # '\' not '\\': in a PowerShell single-quoted string the latter is TWO backslashes, so a
     # Windows separator from GetRelativePath would pass through unchanged and the self-exclusion
@@ -972,31 +976,44 @@ foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'script
 
     $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath.FullName, [ref]$null, [ref]$parseErrors)
-    if ($parseErrors -and $parseErrors.Count -gt 0) { continue }
+    # A script the parser cannot read is not a script this rule has cleared. Skipping it silently
+    # is the same failure mode the rule exists to prevent, so report it instead.
+    if ($parseErrors -and $parseErrors.Count -gt 0) {
+        $violations.Add(@{
+            Path = $rel
+            Line = $parseErrors[0].Extent.StartLineNumber
+            Code = 'PWS005'
+            Message = "could not be parsed, so its parameter block was never checked: $($parseErrors[0].Message)"
+            Content = $parseErrors[0].Extent.Text
+        }) | Out-Null
+        continue
+    }
     # The SCRIPT's own param block, not a nested function's: a function parameter is bound in
     # process and never goes through -File argument binding.
     $paramBlock = $ast.ParamBlock
     if ($null -eq $paramBlock) { continue }
 
-    $declaresPaths = $false
+    $arrayParameters = [System.Collections.Generic.List[string]]::new()
     $catchesRemaining = $false
     foreach ($parameter in $paramBlock.Parameters) {
-        if ($parameter.Name.VariablePath.UserPath -eq 'Paths' -and
-            $parameter.StaticType -eq [string[]]) {
-            $declaresPaths = $true
-        }
+        $isRemaining = $false
         foreach ($attribute in $parameter.Attributes) {
             if ($attribute.Extent.Text -match 'ValueFromRemainingArguments') {
                 $catchesRemaining = $true
+                $isRemaining = $true
             }
         }
+        if (-not $isRemaining -and $parameter.StaticType -eq [string[]]) {
+            $arrayParameters.Add($parameter.Name.VariablePath.UserPath) | Out-Null
+        }
     }
-    if ($declaresPaths -and -not $catchesRemaining) {
+    if ($arrayParameters.Count -gt 0 -and -not $catchesRemaining) {
+        $first = $arrayParameters[0]
         $violations.Add(@{
             Path = $rel
             Line = $paramBlock.Extent.StartLineNumber
             Code = 'PWS005'
-            Message = "declares [string[]]`$Paths with no ValueFromRemainingArguments sibling, so ``pwsh -File $rel -Paths a b c`` binds only 'a' and silently drops the rest. Add [Parameter(ValueFromRemainingArguments = `$true)][string[]]`$AdditionalPaths and merge it into `$Paths. See .llm/skills/bash-pwsh-invocation.md."
+            Message = "declares [string[]] parameter(s) $($arrayParameters -join ', ') with no ValueFromRemainingArguments sibling, so ``pwsh -File $rel -$first a b c`` binds only 'a' and silently drops the rest. Add [Parameter(ValueFromRemainingArguments = `$true)][string[]]`$AdditionalPaths and merge it into the array parameter. See .llm/skills/bash-pwsh-invocation.md."
             Content = $paramBlock.Extent.Text.Split("`n")[0].Trim()
         }) | Out-Null
     }

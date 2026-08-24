@@ -192,11 +192,23 @@ param(
     [ValidateSet('Release', 'Debug')]
     [string]$Il2CppCompilerConfiguration = 'Release',
 
-    [switch]$GenerateOnly
+    [switch]$GenerateOnly,
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$UnboundArguments
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# `pwsh -File <script> -AdditionalScriptingDefines a b c` binds ONLY `a` and leaves `b c` unbound,
+# so a multi-value invocation would silently compile with one define. There is no safe way to guess
+# which array parameter the remainder belonged to, so catch it and refuse. Pass a comma-separated
+# list, or invoke the script with the call operator. See .llm/skills/bash-pwsh-invocation.md.
+if ($UnboundArguments -and $UnboundArguments.Count -gt 0) {
+    Write-Error "Unbound arguments: $($UnboundArguments -join ', '). `pwsh -File` binds only the first value of an array parameter; pass a comma-separated list, or invoke the script with the call operator."
+    exit 2
+}
 
 # PowerShell 7.4 introduced $PSNativeCommandUseErrorActionPreference (stabilizing
 # the native-error experimental feature). Its default is $false on current builds,

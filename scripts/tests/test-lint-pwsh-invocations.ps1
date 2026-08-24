@@ -1138,6 +1138,90 @@ Set-StrictMode -Version Latest
     $hasPws003 = $result.Output -match 'PWS003' -and $result.Output -match 'runs-psexe-short-file\.ps1'
     Write-TestResult "Fail_Pws003PowerShellExeShortFileAliasCovered" ($result.ExitCode -ne 0 -and $hasPws003) "Expected exit != 0 + PWS003 for 'powershell.exe -f' form. Exit: $($result.ExitCode). Output: $($result.Output)"
 
+    Write-Host "`n  Section: PWS005 (array parameter without a remaining-args sibling)" -ForegroundColor White
+
+    # PWS005 is the rule session 221 wrote so a gate could not silently lint one file of many, and
+    # it shipped with no fixture of its own -- exactly the defect it describes. These are its red
+    # half (#556).
+
+    # --- Fail_Pws005PathsWithoutRemainingArgs ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-paths.ps1') -Value @'
+param(
+  [string[]]$Paths
+)
+Write-Host $Paths
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-paths\.ps1'
+    Write-TestResult "Fail_Pws005PathsWithoutRemainingArgs" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 for [string[]]`$Paths with no sibling. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws005NonPathsArrayWithoutRemainingArgs ---
+    # The array-ness is what makes -File binding drop arguments, not the name. Four live scripts
+    # carried this under other names while the rule only looked for `Paths`.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-versions.ps1') -Value @'
+param(
+  [Alias('UnityVersions')]
+  [string[]]$RunnerUnityVersions = @()
+)
+Write-Host $RunnerUnityVersions
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-versions\.ps1'
+    Write-TestResult "Fail_Pws005NonPathsArrayWithoutRemainingArgs" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 for a differently named [string[]] parameter. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws005UnparsableScriptIsReported ---
+    # A script the AST parser chokes on used to be skipped, so a syntax error bought exemption from
+    # every check in this rule.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-broken.ps1') -Value @'
+param(
+  [string[]]$Paths
+Write-Host "unclosed param block"
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-broken\.ps1'
+    Write-TestResult "Fail_Pws005UnparsableScriptIsReported" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 naming the unparsable script. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws005ArrayWithRemainingArgs ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-ok.ps1') -Value @'
+param(
+  [string[]]$Paths,
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$AdditionalPaths
+)
+if ($AdditionalPaths) { $Paths = @($Paths) + @($AdditionalPaths) }
+Write-Host $Paths
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws005ArrayWithRemainingArgs" ($result.ExitCode -eq 0) "Expected exit 0 when the sibling is declared. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws005FunctionParameterNotFlagged ---
+    # A function parameter is bound in process and never goes through -File argument binding.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-function.ps1') -Value @'
+function Invoke-Thing {
+  param([string[]]$Paths)
+  Write-Host $Paths
+}
+Invoke-Thing -Paths @('a', 'b')
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws005FunctionParameterNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 for a [string[]] parameter on a nested function. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws005ScalarStringNotFlagged ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-scalar.ps1') -Value @'
+param(
+  [string]$Path
+)
+Write-Host $Path
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws005ScalarStringNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 for a scalar [string] parameter. Exit: $($result.ExitCode). Output: $($result.Output)"
+
 } finally {
     Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
 }

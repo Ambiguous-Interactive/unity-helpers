@@ -18,8 +18,21 @@ param(
 
     [string[]]$RequiredEditorPayloadRelativePath = @(),
 
-    [switch]$RequireHealthyExisting
+    [switch]$RequireHealthyExisting,
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$UnboundArguments
 )
+# `pwsh -File <script> -RequiredEditorPayloadRelativePath a b c` binds ONLY `a` to -RequiredEditorPayloadRelativePath and leaves `b c` unbound, so a
+# multi-value invocation would silently act on one of them. There is no safe way to guess which
+# array parameter the remainder belonged to, so catch it and refuse. Use the call operator
+# (`./scripts/unity/ensure-editor.ps1 -RequiredEditorPayloadRelativePath a,b,c`) or a comma-separated list instead.
+# See .llm/skills/bash-pwsh-invocation.md.
+if ($UnboundArguments -and $UnboundArguments.Count -gt 0) {
+    Write-Error "Unbound arguments: $($UnboundArguments -join ', '). `pwsh -File` binds only the first value of an array parameter; pass a comma-separated list, or invoke the script with the call operator."
+    exit 2
+}
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

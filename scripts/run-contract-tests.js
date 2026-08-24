@@ -67,6 +67,11 @@ const CHECKS = [
     run: "npm run test:lint-preserve-attributes"
   },
   {
+    id: "extract-code-samples",
+    name: "Documentation code-sample extractor self-test",
+    run: "npm run test:extract-code-samples"
+  },
+  {
     id: "lint-comparison-direction",
     name: "Comparison-direction linter self-test",
     run: "npm run test:lint-comparison-direction"

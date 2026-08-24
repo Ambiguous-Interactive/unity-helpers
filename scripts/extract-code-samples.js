@@ -20,6 +20,11 @@ const fs = require("fs");
 const path = require("path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
+// Overridable so the self-test can point the scan at a fixture tree. Nothing in CI sets it, so the
+// default is the only path that ships.
+const SCAN_ROOT = process.env.CODE_SAMPLES_ROOT
+  ? path.resolve(process.env.CODE_SAMPLES_ROOT)
+  : REPO_ROOT;
 const DEFAULT_OUTPUT_DIR = path.join(REPO_ROOT, "artifacts", "code-samples");
 
 // Patterns to identify incomplete/partial samples
@@ -246,7 +251,12 @@ function generateReport(samples, outputDir) {
 function extractSamples(options) {
   console.log("🔍 Scanning for Markdown files...");
 
-  const mdFiles = findMarkdownFiles(REPO_ROOT);
+  if (!fs.existsSync(SCAN_ROOT)) {
+    console.error(`\n❌ Scan root does not exist: ${SCAN_ROOT}`);
+    process.exit(1);
+  }
+
+  const mdFiles = findMarkdownFiles(SCAN_ROOT);
   console.log(`   Found ${mdFiles.length} Markdown files`);
 
   const allSamples = [];
@@ -378,7 +388,7 @@ function main() {
     console.log("\n📋 Samples by file:");
     const byFile = new Map();
     for (const sample of csharpSamples) {
-      const relPath = path.relative(REPO_ROOT, sample.filePath);
+      const relPath = path.relative(SCAN_ROOT, sample.filePath);
       if (!byFile.has(relPath)) {
         byFile.set(relPath, []);
       }
@@ -394,10 +404,12 @@ function main() {
 
   console.log("\n✅ Done!");
 
-  // Exit with error if no samples found (CI check)
+  // A scan that found nothing is the shape this gate exists to catch: the docs tree moved, the
+  // fence language changed, or the walk stopped descending. Exiting 0 there left the check unable
+  // to go red under any input (#556).
   if (csharpSamples.length === 0) {
-    console.warn("\n⚠️ Warning: No C# code samples found in documentation!");
-    process.exit(0);
+    console.error("\n❌ No C# code samples found in documentation!");
+    process.exit(1);
   }
 }
 
