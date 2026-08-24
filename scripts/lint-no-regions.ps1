@@ -153,6 +153,13 @@ Write-Info "Scanning for #region directives in C# files..."
 
 $files = Get-FilesToCheck -StagedOnly:$StagedOnly
 
+# -StagedOnly matching nothing is ordinary; a repository-wide walk finding no C# files is
+# the walk breaking, and reporting success for it is the failure mode #556 is about.
+if (-not $StagedOnly -and @($files).Count -eq 0) {
+  Write-Host '[lint-no-regions] ERROR: the repository-wide scan found no C# files, so a pass here would mean nothing.' -ForegroundColor Red
+  exit 1
+}
+
 foreach ($file in $files) {
   $filePath = $file.FullName
   $rel = Get-RelativePath $filePath

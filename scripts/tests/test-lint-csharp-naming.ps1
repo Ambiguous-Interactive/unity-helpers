@@ -61,7 +61,12 @@ $tempRoot = Join-Path $tempBase "test-lint-csharp-naming-$(Get-Random)"
 function New-FixtureRoot {
     $root = Join-Path $tempRoot "repo-$(Get-Random)"
     New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
+    # All three source roots, not just the one the cases write into: the linter now refuses a
+    # missing root rather than skipping it, so a fixture repo that lacks Editor/ and Tests/ is not
+    # a repository shape it should accept (#556).
     New-Item -ItemType Directory -Path (Join-Path $root 'Runtime') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'Editor') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'Tests') -Force | Out-Null
     # The lint script dot-sources BOTH git-staging-helpers AND comment-stripping
     # from $PSScriptRoot — every dependency must be staged into the fixture
     # `scripts/` directory or the script throws on dot-source.
