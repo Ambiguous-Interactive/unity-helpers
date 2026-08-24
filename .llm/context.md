@@ -116,7 +116,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../.claude/settings.json) which ships with the repo) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit, so typos surface immediately; manual invocation before completion remains the expectation (the hook is a safety net, not a substitute -- it does not fire in CI or when editing outside Claude Code)
-- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`
+- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script now declares a `ValueFromRemainingArguments` sibling -- `pwsh -File` binds the first token and drops the rest, so before that these commands linted ONE file and printed "No issues found". `PWS005` enforces the declaration
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
 - **Pre-push validation**: run `npm run validate:prepush` before push; it is a roughly one-second

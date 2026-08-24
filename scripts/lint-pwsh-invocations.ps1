@@ -957,6 +957,48 @@ foreach ($file in $targets) {
     }
 }
 
+# PWS005: a script that declares [string[]]$Paths must also declare a
+# ValueFromRemainingArguments sibling. `pwsh -File <script> -Paths a b c` binds ONLY `a` and
+# silently drops the rest, so a multi-file invocation lints one file and reports success -- the
+# worst shape a gate can fail in, and the shape `.llm/context.md` documents for lint-tests.ps1.
+# Found in six scripts at once (session 221); the pattern was already written down in
+# .llm/skills/bash-pwsh-invocation.md and nothing enforced it.
+foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File)) {
+    $rel = [System.IO.Path]::GetRelativePath($repoRoot, $scriptPath.FullName).Replace('\\', '/')
+    if ($rel -eq $selfRel -or $rel -eq $selfTestRel) { continue }
+
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath.FullName, [ref]$null, [ref]$parseErrors)
+    if ($parseErrors -and $parseErrors.Count -gt 0) { continue }
+    # The SCRIPT's own param block, not a nested function's: a function parameter is bound in
+    # process and never goes through -File argument binding.
+    $paramBlock = $ast.ParamBlock
+    if ($null -eq $paramBlock) { continue }
+
+    $declaresPaths = $false
+    $catchesRemaining = $false
+    foreach ($parameter in $paramBlock.Parameters) {
+        if ($parameter.Name.VariablePath.UserPath -eq 'Paths' -and
+            $parameter.StaticType -eq [string[]]) {
+            $declaresPaths = $true
+        }
+        foreach ($attribute in $parameter.Attributes) {
+            if ($attribute.Extent.Text -match 'ValueFromRemainingArguments') {
+                $catchesRemaining = $true
+            }
+        }
+    }
+    if ($declaresPaths -and -not $catchesRemaining) {
+        $violations.Add(@{
+            Path = $rel
+            Line = $paramBlock.Extent.StartLineNumber
+            Code = 'PWS005'
+            Message = "declares [string[]]`$Paths with no ValueFromRemainingArguments sibling, so ``pwsh -File $rel -Paths a b c`` binds only 'a' and silently drops the rest. Add [Parameter(ValueFromRemainingArguments = `$true)][string[]]`$AdditionalPaths and merge it into `$Paths. See .llm/skills/bash-pwsh-invocation.md."
+            Content = $paramBlock.Extent.Text.Split("`n")[0].Trim()
+        }) | Out-Null
+    }
+}
+
 if ($violations.Count -gt 0) {
     foreach ($v in $violations) {
         Write-Host ("{0}:{1}: {2} {3}" -f $v.Path, $v.Line, $v.Code, $v.Message) -ForegroundColor Red

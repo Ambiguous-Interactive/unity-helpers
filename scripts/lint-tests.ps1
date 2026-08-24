@@ -1,11 +1,22 @@
 Param(
   [switch]$VerboseOutput,
   [string[]]$Paths,
-  [switch]$FixNullChecks
+  [switch]$FixNullChecks,
+  # `pwsh -File <script> -Paths a b c` binds ONLY `a` to -Paths and silently drops the rest, so a
+  # multi-file invocation scans one file and reports success. This catches the remainder; see
+  # .llm/skills/bash-pwsh-invocation.md.
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$AdditionalPaths
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# The remaining-args catch above is only half of it: the two have to be merged before anything
+# reads $Paths, or the extra files are collected and ignored.
+if ($AdditionalPaths) {
+  $Paths = @($Paths) + @($AdditionalPaths)
+}
 
 . (Join-Path $PSScriptRoot 'comment-stripping.ps1')
 
@@ -1286,16 +1297,19 @@ $violations = @()
 # forcing a risky mass-conversion of fixtures to a batched base.
 $advisories = @()
 
-$filesToScan = @()
+# A List rather than `$filesToScan += ...`: `+=` on a PowerShell array copies the whole array every
+# time, so the -Paths branch was quadratic. With every test file passed explicitly it took 193 s
+# against 77 s for the enumerate-everything branch -- the caller with the MOST information was the
+# slowest. Resolve-Path is a cmdlet call per file on top of that; GetFullPath is a string operation.
+$filesToScanList = [System.Collections.Generic.List[string]]::new()
 if ($Paths -and $Paths.Count -gt 0) {
   foreach ($p in $Paths) {
-    try {
-      $candidatePath = $p -replace '\\','/'
-      $resolved = Resolve-Path -LiteralPath $candidatePath -ErrorAction Stop
-      if ($resolved -and ($resolved.Path -like '*.cs')) {
-        $filesToScan += $resolved.Path
-      }
-    } catch {
+    $candidatePath = $p -replace '\\','/'
+    if ($candidatePath -notlike '*.cs') { continue }
+    $full = [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $candidatePath))
+    if ([System.IO.File]::Exists($full)) {
+      $filesToScanList.Add($full)
+    } else {
       Write-Info "Skipping path '$p' because it was not found."
     }
   }
@@ -1305,15 +1319,15 @@ if ($Paths -and $Paths.Count -gt 0) {
     # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse -Include, which
     # enumerates everything and post-filters: 0.8 s against 28.5 s over this repository's C# files
     # on the devcontainer's 9p mount. The Sort-Object -Unique below already fixes the order.
-    $filesToScan += [System.IO.Directory]::EnumerateFiles(
+    $filesToScanList.AddRange([System.IO.Directory]::EnumerateFiles(
       (Resolve-Path -LiteralPath $root).Path,
       '*.cs',
       [System.IO.SearchOption]::AllDirectories
-    )
+    ))
   }
 }
 
-$filesToScan = $filesToScan | Sort-Object -Unique
+$filesToScan = $filesToScanList | Sort-Object -Unique
 
 foreach ($file in $filesToScan) {
   if ($file -like '*.meta') { continue }

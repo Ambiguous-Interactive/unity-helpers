@@ -85,6 +85,11 @@ if ($AdditionalPaths) { $allPaths += $AdditionalPaths }
 
 See [`lint-skill-sizes.ps1`](../../scripts/lint-skill-sizes.ps1) and [`lint-dependabot.ps1`](../../scripts/lint-dependabot.ps1) for the canonical shape.
 
+**`PWS005` enforces this**, because writing it down was not enough: six scripts were missing it at
+once, `lint-tests.ps1` among them, and `.llm/context.md` documented a multi-file invocation of that
+very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c`, and prints
+"No issues found in test code", which reads exactly like a pass.
+
 ---
 
 ## What The Lint Catches

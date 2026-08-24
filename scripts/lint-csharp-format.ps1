@@ -5,11 +5,22 @@ Param(
   # changed-file pass uses this, so it can run inside a scratch repository that has neither; the
   # whole-repository check in validate:local never sets it, which is what keeps the gate real.
   [switch]$SkipWhenUnavailable,
-  [string[]]$Paths
+  [string[]]$Paths,
+  # `pwsh -File <script> -Paths a b c` binds ONLY `a` to -Paths and silently drops the rest, so a
+  # multi-file invocation scans one file and reports success. This catches the remainder; see
+  # .llm/skills/bash-pwsh-invocation.md.
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$AdditionalPaths
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# The remaining-args catch above is only half of it: the two have to be merged before anything
+# reads $Paths, or the extra files are collected and ignored.
+if ($AdditionalPaths) {
+  $Paths = @($Paths) + @($AdditionalPaths)
+}
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
