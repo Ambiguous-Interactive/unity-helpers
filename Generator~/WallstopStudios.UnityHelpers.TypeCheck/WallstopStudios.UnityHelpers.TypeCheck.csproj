@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
   <!--
     A LOCAL TYPE-CHECKER for the package's Unity-dependent runtime sources.
 
@@ -109,7 +110,6 @@
       >$(DefineConstants);SINGLE_THREADED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
     <!-- Analyzer only: it ships to nobody and contributes no runtime assets. -->
     <PackageReference Include="ErrorProne.NET.Structs" Version="0.1.2">
       <PrivateAssets>all</PrivateAssets>

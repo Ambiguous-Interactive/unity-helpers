@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
   <!--
     A LOCAL TYPE-CHECKER for the package's PlayMode test sources (#404).
 
@@ -61,7 +62,6 @@
       >$(DefineConstants);SINGLE_THREADED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
     <!-- THE VERSION UNITY SHIPS, exactly. It was 3.13.3, "the closest thing on NuGet", which
          binds every member 3.5 does and a great many it does not. Anything added to a fixture that
          exists only in the newer one compiled here with 0 errors and failed to compile in all eight

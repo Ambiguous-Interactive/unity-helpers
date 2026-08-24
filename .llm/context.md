@@ -376,6 +376,12 @@ deliberate act, not the tail of every commit.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
   - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
     assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
+    **Those reference assemblies are `UnityEngine.Modules` 2021.3.33, older than every editor CI
+    runs, and that is the only version the package has ever published** -- so the pin cannot be
+    moved and the gate prints what it is on every compile. Member signatures are safe to check
+    here; anything resolved out of Unity's own metadata (attribute targets, defaults, serialization
+    behaviour) has to be confirmed in a real editor, because the failure mode is a confident answer
+    for a Unity nobody ships ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
     It builds each source tree four ways, because four different branches ship: the
     `WALLSTOP_PROTO` default, the legacy define-off fallback,
     `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`typecheck:unity:odin` / `typecheck:tests:odin`) and

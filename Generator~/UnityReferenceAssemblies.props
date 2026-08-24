@@ -1,0 +1,32 @@
+<Project>
+  <!--
+    The Unity reference assemblies both local type-check gates compile against, in ONE place.
+
+    #553: `npm run typecheck:unity` answered CS0592 for `[WShowIf]` on a property, and was WRONG.
+    Its `UnityEngine.PropertyAttribute` is `AttributeTargets.Field`; every editor CI runs says
+    `Property, Field`, and six package attributes inherited that. A confident red for a Unity nobody
+    ships is the worse failure mode, because nothing in the output said which Unity answered.
+
+    The pin cannot be moved. `UnityEngine.Modules` has published exactly ONE version, 2021.3.33
+    (nuget.org flat-container index, checked 2026-08-24), and the only other community feed of Unity
+    reference assemblies, `unity3d.unityengine`, stops at 2020.3.21, older still. So "move the pin
+    up to the oldest editor CI runs" and "add a second configuration at the newest editor" are
+    impossible rather than merely expensive.
+
+    What is left is to SAY what answered, where the answer is read, which is why the target below
+    runs on every compile. TypeCheck and TestCheck used to carry the version separately; they now
+    share it, so the two cannot drift and the banner cannot outlive the pin.
+  -->
+  <PropertyGroup>
+    <UnityReferenceAssemblyVersion>2021.3.33</UnityReferenceAssemblyVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="$(UnityReferenceAssemblyVersion)" />
+  </ItemGroup>
+  <Target Name="AnnounceReferenceAssemblyPin" BeforeTargets="CoreCompile">
+    <Message
+      Importance="High"
+      Text="[typecheck] Reference assemblies: UnityEngine.Modules $(UnityReferenceAssemblyVersion) -- older than every editor CI runs. Member signatures are safe to check here; anything resolved out of Unity's own METADATA (attribute targets, defaults, serialization behaviour) must be confirmed in a real editor. See issue #553."
+    />
+  </Target>
+</Project>

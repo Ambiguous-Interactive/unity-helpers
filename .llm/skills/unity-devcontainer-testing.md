@@ -301,8 +301,11 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   `Property, Field`. Six package attributes inherit that declaration, so the gate's answer inverted
   the finding and a wrong conclusion was written up before the editor refuted it. Signatures are
   safe to check locally; anything resolved out of Unity's own attributes, defaults or metadata has
-  to be read in a real editor. Tracked as
-  [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
+  to be read in a real editor. **The pin cannot be moved off 2021.3.33** -- that is the only version
+  `UnityEngine.Modules` has ever published, and the one alternative community feed
+  (`unity3d.unityengine`) stops at 2020.3.21 -- so instead every `typecheck:unity` /
+  `typecheck:tests` compile now prints the version it answered for
+  ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
 - **Gate every measurement on a member only the variant under test declares, and print the gate.**
   This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
   _absence_ of `_cacheLock`, and refused to print numbers otherwise. Absence matters as much as
