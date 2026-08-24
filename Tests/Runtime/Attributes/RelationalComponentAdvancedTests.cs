@@ -323,6 +323,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         }
 
         [Test]
+        public void SingleRelationalFieldSkipsDisabledCandidateAheadOfTheEnabledOne()
+        {
+            GameObject root = Track(new GameObject("ActiveOnlyRoot"));
+            BoxCollider disabledCollider = root.AddComponent<BoxCollider>();
+            disabledCollider.enabled = false;
+            BoxCollider enabledCollider = root.AddComponent<BoxCollider>();
+
+            TestInterfaceComponent disabledImplementer =
+                root.AddComponent<TestInterfaceComponent>();
+            disabledImplementer.enabled = false;
+            TestInterfaceComponent enabledImplementer = root.AddComponent<TestInterfaceComponent>();
+
+            GameObject child = Track(new GameObject("ActiveOnlyChild"));
+            child.transform.SetParent(root.transform);
+            SphereCollider disabledChild = child.AddComponent<SphereCollider>();
+            disabledChild.enabled = false;
+            SphereCollider enabledChild = child.AddComponent<SphereCollider>();
+
+            RelationalActiveOnlyTester tester = root.AddComponent<RelationalActiveOnlyTester>();
+
+            tester.AssignRelationalComponents();
+
+            Assert.AreSame(
+                enabledCollider,
+                tester.activeSibling,
+                "IncludeInactive = false must skip the disabled sibling ahead of the enabled one."
+            );
+            Assert.AreSame(
+                enabledImplementer,
+                tester.activeSiblingInterface,
+                "The interface shape must skip the disabled implementer too."
+            );
+            Assert.AreSame(
+                enabledChild,
+                tester.activeChild,
+                "The child shape must skip the disabled descendant component too."
+            );
+
+            return;
+        }
+
+        [Test]
         public void SiblingCanFindInterfaceComponents()
         {
             GameObject root = new("Root");

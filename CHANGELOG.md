@@ -96,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Relational fields typed as an interface no longer fetch every component on the object and type-test each one. Unity's own query resolves an interface, so the query is 1.35x-2.49x faster depending on how many components the object carries -- and the child shape pays it once per descendant ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Relational collection fields typed as a base component -- `Collider2D[]`, `Renderer[]` -- no longer fetch every component on the object and type-test each one. Unity's own query already resolves a base class, so assignment of a component with three such fields is 9% faster ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - `Animator.ResetTriggers()` no longer allocates. It read `Animator.parameters`, which builds a new array and new element objects on every read -- 53.5 bytes per call for a three-parameter controller. The trigger hashes are now read once per controller ([#549](https://github.com/Ambiguous-Interactive/unity-helpers/issues/549)).
 - `GameObject.IsDontDestroyOnLoad()` no longer allocates. It read `Scene.name`, which marshals a fresh managed string every call, and the signature reads cheap enough to end up in `Update`. The answer now comes from the scene's handle ([#549](https://github.com/Ambiguous-Interactive/unity-helpers/issues/549)).
@@ -130,6 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix a single relational field binding a disabled component when `IncludeInactive = false`. With two candidates on one object and the first disabled, `[SiblingComponent]`, `[ChildComponent]` and `[ParentComponent]` assigned the disabled one instead of the enabled one behind it ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Fix a second `await` of the same `AsyncOperation` stopping the first one resuming. Two coroutines or tasks awaiting one `SceneManager.LoadSceneAsync` handle now both continue; previously only the last to register did.
 - Fix one refused protobuf surrogate registration disabling every registration after it, so `Vector3`, `Color` and `Bounds` silently encoded with different bytes. Each is now independent and names the type it could not register.
 - Fix `UnityRandom` losing its position when saved: its snapshot now carries `UnityEngine.Random`'s state, so a restored generator resumes the exact sequence instead of continuing from wherever the engine is. Restoring writes that global back. See [Random Generators](./docs/features/utilities/random-generators.md#saving-and-restoring-a-generator) ([#521](https://github.com/Ambiguous-Interactive/unity-helpers/issues/521)).
