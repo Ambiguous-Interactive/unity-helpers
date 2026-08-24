@@ -37,10 +37,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// </para>
         /// <para>
         /// Scope is <see cref="IRandom"/> itself. The composed ranged draws in
-        /// <see cref="RandomExtensions"/> -- <c>NextVector2Int(min, max)</c>,
-        /// <c>NextVector3Int(min, max)</c>, <c>NextAngle(min, max)</c> -- throw on a collapsed range
-        /// too, and are tracked separately because naming their siblings collides with the existing
-        /// <c>NextVector2InRange(range, origin)</c>.
+        /// <see cref="RandomExtensions"/> throw on a collapsed range too; the decision on #552 was to
+        /// document that rather than name siblings that would collide with the existing
+        /// <c>NextVector2InRange(range, origin)</c>, and
+        /// <see cref="ComposedRangedDrawsRaiseOnACollapsedRange"/> holds them to it.
         /// </para>
         /// </remarks>
         [Test]
@@ -579,6 +579,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Vector3 result = rng.NextVector3InRange(range);
 
             Assert.LessOrEqual(result.magnitude, range);
+        }
+
+        /// <summary>
+        /// The composed ranged draws raise on a collapsed range, and the two rect/bounds draws
+        /// deliberately do not.
+        /// </summary>
+        /// <remarks>
+        /// #552 decided to document this rather than ship a second suffix for one concept, so this
+        /// is what makes the decision visible: the throw is the contract, not an oversight, and the
+        /// XML docs name the scalar sibling to compose from instead.
+        /// <para>
+        /// The split is the point. #552 asserted that <c>NextVector2InRect</c> and
+        /// <c>NextVector3InBounds</c> "are the same shape once removed" and reach
+        /// <c>NextFloat(x, x)</c>; they do not -- both guard every axis first, and a zero-area rect
+        /// has always answered its min corner. Pinning both halves is what stops the next reader
+        /// "fixing" a guard that already exists.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void ComposedRangedDrawsRaiseOnACollapsedRange()
+        {
+            SystemRandom rng = new(552);
+
+            Assert.Throws<ArgumentException>(() => rng.NextVector2Int(3, 3));
+            Assert.Throws<ArgumentException>(() => rng.NextVector3Int(3, 3));
+            Assert.Throws<ArgumentException>(() =>
+                rng.NextVector2Int(new Vector2Int(1, 2), new Vector2Int(1, 5))
+            );
+            Assert.Throws<ArgumentException>(() =>
+                rng.NextVector3Int(new Vector3Int(1, 2, 3), new Vector3Int(4, 2, 6))
+            );
+            Assert.Throws<ArgumentException>(() => rng.NextAngle(90f, 90f));
+
+            // The documented escape hatch: the scalar siblings answer the low bound.
+            Assert.AreEqual(3, rng.NextIntInRange(3, 3));
+            Assert.AreEqual(90f, rng.NextFloatInRange(90f, 90f));
+        }
+
+        /// <summary>
+        /// A flattened rect or a zero-volume bounds answers a point on it instead of raising.
+        /// </summary>
+        [Test]
+        public void RectAndBoundsDrawsAnswerACollapsedRange()
+        {
+            SystemRandom rng = new(553);
+
+            Vector2 onALine = rng.NextVector2InRect(new Rect(2f, 5f, 0f, 4f));
+            Assert.AreEqual(2f, onALine.x);
+            Assert.IsTrue(5f <= onALine.y && onALine.y < 9f);
+
+            Vector2 onAPoint = rng.NextVector2InRect(new Rect(2f, 5f, 0f, 0f));
+            Assert.AreEqual(new Vector2(2f, 5f), onAPoint);
+
+            Bounds flat = new(new Vector3(1f, 2f, 3f), new Vector3(4f, 0f, 4f));
+            Assert.AreEqual(flat.center, rng.NextVector3InBounds(flat));
         }
     }
 }

@@ -1105,8 +1105,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - two random integer generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: If minAmplitude >= maxAmplitude, behavior depends on IRandom.Next implementation.
+        /// Edge Cases: A collapsed range (maxAmplitude at or below minAmplitude) throws, because this
+        /// composes from <see cref="IRandom.Next(int, int)"/>, which refuses one. Use
+        /// <see cref="RandomExtensions.NextIntInRange(IRandom, int, int)"/> per component to get the
+        /// low bound back instead.
         /// </remarks>
+        /// <exception cref="System.ArgumentException">maxAmplitude is at or below minAmplitude.</exception>
         public static Vector2Int NextVector2Int(
             this IRandom random,
             int minAmplitude,
@@ -1130,8 +1134,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - two random integer generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: If any min component >= corresponding max component, behavior depends on IRandom.Next.
+        /// Edge Cases: A component whose max is at or below its min throws, because this composes from
+        /// <see cref="IRandom.Next(int, int)"/>, which refuses a collapsed range. Flattening a spawn box
+        /// to a line is an authored case, so build it from
+        /// <see cref="RandomExtensions.NextIntInRange(IRandom, int, int)"/> per component, which answers
+        /// the low bound instead of raising.
         /// </remarks>
+        /// <exception cref="System.ArgumentException">A component's max is at or below its min.</exception>
         public static Vector2Int NextVector2Int(this IRandom random, Vector2Int min, Vector2Int max)
         {
             int x = random.Next(min.x, max.x);
@@ -1175,8 +1184,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - three random integer generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: If minAmplitude >= maxAmplitude, behavior depends on IRandom.Next implementation.
+        /// Edge Cases: A collapsed range (maxAmplitude at or below minAmplitude) throws, because this
+        /// composes from <see cref="IRandom.Next(int, int)"/>, which refuses one. Use
+        /// <see cref="RandomExtensions.NextIntInRange(IRandom, int, int)"/> per component to get the
+        /// low bound back instead.
         /// </remarks>
+        /// <exception cref="System.ArgumentException">maxAmplitude is at or below minAmplitude.</exception>
         public static Vector3Int NextVector3Int(
             this IRandom random,
             int minAmplitude,
@@ -1201,8 +1214,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - three random integer generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: If any min component >= corresponding max component, behavior depends on IRandom.Next.
+        /// Edge Cases: A component whose max is at or below its min throws, because this composes from
+        /// <see cref="IRandom.Next(int, int)"/>, which refuses a collapsed range. Flattening a spawn box
+        /// to a line is an authored case, so build it from
+        /// <see cref="RandomExtensions.NextIntInRange(IRandom, int, int)"/> per component, which answers
+        /// the low bound instead of raising.
         /// </remarks>
+        /// <exception cref="System.ArgumentException">A component's max is at or below its min.</exception>
         public static Vector3Int NextVector3Int(this IRandom random, Vector3Int min, Vector3Int max)
         {
             int x = random.Next(min.x, max.x);
@@ -1258,8 +1276,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - single random float generation.
         /// Allocations: No heap allocations.
-        /// Edge Cases: Does not normalize angle to [0, 360) - can return negative or >360 values if range allows.
+        /// Edge Cases: Does not normalize the angle to [0, 360) - can return a negative value, or one
+        /// above 360, if the range allows. A collapsed range (max at or below min) throws, because this
+        /// composes from <see cref="IRandom.NextFloat(float, float)"/>, which refuses one. Pinning an
+        /// angle to a fixed value is an authored case, so use
+        /// <see cref="RandomExtensions.NextFloatInRange(IRandom, float, float)"/>, which answers the low
+        /// bound instead of raising.
         /// </remarks>
+        /// <exception cref="System.ArgumentException">max is at or below min.</exception>
         public static float NextAngle(this IRandom random, float min = 0f, float max = 360f)
         {
             return random.NextFloat(min, max);
@@ -1276,7 +1300,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - two random float generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: Works with negative or inverted rectangles. Zero-area rectangles return the min corner.
+        /// Edge Cases: Works with negative or inverted rectangles. A zero-width or zero-height rect
+        /// returns that axis's min rather than raising - unlike the composed integer draws, this one
+        /// guards each axis before it reaches <see cref="IRandom.NextFloat(float, float)"/>.
         /// </remarks>
         public static Vector2 NextVector2InRect(this IRandom random, Rect rect)
         {
@@ -1301,7 +1327,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe.
         /// Performance: O(1) - three random float generations.
         /// Allocations: No heap allocations.
-        /// Edge Cases: Degenerate (zero-volume) bounds return the center point.
+        /// Edge Cases: Degenerate (zero-volume) bounds return the center point rather than raising -
+        /// unlike the composed integer draws, this one guards before it reaches
+        /// <see cref="IRandom.NextFloat(float, float)"/>.
         /// </remarks>
         public static Vector3 NextVector3InBounds(this IRandom random, Bounds bounds)
         {
