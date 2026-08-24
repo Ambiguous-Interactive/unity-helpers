@@ -1,11 +1,11 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// This generator uses the ROMU multiplier 15241094284759029579 from the ROMU family by Mark A.
-// Overton (Apache License 2.0, https://romu-random.org/code.c), but its state update
-// (y = ROTL(y, 27) + x) matches neither published romuDuo (ROTL(y,36) + ROTL(y,15) - x) nor
-// romuDuoJr (ROTL(y - x, 27)), so upstream test results do not transfer.
-// See docs/project/third-party-notices.md.
+// romuDuo from the ROMU family by Mark A. Overton (Apache License 2.0,
+// https://romu-random.org/code.c). Through 3.5.1 the update rule here was y = ROTL(y, 27) + x,
+// which is neither published romuDuo nor romuDuoJr, so upstream test results did not transfer; it
+// now implements published romuDuo exactly. A given seed therefore produces a different sequence
+// than it did in 3.5.1. See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Good,
-        "ROMU multiplier with a modified duo update; returns the low 32 bits of the 64-bit product. Not the published romuDuo or romuDuoJr, so their measured results do not transfer.",
+        "Published romuDuo: the ROMU multiplier with the ROTL(y,36) + ROTL(y,15) - x update. NextUint returns the low 32 bits of the 64-bit word.",
         "Overton 2020",
         "https://romu-random.org/code.c"
     )]
@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 ulong xp = _x;
                 _x = 15241094284759029579UL * _y;
-                _y = Rol64(_y, 27) + xp;
+                _y = Rol64(_y, 36) + Rol64(_y, 15) - xp;
                 return xp;
             }
         }

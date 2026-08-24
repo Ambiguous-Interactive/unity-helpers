@@ -306,6 +306,15 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   (`unity3d.unityengine`) stops at 2020.3.21 -- so instead every `typecheck:unity` /
   `typecheck:tests` compile now prints the version it answered for
   ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
+- **Select fixtures by NAMESPACE, and make the probe refuse a zero-fixture run.** A sweep that
+  filtered on the assembly _name_ containing `Serialization` matched **nothing** and printed
+  `0 pass / 0 fail`, which reads exactly like a clean suite. The serialization fixtures are in
+  `WallstopStudios.UnityHelpers.Tests.Runtime`, not a per-directory assembly -- the per-directory
+  split is real but partial, so an assembly-name filter is a guess and a namespace filter is not.
+  Every selecting probe needs the property
+  [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) is about: end with
+  `if (matched == 0) { result.LogError("NO FIXTURES MATCHED -- this run measured nothing."); return; }`,
+  or print the matched names. One `GetAssemblies()` dump answers the naming for the whole session.
 - **Gate every measurement on a member only the variant under test declares, and print the gate.**
   This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
   _absence_ of `_cacheLock`, and refused to print numbers otherwise. Absence matters as much as

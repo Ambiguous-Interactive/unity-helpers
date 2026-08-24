@@ -131,7 +131,7 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 - Upstream: [romu-random.org](https://romu-random.org/code.c) (reachable; its TLS certificate is expired)
 - License: Apache License 2.0
 - License URL: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- Notes: Two 64-bit state words and the ROMU multiplier, but the update rule differs from published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
+- Notes: Implements published romuDuo -- two 64-bit state words, the ROMU multiplier and the `ROTL(y,36) + ROTL(y,15) - x` update. Through 3.5.1 the update rule differed from both published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
 
 ### WyRandom (wyhash)
 

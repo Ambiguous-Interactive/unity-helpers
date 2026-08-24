@@ -132,12 +132,12 @@
         "32": {
           "expected": "pass",
           "cleanThrough": "8GB",
-          "reason": "ROMU multiplier with a modified duo update; clean through 8GB with no anomalies."
+          "reason": "Published romuDuo; clean through 8GB with no FAIL or suspicious result."
         },
         "64": {
           "expected": "pass",
           "cleanThrough": "8GB",
-          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB with no anomalies."
+          "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB with no FAIL or suspicious result."
         }
       }
     },
