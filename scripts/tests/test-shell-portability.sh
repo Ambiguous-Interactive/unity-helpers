@@ -68,6 +68,43 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Each pattern was verified to select exactly the same lines as the grep it replaces, over the real
 # corpus PLUS a synthetic line per pattern -- the corpus contains no violations, so agreement on it
 # alone would only prove the absence of false positives, not that the checks still fire.
+# A line-by-line scan of a file that cannot contain the token being looked for is pure interpreter
+# time. Profiled with `PS4='+|${EPOCHREALTIME}|...' bash -x`: 7.44 s over 105,264 iterations for the
+# D1 scan alone, ~70 us per line, and the corpus contains no violations -- so almost all of it is
+# spent reading lines that were never going to match. One `grep -Fl` spawn per section names the
+# files that could match and the rest are skipped whole. Measured coverage on the current tree:
+# `& pwsh` 23 of 107 PowerShell files, `grep` 25 of 48 shell files, `awk` 8, `xargs` 2.
+#
+# The token must be a literal substring that EVERY line the section can flag necessarily contains,
+# or the section silently stops firing. Each one below is taken from the section's own filter.
+#
+# `grep -l` exits 1 when nothing matches, which is not an error here.
+# Callers MUST re-attach the trailing newline -- `x="$(candidates_containing ...)"$'\n'` -- because
+# command substitution strips trailing newlines. Without it the LAST candidate never matches the
+# membership test, and that file is skipped: the section still passes, having checked nothing.
+# Caught by injecting a violation per section, where the probe sorted last for every token and all
+# six sections went quiet. A green run over this corpus cannot catch it -- the corpus has no
+# violations, so silence is the expected output either way.
+candidates_containing() {
+    local token="$1"
+    shift
+    printf '\n%s' "$(grep -Fl -- "$token" "$@" 2>/dev/null || true)"
+}
+
+# The contract above is unobservable from this repository's own corpus: it contains no violations,
+# so a section that silently checks nothing looks exactly like a section that found nothing. This
+# asserts the one property whose loss would do that -- the LAST candidate must still match.
+_cc_probe_dir="$(mktemp -d)"
+printf 'needle\n' >"$_cc_probe_dir/first"
+printf 'needle\n' >"$_cc_probe_dir/last"
+_cc_probe="$(candidates_containing 'needle' "$_cc_probe_dir/first" "$_cc_probe_dir/last")"$'\n'
+rm -rf "$_cc_probe_dir"
+if [[ "$_cc_probe" != *$'\n'"$_cc_probe_dir/last"$'\n'* ]]; then
+    echo "FATAL: candidates_containing drops its last entry, so every section using it would" >&2
+    echo "       skip one file and still report success. Re-attach the trailing newline." >&2
+    exit 1
+fi
+
 readonly GREP_WITH_EPF_FLAG='grep[[:space:]]+-[a-zA-Z]*[EPF]'
 readonly GREP_WITH_F_FLAG='grep[[:space:]]+-[a-zA-Z]*F'
 readonly GREP_WITH_PF_FLAG='grep[[:space:]]+-[a-zA-Z]*[PF]'
@@ -121,9 +158,11 @@ echo "=== Section A: Non-portable grep patterns ==="
 # The fix is to use -E (ERE mode) so | works portably, or use -F for literals.
 echo ""
 echo "--- A1: grep with BRE \\| alternation (requires -E for portability) ---"
+a1_candidates="$(candidates_containing 'grep' "${SHELL_FILES[@]}")"$'\n'
 
 a1_violations=""
 for file in "${SHELL_FILES[@]}"; do
+    [[ "$a1_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
     line_num=0
     while IFS= read -r line; do
@@ -166,9 +205,11 @@ fi
 # A2: grep with \s (non-POSIX shorthand, should use [[:space:]])
 echo ""
 echo "--- A2: grep with \\s shorthand (non-POSIX, use [[:space:]]) ---"
+a2_candidates="$(candidates_containing 'grep' "${SHELL_FILES[@]}")"$'\n'
 
 a2_violations=""
 for file in "${SHELL_FILES[@]}"; do
+    [[ "$a2_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
     line_num=0
     while IFS= read -r line; do
@@ -497,9 +538,11 @@ echo '=== Section D: PowerShell $LASTEXITCODE after child process calls ==='
 # D1: & pwsh invocations without $LASTEXITCODE check nearby
 echo ""
 echo '--- D1: Missing $LASTEXITCODE check after & pwsh calls ---'
+d1_candidates="$(candidates_containing '& pwsh' "${PS1_FILES[@]}")"$'\n'
 
 d1_violations=""
 for file in "${PS1_FILES[@]}"; do
+    [[ "$d1_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
 
     # Find lines with "& pwsh" invocations
@@ -559,9 +602,11 @@ echo '=== Section E: Filename transport and path parsing safety ==='
 # spaces and other delimiters.
 echo ""
 echo '--- E1: Unsafe echo-to-xargs file transport ---'
+e1_candidates="$(candidates_containing 'xargs' "${SHELL_FILES[@]}")"$'\n'
 
 e1_violations=""
 for file in "${SHELL_FILES[@]}"; do
+    [[ "$e1_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
     line_num=0
     while IFS= read -r line; do
@@ -587,9 +632,11 @@ fi
 # file names cannot be interpreted as options.
 echo ""
 echo '--- E2: grep exact-match variable arguments missing -- ---'
+e2_candidates="$(candidates_containing 'grep' "${SHELL_FILES[@]}")"$'\n'
 
 e2_violations=""
 for file in "${SHELL_FILES[@]}"; do
+    [[ "$e2_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
     line_num=0
     while IFS= read -r line; do
@@ -616,9 +663,11 @@ fi
 # E3: Fixed-field awk parsing is fragile for git paths with spaces.
 echo ""
 echo '--- E3: Fragile awk field parsing for git paths ---'
+e3_candidates="$(candidates_containing 'awk' "${SHELL_FILES[@]}")"$'\n'
 
 e3_violations=""
 for file in "${SHELL_FILES[@]}"; do
+    [[ "$e3_candidates" == *$'\n'"$file"$'\n'* ]] || continue
     rel_path="${file#"$REPO_ROOT"/}"
     line_num=0
     while IFS= read -r line; do
