@@ -125,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             EditorGUI.BeginChangeCheck();
             int newIndex = EditorGUILayout.Popup($"{parameterType.Name}", currentIndex, enumNames);
-            if (EditorGUI.EndChangeCheck() && newIndex >= 0)
+            if (EditorGUI.EndChangeCheck() && 0 <= newIndex)
             {
                 recordUndo?.Invoke("Change Animation Event Parameter");
                 item.animationEvent.intParameter = (int)

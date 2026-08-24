@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     : $"Expected no conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
             );
 
-            if (shouldHaveConflict && expectedConflictCount > 0)
+            if (shouldHaveConflict && 0 < expectedConflictCount)
             {
                 Assert.AreEqual(
                     expectedConflictCount,
@@ -475,7 +475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     : $"Expected no conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
             );
 
-            if (shouldHaveConflict && expectedConflictCount > 0)
+            if (shouldHaveConflict && 0 < expectedConflictCount)
             {
                 Assert.AreEqual(
                     expectedConflictCount,
@@ -585,10 +585,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     : $"Expected no conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
             );
 
-            if (shouldHaveConflict && minExpectedConflictCount > 0)
+            if (shouldHaveConflict && 0 < minExpectedConflictCount)
             {
                 Assert.IsTrue(
-                    warnings[groupName]._allDrawOrders.Count >= minExpectedConflictCount,
+                    minExpectedConflictCount <= warnings[groupName]._allDrawOrders.Count,
                     $"Expected at least {minExpectedConflictCount} conflicting draw order values, but got {warnings[groupName]._allDrawOrders.Count}: [{string.Join(", ", warnings[groupName]._allDrawOrders)}]"
                 );
             }
@@ -728,7 +728,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 + (hasPlacementConflict ? 1 : 0);
 
             Assert.IsTrue(
-                conflictCount >= 1,
+                1 <= conflictCount,
                 "Should have at least one type of conflict for ThreeWayConflictTarget"
             );
         }

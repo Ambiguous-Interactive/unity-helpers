@@ -160,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 Assert.AreEqual(i + 1, invocation.TickContext.executedTicks);
                 Assert.AreEqual(0.11f, invocation.Context.deltaTime);
 
-                if (i > 0)
+                if (0 < i)
                 {
                     float previousTime = RecordingEffectBehavior
                         .PeriodicInvocations[i - 1]

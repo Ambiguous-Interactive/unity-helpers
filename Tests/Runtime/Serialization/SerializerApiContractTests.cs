@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
             }
 
-            if (missing.Count > 0)
+            if (0 < missing.Count)
             {
                 Assert.Fail(
                     "The following public Serializer deserialize methods lack a matching Try* sibling — "

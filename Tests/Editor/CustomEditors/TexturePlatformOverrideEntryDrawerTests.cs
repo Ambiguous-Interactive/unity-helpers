@@ -51,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             float height = _drawer.GetPropertyHeight(entryProperty, GUIContent.none);
 
-            Assert.IsTrue(height > 0f, "Height should be positive");
+            Assert.IsTrue(0f < height, "Height should be positive");
         }
 
         [Test]
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             float height = _drawer.GetPropertyHeight(entryProperty, GUIContent.none);
 
-            Assert.IsTrue(height > 0f, "Height should be positive even with no apply flags");
+            Assert.IsTrue(0f < height, "Height should be positive even with no apply flags");
         }
 
         [Test]
@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             float heightWithOneFlag = _drawer.GetPropertyHeight(entryProperty, GUIContent.none);
 
             Assert.IsTrue(
-                heightWithOneFlag > heightWithNoFlags,
+                heightWithNoFlags < heightWithOneFlag,
                 "Height should increase when apply flag is enabled"
             );
         }
@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             float heightWithNoFlags = _drawer.GetPropertyHeight(entryProperty, GUIContent.none);
 
             Assert.IsTrue(
-                heightWithAllFlags > heightWithNoFlags,
+                heightWithNoFlags < heightWithAllFlags,
                 "Height with all flags should be greater than with no flags"
             );
         }
@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             float height = _drawer.GetPropertyHeight(entryProperty, GUIContent.none);
 
-            Assert.IsTrue(height > 0f, "Height should be positive even with empty platform name");
+            Assert.IsTrue(0f < height, "Height should be positive even with empty platform name");
         }
 
         [Test]
@@ -406,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             for (int i = 1; i < heights.Count; i++)
             {
                 Assert.IsTrue(
-                    heights[i] > heights[i - 1],
+                    heights[i - 1] < heights[i],
                     $"Height at index {i} should be greater than height at index {i - 1}"
                 );
             }

@@ -321,7 +321,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             for (int i = 0; i < extractor._discoveredSheets.Count; i++)
             {
                 SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
-                if (entry._sprites.Count > 0)
+                if (0 < entry._sprites.Count)
                 {
                     anyFound = true;
                     AssertAllSpritesHaveSelection(entry, true, "InitialSelection");
@@ -492,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.PopulateSpritesFromPaddedGrid(entry, texture);
 
             Assert.That(entry._sprites.Count, Is.EqualTo(4), "Should have 4 sprites");
-            if (entry._sprites.Count > 0)
+            if (0 < entry._sprites.Count)
             {
                 int expectedWidth = 32 - 8;
                 Assert.That(
@@ -1454,7 +1454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null);
 
-            if (entry._sprites.Count > 0 && entry._sprites[0]._previewTexture != null)
+            if (0 < entry._sprites.Count && entry._sprites[0]._previewTexture != null)
             {
                 int maxDim = Mathf.Max(
                     entry._sprites[0]._previewTexture.width,
@@ -1475,7 +1475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null);
 
-            if (entry._sprites.Count > 0 && entry._sprites[0]._previewTexture != null)
+            if (0 < entry._sprites.Count && entry._sprites[0]._previewTexture != null)
             {
                 int expectedWidth = (int)entry._sprites[0]._rect.width;
                 int expectedHeight = (int)entry._sprites[0]._rect.height;
@@ -1653,7 +1653,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
-            if (entry._sprites.Count >= 2)
+            if (2 <= entry._sprites.Count)
             {
                 entry._sprites[1]._rect = entry._sprites[0]._rect;
             }
@@ -1675,7 +1675,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
-            if (entry._sprites.Count >= 2)
+            if (2 <= entry._sprites.Count)
             {
                 entry._sprites[1]._rect = entry._sprites[0]._rect;
             }
@@ -1699,7 +1699,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
 
-            if (entry._sprites.Count > 2)
+            if (2 < entry._sprites.Count)
             {
                 entry._sprites.RemoveAt(entry._sprites.Count - 1);
             }

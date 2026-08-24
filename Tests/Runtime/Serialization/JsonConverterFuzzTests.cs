@@ -880,19 +880,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     }
 
                     builder.Append('{');
-                    for (int index = properties.Count - 1; index >= 0; index--)
+                    for (int index = properties.Count - 1; 0 <= index; index--)
                     {
                         JsonProperty property = properties[index];
                         builder.Append('\n').Append(' ', (depth + 1) * 2).Append('"');
                         AppendEscapedPropertyName(builder, property.Name);
                         builder.Append("\": ");
                         WriteEquivalentJson(builder, property.Value, depth + 1);
-                        if (index > 0)
+                        if (0 < index)
                         {
                             builder.Append(',');
                         }
                     }
-                    if (properties.Count > 0)
+                    if (0 < properties.Count)
                     {
                         builder.Append('\n').Append(' ', depth * 2);
                     }
@@ -903,7 +903,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     int itemIndex = 0;
                     foreach (JsonElement item in element.EnumerateArray())
                     {
-                        if (itemIndex > 0)
+                        if (0 < itemIndex)
                         {
                             builder.Append(',');
                         }
@@ -911,7 +911,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         WriteEquivalentJson(builder, item, depth + 1);
                         itemIndex++;
                     }
-                    if (itemIndex > 0)
+                    if (0 < itemIndex)
                     {
                         builder.Append('\n').Append(' ', depth * 2);
                     }

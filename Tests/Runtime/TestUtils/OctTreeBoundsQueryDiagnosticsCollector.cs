@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 $"  Bulk appends: {_bulkAppends.Count}, child prunes: {_childPrunes.Count}"
             );
 
-            if (_nodes.Count > 0)
+            if (0 < _nodes.Count)
             {
                 builder.AppendLine("  Sample node visits:");
                 foreach (
@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 builder.AppendLine("  Node visit summary: " + FormatVisitSummary(_nodes));
             }
 
-            if (_points.Count > 0)
+            if (0 < _points.Count)
             {
                 builder.AppendLine("  Sample point evaluations:");
                 foreach (PointEvaluationRecord record in _points.Take(Math.Min(8, _points.Count)))
@@ -128,7 +128,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 }
             }
 
-            if (_childPrunes.Count > 0)
+            if (0 < _childPrunes.Count)
             {
                 builder.AppendLine("  Sample child prunes:");
                 foreach (
@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 actual,
                 maxItems
             );
-            if (missing.Count > 0 || extra.Count > 0)
+            if (0 < missing.Count || 0 < extra.Count)
             {
                 builder.AppendLine($"  Missing ({missing.Count}): {FormatVectorList(missing)}");
                 builder.AppendLine($"  Extra ({extra.Count}): {FormatVectorList(extra)}");
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             {
                 left.TryGetValue(key, out int lc);
                 right.TryGetValue(key, out int rc);
-                if (lc > rc)
+                if (rc < lc)
                 {
                     int diff = Math.Min(maxItems - missing.Count, lc - rc);
                     for (int i = 0; i < diff; ++i)
@@ -205,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                         missing.Add(key);
                     }
                 }
-                else if (rc > lc)
+                else if (lc < rc)
                 {
                     int diff = Math.Min(maxItems - extra.Count, rc - lc);
                     for (int i = 0; i < diff; ++i)
@@ -213,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                         extra.Add(key);
                     }
                 }
-                if (missing.Count >= maxItems && extra.Count >= maxItems)
+                if (maxItems <= missing.Count && maxItems <= extra.Count)
                 {
                     break;
                 }

@@ -617,7 +617,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             List<WButtonGroupKey> keys = foldoutStates.Keys.ToList();
-            if (keys.Count >= 2)
+            if (2 <= keys.Count)
             {
                 foldoutStates[keys[0]] = true;
                 foldoutStates[keys[1]] = false;
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             WButtonPaginationState state = new();
             state._pageIndex = 5;
 
-            if (state._pageIndex >= 3)
+            if (3 <= state._pageIndex)
             {
                 state._pageIndex = 2;
             }
@@ -942,7 +942,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             Assert.That(
-                cancellableMethod.CancellationTokenParameterIndex >= 0,
+                0 <= cancellableMethod.CancellationTokenParameterIndex,
                 Is.True,
                 "Method should support cancellation"
             );

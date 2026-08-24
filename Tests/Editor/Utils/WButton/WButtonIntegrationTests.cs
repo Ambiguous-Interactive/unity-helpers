@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             float endTime = Time.realtimeSinceStartup + timeoutSeconds;
             while (!condition())
             {
-                if (Time.realtimeSinceStartup > endTime)
+                if (endTime < Time.realtimeSinceStartup)
                 {
                     Assert.Fail("Timed out while waiting for condition.");
                 }

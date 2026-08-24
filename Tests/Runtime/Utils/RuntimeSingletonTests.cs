@@ -428,7 +428,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string result = instance.ToString();
 
             Assert.IsTrue(result != null);
-            Assert.IsTrue(result.Contains("TestRuntimeSingleton") || result.Length > 0);
+            Assert.IsTrue(result.Contains("TestRuntimeSingleton") || 0 < result.Length);
         }
 
         [Test]

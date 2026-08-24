@@ -65,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                         }
                     }
 
-                    if (fieldNames.Count > 0)
+                    if (0 < fieldNames.Count)
                     {
                         typeMetadataList.Add(
                             new TypeFieldMetadata(
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 .Where(AttributeMetadataFilters.ShouldSerialize)
                 .ToList();
 
-            if (types.Count > 0)
+            if (0 < types.Count)
             {
                 return types;
             }
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     );
                 }
 
-                if (fieldMetadataList.Count > 0)
+                if (0 < fieldMetadataList.Count)
                 {
                     result.Add(
                         new RelationalTypeMetadata(

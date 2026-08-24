@@ -2658,7 +2658,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             Trie<int> trie = new(dict);
 
-            List<int> filtered = trie.Where(v => v > 15).ToList();
+            List<int> filtered = trie.Where(v => 15 < v).ToList();
 
             Assert.AreEqual(3, filtered.Count);
             Assert.IsTrue(filtered.Contains(20));

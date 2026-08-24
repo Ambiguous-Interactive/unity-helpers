@@ -432,7 +432,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 )
             )
             {
-                if (CachedAccessors.Count >= MaxCachedAccessorTypes)
+                if (MaxCachedAccessorTypes <= CachedAccessors.Count)
                 {
                     return BuildAccessor(ownerType, memberPath);
                 }
@@ -660,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     value =>
                     {
                         Array array = value as Array;
-                        if (array == null || index < 0 || index >= array.Length)
+                        if (array == null || index < 0 || array.Length <= index)
                         {
                             return null;
                         }
@@ -678,7 +678,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     value =>
                     {
                         IList list = value as IList;
-                        if (list == null || index < 0 || index >= list.Count)
+                        if (list == null || index < 0 || list.Count <= index)
                         {
                             return null;
                         }
@@ -794,7 +794,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     name = raw.Substring(0, bracket);
                     int cursor = bracket;
-                    while (cursor < raw.Length && (cursor = raw.IndexOf('[', cursor)) >= 0)
+                    while (cursor < raw.Length && 0 <= (cursor = raw.IndexOf('[', cursor)))
                     {
                         int endBracket = raw.IndexOf(']', cursor + 1);
                         if (endBracket < 0)
@@ -813,7 +813,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 MemberPathSegment segment = new(
                     name,
-                    indices.Count > 0 ? indices.ToArray() : Array.Empty<int>()
+                    0 < indices.Count ? indices.ToArray() : Array.Empty<int>()
                 );
                 segments.Add(segment);
             }

@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 // Only track scope depth if there's actual padding to apply
                 // Zero padding should not increase scope depth as it has no visual effect
-                _trackScopeDepth = _padding > 0f;
+                _trackScopeDepth = 0f < _padding;
 
                 if (_trackScopeDepth)
                 {

@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
             availableWidth = Mathf.Max(32f, availableWidth);
             float helpBoxHeight;
-            if (measuredHelpBoxHeight > 0f)
+            if (0f < measuredHelpBoxHeight)
             {
                 helpBoxHeight = measuredHelpBoxHeight;
             }
@@ -338,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The row height in pixels.</returns>
         public static float GetOptionRowHeight()
         {
-            if (s_cachedOptionRowHeight > 0f)
+            if (0f < s_cachedOptionRowHeight)
             {
                 return s_cachedOptionRowHeight;
             }
@@ -369,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The control height in pixels.</returns>
         public static float GetOptionControlHeight()
         {
-            if (s_cachedOptionControlHeight > 0f)
+            if (0f < s_cachedOptionControlHeight)
             {
                 return s_cachedOptionControlHeight;
             }

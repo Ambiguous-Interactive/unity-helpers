@@ -124,11 +124,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     );
 
                     List<WGroupAttribute> groupList =
-                        groupAttrs != null && groupAttrs.Length > 0
+                        groupAttrs != null && 0 < groupAttrs.Length
                             ? new List<WGroupAttribute>(groupAttrs)
                             : EmptyGroupAttributes;
                     List<WGroupEndAttribute> endList =
-                        endAttrs != null && endAttrs.Length > 0
+                        endAttrs != null && 0 < endAttrs.Length
                             ? new List<WGroupEndAttribute>(endAttrs)
                             : EmptyEndAttributes;
 
@@ -245,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 HashSet<GroupContext> explicitContexts = null;
                 PooledResource<HashSet<GroupContext>> explicitContextsLease = default;
 
-                if (descriptor.GroupAttributes.Count > 0)
+                if (0 < descriptor.GroupAttributes.Count)
                 {
                     explicitContextsLease = Buffers<GroupContext>.HashSet.Get(out explicitContexts);
                     foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
@@ -333,7 +333,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     }
                 }
 
-                if (descriptor.EndAttributes.Count > 0)
+                if (0 < descriptor.EndAttributes.Count)
                 {
                     ApplyGroupEnds(descriptor.EndAttributes, activeAutoContexts, contextsByName);
                 }
@@ -436,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 definition.SortChildGroups();
 
                 // Calculate direct property paths (excluding child group anchor paths)
-                if (definition.ChildGroups.Count > 0)
+                if (0 < definition.ChildGroups.Count)
                 {
                     HashSet<string> childAnchorPaths = new(StringComparer.Ordinal);
                     foreach (WGroupDefinition child in definition.ChildGroups)
@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
         private static GroupContext SelectAutoIncludeTarget(List<GroupContext> activeAutoContexts)
         {
-            for (int index = activeAutoContexts.Count - 1; index >= 0; index--)
+            for (int index = activeAutoContexts.Count - 1; 0 <= index; index--)
             {
                 GroupContext candidate = activeAutoContexts[index];
                 if (!candidate.HasAutoIncludeBudget)
@@ -904,7 +904,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         return true;
                     }
 
-                    return RemainingAutoInclude > 0;
+                    return 0 < RemainingAutoInclude;
                 }
             }
 

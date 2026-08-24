@@ -1193,7 +1193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 for (int i = 0; i < 10; i++)
                 {
                     Buffers.GetWaitForSecondsRealTime(i * 0.1f);
-                    if (i > 0)
+                    if (0 < i)
                     {
                         expectedEvictions++;
                     }
@@ -1210,7 +1210,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 for (int i = 0; i < 10; i++)
                 {
                     Buffers.GetWaitForSeconds(i * 0.1f);
-                    if (i > 0)
+                    if (0 < i)
                     {
                         expectedEvictions++;
                     }

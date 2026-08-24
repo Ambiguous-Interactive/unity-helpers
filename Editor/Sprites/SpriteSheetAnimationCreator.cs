@@ -63,9 +63,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -554,12 +554,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // condition. This prevents rapid "catch-up" animation that makes the preview
             // appear to run at too high FPS.
             // Allow at most one frame of lag before resetting to current time.
-            if (elapsed - _lastTick.Value > deltaTime + deltaTime)
+            if (deltaTime + deltaTime < elapsed - _lastTick.Value)
             {
                 _lastTick = elapsed - deltaTime;
             }
 
-            if (_lastTick + deltaTime > elapsed)
+            if (elapsed < _lastTick + deltaTime)
             {
                 return;
             }
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 VisualElement thumb = _spriteThumbnailsContainer.ElementAt(i);
                 if (thumb.userData is int thumbIndex)
                 {
-                    if (thumbIndex >= minIdx && thumbIndex <= maxIdx)
+                    if (minIdx <= thumbIndex && thumbIndex <= maxIdx)
                     {
                         thumb.style.backgroundColor = _selectedThumbnailBackgroundColor;
                         thumb.style.borderBottomColor =
@@ -643,8 +643,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (
                 startSpriteIndex < 0
                 || endSpriteIndex < 0
-                || startSpriteIndex >= _availableSprites.Count
-                || endSpriteIndex >= _availableSprites.Count
+                || _availableSprites.Count <= startSpriteIndex
+                || _availableSprites.Count <= endSpriteIndex
             )
             {
                 this.LogWarn(
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             StartOrUpdateCurrentPreview(newDefinition);
             _animationDefinitionsListView.Rebuild();
 
-            if (_animationDefinitionsListView.itemsSource.Count > 0)
+            if (0 < _animationDefinitionsListView.itemsSource.Count)
             {
                 _animationDefinitionsListView.ScrollToItem(_animationDefinitions.Count - 1);
             }
@@ -1095,10 +1095,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 definition.StartSpriteIndex = Mathf.Clamp(
                     evt.newValue,
                     0,
-                    _availableSprites.Count > 0 ? _availableSprites.Count - 1 : 0
+                    0 < _availableSprites.Count ? _availableSprites.Count - 1 : 0
                 );
                 if (
-                    definition.StartSpriteIndex > definition.EndSpriteIndex
+                    definition.EndSpriteIndex < definition.StartSpriteIndex
                     && 0 < _availableSprites.Count
                 )
                 {
@@ -1121,7 +1121,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 definition.EndSpriteIndex = Mathf.Clamp(
                     evt.newValue,
                     0,
-                    _availableSprites.Count > 0 ? _availableSprites.Count - 1 : 0
+                    0 < _availableSprites.Count ? _availableSprites.Count - 1 : 0
                 );
                 if (
                     definition.EndSpriteIndex < definition.StartSpriteIndex
@@ -1232,8 +1232,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 && def.StartSpriteIndex <= def.EndSpriteIndex
                 && def.StartSpriteIndex < _availableSprites.Count
                 && def.EndSpriteIndex < _availableSprites.Count
-                && def.StartSpriteIndex >= 0
-                && def.EndSpriteIndex >= 0
+                && 0 <= def.StartSpriteIndex
+                && 0 <= def.EndSpriteIndex
             )
             {
                 for (int i = def.StartSpriteIndex; i <= def.EndSpriteIndex; ++i)
@@ -1283,7 +1283,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void RemoveAnimationDefinition(int index)
         {
-            if (index >= 0 && index < _animationDefinitions.Count)
+            if (0 <= index && index < _animationDefinitions.Count)
             {
                 if (_currentPreviewAnimDefIndex == index)
                 {
@@ -1292,7 +1292,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 _animationDefinitions.RemoveAt(index);
                 _animationDefinitionsListView.Rebuild();
-                if (_currentPreviewAnimDefIndex > index)
+                if (index < _currentPreviewAnimDefIndex)
                 {
                     _currentPreviewAnimDefIndex--;
                 }
@@ -1313,7 +1313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             _previewScrubber.style.visibility = Visibility.Visible;
-            _previewScrubber.highValue = def.SpritesToAnimate.Count > 1 ? 1f : 0f;
+            _previewScrubber.highValue = 1 < def.SpritesToAnimate.Count ? 1f : 0f;
             _previewScrubber.SetValueWithoutNotify(0);
 
             SetPreviewFrame(0);
@@ -1366,7 +1366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _previewImage.MarkDirtyRepaint();
 
             float currentCurveTime = 0f;
-            if (_currentPreviewDefinition.SpritesToAnimate.Count > 1)
+            if (1 < _currentPreviewDefinition.SpritesToAnimate.Count)
             {
                 currentCurveTime =
                     (float)_currentPreviewSpriteIndex
@@ -1385,7 +1385,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _previewFrameLabel.text =
                 $"Frame: {_currentPreviewSpriteIndex + 1}/{_currentPreviewDefinition.SpritesToAnimate.Count} | FPS: {fpsAtCurrent:F1}";
 
-            if (_currentPreviewDefinition.SpritesToAnimate.Count > 1)
+            if (1 < _currentPreviewDefinition.SpritesToAnimate.Count)
             {
                 _previewScrubber.SetValueWithoutNotify(
                     (float)_currentPreviewSpriteIndex
@@ -1415,7 +1415,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 newFrame = count - 1;
             }
 
-            if (newFrame >= count)
+            if (count <= newFrame)
             {
                 newFrame = 0;
             }
@@ -1513,7 +1513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (i < definition.SpritesToAnimate.Count - 1)
                     {
                         float normalizedTimeForCurve =
-                            definition.SpritesToAnimate.Count > 1
+                            1 < definition.SpritesToAnimate.Count
                                 ? (float)i / (definition.SpritesToAnimate.Count - 1)
                                 : 0;
                         float timeForCurveEval = normalizedTimeForCurve * curveDuration;
@@ -1554,7 +1554,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 createdCount++;
             }
 
-            if (createdCount > 0)
+            if (0 < createdCount)
             {
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();

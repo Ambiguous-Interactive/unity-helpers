@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.DoesNotThrow(() =>
             {
-                for (int size = maxSize - 1; size >= 1; size -= 7)
+                for (int size = maxSize - 1; 1 <= size; size -= 7)
                 {
                     using PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                         size,
@@ -634,7 +634,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
             // during verification, corrupting the LIFO order we're trying to test.
             List<PooledArray<int>> verificationArrays = new();
-            for (int i = arrayCount - 1; i >= 0; i--)
+            for (int i = arrayCount - 1; 0 <= i; i--)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                     arraySize,
@@ -703,7 +703,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
             // during verification, corrupting the LIFO order we're trying to test.
             List<PooledArray<int>> verificationArrays = new();
-            for (int i = arrayCount - 1; i >= 0; i--)
+            for (int i = arrayCount - 1; 0 <= i; i--)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                     arraySize,
@@ -958,7 +958,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     $"Thread {failure.ThreadId}: {failure.Exception.GetType().Name} - {failure.Exception.Message}"
                 );
 
-                if (failure.Exception.Data != null && failure.Exception.Data.Count > 0)
+                if (failure.Exception.Data != null && 0 < failure.Exception.Data.Count)
                 {
                     foreach (DictionaryEntry entry in failure.Exception.Data)
                     {
@@ -1187,7 +1187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     // and retrieved in the same LIFO order from the pool's internal stack
                     Dictionary<int, Stack<int[]>> expectedOrder = new();
 
-                    for (int i = rentals.Count - 1; i >= 0; i--)
+                    for (int i = rentals.Count - 1; 0 <= i; i--)
                     {
                         PooledArray<int> pooled = rentals[i];
                         int size = pooled.length;
@@ -1200,7 +1200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     List<PooledArray<int>> verificationArrays = new();
                     foreach (KeyValuePair<int, Stack<int[]>> pair in expectedOrder)
                     {
-                        while (pair.Value.Count > 0)
+                        while (0 < pair.Value.Count)
                         {
                             int[] expected = pair.Value.Pop();
                             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
@@ -1396,7 +1396,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Task.WaitAll(tasks);
 
-            if (exceptions.Count > 0)
+            if (0 < exceptions.Count)
             {
                 throw new AggregateException(exceptions);
             }
@@ -1456,7 +1456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Task.WaitAll(tasks);
 
-            if (exceptions.Count > 0)
+            if (0 < exceptions.Count)
             {
                 throw new AggregateException(exceptions);
             }

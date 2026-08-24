@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 {
                     // Check if the suffix is a number (indicating a duplicate)
                     string[] parts = folderName.Split(' ');
-                    if (parts.Length >= 2 && int.TryParse(parts[^1], out _))
+                    if (2 <= parts.Length && int.TryParse(parts[^1], out _))
                     {
                         anyDuplicateExists = true;
                         duplicateFound = folder;
@@ -1077,7 +1077,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 {
                     // Check if the suffix is a number (indicating a duplicate)
                     string[] parts = folderName.Split(' ');
-                    if (parts.Length >= 2 && int.TryParse(parts[^1], out _))
+                    if (2 <= parts.Length && int.TryParse(parts[^1], out _))
                     {
                         anyDuplicateExists = true;
                         duplicateFound = folder;
@@ -1227,7 +1227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 )
                 {
                     string[] parts = name.Split(' ');
-                    if (parts.Length >= 2 && int.TryParse(parts[^1], out _))
+                    if (2 <= parts.Length && int.TryParse(parts[^1], out _))
                     {
                         foundDuplicate = true;
                     }
@@ -1744,7 +1744,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 {
                     string sub = subs[s];
                     int last = sub.LastIndexOf('/');
-                    string name = last >= 0 ? sub.Substring(last + 1) : sub;
+                    string name = 0 <= last ? sub.Substring(last + 1) : sub;
                     if (string.Equals(name, desired, StringComparison.OrdinalIgnoreCase))
                     {
                         match = sub;

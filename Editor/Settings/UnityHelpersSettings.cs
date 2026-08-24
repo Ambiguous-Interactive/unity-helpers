@@ -1244,7 +1244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     );
 
                     float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = halfWidth >= minFieldWidth;
+                    bool useLabels = minFieldWidth <= halfWidth;
 
                     EditorGUI.PropertyField(
                         buttonRect,
@@ -1354,7 +1354,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     );
 
                     float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = halfWidth >= minFieldWidth;
+                    bool useLabels = minFieldWidth <= halfWidth;
 
                     EditorGUI.PropertyField(
                         selectedBackgroundRect,
@@ -2783,7 +2783,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 float labelWidth = CalculateLabelWidth(columnWidth);
                 float minFieldWidth = MinColorFieldWidth + labelWidth;
-                return columnWidth >= minFieldWidth;
+                return minFieldWidth <= columnWidth;
             }
         }
 

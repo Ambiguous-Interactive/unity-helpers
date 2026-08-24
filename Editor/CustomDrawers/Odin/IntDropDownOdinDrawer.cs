@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             // Check for mixed values BEFORE any calculations
             bool hasMultipleDifferentValues = false;
-            if (Property.ValueEntry.ValueCount > 1)
+            if (1 < Property.ValueEntry.ValueCount)
             {
                 object firstValue = Property.ValueEntry.WeakValues[0];
                 for (int i = 1; i < Property.ValueEntry.ValueCount; i++)
@@ -150,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 displayValue = "\u2014"; // Em dash for mixed values
             }
-            else if (currentIndex >= 0 && currentIndex < displayOptions.Length)
+            else if (0 <= currentIndex && currentIndex < displayOptions.Length)
             {
                 displayValue = displayOptions[currentIndex];
             }
@@ -207,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            if (validTargets.Count > 0)
+            if (0 < validTargets.Count)
             {
                 Undo.RecordObjects(validTargets.ToArray(), "Change IntDropDown Selection");
             }

@@ -192,22 +192,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 if (hasSearchFilter)
                 {
                     bool matchesSearch =
-                        issue.ClassName.IndexOf(_searchFilter, StringComparison.OrdinalIgnoreCase)
-                            >= 0
-                        || issue.MethodName.IndexOf(
-                            _searchFilter,
-                            StringComparison.OrdinalIgnoreCase
-                        ) >= 0
-                        || issue.IssueType.IndexOf(
-                            _searchFilter,
-                            StringComparison.OrdinalIgnoreCase
-                        ) >= 0
-                        || issue.FilePath.IndexOf(_searchFilter, StringComparison.OrdinalIgnoreCase)
-                            >= 0
-                        || issue.Description.IndexOf(
-                            _searchFilter,
-                            StringComparison.OrdinalIgnoreCase
-                        ) >= 0;
+                        0
+                            <= issue.ClassName.IndexOf(
+                                _searchFilter,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        || 0
+                            <= issue.MethodName.IndexOf(
+                                _searchFilter,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        || 0
+                            <= issue.IssueType.IndexOf(
+                                _searchFilter,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        || 0
+                            <= issue.FilePath.IndexOf(
+                                _searchFilter,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        || 0
+                            <= issue.Description.IndexOf(
+                                _searchFilter,
+                                StringComparison.OrdinalIgnoreCase
+                            );
 
                     if (!matchesSearch)
                     {
@@ -547,8 +556,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 ];
 
                 string prefix =
-                    criticalCount > 0 ? "🔴 "
-                    : highCount > 0 ? "🟠 "
+                    0 < criticalCount ? "🔴 "
+                    : 0 < highCount ? "🟠 "
                     : "🟡 ";
 
                 IssueTreeViewItem fileItem = new(
@@ -699,11 +708,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 GUIStyle style = new(EditorStyles.boldLabel);
 
-                if (item.CriticalCount > 0)
+                if (0 < item.CriticalCount)
                 {
                     style.normal.textColor = new Color(1f, 0.5f, 0.5f);
                 }
-                else if (item.HighCount > 0)
+                else if (0 < item.HighCount)
                 {
                     style.normal.textColor = new Color(1f, 0.7f, 0.4f);
                 }

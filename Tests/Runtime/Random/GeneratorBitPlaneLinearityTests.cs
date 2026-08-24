@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             // Ratings are ordered best-first, so only ratings strictly weaker than Good are exempt.
             // Testing that way rather than listing the strong ratings keeps Unknown -- a generator whose
             // metadata attribute went missing -- inside the gate rather than silently outside it.
-            bool exempt = (int)metadata.Quality > (int)RandomQuality.Good;
+            bool exempt = (int)RandomQuality.Good < (int)metadata.Quality;
             if (exempt)
             {
                 Assert.Pass(

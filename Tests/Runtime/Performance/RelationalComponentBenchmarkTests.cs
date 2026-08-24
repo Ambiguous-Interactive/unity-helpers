@@ -406,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static string FormatOpsRow(ScenarioResult result)
         {
             string ratio =
-                result.Manual.OpsPerSecond > 0d
+                0d < result.Manual.OpsPerSecond
                     ? (result.Relational.OpsPerSecond / result.Manual.OpsPerSecond).ToString(
                         "0.00",
                         CultureInfo.InvariantCulture
@@ -428,12 +428,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static string FormatOps(double value)
         {
-            if (value >= 1000d)
+            if (1000d <= value)
             {
                 return value.ToString("N0", CultureInfo.InvariantCulture);
             }
 
-            if (value >= 100d)
+            if (100d <= value)
             {
                 return value.ToString("N1", CultureInfo.InvariantCulture);
             }
@@ -628,7 +628,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             public void Assign()
             {
                 BoxCollider[] buffer = GetComponentsInChildren<BoxCollider>();
-                childCollider = buffer.Length > 0 ? buffer[0] : null;
+                childCollider = 0 < buffer.Length ? buffer[0] : null;
             }
         }
 

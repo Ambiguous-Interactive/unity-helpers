@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             deque.PushBack(3);
 
             Assert.AreEqual(3, deque.Count);
-            Assert.IsTrue(deque.Capacity >= 3);
+            Assert.IsTrue(3 <= deque.Capacity);
         }
 
         [Test]

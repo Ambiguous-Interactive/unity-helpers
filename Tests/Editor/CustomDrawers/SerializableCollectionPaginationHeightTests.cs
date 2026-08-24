@@ -78,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Pages with same item count should have same height."
                 );
                 Assert.IsTrue(
-                    page0Height > page2Height || Mathf.Approximately(page0Height, page2Height),
+                    page2Height < page0Height || Mathf.Approximately(page0Height, page2Height),
                     $"Page 0 (full) should have height >= page 2 (partial). Page0: {page0Height}, Page2: {page2Height}"
                 );
             }
@@ -128,7 +128,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
-                    initialHeight > collapsedHeight,
+                    collapsedHeight < initialHeight,
                     $"Initial height ({initialHeight}) should be greater than collapsed height ({collapsedHeight}). This suggests the drawer's fieldInfo may not be set correctly."
                 );
 
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
-                    height1 > collapsedHeight,
+                    collapsedHeight < height1,
                     $"Height ({height1}) should be greater than collapsed height ({collapsedHeight}). This suggests the drawer's fieldInfo may not be set correctly."
                 );
 
@@ -325,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Height should be the same when returning to the same page."
                 );
                 Assert.IsTrue(
-                    heightPage0First > heightPage3
+                    heightPage3 < heightPage0First
                         || Mathf.Approximately(heightPage0First, heightPage3),
                     "Full page should have height >= partial page."
                 );
@@ -393,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 Assert.IsTrue(
-                    fullPageHeight > partialPageHeight
+                    partialPageHeight < fullPageHeight
                         || Mathf.Approximately(fullPageHeight, partialPageHeight),
                     $"Full page with complex values should have height >= partial page. Full: {fullPageHeight}, Partial: {partialPageHeight}"
                 );
@@ -451,7 +451,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Pages with same item count should have same height."
                 );
                 Assert.IsTrue(
-                    page0Height > page2Height || Mathf.Approximately(page0Height, page2Height),
+                    page2Height < page0Height || Mathf.Approximately(page0Height, page2Height),
                     $"Page 0 (full) should have height >= page 2 (partial). Page0: {page0Height}, Page2: {page2Height}"
                 );
             }
@@ -657,7 +657,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Height should be the same when returning to the same page."
                 );
                 Assert.IsTrue(
-                    heightPage0First > heightPage3
+                    heightPage3 < heightPage0First
                         || Mathf.Approximately(heightPage0First, heightPage3),
                     "Full page should have height >= partial page."
                 );
@@ -712,7 +712,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 float partialPageHeight = drawer.GetPropertyHeight(setProperty, GUIContent.none);
 
                 Assert.IsTrue(
-                    fullPageHeight > partialPageHeight
+                    partialPageHeight < fullPageHeight
                         || Mathf.Approximately(fullPageHeight, partialPageHeight),
                     $"Full page with complex values should have height >= partial page. Full: {fullPageHeight}, Partial: {partialPageHeight}"
                 );
@@ -766,7 +766,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
-                    fullPageHeight > collapsedHeight,
+                    collapsedHeight < fullPageHeight,
                     $"Full page height ({fullPageHeight}) should be greater than collapsed height ({collapsedHeight}). This suggests the drawer's fieldInfo may not be set correctly."
                 );
 
@@ -778,7 +778,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 Assert.IsTrue(
-                    fullPageHeight > singleItemPageHeight,
+                    singleItemPageHeight < fullPageHeight,
                     $"Full page ({SmallPageSize} items) should be taller than single-item page. Full: {fullPageHeight}, Single: {singleItemPageHeight}"
                 );
             }
@@ -825,7 +825,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 float singleItemPageHeight = drawer.GetPropertyHeight(setProperty, GUIContent.none);
 
                 Assert.IsTrue(
-                    fullPageHeight > singleItemPageHeight,
+                    singleItemPageHeight < fullPageHeight,
                     $"Full page ({SmallPageSize} items) should be taller than single-item page. Full: {fullPageHeight}, Single: {singleItemPageHeight}"
                 );
             }
@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
-                    page0Height > collapsedHeight,
+                    collapsedHeight < page0Height,
                     $"Page 0 height ({page0Height}) should be greater than collapsed height ({collapsedHeight}). This suggests the drawer's fieldInfo may not be set correctly."
                 );
 
@@ -893,7 +893,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     $"Full pages should have the same height. Page 0: {page0Height}, Page 1: {page1Height}"
                 );
                 Assert.IsTrue(
-                    page0Height > page2Height,
+                    page2Height < page0Height,
                     $"Last page with 1 item should be shorter than full pages. Page 0: {page0Height}, Page 2: {page2Height}"
                 );
             }
@@ -949,7 +949,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Full pages should have the same height."
                 );
                 Assert.IsTrue(
-                    page0Height > page2Height,
+                    page2Height < page0Height,
                     "Last page with 1 item should be shorter than full pages."
                 );
             }
@@ -1007,7 +1007,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 Assert.IsTrue(
-                    fullPageHeight > lastPageHeight,
+                    lastPageHeight < fullPageHeight,
                     $"Last page height should be calculated fresh, not use cached full page height. Full: {fullPageHeight}, Last: {lastPageHeight}"
                 );
             }
@@ -1054,7 +1054,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 float lastPageHeight = drawer.GetPropertyHeight(setProperty, GUIContent.none);
 
                 Assert.IsTrue(
-                    fullPageHeight > lastPageHeight,
+                    lastPageHeight < fullPageHeight,
                     $"Last page height should be calculated fresh, not use cached full page height. Full: {fullPageHeight}, Last: {lastPageHeight}"
                 );
             }

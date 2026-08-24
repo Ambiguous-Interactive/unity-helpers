@@ -28,8 +28,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle second = EffectHandle.CreateInstance(effect);
 
             Assert.AreEqual(first.id + 1, second.id);
-            Assert.IsTrue(second.CompareTo(first) > 0);
-            Assert.IsTrue(second.CompareTo((object)first) > 0);
+            Assert.IsTrue(0 < second.CompareTo(first));
+            Assert.IsTrue(0 < second.CompareTo((object)first));
         }
 
         [Test]

@@ -275,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
 
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
             {
-                for (int i = folders.Length - 1; i >= 0; i--)
+                for (int i = folders.Length - 1; 0 <= i; i--)
                 {
                     string folderPath = folders[i];
                     if (AssetDatabase.IsValidFolder(folderPath))

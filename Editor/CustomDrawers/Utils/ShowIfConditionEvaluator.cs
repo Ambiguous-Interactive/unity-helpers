@@ -304,9 +304,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             switch (comparison)
             {
                 case WShowIfComparison.GreaterThan:
-                    return compareResult > 0;
+                    return 0 < compareResult;
                 case WShowIfComparison.GreaterThanOrEqual:
-                    return compareResult >= 0;
+                    return 0 <= compareResult;
                 case WShowIfComparison.LessThan:
                     return compareResult < 0;
                 case WShowIfComparison.LessThanOrEqual:

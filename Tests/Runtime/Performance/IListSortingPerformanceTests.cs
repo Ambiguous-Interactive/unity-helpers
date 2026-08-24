@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             IComparer<int> comparer
         )
         {
-            if (baseData.Length > implementation.MaxSupportedCount)
+            if (implementation.MaxSupportedCount < baseData.Length)
             {
                 return "n/a";
             }
@@ -251,23 +251,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static string FormatDuration(double milliseconds)
         {
-            if (milliseconds >= 1000d)
+            if (1000d <= milliseconds)
             {
                 double seconds = milliseconds / 1000d;
                 return string.Format(CultureInfo.InvariantCulture, "{0:0.00} s", seconds);
             }
 
-            if (milliseconds >= 100d)
+            if (100d <= milliseconds)
             {
                 return string.Format(CultureInfo.InvariantCulture, "{0:0} ms", milliseconds);
             }
 
-            if (milliseconds >= 10d)
+            if (10d <= milliseconds)
             {
                 return string.Format(CultureInfo.InvariantCulture, "{0:0.0} ms", milliseconds);
             }
 
-            if (milliseconds >= 1d)
+            if (1d <= milliseconds)
             {
                 return string.Format(CultureInfo.InvariantCulture, "{0:0.00} ms", milliseconds);
             }
@@ -319,7 +319,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             IRandom random = new PcgRandom(unchecked(count * 7919));
 
-            for (int i = count - 1; i > 0; --i)
+            for (int i = count - 1; 0 < i; --i)
             {
                 int swapIndex = random.Next(0, i + 1);
                 int temp = data[i];

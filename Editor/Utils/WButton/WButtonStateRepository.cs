@@ -106,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         internal List<WButtonResultEntry> History { get; } = new();
 
-        internal bool HasHistory => History.Count > 0;
+        internal bool HasHistory => 0 < History.Count;
 
         internal void AddResult(WButtonResultEntry entry, int historyCapacity)
         {
@@ -116,10 +116,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             History.Add(entry);
-            if (historyCapacity > 0)
+            if (0 < historyCapacity)
             {
                 int overflow = History.Count - historyCapacity;
-                if (overflow > 0)
+                if (0 < overflow)
                 {
                     History.RemoveRange(0, overflow);
                 }

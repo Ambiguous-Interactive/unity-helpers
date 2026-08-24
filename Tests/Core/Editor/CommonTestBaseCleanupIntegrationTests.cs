@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
 
             // Cleanup: Dispose all scopes
-            for (int i = scopes.Count - 1; i >= 0; i--)
+            for (int i = scopes.Count - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
             }

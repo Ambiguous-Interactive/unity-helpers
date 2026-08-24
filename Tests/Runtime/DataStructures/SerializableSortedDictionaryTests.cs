@@ -1666,7 +1666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ToArrayConsistentWithEnumerationForVariousSizes(int size)
         {
             SerializableSortedDictionary<int, string> dictionary = new();
-            for (int i = size - 1; i >= 0; i--)
+            for (int i = size - 1; 0 <= i; i--)
             {
                 dictionary[i] = $"value_{i}";
             }

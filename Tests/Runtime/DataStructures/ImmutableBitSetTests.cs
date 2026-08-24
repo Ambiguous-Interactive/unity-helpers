@@ -669,7 +669,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             BitSet bits = new(capacity);
             bits.TrySet(0);
-            if (capacity > 1)
+            if (1 < capacity)
             {
                 bits.TrySet(capacity - 1);
             }
@@ -678,7 +678,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(capacity, immutable.Capacity);
             Assert.IsTrue(immutable[0]);
-            if (capacity > 1)
+            if (1 < capacity)
             {
                 Assert.IsTrue(immutable[capacity - 1]);
             }

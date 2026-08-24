@@ -274,7 +274,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             }
 
             int columns =
-                requestedPerRow > 0
+                0 < requestedPerRow
                     ? requestedPerRow
                     : DetermineAutoColumns(availableWidth, spacing, minWidth);
 

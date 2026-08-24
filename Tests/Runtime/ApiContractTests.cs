@@ -423,12 +423,12 @@ namespace WallstopStudios.UnityHelpers.Tests
             foreach (MethodInfo method in jsonSerializeMethodsList)
             {
                 ParameterInfo[] parameters = method.GetParameters();
-                if (parameters.Length >= 2)
+                if (2 <= parameters.Length)
                 {
                     // Check that no overload has a simple bool as second parameter
                     // (which would suggest a 'pretty' flag)
                     bool hasBoolSecondParam =
-                        parameters.Length >= 2 && parameters[1].ParameterType == typeof(bool);
+                        2 <= parameters.Length && parameters[1].ParameterType == typeof(bool);
 
                     Assert.IsFalse(
                         hasBoolSecondParam,

@@ -386,7 +386,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
                 else
                 {
-                    for (int i = runLength - 1; i >= 0; --i)
+                    for (int i = runLength - 1; 0 <= i; --i)
                     {
                         values.Add(current + i);
                     }
@@ -802,7 +802,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.DoesNotThrow(() =>
                 filled.Fill(index =>
                 {
-                    if (filled.Count > 4)
+                    if (4 < filled.Count)
                     {
                         filled.RemoveAt(filled.Count - 1);
                     }
@@ -815,7 +815,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.DoesNotThrow(() =>
                 searched.IndexOf(value =>
                 {
-                    if (searched.Count > 4)
+                    if (4 < searched.Count)
                     {
                         searched.RemoveAt(searched.Count - 1);
                     }
@@ -828,12 +828,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.DoesNotThrow(() =>
                 found.FindAll(value =>
                 {
-                    if (found.Count > 4)
+                    if (4 < found.Count)
                     {
                         found.RemoveAt(found.Count - 1);
                     }
 
-                    return value >= 0;
+                    return 0 <= value;
                 })
             );
 
@@ -841,12 +841,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.DoesNotThrow(() =>
                 partitioned.Partition(value =>
                 {
-                    if (partitioned.Count > 4)
+                    if (4 < partitioned.Count)
                     {
                         partitioned.RemoveAt(partitioned.Count - 1);
                     }
 
-                    return value >= 0;
+                    return 0 <= value;
                 })
             );
         }
@@ -1198,7 +1198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void IndexOfFound()
         {
             int[] arr = { 1, 2, 3, 4, 5 };
-            Assert.That(arr.IndexOf(x => x > 3), Is.EqualTo(3));
+            Assert.That(arr.IndexOf(x => 3 < x), Is.EqualTo(3));
             Assert.That(arr.IndexOf(x => x == 1), Is.EqualTo(0));
         }
 
@@ -1206,7 +1206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void IndexOfNotFound()
         {
             int[] arr = { 1, 2, 3 };
-            Assert.That(arr.IndexOf(x => x > 10), Is.EqualTo(-1));
+            Assert.That(arr.IndexOf(x => 10 < x), Is.EqualTo(-1));
         }
 
         [Test]
@@ -1228,7 +1228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void LastIndexOfNotFound()
         {
             int[] arr = { 1, 2, 3 };
-            Assert.That(arr.LastIndexOf(x => x > 10), Is.EqualTo(-1));
+            Assert.That(arr.LastIndexOf(x => 10 < x), Is.EqualTo(-1));
         }
 
         [Test]
@@ -1578,7 +1578,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void CombinedOperationsRemoveAllThenIsSorted()
         {
             List<int> list = new() { 5, 2, 8, 1, 9, 3, 7, 4, 6 };
-            list.RemoveAll(x => x > 5);
+            list.RemoveAll(x => 5 < x);
             list.Sort(new IntComparer());
             Assert.That(list.IsSorted(), Is.True);
             Assert.That(list, Is.EqualTo(new[] { 1, 2, 3, 4, 5 }));

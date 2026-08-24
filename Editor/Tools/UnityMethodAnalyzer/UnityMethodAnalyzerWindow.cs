@@ -54,9 +54,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             if (GUILayout.Button("+", GUILayout.Width(25)))
             {
                 string browsePath =
-                    _sourcePaths?.Count > 0 && !string.IsNullOrEmpty(_sourcePaths[^1])
+                    0 < _sourcePaths?.Count && !string.IsNullOrEmpty(_sourcePaths[^1])
                         ? _sourcePaths[^1]
                         : GetProjectRoot();
 
@@ -307,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     )
                     {
                         displayPath =
-                            displayPath.Length > projectRoot.Length
+                            projectRoot.Length < displayPath.Length
                                 ? "." + displayPath.Substring(projectRoot.Length)
                                 : ".";
                     }
@@ -358,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     GUILayout.EndHorizontal();
                 }
 
-                if (removeIndex >= 0)
+                if (0 <= removeIndex)
                 {
                     _sourcePaths.RemoveAt(removeIndex);
                 }
@@ -705,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             GUILayout.FlexibleSpace();
 
-            if (_totalCount > 0)
+            if (0 < _totalCount)
             {
                 if (GUILayout.Button("Export ▾", GUILayout.Width(isNarrowLayout ? 70f : 100f)))
                 {
@@ -1250,7 +1250,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         SearchOption.AllDirectories
                     );
 
-                    if (foundFiles.Length > 0)
+                    if (0 < foundFiles.Length)
                     {
                         fullPath = foundFiles[0];
                     }
@@ -1318,14 +1318,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 string afterCache = normalizedPath.Substring(packageCachePath.Length + 1);
                 // The package folder has version suffix like "com.package@1.0.0"
                 int firstSlash = afterCache.IndexOf('/');
-                if (firstSlash > 0)
+                if (0 < firstSlash)
                 {
                     string packageFolderName = afterCache.Substring(0, firstSlash);
                     string pathInsidePackage = afterCache.Substring(firstSlash + 1);
                     // Extract package ID by removing version suffix (everything after @)
                     int atIndex = packageFolderName.IndexOf('@');
                     string packageId =
-                        atIndex > 0 ? packageFolderName.Substring(0, atIndex) : packageFolderName;
+                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
                     return "Packages/" + packageId + "/" + pathInsidePackage;
                 }
             }
@@ -1336,19 +1336,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 packageCacheMarker,
                 StringComparison.OrdinalIgnoreCase
             );
-            if (cacheIndex >= 0)
+            if (0 <= cacheIndex)
             {
                 string afterCache = normalizedPath.Substring(
                     cacheIndex + packageCacheMarker.Length
                 );
                 int firstSlash = afterCache.IndexOf('/');
-                if (firstSlash > 0)
+                if (0 < firstSlash)
                 {
                     string packageFolderName = afterCache.Substring(0, firstSlash);
                     string pathInsidePackage = afterCache.Substring(firstSlash + 1);
                     int atIndex = packageFolderName.IndexOf('@');
                     string packageId =
-                        atIndex > 0 ? packageFolderName.Substring(0, atIndex) : packageFolderName;
+                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
                     return "Packages/" + packageId + "/" + pathInsidePackage;
                 }
             }
@@ -1358,7 +1358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 "/Packages/",
                 StringComparison.OrdinalIgnoreCase
             );
-            if (packagesIndex >= 0)
+            if (0 <= packagesIndex)
             {
                 return normalizedPath.Substring(packagesIndex + 1);
             }
@@ -1417,7 +1417,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         SearchOption.AllDirectories
                     );
 
-                    if (foundFiles.Length > 0)
+                    if (0 < foundFiles.Length)
                     {
                         fullPath = foundFiles[0];
                     }

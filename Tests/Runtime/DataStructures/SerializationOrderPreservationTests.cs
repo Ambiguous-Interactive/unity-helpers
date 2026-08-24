@@ -1672,7 +1672,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             // Diagnostic: Show hex dump of first bytes
             string hexDump =
-                bytes.Length > 0
+                0 < bytes.Length
                     ? string.Join(" ", bytes.Take(20).Select(b => b.ToString("X2")))
                     : "empty";
 
@@ -3382,7 +3382,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             // Arrange
             SerializableDictionary<int, string> dict = new();
-            if (initialKeys.Length > 0)
+            if (0 < initialKeys.Length)
             {
                 dict._keys = initialKeys;
                 dict._values = initialValues;

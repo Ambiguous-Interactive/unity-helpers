@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
         [ThreadStatic]
         private static int _scopeDepth;
 
-        public static bool IsActive => _scopeDepth > 0;
+        public static bool IsActive => 0 < _scopeDepth;
 
         public static IDisposable Enter()
         {
@@ -30,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
                 }
 
                 _disposed = true;
-                if (_scopeDepth > 0)
+                if (0 < _scopeDepth)
                 {
                     _scopeDepth--;
                 }

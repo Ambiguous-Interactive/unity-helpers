@@ -87,12 +87,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             _changedWButtonKeys = DetectWButtonChanges(settingsObject);
             _changedWEnumKeys = DetectWEnumToggleButtonsChanges(settingsObject);
 
-            if (_changedWButtonKeys != null && _changedWButtonKeys.Count > 0)
+            if (_changedWButtonKeys != null && 0 < _changedWButtonKeys.Count)
             {
                 OnWButtonColorKeysChanged?.Invoke(_changedWButtonKeys);
             }
 
-            if (_changedWEnumKeys != null && _changedWEnumKeys.Count > 0)
+            if (_changedWEnumKeys != null && 0 < _changedWEnumKeys.Count)
             {
                 OnWEnumToggleButtonsColorKeysChanged?.Invoke(_changedWEnumKeys);
             }

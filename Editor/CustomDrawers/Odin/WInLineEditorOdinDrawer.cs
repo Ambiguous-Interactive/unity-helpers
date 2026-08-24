@@ -150,8 +150,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 headerSpacing = InLineEditorShared.HeaderPingSpacing;
                 headerRightMargin = InLineEditorShared.PingButtonRightMargin;
                 bool hasSpace =
-                    rect.width - pingWidth - headerSpacing - headerRightMargin
-                    >= InLineEditorShared.MinimumFoldoutLabelWidth;
+                    InLineEditorShared.MinimumFoldoutLabelWidth
+                    <= rect.width - pingWidth - headerSpacing - headerRightMargin;
                 if (!hasSpace)
                 {
                     showPingButton = false;

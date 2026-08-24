@@ -2511,7 +2511,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Document the behavior: at time=0, idle tracking may not work as expected
             // This test documents the behavior rather than asserting a specific outcome
             Assert.That(
-                purged >= 0,
+                0 <= purged,
                 Is.True,
                 $"Purge at time={_currentTime} with items returned at time=0: purged={purged}. "
                     + "Note: time=0 is a special case where idle tracking may be undefined."
@@ -2586,7 +2586,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Document behavior: pre-warmed items at time=0 may have special handling
             Assert.That(
-                purged >= 0,
+                0 <= purged,
                 Is.True,
                 $"Pre-warmed items at time=0 behavior: purged={purged} of 3. "
                     + "Note: Pre-warmed items may have special idle tracking behavior."

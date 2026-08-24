@@ -27,7 +27,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            if (focusedIndex < 0 || focusedIndex >= viewModel.Count)
+            if (focusedIndex < 0 || viewModel.Count <= focusedIndex)
             {
                 focusedIndex = 0;
             }
@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         )
         {
             recordUndo?.Invoke("Duplicate Animation Event");
-            if (focusedIndex < 0 || focusedIndex >= viewModel.Count)
+            if (focusedIndex < 0 || viewModel.Count <= focusedIndex)
             {
                 return;
             }

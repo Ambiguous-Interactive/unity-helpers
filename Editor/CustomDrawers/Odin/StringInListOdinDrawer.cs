@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             // Check for mixed values
             bool hasMultipleDifferentValues = false;
-            if (Property.ValueEntry.ValueCount > 1)
+            if (1 < Property.ValueEntry.ValueCount)
             {
                 object firstValue = Property.ValueEntry.WeakValues[0];
                 for (int i = 1; i < Property.ValueEntry.ValueCount; i++)
@@ -150,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int currentIndex = currentValue is int intValue ? intValue : -1;
 
             // Clamp index to valid range
-            if (currentIndex < 0 || currentIndex >= options.Length)
+            if (currentIndex < 0 || options.Length <= currentIndex)
             {
                 currentIndex = -1;
             }
@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
 
             string currentDisplay =
-                currentIndex >= 0 && currentIndex < displayOptions.Length
+                0 <= currentIndex && currentIndex < displayOptions.Length
                     ? displayOptions[currentIndex]
                     : DropDownShared.GetCachedIntString(currentValue is int idx ? idx : -1);
 
@@ -204,7 +204,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
 
             string currentDisplay =
-                currentIndex >= 0 && currentIndex < displayOptions.Length
+                0 <= currentIndex && currentIndex < displayOptions.Length
                     ? displayOptions[currentIndex]
                     : "(None)";
 
@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object parentValue = Property.Parent?.ValueEntry?.WeakSmartValue;
             string[] options = Attribute.GetOptions(parentValue) ?? Array.Empty<string>();
             int index = Array.IndexOf(options, value);
-            if (index >= 0)
+            if (0 <= index)
             {
                 Property.ValueEntry.WeakSmartValue = index;
             }

@@ -179,7 +179,7 @@ const TYPE_ARGUMENT_KEYWORDS = new Set([
 // balance-checked in the scan, so `if (a < b) Foo(c > d)` cannot masquerade as one type argument.
 const TYPE_ARGUMENT_PUNCTUATION = new Set([".", ",", "?", "[", "]", "*", "::", "(", ")"]);
 
-function tokenize(text, lineOffset = 0, columnOffset = 0) {
+function tokenize(text, lineOffset = 0, columnOffset = 0, holeTag = undefined) {
   const tokens = [];
   let i = 0;
   let line = 1;
@@ -194,6 +194,12 @@ function tokenize(text, lineOffset = 0, columnOffset = 0) {
       end,
       line: line + lineOffset,
       column: start - lineStart + 1 + (line === 1 ? columnOffset : 0),
+      /**
+       * Identifies the interpolation hole this token came from, or undefined at the top level.
+       * Hole tokens are emitted BEFORE the literal that contains them, so an operand scan that
+       * ignored this would walk out of `$"{a > b}"` and swallow the whole literal.
+       */
+      hole: holeTag,
       /** True when the previous character is not whitespace -- how `>=` is told from `> =`. */
       glued: 0 < start && !/\s/.test(text[start - 1])
     });
@@ -253,7 +259,8 @@ function tokenize(text, lineOffset = 0, columnOffset = 0) {
           for (const token of tokenize(
             text.slice(hole.start, hole.end),
             holeLine + lineOffset - 1,
-            hole.start - holeLineStart
+            hole.start - holeLineStart,
+            `${holeTag === undefined ? "" : holeTag}/${hole.start}`
           )) {
             tokens.push({ ...token, start: token.start + hole.start, end: token.end + hole.start });
           }
@@ -631,8 +638,13 @@ function operandRange(tokens, operatorIndex, operatorTokenEnd, direction) {
   let depth = 0;
   let i = direction === "left" ? operatorIndex - 1 : operatorTokenEnd + 1;
   let last = -1;
+  const hole = tokens[operatorIndex].hole;
   while (0 <= i && i < tokens.length) {
     const token = tokens[i];
+    // An operand cannot leave the interpolation hole it started in.
+    if (token.hole !== hole) {
+      break;
+    }
     if (token.kind === "punctuation" && opens.includes(token.text)) {
       depth++;
       last = i;

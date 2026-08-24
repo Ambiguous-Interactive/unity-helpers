@@ -94,11 +94,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 
         public int genericComparableDependent;
 
-        public bool ComputedProperty => boolCondition && intCondition > 0;
+        public bool ComputedProperty => boolCondition && 0 < intCondition;
 
         public bool HasPositiveDuration()
         {
-            return durationType == ModifierDurationType.Duration && durationAmount > 0;
+            return durationType == ModifierDurationType.Duration && 0 < durationAmount;
         }
 
         [WShowIf(nameof(boolCondition))]

@@ -1978,7 +1978,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 return;
             }
 
-            if (oldIndex < 0 || oldIndex >= backing.Count)
+            if (oldIndex < 0 || backing.Count <= oldIndex)
             {
                 return;
             }
@@ -1987,7 +1987,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             backing.RemoveAt(oldIndex);
 
             int clampedIndex = Mathf.Clamp(newIndex, 0, backing.Count);
-            if (clampedIndex >= backing.Count)
+            if (backing.Count <= clampedIndex)
             {
                 backing.Add(element);
             }

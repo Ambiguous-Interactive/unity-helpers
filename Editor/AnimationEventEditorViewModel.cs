@@ -215,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public bool CanSwapWithPrevious(int index)
         {
-            if (index <= 0 || index >= _events.Count)
+            if (index <= 0 || _events.Count <= index)
             {
                 return false;
             }
@@ -225,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public bool CanSwapWithNext(int index)
         {
-            if (index < 0 || index >= _events.Count - 1)
+            if (index < 0 || _events.Count - 1 <= index)
             {
                 return false;
             }
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public void MoveEvent(int fromIndex, int toIndex)
         {
-            if (fromIndex < 0 || fromIndex >= _events.Count)
+            if (fromIndex < 0 || _events.Count <= fromIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(fromIndex));
             }
@@ -249,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             AnimationEventItem item = _events[fromIndex];
             _events.RemoveAt(fromIndex);
-            if (clampedTarget > fromIndex)
+            if (fromIndex < clampedTarget)
             {
                 clampedTarget--;
             }
@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public bool TryGetBaseline(int originalIndex, out AnimationEvent animationEvent)
         {
-            if (originalIndex < 0 || originalIndex >= _baseline.Count)
+            if (originalIndex < 0 || _baseline.Count <= originalIndex)
             {
                 animationEvent = null;
                 return false;
@@ -342,7 +342,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 AnimationEvent previous = _events[i - 1].animationEvent;
                 AnimationEvent current = _events[i].animationEvent;
-                if (AnimationEventEqualityComparer.Instance.Compare(previous, current) > 0)
+                if (0 < AnimationEventEqualityComparer.Instance.Compare(previous, current))
                 {
                     return true;
                 }

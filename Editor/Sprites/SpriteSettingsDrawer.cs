@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     + EditorGUIUtility.standardVerticalSpacing;
             }
 
-            if (totalHeight > 0)
+            if (0 < totalHeight)
             {
                 totalHeight -= EditorGUIUtility.standardVerticalSpacing;
             }

@@ -1426,7 +1426,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 string availableIndexers = string.Join(
                     ", ",
                     allProps
-                        .Where(p => p.GetIndexParameters().Length > 0)
+                        .Where(p => 0 < p.GetIndexParameters().Length)
                         .Select(p =>
                         {
                             ParameterInfo[] parms = p.GetIndexParameters();

@@ -109,9 +109,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -546,7 +546,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         int rowOffset = y * width;
                         for (int x = 0; x < width; ++x)
                         {
-                            if (pixels32[rowOffset + x].a > alphaThreshold)
+                            if (alphaThreshold < pixels32[rowOffset + x].a)
                             {
                                 local.sumX += x;
                                 local.sumY += y;
@@ -576,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         int rowOffset = y * width;
                         for (int x = 0; x < width; ++x)
                         {
-                            if (pixels[rowOffset + x].a > alphaCutoff)
+                            if (alphaCutoff < pixels[rowOffset + x].a)
                             {
                                 local.sumX += x;
                                 local.sumY += y;

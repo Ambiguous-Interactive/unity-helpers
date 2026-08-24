@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 foreach (Event evt in events)
                 {
                     double elapsed = EditorApplication.timeSinceStartup - start;
-                    if (passes >= budget.MaxFrames || elapsed >= budget.MaxSeconds)
+                    if (budget.MaxFrames <= passes || budget.MaxSeconds <= elapsed)
                     {
                         throw new TestIMGUIExecutorTimeoutException(passes, elapsed, budget);
                     }

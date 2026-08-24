@@ -72,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(inst2.gameObject);
             Coroutine coroutine = inst2.StartCoroutine(TestCoroutine());
 
-            yield return WaitUntil(() => counter >= 2, nameof(counter));
+            yield return WaitUntil(() => 2 <= counter, nameof(counter));
 
             int countBeforeStop = counter;
             CoroutineHandler.Instance.StopCoroutine(coroutine);
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             inst3.StartCoroutine(TestCoroutine1());
             inst3.StartCoroutine(TestCoroutine2());
 
-            yield return WaitUntil(() => counter1 > 0 && counter2 > 0, "both counters");
+            yield return WaitUntil(() => 0 < counter1 && 0 < counter2, "both counters");
 
             int count1BeforeStop = counter1;
             int count2BeforeStop = counter2;

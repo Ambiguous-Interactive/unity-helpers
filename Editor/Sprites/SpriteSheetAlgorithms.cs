@@ -138,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             /// <summary>
             /// Whether this result represents a valid grid detection.
             /// </summary>
-            public bool IsValid => CellWidth >= MinimumCellSize && CellHeight >= MinimumCellSize;
+            public bool IsValid => MinimumCellSize <= CellWidth && MinimumCellSize <= CellHeight;
 
             public AlgorithmResult(
                 int cellWidth,
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(algorithm);
             }
 
-            if (alphaThreshold < 0f || alphaThreshold >= 1f)
+            if (alphaThreshold < 0f || 1f <= alphaThreshold)
             {
                 return AlgorithmResult.Invalid(algorithm);
             }
@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 snapToTextureDivisor
             );
 
-            if (boundaryResult.IsValid && boundaryResult.Confidence >= AutoBestEarlyStopConfidence)
+            if (boundaryResult.IsValid && AutoBestEarlyStopConfidence <= boundaryResult.Confidence)
             {
                 return new AlgorithmResult(
                     boundaryResult.CellWidth,
@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            if (boundaryResult.Confidence > bestResult.Confidence)
+            if (bestResult.Confidence < boundaryResult.Confidence)
             {
                 bestResult = boundaryResult;
             }
@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cancellationToken
             );
 
-            if (clusterResult.IsValid && clusterResult.Confidence >= AutoBestEarlyStopConfidence)
+            if (clusterResult.IsValid && AutoBestEarlyStopConfidence <= clusterResult.Confidence)
             {
                 return new AlgorithmResult(
                     clusterResult.CellWidth,
@@ -332,7 +332,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            if (clusterResult.Confidence > bestResult.Confidence)
+            if (bestResult.Confidence < clusterResult.Confidence)
             {
                 bestResult = clusterResult;
             }
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cancellationToken
             );
 
-            if (distanceResult.IsValid && distanceResult.Confidence >= AutoBestEarlyStopConfidence)
+            if (distanceResult.IsValid && AutoBestEarlyStopConfidence <= distanceResult.Confidence)
             {
                 return new AlgorithmResult(
                     distanceResult.CellWidth,
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            if (distanceResult.Confidence > bestResult.Confidence)
+            if (bestResult.Confidence < distanceResult.Confidence)
             {
                 bestResult = distanceResult;
             }
@@ -384,13 +384,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cancellationToken
             );
 
-            if (regionResult.Confidence > bestResult.Confidence)
+            if (bestResult.Confidence < regionResult.Confidence)
             {
                 bestResult = regionResult;
             }
 
             // Try UniformGrid as last resort if expected count is provided
-            if (expectedSpriteCount > 0)
+            if (0 < expectedSpriteCount)
             {
                 AlgorithmResult uniformResult = DetectGridUniformGrid(
                     textureWidth,
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     expectedSpriteCount
                 );
 
-                if (uniformResult.Confidence > bestResult.Confidence)
+                if (bestResult.Confidence < uniformResult.Confidence)
                 {
                     bestResult = uniformResult;
                 }
@@ -491,7 +491,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             // Reduce confidence for extreme aspect ratios
             float cellAspectRatio = (float)finalCellWidth / finalCellHeight;
-            if (cellAspectRatio < 0.25f || cellAspectRatio > 4.0f)
+            if (cellAspectRatio < 0.25f || 4.0f < cellAspectRatio)
             {
                 confidence *= 0.5f;
             }
@@ -558,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
-            if (expectedSpriteCount > 0)
+            if (0 < expectedSpriteCount)
             {
                 int cellWidth;
                 int cellHeight;
@@ -621,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 $"[BoundaryScoring] Auto-detection path: detectedSpriteCount={spriteCount}, expectedSpriteCount={expectedSpriteCount}"
             );
 
-            if (spriteCount >= 2)
+            if (2 <= spriteCount)
             {
                 int cellWidth;
                 int cellHeight;
@@ -645,7 +645,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
 
                     // If sprites fit reasonably well, use this result directly
-                    if (spriteFitScore >= 0.5f)
+                    if (0.5f <= spriteFitScore)
                     {
                         return new AlgorithmResult(
                             cellWidth,
@@ -714,7 +714,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int cellCount = columns * rows;
 
                     // HARD CONSTRAINT: Skip candidates that split sprites
-                    if (spriteBounds.Count > 0)
+                    if (0 < spriteBounds.Count)
                     {
                         float spriteFitScore = CalculateSpriteFitScore(
                             spriteBounds,
@@ -731,7 +731,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         // Bonus for excellent fit
-                        if (spriteFitScore >= 0.95f)
+                        if (0.95f <= spriteFitScore)
                         {
                             selectionScore += 0.1f;
                         }
@@ -741,27 +741,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     // This is the most reliable signal - the grid should have about as many cells as sprites
                     int detectedSpriteCount = spriteBounds.Count;
                     float cellCountRatio =
-                        detectedSpriteCount > 0 ? (float)cellCount / detectedSpriteCount : 1f;
+                        0 < detectedSpriteCount ? (float)cellCount / detectedSpriteCount : 1f;
 
                     // HARD CONSTRAINT: Cell count should not exceed 2x detected sprites
                     // (allows some margin for empty cells but prevents over-splitting)
-                    if (detectedSpriteCount > 0 && cellCount > detectedSpriteCount * 2)
+                    if (0 < detectedSpriteCount && detectedSpriteCount * 2 < cellCount)
                     {
                         continue; // Skip this candidate entirely
                     }
 
                     // HARD CONSTRAINT: Cell count should not be less than half of detected sprites
                     // (prevents under-splitting / grouping multiple sprites per cell)
-                    if (detectedSpriteCount > 0 && cellCount < detectedSpriteCount / 2)
+                    if (0 < detectedSpriteCount && cellCount < detectedSpriteCount / 2)
                     {
                         continue; // Skip this candidate entirely
                     }
 
                     // Strong bonus for cell count CLOSE to detected sprite count
                     // This is the primary selection criterion
-                    if (detectedSpriteCount > 0)
+                    if (0 < detectedSpriteCount)
                     {
-                        if (cellCountRatio >= 0.5f && cellCountRatio <= 2f)
+                        if (0.5f <= cellCountRatio && cellCountRatio <= 2f)
                         {
                             // Cell count is within 0.5x to 2x of sprite count - strong bonus
                             float closenessBonus = 1f - Math.Abs(1f - cellCountRatio);
@@ -775,11 +775,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     // Bonus for producing multiple cells
-                    if (columns >= 2 && rows >= 2)
+                    if (2 <= columns && 2 <= rows)
                     {
                         selectionScore += 0.1f;
                     }
-                    else if (columns >= 2 || rows >= 2)
+                    else if (2 <= columns || 2 <= rows)
                     {
                         selectionScore += 0.05f;
                     }
@@ -797,15 +797,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     // Much stronger penalty for very high cell counts
-                    if (cellCount > 100)
+                    if (100 < cellCount)
                     {
                         selectionScore *= 0.3f; // Was 0.5
                     }
-                    else if (cellCount > 64)
+                    else if (64 < cellCount)
                     {
                         selectionScore *= 0.5f; // Was 0.7
                     }
-                    else if (cellCount > 32)
+                    else if (32 < cellCount)
                     {
                         selectionScore *= 0.7f;
                     }
@@ -816,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     float sizeBonus = sizeRatio * 0.3f; // Was 0.1f
                     selectionScore += sizeBonus;
 
-                    if (selectionScore > bestScore)
+                    if (bestScore < selectionScore)
                     {
                         bestScore = selectionScore;
                         bestTransparencyScore = transparencyScore;
@@ -826,7 +826,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (bestScore >= 0.15f && bestWidth > 0 && bestHeight > 0)
+            if (0.15f <= bestScore && 0 < bestWidth && 0 < bestHeight)
             {
                 int finalWidth = bestWidth;
                 int finalHeight = bestHeight;
@@ -846,7 +846,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     finalHeight = adjusted.y;
 
                     // Validate the adjusted result also fits sprites well
-                    if (spriteBounds.Count > 0)
+                    if (0 < spriteBounds.Count)
                     {
                         float adjustedFitScore = CalculateSpriteFitScore(
                             spriteBounds,
@@ -961,11 +961,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 avgWidth += spriteBounds[i].width;
                 avgHeight += spriteBounds[i].height;
-                if (spriteBounds[i].width > maxWidth)
+                if (maxWidth < spriteBounds[i].width)
                 {
                     maxWidth = spriteBounds[i].width;
                 }
-                if (spriteBounds[i].height > maxHeight)
+                if (maxHeight < spriteBounds[i].height)
                 {
                     maxHeight = spriteBounds[i].height;
                 }
@@ -974,7 +974,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             avgHeight /= spriteBounds.Count;
 
             // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
-            if (expectedSpriteCount > 0)
+            if (0 < expectedSpriteCount)
             {
                 int cellWidth;
                 int cellHeight;
@@ -1083,7 +1083,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     textureHeight
                 );
 
-                if (altFitScore > spriteFitScore)
+                if (spriteFitScore < altFitScore)
                 {
                     cellWidth2 = altCellWidth;
                     cellHeight2 = altCellHeight;
@@ -1154,7 +1154,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // SPECIAL CASE: For strip textures (horizontal or vertical), prefer single-row/column layouts
             // even if they don't evenly divide the texture. This handles cases like 256x21 with 12 sprites
             // where the ideal layout (12x1) doesn't evenly divide (256/12 = 21.33).
-            if (textureAspect > 4f && spriteCount > 1)
+            if (4f < textureAspect && 1 < spriteCount)
             {
                 // Horizontal strip - prefer single row layout
                 // Use texture height as the target cell height (sprites are likely square-ish)
@@ -1164,15 +1164,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 // Check if this produces reasonable cells
                 if (
-                    targetCellWidth >= MinimumCellSize
-                    && targetCellHeight >= MinimumCellSize
+                    MinimumCellSize <= targetCellWidth
+                    && MinimumCellSize <= targetCellHeight
                     && targetCellWidth <= textureWidth
                 )
                 {
                     // Even if width doesn't divide evenly, prefer this for strip textures
                     // as long as cells are roughly square (within 3:1 aspect ratio)
                     float stripCellAspect = (float)targetCellWidth / targetCellHeight;
-                    if (stripCellAspect > 0.33f && stripCellAspect < 3f)
+                    if (0.33f < stripCellAspect && stripCellAspect < 3f)
                     {
                         cellWidth = targetCellWidth;
                         cellHeight = targetCellHeight;
@@ -1180,7 +1180,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
             }
-            else if (textureAspect < 0.25f && spriteCount > 1)
+            else if (textureAspect < 0.25f && 1 < spriteCount)
             {
                 // Vertical strip - prefer single column layout
                 int targetCellWidth = textureWidth;
@@ -1188,13 +1188,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int targetCellHeight = (textureHeight + spriteCount / 2) / spriteCount;
 
                 if (
-                    targetCellWidth >= MinimumCellSize
-                    && targetCellHeight >= MinimumCellSize
+                    MinimumCellSize <= targetCellWidth
+                    && MinimumCellSize <= targetCellHeight
                     && targetCellHeight <= textureHeight
                 )
                 {
                     float stripCellAspect = (float)targetCellWidth / targetCellHeight;
-                    if (stripCellAspect > 0.33f && stripCellAspect < 3f)
+                    if (0.33f < stripCellAspect && stripCellAspect < 3f)
                     {
                         cellWidth = targetCellWidth;
                         cellHeight = targetCellHeight;
@@ -1241,17 +1241,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 // However, for extreme aspect ratio textures (horizontal/vertical strips),
                 // we should prefer layouts that match the strip orientation
                 float aspectError;
-                if (textureAspect > 4f)
+                if (4f < textureAspect)
                 {
                     // Wide horizontal strip (e.g., 256x21) - prefer fewer rows
                     // Penalize configurations with more rows
-                    float rowPenalty = rows > 1 ? (rows - 1) * 2f : 0f;
+                    float rowPenalty = 1 < rows ? (rows - 1) * 2f : 0f;
                     aspectError = Math.Abs(cellAspect - 1f) + rowPenalty;
                 }
                 else if (textureAspect < 0.25f)
                 {
                     // Tall vertical strip - prefer fewer columns
-                    float colPenalty = cols > 1 ? (cols - 1) * 2f : 0f;
+                    float colPenalty = 1 < cols ? (cols - 1) * 2f : 0f;
                     aspectError = Math.Abs(cellAspect - 1f) + colPenalty;
                 }
                 else
@@ -1274,7 +1274,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             cellWidth = inferredCellWidth;
             cellHeight = inferredCellHeight;
-            return inferredCellWidth >= MinimumCellSize && inferredCellHeight >= MinimumCellSize;
+            return MinimumCellSize <= inferredCellWidth && MinimumCellSize <= inferredCellHeight;
         }
 
         /// <summary>
@@ -1323,7 +1323,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 // Overcounting creates empty cells, which is usually worse
                 float cellCountError = Math.Abs(actualCells - expectedSpriteCount);
                 float overcountPenalty =
-                    actualCells > expectedSpriteCount
+                    expectedSpriteCount < actualCells
                         ? (actualCells - expectedSpriteCount) * 15f
                         : 0f;
                 float cellAspect = (float)candidateCellWidth / candidateCellHeight;
@@ -1343,7 +1343,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             cellWidth = inferredCellWidth;
             cellHeight = inferredCellHeight;
-            return inferredCellWidth >= MinimumCellSize && inferredCellHeight >= MinimumCellSize;
+            return MinimumCellSize <= inferredCellWidth && MinimumCellSize <= inferredCellHeight;
         }
 
         /// <summary>
@@ -1366,7 +1366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 1; i < sortedPositions.Count; ++i)
             {
                 // Compare to PREVIOUS position, not group start
-                if (sortedPositions[i] - sortedPositions[i - 1] > tolerance)
+                if (tolerance < sortedPositions[i] - sortedPositions[i - 1])
                 {
                     ++groupCount;
                 }
@@ -1402,7 +1402,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 float gap = sortedPositions[i] - sortedPositions[i - 1];
                 // Gaps must be larger than MinSignificantGapSize to be considered "between columns/rows"
                 // This filters out small variations in sprite positions within the same column
-                if (gap > MinSignificantGapSize)
+                if (MinSignificantGapSize < gap)
                 {
                     gaps.Add(gap);
                 }
@@ -1468,7 +1468,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 for (int x = cellWidth; x < textureWidth; x += cellWidth)
                 {
                     // Only penalize if the grid line passes through the CORE zone
-                    if (coreXMin < x && coreXMax > x)
+                    if (coreXMin < x && x < coreXMax)
                     {
                         // Calculate severity based on how centered the split is in the core zone
                         float coreWidth = coreXMax - coreXMin;
@@ -1476,10 +1476,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         float distFromCoreRight = coreXMax - x;
                         float minDist = Math.Min(distFromCoreLeft, distFromCoreRight);
                         float halfCoreWidth = coreWidth * 0.5f;
-                        float splitRatio = halfCoreWidth > 0f ? minDist / halfCoreWidth : 0f;
+                        float splitRatio = 0f < halfCoreWidth ? minDist / halfCoreWidth : 0f;
                         float severity = Mathf.Clamp01(splitRatio);
 
-                        if (severity > worstVerticalSeverity)
+                        if (worstVerticalSeverity < severity)
                         {
                             worstVerticalSeverity = severity;
                         }
@@ -1491,17 +1491,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 for (int y = cellHeight; y < textureHeight; y += cellHeight)
                 {
                     // Only penalize if the grid line passes through the CORE zone
-                    if (coreYMin < y && coreYMax > y)
+                    if (coreYMin < y && y < coreYMax)
                     {
                         float coreHeight = coreYMax - coreYMin;
                         float distFromCoreBottom = y - coreYMin;
                         float distFromCoreTop = coreYMax - y;
                         float minDist = Math.Min(distFromCoreBottom, distFromCoreTop);
                         float halfCoreHeight = coreHeight * 0.5f;
-                        float splitRatio = halfCoreHeight > 0f ? minDist / halfCoreHeight : 0f;
+                        float splitRatio = 0f < halfCoreHeight ? minDist / halfCoreHeight : 0f;
                         float severity = Mathf.Clamp01(splitRatio);
 
-                        if (severity > worstHorizontalSeverity)
+                        if (worstHorizontalSeverity < severity)
                         {
                             worstHorizontalSeverity = severity;
                         }
@@ -1510,7 +1510,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 // Combine severities: worst case of either direction, but compound if both split
                 float combinedSeverity = Math.Max(worstVerticalSeverity, worstHorizontalSeverity);
-                if (worstVerticalSeverity > 0f && worstHorizontalSeverity > 0f)
+                if (0f < worstVerticalSeverity && 0f < worstHorizontalSeverity)
                 {
                     // Both directions split - extra penalty
                     combinedSeverity = Math.Min(
@@ -1563,17 +1563,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float confidence = 0.9f;
 
             // Penalize non-square cells more heavily for extreme deviations
-            if (cellAspectDeviation > 2f) // > 7.4:1 or < 1:7.4
+            if (2f < cellAspectDeviation) // > 7.4:1 or < 1:7.4
             {
                 // Extreme deviation - significantly reduce confidence
                 confidence = 0.5f;
             }
-            else if (cellAspectDeviation > 1.4f) // > 4:1 or < 1:4
+            else if (1.4f < cellAspectDeviation) // > 4:1 or < 1:4
             {
                 // Large deviation - reduce confidence
                 confidence = 0.6f;
             }
-            else if (cellAspectDeviation > 0.7f) // > 2:1 or < 1:2
+            else if (0.7f < cellAspectDeviation) // > 2:1 or < 1:2
             {
                 // Moderate deviation - slight reduction
                 confidence = 0.75f;
@@ -1587,11 +1587,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             // For texture strips (extreme aspect ratios), matching cell orientation gets bonus
             // E.g., 256x21 texture (12:1) should prefer horizontal layout with square-ish cells
-            if (textureAspect > 4f || textureAspect < 0.25f)
+            if (4f < textureAspect || textureAspect < 0.25f)
             {
                 // Check if cells match texture orientation
-                bool textureIsHorizontal = textureAspect > 1f;
-                bool cellsAreHorizontal = cellAspect > 1f;
+                bool textureIsHorizontal = 1f < textureAspect;
+                bool cellsAreHorizontal = 1f < cellAspect;
 
                 if (textureIsHorizontal == cellsAreHorizontal && cellAspectDeviation < 0.7f)
                 {
@@ -1716,7 +1716,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int top = distance[idx - textureWidth];
                     int current = distance[idx];
 
-                    if (x > 0)
+                    if (0 < x)
                     {
                         int topLeft = distance[idx - textureWidth - 1];
                         int left = distance[idx - 1];
@@ -1741,9 +1741,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // Backward pass
-            for (int y = textureHeight - 2; y >= 0; --y)
+            for (int y = textureHeight - 2; 0 <= y; --y)
             {
-                for (int x = textureWidth - 1; x >= 0; --x)
+                for (int x = textureWidth - 1; 0 <= x; --x)
                 {
                     int idx = y * textureWidth + x;
                     if (distance[idx] == 0)
@@ -1763,7 +1763,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     current = Math.Min(current, bottom + 3);
 
-                    if (x > 0)
+                    if (0 < x)
                     {
                         int bottomLeft = distance[idx + textureWidth - 1];
                         current = Math.Min(current, bottomLeft + 4);
@@ -1809,7 +1809,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 continue;
                             }
                             int neighborIdx = (y + dy) * textureWidth + (x + dx);
-                            if (distance[neighborIdx] > val)
+                            if (val < distance[neighborIdx])
                             {
                                 isMaximum = false;
                             }
@@ -1909,7 +1909,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
-            if (expectedSpriteCount > 0)
+            if (0 < expectedSpriteCount)
             {
                 int cellWidth;
                 int cellHeight;
@@ -1963,7 +1963,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int inferredCellHeight;
 
             if (
-                spriteCount > 0
+                0 < spriteCount
                 && InferGridFromSpriteCount(
                     spriteCount,
                     textureWidth,
@@ -2040,7 +2040,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < pixels.Length; ++i)
             {
                 Color32 c = pixels[i];
-                intensity[i] = c.a > alphaThresholdByte ? c.r + c.g + c.b : 0;
+                intensity[i] = alphaThresholdByte < c.a ? c.r + c.g + c.b : 0;
             }
 
             if (cancellationToken.IsCancellationRequested)
@@ -2077,9 +2077,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                             int neighborIdx = (y + dy) * textureWidth + (x + dx);
                             if (
-                                neighborIdx >= 0
+                                0 <= neighborIdx
                                 && neighborIdx < pixels.Length
-                                && intensity[neighborIdx] > val
+                                && val < intensity[neighborIdx]
                             )
                             {
                                 isMaximum = false;
@@ -2142,7 +2142,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int minY = seed.y;
                 int maxY = seed.y;
 
-                while (stack.Count > 0)
+                while (0 < stack.Count)
                 {
                     int lastIndex = stack.Count - 1;
                     int idx = stack[lastIndex];
@@ -2156,7 +2156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         minX = px;
                     }
-                    if (px > maxX)
+                    if (maxX < px)
                     {
                         maxX = px;
                     }
@@ -2164,16 +2164,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         minY = py;
                     }
-                    if (py > maxY)
+                    if (maxY < py)
                     {
                         maxY = py;
                     }
 
                     // 4-connected neighbors
-                    if (px > 0)
+                    if (0 < px)
                     {
                         int left = idx - 1;
-                        if (regionId[left] == 0 && pixels[left].a > alphaThresholdByte)
+                        if (regionId[left] == 0 && alphaThresholdByte < pixels[left].a)
                         {
                             regionId[left] = currentRegion;
                             stack.Add(left);
@@ -2182,16 +2182,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (px < textureWidth - 1)
                     {
                         int right = idx + 1;
-                        if (regionId[right] == 0 && pixels[right].a > alphaThresholdByte)
+                        if (regionId[right] == 0 && alphaThresholdByte < pixels[right].a)
                         {
                             regionId[right] = currentRegion;
                             stack.Add(right);
                         }
                     }
-                    if (py > 0)
+                    if (0 < py)
                     {
                         int bottom = idx - textureWidth;
-                        if (regionId[bottom] == 0 && pixels[bottom].a > alphaThresholdByte)
+                        if (regionId[bottom] == 0 && alphaThresholdByte < pixels[bottom].a)
                         {
                             regionId[bottom] = currentRegion;
                             stack.Add(bottom);
@@ -2200,7 +2200,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (py < textureHeight - 1)
                     {
                         int top = idx + textureWidth;
-                        if (regionId[top] == 0 && pixels[top].a > alphaThresholdByte)
+                        if (regionId[top] == 0 && alphaThresholdByte < pixels[top].a)
                         {
                             regionId[top] = currentRegion;
                             stack.Add(top);
@@ -2208,7 +2208,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                if (size > MinimumCellSize * MinimumCellSize / 4)
+                if (MinimumCellSize * MinimumCellSize / 4 < size)
                 {
                     regionSizes.Add(size);
                     regionBounds.Add(new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1));
@@ -2247,11 +2247,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 xPositions.Add(bounds.center.x);
                 yPositions.Add(bounds.center.y);
 
-                if (bounds.width > maxWidth)
+                if (maxWidth < bounds.width)
                 {
                     maxWidth = bounds.width;
                 }
-                if (bounds.height > maxHeight)
+                if (maxHeight < bounds.height)
                 {
                     maxHeight = bounds.height;
                 }
@@ -2260,7 +2260,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             avgHeight /= regionBounds.Count;
 
             // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
-            if (expectedSpriteCount > 0)
+            if (0 < expectedSpriteCount)
             {
                 int cellWidth;
                 int cellHeight;
@@ -2379,7 +2379,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     textureHeight
                 );
 
-                if (altFitScore > spriteFitScore)
+                if (spriteFitScore < altFitScore)
                 {
                     cellWidth2 = altCellWidth;
                     cellHeight2 = altCellHeight;
@@ -2408,8 +2408,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float widthStdDev = Mathf.Sqrt(widthVariance);
             float heightStdDev = Mathf.Sqrt(heightVariance);
 
-            float widthCoeffVar = avgWidth > 0 ? widthStdDev / avgWidth : 1f;
-            float heightCoeffVar = avgHeight > 0 ? heightStdDev / avgHeight : 1f;
+            float widthCoeffVar = 0 < avgWidth ? widthStdDev / avgWidth : 1f;
+            float heightCoeffVar = 0 < avgHeight ? heightStdDev / avgHeight : 1f;
 
             float uniformityScore = Mathf.Clamp01(1f - (widthCoeffVar + heightCoeffVar) * 0.5f);
 
@@ -2476,7 +2476,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     stack.Add(index);
                     visited[index] = true;
 
-                    while (stack.Count > 0)
+                    while (0 < stack.Count)
                     {
                         int lastIndex = stack.Count - 1;
                         int current = stack[lastIndex];
@@ -2489,7 +2489,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             minX = currentX;
                         }
-                        if (currentX > maxX)
+                        if (maxX < currentX)
                         {
                             maxX = currentX;
                         }
@@ -2497,16 +2497,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             minY = currentY;
                         }
-                        if (currentY > maxY)
+                        if (maxY < currentY)
                         {
                             maxY = currentY;
                         }
 
                         // 4-connected neighbors (cardinal directions)
-                        if (currentX > 0)
+                        if (0 < currentX)
                         {
                             int leftIndex = current - 1;
-                            if (!visited[leftIndex] && pixels[leftIndex].a > alphaThresholdByte)
+                            if (!visited[leftIndex] && alphaThresholdByte < pixels[leftIndex].a)
                             {
                                 visited[leftIndex] = true;
                                 stack.Add(leftIndex);
@@ -2515,16 +2515,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (currentX < textureWidth - 1)
                         {
                             int rightIndex = current + 1;
-                            if (!visited[rightIndex] && pixels[rightIndex].a > alphaThresholdByte)
+                            if (!visited[rightIndex] && alphaThresholdByte < pixels[rightIndex].a)
                             {
                                 visited[rightIndex] = true;
                                 stack.Add(rightIndex);
                             }
                         }
-                        if (currentY > 0)
+                        if (0 < currentY)
                         {
                             int bottomIndex = current - textureWidth;
-                            if (!visited[bottomIndex] && pixels[bottomIndex].a > alphaThresholdByte)
+                            if (!visited[bottomIndex] && alphaThresholdByte < pixels[bottomIndex].a)
                             {
                                 visited[bottomIndex] = true;
                                 stack.Add(bottomIndex);
@@ -2533,7 +2533,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (currentY < textureHeight - 1)
                         {
                             int topIndex = current + textureWidth;
-                            if (!visited[topIndex] && pixels[topIndex].a > alphaThresholdByte)
+                            if (!visited[topIndex] && alphaThresholdByte < pixels[topIndex].a)
                             {
                                 visited[topIndex] = true;
                                 stack.Add(topIndex);
@@ -2542,12 +2542,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                         // Add diagonal neighbors for 8-connectivity
                         // Top-left
-                        if (currentX > 0 && currentY < textureHeight - 1)
+                        if (0 < currentX && currentY < textureHeight - 1)
                         {
                             int neighborIndex = (currentY + 1) * textureWidth + (currentX - 1);
                             if (
                                 !visited[neighborIndex]
-                                && pixels[neighborIndex].a > alphaThresholdByte
+                                && alphaThresholdByte < pixels[neighborIndex].a
                             )
                             {
                                 visited[neighborIndex] = true;
@@ -2560,7 +2560,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             int neighborIndex = (currentY + 1) * textureWidth + (currentX + 1);
                             if (
                                 !visited[neighborIndex]
-                                && pixels[neighborIndex].a > alphaThresholdByte
+                                && alphaThresholdByte < pixels[neighborIndex].a
                             )
                             {
                                 visited[neighborIndex] = true;
@@ -2568,12 +2568,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
                         // Bottom-left
-                        if (currentX > 0 && currentY > 0)
+                        if (0 < currentX && 0 < currentY)
                         {
                             int neighborIndex = (currentY - 1) * textureWidth + (currentX - 1);
                             if (
                                 !visited[neighborIndex]
-                                && pixels[neighborIndex].a > alphaThresholdByte
+                                && alphaThresholdByte < pixels[neighborIndex].a
                             )
                             {
                                 visited[neighborIndex] = true;
@@ -2581,12 +2581,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
                         // Bottom-right
-                        if (currentX < textureWidth - 1 && currentY > 0)
+                        if (currentX < textureWidth - 1 && 0 < currentY)
                         {
                             int neighborIndex = (currentY - 1) * textureWidth + (currentX + 1);
                             if (
                                 !visited[neighborIndex]
-                                && pixels[neighborIndex].a > alphaThresholdByte
+                                && alphaThresholdByte < pixels[neighborIndex].a
                             )
                             {
                                 visited[neighborIndex] = true;
@@ -2608,9 +2608,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
 
                     if (
-                        width >= minDimension
-                        && height >= minDimension
-                        && width * height >= minArea
+                        minDimension <= width
+                        && minDimension <= height
+                        && minArea <= width * height
                     )
                     {
                         result.Add(new Rect(minX, minY, width, height));
@@ -2633,7 +2633,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < CommonCellSizes.Length; ++i)
             {
                 int size = CommonCellSizes[i];
-                if (size >= MinimumCellSize && size <= dimension && dimension % size == 0)
+                if (MinimumCellSize <= size && size <= dimension && dimension % size == 0)
                 {
                     candidates.Add(size);
                 }
@@ -2652,7 +2652,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int complement = dimension / div;
                     if (
                         complement != div
-                        && complement >= MinimumCellSize
+                        && MinimumCellSize <= complement
                         && !candidates.Contains(complement)
                     )
                     {
@@ -2758,7 +2758,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the value is a positive power of two (1, 2, 4, 8, ...).</returns>
         private static bool IsPowerOfTwo(int value)
         {
-            return value > 0 && (value & (value - 1)) == 0;
+            return 0 < value && (value & (value - 1)) == 0;
         }
 
         /// <summary>
@@ -2815,7 +2815,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     widthDivisors.Add(div);
                     int complement = textureWidth / div;
-                    if (complement != div && complement >= MinimumCellSize)
+                    if (complement != div && MinimumCellSize <= complement)
                     {
                         widthDivisors.Add(complement);
                     }
@@ -2828,7 +2828,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     heightDivisors.Add(div);
                     int complement = textureHeight / div;
-                    if (complement != div && complement >= MinimumCellSize)
+                    if (complement != div && MinimumCellSize <= complement)
                     {
                         heightDivisors.Add(complement);
                     }
@@ -2873,7 +2873,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int candidateRows = textureHeight / candidateHeight;
                     int candidateCellCount = candidateCols * candidateRows;
 
-                    if (candidateCellCount < minCellCount || candidateCellCount > maxCellCount)
+                    if (candidateCellCount < minCellCount || maxCellCount < candidateCellCount)
                     {
                         continue; // Skip divisors that produce wrong cell counts
                     }
@@ -2888,7 +2888,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
 
                     // HARD CONSTRAINT: Reject any divisor that would split sprites through their center
-                    if (spriteBounds != null && spriteBounds.Count > 0)
+                    if (spriteBounds != null && 0 < spriteBounds.Count)
                     {
                         float spriteFitScore = CalculateSpriteFitScore(
                             spriteBounds,
@@ -2905,7 +2905,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         // Mild bonus for excellent sprite fit
-                        if (spriteFitScore >= 0.95f)
+                        if (0.95f <= spriteFitScore)
                         {
                             score *= 1.1f;
                         }
@@ -2935,10 +2935,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     // 1. It has significantly better transparency score (> 15% better), OR
                     // 2. It has similar transparency but better combined bonus (proximity + size)
                     const float scoreDifferenceThreshold = 0.15f;
-                    bool isMuchBetterScore = score > bestScore + scoreDifferenceThreshold;
+                    bool isMuchBetterScore = bestScore + scoreDifferenceThreshold < score;
                     bool isSimilarScoreButBetter =
                         Math.Abs(score - bestScore) <= scoreDifferenceThreshold
-                        && combinedBonus > bestCombinedBonus;
+                        && bestCombinedBonus < combinedBonus;
 
                     if (isMuchBetterScore || isSimilarScoreButBetter)
                     {
@@ -2960,7 +2960,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int remainderX = textureWidth % bestWidth;
             int remainderY = textureHeight % bestHeight;
 
-            if (remainderX > 0)
+            if (0 < remainderX)
             {
                 float remainderTransparency = CalculateColumnTransparency(
                     pixels,
@@ -2974,14 +2974,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (remainderTransparency < RemainderTransparencyThreshold)
                 {
                     int cols = textureWidth / bestWidth;
-                    if (cols > 0)
+                    if (0 < cols)
                     {
                         bestWidth = textureWidth / cols;
                     }
                 }
             }
 
-            if (remainderY > 0)
+            if (0 < remainderY)
             {
                 float remainderTransparency = CalculateRowTransparency(
                     pixels,
@@ -2995,7 +2995,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (remainderTransparency < RemainderTransparencyThreshold)
                 {
                     int rows = textureHeight / bestHeight;
-                    if (rows > 0)
+                    if (0 < rows)
                     {
                         bestHeight = textureHeight / rows;
                     }
@@ -3098,7 +3098,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int centerX = col * cellWidth + cellWidth / 2;
                     int centerY = row * cellHeight + cellHeight / 2;
 
-                    if (centerX >= textureWidth || centerY >= textureHeight)
+                    if (textureWidth <= centerX || textureHeight <= centerY)
                     {
                         continue;
                     }
@@ -3113,7 +3113,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     for (int dy = -sampleRadius; dy <= sampleRadius; ++dy)
                     {
                         int y = centerY + dy;
-                        if (y < 0 || y >= textureHeight)
+                        if (y < 0 || textureHeight <= y)
                         {
                             continue;
                         }
@@ -3121,13 +3121,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         for (int dx = -sampleRadius; dx <= sampleRadius; ++dx)
                         {
                             int x = centerX + dx;
-                            if (x < 0 || x >= textureWidth)
+                            if (x < 0 || textureWidth <= x)
                             {
                                 continue;
                             }
 
                             int index = y * textureWidth + x;
-                            if (pixels[index].a > alphaThreshold)
+                            if (alphaThreshold < pixels[index].a)
                             {
                                 ++opaqueCount;
                             }
@@ -3135,7 +3135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    if (sampleCount > 0)
+                    if (0 < sampleCount)
                     {
                         totalInteriorOpacity += (float)opaqueCount / sampleCount;
                         ++interiorSampleCount;
@@ -3144,7 +3144,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             float avgInteriorOpacity =
-                interiorSampleCount > 0 ? totalInteriorOpacity / interiorSampleCount : 0f;
+                0 < interiorSampleCount ? totalInteriorOpacity / interiorSampleCount : 0f;
 
             // Contrast score: good grids have transparent boundaries and opaque interiors
             // Score = avgBoundaryTransparency * (1 + avgInteriorOpacity * 0.5)
@@ -3204,7 +3204,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            return totalCount > 0 ? (float)transparentCount / totalCount : 1f;
+            return 0 < totalCount ? (float)transparentCount / totalCount : 1f;
         }
 
         /// <summary>
@@ -3243,7 +3243,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            return totalCount > 0 ? (float)transparentCount / totalCount : 1f;
+            return 0 < totalCount ? (float)transparentCount / totalCount : 1f;
         }
     }
 #endif

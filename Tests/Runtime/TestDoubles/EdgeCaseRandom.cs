@@ -45,12 +45,12 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
 
         private float SampleFloat()
         {
-            if (++_floatCalls > _maxFloatCalls)
+            if (_maxFloatCalls < ++_floatCalls)
             {
                 throw new InvalidOperationException("Exceeded configured float call budget.");
             }
 
-            if (_floatSequence != null && _floatSequence.Count > 0)
+            if (_floatSequence != null && 0 < _floatSequence.Count)
             {
                 return _floatSequence.Dequeue();
             }
@@ -60,12 +60,12 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
 
         private double SampleDouble()
         {
-            if (++_doubleCalls > _maxDoubleCalls)
+            if (_maxDoubleCalls < ++_doubleCalls)
             {
                 throw new InvalidOperationException("Exceeded configured double call budget.");
             }
 
-            if (_doubleSequence != null && _doubleSequence.Count > 0)
+            if (_doubleSequence != null && 0 < _doubleSequence.Count)
             {
                 return _doubleSequence.Dequeue();
             }
@@ -186,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
         public float NextFloat(float max)
         {
             float sample = SampleFloat();
-            return sample >= 1f ? max : max * sample;
+            return 1f <= sample ? max : max * sample;
         }
 
         public float NextFloat(float min, float max)
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
                 return min;
             }
 
-            if (sample >= 1f)
+            if (1f <= sample)
             {
                 return max;
             }
@@ -213,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
         public double NextDouble(double max)
         {
             double sample = SampleDouble();
-            return sample >= 1d ? max : max * sample;
+            return 1d <= sample ? max : max * sample;
         }
 
         public double NextDouble(double min, double max)
@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
                 return min;
             }
 
-            if (sample >= 1d)
+            if (1d <= sample)
             {
                 return max;
             }

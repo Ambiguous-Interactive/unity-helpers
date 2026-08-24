@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EditorGUI.BeginProperty(position, label, property);
             try
             {
-                if (options.Length > pageSize)
+                if (pageSize < options.Length)
                 {
                     DrawPopupDropDown(
                         position,
@@ -159,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 displayValue = "\u2014"; // Em dash for mixed values
             }
-            else if (selectedIndex >= 0 && selectedIndex < displayedOptions.Length)
+            else if (0 <= selectedIndex && selectedIndex < displayedOptions.Length)
             {
                 displayValue = displayedOptions[selectedIndex];
             }
@@ -261,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 displayValue = "\u2014"; // Em dash for mixed values
             }
-            else if (selectedIndex >= 0 && selectedIndex < displayedOptions.Length)
+            else if (0 <= selectedIndex && selectedIndex < displayedOptions.Length)
             {
                 displayValue = displayedOptions[selectedIndex];
             }
@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
             string[] displayedOptions = GetOrCreateDisplayOptions(options);
 
-            if (options.Length > pageSize)
+            if (pageSize < options.Length)
             {
                 IntDropDownPopupSelectorElement popupElement = new(options, displayedOptions);
                 popupElement.BindProperty(property, property.displayName);
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 int currentValue = property.intValue;
                 int selectedIndex = Array.IndexOf(_options, currentValue);
 
-                if (selectedIndex >= 0 && selectedIndex < _displayedOptions.Length)
+                if (0 <= selectedIndex && selectedIndex < _displayedOptions.Length)
                 {
                     return _displayedOptions[selectedIndex];
                 }
@@ -403,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             protected override string GetDisplayLabel(int optionIndex)
             {
-                return optionIndex >= 0 && optionIndex < _displayedOptions.Length
+                return 0 <= optionIndex && optionIndex < _displayedOptions.Length
                     ? _displayedOptions[optionIndex]
                     : DropDownShared.GetCachedIntString(_options[optionIndex]);
             }
@@ -432,7 +432,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return _options[optionIndex];
             }
 
-            protected override int GetDefaultValue() => _options.Length > 0 ? _options[0] : 0;
+            protected override int GetDefaultValue() => 0 < _options.Length ? _options[0] : 0;
 
             protected override string UndoActionName => "Change IntDropDown Selection";
         }

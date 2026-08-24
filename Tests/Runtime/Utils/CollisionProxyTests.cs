@@ -82,7 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
 
-            if (stayCount > 0)
+            if (0 < stayCount)
             {
                 Assert.Greater(stayCount, 0);
             }
@@ -201,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
 
-            if (stayCount > 0)
+            if (0 < stayCount)
             {
                 Assert.Greater(stayCount, 0);
             }
@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
 
-            if (subscriber1Count > 0)
+            if (0 < subscriber1Count)
             {
                 Assert.AreEqual(subscriber1Count, subscriber2Count);
                 Assert.AreEqual(subscriber2Count, subscriber3Count);

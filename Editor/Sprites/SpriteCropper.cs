@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     $"Found {_filesToProcess.Count} sprites to process.",
                     EditorStyles.boldLabel
                 );
-                if (_multiSpriteFiles.Count > 0)
+                if (0 < _multiSpriteFiles.Count)
                 {
                     EditorGUILayout.HelpBox(
                         $"Detected {_multiSpriteFiles.Count} textures with Sprite Import Mode = Multiple. SpriteCropper only supports Single sprites. These will be skipped.",
@@ -632,7 +632,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     // Restore readability to originals that we changed
-                    if (originalReadable.Count > 0 && !_overwriteOriginals)
+                    if (0 < originalReadable.Count && !_overwriteOriginals)
                     {
                         using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
                         {
@@ -808,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int y = index / width;
 
                     byte a = pixels[index].a;
-                    if (a > alphaByteThreshold)
+                    if (alphaByteThreshold < a)
                     {
                         localState.hasVisible = true;
                         localState.minX = Mathf.Min(localState.minX, x);
@@ -861,8 +861,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Vector2 origCenter = new(width * origPivot.x, height * origPivot.y);
             Vector2 newPivotPixels = origCenter - new Vector2(visibleMinX, visibleMinY);
             Vector2 newPivotNorm = new(
-                cropWidth > 0 ? newPivotPixels.x / cropWidth : 0.5f,
-                cropHeight > 0 ? newPivotPixels.y / cropHeight : 0.5f
+                0 < cropWidth ? newPivotPixels.x / cropWidth : 0.5f,
+                0 < cropHeight ? newPivotPixels.y / cropHeight : 0.5f
             );
 
             if (!hasVisible)
@@ -967,7 +967,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     int destRow = y * cropWidth;
                     int srcY = visibleMinY + y;
-                    if (srcY < 0 || srcY >= height || srcY < srcY0 || srcY > srcY1)
+                    if (srcY < 0 || height <= srcY || srcY < srcY0 || srcY1 < srcY)
                     {
                         Array.Clear(croppedPixels, destRow, cropWidth);
                         return;
@@ -979,12 +979,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int leftClear = copyStartDestX;
                     int rightClear = cropWidth - 1 - copyEndDestX;
 
-                    if (leftClear > 0)
+                    if (0 < leftClear)
                     {
                         Array.Clear(croppedPixels, destRow, leftClear);
                     }
 
-                    if (copyEndDestX >= copyStartDestX)
+                    if (copyStartDestX <= copyEndDestX)
                     {
                         int numToCopy = copyEndDestX - copyStartDestX + 1;
                         int srcStartX = srcX0;
@@ -993,7 +993,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         Array.Copy(pixels, srcIndex, croppedPixels, destIndex, numToCopy);
                     }
 
-                    if (rightClear > 0)
+                    if (0 < rightClear)
                     {
                         Array.Clear(croppedPixels, destRow + (cropWidth - rightClear), rightClear);
                     }

@@ -1080,7 +1080,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 // At indentLevel 0, width can increase due to UnityListAlignmentOffset
                 // At indentLevel > 0, width should not exceed original
-                if (indentLevel > 0)
+                if (0 < indentLevel)
                 {
                     Assert.LessOrEqual(
                         resolvedRect.width,
@@ -1125,7 +1125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 GroupGUIWidthUtility.ResetForTests();
 
-                if (leftPadding > 0f || rightPadding > 0f)
+                if (0f < leftPadding || 0f < rightPadding)
                 {
                     using (
                         GroupGUIWidthUtility.PushContentPadding(
@@ -3239,7 +3239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 float xMaxShift = controlRect.xMax - indentedRect.xMax;
                 float widthDifference = controlRect.width - indentedRect.width;
-                bool behaviorModifiesRect = widthDifference > 0.001f;
+                bool behaviorModifiesRect = 0.001f < widthDifference;
 
                 TestContext.WriteLine(
                     $"[IndentedRect at indentLevel=0] Unity Version Behavior Documentation:"
@@ -3349,7 +3349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 // Our fix: skip IndentedRect at level 0
                 Rect result =
-                    EditorGUI.indentLevel > 0 ? EditorGUI.IndentedRect(controlRect) : controlRect;
+                    0 < EditorGUI.indentLevel ? EditorGUI.IndentedRect(controlRect) : controlRect;
 
                 Assert.AreEqual(
                     controlRect.x,
@@ -3499,7 +3499,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 // Production approach: skip IndentedRect at level 0
                 Rect productionApproach =
-                    indentLevel > 0 ? EditorGUI.IndentedRect(controlRect) : controlRect;
+                    0 < indentLevel ? EditorGUI.IndentedRect(controlRect) : controlRect;
 
                 TestContext.WriteLine(
                     $"[IndentedRect DataDriven] indentLevel={indentLevel}, "

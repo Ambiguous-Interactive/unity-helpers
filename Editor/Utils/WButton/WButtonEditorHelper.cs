@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// </summary>
         public void ProcessInvocations()
         {
-            if (_triggeredContexts.Count > 0)
+            if (0 < _triggeredContexts.Count)
             {
                 WButtonInvocationController.ProcessTriggeredMethods(_triggeredContexts);
                 _triggeredContexts.Clear();

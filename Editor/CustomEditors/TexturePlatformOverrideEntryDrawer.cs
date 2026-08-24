@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             int idx = GetSelectedIndex(nameProp.stringValue, choices);
             string currentDisplay =
                 isMixed ? MixedValueIndicator
-                : idx >= 0 && idx < choices.Length ? choices[idx]
+                : 0 <= idx && idx < choices.Length ? choices[idx]
                 : string.Empty;
 
             bool previousMixed = EditorGUI.showMixedValue;

@@ -323,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 Color result = PRNG.Instance.NextColorInRange(Color.red, 0.1f, 0f, 0f);
                 Color.RGBToHSV(result, out float hue, out float _, out float _);
-                if (hue > 0.5f)
+                if (0.5f < hue)
                 {
                     ++wrapped;
                 }

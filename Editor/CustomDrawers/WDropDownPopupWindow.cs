@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 PageSize = pageSize,
                 OnSelectionChanged = (selectedIndex) =>
                 {
-                    if (selectedIndex < 0 || selectedIndex >= options.Length)
+                    if (selectedIndex < 0 || options.Length <= selectedIndex)
                     {
                         return;
                     }
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 PageSize = pageSize,
                 OnSelectionChanged = (selectedIndex) =>
                 {
-                    if (selectedIndex < 0 || selectedIndex >= values.Length)
+                    if (selectedIndex < 0 || values.Length <= selectedIndex)
                     {
                         return;
                     }
@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 PageSize = pageSize,
                 OnSelectionChanged = (selectedIndex) =>
                 {
-                    if (selectedIndex < 0 || selectedIndex >= options.Length)
+                    if (selectedIndex < 0 || options.Length <= selectedIndex)
                     {
                         return;
                     }
@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (property.propertyType == SerializedPropertyType.Integer)
             {
                 int index = property.intValue;
-                if (index >= 0 && index < options.Length)
+                if (0 <= index && index < options.Length)
                 {
                     return index;
                 }
@@ -346,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private Vector2 CalculateInitialWindowSize(int totalOptions, int pageSize)
         {
             int visibleCount = Mathf.Min(totalOptions, pageSize);
-            bool hasPagination = totalOptions > pageSize;
+            bool hasPagination = pageSize < totalOptions;
 
             float height = VerticalPadding * 2;
             height += SearchRowHeight + 4f;
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             int pageSize = _data.PageSize;
             int filteredCount = _filteredIndices?.Count ?? CalculateFilteredCount();
-            bool hasPagination = filteredCount > pageSize;
+            bool hasPagination = pageSize < filteredCount;
             int rowsOnPage = CalculateRowsOnPage(filteredCount, pageSize, _pageIndex);
 
             float height = VerticalPadding * 2;
@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void OnPreviousPage()
         {
-            if (_pageIndex > 0)
+            if (0 < _pageIndex)
             {
                 _pageIndex--;
                 _focusedOptionIndex = -1;
@@ -642,18 +642,18 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 case KeyCode.Return:
                 case KeyCode.KeypadEnter:
                     evt.StopPropagation();
-                    if (_focusedOptionIndex >= 0)
+                    if (0 <= _focusedOptionIndex)
                     {
                         SelectFocusedOption();
                     }
-                    else if (_suggestionIndex >= 0)
+                    else if (0 <= _suggestionIndex)
                     {
                         AcceptSuggestion();
                     }
                     break;
 
                 case KeyCode.Tab:
-                    if (!string.IsNullOrEmpty(_suggestion) && _suggestionIndex >= 0)
+                    if (!string.IsNullOrEmpty(_suggestion) && 0 <= _suggestionIndex)
                     {
                         evt.StopPropagation();
                         AcceptSuggestion();
@@ -685,7 +685,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 _focusedOptionIndex = optionCount - 1;
             }
-            else if (_focusedOptionIndex >= optionCount)
+            else if (optionCount <= _focusedOptionIndex)
             {
                 _focusedOptionIndex = 0;
             }
@@ -711,7 +711,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void SelectFocusedOption()
         {
-            if (_focusedOptionIndex < 0 || _focusedOptionIndex >= _optionsContainer.childCount)
+            if (_focusedOptionIndex < 0 || _optionsContainer.childCount <= _focusedOptionIndex)
             {
                 return;
             }
@@ -780,7 +780,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 for (int i = 0; i < _data.DisplayLabels.Length; i++)
                 {
                     string label = GetNormalizedLabel(i);
-                    if (label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))
                     {
                         _filteredIndices.Add(i);
                     }
@@ -849,14 +849,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             _pageIndex = Mathf.Clamp(_pageIndex, 0, Mathf.Max(0, pageCount - 1));
 
-            bool showPagination = pageCount > 1;
+            bool showPagination = 1 < pageCount;
             _paginationContainer.style.display = showPagination
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
 
             if (showPagination)
             {
-                _previousButton.SetEnabled(_pageIndex > 0);
+                _previousButton.SetEnabled(0 < _pageIndex);
                 _nextButton.SetEnabled(_pageIndex < pageCount - 1);
                 _pageLabel.text = GetPaginationLabel(_pageIndex + 1, pageCount);
             }
@@ -985,7 +985,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             for (int i = 0; i < _data.DisplayLabels.Length; i++)
             {
                 string label = GetNormalizedLabel(i);
-                if (label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))
                 {
                     count++;
                 }

@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
                     string stripped = StripDeferralSchedules(result.Body);
                     List<string> firedTokens = FindForbiddenTokens(stripped);
-                    if (firedTokens.Count > 0)
+                    if (0 < firedTokens.Count)
                     {
                         StringBuilder message = new();
                         message
@@ -304,7 +304,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -627,7 +627,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 bool satisfied = false;
                 for (int t = 0; t < accepted.Length; t++)
                 {
-                    if (IndexOfOutsideLiteral(body, accepted[t], 0) >= 0)
+                    if (0 <= IndexOfOutsideLiteral(body, accepted[t], 0))
                     {
                         satisfied = true;
                         break;
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -683,7 +683,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return null;
             }
 
-            if (matches.Length > 1)
+            if (1 < matches.Length)
             {
                 failures.Add(
                     $"[{fileName}:{methodName}] ambiguous: multiple files named {fileName} found under "
@@ -784,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                             + "CentralizedClearHelpersActuallyFlush verifies its flush behavior."
                     );
                 }
-                else if (total > 1)
+                else if (1 < total)
                 {
                     failures.Add(
                         $"FlushEquivalentExpressions contains '{expression}' and it matches "
@@ -796,7 +796,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -918,7 +918,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 bool handlerInvolved = false;
                 for (int t = 0; t < handlerInvolvementTokens.Length; t++)
                 {
-                    if (source.IndexOf(handlerInvolvementTokens[t], StringComparison.Ordinal) >= 0)
+                    if (0 <= source.IndexOf(handlerInvolvementTokens[t], StringComparison.Ordinal))
                     {
                         handlerInvolved = true;
                         break;
@@ -962,7 +962,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 // reference inside a comment or string literal cannot mask a
                 // real placement regression.
                 int baseSetUpIndex = IndexOfOutsideLiteral(source, BaseSetUpCall, 0);
-                if (baseSetUpIndex >= 0 && tripwireIndex > baseSetUpIndex)
+                if (0 <= baseSetUpIndex && baseSetUpIndex < tripwireIndex)
                 {
                     failures.Add(
                         $"[{fileName}] calls AssetPostprocessorTestHandlers.AssertCleanAndClearAll() "
@@ -975,7 +975,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (failures.Count > 0)
+            if (0 < failures.Count)
             {
                 Assert.Fail(string.Join("\n\n", failures));
             }
@@ -1046,7 +1046,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (offenders.Count > 0)
+            if (0 < offenders.Count)
             {
                 Assert.Fail(
                     "The following test handler types declare [DetectAssetChanged] methods but "
@@ -1107,7 +1107,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
 
-            if (missing.Count > 0)
+            if (0 < missing.Count)
             {
                 Assert.Fail(
                     "AssetPostprocessorTestHandlers.DiscoveredHandlerTypes is missing expected handlers:\n"
@@ -1195,7 +1195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             for (int i = 0; i < FlushEquivalentExpressions.Length; i++)
             {
-                if (IndexOfOutsideLiteral(body, FlushEquivalentExpressions[i], 0) >= 0)
+                if (0 <= IndexOfOutsideLiteral(body, FlushEquivalentExpressions[i], 0))
                 {
                     return true;
                 }
@@ -1220,7 +1220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             for (int i = 0; i < HandlerClearEquivalentCalls.Length; i++)
             {
-                if (IndexOfOutsideLiteral(body, HandlerClearEquivalentCalls[i], 0) >= 0)
+                if (0 <= IndexOfOutsideLiteral(body, HandlerClearEquivalentCalls[i], 0))
                 {
                     return true;
                 }
@@ -1270,7 +1270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             for (int i = 0; i < AssetMutationTokens.Length; i++)
             {
-                if (IndexOfOutsideLiteral(body, AssetMutationTokens[i], 0) >= 0)
+                if (0 <= IndexOfOutsideLiteral(body, AssetMutationTokens[i], 0))
                 {
                     return true;
                 }
@@ -1283,7 +1283,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             for (int i = 0; i < AssetContextTokens.Length; i++)
             {
-                if (source.IndexOf(AssetContextTokens[i], StringComparison.Ordinal) >= 0)
+                if (0 <= source.IndexOf(AssetContextTokens[i], StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -1398,7 +1398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
                 TryAppendMatches(root, exactName, paths, seen);
                 TryAppendMatches(root, partialPattern, paths, seen);
-                if (paths.Count > 0)
+                if (0 < paths.Count)
                 {
                     break;
                 }
@@ -1565,7 +1565,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 //   `;` -> partial declaration (no body) -> skip to next match
                 //   `where T : ...` -> generic constraint; scan past to the body token
                 int cursor = SkipWhitespaceAndConstraints(source, closeParen + 1);
-                if (cursor >= source.Length)
+                if (source.Length <= cursor)
                 {
                     return null;
                 }
@@ -1574,7 +1574,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 if (lead == '{')
                 {
                     int end = FindMatchingBrace(source, cursor);
-                    if (end > cursor)
+                    if (cursor < end)
                     {
                         return source.Substring(cursor + 1, end - cursor - 1);
                     }
@@ -1583,7 +1583,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 {
                     int bodyStart = cursor + 2;
                     int bodyEnd = FindStatementTerminator(source, bodyStart);
-                    if (bodyEnd >= bodyStart)
+                    if (bodyStart <= bodyEnd)
                     {
                         return source.Substring(bodyStart, bodyEnd - bodyStart);
                     }
@@ -1852,7 +1852,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         // simplification is safe for the contract test.
         private static int SkipLiteralOrComment(string source, int i)
         {
-            if (i >= source.Length)
+            if (source.Length <= i)
             {
                 return i;
             }
@@ -1919,7 +1919,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     quoteRun++;
                 }
 
-                if (quoteRun >= 3)
+                if (3 <= quoteRun)
                 {
                     int j = i + quoteRun;
                     while (j <= source.Length - quoteRun)
@@ -2027,7 +2027,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             for (int i = 0; i < ForbiddenTokens.Length; i++)
             {
                 string token = ForbiddenTokens[i];
-                if (body.IndexOf(token, StringComparison.Ordinal) >= 0)
+                if (0 <= body.IndexOf(token, StringComparison.Ordinal))
                 {
                     fired.Add(token.Trim());
                 }

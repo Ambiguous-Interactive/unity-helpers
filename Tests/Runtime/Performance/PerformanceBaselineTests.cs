@@ -1797,7 +1797,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 }
 
                 double percent =
-                    result.BaselineMs > 0
+                    0 < result.BaselineMs
                         ? (result.TimeMs / (double)result.BaselineMs) * 100.0
                         : 0.0;
                 string status = result.Passed ? "Pass" : "FAIL";
@@ -1848,11 +1848,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static string FormatNumber(int number)
         {
-            if (number >= 1000000)
+            if (1000000 <= number)
             {
                 return $"{number / 1000000.0:F0}M".Replace(".0M", "M");
             }
-            if (number >= 1000)
+            if (1000 <= number)
             {
                 return $"{number / 1000.0:F0}K".Replace(".0K", "K");
             }

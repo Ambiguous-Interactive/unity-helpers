@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             double maxNextUint = 0;
             foreach (RandomBenchmarkResult result in results)
             {
-                if (result.NextUintPerSecond > maxNextUint)
+                if (maxNextUint < result.NextUintPerSecond)
                 {
                     maxNextUint = result.NextUintPerSecond;
                 }

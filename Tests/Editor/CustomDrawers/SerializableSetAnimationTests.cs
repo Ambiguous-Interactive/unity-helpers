@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     cycleLimit
                 );
 
-                if (offset > 0.01f)
+                if (0.01f < offset)
                 {
                     positiveCount++;
                 }

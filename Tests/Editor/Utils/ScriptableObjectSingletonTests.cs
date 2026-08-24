@@ -731,7 +731,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string result = instance.ToString();
 
             Assert.IsTrue(result != null, "ToString result should not be null");
-            Assert.IsTrue(result.Contains("TestSingleton") || result.Length > 0);
+            Assert.IsTrue(result.Contains("TestSingleton") || 0 < result.Length);
             yield break;
         }
 
@@ -1336,7 +1336,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AggregateException aggregate = task.Exception;
             Assert.IsTrue(aggregate != null, "Task exception should not be null for faulted task");
             AggregateException flattened = aggregate.Flatten();
-            Assert.IsTrue(flattened.InnerExceptions.Count > 0);
+            Assert.IsTrue(0 < flattened.InnerExceptions.Count);
             InvalidOperationException exception =
                 flattened.InnerExceptions[0] as InvalidOperationException;
             Assert.IsTrue(exception != null, "Inner exception should be InvalidOperationException");

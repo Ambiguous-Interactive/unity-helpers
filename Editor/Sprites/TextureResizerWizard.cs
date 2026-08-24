@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                if (sourcePaths.Count > 0)
+                if (0 < sourcePaths.Count)
                 {
                     foreach (
                         string guid in AssetDatabase.FindAssets(

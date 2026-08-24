@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             foreach (double max in BoundedDoubleMaxima)
             {
                 long bits = BitConverter.DoubleToInt64Bits(max);
-                double expected = BitConverter.Int64BitsToDouble(max > 0d ? bits - 1L : bits + 1L);
+                double expected = BitConverter.Int64BitsToDouble(0d < max ? bits - 1L : bits + 1L);
 
                 double result = WallMath.BoundedDouble(max, max);
 
@@ -78,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             foreach (float max in BoundedFloatMaxima)
             {
                 int bits = BitConverter.SingleToInt32Bits(max);
-                float expected = BitConverter.Int32BitsToSingle(max > 0f ? bits - 1 : bits + 1);
+                float expected = BitConverter.Int32BitsToSingle(0f < max ? bits - 1 : bits + 1);
 
                 float result = WallMath.BoundedFloat(max, max);
 

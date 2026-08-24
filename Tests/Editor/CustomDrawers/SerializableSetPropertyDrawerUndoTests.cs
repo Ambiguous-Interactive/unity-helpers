@@ -975,7 +975,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int numberOfAdds = 5;
             for (int i = 0; i < numberOfAdds; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }
@@ -994,7 +994,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            for (int i = numberOfAdds - 1; i >= 0; i--)
+            for (int i = numberOfAdds - 1; 0 <= i; i--)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1036,7 +1036,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             for (int i = 0; i < removalCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }
@@ -1056,7 +1056,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            for (int i = removalCount - 1; i >= 0; i--)
+            for (int i = removalCount - 1; 0 <= i; i--)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1098,7 +1098,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int expectedCountAfterAdds = initialCount + addCount;
             for (int i = 0; i < addCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }
@@ -1123,7 +1123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int expectedCountAfterRemoves = expectedCountAfterAdds - safeRemoveCount;
             for (int i = 0; i < safeRemoveCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }
@@ -1197,7 +1197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             for (int i = 0; i < moveCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }
@@ -1217,7 +1217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 stateHistory.Add(FormatSetContents(host.set));
             }
 
-            for (int i = moveCount - 1; i >= 0; i--)
+            for (int i = moveCount - 1; 0 <= i; i--)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1319,7 +1319,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             for (int i = 0; i < operationCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     Undo.IncrementCurrentGroup();
                 }

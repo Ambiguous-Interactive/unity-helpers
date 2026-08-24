@@ -152,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long protobufNetMs = sw.ElapsedMilliseconds;
 
             double speedup =
-                wallstopProtoMs > 0
+                0 < wallstopProtoMs
                     ? (double)protobufNetMs / wallstopProtoMs
                     : double.PositiveInfinity;
             UnityEngine.Debug.Log(
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long protobufNetMs = sw.ElapsedMilliseconds;
 
             double speedup =
-                wallstopProtoMs > 0
+                0 < wallstopProtoMs
                     ? (double)protobufNetMs / wallstopProtoMs
                     : double.PositiveInfinity;
             UnityEngine.Debug.Log(

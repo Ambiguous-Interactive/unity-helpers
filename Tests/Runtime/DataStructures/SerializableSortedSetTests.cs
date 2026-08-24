@@ -1577,7 +1577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ToArrayConsistentWithEnumerationForVariousSizes(int size)
         {
             SerializableSortedSet<int> set = new();
-            for (int i = size - 1; i >= 0; i--)
+            for (int i = size - 1; 0 <= i; i--)
             {
                 set.Add(i);
             }

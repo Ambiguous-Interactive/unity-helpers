@@ -332,7 +332,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             );
 
             Assert.IsTrue(metadata != null, "Metadata should not be null");
-            Assert.IsTrue(metadata.Count > 0, "Should find WButton methods");
+            Assert.IsTrue(0 < metadata.Count, "Should find WButton methods");
 
             bool foundGroupedMethod = false;
             for (int i = 0; i < metadata.Count; i++)
@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             );
 
             Assert.IsTrue(metadata != null, "Metadata should not be null");
-            Assert.IsTrue(metadata.Count >= 2, "Should find multiple WButton methods");
+            Assert.IsTrue(2 <= metadata.Count, "Should find multiple WButton methods");
 
             bool hasExplicitDrawOrder = false;
             for (int i = 0; i < metadata.Count; i++)
@@ -514,7 +514,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             );
 
             Assert.IsTrue(
-                attrs.Length > 0,
+                0 < attrs.Length,
                 "WButtonInspector should have CanEditMultipleObjects attribute"
             );
         }
@@ -527,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 true
             );
 
-            Assert.IsTrue(attrs.Length > 0, "WButtonInspector should have CustomEditor attribute");
+            Assert.IsTrue(0 < attrs.Length, "WButtonInspector should have CustomEditor attribute");
         }
     }
 #endif

@@ -150,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 b = new(10, 0);
             Vector2 p = new(5, 5);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left of the vector.");
+            Assert.IsTrue(0 < result, "Point should be to the left of the vector.");
         }
 
         [Test]
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 b = new(-5, -5);
             Vector2 p = new(-8, -6);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left with negative coordinates.");
+            Assert.IsTrue(0 < result, "Point should be to the left with negative coordinates.");
         }
 
         [Test]
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 b = new(5, 10);
             Vector2 p = new(3, 5);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point to the left of vertical line should return positive.");
+            Assert.IsTrue(0 < result, "Point to the left of vertical line should return positive.");
         }
 
         [Test]
@@ -243,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 b = new(10, 10);
             Vector2 p = new(5, 6);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point above diagonal should be to the left.");
+            Assert.IsTrue(0 < result, "Point above diagonal should be to the left.");
         }
 
         [Test]
@@ -330,7 +330,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2 b = new(100000, 0);
             Vector2 p = new(50000, 10000);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left with large coordinates.");
+            Assert.IsTrue(0 < result, "Point should be to the left with large coordinates.");
         }
 
         [Test]
@@ -340,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector3 b = new(10, 0, 0);
             Vector3 p = new(5, 5, 0);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left of the vector (ignoring z).");
+            Assert.IsTrue(0 < result, "Point should be to the left of the vector (ignoring z).");
         }
 
         [Test]
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector3 b = new(10, 0, 10);
             Vector3 p = new(5, 5, 100);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Z coordinate should be ignored in calculation.");
+            Assert.IsTrue(0 < result, "Z coordinate should be ignored in calculation.");
         }
 
         [Test]
@@ -410,7 +410,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector3 b = new(-5, -5, -5);
             Vector3 p = new(-8, -6, -3);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left with negative coordinates.");
+            Assert.IsTrue(0 < result, "Point should be to the left with negative coordinates.");
         }
 
         [Test]
@@ -420,7 +420,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector3 b = new(5, 10, 0);
             Vector3 p = new(3, 5, 0);
             float result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point to the left of vertical line should return positive.");
+            Assert.IsTrue(0 < result, "Point to the left of vertical line should return positive.");
         }
 
         [Test]
@@ -440,7 +440,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(10, 0);
             Vector2Int p = new(5, 5);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left of the vector.");
+            Assert.IsTrue(0 < result, "Point should be to the left of the vector.");
         }
 
         [Test]
@@ -500,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(-5, -5);
             Vector2Int p = new(-8, -6);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left with negative coordinates.");
+            Assert.IsTrue(0 < result, "Point should be to the left with negative coordinates.");
         }
 
         [Test]
@@ -510,7 +510,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(5, 10);
             Vector2Int p = new(3, 5);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point to the left of vertical line should return positive.");
+            Assert.IsTrue(0 < result, "Point to the left of vertical line should return positive.");
         }
 
         [Test]
@@ -533,7 +533,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(10, 10);
             Vector2Int p = new(5, 6);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point above diagonal should be to the left.");
+            Assert.IsTrue(0 < result, "Point above diagonal should be to the left.");
         }
 
         [Test]
@@ -563,7 +563,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(10000, 0);
             Vector2Int p = new(5000, 1000);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Point should be to the left with large coordinates.");
+            Assert.IsTrue(0 < result, "Point should be to the left with large coordinates.");
         }
 
         [Test]
@@ -574,7 +574,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int b = new(30000, 30000);
             Vector2Int p = new(15000, 15001);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
-            Assert.IsTrue(result > 0, "Should handle large values without overflow.");
+            Assert.IsTrue(0 < result, "Should handle large values without overflow.");
         }
 
         private static Vector2 RotateAndQuantize(int x, int y, float cos, float sin)

@@ -71,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             BitSet bits = new(10);
             Assert.IsTrue(bits.TrySet(50));
-            Assert.IsTrue(bits.Capacity >= 51);
+            Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits.TryGet(50, out bool value));
             Assert.IsTrue(value);
         }
@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             BitSet bits = new(64);
             Assert.IsTrue(bits.TrySet(64));
-            Assert.IsTrue(bits.Capacity > 64);
+            Assert.IsTrue(64 < bits.Capacity);
             Assert.IsTrue(bits.TryGet(64, out bool value));
             Assert.IsTrue(value);
         }
@@ -205,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             BitSet bits = new(10);
             Assert.IsTrue(bits.TryFlip(50));
-            Assert.IsTrue(bits.Capacity >= 51);
+            Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits.TryGet(50, out bool value));
             Assert.IsTrue(value);
         }
@@ -303,7 +303,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IndexerSetBeyondCapacityExpandsAndSets()
         {
             BitSet bits = new(10) { [50] = true };
-            Assert.IsTrue(bits.Capacity >= 51);
+            Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits[50]);
         }
 
@@ -1024,7 +1024,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             BitSet bits = new(64);
             bits.EnsureCapacity(100);
-            Assert.IsTrue(bits.Capacity >= 100);
+            Assert.IsTrue(100 <= bits.Capacity);
         }
 
         [Test]
@@ -1058,7 +1058,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             BitSet bits = new(1000);
             bits.TrySet(50);
             bits.TrimExcess();
-            Assert.IsTrue(bits.Capacity >= 51);
+            Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits.Capacity < 1000);
             Assert.IsTrue(bits[50]);
         }
@@ -1319,7 +1319,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsFalse(bits[15]);
 
             bits.TrimExcess();
-            Assert.IsTrue(bits.Capacity >= 64);
+            Assert.IsTrue(64 <= bits.Capacity);
         }
 
         [Test]
@@ -1359,11 +1359,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(10, bits.Capacity);
 
             bits[50] = true;
-            Assert.IsTrue(bits.Capacity >= 51);
+            Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits[50]);
 
             bits.TryFlip(100);
-            Assert.IsTrue(bits.Capacity >= 101);
+            Assert.IsTrue(101 <= bits.Capacity);
             Assert.IsTrue(bits[100]);
         }
 

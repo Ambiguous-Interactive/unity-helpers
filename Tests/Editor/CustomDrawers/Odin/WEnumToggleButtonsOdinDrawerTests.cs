@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             (bool shouldPaginate, int pageSize) = ShouldPaginate(attribute, optionCount);
 
-            if (optionCount > defaultPageSize)
+            if (defaultPageSize < optionCount)
             {
                 Assert.That(
                     shouldPaginate,

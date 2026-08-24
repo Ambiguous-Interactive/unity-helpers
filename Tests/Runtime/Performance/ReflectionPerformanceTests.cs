@@ -1131,7 +1131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             const double Million = 1_000_000.0;
             const double Thousand = 1_000.0;
 
-            if (value >= Million)
+            if (Million <= value)
             {
                 return string.Format(
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -1140,7 +1140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 );
             }
 
-            if (value >= Thousand)
+            if (Thousand <= value)
             {
                 return string.Format(
                     System.Globalization.CultureInfo.InvariantCulture,

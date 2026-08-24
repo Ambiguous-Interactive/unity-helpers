@@ -447,7 +447,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         {
             int pageSize = ResolvePageSize();
             int pageCount = CalculatePageCount(pageSize, _currentFilteredCount);
-            if (_pageIndex >= pageCount - 1)
+            if (pageCount - 1 <= _pageIndex)
             {
                 return;
             }
@@ -531,28 +531,28 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             ToggleDropDownVisibility(true);
 
             int pageCount = CalculatePageCount(pageSize, filteredCount);
-            if (selectedOptionIndex >= 0)
+            if (0 <= selectedOptionIndex)
             {
                 int filteredIndex = hasSearch
                     ? _filteredIndices.IndexOf(selectedOptionIndex)
                     : selectedOptionIndex;
-                if (filteredIndex >= 0)
+                if (0 <= filteredIndex)
                 {
                     _pageIndex = filteredIndex / pageSize;
                 }
-                else if (_pageIndex >= pageCount)
+                else if (pageCount <= _pageIndex)
                 {
                     _pageIndex = 0;
                 }
             }
-            else if (_pageIndex >= pageCount)
+            else if (pageCount <= _pageIndex)
             {
                 _pageIndex = 0;
             }
 
             UpdatePagination(searchActive, pageCount, pageSize, filteredCount);
 
-            bool paginate = searchActive && filteredCount > pageSize;
+            bool paginate = searchActive && pageSize < filteredCount;
 
             _pageOptionIndices.Clear();
             _pageChoices.Clear();
@@ -574,21 +574,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
             string dropdownValue = string.Empty;
             string dropdownTooltip = string.Empty;
-            if (selectedOptionIndex >= 0 && selectedOptionIndex < OptionCount)
+            if (0 <= selectedOptionIndex && selectedOptionIndex < OptionCount)
             {
                 dropdownValue = GetNormalizedDisplayLabel(selectedOptionIndex);
                 dropdownTooltip = GetTooltip(selectedOptionIndex);
             }
 
-            if (string.IsNullOrEmpty(dropdownValue) && _pageChoices.Count > 0)
+            if (string.IsNullOrEmpty(dropdownValue) && 0 < _pageChoices.Count)
             {
                 dropdownValue = _pageChoices[0];
                 dropdownTooltip =
-                    _pageOptionIndices.Count > 0 ? GetTooltip(_pageOptionIndices[0]) : string.Empty;
+                    0 < _pageOptionIndices.Count ? GetTooltip(_pageOptionIndices[0]) : string.Empty;
             }
 
             _dropdown.SetValueWithoutNotify(dropdownValue);
-            if (selectedOptionIndex >= 0)
+            if (0 <= selectedOptionIndex)
             {
                 SetValueWithoutNotify(GetValueForOption(selectedOptionIndex));
             }
@@ -596,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             {
                 SetValueWithoutNotify(GetDefaultValue());
             }
-            _dropdown.SetEnabled(_pageChoices.Count > 0);
+            _dropdown.SetEnabled(0 < _pageChoices.Count);
             _dropdown.tooltip = dropdownTooltip ?? string.Empty;
 
             _currentFilteredCount = filteredCount;
@@ -664,7 +664,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 return;
             }
 
-            bool showPagination = searchActive && filteredCount > pageSize;
+            bool showPagination = searchActive && pageSize < filteredCount;
             _paginationContainer.style.display = showPagination
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
@@ -680,7 +680,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             int clampedPageCount = Math.Max(1, pageCount);
             _pageIndex = Mathf.Clamp(_pageIndex, 0, clampedPageCount - 1);
             _pageLabel.text = GetPaginationLabel(_pageIndex + 1, clampedPageCount);
-            _previousButton.SetEnabled(_pageIndex > 0);
+            _previousButton.SetEnabled(0 < _pageIndex);
             _nextButton.SetEnabled(_pageIndex < clampedPageCount - 1);
         }
 
@@ -723,7 +723,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             bool suggestionsVisible =
                 _searchVisible
                 && !string.IsNullOrEmpty(suggestionValue)
-                && optionIndex >= 0
+                && 0 <= optionIndex
                 && matchPosition == 0;
 
             if (_suggestionHintLabel != null)
@@ -780,7 +780,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             UpdateSuggestionDisplay(string.Empty, -1, -1);
             UpdateFromProperty();
 
-            if (commitSelection && optionIndexToApply >= 0)
+            if (commitSelection && 0 <= optionIndexToApply)
             {
                 ApplySelection(optionIndexToApply);
             }
@@ -800,7 +800,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
         private bool ShouldShowSearch(int pageSize)
         {
-            return OptionCount > pageSize;
+            return pageSize < OptionCount;
         }
 
         private void ApplySearchVisibility(bool searchVisible)
@@ -887,7 +887,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 return;
             }
 
-            if (optionIndex < 0 || optionIndex >= OptionCount)
+            if (optionIndex < 0 || OptionCount <= optionIndex)
             {
                 return;
             }

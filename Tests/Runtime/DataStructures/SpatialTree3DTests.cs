@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     Random.NextFloat(-radius, radius)
                 );
 
-                if (offset.sqrMagnitude > radiusSquared)
+                if (radiusSquared < offset.sqrMagnitude)
                 {
                     continue;
                 }
@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 // longer than the one accepted above -- enough to put the point outside the query
                 // sphere, which every tree is then right to exclude. Re-test with the trees' own
                 // predicate so the expected set only contains points that are genuinely in range.
-                if ((point - center).sqrMagnitude > radiusSquared)
+                if (radiusSquared < (point - center).sqrMagnitude)
                 {
                     continue;
                 }

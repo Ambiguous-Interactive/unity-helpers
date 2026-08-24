@@ -193,7 +193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 // faint 4x4 at (0..3,0..3), alpha=0.2
                 bool faint = x < 4 && y < 4;
                 // solid 4x4 at top-right (w-4..w-1, h-4..h-1)
-                bool solid = x >= w - 4 && y >= h - 4;
+                bool solid = w - 4 <= x && h - 4 <= y;
                 if (solid)
                 {
                     pix[y * w + x] = new Color(1, 1, 1, 1);

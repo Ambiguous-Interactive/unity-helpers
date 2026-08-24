@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            if (_previewAnimationIndex >= animationData.Count)
+            if (animationData.Count <= _previewAnimationIndex)
             {
                 StopPreview();
                 return;
@@ -401,12 +401,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             TimeSpan frameDuration = TimeSpan.FromMilliseconds(1000.0 / targetFps);
             TimeSpan elapsed = _previewTimer.Elapsed;
 
-            if (elapsed - _lastPreviewTick > frameDuration + frameDuration)
+            if (frameDuration + frameDuration < elapsed - _lastPreviewTick)
             {
                 _lastPreviewTick = elapsed - frameDuration;
             }
 
-            if (_lastPreviewTick + frameDuration > elapsed)
+            if (elapsed < _lastPreviewTick + frameDuration)
             {
                 return;
             }
@@ -414,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _lastPreviewTick += frameDuration;
 
             int nextFrame = _previewFrameIndex + 1;
-            if (nextFrame >= data.frames.Count)
+            if (data.frames.Count <= nextFrame)
             {
                 if (data.loop)
                 {
@@ -594,7 +594,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     EditorGUILayout.LabelField("Fallback Base:", fbBase);
                     EditorGUILayout.LabelField(
                         "Fallback Index:",
-                        fbIndex >= 0 ? fbIndex.ToString() : "(none)"
+                        0 <= fbIndex ? fbIndex.ToString() : "(none)"
                     );
                 }
                 else
@@ -663,7 +663,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 $"Preview Groups ({_autoParsePreview.Count})",
                 true
             );
-            if (_autoParsePreviewExpanded && _autoParsePreview.Count > 0)
+            if (_autoParsePreviewExpanded && 0 < _autoParsePreview.Count)
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -675,7 +675,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"Frames: {rec.count} | Numeric: {(rec.hasIndex ? "Yes" : "No")}"
                         );
                         shown++;
-                        if (shown >= 200)
+                        if (200 <= shown)
                         {
                             EditorGUILayout.LabelField($"Showing first {shown} groups...");
                             break;
@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 $"Dry-Run Results ({_autoParseDryRun.Count})",
                 true
             );
-            if (_autoParseDryRunExpanded && _autoParseDryRun.Count > 0)
+            if (_autoParseDryRunExpanded && 0 < _autoParseDryRun.Count)
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -704,7 +704,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         EditorGUILayout.LabelField(rec.folderPath, info);
                         EditorGUILayout.LabelField("-> Asset Path:", rec.finalAssetPath);
                         shown++;
-                        if (shown >= 200)
+                        if (200 <= shown)
                         {
                             EditorGUILayout.LabelField($"Showing first {shown} results...");
                             break;
@@ -750,7 +750,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         nameProp != null ? nameProp.stringValue ?? string.Empty : string.Empty;
 
                     bool matchesSearch = true;
-                    if (searchTerms.Length > 0)
+                    if (0 < searchTerms.Length)
                     {
                         for (int si = 0; si < searchTerms.Length; si++)
                         {
@@ -784,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (_animationDataIsExpanded)
                 {
                     using EditorGUI.IndentLevelScope indent = new();
-                    if (matchCount > 0)
+                    if (0 < matchCount)
                     {
                         int totalPages = Mathf.CeilToInt((float)matchCount / AnimationDataPageSize);
                         _animationDataPageIndex = Mathf.Clamp(
@@ -793,7 +793,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             totalPages - 1
                         );
 
-                        if (totalPages > 1)
+                        if (1 < totalPages)
                         {
                             DrawAnimationDataPagination(matchCount, totalPages);
                         }
@@ -806,12 +806,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             DrawAnimationDataElement(matchingIndices[i]);
                         }
 
-                        if (totalPages > 1)
+                        if (1 < totalPages)
                         {
                             DrawAnimationDataPagination(matchCount, totalPages);
                         }
                     }
-                    else if (listSize > 0)
+                    else if (0 < listSize)
                     {
                         EditorGUILayout.HelpBox(
                             $"No animation data matched the search term '{_searchString}'.",
@@ -847,7 +847,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 GUILayout.Width(180)
             );
 
-            using (new EditorGUI.DisabledScope(_animationDataPageIndex >= totalPages - 1))
+            using (new EditorGUI.DisabledScope(totalPages - 1 <= _animationDataPageIndex))
             {
                 if (GUILayout.Button(">", GUILayout.Width(30)))
                 {
@@ -879,7 +879,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void DrawAnimationDataElement(int index)
         {
-            if (index < 0 || index >= animationData.Count)
+            if (index < 0 || animationData.Count <= index)
             {
                 return;
             }
@@ -936,7 +936,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (GUILayout.Button(FlatButtonContent))
             {
                 float fps =
-                    data.framesPerSecond > 0
+                    0 < data.framesPerSecond
                         ? data.framesPerSecond
                         : AnimationData.DefaultFramesPerSecond;
                 data.framesPerSecondCurve = AnimationCurve.Constant(0, 1, fps);
@@ -985,13 +985,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < data.frames.Count; i++)
             {
                 float normalizedPosition =
-                    data.frames.Count > 1 ? (float)i / (data.frames.Count - 1) : 0f;
+                    1 < data.frames.Count ? (float)i / (data.frames.Count - 1) : 0f;
 
                 float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
                 if (fps <= 0)
                 {
                     fps =
-                        data.framesPerSecond > 0
+                        0 < data.framesPerSecond
                             ? data.framesPerSecond
                             : AnimationData.DefaultFramesPerSecond;
                 }
@@ -1080,7 +1080,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             EditorGUI.BeginChangeCheck();
             float scrubberValue =
-                data.frames.Count > 1 ? (float)displayFrameIndex / (data.frames.Count - 1) : 0f;
+                1 < data.frames.Count ? (float)displayFrameIndex / (data.frames.Count - 1) : 0f;
 
             float newScrubberValue = EditorGUILayout.Slider(scrubberValue, 0f, 1f);
             if (EditorGUI.EndChangeCheck())
@@ -1128,7 +1128,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (GUILayout.Button(">", GUILayout.Width(30)))
             {
                 int next = isActive ? _previewFrameIndex + 1 : 1;
-                if (next >= data.frames.Count)
+                if (data.frames.Count <= next)
                 {
                     next = data.loop ? 0 : data.frames.Count - 1;
                 }
@@ -1146,7 +1146,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void StartPreview(int animationIndex)
         {
-            if (_previewAnimationIndex >= 0 && _previewAnimationIndex < animationData.Count)
+            if (0 <= _previewAnimationIndex && _previewAnimationIndex < animationData.Count)
             {
                 animationData[_previewAnimationIndex].showPreview = false;
             }
@@ -1156,7 +1156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _isPreviewPlaying = true;
             _lastPreviewTick = _previewTimer.Elapsed;
 
-            if (animationIndex >= 0 && animationIndex < animationData.Count)
+            if (0 <= animationIndex && animationIndex < animationData.Count)
             {
                 animationData[animationIndex].showPreview = true;
             }
@@ -1180,7 +1180,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void SetPreviewFrame(int animationIndex, int frameIndex)
         {
-            if (animationIndex < 0 || animationIndex >= animationData.Count)
+            if (animationIndex < 0 || animationData.Count <= animationIndex)
             {
                 return;
             }
@@ -1229,16 +1229,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             if (data.framerateMode == FramerateMode.Constant)
             {
-                return data.framesPerSecond > 0
+                return 0 < data.framesPerSecond
                     ? data.framesPerSecond
                     : AnimationData.DefaultFramesPerSecond;
             }
 
             float normalizedPosition =
-                data.frames.Count > 1 ? (float)frameIndex / (data.frames.Count - 1) : 0f;
+                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
 
             float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-            return fps > 0 ? fps : AnimationData.DefaultFramesPerSecond;
+            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
         }
 
         private void DrawActionButtons()
@@ -1258,7 +1258,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         this.LogWarn($"Add at least one Animation Data entry first.");
                     }
-                    else if (animationData[0].frames.Count > 0)
+                    else if (0 < animationData[0].frames.Count)
                     {
                         if (
                             !Utils.EditorUi.Confirm(
@@ -1273,7 +1273,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             return;
                         }
                     }
-                    if (animationData.Count > 0)
+                    if (0 < animationData.Count)
                     {
                         animationData[0].frames = new List<Sprite>(_filteredSprites);
                         animationData[0].animationName = "All_Matched_Sprites";
@@ -1516,17 +1516,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 List<string> foldersWithConfigs = GetFoldersWithConfigs();
-                bool hasConfigs = foldersWithConfigs.Count > 0;
+                bool hasConfigs = 0 < foldersWithConfigs.Count;
 
                 using (new EditorGUI.DisabledScope(!hasConfigs))
                 {
                     EditorGUILayout.BeginHorizontal();
                     if (GUILayout.Button("Load Config from First Source"))
                     {
-                        if (foldersWithConfigs.Count > 0)
+                        if (0 < foldersWithConfigs.Count)
                         {
                             if (
-                                animationData.Count > 0
+                                0 < animationData.Count
                                 && !Utils.EditorUi.Confirm(
                                     "Confirm Load",
                                     "Loading configuration will replace current animation data. Continue?",
@@ -1778,7 +1778,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private AnimationClip CreateAnimationClip(AnimationData data, List<Sprite> validFrames)
         {
             float baseFrameRate =
-                data.framesPerSecond > 0
+                0 < data.framesPerSecond
                     ? data.framesPerSecond
                     : AnimationData.DefaultFramesPerSecond;
 
@@ -1802,7 +1802,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (data.framerateMode == FramerateMode.Curve)
                     {
                         float normalizedPosition =
-                            validFrames.Count > 1 ? (float)i / (validFrames.Count - 1) : 0f;
+                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
 
                         fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
                         if (fps <= 0)
@@ -2072,7 +2072,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             m = s_TrailingIndexRegex.Match(name);
-            if (m.Success && m.Groups["base"].Length > 0)
+            if (m.Success && 0 < m.Groups["base"].Length)
             {
                 string trailingBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
                 _ = int.TryParse(m.Groups["index"].Value, out int trailingIndex);
@@ -2229,7 +2229,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    bool hasAnyIndex = entries.Exists(e => e.index >= 0);
+                    bool hasAnyIndex = entries.Exists(e => 0 <= e.index);
                     if (strictNumericOrdering)
                     {
                         if (hasAnyIndex)
@@ -2393,7 +2393,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string dir = kvp.Key;
                 foreach ((string baseKey, List<(int index, Sprite sprite)> entries) in kvp.Value)
                 {
-                    bool hasAnyIndex = entries.Exists(e => e.index >= 0);
+                    bool hasAnyIndex = entries.Exists(e => 0 <= e.index);
                     if (strictNumericOrdering)
                     {
                         if (hasAnyIndex)
@@ -2465,7 +2465,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         folder = folderName,
                         baseName = baseKey,
                         count = entries.Count,
-                        hasIndex = entries.Exists(e => e.index >= 0),
+                        hasIndex = entries.Exists(e => 0 <= e.index),
                     };
                     _autoParsePreview.Add(rec);
                 }
@@ -2479,16 +2479,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             if (data.framerateMode == FramerateMode.Constant)
             {
-                return data.framesPerSecond > 0
+                return 0 < data.framesPerSecond
                     ? data.framesPerSecond
                     : AnimationData.DefaultFramesPerSecond;
             }
 
             float normalizedPosition =
-                data.frames.Count > 1 ? (float)frameIndex / (data.frames.Count - 1) : 0f;
+                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
 
             float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-            return fps > 0 ? fps : AnimationData.DefaultFramesPerSecond;
+            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
         }
 
         internal static AnimationClip CreateAnimationClipForTests(
@@ -2497,7 +2497,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         )
         {
             float baseFrameRate =
-                data.framesPerSecond > 0
+                0 < data.framesPerSecond
                     ? data.framesPerSecond
                     : AnimationData.DefaultFramesPerSecond;
 
@@ -2518,7 +2518,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (data.framerateMode == FramerateMode.Curve)
                     {
                         float normalizedPosition =
-                            validFrames.Count > 1 ? (float)i / (validFrames.Count - 1) : 0f;
+                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
 
                         fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
                         if (fps <= 0)

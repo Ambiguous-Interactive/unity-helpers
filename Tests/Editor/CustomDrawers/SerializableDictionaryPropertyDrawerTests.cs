@@ -1382,7 +1382,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     isSortedDictionary: false
                 );
             pending.key = "Accent";
-            int storedIndex = initialEntry.index >= 0 ? initialEntry.index : 0;
+            int storedIndex = 0 <= initialEntry.index ? initialEntry.index : 0;
             pending.value = new ColorData { color1 = Color.white };
             TestContext.WriteLine(
                 $"[DuplicateCache] Pending value preset: {DescribeColorData((ColorData)pending.value)}"
@@ -4497,7 +4497,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             // the virtualWidth changes which affects column width calculations, but the
             // proportional layout should keep offsets relatively consistent.
             // Allow generous tolerance since Unity's ReorderableList rect can vary.
-            float scaleFactor = horizontalPadding > 100f ? 0.5f : 0.3f;
+            float scaleFactor = 100f < horizontalPadding ? 0.5f : 0.3f;
             float scaledTolerance = 15.0f + (horizontalPadding * scaleFactor);
             Assert.LessOrEqual(
                 offsetDelta,
@@ -6389,7 +6389,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            for (int i = keysProperty.arraySize - 1; i >= 0; i--)
+            for (int i = keysProperty.arraySize - 1; 0 <= i; i--)
             {
                 string key = keysProperty.GetArrayElementAtIndex(i).stringValue;
                 if (testKeys.Contains(key))

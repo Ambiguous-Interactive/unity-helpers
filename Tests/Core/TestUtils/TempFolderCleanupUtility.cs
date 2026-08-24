@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 return false;
             }
 
-            return int.TryParse(suffix, out int number) && number > 0;
+            return int.TryParse(suffix, out int number) && 0 < number;
         }
 
         /// <summary>
@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             // Check if the folder is empty
             string[] remainingAssets = AssetDatabase.FindAssets("", new[] { "Assets/Temp" });
-            if (remainingAssets.Length > 0)
+            if (0 < remainingAssets.Length)
             {
                 return false;
             }

@@ -1787,7 +1787,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             heap.Add(2);
 
-            Assert.IsTrue(heap.Capacity > 1);
+            Assert.IsTrue(1 < heap.Capacity);
             Assert.AreEqual(2, heap.Count);
         }
 
@@ -1802,7 +1802,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             Assert.AreEqual(100, heap.Count);
-            Assert.IsTrue(heap.Capacity >= 100);
+            Assert.IsTrue(100 <= heap.Capacity);
         }
 
         [Test]
@@ -1830,7 +1830,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Heap<int> heap = new(100);
             heap.TrimExcess();
 
-            Assert.IsTrue(heap.Capacity >= 16); // DefaultCapacity is 16
+            Assert.IsTrue(16 <= heap.Capacity); // DefaultCapacity is 16
         }
 
         [Test]
@@ -1840,7 +1840,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             heap.Clear();
             heap.TrimExcess();
 
-            Assert.IsTrue(heap.Capacity >= 16); // Should be at least DefaultCapacity
+            Assert.IsTrue(16 <= heap.Capacity); // Should be at least DefaultCapacity
             Assert.AreEqual(0, heap.Count);
         }
     }

@@ -47,9 +47,9 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -287,13 +287,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     _potentialChangeCount = CalculateTextureChanges(applyChanges: false);
                     string message =
-                        _potentialChangeCount >= 0
+                        0 <= _potentialChangeCount
                             ? $"Calculation complete. {_potentialChangeCount} textures would be modified."
                             : "Calculation failed.";
                     this.Log($"{message}");
                 }
 
-                if (_potentialChangeCount >= 0)
+                if (0 <= _potentialChangeCount)
                 {
                     EditorGUILayout.HelpBox(
                         $"{_potentialChangeCount} textures would be modified with the current settings. Grows: {_potentialGrowCount}, Shrinks: {_potentialShrinkCount}, Unchanged: {_potentialUnchangedCount}.",
@@ -330,7 +330,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     int actualChanges = CalculateTextureChanges(applyChanges: true);
                     _potentialChangeCount = -1;
                     string message =
-                        actualChanges >= 0
+                        0 <= actualChanges
                             ? $"Operation complete. {actualChanges} textures were modified."
                             : "Operation failed.";
                     this.Log($"{message}");
@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 searchPaths.AddRange(uniqueAssetPaths);
             }
 
-            if (searchPaths.Count > 0)
+            if (0 < searchPaths.Count)
             {
                 string typeFilter = _onlySprites ? "t:sprite" : "t:texture2D";
                 // Use type-filter search only; perform label filtering per-asset below
@@ -534,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         parts[count++] = item;
                     }
                 }
-                if (count > 0)
+                if (0 < count)
                 {
                     parsedLabels = new string[count];
                     for (int i = 0; i < count; i++)
@@ -615,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                             StringComparison comp = _caseSensitiveNameFilter
                                 ? StringComparison.Ordinal
                                 : StringComparison.OrdinalIgnoreCase;
-                            nameMatch = fileName.IndexOf(_nameFilter, comp) >= 0;
+                            nameMatch = 0 <= fileName.IndexOf(_nameFilter, comp);
                         }
                         if (!nameMatch)
                         {
@@ -831,7 +831,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
                 int tempSize = targetTextureSize;
                 // Only shrink if current size is above the needed POT
-                if (tempSize > neededPot)
+                if (neededPot < tempSize)
                 {
                     tempSize = neededPot;
                 }
@@ -848,7 +848,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 targetTextureSize = minAllowedTextureSize;
                 needsChange = needsChange || (currentTextureSize != targetTextureSize);
             }
-            if (targetTextureSize > maxAllowedTextureSize)
+            if (maxAllowedTextureSize < targetTextureSize)
             {
                 targetTextureSize = maxAllowedTextureSize;
                 needsChange = needsChange || (currentTextureSize != targetTextureSize);
@@ -857,7 +857,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             // After clamping, determine net direction of change for counts
             if (needsChange)
             {
-                grew = targetTextureSize > currentTextureSize;
+                grew = currentTextureSize < targetTextureSize;
                 shrank = targetTextureSize < currentTextureSize;
             }
 

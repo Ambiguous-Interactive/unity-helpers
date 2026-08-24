@@ -391,7 +391,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Rect nextRect = new(labelRect.xMax + spacing, rect.y, buttonWidth, rect.height);
             Rect lastRect = new(nextRect.xMax + spacing, rect.y, buttonWidth, rect.height);
 
-            if (lastRect.xMax > rect.xMax)
+            if (rect.xMax < lastRect.xMax)
             {
                 float overflow = lastRect.xMax - rect.xMax;
                 firstRect.x -= overflow * EnumShared.OverflowCenteringRatio;
@@ -402,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             bool originalEnabled = GUI.enabled;
-            bool canNavigateBackward = state.PageIndex > 0;
+            bool canNavigateBackward = 0 < state.PageIndex;
             bool canNavigateForward = state.PageIndex < state.TotalPages - 1;
 
             GUI.enabled = originalEnabled && canNavigateBackward;
@@ -566,7 +566,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             state.TotalItems = Mathf.Max(0, totalItems);
 
             int totalPages = state.TotalPages;
-            if (state.PageIndex >= totalPages)
+            if (totalPages <= state.PageIndex)
             {
                 state.PageIndex = totalPages - 1;
             }
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     continue;
                 }
 
-                if (index >= startIndex && index < endIndex)
+                if (startIndex <= index && index < endIndex)
                 {
                     continue;
                 }
@@ -733,13 +733,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             pageSize = resolved;
-            return optionCount > resolved;
+            return resolved < optionCount;
         }
 
         internal static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)
         {
             int overrideSize = attribute?.PageSize ?? 0;
-            if (overrideSize > 0)
+            if (0 < overrideSize)
             {
                 return Mathf.Clamp(
                     overrideSize,

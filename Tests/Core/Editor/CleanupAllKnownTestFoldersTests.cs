@@ -521,11 +521,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             // These counts should match the array sizes in CleanupAllKnownTestFolders()
             // If this test fails, it means someone added/removed patterns in one place but not the other
             Assert.IsTrue(
-                expectedResourcesPatterns.Count > 0,
+                0 < expectedResourcesPatterns.Count,
                 "ResourcesTestFolderPatternsArray should not be empty"
             );
             Assert.IsTrue(
-                expectedAssetsPatterns.Count > 0,
+                0 < expectedAssetsPatterns.Count,
                 "AssetsTestFolderPatternsArray should not be empty"
             );
 

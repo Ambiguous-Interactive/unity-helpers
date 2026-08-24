@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
                 List<MethodInfo> definedMethods = GetPossibleAnimatorEventsForType(type);
                 // Filter: only methods directly declared on this type and attributed
-                for (int m = definedMethods.Count - 1; m >= 0; m--)
+                for (int m = definedMethods.Count - 1; 0 <= m; m--)
                 {
                     MethodInfo method = definedMethods[m];
                     if (method.DeclaringType != type)
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                     }
                 }
 
-                if (definedMethods.Count > 0)
+                if (0 < definedMethods.Count)
                 {
                     // Include inherited methods that explicitly allow derived
                     List<MethodInfo> allPossible = GetPossibleAnimatorEventsForType(type);
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                     }
                 }
 
-                if (definedMethods.Count > 0)
+                if (0 < definedMethods.Count)
                 {
                     typesToMethods[type] = definedMethods;
                 }
@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         }
 
                         // Remove inherited methods with this name
-                        for (int midx = entry.Value.Count - 1; midx >= 0; midx--)
+                        for (int midx = entry.Value.Count - 1; 0 <= midx; midx--)
                         {
                             if (entry.Value[midx].Name == methodName)
                             {

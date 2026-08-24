@@ -24,8 +24,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             string[] names = TexturePlatformNameHelper.GetKnownPlatformNames();
             // Not all editor installs have iOS module; allow either iPhone or fallback iOS string
-            bool hasIPhone = System.Array.IndexOf(names, "iPhone") >= 0;
-            bool hasIOS = System.Array.IndexOf(names, "iOS") >= 0;
+            bool hasIPhone = 0 <= System.Array.IndexOf(names, "iPhone");
+            bool hasIOS = 0 <= System.Array.IndexOf(names, "iOS");
             Assert.IsTrue(hasIPhone || hasIOS);
         }
 

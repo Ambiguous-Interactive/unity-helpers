@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             {
                 left.TryGetValue(key, out int lc);
                 right.TryGetValue(key, out int rc);
-                if (lc > rc)
+                if (rc < lc)
                 {
                     int diff = lc - rc;
                     for (int i = 0; i < diff && missing.Count < maxItems; ++i)
@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                         missing.Add(key);
                     }
                 }
-                else if (rc > lc)
+                else if (lc < rc)
                 {
                     int diff = rc - lc;
                     for (int i = 0; i < diff && extra.Count < maxItems; ++i)

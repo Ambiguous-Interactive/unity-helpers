@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int cellHeight = height / gridRows;
             int totalCells = gridColumns * gridRows;
 
-            if (pixels.Length >= ParallelThreshold)
+            if (ParallelThreshold <= pixels.Length)
             {
                 // Parallelize by row for cache-friendly access
                 Parallel.For(

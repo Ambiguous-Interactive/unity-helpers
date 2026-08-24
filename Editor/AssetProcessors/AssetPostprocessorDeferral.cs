@@ -223,7 +223,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
                 // Reentrant additions happened while draining. Re-arm delayCall so
                 // they run in the next editor tick.
-                if (PendingDrains.Count > 0 && !_scheduled)
+                if (0 < PendingDrains.Count && !_scheduled)
                 {
                     _scheduled = true;
                     EditorApplication.delayCall += DrainScheduled;

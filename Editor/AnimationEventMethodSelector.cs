@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     Type type = entry.Key;
 
-                    if (typeSearchTerms.Count > 0)
+                    if (0 < typeSearchTerms.Count)
                     {
                         string typeLower =
                             type.FullName != null ? type.FullName.ToLowerInvariant() : string.Empty;
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                     }
 
-                    if (methodBuffer.Count > 0)
+                    if (0 < methodBuffer.Count)
                     {
                         filtered[type] = methodBuffer;
                     }
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 EditorGUI.BeginChangeCheck();
                 int selectedIndex = EditorGUILayout.Popup("MethodName", currentIndex, methodNames);
-                if (EditorGUI.EndChangeCheck() && selectedIndex >= 0)
+                if (EditorGUI.EndChangeCheck() && 0 <= selectedIndex)
                 {
                     recordUndo?.Invoke("Change Animation Event Method");
                     item.selectedMethod = buffer[selectedIndex];
@@ -386,8 +386,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                     Type type = allTypes[i];
                     string fullName = type.FullName ?? string.Empty;
                     if (
-                        fullName.ToLowerInvariant().IndexOf(searchLower, StringComparison.Ordinal)
-                        >= 0
+                        0
+                        <= fullName
+                            .ToLowerInvariant()
+                            .IndexOf(searchLower, StringComparison.Ordinal)
                     )
                     {
                         filtered.Add(type);
@@ -400,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 filtered.Insert(0, item.selectedType);
             }
 
-            if (filtered.Count > limit)
+            if (limit < filtered.Count)
             {
                 filtered.RemoveRange(limit, filtered.Count - limit);
                 truncated = true;

@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             Color[] pixels = new Color[width * height];
-            float widthMinusOne = width > 1 ? width - 1 : 1;
+            float widthMinusOne = 1 < width ? width - 1 : 1;
 
             for (int y = 0; y < height; y++)
             {
@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             Color[] pixels = new Color[width * height];
-            float heightMinusOne = height > 1 ? height - 1 : 1;
+            float heightMinusOne = 1 < height ? height - 1 : 1;
 
             for (int y = 0; y < height; y++)
             {
@@ -412,14 +412,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         int rowOffset = y * width;
                         bool isVerticalBorder =
-                            borderWidth > 0
-                            && (y < cellStartY + borderWidth || y >= cellEndY - borderWidth);
+                            0 < borderWidth
+                            && (y < cellStartY + borderWidth || cellEndY - borderWidth <= y);
 
                         for (int x = cellStartX; x < cellEndX; x++)
                         {
                             bool isHorizontalBorder =
-                                borderWidth > 0
-                                && (x < cellStartX + borderWidth || x >= cellEndX - borderWidth);
+                                0 < borderWidth
+                                && (x < cellStartX + borderWidth || cellEndX - borderWidth <= x);
 
                             if (isVerticalBorder || isHorizontalBorder)
                             {
@@ -573,7 +573,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return null;
             }
 
-            if (rect.xMax > texture.width || rect.yMax > texture.height)
+            if (texture.width < rect.xMax || texture.height < rect.yMax)
             {
                 return null;
             }
@@ -632,7 +632,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </remarks>
         public void Cleanup()
         {
-            for (int i = _trackedObjects.Count - 1; i >= 0; i--)
+            for (int i = _trackedObjects.Count - 1; 0 <= i; i--)
             {
                 Object obj = _trackedObjects[i];
                 if (obj != null)

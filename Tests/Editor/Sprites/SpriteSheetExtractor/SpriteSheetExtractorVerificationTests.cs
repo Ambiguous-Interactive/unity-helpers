@@ -94,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Parse sourceFile
             int sourceFileStart = json.IndexOf("\"sourceFile\":", StringComparison.Ordinal);
-            if (sourceFileStart >= 0)
+            if (0 <= sourceFileStart)
             {
                 int valueStart = json.IndexOf('"', sourceFileStart + 13) + 1;
                 int valueEnd = json.IndexOf('"', valueStart);
@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Parse spriteCount
             int spriteCountStart = json.IndexOf("\"spriteCount\":", StringComparison.Ordinal);
-            if (spriteCountStart >= 0)
+            if (0 <= spriteCountStart)
             {
                 int valueStart = spriteCountStart + 14;
                 int valueEnd = json.IndexOfAny(new[] { ',', '}', '\n' }, valueStart);
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Parse expectedNames array
             int namesStart = json.IndexOf("\"expectedNames\":", StringComparison.Ordinal);
-            if (namesStart >= 0)
+            if (0 <= namesStart)
             {
                 int arrayStart = json.IndexOf('[', namesStart);
                 int arrayEnd = json.IndexOf(']', arrayStart);
@@ -134,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Parse spriteDimensions array
             int dimStart = json.IndexOf("\"spriteDimensions\":", StringComparison.Ordinal);
-            if (dimStart >= 0)
+            if (0 <= dimStart)
             {
                 int arrayStart = json.IndexOf('[', dimStart);
                 int arrayEnd = json.IndexOf(']', arrayStart);
@@ -149,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Parse gridSize array
             int gridStart = json.IndexOf("\"gridSize\":", StringComparison.Ordinal);
-            if (gridStart >= 0)
+            if (0 <= gridStart)
             {
                 int arrayStart = json.IndexOf('[', gridStart);
                 int arrayEnd = json.IndexOf(']', arrayStart);

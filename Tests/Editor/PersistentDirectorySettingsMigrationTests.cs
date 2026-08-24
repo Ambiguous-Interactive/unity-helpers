@@ -844,7 +844,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 ? AssetDatabase.GetSubFolders(wallstopRoot)
                 : Array.Empty<string>();
             string preExistingInfo =
-                preExistingSubFolders.Length > 0
+                0 < preExistingSubFolders.Length
                     ? $"Pre-existing subfolders after cleanup: {string.Join(", ", preExistingSubFolders)}"
                     : "No pre-existing subfolders after cleanup";
 
@@ -882,7 +882,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 ? AssetDatabase.GetSubFolders(wallstopRoot)
                 : Array.Empty<string>();
             string remainingFoldersInfo =
-                remainingSubFolders.Length > 0 ? string.Join(", ", remainingSubFolders) : "(none)";
+                0 < remainingSubFolders.Length ? string.Join(", ", remainingSubFolders) : "(none)";
 
             Assert.IsFalse(
                 AssetDatabase.IsValidFolder("Assets/Resources/Wallstop Studios/Branch1"),
@@ -1294,13 +1294,13 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
 
             string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null && subFolders.Length > 0)
+            if (subFolders != null && 0 < subFolders.Length)
             {
                 return;
             }
 
             string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (assets != null && assets.Length > 0)
+            if (assets != null && 0 < assets.Length)
             {
                 return;
             }
@@ -1317,7 +1317,7 @@ namespace WallstopStudios.UnityHelpers.Tests
 
             string[] subFolders = AssetDatabase.GetSubFolders(WallstopRoot);
             string subFolderList =
-                subFolders != null && subFolders.Length > 0
+                subFolders != null && 0 < subFolders.Length
                     ? string.Join(", ", subFolders)
                     : "(none)";
 
@@ -1339,7 +1339,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 }
             }
 
-            return existing.Count > 0 ? string.Join(", ", existing) : "(none)";
+            return 0 < existing.Count ? string.Join(", ", existing) : "(none)";
         }
 
         private static string GetUnexpectedWallstopSubFolderDiagnostics()
@@ -1394,7 +1394,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 }
             }
 
-            return unexpected.Count > 0 ? string.Join(", ", unexpected) : "(none)";
+            return 0 < unexpected.Count ? string.Join(", ", unexpected) : "(none)";
         }
 
         public sealed class CleanupScenario
@@ -1420,7 +1420,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 AssetPaths = assetPaths ?? Array.Empty<string>();
                 ExpectedDeleted = expectedDeleted ?? Array.Empty<string>();
                 ExpectedPreserved = expectedPreserved ?? Array.Empty<string>();
-                CleanupInvocationCount = cleanupInvocationCount > 0 ? cleanupInvocationCount : 1;
+                CleanupInvocationCount = 0 < cleanupInvocationCount ? cleanupInvocationCount : 1;
             }
 
             public override string ToString() => Description;

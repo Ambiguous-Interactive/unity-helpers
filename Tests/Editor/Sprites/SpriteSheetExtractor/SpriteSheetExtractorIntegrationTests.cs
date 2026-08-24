@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 .Replace('\'', '_');
 
             // Limit length to avoid path issues
-            if (testName.Length > 50)
+            if (50 < testName.Length)
             {
                 testName = testName.Substring(0, 50);
             }
@@ -405,7 +405,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 bool hasNonZeroPixels = false;
                 for (int i = 0; i < pixels.Length; i++)
                 {
-                    if (pixels[i].a > 0.01f)
+                    if (0.01f < pixels[i].a)
                     {
                         hasNonZeroPixels = true;
                         break;
@@ -436,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             DeselectAllEntries(extractor);
             entry._isSelected = true;
-            if (entry._sprites.Count > 0)
+            if (0 < entry._sprites.Count)
             {
                 entry._sprites[0]._isSelected = true;
             }
@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             byte[] modifiedContent = new byte[originalContent.Length];
             Array.Copy(originalContent, modifiedContent, originalContent.Length);
             // Flip some bytes to make content detectably different
-            if (modifiedContent.Length > 100)
+            if (100 < modifiedContent.Length)
             {
                 modifiedContent[100] = (byte)(modifiedContent[100] ^ 0xFF);
             }
@@ -546,7 +546,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             DeselectAllEntries(extractor);
             entry._isSelected = true;
-            if (entry._sprites.Count > 0)
+            if (0 < entry._sprites.Count)
             {
                 entry._sprites[0]._isSelected = true;
             }
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             DeselectAllEntries(extractor);
             entry._isSelected = true;
-            if (entry._sprites.Count > 0)
+            if (0 < entry._sprites.Count)
             {
                 entry._sprites[0]._isSelected = true;
             }
@@ -673,7 +673,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             entry._useGlobalSettings = false;
             entry._pivotModeOverride = PivotMode.TopLeft;
 
-            Assert.IsTrue(entry._sprites.Count > 0, "Entry should have sprites");
+            Assert.IsTrue(0 < entry._sprites.Count, "Entry should have sprites");
             SpriteSheetExtractor.SpriteEntryData sprite = entry._sprites[0];
             sprite._isSelected = true;
             sprite._usePivotOverride = true;
@@ -740,7 +740,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             entry._pivotModeOverride = PivotMode.Custom;
             entry._customPivotOverride = new Vector2(0.25f, 0.75f);
 
-            Assert.IsTrue(entry._sprites.Count > 0, "Entry should have sprites");
+            Assert.IsTrue(0 < entry._sprites.Count, "Entry should have sprites");
             SpriteSheetExtractor.SpriteEntryData sprite = entry._sprites[0];
             sprite._isSelected = true;
             sprite._usePivotOverride = false;
@@ -814,7 +814,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             DeselectAllEntries(extractor);
             entry._isSelected = true;
-            if (entry._sprites.Count > 0)
+            if (0 < entry._sprites.Count)
             {
                 entry._sprites[0]._isSelected = true;
             }

@@ -221,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return;
             }
 
-            for (int index = Instances.Count - 1; index >= 0; index--)
+            for (int index = Instances.Count - 1; 0 <= index; index--)
             {
                 CoroutineInstance instance = Instances[index];
                 instance.Tick();

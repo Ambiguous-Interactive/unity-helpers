@@ -692,7 +692,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             string directoryPath = Path.GetDirectoryName(absolutePath) ?? string.Empty;
 
-            if (directoryPath.Length > 0)
+            if (0 < directoryPath.Length)
             {
                 Directory.CreateDirectory(directoryPath);
             }

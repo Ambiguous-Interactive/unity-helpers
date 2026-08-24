@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             for (int y = 0; y < h; ++y)
             for (int x = 0; x < w; ++x)
             {
-                bool inRect = x >= rectX && x < rectX + rectW && y >= rectY && y < rectY + rectH;
+                bool inRect = rectX <= x && x < rectX + rectW && rectY <= y && y < rectY + rectH;
                 pix[y * w + x] = inRect ? color : new Color(0f, 0f, 0f, 0f);
             }
             t.SetPixels(pix);

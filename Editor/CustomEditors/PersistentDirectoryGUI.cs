@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     false,
                     0
                 );
-                if (allPaths.Length > topN)
+                if (topN < allPaths.Length)
                 {
                     Rect expansionFoldoutRect = new(
                         startX + 15f,
@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     if (ContextFoldoutStates[foldoutKey])
                     {
                         int remaining = allPaths.Length - topN;
-                        if (remaining > 0)
+                        if (0 < remaining)
                         {
                             for (int idx = topN; idx < allPaths.Length; idx++)
                             {
@@ -207,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     false,
                     0
                 );
-                if (allPaths.Length > topN)
+                if (topN < allPaths.Length)
                 {
                     height +=
                         EditorGUIUtility.singleLineHeight
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     false,
                     0
                 );
-                if (allPaths.Length > topN)
+                if (topN < allPaths.Length)
                 {
                     height +=
                         EditorGUIUtility.singleLineHeight
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 }
             }
 
-            if (height > 0)
+            if (0 < height)
             {
                 height += EditorGUIUtility.standardVerticalSpacing * 2;
             }
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             }
 
             float historyHeight = GetDrawFrequentPathsHeight(toolName, contextKeyForHistory);
-            if (historyHeight > 0)
+            if (0 < historyHeight)
             {
                 height += EditorGUIUtility.standardVerticalSpacing;
                 height += historyHeight;
@@ -596,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (textFieldWidthOverride > 0)
+                if (0 < textFieldWidthOverride)
                 {
                     pathInTextField = EditorGUILayout.TextField(
                         label,
@@ -782,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     }
 
                     int remaining = allPaths.Length - topN;
-                    if (remaining > 0)
+                    if (0 < remaining)
                     {
                         for (int idx = topN; idx < allPaths.Length; idx++)
                         {

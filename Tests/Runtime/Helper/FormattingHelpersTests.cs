@@ -344,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string result = FormattingHelpers.FormatBytes(1050); // ~1.025 KB
             string[] parts = result.Split(' ');
-            if (parts.Length > 0 && double.TryParse(parts[0], out double value))
+            if (0 < parts.Length && double.TryParse(parts[0], out double value))
             {
                 int decimalPlaces = 0;
                 string valueStr = parts[0];

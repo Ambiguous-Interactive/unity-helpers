@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 lock (Lock)
                 {
-                    return _batchDepth > 0;
+                    return 0 < _batchDepth;
                 }
             }
         }
@@ -730,7 +730,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 if (_batchDepth == 0)
                 {
                     // Only decrement the Unity depth if we were tracking it
-                    if (_actualUnityBatchDepth > 0)
+                    if (0 < _actualUnityBatchDepth)
                     {
                         _actualUnityBatchDepth--;
                     }
@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _batchDepth = 0;
                 _actualUnityBatchDepth = 0;
 
-                depthToCleanup = currentDepth > 0 ? Math.Min(currentDepth, actualDepth) : 0;
+                depthToCleanup = 0 < currentDepth ? Math.Min(currentDepth, actualDepth) : 0;
             }
 
             int allowAutoRefreshFailures = 0;
@@ -812,7 +812,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            if (allowAutoRefreshFailures > 0 || stopAssetEditingFailures > 0)
+            if (0 < allowAutoRefreshFailures || 0 < stopAssetEditingFailures)
             {
                 Debug.LogWarning(
                     $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(ResetBatchDepth)} completed with {allowAutoRefreshFailures + stopAssetEditingFailures} errors out of {depthToCleanup * 2} calls. Unity AssetDatabase state may be inconsistent."
@@ -929,7 +929,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             bool wasBatching;
             lock (Lock)
             {
-                wasBatching = _batchDepth > 0 && _actualUnityBatchDepth > 0;
+                wasBatching = 0 < _batchDepth && 0 < _actualUnityBatchDepth;
                 if (wasBatching)
                 {
                     _actualUnityBatchDepth--;

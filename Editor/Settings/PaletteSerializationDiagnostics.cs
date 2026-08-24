@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             StringBuilder builder = new();
             for (int index = 0; index < keys.Count; index++)
             {
-                if (index > 0)
+                if (0 < index)
                 {
                     builder.Append(", ");
                 }

@@ -557,7 +557,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            if (added > 0 || updated > 0 || removed > 0)
+            if (0 < added || 0 < updated || 0 < removed)
             {
                 EditorUtility.SetDirty(metadata);
                 AssetDatabase.SaveAssets();
@@ -581,7 +581,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 new[] { "Assets/Resources" }
             );
 
-            if (guids != null && guids.Length > 0)
+            if (guids != null && 0 < guids.Length)
             {
                 foreach (string guid in guids)
                 {
@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             // Try loading from Resources as a fallback
             Object[] instances = Resources.LoadAll(string.Empty, type);
-            if (instances != null && instances.Length > 0)
+            if (instances != null && 0 < instances.Length)
             {
                 foreach (Object instance in instances)
                 {

@@ -3785,7 +3785,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             for (int i = 0; i < maxSize; i++)
             {
                 cache.Set($"key{i}", i);
-                if (cache.Capacity > previousCapacity)
+                if (previousCapacity < cache.Capacity)
                 {
                     Assert.That(
                         cache.Capacity,

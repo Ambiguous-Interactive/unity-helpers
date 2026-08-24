@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     "Encountered Infinity at iteration {0}",
                     i
                 );
-                if (value >= 0)
+                if (0 <= value)
                 {
                     sawPositive = true;
                 }
@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 Assert.AreEqual(original.Next(), restored.Next(), $"Mismatch at {i}");
             }
 
-            if (snapshot.PayloadBytes != null && snapshot.PayloadBytes.Count > 0)
+            if (snapshot.PayloadBytes != null && 0 < snapshot.PayloadBytes.Count)
             {
                 Assert.GreaterOrEqual(snapshot.PayloadBytes.Count, 12);
             }

@@ -217,15 +217,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     Triggers = (PurgeTrigger)triggerValue,
                     UseIntelligentPurging = useIntelligentPurging,
                 };
-                if (idleTimeoutSeconds > 0f)
+                if (0f < idleTimeoutSeconds)
                 {
                     options.IdleTimeoutSeconds = idleTimeoutSeconds;
                 }
-                if (maxPoolSize > 0)
+                if (0 < maxPoolSize)
                 {
                     options.MaxPoolSize = maxPoolSize;
                 }
-                if (purgeIntervalSeconds > 0f)
+                if (0f < purgeIntervalSeconds)
                 {
                     options.PurgeIntervalSeconds = purgeIntervalSeconds;
                 }

@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 {
                     break;
                 }
-                if (Time.time >= timeout)
+                if (timeout <= Time.time)
                 {
                     break;
                 }

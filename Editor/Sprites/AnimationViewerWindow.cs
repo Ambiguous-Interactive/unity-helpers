@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
                 OriginalClipFps =
-                    clip.frameRate > 0 ? clip.frameRate : AnimatedSpriteLayer.FrameRate;
+                    0 < clip.frameRate ? clip.frameRate : AnimatedSpriteLayer.FrameRate;
 
                 BindingPath = string.Empty;
                 if (SourceClip != null)
@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _fileSelector.OnFilesSelectedReadOnly += HandleFilesSelectedFromCustomBrowser;
                 _fileSelector.OnCancelled += HideMultiFileSelector;
                 root.Add(_fileSelector);
-                if (root.childCount > 1)
+                if (1 < root.childCount)
                 {
                     _fileSelector.PlaceInFront(root.Children().FirstOrDefault());
                 }
@@ -302,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 _fileSelector.ResetAndShow(GetLastAnimationDirectory());
                 root.Add(_fileSelector);
-                if (root.childCount > 1)
+                if (1 < root.childCount)
                 {
                     _fileSelector.PlaceInFront(root.Children().FirstOrDefault());
                 }
@@ -387,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (clipsAddedCount > 0)
+            if (0 < clipsAddedCount)
             {
                 this.Log($"Added {clipsAddedCount} clip(s).");
                 if (!string.IsNullOrWhiteSpace(lastValidDirectory))
@@ -449,11 +449,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (clipsAddedCount > 0)
+            if (0 < clipsAddedCount)
             {
                 this.Log($"Added {clipsAddedCount} new AnimationClip(s) to the viewer.");
             }
-            else if (selectedObjects.Length > 0)
+            else if (0 < selectedObjects.Length)
             {
                 this.Log($"All selected AnimationClips were already loaded.");
             }
@@ -570,7 +570,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             EditorLayerData newEditorLayer = new(clip);
             _loadedEditorLayers.Add(newEditorLayer);
 
-            if (_activeEditorLayer == null && newEditorLayer.Sprites.Count > 0)
+            if (_activeEditorLayer == null && 0 < newEditorLayer.Sprites.Count)
             {
                 SetActiveEditorLayer(newEditorLayer);
             }
@@ -594,7 +594,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (_activeEditorLayer == layerToRemove)
             {
-                SetActiveEditorLayer(_loadedEditorLayers.Count > 0 ? _loadedEditorLayers[0] : null);
+                SetActiveEditorLayer(0 < _loadedEditorLayers.Count ? _loadedEditorLayers[0] : null);
             }
 
             RebuildLoadedClipsUI();
@@ -707,7 +707,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float diffSqrMagnitude = (evt.position - _clipDragStartPosition).sqrMagnitude;
 
-            if (diffSqrMagnitude >= DragThresholdSqrMagnitude)
+            if (DragThresholdSqrMagnitude <= diffSqrMagnitude)
             {
                 _draggedLoadedClipElement = _clipDragPendingElement;
                 _draggedLoadedClipOriginalIndex = _clipDragPendingOriginalIndex;
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (_isClipDragPending)
             {
-                if (listIndex >= 0 && listIndex < _loadedEditorLayers.Count)
+                if (0 <= listIndex && listIndex < _loadedEditorLayers.Count)
                 {
                     SetActiveEditorLayer(_loadedEditorLayers[listIndex]);
                 }
@@ -824,7 +824,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 if (
                     newVisualIndex < 0
-                    && _loadedClipsContainer.childCount > 0
+                    && 0 < _loadedClipsContainer.childCount
                     && _draggedLoadedClipElement
                         != _loadedClipsContainer.ElementAt(_loadedClipsContainer.childCount - 1)
                 )
@@ -866,7 +866,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 int originalListIndex = (int)draggedIndexData;
 
-                if (originalListIndex < 0 || originalListIndex >= _loadedEditorLayers.Count)
+                if (originalListIndex < 0 || _loadedEditorLayers.Count <= originalListIndex)
                 {
                     this.LogError(
                         $"DragPerform (LoadedClips): Stale or invalid dragged index. Aborting drop."
@@ -1008,7 +1008,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     out List<AnimatedSpriteLayer> animatedSpriteLayers
                 );
 
-            if (_loadedEditorLayers.Count > 0)
+            if (0 < _loadedEditorLayers.Count)
             {
                 foreach (EditorLayerData editorLayer in _loadedEditorLayers)
                 {
@@ -1060,7 +1060,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 if (
                     newVisualIndex < 0
-                    && _framesContainer.childCount > 0
+                    && 0 < _framesContainer.childCount
                     && _draggedFrameElement
                         != _framesContainer.ElementAt(_framesContainer.childCount - 1)
                 )
@@ -1106,7 +1106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 int originalDataIndex = (int)draggedIndexData;
 
-                if (originalDataIndex < 0 || originalDataIndex >= _activeEditorLayer.Sprites.Count)
+                if (originalDataIndex < 0 || _activeEditorLayer.Sprites.Count <= originalDataIndex)
                 {
                     this.LogError(
                         $"DragPerform (Frames): Stale or invalid dragged index. Aborting drop."
@@ -1327,7 +1327,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (newClampedDataIndex != originalDataIndex)
             {
-                if (originalDataIndex < 0 || originalDataIndex >= _activeEditorLayer.Sprites.Count)
+                if (originalDataIndex < 0 || _activeEditorLayer.Sprites.Count <= originalDataIndex)
                 {
                     this.LogWarn(
                         $"Original index {originalDataIndex} out of bounds. Rebuilding UI to correct."
@@ -1361,7 +1361,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (
                 _activeEditorLayer == null
                 || originalDataIndex < 0
-                || originalDataIndex >= _activeEditorLayer.Sprites.Count
+                || _activeEditorLayer.Sprites.Count <= originalDataIndex
             )
             {
                 this.LogError(
@@ -1550,7 +1550,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             ObjectReferenceKeyframe[] newKeyframes = new ObjectReferenceKeyframe[
                 spritesToSave.Count
             ];
-            float timePerFrame = _currentPreviewFps > 0 ? 1.0f / _currentPreviewFps : 0f;
+            float timePerFrame = 0 < _currentPreviewFps ? 1.0f / _currentPreviewFps : 0f;
 
             for (int i = 0; i < spritesToSave.Count; i++)
             {

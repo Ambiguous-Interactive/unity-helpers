@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long classicMs = sw.ElapsedMilliseconds;
 
             double speedup =
-                classicMs > 0 ? (double)classicMs / optimizedMs : double.PositiveInfinity;
+                0 < classicMs ? (double)classicMs / optimizedMs : double.PositiveInfinity;
             UnityEngine.Debug.Log(
                 $"| {label} | {optimizedMs, 25:N0} | {classicMs, 23:N0} | {speedup, 7:0.00}x |"
             );

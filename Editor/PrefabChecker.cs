@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
 
                 string[] labels = AssetDatabase.GetLabels(prefab);
-                if (includeSet.Count > 0)
+                if (0 < includeSet.Count)
                 {
                     bool anyIncluded = false;
                     foreach (string label in labels)
@@ -519,7 +519,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         continue;
                     }
                 }
-                if (excludeSet.Count > 0)
+                if (0 < excludeSet.Count)
                 {
                     bool anyExcluded = false;
                     foreach (string label in labels)
@@ -644,7 +644,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                 }
 
-                if (issuesForThisPrefab > 0)
+                if (0 < issuesForThisPrefab)
                 {
                     int toLog = Mathf.Min(100, messages.Count);
                     for (int m = 0; m < toLog; m++)
@@ -652,7 +652,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         prefab.LogWarn($"{messages[m]}");
                     }
 
-                    if (messages.Count > toLog)
+                    if (toLog < messages.Count)
                     {
                         prefab.LogWarn($"... and {messages.Count - toLog} more.");
                     }
@@ -696,7 +696,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            if (totalIssuesFound > 0)
+            if (0 < totalIssuesFound)
             {
                 this.LogError(
                     $"Prefab check complete. Found {totalIssuesFound} potential issues across {totalPrefabsChecked} prefabs."
@@ -1019,7 +1019,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<List<Transform>> transformBufferResource =
                 Buffers<Transform>.List.Get(out List<Transform> transforms);
             prefabRoot.GetComponentsInChildren(true, transforms);
-            if (transforms.Count > MaxTransformScanForMissingOwner)
+            if (MaxTransformScanForMissingOwner < transforms.Count)
             {
                 prefabRoot.LogWarn(
                     $"Hierarchy too large to locate owner of missing script (>{MaxTransformScanForMissingOwner}). Reporting at prefab root."
@@ -1039,7 +1039,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 },
                 drawElementCallback = (rect, index, _, _) =>
                 {
-                    if (index < 0 || index >= _assetPaths.Count)
+                    if (index < 0 || _assetPaths.Count <= index)
                     {
                         return;
                     }
@@ -1095,7 +1095,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 },
                 onRemoveCallback = list =>
                 {
-                    if (list.index >= 0 && list.index < _assetPaths.Count)
+                    if (0 <= list.index && list.index < _assetPaths.Count)
                     {
                         _assetPaths.RemoveAt(list.index);
                     }
@@ -1193,7 +1193,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            if (_assetPaths.Count > 0)
+            if (0 < _assetPaths.Count)
             {
                 return;
             }

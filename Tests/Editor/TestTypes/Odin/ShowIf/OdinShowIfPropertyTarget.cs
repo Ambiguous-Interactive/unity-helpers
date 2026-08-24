@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.ShowIf
         public bool boolField;
         public int intField;
 
-        public bool ComputedProperty => boolField && intField > 0;
+        public bool ComputedProperty => boolField && 0 < intField;
 
         [WShowIf(nameof(ComputedProperty))]
         public int dependentField;

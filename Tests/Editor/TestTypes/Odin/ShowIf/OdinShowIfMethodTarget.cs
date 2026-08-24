@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.ShowIf
 
         public bool IsPositive()
         {
-            return value > 0;
+            return 0 < value;
         }
 
         [WShowIf(nameof(IsPositive))]

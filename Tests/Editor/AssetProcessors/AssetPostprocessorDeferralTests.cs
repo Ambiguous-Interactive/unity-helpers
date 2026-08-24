@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 {
                     callCount++;
                     remaining--;
-                    if (remaining > 0)
+                    if (0 < remaining)
                     {
                         AssetPostprocessorDeferral.Schedule(CreateSelfReschedulingAction());
                     }
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 callCount++;
                 remaining--;
-                if (remaining > 0)
+                if (0 < remaining)
                 {
                     AssetPostprocessorDeferral.Schedule(drain);
                 }

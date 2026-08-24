@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector3> octResults = new();
             OctTreeBoundsQueryDiagnosticsCollector diagnostics = new();
             oct.GetElementsInBoundsWithDiagnostics(query, octResults, diagnostics);
-            if (octResults.Count > 0)
+            if (0 < octResults.Count)
             {
                 octResults.RemoveAt(0);
             }

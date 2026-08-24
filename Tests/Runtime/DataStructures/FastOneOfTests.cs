@@ -776,7 +776,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 i => i.ToString(),
                 s => s.Length,
                 b => b ? 1.0 : 0.0,
-                d => d > 0
+                d => 0 < d
             );
 
             Assert.IsTrue(mapped.IsT3);

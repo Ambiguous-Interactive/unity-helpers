@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 EditorGUILayout.Space();
             }
 
-            if (triggeredContexts.Count > 0)
+            if (0 < triggeredContexts.Count)
             {
                 WButtonInvocationController.ProcessTriggeredMethods(triggeredContexts);
             }

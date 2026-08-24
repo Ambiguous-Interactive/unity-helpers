@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             string[] names = GetEnumDisplayNames(enumType);
             Dictionary<ulong, string> map = new(names.Length);
 
-            if (names.Length > 0)
+            if (0 < names.Length)
             {
                 Array values = Enum.GetValues(enumType);
                 int count = Math.Min(values.Length, names.Length);
@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         false
                     );
 
-                    if (inspectorNameAttributes.Length > 0)
+                    if (0 < inspectorNameAttributes.Length)
                     {
                         InspectorNameAttribute attr =
                             inspectorNameAttributes[0] as InspectorNameAttribute;
@@ -399,7 +399,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 return null;
             }
 
-            if (GUIStyleCache.Count >= MaxGUIStyleCacheSize)
+            if (MaxGUIStyleCacheSize <= GUIStyleCache.Count)
             {
                 return factory();
             }
@@ -488,7 +488,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 return;
             }
 
-            while (cache.Count >= maxSize)
+            while (maxSize <= cache.Count)
             {
                 if (tracker.TryGetLeastRecentlyUsed(out TKey lruKey))
                 {

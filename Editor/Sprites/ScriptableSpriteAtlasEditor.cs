@@ -68,9 +68,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                         using EditorGUI.IndentLevelScope nextIndentScope = new();
 
-                        if (result.spritesToAdd.Count > 0)
+                        if (0 < result.spritesToAdd.Count)
                         {
                             EditorGUILayout.LabelField(
                                 $"To Add: {result.spritesToAdd.Count} sprites."
@@ -479,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             );
                         }
 
-                        if (result.spritesToRemove.Count > 0)
+                        if (0 < result.spritesToRemove.Count)
                         {
                             EditorGUILayout.LabelField(
                                 $"To Remove: {result.spritesToRemove.Count} sprites (currently in list but not found by scan)."
@@ -770,7 +770,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             "t:Texture2D",
                             new[] { entry.folderPath }
                         );
-                        if (defaultGuids != null && defaultGuids.Length > 0)
+                        if (defaultGuids != null && 0 < defaultGuids.Length)
                         {
                             guidList.AddRange(defaultGuids);
                         }
@@ -813,7 +813,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     bool needsExcludeLabels =
-                        hasExcludeLabels && excludeLabels != null && excludeLabels.Count > 0;
+                        hasExcludeLabels && excludeLabels != null && 0 < excludeLabels.Count;
                     bool needsLabels = includeLabelFilter || needsExcludeLabels;
 
                     for (int i = 0; i < guidList.Count; ++i)
@@ -829,7 +829,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         bool regexMatch = true;
                         if (
                             compiledRegexes != null
-                            && compiledRegexes.Count > 0
+                            && 0 < compiledRegexes.Count
                             && !string.IsNullOrEmpty(fileName)
                         )
                         {
@@ -1013,7 +1013,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     string[] guids = AssetDatabase.FindAssets(query, new[] { entry.folderPath });
-                    if (guids != null && guids.Length > 0)
+                    if (guids != null && 0 < guids.Length)
                     {
                         guidList.AddRange(guids);
                     }
@@ -1051,7 +1051,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
 
-                        if (set.Count > 0)
+                        if (0 < set.Count)
                         {
                             guidList.AddRange(set);
                         }
@@ -1263,7 +1263,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (addedCount > 0)
+            if (0 < addedCount)
             {
                 so.ApplyModifiedProperties();
                 config.spritesToPack.SortByName();
@@ -1313,7 +1313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (countRemoved > 0)
+            if (0 < countRemoved)
             {
                 so.ApplyModifiedProperties();
                 this.Log(
@@ -1468,12 +1468,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // No need to remove null sprites from atlas contents here; we control packables below.
 
             int removed = config.spritesToPack.RemoveAll(sprite => sprite == null);
-            if (removed > 0)
+            if (0 < removed)
             {
                 EditorUtility.SetDirty(config);
             }
 
-            if (config.spritesToPack.Count > 0)
+            if (0 < config.spritesToPack.Count)
             {
                 Object[] spritesToAdd = config.spritesToPack.ToArray<Object>();
                 atlas.Add(spritesToAdd);
@@ -1702,7 +1702,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     importer.SaveAndReimport();
                 }
 
-                if (modifiedCount > 0 || errorCount > 0)
+                if (0 < modifiedCount || 0 < errorCount)
                 {
                     AssetDatabase.SaveAssets();
                     AssetDatabase.Refresh();
@@ -1760,7 +1760,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // Rewrite list to match target set
-            while (spritesListProp.arraySize > 0)
+            while (0 < spritesListProp.arraySize)
             {
                 spritesListProp.DeleteArrayElementAtIndex(spritesListProp.arraySize - 1);
             }

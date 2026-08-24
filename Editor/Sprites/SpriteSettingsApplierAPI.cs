@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     continue;
                 }
 
-                if (best == null || p.priority > bestPriority)
+                if (best == null || bestPriority < p.priority)
                 {
                     best = p.settings;
                     bestPriority = p.priority;

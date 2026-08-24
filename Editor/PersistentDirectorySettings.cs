@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            bool hasSubFolders = actualSubFolderCount > 0;
+            bool hasSubFolders = 0 < actualSubFolderCount;
 
             if (!hasDirectAssets && !hasSubFolders)
             {
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         return target;
                     }
 
-                    if (target == null && candidatePaths.Count > 0)
+                    if (target == null && 0 < candidatePaths.Count)
                     {
                         // Target doesn't exist but we have candidates - move the first one
                         string primaryPath = candidatePaths[0];
@@ -433,7 +433,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
 
                     // Target now exists - merge and delete any remaining duplicates
-                    if (target != null && candidatePaths.Count > 0)
+                    if (target != null && 0 < candidatePaths.Count)
                     {
                         bool anyMerged = false;
                         List<string> deletedPaths = new();
@@ -593,7 +593,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             int n =
-                topN < 0 ? 0 : (topN > sortedDirectories.Length ? sortedDirectories.Length : topN);
+                topN < 0 ? 0 : (sortedDirectories.Length < topN ? sortedDirectories.Length : topN);
             if (n == sortedDirectories.Length)
             {
                 return sortedDirectories;
@@ -728,7 +728,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         {
                             long maxTicks = Math.Max(td.lastUsedTicks, od.lastUsedTicks);
                             long sumCount = (long)td.count + od.count;
-                            td.count = sumCount > int.MaxValue ? int.MaxValue : (int)sumCount;
+                            td.count = int.MaxValue < sumCount ? int.MaxValue : (int)sumCount;
                             td.lastUsedTicks = maxTicks;
                         }
                     }

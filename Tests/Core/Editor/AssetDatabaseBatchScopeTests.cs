@@ -527,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Should be batching at maximum depth"
             );
 
-            for (int i = nestingLevel - 1; i >= 0; i--)
+            for (int i = nestingLevel - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
                 Assert.That(
@@ -1181,7 +1181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Should be at depth {refreshSettings.Length} with mixed refresh settings"
             );
 
-            for (int i = refreshSettings.Length - 1; i >= 0; i--)
+            for (int i = refreshSettings.Length - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
             }
@@ -1486,7 +1486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     activeScopes.Add(AssetDatabaseBatchHelper.BeginBatch());
                 }
 
-                while (AssetDatabaseBatchHelper.CurrentBatchDepth > targetDepth)
+                while (targetDepth < AssetDatabaseBatchHelper.CurrentBatchDepth)
                 {
                     int lastIndex = activeScopes.Count - 1;
                     activeScopes[lastIndex].Dispose();
@@ -1500,7 +1500,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 );
             }
 
-            while (activeScopes.Count > 0)
+            while (0 < activeScopes.Count)
             {
                 int lastIndex = activeScopes.Count - 1;
                 activeScopes[lastIndex].Dispose();
@@ -1792,7 +1792,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Should be at depth {depth}"
             );
 
-            for (int i = depth - 1; i >= 0; i--)
+            for (int i = depth - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
             }

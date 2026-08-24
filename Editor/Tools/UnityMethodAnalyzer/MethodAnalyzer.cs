@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             if (
                 normalizedFull.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
-                && normalizedFull.Length > normalizedRoot.Length
+                && normalizedRoot.Length < normalizedFull.Length
             )
             {
                 return normalizedFull
@@ -421,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 if (c == '"')
                 {
                     // Check for verbatim string @"..."
-                    if (i > 0 && code[i - 1] == '@')
+                    if (0 < i && code[i - 1] == '@')
                     {
                         result[i] = ' ';
                         i++;
@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         /// </summary>
         private static bool IsOnlyWhitespaceBefore(string code, int position)
         {
-            for (int i = position - 1; i >= 0; i--)
+            for (int i = position - 1; 0 <= i; i--)
             {
                 char c = code[i];
                 if (c == '\n')
@@ -627,7 +627,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             // Pattern 4: Return type starts with punctuation that wouldn't be valid in a real return type
             // This catches cases like ", new" where the comma gets captured
-            if (returnType.Length > 0 && !char.IsLetter(returnType[0]) && returnType[0] != '_')
+            if (0 < returnType.Length && !char.IsLetter(returnType[0]) && returnType[0] != '_')
             {
                 return true;
             }
@@ -781,9 +781,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             // Try resolving generics from derived class to base class
             if (
                 derivedClass.BaseClassTypeArguments != null
-                && derivedClass.BaseClassTypeArguments.Count > 0
+                && 0 < derivedClass.BaseClassTypeArguments.Count
                 && baseClass.GenericTypeParameters != null
-                && baseClass.GenericTypeParameters.Count > 0
+                && 0 < baseClass.GenericTypeParameters.Count
             )
             {
                 string resolvedBaseType = ResolveGenericType(
@@ -817,7 +817,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 int braceCount = 1;
                 int braceEnd = braceStart + 1;
-                while (braceEnd < code.Length && braceCount > 0)
+                while (braceEnd < code.Length && 0 < braceCount)
                 {
                     char c = code[braceEnd];
                     if (c == '{')
@@ -878,7 +878,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             // Find the last closing brace in the lookback region - this marks the end of
             // the previous class or method. Attributes for THIS class will be after it.
             int lastBrace = -1;
-            for (int idx = lookbackRegion.Length - 1; idx >= 0; idx--)
+            for (int idx = lookbackRegion.Length - 1; 0 <= idx; idx--)
             {
                 if (lookbackRegion[idx] == '}')
                 {
@@ -889,7 +889,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             // Only search for [SuppressAnalyzer] after the last class/method boundary
             string contentBeforeClass =
-                lastBrace >= 0 ? lookbackRegion.Substring(lastBrace + 1) : lookbackRegion;
+                0 <= lastBrace ? lookbackRegion.Substring(lastBrace + 1) : lookbackRegion;
 
             // Strip comments from contentBeforeClass to avoid false positives when
             // [SuppressAnalyzer] appears in a comment (e.g., "// no [SuppressAnalyzer] here").
@@ -917,7 +917,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     whereIndex = baseList.IndexOf("\rwhere ", StringComparison.Ordinal);
                 }
 
-                if (whereIndex >= 0)
+                if (0 <= whereIndex)
                 {
                     baseList = baseList.Substring(0, whereIndex).Trim();
                 }
@@ -935,7 +935,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     // Extract the base name without generics
                     int genericIndex = trimmed.IndexOf('<');
                     string baseName =
-                        genericIndex > 0 ? trimmed.Substring(0, genericIndex).Trim() : trimmed;
+                        0 < genericIndex ? trimmed.Substring(0, genericIndex).Trim() : trimmed;
 
                     // Check if it's an interface
                     // Handle nested interface types like "OuterClass.IInterface" or "OuterClass<T>.IInterface"
@@ -952,7 +952,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         baseClassFullDeclaration = trimmed;
 
                         // Extract generic arguments from the base class
-                        if (genericIndex > 0)
+                        if (0 < genericIndex)
                         {
                             baseClassTypeArgs = ExtractGenericArguments(trimmed);
                         }
@@ -1009,17 +1009,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             // Check for nested interface: look for .I followed by uppercase letter
             int dotIndex = cleaned.LastIndexOf('.');
-            if (dotIndex >= 0 && dotIndex < cleaned.Length - 2)
+            if (0 <= dotIndex && dotIndex < cleaned.Length - 2)
             {
                 string afterDot = cleaned.Substring(dotIndex + 1);
-                if (afterDot.Length > 1 && afterDot[0] == 'I' && char.IsUpper(afterDot[1]))
+                if (1 < afterDot.Length && afterDot[0] == 'I' && char.IsUpper(afterDot[1]))
                 {
                     return true;
                 }
             }
 
             // Check for simple interface: starts with I and next char is uppercase
-            if (cleaned.Length > 1 && cleaned[0] == 'I' && char.IsUpper(cleaned[1]))
+            if (1 < cleaned.Length && cleaned[0] == 'I' && char.IsUpper(cleaned[1]))
             {
                 return true;
             }
@@ -1128,11 +1128,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         // don't affect method signature matching in C#
                         int equalsIndex = trimmed.IndexOf('=');
                         string paramWithoutDefault =
-                            equalsIndex > 0 ? trimmed.Substring(0, equalsIndex).Trim() : trimmed;
+                            0 < equalsIndex ? trimmed.Substring(0, equalsIndex).Trim() : trimmed;
 
                         parameters.Add(paramWithoutDefault);
                         int lastSpace = paramWithoutDefault.LastIndexOf(' ');
-                        if (lastSpace > 0)
+                        if (0 < lastSpace)
                         {
                             string typeStr = paramWithoutDefault.Substring(0, lastSpace).Trim();
                             if (typeStr.StartsWith("this ", StringComparison.Ordinal))
@@ -1189,7 +1189,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 // Find the last closing brace in the lookback region - this marks the end of
                 // the previous method or initializer. Attributes for THIS method will be after it.
                 int lastBraceOrSemicolon = -1;
-                for (int idx = lookbackRegion.Length - 1; idx >= 0; idx--)
+                for (int idx = lookbackRegion.Length - 1; 0 <= idx; idx--)
                 {
                     char ch = lookbackRegion[idx];
                     if (ch == '}' || ch == ';')
@@ -1201,7 +1201,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 // Only search for [SuppressAnalyzer] after the last method boundary
                 string contentBeforeMethod =
-                    lastBraceOrSemicolon >= 0
+                    0 <= lastBraceOrSemicolon
                         ? lookbackRegion.Substring(lastBraceOrSemicolon + 1)
                         : lookbackRegion;
 
@@ -1353,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     }
 
                     // Return first candidate if no exact match
-                    return candidates.Count > 0 ? candidates[0] : null;
+                    return 0 < candidates.Count ? candidates[0] : null;
                 }
             }
 
@@ -1539,7 +1539,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             // Only flag unexpected parameters if this is not an override (overrides
             // are legitimately following a base class signature, e.g., PropertyDrawer.OnGUI)
             if (
-                method.Parameters.Count > 0
+                0 < method.Parameters.Count
                 && !UnityMethods.MethodsWithParameters.Contains(method.Name)
                 && !method.IsOverride
             )

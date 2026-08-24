@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             // To support tests that conceptually want a sprite with 0 PPU, we return
             // a null sprite in that case and let downstream logic handle it gracefully.
             Sprite sprite = null;
-            if (pixelsPerUnit > 0f)
+            if (0f < pixelsPerUnit)
             {
                 sprite = Sprite.Create(
                     texture,
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
         public static void DestroyTracked(List<Object> tracked)
         {
-            for (int i = tracked.Count - 1; i >= 0; --i)
+            for (int i = tracked.Count - 1; 0 <= i; --i)
             {
                 Object instance = tracked[i];
                 if (instance != null)

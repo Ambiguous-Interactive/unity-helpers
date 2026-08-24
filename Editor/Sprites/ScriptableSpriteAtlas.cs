@@ -243,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (!Application.isPlaying)
             {
                 int removed = spritesToPack.RemoveAll(sprite => sprite == null);
-                if (removed > 0)
+                if (0 < removed)
                 {
                     EditorUtility.SetDirty(this);
                 }

@@ -216,8 +216,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             float dictionaryStart =
-                dictionaryValueRects.Length > 0 ? dictionaryValueRects[0].Rect.y : 0f;
-            float setStart = setRects.Length > 0 ? setRects[0].Rect.y : 0f;
+                0 < dictionaryValueRects.Length ? dictionaryValueRects[0].Rect.y : 0f;
+            float setStart = 0 < setRects.Length ? setRects[0].Rect.y : 0f;
 
             TestContext.WriteLine(
                 $"[Layout] Dictionary baselines: {string.Join(", ", dictionaryValueRects.Select((sample, index) => $"{index}:{sample.Rect.y - dictionaryStart:0.00}"))}"

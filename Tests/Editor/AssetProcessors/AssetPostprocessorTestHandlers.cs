@@ -251,9 +251,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 // Emitting clean canonical surfaces alongside a dirty extra probe
                 // implies the canonical surfaces are the pollution source; hiding
                 // them focuses the diagnostic on the actually-dirty surface.
-                bool emitContexts = entry.RecordedContextsEnumerator != null && contextsCount > 0;
+                bool emitContexts = entry.RecordedContextsEnumerator != null && 0 < contextsCount;
                 bool emitInstances =
-                    entry.RecordedInstancesEnumerator != null && instancesCount > 0;
+                    entry.RecordedInstancesEnumerator != null && 0 < instancesCount;
 
                 StringBuilder message = new();
                 message.Append(entry.HandlerType.Name).Append(" pollution");
@@ -401,7 +401,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.FlushForTesting();
             IReadOnlyList<string> pollutionErrors = DescribePollution();
             ClearAllInternal(entries);
-            if (pollutionErrors.Count > 0)
+            if (0 < pollutionErrors.Count)
             {
                 Assert.Fail(
                     "Test pollution detected from prior test. Handler state was not clean at test start:\n"
@@ -672,7 +672,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 return null;
             }
-            if (indexParameters != null && indexParameters.Length > 0)
+            if (indexParameters != null && 0 < indexParameters.Length)
             {
                 return null;
             }
@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             if (value is ICollection collection)
             {
-                return collection.Count > 0;
+                return 0 < collection.Count;
             }
 
             if (value is IEnumerable enumerable)

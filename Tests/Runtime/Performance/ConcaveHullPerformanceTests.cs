@@ -278,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 for (int x = 0; x < width; ++x)
                 {
                     bool inCavity =
-                        x > cavityMinX && x < cavityMaxX && y > cavityMinY && y < cavityMaxY;
+                        cavityMinX < x && x < cavityMaxX && cavityMinY < y && y < cavityMaxY;
                     if (!inCavity)
                     {
                         points.Add(new FastVector3Int(x, y, 0));

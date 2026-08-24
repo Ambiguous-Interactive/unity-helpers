@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            if (failedAssemblies.Count > 0)
+            if (0 < failedAssemblies.Count)
             {
                 TestContext.WriteLine(
                     "Diagnostic: All loaded assembly names containing 'WallstopStudios':"
@@ -127,14 +127,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            if (skippedAssemblies.Count > 0)
+            if (0 < skippedAssemblies.Count)
             {
                 Debug.Log(
                     $"Skipped optional integration assemblies:\n{string.Join("\n", skippedAssemblies)}"
                 );
             }
 
-            if (failedAssemblies.Count > 0)
+            if (0 < failedAssemblies.Count)
             {
                 TestContext.WriteLine(
                     "Diagnostic: All loaded assembly names containing 'WallstopStudios':"
@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            if (missingEntries.Count > 0)
+            if (0 < missingEntries.Count)
             {
                 TestContext.WriteLine("Diagnostic: InternalsVisibleTo entries found per file:");
                 foreach (KeyValuePair<string, HashSet<string>> kvp in assemblyInfoEntries)
@@ -521,7 +521,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            if (issues.Count > 0)
+            if (0 < issues.Count)
             {
                 TestContext.WriteLine("Diagnostic: discovered test asmdef assembly names on disk:");
                 foreach (string name in asmdefAssemblyNames)
@@ -852,7 +852,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         }
                     }
 
-                    if (types.Length > 0 && !hasMatchingNamespace && mismatchedTypes.Count > 0)
+                    if (0 < types.Length && !hasMatchingNamespace && 0 < mismatchedTypes.Count)
                     {
                         StringBuilder issueBuilder = new(
                             $"{assemblyName}: rootNamespace is '{rootNamespace}' but types use different namespaces:"
@@ -863,7 +863,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             issueBuilder.Append("\n  ");
                             issueBuilder.Append(mismatchedTypes[i]);
                         }
-                        if (mismatchedTypes.Count > 5)
+                        if (5 < mismatchedTypes.Count)
                         {
                             issueBuilder.Append($"\n  ... and {mismatchedTypes.Count - 5} more");
                         }
@@ -881,7 +881,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             // This is informational - namespace mismatches are not necessarily errors
-            if (issues.Count > 0)
+            if (0 < issues.Count)
             {
                 Debug.LogWarning(
                     "Namespace configuration notes (not necessarily errors):\n"

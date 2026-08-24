@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line3D line = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 0f, 0f));
             BoundingBox3D bounds = new(new Vector3(5f, 5f, 5f), new Vector3(10f, 10f, 10f));
             Vector3 closest = line.ClosestPointOnBounds(bounds);
-            Assert.IsTrue(closest.x >= 0f && closest.x <= 10f);
+            Assert.IsTrue(0f <= closest.x && closest.x <= 10f);
             Assert.AreEqual(0f, closest.y, Epsilon);
             Assert.AreEqual(0f, closest.z, Epsilon);
         }

@@ -968,7 +968,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 averageInterRentalTimeSeconds: 1f,
                 lastAccessTime: 100f,
                 totalRentalCount: 50,
-                isHighFrequency: rentalsPerMinute >= 10f,
+                isHighFrequency: 10f <= rentalsPerMinute,
                 isLowFrequency: rentalsPerMinute <= 1f,
                 isUnused: false
             );
@@ -994,8 +994,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 averageInterRentalTimeSeconds: 1f,
                 lastAccessTime: 100f,
                 totalRentalCount: 50,
-                isHighFrequency: rentalsPerMinute >= 10f,
-                isLowFrequency: rentalsPerMinute <= 1f && 50 > 0,
+                isHighFrequency: 10f <= rentalsPerMinute,
+                isLowFrequency: rentalsPerMinute <= 1f && 0 < 50,
                 isUnused: false
             );
 
@@ -1281,7 +1281,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  Time: {_currentTime}");
             TestContext.WriteLine($"  Actual idle time elapsed: {actualIdleTime}s");
             TestContext.WriteLine($"  Effective idle timeout: {baseIdleTimeout}s");
-            TestContext.WriteLine($"  Idle time > timeout: {actualIdleTime > baseIdleTimeout}");
+            TestContext.WriteLine($"  Idle time > timeout: {baseIdleTimeout < actualIdleTime}");
 
             // Trigger purge check
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
@@ -2253,7 +2253,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  ExpectedMinCount: {expectedMinCount}");
             TestContext.WriteLine($"  MaxPossiblePurges: {maxPossiblePurges}");
 
-            if (maxPossiblePurges > 0)
+            if (0 < maxPossiblePurges)
             {
                 Assert.GreaterOrEqual(
                     purgeCount,

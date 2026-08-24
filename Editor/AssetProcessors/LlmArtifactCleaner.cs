@@ -77,14 +77,14 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 string segment = BlockedSegments[i];
                 int index = assetPath.IndexOf(segment, StringComparison.Ordinal);
-                while (index >= 0)
+                while (0 <= index)
                 {
                     // Check that _llm_ is not preceded by an underscore (to avoid matching __llm__)
                     bool validPrefix = index == 0 || assetPath[index - 1] != '_';
                     // Check that _llm_ is not followed by an additional underscore immediately after
                     int afterIndex = index + segment.Length;
                     bool validSuffix =
-                        afterIndex >= assetPath.Length || assetPath[afterIndex] != '_';
+                        assetPath.Length <= afterIndex || assetPath[afterIndex] != '_';
 
                     if (validPrefix && validSuffix)
                     {
@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             _isDeleting = true;
             try
             {
-                while (PendingDeletions.Count > 0)
+                while (0 < PendingDeletions.Count)
                 {
                     string[] batch = new string[PendingDeletions.Count];
                     PendingDeletions.CopyTo(batch);

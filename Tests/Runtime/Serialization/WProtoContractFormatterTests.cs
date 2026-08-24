@@ -645,7 +645,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                 uint remainingLength = (uint)payload.Length;
                 int cursor = 1;
-                while (remainingLength >= 0x80u)
+                while (0x80u <= remainingLength)
                 {
                     next[cursor++] = (byte)(remainingLength | 0x80u);
                     remainingLength >>= 7;
@@ -685,7 +685,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </remarks>
         private static bool TryWalkNesting(ref WProtoReader reader, ref int deepest)
         {
-            if (reader.Depth > deepest)
+            if (deepest < reader.Depth)
             {
                 deepest = reader.Depth;
             }
@@ -719,7 +719,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// <summary>Descends to the bound, then asserts the level past it is refused.</summary>
         private static void AssertDescendingPastTheBoundIsRefused(ref WProtoReader reader)
         {
-            if (reader.Depth >= WProtoReader.MaxNestingDepth)
+            if (WProtoReader.MaxNestingDepth <= reader.Depth)
             {
                 WProtoReader past = new(new byte[] { 0x08, 0x01 }, in reader);
                 Assert.IsTrue(past.Malformed);

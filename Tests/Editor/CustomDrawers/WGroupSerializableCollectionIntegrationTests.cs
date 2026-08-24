@@ -727,7 +727,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             )
             {
                 int scopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
-                bool hasWGroupContext = scopeDepth > 0;
+                bool hasWGroupContext = 0 < scopeDepth;
 
                 Assert.AreEqual(
                     expectOffset,

@@ -124,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 // Use AddToBoundedCache to ensure entries are tracked in the LRU tracker
                 EditorCacheHelper.AddToBoundedCache(cache, $"key{i}", i, maxSize);
             }
-            string firstKey = initialCount > 0 ? "key0" : null;
+            string firstKey = 0 < initialCount ? "key0" : null;
 
             EditorCacheHelper.AddToBoundedCache(cache, "newEntry", 42, maxSize);
 
@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 $"Cache count {cache.Count} should not exceed maxSize {maxSize}"
             );
 
-            if (entriesToAdd > maxSize)
+            if (maxSize < entriesToAdd)
             {
                 for (int i = entriesToAdd - maxSize; i < entriesToAdd; i++)
                 {

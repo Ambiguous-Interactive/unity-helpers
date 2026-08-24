@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     UnityEngine.Debug.Log(string.Empty);
                 }
 
-                if (readmeLines.Count > 0 && string.IsNullOrWhiteSpace(readmeLines[^1]))
+                if (0 < readmeLines.Count && string.IsNullOrWhiteSpace(readmeLines[^1]))
                 {
                     readmeLines.RemoveAt(readmeLines.Count - 1);
                 }
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     {
                         int index = rowOffset + x;
 
-                        if (index >= points.Length)
+                        if (points.Length <= index)
                         {
                             continue;
                         }
@@ -453,7 +453,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
                 lines.Add(string.Empty);
 
-                if (datasetLines.Count > 0)
+                if (0 < datasetLines.Count)
                 {
                     lines.AddRange(datasetLines);
                 }
@@ -465,7 +465,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 lines.Add(string.Empty);
             }
 
-            if (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[^1]))
+            if (0 < lines.Count && string.IsNullOrWhiteSpace(lines[^1]))
             {
                 lines.RemoveAt(lines.Count - 1);
             }
@@ -633,22 +633,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static string FormatValue(float value)
         {
-            if (value >= 1_000f)
+            if (1_000f <= value)
             {
                 return value.ToString("N0");
             }
 
-            if (value >= 100f)
+            if (100f <= value)
             {
                 return value.ToString("N1");
             }
 
-            if (value >= 10f)
+            if (10f <= value)
             {
                 return value.ToString("N2");
             }
 
-            if (value >= 1f)
+            if (1f <= value)
             {
                 return value.ToString("0.##");
             }

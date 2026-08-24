@@ -42,9 +42,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -326,9 +326,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 + selectedChanged
                 + (_includeUnchangedInCopyAll ? selectedUnchanged : 0);
 
-            bool canCopyNew = canAnalyze && analysisDone && selectedNew > 0;
-            bool canCopyChanged = canAnalyze && analysisDone && selectedChanged > 0;
-            bool canCopyAll = canAnalyze && analysisDone && selectedAll > 0;
+            bool canCopyNew = canAnalyze && analysisDone && 0 < selectedNew;
+            bool canCopyChanged = canAnalyze && analysisDone && 0 < selectedChanged;
+            bool canCopyAll = canAnalyze && analysisDone && 0 < selectedAll;
 
             EditorGUI.BeginDisabledGroup(!canCopyNew);
             if (GUILayout.Button($"Copy New ({selectedNew})"))
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (GUILayout.Button($"Copy All ({totalToCopyAll})"))
             {
                 string overwriteWarning =
-                    selectedChanged + (_includeUnchangedInCopyAll ? selectedUnchanged : 0) > 0
+                    0 < selectedChanged + (_includeUnchangedInCopyAll ? selectedUnchanged : 0)
                         ? $" This will overwrite {selectedChanged + (_includeUnchangedInCopyAll ? selectedUnchanged : 0)} existing files."
                         : "";
                 if (
@@ -394,8 +394,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             bool canAnalyze = ArePathsValid();
             bool analysisDone = !_analysisNeeded;
-            bool hasUnchanged = _unchangedAnimations.Count > 0;
-            bool hasOrphans = _destinationOrphans.Count > 0;
+            bool hasUnchanged = 0 < _unchangedAnimations.Count;
+            bool hasOrphans = 0 < _destinationOrphans.Count;
 
             _dryRun = EditorGUILayout.ToggleLeft("Dry Run (no changes)", _dryRun);
 
@@ -1846,8 +1846,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         AnimationFileInfo it = items[i];
                         if (
                             it is { FileName: not null }
-                            && it.FileName.IndexOf(_filterText, StringComparison.OrdinalIgnoreCase)
-                                >= 0
+                            && 0
+                                <= it.FileName.IndexOf(
+                                    _filterText,
+                                    StringComparison.OrdinalIgnoreCase
+                                )
                         )
                         {
                             filtered.Add(it);

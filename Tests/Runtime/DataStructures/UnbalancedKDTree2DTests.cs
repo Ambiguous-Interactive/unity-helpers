@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ReverseSortedInputHandledCorrectly()
         {
             List<Vector2> points = new();
-            for (int i = 100; i >= 0; i--)
+            for (int i = 100; 0 <= i; i--)
             {
                 points.Add(new Vector2(i, i));
             }

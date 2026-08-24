@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 CalculateStats();
             }
 
-            if (_totalSpritesToProcess >= 0 && _spritesThatWillChange >= 0)
+            if (0 <= _totalSpritesToProcess && 0 <= _spritesThatWillChange)
             {
                 EditorGUILayout.LabelField($"Sprites to process: {_totalSpritesToProcess}");
                 EditorGUILayout.LabelField($"Sprites that will change: {_spritesThatWillChange}");
@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         EditorGUILayout.LabelField(_assetsThatWillChange[i]);
                     }
-                    if (_assetsThatWillChange.Count > 200)
+                    if (200 < _assetsThatWillChange.Count)
                     {
                         EditorGUILayout.LabelField(
                             $"...and {_assetsThatWillChange.Count - 200} more"
@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // Search in folders via AssetDatabase
-            if (folderAssetPaths.Count > 0)
+            if (0 < folderAssetPaths.Count)
             {
                 string[] guids = AssetDatabase.FindAssets(
                     "t:Texture2D",
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     string ext = Path.GetExtension(assetPath);
-                    if (allowedExtensions.Count > 0 && !allowedExtensions.Contains(ext))
+                    if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
                     {
                         continue;
                     }
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 string ext = Path.GetExtension(assetPath);
-                if (allowedExtensions.Count > 0 && !allowedExtensions.Contains(ext))
+                if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
                 {
                     continue;
                 }
@@ -325,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     i == 0
                     || i == targetFiles.Count - 1
                     || i % 50 == 0
-                    || now - lastUpdateTime > 0.2
+                    || 0.2 < now - lastUpdateTime
                 )
                 {
                     Utils.EditorUi.ShowProgress(
@@ -396,7 +396,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         i == 0
                         || i == targetFiles.Count - 1
                         || i % 50 == 0
-                        || now - lastUpdateTime > 0.2;
+                        || 0.2 < now - lastUpdateTime;
                     if (
                         shouldUpdate
                         && Utils.EditorUi.CancelableProgress(

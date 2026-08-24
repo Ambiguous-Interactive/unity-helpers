@@ -420,14 +420,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
                 IReadOnlyList<string> propertyPaths = definition.PropertyPaths;
                 int propertyCount = propertyPaths.Count;
-                if (propertyCount > 0)
+                if (0 < propertyCount)
                 {
                     AddContentPadding();
                 }
 
                 // Build lookup of child groups by their anchor path
                 Dictionary<string, WGroupDefinition> childByAnchor = null;
-                if (definition.ChildGroups.Count > 0)
+                if (0 < definition.ChildGroups.Count)
                 {
                     childByAnchor = new Dictionary<string, WGroupDefinition>(
                         StringComparer.Ordinal
@@ -513,7 +513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     }
                 }
 
-                if (propertyCount > 0)
+                if (0 < propertyCount)
                 {
                     AddContentPadding();
                 }

@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (string.Equals(name, "iOS", StringComparison.OrdinalIgnoreCase))
                     {
                         int idx = Array.IndexOf(knownNames, "iPhone");
-                        if (idx >= 0 && GUILayout.Button("Use iPhone", GUILayout.Width(90)))
+                        if (0 <= idx && GUILayout.Button("Use iPhone", GUILayout.Width(90)))
                         {
                             platformOverrides[i].platformName = "iPhone";
                             _replaceSelectionByIndex[i] = idx;
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ),
                 requireChangesBeforeApply
             );
-            if (requireChangesBeforeApply && _totalTexturesToProcess >= 0)
+            if (requireChangesBeforeApply && 0 <= _totalTexturesToProcess)
             {
                 if (_texturesThatWillChange == 0)
                 {
@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         MessageType.Info
                     );
                 }
-                else if (_texturesThatWillChange > 0)
+                else if (0 < _texturesThatWillChange)
                 {
                     EditorGUILayout.HelpBox(
                         $"{_texturesThatWillChange} texture(s) will change.",
@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 CalculateStats();
             }
-            if (_totalTexturesToProcess >= 0 && _texturesThatWillChange >= 0)
+            if (0 <= _totalTexturesToProcess && 0 <= _texturesThatWillChange)
             {
                 EditorGUILayout.LabelField($"Textures to process: {_totalTexturesToProcess}");
                 EditorGUILayout.LabelField($"Textures that will change: {_texturesThatWillChange}");
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         EditorGUILayout.LabelField(_assetsThatWillChange[i]);
                     }
-                    if (_assetsThatWillChange.Count > 200)
+                    if (200 < _assetsThatWillChange.Count)
                     {
                         EditorGUILayout.LabelField(
                             $"...and {_assetsThatWillChange.Count - 200} more"
@@ -458,7 +458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             .Get(out HashSet<string> unique)
                     )
                     {
-                        if (folderAssetPaths.Count > 0)
+                        if (0 < folderAssetPaths.Count)
                         {
                             string[] guids = AssetDatabase.FindAssets(
                                 "t:Texture2D",
@@ -473,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
 
                                 string ext = Path.GetExtension(p);
-                                if (allowedExtensions.Count > 0 && !allowedExtensions.Contains(ext))
+                                if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
                                 {
                                     continue;
                                 }
@@ -513,7 +513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
 
                                 string ext = Path.GetExtension(p);
-                                if (allowedExtensions.Count > 0 && !allowedExtensions.Contains(ext))
+                                if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
                                 {
                                     continue;
                                 }
@@ -551,7 +551,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string rel = targets[i];
                 double now = EditorApplication.timeSinceStartup;
-                if (i == 0 || i == targets.Count - 1 || i % 50 == 0 || now - last > 0.2)
+                if (i == 0 || i == targets.Count - 1 || i % 50 == 0 || 0.2 < now - last)
                 {
                     Utils.EditorUi.ShowProgress(
                         "Calculating Stats",
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string path = targets[i];
                     double now = EditorApplication.timeSinceStartup;
                     bool shouldUpdate =
-                        i == 0 || i == targets.Count - 1 || i % 50 == 0 || now - lastUpdate > 0.2;
+                        i == 0 || i == targets.Count - 1 || i % 50 == 0 || 0.2 < now - lastUpdate;
                     if (
                         shouldUpdate
                         && EditorUi.CancelableProgress(
@@ -670,7 +670,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed[j].SaveAndReimport();
             }
 
-            if (count > 0)
+            if (0 < count)
             {
                 this.Log($"Processed {count} textures.");
             }
@@ -678,7 +678,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 this.Log($"No textures required changes.");
             }
-            if (count > 0)
+            if (0 < count)
             {
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();

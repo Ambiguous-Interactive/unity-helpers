@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 // Best-effort cleanup - ignore exceptions during teardown
             }
 
-            if (!Application.isPlaying && _trackedScenes.Count > 0)
+            if (!Application.isPlaying && 0 < _trackedScenes.Count)
             {
                 CloseTrackedScenesInEditor();
             }
@@ -288,9 +288,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             EditorUi.Suppress = _previousEditorUiSuppress;
 #endif
 
-            if (_trackedDisposables.Count > 0)
+            if (0 < _trackedDisposables.Count)
             {
-                for (int i = _trackedDisposables.Count - 1; i >= 0; i--)
+                for (int i = _trackedDisposables.Count - 1; 0 <= i; i--)
                 {
                     try
                     {
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // disposal would leak state into the next test. Surfaced after cleanup, below.
             string disposalFailure = null;
             string trackedObjectFailure = null;
-            if (_trackedAsyncDisposals.Count > 0)
+            if (0 < _trackedAsyncDisposals.Count)
             {
                 // Bounded wait: an async disposal that never completes (e.g. a batchmode
                 // scene op that never signals) MUST NOT hang the leg. A hang produces no
@@ -389,7 +389,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     ValueTask task = producer();
                     while (!task.IsCompleted)
                     {
-                        if (Time.realtimeSinceStartup > disposalEndTime)
+                        if (disposalEndTime < Time.realtimeSinceStartup)
                         {
                             // Record + abandon the wait; do NOT throw here. The failure is
                             // surfaced after all cleanup runs so the next test starts clean.
@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 _trackedAsyncDisposals.Clear();
             }
 
-            if (_trackedObjects.Count > 0)
+            if (0 < _trackedObjects.Count)
             {
                 Object[] snapshot = _trackedObjects.ToArray();
                 foreach (Object obj in snapshot)
@@ -521,8 +521,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 int dispatcherDestroyFrames = 10;
                 while (
-                    UnityMainThreadDispatcher.GetLiveDispatcherCount() > 0
-                    && dispatcherDestroyFrames > 0
+                    0 < UnityMainThreadDispatcher.GetLiveDispatcherCount()
+                    && 0 < dispatcherDestroyFrames
                 )
                 {
                     dispatcherDestroyFrames--;
@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
                 while (
                     !string.IsNullOrWhiteSpace(singletonLeaksAfterClear)
-                    && singletonDestroyFrames > 0
+                    && 0 < singletonDestroyFrames
                 )
                 {
                     singletonDestroyFrames--;
@@ -557,8 +557,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                 dispatcherDestroyFrames = 10;
                 while (
-                    UnityMainThreadDispatcher.GetLiveDispatcherCount() > 0
-                    && dispatcherDestroyFrames > 0
+                    0 < UnityMainThreadDispatcher.GetLiveDispatcherCount()
+                    && 0 < dispatcherDestroyFrames
                 )
                 {
                     dispatcherDestroyFrames--;
@@ -571,7 +571,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 // regression self-identifies in unity.log and fails the producer test instead of a
                 // later bystander.
                 int residentDispatchers = UnityMainThreadDispatcher.GetLiveDispatcherCount();
-                if (residentDispatchers > 0)
+                if (0 < residentDispatchers)
                 {
                     dispatcherFailure ??=
                         $"[uh-leak] {residentDispatchers} UnityMainThreadDispatcher object(s) "
@@ -600,7 +600,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 List<GameObject> leakedRoots = CollectLeakedRoots();
                 int settleFrames = TrackedObjectDestroyMaxFrames;
-                while (leakedRoots != null && settleFrames > 0)
+                while (leakedRoots != null && 0 < settleFrames)
                 {
                     settleFrames--;
                     yield return null;
@@ -930,7 +930,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     try
                     {
                         message =
-                            args != null && args.Length > 0 ? string.Format(format, args) : format;
+                            args != null && 0 < args.Length ? string.Format(format, args) : format;
                     }
                     catch
                     {
@@ -1270,7 +1270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 // Best-effort cleanup - ignore exceptions during teardown
             }
 
-            if (_trackedScenes.Count > 0)
+            if (0 < _trackedScenes.Count)
             {
                 CloseTrackedScenesInEditor();
             }
@@ -1297,9 +1297,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 #endif
 
-            if (_trackedDisposables.Count > 0)
+            if (0 < _trackedDisposables.Count)
             {
-                for (int i = _trackedDisposables.Count - 1; i >= 0; i--)
+                for (int i = _trackedDisposables.Count - 1; 0 <= i; i--)
                 {
                     try
                     {
@@ -1313,7 +1313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 _trackedDisposables.Clear();
             }
 
-            if (_trackedAsyncDisposals.Count > 0)
+            if (0 < _trackedAsyncDisposals.Count)
             {
                 foreach (Func<ValueTask> producer in _trackedAsyncDisposals.ToArray())
                 {
@@ -1399,7 +1399,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             float endTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
             while (!unload.isDone)
             {
-                if (Time.realtimeSinceStartup > endTime)
+                if (endTime < Time.realtimeSinceStartup)
                 {
                     Debug.LogWarning(
                         $"[uh-leak] Scene '{scene.name}' did not finish unloading within "
@@ -1465,7 +1465,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 #if UNITY_EDITOR
         private void CloseTrackedScenesInEditor()
         {
-            for (int i = _trackedScenes.Count - 1; i >= 0; i--)
+            for (int i = _trackedScenes.Count - 1; 0 <= i; i--)
             {
                 Scene scene = _trackedScenes[i];
                 if (!scene.IsValid())
@@ -2034,7 +2034,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     yield break;
                 }
-                if (Time.realtimeSinceStartup > endTime)
+                if (endTime < Time.realtimeSinceStartup)
                 {
                     TestContext.WriteLine(
                         $"WaitUntilAssetUnloaded timed out after {timeoutSeconds:0.###} second(s). "
@@ -2069,7 +2069,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     yield break;
                 }
-                if (Time.realtimeSinceStartup > endTime)
+                if (endTime < Time.realtimeSinceStartup)
                 {
                     TestContext.WriteLine(
                         $"WaitUntilAssetLoaded timed out after {timeoutSeconds:0.###} second(s). "
@@ -2505,7 +2505,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             // Only positive integers are valid duplicates (Unity uses 1, 2, 3, etc.)
-            return int.TryParse(suffix, out int number) && number > 0;
+            return int.TryParse(suffix, out int number) && 0 < number;
         }
 
         /// <summary>
@@ -2555,7 +2555,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     string remainder = normalizedPath.Substring(prefix.Length);
                     int slashIndex = remainder.IndexOf('/');
                     string folderSuffix =
-                        slashIndex >= 0 ? remainder.Substring(0, slashIndex) : remainder;
+                        0 <= slashIndex ? remainder.Substring(0, slashIndex) : remainder;
                     if (int.TryParse(folderSuffix, out _))
                     {
                         return true;

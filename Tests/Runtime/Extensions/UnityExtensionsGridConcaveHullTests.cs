@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             // Log expected vs actual for diagnostics but do not fail on repair count.
             // EdgeSplit may produce complete axis-aligned hulls without needing repair.
             // What matters is that required corners are present (validated above).
-            if (expectedAxisPathInsertionsMin > 0)
+            if (0 < expectedAxisPathInsertionsMin)
             {
                 int actualInsertions =
                     edgeStats.AxisPathInsertions + edgeStats.AxisCornerInsertions;
@@ -542,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 for (int x = 0; x < 40; ++x)
                 {
-                    if (x > 10 && x < 30 && y > 10 && y < 30)
+                    if (10 < x && x < 30 && 10 < y && y < 30)
                     {
                         continue;
                     }
@@ -661,8 +661,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 for (int x = 0; x < 48; ++x)
                 {
-                    bool inFirstCavity = x > 8 && x < 19 && y > 8 && y < 19;
-                    bool inSecondCavity = x > 30 && x < 40 && y > 24 && y < 40;
+                    bool inFirstCavity = 8 < x && x < 19 && 8 < y && y < 19;
+                    bool inSecondCavity = 30 < x && x < 40 && 24 < y && y < 40;
                     if (inFirstCavity || inSecondCavity)
                     {
                         continue;
@@ -852,7 +852,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public bool Contains(int x, int y)
             {
-                return x >= MinX && x <= MaxX && y >= MinY && y <= MaxY;
+                return MinX <= x && x <= MaxX && MinY <= y && y <= MaxY;
             }
         }
 
@@ -1207,9 +1207,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 for (int x = 0; x < 30; ++x)
                 {
-                    bool leftCavity = x >= 5 && x <= 10 && y >= 5 && y <= 20;
-                    bool rightCavity = x >= 19 && x <= 24 && y >= 9 && y <= 24;
-                    bool sharedThroat = x == 15 && y >= 10 && y <= 14;
+                    bool leftCavity = 5 <= x && x <= 10 && 5 <= y && y <= 20;
+                    bool rightCavity = 19 <= x && x <= 24 && 9 <= y && y <= 24;
+                    bool sharedThroat = x == 15 && 10 <= y && y <= 14;
                     if ((leftCavity || rightCavity) && !sharedThroat)
                     {
                         continue;

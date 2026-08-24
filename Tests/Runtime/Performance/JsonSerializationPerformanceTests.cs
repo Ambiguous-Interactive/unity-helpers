@@ -138,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long classicMs = sw.ElapsedMilliseconds;
 
             double fastVsClassic =
-                classicMs > 0 ? (double)classicMs / fastMs : double.PositiveInfinity;
+                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
             UnityEngine.Debug.Log(
                 $"Large collection (50k ints): Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x"
             );
@@ -234,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long classicMs = sw.ElapsedMilliseconds;
 
             double fastVsClassic =
-                classicMs > 0 ? (double)classicMs / fastMs : double.PositiveInfinity;
+                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
             UnityEngine.Debug.Log(
                 $"Complex object: Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x (1000 iters)"
             );
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long classicKB = (allocEnd - allocStart) / 1024;
 
             double fastVsClassic =
-                classicMs > 0 ? (double)classicMs / pooledFastMs : double.PositiveInfinity;
+                0 < classicMs ? (double)classicMs / pooledFastMs : double.PositiveInfinity;
             UnityEngine.Debug.Log(
                 $"| {label} | {pooledNormalMs, 17:N0}, {pooledNormalKB, 4:N0} | {pooledFastMs, 14:N0}, {pooledFastKB, 4:N0} | {classicMs, 13:N0}, {classicKB, 4:N0} | {fastVsClassic, 11:0.00}x | {payloadSize, 12:N0} |"
             );
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long classicKB = (allocEnd - allocStart) / 1024;
 
             double fPocoVsClassic =
-                classicMs > 0 ? (double)classicMs / pooledFastPocoMs : double.PositiveInfinity;
+                0 < classicMs ? (double)classicMs / pooledFastPocoMs : double.PositiveInfinity;
             UnityEngine.Debug.Log(
                 $"| {label} | {pooledNormalMs, 17:N0}, {pooledNormalKB, 4:N0} | {pooledFastMs, 13:N0}, {pooledFastKB, 4:N0} | {pooledFastPocoMs, 22:N0}, {pooledFastPocoKB, 4:N0} | {classicMs, 13:N0}, {classicKB, 4:N0} | {fPocoVsClassic, 12:0.00}x |"
             );
@@ -418,11 +418,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long serializeFastKB = (allocEnd - allocStart) / 1024;
 
             double ratioNormal =
-                serializeNormalMs > 0
+                0 < serializeNormalMs
                     ? (double)stringifyNormalMs / serializeNormalMs
                     : double.PositiveInfinity;
             double ratioFast =
-                serializeFastMs > 0
+                0 < serializeFastMs
                     ? (double)stringifyFastMs / serializeFastMs
                     : double.PositiveInfinity;
             UnityEngine.Debug.Log(

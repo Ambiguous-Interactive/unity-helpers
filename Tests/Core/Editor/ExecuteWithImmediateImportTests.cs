@@ -276,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Should return to original depth {depth}"
             );
 
-            for (int i = scopes.Count - 1; i >= 0; i--)
+            for (int i = scopes.Count - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
             }
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
             Assert.That(result, Is.EqualTo(42), "Should return correct value");
 
-            for (int i = scopes.Count - 1; i >= 0; i--)
+            for (int i = scopes.Count - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
             }

@@ -751,7 +751,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             string result = longInput.ToCamelCase();
             Assert.IsTrue(char.IsLower(result[0]));
             Assert.IsFalse(result.Contains("_"));
-            Assert.IsTrue(result.Length > 0);
+            Assert.IsTrue(0 < result.Length);
 
             // Verify it starts correctly
             Assert.IsTrue(result.StartsWith("word0"));
@@ -898,7 +898,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 // Basic invariants
                 Assert.IsTrue(result != null, $"Result should not be null for: {pattern}");
 
-                if (result.Length > 0)
+                if (0 < result.Length)
                 {
                     // First character should be lowercase or a non-letter
                     Assert.IsTrue(
@@ -1438,7 +1438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             string result = longInput.ToKebabCase();
             Assert.IsFalse(result.Contains("_"));
             Assert.IsTrue(result.Contains("-"));
-            Assert.IsTrue(result.Length > 0);
+            Assert.IsTrue(0 < result.Length);
 
             // Verify it starts correctly
             Assert.IsTrue(result.StartsWith("word0"));
@@ -1587,7 +1587,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 // Basic invariants
                 Assert.IsTrue(result != null, $"Result should not be null for: {pattern}");
 
-                if (result.Length > 0)
+                if (0 < result.Length)
                 {
                     // First character should be lowercase or a non-letter
                     Assert.IsTrue(
@@ -1868,7 +1868,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 if (char.IsHighSurrogate(value[i]))
                 {
-                    if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1]))
+                    if (value.Length <= i + 1 || !char.IsLowSurrogate(value[i + 1]))
                     {
                         return false;
                     }

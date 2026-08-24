@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                if (widest == null || parameters.Length > widest.GetParameters().Length)
+                if (widest == null || widest.GetParameters().Length < parameters.Length)
                 {
                     widest = candidate;
                 }

@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             if (!string.IsNullOrWhiteSpace(metadata.ReferenceUrl))
             {
-                if (builder.Length > 0)
+                if (0 < builder.Length)
                 {
                     builder.Append(' ');
                 }

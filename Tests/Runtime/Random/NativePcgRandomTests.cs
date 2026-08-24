@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 float value = random.NextFloat();
                 Assert.GreaterOrEqual(value, 0f, "NextFloat returned a negative value.");
                 Assert.Less(value, 1f, "NextFloat returned 1 or greater.");
-                if (value > maximum)
+                if (maximum < value)
                 {
                     maximum = value;
                 }
@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             for (int mantissa = 0; mantissa < MantissaCount; mantissa++)
             {
                 float value = mantissa * NativePcgRandom.FloatScale;
-                if (value >= 1f)
+                if (1f <= value)
                 {
                     Assert.Fail($"Mantissa {mantissa} scales to {value:R}, which is not below 1.");
                 }
@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 double value = random.NextDouble();
                 Assert.GreaterOrEqual(value, 0.0, "NextDouble returned a negative value.");
                 Assert.Less(value, 1.0, "NextDouble returned 1 or greater.");
-                if (value > maximum)
+                if (maximum < value)
                 {
                     maximum = value;
                 }

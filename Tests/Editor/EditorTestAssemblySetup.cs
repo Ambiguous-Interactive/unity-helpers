@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             int totalDeleted = TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry(
                 TempFolderCleanupUtility.AssemblyLevelRetryCount
             );
-            if (totalDeleted > 0)
+            if (0 < totalDeleted)
             {
                 Debug.Log(
                     $"[EditorTestAssemblySetup] Cleaned up {totalDeleted} 'Temp N' duplicate folders."

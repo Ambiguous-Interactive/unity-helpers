@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 yield return null;
                 dispatchers = Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-            } while (dispatchers.Length > 1 && timer.Elapsed < TimeSpan.FromSeconds(2));
+            } while (1 < dispatchers.Length && timer.Elapsed < TimeSpan.FromSeconds(2));
 
             Assert.LessOrEqual(
                 dispatchers.Length,

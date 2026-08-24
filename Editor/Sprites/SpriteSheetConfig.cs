@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="config">The configuration to migrate.</param>
         public static void MigrateConfig(SpriteSheetConfig config)
         {
-            if (config == null || config.version >= CurrentVersion)
+            if (config == null || CurrentVersion <= config.version)
             {
                 return;
             }

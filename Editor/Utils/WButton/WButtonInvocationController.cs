@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             WButtonMethodMetadata metadata = context.Metadata;
             int historyCapacity =
-                metadata.HistoryCapacity >= 0
+                0 <= metadata.HistoryCapacity
                     ? metadata.HistoryCapacity
                     : UnityHelpersSettings.GetWButtonHistorySize();
 

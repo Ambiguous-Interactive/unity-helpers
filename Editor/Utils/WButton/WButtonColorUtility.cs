@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             Color.RGBToHSV(color, out float hue, out float saturation, out float value);
             saturation = Clamp01OrZero(saturation);
             value = Clamp01OrZero(value);
-            value = Clamp01OrZero(value >= ActiveDarkenAmount ? value - amount : value + amount);
+            value = Clamp01OrZero(ActiveDarkenAmount <= value ? value - amount : value + amount);
             Color adjusted = Color.HSVToRGB(hue, saturation, value);
             adjusted.a = color.a;
             return adjusted;
@@ -69,12 +69,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// </remarks>
         private static float Clamp01OrZero(float value)
         {
-            if (!(value > 0f))
+            if (!(0f < value))
             {
                 return 0f;
             }
 
-            return value >= 1f ? 1f : value;
+            return 1f <= value ? 1f : value;
         }
     }
 #endif

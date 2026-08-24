@@ -887,7 +887,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 GroupGUIWidthUtility.ResetForTests();
 
                 Rect resolvedRect;
-                if (horizontalPadding > 0f)
+                if (0f < horizontalPadding)
                 {
                     using (
                         GroupGUIWidthUtility.PushContentPadding(
@@ -937,7 +937,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"Raw expected x={rawExpectedX}, Clamped expected x={expectedX}, Actual x={resolvedRect.x}"
                     );
                 }
-                else if (indentLevel == 0 && horizontalPadding > 0f)
+                else if (indentLevel == 0 && 0f < horizontalPadding)
                 {
                     Assert.AreEqual(
                         controlRect.x + groupLeftPadding,
@@ -988,7 +988,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 GroupGUIWidthUtility.ResetForTests();
 
                 Rect resolvedRect;
-                if (horizontalPadding > 0f)
+                if (0f < horizontalPadding)
                 {
                     using (
                         GroupGUIWidthUtility.PushContentPadding(
@@ -1019,7 +1019,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 bool widthReduced =
-                    (horizontalPadding > 0f || indentLevel > 0)
+                    (0f < horizontalPadding || 0 < indentLevel)
                     && resolvedRect.width < controlWidth;
                 bool widthPreserved =
                     horizontalPadding <= 0f

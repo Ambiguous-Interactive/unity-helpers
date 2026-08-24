@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 int value = i % 500;
                 hwm.Record(i * 0.01f, value);
-                if (value > expectedMax)
+                if (expectedMax < value)
                 {
                     expectedMax = value;
                 }

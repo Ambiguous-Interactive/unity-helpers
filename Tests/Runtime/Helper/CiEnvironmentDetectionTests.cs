@@ -331,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void CiEnvironmentVariablesAllContainsExpectedVariables()
         {
             string[] all = Helpers.CiEnvironmentVariables.All;
-            Assert.IsTrue(all.Length >= 15);
+            Assert.IsTrue(15 <= all.Length);
 
             Assert.Contains(Helpers.CiEnvironmentVariables.Ci, all);
             Assert.Contains(Helpers.CiEnvironmentVariables.GitHubActions, all);

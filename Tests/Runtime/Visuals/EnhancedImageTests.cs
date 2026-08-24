@@ -388,11 +388,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             // Negative channels are clamped to 0 by the shader (2022.1+) or returned raw (2021.3).
             Assert.IsTrue(
-                materialColor.r >= 0f || Mathf.Approximately(materialColor.r, negativeColor.r),
+                0f <= materialColor.r || Mathf.Approximately(materialColor.r, negativeColor.r),
                 $"Red channel should be clamped to >=0 or preserved raw. Got {materialColor.r}"
             );
             Assert.IsTrue(
-                materialColor.g >= 0f || Mathf.Approximately(materialColor.g, negativeColor.g),
+                0f <= materialColor.g || Mathf.Approximately(materialColor.g, negativeColor.g),
                 $"Green channel should be clamped to >=0 or preserved raw. Got {materialColor.g}"
             );
         }

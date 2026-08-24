@@ -541,7 +541,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             // Generate warnings for groups with conflicting draw orders
             foreach (KeyValuePair<string, HashSet<int>> entry in drawOrdersPerGroup)
             {
-                if (entry.Value.Count > 1)
+                if (1 < entry.Value.Count)
                 {
                     (
                         int declarationOrder,
@@ -560,7 +560,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             // Generate warnings for groups with conflicting group priorities
             foreach (KeyValuePair<string, HashSet<int>> entry in groupPrioritiesPerGroup)
             {
-                if (entry.Value.Count > 1)
+                if (1 < entry.Value.Count)
                 {
                     (
                         int declarationOrder,
@@ -584,7 +584,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 > entry in groupPlacementsPerGroup
             )
             {
-                if (entry.Value.Count > 1)
+                if (1 < entry.Value.Count)
                 {
                     (
                         int declarationOrder,
@@ -975,7 +975,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            if (endIndex > startIndex)
+            if (startIndex < endIndex)
             {
                 EditorGUILayout.Space(4f);
             }
@@ -994,7 +994,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             int totalPages = Mathf.Max(1, Mathf.CeilToInt((float)totalItems / pageSize));
-            if (state._pageIndex >= totalPages)
+            if (totalPages <= state._pageIndex)
             {
                 state._pageIndex = totalPages - 1;
             }
@@ -1019,12 +1019,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     }
                 }
 
-                using (new EditorGUI.DisabledScope(state._pageIndex >= totalPages - 1))
+                using (new EditorGUI.DisabledScope(totalPages - 1 <= state._pageIndex))
                 {
                     if (GUILayout.Button("Next", GUILayout.Width(50f)))
                     {
                         state._pageIndex++;
-                        if (state._pageIndex >= totalPages)
+                        if (totalPages <= state._pageIndex)
                         {
                             state._pageIndex = totalPages - 1;
                         }
@@ -1367,7 +1367,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             GUILayout.BeginVertical(EditorStyles.helpBox);
 
             WButtonMethodState[] states = context.States;
-            if (states.Length > 0 && states[0].Parameters.Length > 0)
+            if (0 < states.Length && 0 < states[0].Parameters.Length)
             {
                 using (IndentLevelScope.Indent())
                 {
@@ -1378,7 +1378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             GetInvocationStatus(states, out int runningCount, out bool cancellable);
-            bool isRunning = runningCount > 0;
+            bool isRunning = 0 < runningCount;
 
             if (isRunning)
             {
@@ -1509,7 +1509,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             );
             float availableWidth = headerRect.width;
             bool canShowButton =
-                availableWidth >= (labelSize.x + ClearHistorySpacing + buttonWidth);
+                (labelSize.x + ClearHistorySpacing + buttonWidth) <= availableWidth;
             float labelWidth = canShowButton
                 ? Mathf.Min(labelSize.x, availableWidth - (buttonWidth + ClearHistorySpacing))
                 : availableWidth;
@@ -1545,7 +1545,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return;
             }
 
-            for (int index = state.History.Count - 1; index >= 0; index--)
+            for (int index = state.History.Count - 1; 0 <= index; index--)
             {
                 WButtonResultEntry entry = state.History[index];
                 DrawHistoryEntry(entry);
@@ -1602,7 +1602,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             int pageSize = UnityHelpersSettings.GetWButtonPageSize();
             int pageCount = Mathf.Max(1, Mathf.CeilToInt((float)itemCount / pageSize));
-            if (state._pageIndex >= pageCount)
+            if (pageCount <= state._pageIndex)
             {
                 state._pageIndex = pageCount - 1;
             }

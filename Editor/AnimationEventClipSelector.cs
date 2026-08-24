@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             int popupIndex = Mathf.Max(0, selectedIndex);
             int resultIndex = EditorGUILayout.Popup("Animation", popupIndex, names);
-            if (resultIndex < 0 || resultIndex >= filtered.Count)
+            if (resultIndex < 0 || filtered.Count <= resultIndex)
             {
                 clearSelection?.Invoke();
                 return null;

@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     // Clean up stale metadata entries that point to non-existent assets
                     int staleCount = ScriptableObjectSingletonMetadataUtility.CleanupStaleEntries();
-                    if (staleCount > 0)
+                    if (0 < staleCount)
                     {
                         LogVerbose(
                             $"ScriptableObjectSingletonCreator: Removed {staleCount} stale metadata entries."
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         // Skip name-collision types to avoid creating overlapping assets like TypeName.asset
                         if (
                             byName.TryGetValue(derivedType.Name, out List<Type> group)
-                            && group.Count > 1
+                            && 1 < group.Count
                         )
                         {
                             if (collisionLogged.Add(derivedType.Name))
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         allCandidates,
                         out emptyFolderCandidates
                     );
-                    if (duplicatesRemoved > 0)
+                    if (0 < duplicatesRemoved)
                     {
                         LogVerbose(
                             $"ScriptableObjectSingletonCreator: Removed {duplicatesRemoved} duplicate singleton assets."
@@ -442,7 +442,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             // Determine if we made progress this run
-            bool madeProgress = singletonsSucceeded > 0 || anyChanges;
+            bool madeProgress = 0 < singletonsSucceeded || anyChanges;
 
             if (retryRequested && !DisableAutomaticRetries)
             {
@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 MarkInitialEnsureCompleted();
             }
 
-            if (VerboseLogging && singletonsProcessed > 0)
+            if (VerboseLogging && 0 < singletonsProcessed)
             {
                 LogVerbose(
                     $"ScriptableObjectSingletonCreator: Processed {singletonsProcessed} singleton types, {singletonsSucceeded} succeeded, retry={retryRequested}, progress={madeProgress}."
@@ -493,7 +493,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             // Use a stricter limit for consecutive zero-progress retries
             // This prevents infinite loops when all remaining singletons are permanently blocked
             const int MaxZeroProgressRetries = 3;
-            if (_consecutiveZeroProgressRetries >= MaxZeroProgressRetries)
+            if (MaxZeroProgressRetries <= _consecutiveZeroProgressRetries)
             {
                 Debug.LogWarning(
                     $"ScriptableObjectSingletonCreator: {MaxZeroProgressRetries} consecutive retry attempts made no progress. "
@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            if (_retryAttempts >= MaxRetryAttempts)
+            if (MaxRetryAttempts <= _retryAttempts)
             {
                 Debug.LogWarning(
                     $"ScriptableObjectSingletonCreator: Maximum automatic retry attempts ({MaxRetryAttempts}) reached. Further retries are suppressed to avoid infinite loops."
@@ -533,7 +533,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             EditorApplication.delayCall -= RunScheduledEnsure;
             _ensureScheduled = false;
 
-            if (_retryAttempts > 0)
+            if (0 < _retryAttempts)
             {
                 _retryAttempts--;
             }
@@ -1502,7 +1502,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             string currentTerminal = matchedExisting;
                             int ls = currentTerminal.LastIndexOf('/', currentTerminal.Length - 1);
                             currentTerminal =
-                                ls >= 0 ? currentTerminal.Substring(ls + 1) : currentTerminal;
+                                0 <= ls ? currentTerminal.Substring(ls + 1) : currentTerminal;
 
                             if (
                                 string.Equals(
@@ -1629,7 +1629,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foreach (string sub in subFolders)
                 {
                     int lastSlash = sub.LastIndexOf('/', sub.Length - 1);
-                    string terminal = lastSlash >= 0 ? sub.Substring(lastSlash + 1) : sub;
+                    string terminal = 0 <= lastSlash ? sub.Substring(lastSlash + 1) : sub;
                     if (string.Equals(terminal, desiredName, StringComparison.OrdinalIgnoreCase))
                     {
                         return sub;
@@ -1706,7 +1706,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     foreach (string sub in subs)
                     {
                         int last = sub.LastIndexOf('/', sub.Length - 1);
-                        string name = last >= 0 ? sub.Substring(last + 1) : sub;
+                        string name = 0 <= last ? sub.Substring(last + 1) : sub;
                         if (string.Equals(name, desired, StringComparison.OrdinalIgnoreCase))
                         {
                             current = sub;
@@ -1767,7 +1767,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             // Check if the suffix is a positive integer
-            return int.TryParse(suffix, out int number) && number > 0;
+            return int.TryParse(suffix, out int number) && 0 < number;
         }
 
         private static bool IsRunningInsideAssetImportWorkerProcess()

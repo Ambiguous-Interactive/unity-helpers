@@ -439,15 +439,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         {
                             min.z = point.z;
                         }
-                        if (point.x > max.x)
+                        if (max.x < point.x)
                         {
                             max.x = point.x;
                         }
-                        if (point.y > max.y)
+                        if (max.y < point.y)
                         {
                             max.y = point.y;
                         }
-                        if (point.z > max.z)
+                        if (max.z < point.z)
                         {
                             max.z = point.z;
                         }

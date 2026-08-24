@@ -3217,7 +3217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 } while (iterator.NextVisible(false));
             }
 
-            return propertyNames.Count > 0
+            return 0 < propertyNames.Count
                 ? string.Join(", ", propertyNames)
                 : "(no visible properties found)";
         }

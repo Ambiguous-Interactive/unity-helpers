@@ -465,7 +465,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             private int Index { get; }
 
-            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && Index >= 0;
+            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
 
             public bool Equals(RowFoldoutKey other)
             {
@@ -576,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             rightCursor = addRect.x - ButtonSpacing;
 
             Rect clearRect = new(rightCursor - 80f, buttonsRect.y, 80f, lineHeight);
-            bool canClear = totalCount > 0;
+            bool canClear = 0 < totalCount;
             GUIStyle clearStyle = canClear
                 ? ClearAllActiveButtonStyle
                 : ClearAllInactiveButtonStyle;
@@ -733,7 +733,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static Color AdjustColorBrightness(Color color, float amount)
         {
-            if (amount > 0f)
+            if (0f < amount)
             {
                 return Color.Lerp(color, Color.white, Mathf.Clamp01(amount));
             }
@@ -755,7 +755,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             HasItemsContainerRect = false;
 
             // Log all tween settings on first draw or when inside WGroup for debugging
-            if (GroupGUIWidthUtility.CurrentScopeDepth > 0)
+            if (0 < GroupGUIWidthUtility.CurrentScopeDepth)
             {
                 SerializableCollectionTweenDiagnostics.LogAllTweenSettings(
                     $"OnGUI_InWGroup (path={property?.propertyPath ?? "(null)"})"
@@ -809,7 +809,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 // Apply additional foldout alignment offset when inside a WGroup property context
                 float foldoutAlignmentOffset =
-                    GroupGUIWidthUtility.CurrentScopeDepth > 0 && !targetsSettings
+                    0 < GroupGUIWidthUtility.CurrentScopeDepth && !targetsSettings
                         ? WGroupFoldoutAlignmentOffset
                         : 0f;
 
@@ -859,14 +859,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     // During collapse, skip drawing content below threshold for snappier feel
                     const float CollapseContentThreshold = 0.4f;
-                    shouldDrawContent = mainFoldoutProgress >= CollapseContentThreshold;
+                    shouldDrawContent = CollapseContentThreshold <= mainFoldoutProgress;
                     // Use cubic curve so alpha drops much faster at start of collapse
                     // When progress is 0.5, alpha becomes ~0.125 (very faded)
                     contentAlpha = mainFoldoutProgress * mainFoldoutProgress * mainFoldoutProgress;
                 }
                 else
                 {
-                    shouldDrawContent = mainFoldoutProgress > 0f;
+                    shouldDrawContent = 0f < mainFoldoutProgress;
                     contentAlpha = mainFoldoutProgress;
                 }
 
@@ -1023,7 +1023,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                                 0f,
                                 listRect.height - headerHeight - footerHeight
                             );
-                            if (bodyHeight > 0f)
+                            if (0f < bodyHeight)
                             {
                                 float overlap = Mathf.Min(5f, bodyHeight);
                                 float bodyTop = listRect.y + headerHeight - overlap;
@@ -1106,7 +1106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Rect result = position;
 
                 // Apply WGroup padding even when skipping standard indentation
-                if (leftPadding > 0f || rightPadding > 0f)
+                if (0f < leftPadding || 0f < rightPadding)
                 {
                     result.xMin += leftPadding;
                     result.xMax -= rightPadding;
@@ -1122,7 +1122,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Normal context (outside WGroup): apply WGroup padding ourselves
             Rect padded = GroupGUIWidthUtility.ApplyCurrentPadding(position);
             if (
-                (leftPadding > 0f || rightPadding > 0f)
+                (0f < leftPadding || 0f < rightPadding)
                 && Mathf.Approximately(padded.xMin, position.xMin)
                 && Mathf.Approximately(padded.width, position.width)
             )
@@ -1140,7 +1140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // the rect width at level 0 (shifts xMax left by ~1.25), while in other versions
             // it returns the rect unchanged. By skipping the call at level 0, we handle both
             // cases consistently. Our own alignment offset is applied below for level 0.
-            Rect indentedResult = indentLevel > 0 ? EditorGUI.IndentedRect(padded) : padded;
+            Rect indentedResult = 0 < indentLevel ? EditorGUI.IndentedRect(padded) : padded;
 
             // Clamp width to non-negative after IndentedRect (high indent levels can cause negative width)
             if (indentedResult.width < 0f || float.IsNaN(indentedResult.width))
@@ -1853,7 +1853,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            if (state.selectedIndex >= totalCount)
+            if (totalCount <= state.selectedIndex)
             {
                 state.selectedIndex = totalCount - 1;
             }
@@ -1863,9 +1863,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 state.selectedIndex = -1;
             }
 
-            int pageCount = pageSize > 0 ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
+            int pageCount = 0 < pageSize ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
 
-            if (state.page >= pageCount)
+            if (pageCount <= state.page)
             {
                 state.page = pageCount - 1;
             }
@@ -1875,7 +1875,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 state.page = 0;
             }
 
-            if (state.selectedIndex >= 0)
+            if (0 <= state.selectedIndex)
             {
                 int selectedPage = Mathf.Clamp(state.selectedIndex / pageSize, 0, pageCount - 1);
                 state.page = selectedPage;
@@ -1884,7 +1884,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool RelativeIndexIsValid(ListPageCache cache, int relativeIndex)
         {
-            return cache != null && relativeIndex >= 0 && relativeIndex < cache.entries.Count;
+            return cache != null && 0 <= relativeIndex && relativeIndex < cache.entries.Count;
         }
 
         private static int GetRelativeIndex(ListPageCache cache, int globalIndex)
@@ -1953,7 +1953,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             ReorderableList list;
 
             bool hasExisting = _lists.TryGetValue(listKey, out ReorderableList existing);
-            if (hasExisting && existing.headerHeight > 0f)
+            if (hasExisting && 0f < existing.headerHeight)
             {
                 list = existing;
                 list.list = cache.entries;
@@ -2123,7 +2123,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             rightCursor = addRect.x - buttonSpacing;
 
             Rect clearRect = new(rightCursor - 80f, verticalCenter, 80f, lineHeight);
-            bool canClear = totalCount > 0;
+            bool canClear = 0 < totalCount;
             GUIStyle clearStyle = canClear
                 ? ClearAllActiveButtonStyle
                 : ClearAllInactiveButtonStyle;
@@ -2180,8 +2180,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             bool hasSelection =
-                totalCount > 0
-                && pagination.selectedIndex >= 0
+                0 < totalCount
+                && 0 <= pagination.selectedIndex
                 && pagination.selectedIndex < totalCount;
 
             if (hasSelection)
@@ -2212,7 +2212,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 rightCursor = removeRect.x - buttonSpacing;
 
-                if (totalCount > 1)
+                if (1 < totalCount)
                 {
                     float moveWidth = Mathf.Max(20f, PaginationButtonWidth - 10f);
                     Rect moveDownRect = new(
@@ -2221,7 +2221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         moveWidth,
                         lineHeight
                     );
-                    using (new EditorGUI.DisabledScope(pagination.selectedIndex >= totalCount - 1))
+                    using (new EditorGUI.DisabledScope(totalCount - 1 <= pagination.selectedIndex))
                     {
                         if (GUI.Button(moveDownRect, MoveDownContent, MoveButtonStyle))
                         {
@@ -2319,20 +2319,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float navWidth = navWidthFull;
             float controlsWidth = navWidth + labelWidth + ButtonSpacing;
 
-            if (controlsWidth > contentRect.width)
+            if (contentRect.width < controlsWidth)
             {
                 showLabel = false;
                 controlsWidth = navWidth;
             }
 
-            if (controlsWidth > contentRect.width)
+            if (contentRect.width < controlsWidth)
             {
                 layout = PaginationControlLayout.PrevNext;
                 navWidth = navWidthCompact;
                 controlsWidth = showLabel ? navWidth + labelWidth + ButtonSpacing : navWidth;
             }
 
-            if (controlsWidth > contentRect.width)
+            if (contentRect.width < controlsWidth)
             {
                 layout = PaginationControlLayout.None;
                 navWidth = 0f;
@@ -2358,9 +2358,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 int pageSize = Mathf.Max(1, pagination.pageSize);
                 int pageCount =
-                    totalCount > 0 ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
+                    0 < totalCount ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
                 int currentPage =
-                    totalCount > 0 ? Mathf.Clamp(pagination.page + 1, 1, pageCount) : 0;
+                    0 < totalCount ? Mathf.Clamp(pagination.page + 1, 1, pageCount) : 0;
                 PaginationPageLabelContent.text =
                     totalCount == 0 ? "Page 0/0" : GetPaginationLabel(currentPage, pageCount);
                 float labelY = controlsRect.y + labelCenterOffset + PaginationLabelVerticalOffset;
@@ -2386,7 +2386,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private void DrawPaginationButtons(Rect rect, PaginationState pagination, int totalCount)
         {
             int pageSize = pagination.pageSize;
-            int pageCount = pageSize > 0 ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
+            int pageCount = 0 < pageSize ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
             int currentPage = pagination.page;
 
             Rect firstRect = new(rect.x, rect.y, PaginationButtonWidth, rect.height);
@@ -2424,7 +2424,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            using (new EditorGUI.DisabledScope(currentPage >= pageCount - 1))
+            using (new EditorGUI.DisabledScope(pageCount - 1 <= currentPage))
             {
                 if (GUI.Button(nextRect, NextPageContent, EditorStyles.miniButton))
                 {
@@ -2629,7 +2629,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SerializableCollectionTweenDiagnostics.LogContentFadeApplication(
                     propertyPath ?? "(null)",
                     foldoutProgress,
-                    foldoutProgress > 0f || pending.isExpanded,
+                    0f < foldoutProgress || pending.isExpanded,
                     foldoutProgress <= 0f && !pending.isExpanded
                 );
 
@@ -2817,7 +2817,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     }
                 }
 
-                if (infoWidth > 0f && !string.IsNullOrEmpty(infoMessage))
+                if (0f < infoWidth && !string.IsNullOrEmpty(infoMessage))
                 {
                     Rect infoRect = new(infoX, innerY, infoWidth, rowHeight);
                     GUI.Label(infoRect, infoMessage, EditorStyles.miniLabel);
@@ -3236,7 +3236,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Add Set Entry");
             }
@@ -3256,7 +3256,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Array snapshot = BuildSnapshotArray(itemsProperty, elementType);
             int originalLength = snapshot?.Length ?? 0;
             Array updated = Array.CreateInstance(elementType, originalLength + 1);
-            if (snapshot != null && originalLength > 0)
+            if (snapshot != null && 0 < originalLength)
             {
                 snapshot.CopyTo(updated, 0);
             }
@@ -3277,7 +3277,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EvaluateDuplicateState(property, itemsProperty, force: true);
             EvaluateNullEntryState(property, itemsProperty);
             SyncRuntimeSet(property);
-            if (totalCount > 0)
+            if (0 < totalCount)
             {
                 pagination.selectedIndex = totalCount - 1;
             }
@@ -4205,7 +4205,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 int arrayIndex = entry.arrayIndex;
-                if (arrayIndex < 0 || arrayIndex >= itemsProperty.arraySize)
+                if (arrayIndex < 0 || itemsProperty.arraySize <= arrayIndex)
                 {
                     continue;
                 }
@@ -4221,7 +4221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         previous.comparable,
                         current.comparable
                     );
-                    if (comparison > 0)
+                    if (0 < comparison)
                     {
                         return true;
                     }
@@ -4232,7 +4232,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             previous.value != null ? previous.value.ToString() : string.Empty;
                         string currentFallback =
                             current.value != null ? current.value.ToString() : string.Empty;
-                        if (string.CompareOrdinal(previousFallback, currentFallback) > 0)
+                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
                         {
                             return true;
                         }
@@ -4378,7 +4378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             int pageSize = Mathf.Max(1, pagination.pageSize);
             int pageStart = pagination.page * pageSize;
-            if (pageStart >= totalCount)
+            if (totalCount <= pageStart)
             {
                 pageStart = Mathf.Max(0, totalCount - 1);
             }
@@ -4405,11 +4405,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             double elapsed = currentTime - startTime;
 
-            if (cycleLimit > 0)
+            if (0 < cycleLimit)
             {
                 double cycleDuration = (2d * Math.PI) / DuplicateShakeFrequency;
                 double maxDuration = cycleDuration * cycleLimit;
-                if (elapsed >= maxDuration)
+                if (maxDuration <= elapsed)
                 {
                     return 0f;
                 }
@@ -4599,7 +4599,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             for (int i = 0; i < displayCount; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     builder.Append(", ");
                 }
@@ -4607,7 +4607,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 builder.Append(indices[i]);
             }
 
-            if (indices.Count > maxDisplay)
+            if (maxDisplay < indices.Count)
             {
                 builder.Append(", ... (");
                 builder.Append(indices.Count - maxDisplay);
@@ -4638,7 +4638,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            if (index < 0 || index >= itemsProperty.arraySize)
+            if (index < 0 || itemsProperty.arraySize <= index)
             {
                 return;
             }
@@ -4723,7 +4723,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            if (state.nullIndices.Count > 0)
+            if (0 < state.nullIndices.Count)
             {
                 state.hasNullEntries = true;
                 state.summary = BuildNullEntrySummary(state.scratch);
@@ -4763,7 +4763,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             if (state.grouping.Count == 0)
             {
-                if (state.groupingLeases.Count > 0)
+                if (0 < state.groupingLeases.Count)
                 {
                     foreach (
                         KeyValuePair<
@@ -4924,7 +4924,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     }
                 }
 
-                if (summaryBuilder.Length > 0)
+                if (0 < summaryBuilder.Length)
                 {
                     summaryBuilder.AppendLine();
                 }
@@ -4943,9 +4943,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             state.groupingKeysScratch.Clear();
 
-            if (duplicateGroupCount > 5)
+            if (5 < duplicateGroupCount)
             {
-                if (summaryBuilder.Length > 0)
+                if (0 < summaryBuilder.Length)
                 {
                     summaryBuilder.AppendLine();
                 }
@@ -4953,7 +4953,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 summaryBuilder.Append("Additional duplicate groups omitted for brevity.");
             }
 
-            if (state.animationStartTimes.Count > 0)
+            if (0 < state.animationStartTimes.Count)
             {
                 state.animationKeysScratch.Clear();
                 state.animationKeysScratch.AddRange(state.animationStartTimes.Keys);
@@ -4975,7 +4975,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (state.hasDuplicates)
             {
                 state.summary =
-                    summaryBuilder.Length > 0
+                    0 < summaryBuilder.Length
                         ? summaryBuilder.ToString()
                         : "Duplicate values detected.";
             }
@@ -5025,7 +5025,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             for (int i = 0; i < indices.Count; i++)
             {
-                if (i > 0)
+                if (0 < i)
                 {
                     builder.Append(", ");
                 }
@@ -5164,8 +5164,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             string propertyTypeName = property.type ?? string.Empty;
             if (
-                propertyTypeName.IndexOf("SerializableSortedSet", StringComparison.Ordinal) >= 0
-                || propertyTypeName.IndexOf("SortedSet", StringComparison.Ordinal) >= 0
+                0 <= propertyTypeName.IndexOf("SerializableSortedSet", StringComparison.Ordinal)
+                || 0 <= propertyTypeName.IndexOf("SortedSet", StringComparison.Ordinal)
             )
             {
                 return true;
@@ -5248,7 +5248,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string segment = segments[index];
                 if (segment == "Array")
                 {
-                    if (index + 1 >= segments.Length)
+                    if (segments.Length <= index + 1)
                     {
                         break;
                     }
@@ -5313,7 +5313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Type current = candidate;
             string openGenericName = openGeneric.Name;
             int tickIndex = openGenericName.IndexOf('`');
-            if (tickIndex >= 0)
+            if (0 <= tickIndex)
             {
                 openGenericName = openGenericName.Substring(0, tickIndex);
             }
@@ -5328,7 +5328,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string currentName = current.FullName ?? current.Name;
                 if (
                     !string.IsNullOrEmpty(currentName)
-                    && currentName.IndexOf(openGenericName, StringComparison.Ordinal) >= 0
+                    && 0 <= currentName.IndexOf(openGenericName, StringComparison.Ordinal)
                     && typeof(ISerializableSetInspector).IsAssignableFrom(current)
                 )
                 {
@@ -5452,7 +5452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         previous.comparable,
                         current.comparable
                     );
-                    if (comparison > 0)
+                    if (0 < comparison)
                     {
                         return true;
                     }
@@ -5463,7 +5463,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             previous.value != null ? previous.value.ToString() : string.Empty;
                         string currentFallback =
                             current.value != null ? current.value.ToString() : string.Empty;
-                        if (string.CompareOrdinal(previousFallback, currentFallback) > 0)
+                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
                         {
                             return true;
                         }
@@ -5556,7 +5556,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     continue;
                 }
 
-                if (targets.Length > 0)
+                if (0 < targets.Length)
                 {
                     Undo.RecordObjects(targets, "Add Set Entry");
                 }
@@ -5589,7 +5589,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EvaluateDuplicateState(property, itemsProperty, force: true);
                 EvaluateNullEntryState(property, itemsProperty);
                 SyncRuntimeSet(property);
-                if (totalCount > 0)
+                if (0 < totalCount)
                 {
                     pagination.selectedIndex = totalCount - 1;
                 }
@@ -5629,7 +5629,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedObject serializedObject = property.serializedObject;
 
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Add Set Entry");
             }
@@ -5672,7 +5672,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EvaluateDuplicateState(property, itemsProperty, force: true);
             EvaluateNullEntryState(property, itemsProperty);
             SyncRuntimeSet(property);
-            if (totalCount > 0)
+            if (0 < totalCount)
             {
                 pagination.selectedIndex = totalCount - 1;
             }
@@ -5940,7 +5940,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 itemsProperty == null
                 || !itemsProperty.isArray
                 || arrayIndex < 0
-                || arrayIndex >= itemsProperty.arraySize
+                || itemsProperty.arraySize <= arrayIndex
             )
             {
                 data.isValid = false;
@@ -6149,7 +6149,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             contentRect.x += shakeOffset;
             float maxContentBottom = backgroundRect.yMax - padding;
-            if (contentRect.yMax > maxContentBottom)
+            if (maxContentBottom < contentRect.yMax)
             {
                 contentRect.height = Mathf.Max(0f, maxContentBottom - contentRect.y);
             }
@@ -6177,7 +6177,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 RequestRepaint();
             }
 
-            if (contentRect.yMax > maxContentBottom)
+            if (maxContentBottom < contentRect.yMax)
             {
                 contentRect.height = Mathf.Max(0f, maxContentBottom - contentRect.y);
             }
@@ -6300,7 +6300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             SerializedObject serializedObject = property.serializedObject;
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Reorder Set Entries");
             }
@@ -6374,7 +6374,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     for (int j = i + 1; j < orderedIndices.Count; j++)
                     {
-                        if (orderedIndices[j] > currentIndex && orderedIndices[j] <= desiredIndex)
+                        if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
                         {
                             orderedIndices[j]--;
                         }
@@ -6384,7 +6384,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     for (int j = i + 1; j < orderedIndices.Count; j++)
                     {
-                        if (orderedIndices[j] >= desiredIndex && orderedIndices[j] < currentIndex)
+                        if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
                         {
                             orderedIndices[j]++;
                         }
@@ -6410,7 +6410,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             SerializedObject serializedObject = property.serializedObject;
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Clear Set Entries");
             }
@@ -6450,20 +6450,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int selectedIndex = pagination.selectedIndex;
-            if (selectedIndex < 0 || selectedIndex >= totalCount)
+            if (selectedIndex < 0 || totalCount <= selectedIndex)
             {
                 return;
             }
 
             int targetIndex = selectedIndex + direction;
-            if (targetIndex < 0 || targetIndex >= totalCount)
+            if (targetIndex < 0 || totalCount <= targetIndex)
             {
                 return;
             }
 
             SerializedObject serializedObject = property.serializedObject;
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Move Set Entry");
             }
@@ -6498,14 +6498,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int targetIndex = pagination.selectedIndex;
-            if (targetIndex < 0 || targetIndex >= itemsProperty.arraySize)
+            if (targetIndex < 0 || itemsProperty.arraySize <= targetIndex)
             {
                 return;
             }
 
             SerializedObject serializedObject = property.serializedObject;
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Remove Set Entry");
             }
@@ -6523,7 +6523,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             bool hasItemsArray = itemsProperty is { isArray: true };
             int totalCount = hasItemsArray ? itemsProperty.arraySize : 0;
-            if (pagination.selectedIndex >= totalCount)
+            if (totalCount <= pagination.selectedIndex)
             {
                 pagination.selectedIndex = totalCount - 1;
             }
@@ -6561,7 +6561,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             SerializedObject serializedObject = property.serializedObject;
             Object[] targets = serializedObject.targetObjects;
-            if (targets.Length > 0)
+            if (0 < targets.Length)
             {
                 Undo.RecordObjects(targets, "Sort Set Entries");
             }
@@ -6698,7 +6698,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 for (long i = 0; i < MaxAutoAddAttempts; i++)
                 {
                     yield return Convert.ChangeType(i, elementType);
-                    if (i > 0)
+                    if (0 < i)
                     {
                         yield return Convert.ChangeType(-i, elementType);
                     }
@@ -7477,7 +7477,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             while (true)
             {
-                if (rootType == null || path == null || index >= path.Length)
+                if (rootType == null || path == null || path.Length <= index)
                 {
                     return rootType;
                 }
@@ -7497,7 +7497,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 if (
                     segment != "Array"
-                    || index + 1 >= path.Length
+                    || path.Length <= index + 1
                     || !path[index + 1].StartsWith("data[", StringComparison.Ordinal)
                 )
                 {

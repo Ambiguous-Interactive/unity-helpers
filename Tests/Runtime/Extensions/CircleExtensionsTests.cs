@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int customZ = 5;
             HashSet<FastVector3Int> points = new(circle.EnumerateArea(customZ));
 
-            Assert.IsTrue(points.Count > 0);
+            Assert.IsTrue(0 < points.Count);
             foreach (FastVector3Int point in points)
             {
                 Assert.AreEqual(customZ, point.z);

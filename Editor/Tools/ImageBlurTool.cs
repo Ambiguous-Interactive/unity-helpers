@@ -39,9 +39,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 string a = args[i];
                 if (
-                    a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase) >= 0
-                    || a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase) >= 0
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     return true;
@@ -190,7 +190,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             EditorGUILayout.Space();
 
-            if (_orderedTextures.Count > 0 || _manualTextures.Count > 0)
+            if (0 < _orderedTextures.Count || 0 < _manualTextures.Count)
             {
                 EditorGUILayout.LabelField("Selected Images:", EditorStyles.boldLabel);
                 _scrollPosition = EditorGUILayout.BeginScrollView(
@@ -481,7 +481,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         for (int k = -radius; k <= radius; k++)
                         {
                             int currentX = x + k;
-                            if (currentX >= 0 && currentX < width)
+                            if (0 <= currentX && currentX < width)
                             {
                                 float weight = kernel[k + radius];
                                 weightedSum += premultiplied[yOffset + currentX] * weight;
@@ -510,7 +510,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         for (int k = -radius; k <= radius; k++)
                         {
                             int currentY = y + k;
-                            if (currentY >= 0 && currentY < height)
+                            if (0 <= currentY && currentY < height)
                             {
                                 float weight = kernel[k + radius];
                                 weightedSum += tempPixels[(currentY * width) + x] * weight;

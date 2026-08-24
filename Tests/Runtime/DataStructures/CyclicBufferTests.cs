@@ -700,7 +700,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             for (int i = 0; i < 256; ++i)
             {
                 bool shouldRemove =
-                    expected.Count > 0 && (expected.Count == capacity || PRNG.Instance.NextBool());
+                    0 < expected.Count && (expected.Count == capacity || PRNG.Instance.NextBool());
 
                 if (shouldRemove)
                 {
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5);
 
-            int removed = buffer.RemoveAll(x => x > 0);
+            int removed = buffer.RemoveAll(x => 0 < x);
 
             Assert.AreEqual(0, removed);
             Assert.AreEqual(0, buffer.Count);
@@ -780,7 +780,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 buffer.Add(i);
             }
 
-            int removed = buffer.RemoveAll(x => x % 2 == 0 || x > 8);
+            int removed = buffer.RemoveAll(x => x % 2 == 0 || 8 < x);
 
             Assert.AreEqual(6, removed); // 2, 4, 6, 8, 9, 10
             Assert.AreEqual(4, buffer.Count);
@@ -816,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5 };
 
-            int removed = buffer.RemoveAll(x => x >= 2 && x <= 4);
+            int removed = buffer.RemoveAll(x => 2 <= x && x <= 4);
 
             Assert.AreEqual(3, removed);
             Assert.AreEqual(2, buffer.Count);
@@ -884,7 +884,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3 };
 
-            int removed = buffer.RemoveAll(x => x > 100);
+            int removed = buffer.RemoveAll(x => 100 < x);
 
             Assert.AreEqual(0, removed);
             Assert.AreEqual(3, buffer.Count);
@@ -944,7 +944,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5 };
 
-            int removed = buffer.RemoveAll(x => x > 2);
+            int removed = buffer.RemoveAll(x => 2 < x);
 
             Assert.AreEqual(3, removed);
             Assert.AreEqual(2, buffer.Count);
@@ -956,7 +956,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5 };
 
-            int removed = buffer.RemoveAll(x => x > 0);
+            int removed = buffer.RemoveAll(x => 0 < x);
 
             Assert.AreEqual(5, removed);
             Assert.AreEqual(0, buffer.Count);
@@ -1066,7 +1066,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, removed1);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 1, 3, 5 }));
 
-            int removed2 = buffer.RemoveAll(x => x > 3);
+            int removed2 = buffer.RemoveAll(x => 3 < x);
             Assert.AreEqual(1, removed2);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 1, 3 }));
 
@@ -1183,7 +1183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(10) { 1, 2, 3 };
 
-            int removed = buffer.RemoveAll(x => x >= 2);
+            int removed = buffer.RemoveAll(x => 2 <= x);
 
             Assert.AreEqual(2, removed);
             Assert.AreEqual(1, buffer.Count);
@@ -1195,7 +1195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(10) { 1, 2, 3, 4, 5, 6, 7 };
 
-            int removed = buffer.RemoveAll(x => x >= 3 && x <= 5);
+            int removed = buffer.RemoveAll(x => 3 <= x && x <= 5);
 
             Assert.AreEqual(3, removed);
             Assert.AreEqual(4, buffer.Count);
@@ -1427,14 +1427,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         int value = PRNG.Instance.Next(0, 100);
                         buffer.Add(value);
                         expected.Add(value);
-                        while (expected.Count > buffer.Capacity)
+                        while (buffer.Capacity < expected.Count)
                         {
                             expected.RemoveAt(0);
                         }
                         break;
 
                     case 1: // Remove
-                        if (expected.Count > 0)
+                        if (0 < expected.Count)
                         {
                             int toRemove = expected[PRNG.Instance.Next(0, expected.Count)];
                             bool removedExpected = expected.Remove(toRemove);
@@ -1455,7 +1455,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         break;
 
                     case 4: // Indexer set
-                        if (expected.Count > 0)
+                        if (0 < expected.Count)
                         {
                             int idx = PRNG.Instance.Next(0, expected.Count);
                             int newValue = PRNG.Instance.Next(0, 100);
@@ -1627,7 +1627,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 5, 6, 7, 8 }));
 
             // RemoveAll after multiple wraps
-            int removed = buffer.RemoveAll(x => x > 6);
+            int removed = buffer.RemoveAll(x => 6 < x);
             Assert.AreEqual(2, removed);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 5, 6 }));
 
@@ -1756,7 +1756,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 int capacity = PRNG.Instance.Next(0, 10);
                 CyclicBuffer<int> buffer = new(capacity);
-                List<int> expected = new(capacity > 0 ? capacity : 1);
+                List<int> expected = new(0 < capacity ? capacity : 1);
 
                 int operations = PRNG.Instance.Next(30, 90);
                 for (int step = 0; step < operations; step++)
@@ -1768,7 +1768,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         {
                             int value = PRNG.Instance.Next();
                             buffer.Add(value);
-                            if (capacity > 0)
+                            if (0 < capacity)
                             {
                                 if (expected.Count == capacity)
                                 {
@@ -1783,7 +1783,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         case 1:
                         {
                             bool bufferPopped = buffer.TryPopFront(out int poppedFront);
-                            bool expectedPopped = expected.Count > 0;
+                            bool expectedPopped = 0 < expected.Count;
 
                             Assert.AreEqual(expectedPopped, bufferPopped);
                             if (expectedPopped)
@@ -1801,7 +1801,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         default:
                         {
                             bool bufferPopped = buffer.TryPopBack(out int poppedBack);
-                            bool expectedPopped = expected.Count > 0;
+                            bool expectedPopped = 0 < expected.Count;
 
                             Assert.AreEqual(expectedPopped, bufferPopped);
                             if (expectedPopped)

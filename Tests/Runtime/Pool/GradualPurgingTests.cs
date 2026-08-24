@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int totalPurged = 0;
             int rentsNeeded = 0;
 
-            while (pool.Count > 1)
+            while (1 < pool.Count)
             {
                 using (PooledResource<TestPoolItem> _ = pool.Get())
                 {
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 totalPurged = (int)stats.PurgeCount;
 
                 // Prevent infinite loop
-                if (rentsNeeded > 20)
+                if (20 < rentsNeeded)
                 {
                     break;
                 }
@@ -385,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Keep purging until no more items can be purged
             int iterations = 0;
-            while (pool.Count > minRetain && iterations < 10)
+            while (minRetain < pool.Count && iterations < 10)
             {
                 pool.Purge();
                 iterations++;
@@ -570,7 +570,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             int iterations = 0;
             int previousCount = pool.Count;
-            while (pool.Count > minRetainCount && iterations < 50)
+            while (minRetainCount < pool.Count && iterations < 50)
             {
                 int purgedThisRound = pool.Purge();
                 iterations++;
@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 2f;
 
             int iterations = 0;
-            while (pool.Count > minRetainCount && iterations < 50)
+            while (minRetainCount < pool.Count && iterations < 50)
             {
                 iterations++;
 
@@ -713,7 +713,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 2f;
 
             int iterations = 0;
-            while (pool.Count > minRetainCount && iterations < preWarmCount + 5)
+            while (minRetainCount < pool.Count && iterations < preWarmCount + 5)
             {
                 int purged = pool.Purge();
                 iterations++;
@@ -872,7 +872,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 2f;
 
             int iterations = 0;
-            while (pool.Count > minRetainCount && iterations < 50)
+            while (minRetainCount < pool.Count && iterations < 50)
             {
                 pool.Purge();
                 iterations++;

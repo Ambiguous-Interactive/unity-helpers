@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 TestContextKey
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative");
+            Assert.IsTrue(0f <= height, "Height should be non-negative");
         }
 
         [Test]
@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 TestContextKey
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative");
+            Assert.IsTrue(0f <= height, "Height should be non-negative");
         }
 
         [Test]
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 TestContextKey
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative");
+            Assert.IsTrue(0f <= height, "Height should be non-negative");
         }
 
         [Test]
@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 topN: topN
             );
 
-            Assert.IsTrue(height >= 0f, $"Height should be non-negative for topN={topN}");
+            Assert.IsTrue(0f <= height, $"Height should be non-negative for topN={topN}");
         }
 
         [Test]
@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 allowExpansion: false
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative with expansion disabled");
+            Assert.IsTrue(0f <= height, "Height should be non-negative with expansion disabled");
         }
 
         [Test]
@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 TestToolName
             );
 
-            Assert.IsTrue(height > 0f, "String property should return positive height");
+            Assert.IsTrue(0f < height, "String property should return positive height");
         }
 
         [UnityTest]
@@ -535,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 TestContextKey
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative for edge case tool names");
+            Assert.IsTrue(0f <= height, "Height should be non-negative for edge case tool names");
         }
 
         [Test]
@@ -548,7 +548,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 contextKey
             );
 
-            Assert.IsTrue(height >= 0f, "Height should be non-negative for edge case context keys");
+            Assert.IsTrue(0f <= height, "Height should be non-negative for edge case context keys");
         }
 
         [Test]

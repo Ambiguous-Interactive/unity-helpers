@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             foreach (ObjectReferenceKeyframe keyFrame in referenceCurve)
             {
                 // Keyframes are ordered by time, so the first one past the event ends the search
-                if (keyFrame.time > item.animationEvent.time)
+                if (item.animationEvent.time < keyFrame.time)
                 {
                     break;
                 }

@@ -240,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static bool HasValidFailures()
         {
-            return _instance != null && _instance._failures.Count > 0;
+            return _instance != null && 0 < _instance._failures.Count;
         }
 
         private string WriteFailuresToFile()

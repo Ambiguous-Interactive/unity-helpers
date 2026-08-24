@@ -705,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
 
-            if (duplicates.Count > 0)
+            if (0 < duplicates.Count)
             {
                 Debug.LogWarning(
                     $"[SingletonAssetPollutionPreventionTests] Found {duplicates.Count} duplicate folder(s) in {testCase.ParentPath}. "
@@ -879,13 +879,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null && subFolders.Length > 0)
+            if (subFolders != null && 0 < subFolders.Length)
             {
                 return;
             }
 
             string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (assets != null && assets.Length > 0)
+            if (assets != null && 0 < assets.Length)
             {
                 return;
             }

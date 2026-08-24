@@ -51,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
             if (
                 string.Equals(propertyName, "data", StringComparison.Ordinal)
-                && pathParts.Length > 1
+                && 1 < pathParts.Length
                 && pathParts[^1].Contains('[')
                 && pathParts[^1].Contains(']')
                 && string.Equals(pathParts[^2], "Array", StringComparison.Ordinal)
@@ -171,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             if (resolvedField == null)
             {
                 // Use the last segment of the possibly-trimmed path (actual field name), not property.name (which can be "data")
-                if (pathParts.Length > 0)
+                if (0 < pathParts.Length)
                 {
                     UpdateField(pathParts[^1], ref resolvedField);
                 }
@@ -277,7 +277,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             if (ArrayIndexCache.TryGetValue(dataField, out int cachedIndex))
             {
                 index = cachedIndex;
-                return cachedIndex >= 0;
+                return 0 <= cachedIndex;
             }
 
             if (
@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
         private static object GetElementAtIndex(object obj, int index)
         {
-            if (obj is System.Collections.IList list && index >= 0 && index < list.Count)
+            if (obj is System.Collections.IList list && 0 <= index && index < list.Count)
             {
                 return list[index];
             }

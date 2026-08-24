@@ -445,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             List<Rect> result = new List<Rect>();
             SpriteSheetExtractor.DetectSpriteBoundsByAlpha(pixels, width, height, 0.5f, result);
 
-            if (result.Count > 0)
+            if (0 < result.Count)
             {
                 Assert.That(
                     result[0].width,
@@ -2818,7 +2818,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             if (shouldDetect)
             {
                 Assert.IsTrue(
-                    result || alphaThreshold >= 1.0f == false,
+                    result || 1.0f <= alphaThreshold == false,
                     $"Alpha threshold {alphaThreshold} should detect"
                 );
             }
@@ -3056,7 +3056,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int midX = width / 2;
             int midY = height / 2;
 
-            if (midX > 0 && midX < width)
+            if (0 < midX && midX < width)
             {
                 for (int y = 0; y < height; ++y)
                 {
@@ -3064,7 +3064,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            if (midY > 0 && midY < height)
+            if (0 < midY && midY < height)
             {
                 for (int x = 0; x < width; ++x)
                 {
@@ -3580,8 +3580,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             {
                 for (int x = 0; x < width; ++x)
                 {
-                    bool isVerticalBoundary = (x % cellSize == 0) && (x > 0);
-                    bool isHorizontalBoundary = (y % cellSize == 0) && (y > 0);
+                    bool isVerticalBoundary = (x % cellSize == 0) && (0 < x);
+                    bool isHorizontalBoundary = (y % cellSize == 0) && (0 < y);
 
                     if (isVerticalBoundary || isHorizontalBoundary)
                     {

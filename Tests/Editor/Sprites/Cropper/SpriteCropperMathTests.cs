@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             for (int y = 0; y < height; ++y)
             for (int x = 0; x < width; ++x)
             {
-                bool inRect = x >= rectX && x < rectX + rectW && y >= rectY && y < rectY + rectH;
+                bool inRect = rectX <= x && x < rectX + rectW && rectY <= y && y < rectY + rectH;
                 pixels[y * width + x] = inRect
                     ? new Color32(255, 255, 255, 255)
                     : new Color32(0, 0, 0, 0);

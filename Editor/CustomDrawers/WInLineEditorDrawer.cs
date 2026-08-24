@@ -96,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             float height =
-                scrollbarStyle != null && scrollbarStyle.fixedHeight > 0f
+                scrollbarStyle != null && 0f < scrollbarStyle.fixedHeight
                     ? scrollbarStyle.fixedHeight
                     : EditorGUIUtility.singleLineHeight;
             return Mathf.Max(12f, height);
@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (property != null)
             {
                 string key = BuildFoldoutKey(property);
-                if (PropertyWidths.TryGetValue(key, out float width) && width > 0f)
+                if (PropertyWidths.TryGetValue(key, out float width) && 0f < width)
                 {
                     return width;
                 }
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     value,
                     currentRect.width
                 );
-                if (inlineHeight > 0f)
+                if (0f < inlineHeight)
                 {
                     InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
                         value,
@@ -387,8 +387,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float pingRightMargin = showPingButton ? InLineEditorShared.PingButtonRightMargin : 0f;
             bool hasSpaceForPing =
                 showPingButton
-                && labelRect.width - pingWidth - pingSpacing - pingRightMargin
-                    >= InLineEditorShared.MinimumFoldoutLabelWidth;
+                && InLineEditorShared.MinimumFoldoutLabelWidth
+                    <= labelRect.width - pingWidth - pingSpacing - pingRightMargin;
             if (!hasSpaceForPing)
             {
                 showPingButton = false;
@@ -660,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 inlineAttribute.EnableScrolling && inspectorHeight.RequiresHorizontalScrollbar;
             bool needsVerticalScroll =
                 inlineAttribute.EnableScrolling
-                && inspectorHeight.ContentHeight > contentRect.height + 0.5f;
+                && contentRect.height + 0.5f < inspectorHeight.ContentHeight;
             bool useScrollView =
                 inlineAttribute.EnableScrolling && (needsHorizontalScroll || needsVerticalScroll);
 
@@ -874,9 +874,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 || widthIsTooNarrow;
             bool requiresHorizontalScroll =
                 inlineAttribute.EnableScrolling
-                && inlineAttribute.MinInspectorWidth > 0f
+                && 0f < inlineAttribute.MinInspectorWidth
                 && shouldRespectMinWidth
-                && inlineAttribute.MinInspectorWidth - effectiveWidth > 0.5f;
+                && 0.5f < inlineAttribute.MinInspectorWidth - effectiveWidth;
             float horizontalScrollbarHeight = requiresHorizontalScroll
                 ? GetHorizontalScrollbarHeight()
                 : 0f;
@@ -1302,8 +1302,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 headerSpacing = InLineEditorShared.HeaderPingSpacing;
                 headerRightMargin = InLineEditorShared.PingButtonRightMargin;
                 bool hasSpace =
-                    rect.width - pingWidth - headerSpacing - headerRightMargin
-                    >= InLineEditorShared.MinimumFoldoutLabelWidth;
+                    InLineEditorShared.MinimumFoldoutLabelWidth
+                    <= rect.width - pingWidth - headerSpacing - headerRightMargin;
                 if (!hasSpace)
                 {
                     showPingButton = false;
@@ -1565,9 +1565,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool shouldRespectMinWidth =
                 hasExplicitMinInspectorWidth || !hasSimpleLayout || widthIsTooNarrow;
             return enableScrolling
-                && minInspectorWidth > 0f
+                && 0f < minInspectorWidth
                 && shouldRespectMinWidth
-                && minInspectorWidth - effectiveWidth > 0.5f;
+                && 0.5f < minInspectorWidth - effectiveWidth;
         }
 
         /// <summary>

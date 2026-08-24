@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         )
         {
             string raw = Environment.GetEnvironmentVariable(variableName);
-            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, out int parsed) && parsed > 0)
+            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, out int parsed) && 0 < parsed)
             {
                 return parsed;
             }

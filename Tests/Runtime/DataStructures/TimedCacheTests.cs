@@ -320,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
 
             float deltaToBoundary = MathF.Max(jitterOverride - Epsilon, 0f);
-            if (deltaToBoundary > 0f)
+            if (0f < deltaToBoundary)
             {
                 time.Advance(deltaToBoundary);
                 Assert.AreEqual(

@@ -434,7 +434,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             int processedBatches = 0;
             try
             {
-                while (PendingAssetChanges.Count > 0)
+                while (0 < PendingAssetChanges.Count)
                 {
                     PendingAssetChangeSet changeSet = PendingAssetChanges.Dequeue();
                     bool handled = HandleAssetChanges(
@@ -447,7 +447,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     if (handled)
                     {
                         processedBatches++;
-                        if (processedBatches >= MaxPendingChangeSetsPerCycle)
+                        if (MaxPendingChangeSetsPerCycle <= processedBatches)
                         {
                             EnterLoopProtection();
                             break;
@@ -458,7 +458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             finally
             {
                 _processingAssetChanges = false;
-                if (!_loopProtectionActive && processedBatches > 0)
+                if (!_loopProtectionActive && 0 < processedBatches)
                 {
                     UpdateLoopWindow(processedBatches);
                 }
@@ -492,12 +492,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 );
 
                 AssetChangeFlags triggeredFlags = AssetChangeFlags.None;
-                if (createdPaths.Count > 0)
+                if (0 < createdPaths.Count)
                 {
                     triggeredFlags |= AssetChangeFlags.Created;
                 }
 
-                if (deletedPaths.Count > 0)
+                if (0 < deletedPaths.Count)
                 {
                     triggeredFlags |= AssetChangeFlags.Deleted;
                 }
@@ -534,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     InvokeSubscription(subscription, args);
                 }
 
-                if (createdPaths.Count > 0)
+                if (0 < createdPaths.Count)
                 {
                     foreach (string assetPath in createdPaths)
                     {
@@ -542,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
 
-                if (deletedPaths.Count > 0)
+                if (0 < deletedPaths.Count)
                 {
                     foreach (string deletedPath in deletedPaths)
                     {
@@ -1079,7 +1079,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 // ours. It is not a template: production paths must use asset metadata.
                 if (
                     _includeTestAssets
-                    && path.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase) >= 0
+                    && 0 <= path.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase)
                 )
                 {
                     UnityEngine.Object loadedAsset =
@@ -1593,14 +1593,14 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 loopWindow = UnityHelpersSettings.DefaultDetectAssetChangeLoopWindowSeconds;
             }
 
-            if (now - _lastChangeProcessTimestamp > loopWindow)
+            if (loopWindow < now - _lastChangeProcessTimestamp)
             {
                 _consecutiveChangeBatches = 0;
             }
 
             _lastChangeProcessTimestamp = now;
             _consecutiveChangeBatches += processedBatches;
-            if (_consecutiveChangeBatches >= MaxConsecutiveChangeSetsWithinWindow)
+            if (MaxConsecutiveChangeSetsWithinWindow <= _consecutiveChangeBatches)
             {
                 EnterLoopProtection();
             }
@@ -1687,7 +1687,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (
                 !_includeTestAssets
-                && assetPath.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase) >= 0
+                && 0 <= assetPath.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase)
             )
             {
                 return true;
