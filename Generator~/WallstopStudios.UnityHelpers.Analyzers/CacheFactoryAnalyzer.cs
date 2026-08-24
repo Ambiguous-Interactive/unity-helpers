@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             if (
                 context.Compilation is CSharpCompilation compilation
-                && (int)compilation.LanguageVersion >= FirstLanguageVersionThatCachesMethodGroups
+                && FirstLanguageVersionThatCachesMethodGroups <= (int)compilation.LanguageVersion
             )
             {
                 return;

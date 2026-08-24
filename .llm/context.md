@@ -141,9 +141,11 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 - **Order every comparison left-to-right: use only `<` and `<=`.** `index >= 0` becomes
   `0 <= index`, `a > b` becomes `b < a`, and a range reads as one line of number line:
   `0 <= sum && sum < max`. Swap the operands, not the meaning -- and check for side effects before
-  swapping, because swapping changes evaluation order. New and edited code follows this; the
-  repo-wide sweep of the remaining ~2,900 sites is
-  [#554](https://github.com/Ambiguous-Interactive/unity-helpers/issues/554).
+  swapping, because swapping changes evaluation order. `npm run lint:comparison-direction` enforces
+  this over `Runtime/`, `Editor/`, `Tests/` and `Generator~` and runs in `lint:repo`;
+  `npm run lint:comparison-direction:fix` rewrites what it can and reports the rest with the reason
+  it declined. Relational patterns (`c is >= 'A' and <= 'Z'`) have no left-hand operand to move and
+  are exempt. `Runtime/Utils/SevenZip` is vendored upstream verbatim and is excluded.
 - **`Scene.handle` is an `int` up to Unity 6000.4 and a `SceneHandle` from 6000.5**, where the
   implicit conversion to `int` is obsolete-as-an-**error**. Compare `Scene` values (`==`,
   `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses

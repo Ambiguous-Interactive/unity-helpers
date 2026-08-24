@@ -1002,7 +1002,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             string name = attribute.Name.ToString();
             int lastDot = name.LastIndexOf('.');
-            if (lastDot >= 0)
+            if (0 <= lastDot)
             {
                 name = name.Substring(lastDot + 1);
             }

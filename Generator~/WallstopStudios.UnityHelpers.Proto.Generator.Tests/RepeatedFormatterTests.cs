@@ -599,7 +599,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "a packed run must not need a nesting level it cannot have"
             );
 
-            for (int level = open.Length - 1; level >= 0; level--)
+            for (int level = open.Length - 1; 0 <= level; level--)
             {
                 Assert.IsTrue(writer.TryCloseLengthDelimited(open[level]), "close " + level);
             }

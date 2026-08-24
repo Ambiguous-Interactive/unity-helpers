@@ -32,9 +32,11 @@ const path = require("path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 // Overridable so the self-test can point the scan at a fixture tree. Nothing in CI sets it.
+// `Generator~` is C# this repository authors -- the analyzers, the WallstopProto generator and the
+// gate projects -- so the rule applies there too, even though Unity ignores the tilde directory.
 const SCAN_ROOTS = process.env.COMPARISON_DIRECTION_ROOTS
   ? process.env.COMPARISON_DIRECTION_ROOTS.split(path.delimiter).filter(Boolean)
-  : ["Runtime", "Editor", "Tests"];
+  : ["Runtime", "Editor", "Tests", "Generator~"];
 
 /* ------------------------------------------------------------------ lexer */
 
@@ -755,7 +757,10 @@ function collectCsFiles(root) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        walk(full);
+        // Build output. `obj/` holds generated sources -- nobody can fix a violation there.
+        if (entry.name !== "obj" && entry.name !== "bin") {
+          walk(full);
+        }
       } else if (entry.isFile() && entry.name.endsWith(".cs") && !isVendored(full)) {
         out.push(full);
       }

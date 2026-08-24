@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             if (
                 !string.IsNullOrEmpty(configured)
                 && int.TryParse(configured, out int parsed)
-                && parsed > 0
+                && 0 < parsed
             )
             {
                 return parsed < MinimumIterations ? MinimumIterations : parsed;
@@ -229,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             foreach (T sample in samples)
             {
                 byte[] encoded = Encode(sample);
-                if (encoded.Length > 0)
+                if (0 < encoded.Length)
                 {
                     seeds.Add(encoded);
                 }
@@ -381,7 +381,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             return;
                         }
 
-                        if (length > (ulong)(payload.Length - offset))
+                        if ((ulong)(payload.Length - offset) < length)
                         {
                             return;
                         }
@@ -392,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         return;
                 }
 
-                if (offset > payload.Length)
+                if (payload.Length < offset)
                 {
                     return;
                 }
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             value = 0;
             for (int shift = 0; shift < 64; shift += 7)
             {
-                if (offset >= payload.Length)
+                if (payload.Length <= offset)
                 {
                     return false;
                 }
@@ -971,7 +971,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 Payloads += 1;
                 Accepted += accepted ? 1 : 0;
-                Reached += accepted || consumed >= PastTheFirstKey ? 1 : 0;
+                Reached += accepted || PastTheFirstKey <= consumed ? 1 : 0;
 
                 SortedSet<int> fields = new SortedSet<int>();
                 ScanTopLevelFields(payload, accepted ? payload.Length : consumed, fields);
@@ -1113,14 +1113,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // ceiling ACCEPTED. Recording first would let the deliberate amplifier in
             // TheAllocationCeilingCatchesABoundedAmplification set the high-water mark, and the next
             // person to tune the constants would be reading this suite's own counter-example.
-            if (allocated > _worstAllocation)
+            if (_worstAllocation < allocated)
             {
                 _worstAllocation = allocated;
                 _worstAllocationPayloadLength = payload.Length;
                 _worstAllocationTarget = target.Name;
             }
 
-            if (payload.Length > 0 && (double)allocated / payload.Length > _worstAllocationRatio)
+            if (0 < payload.Length && _worstAllocationRatio < (double)allocated / payload.Length)
             {
                 _worstAllocationRatio = (double)allocated / payload.Length;
                 _worstRatioAllocation = allocated;
@@ -1514,7 +1514,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     // A nested message, one level deeper. Recursion is bounded here at 96 against
                     // the reader's 64 so the bound itself is crossed rather than approached.
                     byte[] nested =
-                        depth >= 96 ? Array.Empty<byte>() : HostileMessage(ref random, depth + 1);
+                        96 <= depth ? Array.Empty<byte>() : HostileMessage(ref random, depth + 1);
                     WriteVarint(payload, (ulong)nested.Length);
                     payload.AddRange(nested);
                     break;
@@ -1538,7 +1538,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static void WriteVarint(List<byte> payload, ulong value)
         {
-            while (value >= 0x80)
+            while (0x80 <= value)
             {
                 payload.Add((byte)(value | 0x80));
                 value >>= 7;
@@ -1649,7 +1649,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 List<byte> wrapper = new List<byte> { 0x0A };
                 WriteVarint(wrapper, (ulong)dimensions.Count);
                 wrapper.AddRange(dimensions);
-                if (elements.Count > 0)
+                if (0 < elements.Count)
                 {
                     wrapper.Add(0x12);
                     WriteVarint(wrapper, (ulong)elements.Count);
