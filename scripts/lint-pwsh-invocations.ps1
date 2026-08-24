@@ -964,7 +964,10 @@ foreach ($file in $targets) {
 # Found in six scripts at once (session 221); the pattern was already written down in
 # .llm/skills/bash-pwsh-invocation.md and nothing enforced it.
 foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File)) {
-    $rel = [System.IO.Path]::GetRelativePath($repoRoot, $scriptPath.FullName).Replace('\\', '/')
+    # '\' not '\\': in a PowerShell single-quoted string the latter is TWO backslashes, so a
+    # Windows separator from GetRelativePath would pass through unchanged and the self-exclusion
+    # against $selfRel would never match (Bugbot, PR #555).
+    $rel = [System.IO.Path]::GetRelativePath($repoRoot, $scriptPath.FullName).Replace('\', '/')
     if ($rel -eq $selfRel -or $rel -eq $selfTestRel) { continue }
 
     $parseErrors = $null

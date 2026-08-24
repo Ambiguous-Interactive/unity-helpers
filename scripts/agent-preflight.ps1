@@ -2249,7 +2249,10 @@ if ($csharpierTargets.Count -gt 0) {
     # of the sources beside them, so an analyzer edit without a rebuild is a ~10 minute round trip to
     # discover -- and CSharpier reformatting the source is enough to trigger it. Gated on the sources
     # actually changing, because the check costs a Release build of both projects.
-    $analyzerSourceTargets = @($csharpTargets | Where-Object {
+    # $relativePaths, not $csharpTargets: the latter is *.cs only, so a .csproj edit -- a package
+    # pin, a payload setting -- changes the built assembly while never entering this gate
+    # (Bugbot, PR #555). Anything under either analyzer project counts.
+    $analyzerSourceTargets = @($relativePaths | Where-Object {
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*'
         })

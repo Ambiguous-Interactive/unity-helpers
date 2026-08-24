@@ -239,4 +239,98 @@ assert.throws(
   /no recorded outcome for width 128/
 );
 
-console.log("random-quality expectations manifest: OK");
+// The manifest restates each generator's quality rating, and a restated fact drifts. Both halves of
+// this evidence -- the per-PR linearity gate and this battery -- exist to make the rating
+// falsifiable, so a rating the manifest disagrees with, or a generator rated Good or better that
+// the manifest expects to FAIL, is a contradiction the repository should not be able to hold.
+// Checked per width, because #544 made `expected` a per-width fact.
+const qualityOrder = ["Unknown", "Excellent", "VeryGood", "Good", "Fair", "Poor", "Experimental"];
+const randomSourceRoot = path.join(repoRoot, "Runtime", "Core", "Random");
+for (const generator of manifest.generators) {
+  const source = path.join(randomSourceRoot, `${generator.name}.cs`);
+  assert.ok(fs.existsSync(source), `${generator.name} has no source at ${source}`);
+  const declared = /\[RandomGeneratorMetadata\(\s*RandomQuality\.(\w+)/.exec(
+    fs.readFileSync(source, "utf8")
+  );
+  assert.ok(declared, `${generator.name} declares no [RandomGeneratorMetadata]`);
+  assert.equal(
+    generator.quality,
+    declared[1],
+    `${generator.name}: the manifest says ${generator.quality} but its attribute says ${declared[1]}`
+  );
+
+  const rank = qualityOrder.indexOf(generator.quality);
+  assert.notEqual(rank, -1, `${generator.name} has an unknown quality ${generator.quality}`);
+  for (const width of WIDTHS) {
+    if (generator.widths[width].expected === "fail") {
+      assert.ok(
+        rank > qualityOrder.indexOf("Good"),
+        `${generator.name} is rated ${generator.quality} but is an expected-failure control at ` +
+          `${width}-bit. Either the rating is too generous or the expectation is wrong -- they ` +
+          `cannot both stand.`
+      );
+    }
+  }
+}
+
+// A missing report is an error, never a silent pass.
+for (const width of WIDTHS) {
+  const partial = reportsFor({}, width);
+  partial.delete("PcgRandom");
+  assert.equal(statusOf(evaluate(manifest, partial, "8GB", width), "PcgRandom"), "error");
+}
+
+// Everything above imports the helpers directly, which leaves the command-line path -- the only
+// path the workflow actually uses -- unexercised. A direct-run guard that silently fails produces
+// no verdict at all, and a step that prints nothing reads exactly like a clean battery, so the CLI
+// is spawned here rather than trusted. Now once per width, because --width is part of that path.
+for (const width of WIDTHS) {
+  const reportsDir = fs.mkdtempSync(path.join(os.tmpdir(), `random-quality-cli-${width}-`));
+  try {
+    for (const [name, text] of reportsFor({}, width)) {
+      fs.writeFileSync(path.join(reportsDir, `${name}.txt`), text, "utf8");
+    }
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        "scripts/random-quality/evaluate-outcomes.mjs",
+        "--reports",
+        reportsDir,
+        "--budget",
+        "32GB",
+        "--width",
+        width,
+        "--seed",
+        manifest.measurement.seed
+      ],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+
+    assert.match(
+      run.stdout,
+      /mismatch-count=0/,
+      `the ${width}-bit CLI produced no clean verdict. stdout: ${run.stdout} stderr: ${run.stderr}`
+    );
+    assert.equal(run.status, 0, `a manifest-matching run must exit 0, got ${run.status}`);
+    assert.match(
+      run.stdout,
+      new RegExp(`${width}-bit`),
+      `the CLI summary does not say which width it evaluated`
+    );
+    for (const generator of manifest.generators) {
+      assert.match(
+        run.stdout,
+        new RegExp(generator.name),
+        `${generator.name} is missing from the ${width}-bit CLI summary`
+      );
+    }
+  } finally {
+    fs.rmSync(reportsDir, { recursive: true, force: true });
+  }
+}
+
+console.log(
+  `random-quality outcomes contract: ${manifest.generators.length} generators x ` +
+    `${WIDTHS.length} widths, CLI path exercised for each`
+);

@@ -18,6 +18,8 @@
 
 "use strict";
 
+const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
@@ -33,14 +35,37 @@ function git(args) {
   return spawnSync("git", ["-C", REPO_ROOT, ...args], { encoding: "utf8" });
 }
 
+/**
+ * Content hashes of the shipped assemblies, keyed by repo-relative path.
+ *
+ * NOT `git status --porcelain`: porcelain records THAT a path is modified, never which bytes it
+ * holds. A DLL that was already dirty and is rewritten with different content still reads ` M path`
+ * both times, so a before/after comparison of that string returns "unchanged" and the check passes
+ * on a stale assembly (Bugbot, PR #555).
+ */
+function shippedHashes() {
+  const directory = path.join(REPO_ROOT, SHIPPED);
+  const hashes = new Map();
+  if (!fs.existsSync(directory)) {
+    return hashes;
+  }
+  for (const entry of fs.readdirSync(directory)) {
+    if (!entry.endsWith(".dll")) {
+      continue;
+    }
+    const full = path.join(directory, entry);
+    hashes.set(
+      `${SHIPPED}/${entry}`,
+      crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex")
+    );
+  }
+  return hashes;
+}
+
 function main(argv) {
   const fix = argv.includes("--fix");
 
-  // A DLL already dirty before the build cannot be attributed to it, so say so rather than
-  // reporting a stale source the author did not cause.
-  // NOT trimmed: porcelain's first two columns are the status pair and the first is a SPACE for an
-  // unstaged modification, so trimming the whole output eats one character of every path.
-  const before = git(["status", "--porcelain", "--", SHIPPED]).stdout;
+  const before = shippedHashes();
 
   for (const project of PROJECTS) {
     const build = spawnSync(
@@ -55,15 +80,11 @@ function main(argv) {
     }
   }
 
-  const after = git(["status", "--porcelain", "--", SHIPPED]).stdout;
-  if (after === before) {
+  const after = shippedHashes();
+  const moved = [...after.keys()].filter((file) => before.get(file) !== after.get(file));
+  if (moved.length === 0) {
     return 0;
   }
-
-  const moved = after
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.slice(3));
   if (fix) {
     console.log(
       `[shipped-analyzers] Rebuilt ${moved.length} shipped analyzer file(s); stage them with the source change:`
