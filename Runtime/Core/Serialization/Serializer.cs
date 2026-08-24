@@ -565,6 +565,54 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             );
             internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
             internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
+
+            // The wrapper type and its constructor are a pure function of T, and resolving them per
+            // call cost a Type[] from GetGenericArguments, a MakeGenericType lookup and a reflection
+            // Activator invoke on the same path the field above is cached for. Null for anything
+            // that is not a supported serializable collection; BuildCollectionWrapper rejects those.
+            internal static readonly Type WrapperType = IsSerializableCollection
+                ? ResolveCollectionWrapperType(typeof(T))
+                : null;
+
+            internal static readonly Func<object> WrapperFactory =
+                WrapperType == null
+                    ? null
+                    : ReflectionHelpers.GetParameterlessConstructor(WrapperType);
+        }
+
+        private static Type ResolveCollectionWrapperType(Type type)
+        {
+            if (!type.IsGenericType)
+            {
+                return null;
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type[] arguments = type.GetGenericArguments();
+
+            if (genericDef == typeof(SerializableHashSet<>))
+            {
+                return typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableSortedSet<>))
+            {
+                return typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableDictionary<,>))
+            {
+                return typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableSortedDictionary<,>))
+            {
+                return typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
+                    arguments
+                );
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -841,7 +889,40 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </summary>
         internal static byte[] SerializeCollectionWithWrapper<T>(T input)
         {
+            byte[] buffer = null;
+            SerializeCollectionWithWrapper(input, ref buffer);
+            return buffer;
+        }
+
+        /// <summary>
+        /// Serializes a serializable collection into <paramref name="buffer"/>, growing it only when
+        /// the payload does not fit, and returns the number of bytes written. The caller-buffer
+        /// overload of <see cref="ProtoSerialize{T}(T, ref byte[], bool)"/> exists so a per-frame
+        /// serialize allocates nothing; routing it through the array-returning overload above and
+        /// copying meant one full-payload allocation plus one full-payload copy on every call.
+        /// </summary>
+        internal static int SerializeCollectionWithWrapper<T>(T input, ref byte[] buffer)
+        {
+            object wrapper = BuildCollectionWrapper(input);
+
+            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
+                out PooledBufferStream stream
+            );
+            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
+            return stream.ToArrayExact(ref buffer);
+        }
+
+        private static object BuildCollectionWrapper<T>(T input)
+        {
             Type type = typeof(T);
+            Type wrapperType = CollectionShape<T>.WrapperType;
+            if (wrapperType == null)
+            {
+                throw new InvalidOperationException(
+                    $"Type {type} is not a supported serializable collection type."
+                );
+            }
+
             Type genericDef = type.GetGenericTypeDefinition();
             bool isSet =
                 genericDef == typeof(SerializableHashSet<>)
@@ -860,39 +941,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object> _____
             ) = CollectionProtoAccessors.GetAccessors(type);
 
-            // Determine wrapper type
-            Type wrapperType;
-            if (genericDef == typeof(SerializableHashSet<>))
-            {
-                wrapperType = typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableSortedSet<>))
-            {
-                wrapperType = typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableDictionary<,>))
-            {
-                wrapperType = typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableSortedDictionary<,>))
-            {
-                wrapperType = typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"Type {type} is not a supported serializable collection type."
-                );
-            }
-
             // Get cached wrapper accessors
             (
                 Func<object, object> _______,
@@ -907,7 +955,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             onBeforeSerialize?.Invoke(input);
 
             // Create wrapper and copy data
-            object wrapper = Activator.CreateInstance(wrapperType);
+            object wrapper = CollectionShape<T>.WrapperFactory();
             if (isSet)
             {
                 object items = getItems?.Invoke(input);
@@ -921,15 +969,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 setWrapperValues?.Invoke(wrapper, values);
             }
 
-            // Serialize wrapper
-            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
-                out PooledBufferStream stream
-            );
-            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
-
-            byte[] buffer = null;
-            stream.ToArrayExact(ref buffer);
-            return buffer;
+            return wrapper;
         }
 
         /// <summary>
@@ -2367,13 +2407,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // Intercept serializable collection types to use wrapper-based serialization
             if (CollectionShape<T>.IsSerializableCollection)
             {
-                byte[] result = SerializeCollectionWithWrapper(input);
-                if (buffer == null || buffer.Length < result.Length)
-                {
-                    buffer = new byte[result.Length];
-                }
-                Array.Copy(result, buffer, result.Length);
-                return result.Length;
+                return SerializeCollectionWithWrapper(input, ref buffer);
             }
 
             // Intercept Deque/CyclicBuffer/SparseSet so the original [ProtoContract] model is never
@@ -3303,9 +3337,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 writer.Flush();
             }
 
-            byte[] buffer = null;
-            int written = bufferWriter.ToArrayExact(ref buffer);
-            return SerializerEncoding.Encoding.GetString(buffer, 0, written);
+            // The pooled writer already holds the payload contiguously, so copying it into a
+            // throwaway array of the same size just to hand Encoding an array doubled the peak
+            // for every document this branch writes.
+            return SerializerEncoding.Encoding.GetString(bufferWriter.WrittenSpan);
         }
 
         // Reference-equality comparer for the cycle guard so distinct-but-equal objects are not
@@ -3922,6 +3957,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         public int WrittenCount => _written;
+
+        /// <summary>
+        /// The bytes written so far, without copying them out. Valid until the lease is returned.
+        /// </summary>
+        public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
 
         public void Preallocate(int sizeHint)
         {

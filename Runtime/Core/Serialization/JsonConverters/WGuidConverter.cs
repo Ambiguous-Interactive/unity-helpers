@@ -59,6 +59,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
+            // One id per entity is an ordinary save-file shape, so this is a per-element path.
+            // Guid.ToString() allocates a 36-character string that the writer immediately encodes
+            // and drops; formatting into the stack costs nothing. The default format specifier is
+            // "D" for both, so the text is unchanged.
+            Span<char> text = stackalloc char[36];
+            if (value.TryFormat(text, out int written))
+            {
+                writer.WriteStringValue(text.Slice(0, written));
+                return;
+            }
+
             writer.WriteStringValue(value.ToString());
         }
 

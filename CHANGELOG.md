@@ -96,6 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Serializer.ProtoSerialize(value, ref buffer)` no longer allocates a second full payload for the `Serializable` collection types. The overload exists so a per-frame serialize allocates nothing ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
+- Serializing a `SerializableDictionary` or `SerializableHashSet` no longer resolves its protobuf wrapper type by reflection on every call; the type and its constructor are resolved once per element type ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
+- Writing a `WGuid` to JSON no longer allocates a 36-character string per value, and reading an `AnimationCurve` keyframe no longer boxes its `weightedMode` ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Relational fields typed as an interface no longer fetch every component on the object and type-test each one. Unity's own query resolves an interface, so the query is 1.35x-2.49x faster depending on how many components the object carries -- and the child shape pays it once per descendant ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Relational collection fields typed as a base component -- `Collider2D[]`, `Renderer[]` -- no longer fetch every component on the object and type-test each one. Unity's own query already resolves a base class, so assignment of a component with three such fields is 9% faster ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - `Animator.ResetTriggers()` no longer allocates. It read `Animator.parameters`, which builds a new array and new element objects on every read -- 53.5 bytes per call for a three-parameter controller. The trigger hashes are now read once per controller ([#549](https://github.com/Ambiguous-Interactive/unity-helpers/issues/549)).
