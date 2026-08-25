@@ -327,6 +327,14 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) is about: end with
   `if (matched == 0) { result.LogError("NO FIXTURES MATCHED -- this run measured nothing."); return; }`,
   or print the matched names. One `GetAssemblies()` dump answers the naming for the whole session.
+- **A namespace filter over `GetTypes()` sweeps up compiler-generated nested types, and they report
+  as fixture failures.** Session 223 ran the `.Random` namespace and got `1117 pass / 12 fail`; all
+  twelve were `Default constructor not found for type ...+<EveryGenerator>d__8` and
+  `...+<>c__DisplayClass3_0` -- iterator state machines and display classes the compiler emits for
+  `[TestCaseSource]` methods and lambdas, plus two nested generic helpers. Zero real test methods
+  failed. The line reads exactly like twelve regressions from the change under test. Filter to types
+  carrying `[TestFixture]`, or at minimum drop any name containing `<`, and report the fixture NAMES
+  so the sweep can be audited.
 - **Gate every measurement on a member only the variant under test declares, and print the gate.**
   This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
   _absence_ of `_cacheLock`, and refused to print numbers otherwise. Absence matters as much as

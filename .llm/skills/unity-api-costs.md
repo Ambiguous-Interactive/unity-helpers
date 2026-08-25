@@ -92,3 +92,22 @@ as `PooledBufferStream` does while growing.
 **Read a pool's `<remarks>` on the CLASS, not just the `Get` overload you are calling.** Session 222
 put six rents on the exact-size pool while citing that pool's own documentation for the parts that
 suited the change; the warning was in the class remarks directly above.
+
+## `Debug.LogError` is ~400x a relational assignment, so a miss is not a benchmark
+
+Measured on `6000.4.6f1` through the MCP bridge. A `[SiblingComponent]` collection field resolves in
+**~1.0 us fixed plus ~0.037 us per sibling** (1 sibling 1.015 us, 64 siblings 3.346 us, against a
+control that read 0.305-0.309 us across all ten measurements). The same call with **nothing to bind**
+costs **366-431 us**, because `LogMissingComponentError` reaches `Debug.LogError` and Unity captures
+a stack trace there.
+
+Two things follow. A benchmark whose fixture has no matching sibling is measuring the console rather
+than the assignment path — the reading is three orders of magnitude out and looks like a catastrophic
+regression. And a scene where many objects carry a non-`Optional` relational field nothing satisfies
+pays that on every assignment, which is a load-time stall with a cause that reads as "some errors in
+the console".
+
+The corollary for optimization work: at realistic sibling counts the **fixed** ~1.0 us is about two
+thirds of the call, so per-element work is not where the remaining headroom is. Three collection
+shapes measured within 9% of each other, and `List<T>` — the one paying a non-generic `IList.Add`
+per element — was the fastest of the three ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
