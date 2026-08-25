@@ -118,218 +118,215 @@ function New-FixtureRoot {
 
     return $root
 }
-
-function Invoke-ValidatorInFixture {
-    param([string]$FixtureRoot)
-    $validatorCopy = Join-Path $FixtureRoot 'scripts/validate-lint-error-codes.ps1'
-    # The validator calls scripts/run-node-bin.js relative to its repo root.
-    # Switching the working directory is not enough; cspell resolves the
-    # nearest cspell.json from the CWD, which is what we want.
-    Push-Location $FixtureRoot
-    try {
-        $output = & pwsh -NoProfile -File $validatorCopy -VerboseOutput *>&1
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        Pop-Location
-    }
-    return @{ Output = ($output | Out-String); ExitCode = $exitCode }
-}
-
-# ── Test 1: Real repo must pass ──────────────────────────────────────────────
-# This is the single most important guard: it asserts that the checked-in
-# cspell.json already covers every prefix emitted by the real lint scripts.
-# Any new lint-error-code family that ships without a cspell entry breaks this
-# test before it can break a pre-push hook.
-Write-Host "`n  Section: Real repository sanity" -ForegroundColor White
-try {
-    Push-Location $repoRoot
-    try {
-        $realOutput = & pwsh -NoProfile -File $validatorPath *>&1
-        $realExit = $LASTEXITCODE
-    }
-    finally {
-        Pop-Location
-    }
-    Write-TestResult "RealRepo.ValidatorPasses" ($realExit -eq 0) "Exit: $realExit. Output: $($realOutput | Out-String)"
-} catch {
-    Write-TestResult "RealRepo.ValidatorPasses" $false "Exception: $_"
-}
-
-# ── Test 2: Fixture with only known prefixes passes ──────────────────────────
-Write-Host "`n  Section: Fixture with registered prefix" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    @"
+# ── Scenarios ────────────────────────────────────────────────────────────────
+# Every scenario is the same shape -- seed a fixture, run the validator in it,
+# assert on the exit code and the output -- so they are declared as data and
+# executed by one loop rather than written out nine times.
+#
+# The validator's cost is almost entirely cspell's start-up: measured on this
+# devcontainer, `cspell --version` is 7.9 s against 8.5 s for real work, and the
+# nine runs were 81.3 s of the contract suite's wall clock. They are independent
+# processes over independent fixtures, so they are started together and waited
+# for afterwards ([#540](https://github.com/Ambiguous-Interactive/unity-helpers/issues/540)).
+$scenarios = @(
+    @{
+        # The single most important guard: the checked-in cspell.json already
+        # covers every prefix the real lint scripts emit. A new lint-error-code
+        # family shipped without a cspell entry breaks this before it can break
+        # a pre-push hook.
+        Name           = 'RealRepo.ValidatorPasses'
+        UseRealRepo    = $true
+        ExpectExitZero = $true
+    },
+    @{
+        Name           = 'Fixture.OnlyKnownPrefix.Passes'
+        Files          = [ordered]@{
+            'scripts/lint-fake-good.ps1' = @"
 # Synthetic lint script using only UNH (registered).
 # UNH001 - example code
 Write-Host "UNH001: something"
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-fake-good.ps1')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    Write-TestResult "Fixture.OnlyKnownPrefix.Passes" ($r.ExitCode -eq 0) "Exit: $($r.ExitCode). Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.OnlyKnownPrefix.Passes" $false "Exception: $_"
-}
-
-# ── Test 3: Fixture with unregistered prefix fails AND prints patch ──────────
-Write-Host "`n  Section: Fixture with unregistered prefix" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    # XYZ is never a real English word; cspell will not accept it via compound
-    # splitting. Using a synthetic prefix guarantees the test fails for the
-    # right reason (missing cspell registration) rather than false positives.
-    @"
+"@
+        }
+        ExpectExitZero = $true
+    },
+    @{
+        # XYZ is never a real English word; cspell will not accept it via
+        # compound splitting. A synthetic prefix guarantees the failure is for
+        # the right reason (missing cspell registration), not a false positive.
+        Name           = 'Fixture.UnregisteredPrefix.Fails'
+        Files          = [ordered]@{
+            'scripts/lint-fake-novel.ps1' = @"
 # Synthetic lint script emitting a novel XYZ-family code.
 Write-Host "XYZ001: unregistered prefix should fail the validator"
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-fake-novel.ps1')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    $failed = ($r.ExitCode -ne 0)
-    $mentionsXyz = ($r.Output -match '\bXYZ\b')
-    $emitsPatch = ($r.Output -match 'add_to_root_words')
-    $emitsSourceLine = ($r.Output -match 'lint-fake-novel\.ps1:')
-    $allPassed = $failed -and $mentionsXyz -and $emitsPatch -and $emitsSourceLine
-
-    Write-TestResult "Fixture.UnregisteredPrefix.Fails" $allPassed "Exit: $($r.ExitCode), mentionsXyz=$mentionsXyz, emitsPatch=$emitsPatch, emitsSourceLine=$emitsSourceLine. Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.UnregisteredPrefix.Fails" $false "Exception: $_"
-}
-
-# ── Test 4: Fixture with no lint scripts at all exits 1 (layout guard) ───────
-# The validator treats an empty lint-*.{ps1,js} glob as a repo-layout error,
-# not a silent pass. This guards against someone renaming the whole family
-# and silently disabling the check.
-Write-Host "`n  Section: Fixture with no lint scripts" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    # Intentionally no lint-*.ps1 files.
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    Write-TestResult "Fixture.NoLintScripts.FailsLoudly" ($r.ExitCode -ne 0) "Exit: $($r.ExitCode). Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.NoLintScripts.FailsLoudly" $false "Exception: $_"
-}
-
-# ── Test 5: Fixture with lint script emitting no codes passes ────────────────
-Write-Host "`n  Section: Fixture with lint script emitting no codes" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    @"
+"@
+        }
+        ExpectExitZero = $false
+        MustMatch      = @('\bXYZ\b', 'add_to_root_words', 'lint-fake-novel\.ps1:')
+    },
+    @{
+        # An empty lint-*.{ps1,js} glob is a repo-layout error, not a silent
+        # pass: renaming the whole family must not disable the check.
+        Name           = 'Fixture.NoLintScripts.FailsLoudly'
+        Files          = [ordered]@{}
+        ExpectExitZero = $false
+    },
+    @{
+        Name           = 'Fixture.LintScriptWithNoCodes.Passes'
+        Files          = [ordered]@{
+            'scripts/lint-fake-silent.ps1' = @"
 # Synthetic lint script with no lint codes at all (emits prose only).
 Write-Host "All good."
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-fake-silent.ps1')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    Write-TestResult "Fixture.LintScriptWithNoCodes.Passes" ($r.ExitCode -eq 0) "Exit: $($r.ExitCode). Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.LintScriptWithNoCodes.Passes" $false "Exception: $_"
-}
-
-# ── Test 6: .js lint scripts are scanned too ─────────────────────────────────
-Write-Host "`n  Section: Fixture with .js lint script" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    @"
+"@
+        }
+        ExpectExitZero = $true
+    },
+    @{
+        # ABC is in cspell's default dictionary, so ABC001 splits and is
+        # accepted. This is a positive control for reading .js at all, and its
+        # exit code is deliberately not asserted.
+        Name           = 'Fixture.JsLintScriptIsScanned'
+        Files          = [ordered]@{
+            'scripts/lint-fake-js.js' = @"
 // Synthetic JS lint script emitting a novel ABC-family code.
 console.log('ABC001: unregistered prefix should fail the validator');
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-fake-js.js')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    # ABC is an English word in cspell's default dictionary, but the token
-    # ABC001 splits to "ABC" and "001" and ABC is accepted. This test is
-    # therefore a positive control — a .js file is scanned without crashing.
-    # The pass/fail hinges on the validator's ability to read .js files at all,
-    # not on ABC being unknown.
-    $noCrash = ($r.Output -notmatch 'FullyQualifiedErrorId')
-    Write-TestResult "Fixture.JsLintScriptIsScanned" $noCrash "Exit: $($r.ExitCode). Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.JsLintScriptIsScanned" $false "Exception: $_"
-}
-
-# ── Test 7: Prefix emitted ONLY in .githooks/ is harvested (P1-2) ────────────
-# Hook error messages frequently cite lint-error-code families (e.g. UNH004 in
-# pre-commit's failure block). A novel prefix emitted from a hook but never
-# from a lint script must still be caught by the validator.
-Write-Host "`n  Section: Prefix emitted only in .githooks/" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    # Seed a lint script with nothing interesting (forces harvester to rely on
-    # the .githooks/ scan for the novel prefix).
-    @"
-# Silent lint script — emits no codes.
+"@
+        }
+        IgnoreExitCode = $true
+        MustNotMatch   = @('FullyQualifiedErrorId')
+    },
+    @{
+        # Hook error messages cite lint-error-code families. A novel prefix
+        # emitted from a hook but never from a lint script must still be caught,
+        # so the lint script here deliberately emits nothing.
+        Name           = 'Fixture.PrefixOnlyInGithooks.Detected'
+        Files          = [ordered]@{
+            'scripts/lint-silent.ps1' = @"
+# Silent lint script -- emits no codes.
 Write-Host 'All good.'
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-silent.ps1')
-
-    @"
+"@
+            '.githooks/pre-commit'    = @"
 #!/usr/bin/env bash
-# pre-commit emits HOK001 as a failure code — unregistered with cspell.
+# pre-commit emits HOK001 as a failure code -- unregistered with cspell.
 echo 'HOK001: hook-emitted code that must be harvested'
-"@ | Set-Content -LiteralPath (Join-Path $fixture '.githooks/pre-commit')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    $failed = ($r.ExitCode -ne 0)
-    $mentionsHok = ($r.Output -match '\bHOK\b')
-    $emitsSourceLine = ($r.Output -match '\.githooks/pre-commit:')
-    $allPassed = $failed -and $mentionsHok -and $emitsSourceLine
-    Write-TestResult "Fixture.PrefixOnlyInGithooks.Detected" $allPassed "Exit: $($r.ExitCode), mentionsHok=$mentionsHok, emitsSourceLine=$emitsSourceLine. Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.PrefixOnlyInGithooks.Detected" $false "Exception: $_"
-}
-
-# ── Test 8: Prefix emitted ONLY in scripts/tests/ is harvested (P1-2) ────────
-# Test assertions frequently reference error codes (e.g. "Assert -match
-# 'UNH005'"). The validator must see tests/ files too, otherwise a code used
-# only in tests would appear valid to cspell but missing from the contract.
-Write-Host "`n  Section: Prefix emitted only in scripts/tests/" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    @"
+"@
+        }
+        ExpectExitZero = $false
+        MustMatch      = @('\bHOK\b', '\.githooks/pre-commit:')
+    },
+    @{
+        # Test assertions reference error codes, so a code used only in tests
+        # would otherwise look valid to cspell but be missing from the contract.
+        Name           = 'Fixture.PrefixOnlyInTests.Detected'
+        Files          = [ordered]@{
+            'scripts/lint-silent.ps1'             = @"
 # Silent lint script.
 Write-Host 'silent'
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-silent.ps1')
-
-    @"
-# A test file that asserts TST001 is emitted — the prefix is introduced here,
+"@
+            'scripts/tests/test-lint-novel.ps1' = @"
+# A test file that asserts TST001 is emitted -- the prefix is introduced here,
 # not in any lint-*.ps1, and must still be flagged.
 Write-Host 'TST001: test-only prefix'
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/tests/test-lint-novel.ps1')
-
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    $failed = ($r.ExitCode -ne 0)
-    $mentionsTst = ($r.Output -match '\bTST\b')
-    $emitsSourceLine = ($r.Output -match 'test-lint-novel\.ps1:')
-    $allPassed = $failed -and $mentionsTst -and $emitsSourceLine
-    Write-TestResult "Fixture.PrefixOnlyInTests.Detected" $allPassed "Exit: $($r.ExitCode), mentionsTst=$mentionsTst, emitsSourceLine=$emitsSourceLine. Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.PrefixOnlyInTests.Detected" $false "Exception: $_"
-}
-
-# ── Test 9: Upstream-rule allowlist skips SC2016 et al. (P1-7) ───────────────
-# `# shellcheck disable=SC2016` is a common and legitimate reference in our
-# scripts. The harvester must not demand cspell registration for the SC
-# family — that's an upstream linter, not a code we own.
-Write-Host "`n  Section: Upstream-rule allowlist (SC/MD/CS/SA)" -ForegroundColor White
-try {
-    $fixture = New-FixtureRoot
-    @"
+"@
+        }
+        ExpectExitZero = $false
+        MustMatch      = @('\bTST\b', 'test-lint-novel\.ps1:')
+    },
+    @{
+        # `# shellcheck disable=SC2016` is a legitimate reference in our scripts.
+        # The harvester must not demand cspell registration for an upstream
+        # linter's family.
+        Name           = 'Fixture.UpstreamRuleAllowlist.SkipsSCandMD'
+        Files          = [ordered]@{
+            'scripts/lint-upstream-refs.ps1' = @"
 # Synthetic lint script that references SC2016 in a comment disable tag,
 # and MD025 in a markdownlint rule reference. Neither should cause the
 # validator to flag SC or MD as missing from cspell.
 # shellcheck disable=SC2016
 # See MD025 (markdownlint) upstream.
 Write-Host 'nothing emitted'
-"@ | Set-Content -LiteralPath (Join-Path $fixture 'scripts/lint-upstream-refs.ps1')
+"@
+        }
+        ExpectExitZero = $true
+        MustNotMatch   = @('(?m)^\s+SC\b', '(?m)^\s+MD\b')
+    }
+)
 
-    $r = Invoke-ValidatorInFixture -FixtureRoot $fixture
-    $passed = ($r.ExitCode -eq 0)
-    # The output SHOULD NOT claim SC or MD is unregistered.
-    $noSpuriousSc = ($r.Output -notmatch '(?m)^\s+SC\b')
-    $noSpuriousMd = ($r.Output -notmatch '(?m)^\s+MD\b')
-    $allPassed = $passed -and $noSpuriousSc -and $noSpuriousMd
-    Write-TestResult "Fixture.UpstreamRuleAllowlist.SkipsSCandMD" $allPassed "Exit: $($r.ExitCode), noSpuriousSc=$noSpuriousSc, noSpuriousMd=$noSpuriousMd. Output: $($r.Output)"
-} catch {
-    Write-TestResult "Fixture.UpstreamRuleAllowlist.SkipsSCandMD" $false "Exception: $_"
+# ── Phase 1: seed every fixture and start every validator ────────────────────
+$running = @()
+foreach ($scenario in $scenarios) {
+    $useRealRepo = $scenario.Contains('UseRealRepo') -and $scenario.UseRealRepo
+    if ($useRealRepo) {
+        $workingDirectory = $repoRoot
+        $scriptPath = $validatorPath
+        $argumentList = @('-NoProfile', '-File', $scriptPath)
+    }
+    else {
+        $workingDirectory = New-FixtureRoot
+        foreach ($relativePath in $scenario.Files.Keys) {
+            $destination = Join-Path $workingDirectory $relativePath
+            Set-Content -LiteralPath $destination -Value $scenario.Files[$relativePath]
+        }
+        $scriptPath = Join-Path $workingDirectory 'scripts/validate-lint-error-codes.ps1'
+        $argumentList = @('-NoProfile', '-File', $scriptPath, '-VerboseOutput')
+    }
+
+    $outputPath = Join-Path $tempRoot "$($scenario.Name).out"
+    $errorPath = Join-Path $tempRoot "$($scenario.Name).err"
+    Write-Info "Starting $($scenario.Name) in $workingDirectory"
+    $process = Start-Process -FilePath 'pwsh' -ArgumentList $argumentList `
+        -WorkingDirectory $workingDirectory -PassThru -NoNewWindow `
+        -RedirectStandardOutput $outputPath -RedirectStandardError $errorPath
+    $running += @{
+        Scenario   = $scenario
+        Process    = $process
+        OutputPath = $outputPath
+        ErrorPath  = $errorPath
+    }
 }
+
+# ── Phase 2: wait, then assert in declaration order ──────────────────────────
+function Read-IfPresent {
+    param([string]$Path)
+    if (Test-Path -LiteralPath $Path) {
+        return (Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue)
+    }
+    return ''
+}
+
+foreach ($entry in $running) {
+    $scenario = $entry.Scenario
+    Write-Host "`n  Section: $($scenario.Name)" -ForegroundColor White
+    try {
+        $entry.Process.WaitForExit()
+        $exitCode = $entry.Process.ExitCode
+        $output = (Read-IfPresent $entry.OutputPath) + (Read-IfPresent $entry.ErrorPath)
+
+        $reasons = @()
+        if (-not ($scenario.Contains('IgnoreExitCode') -and $scenario.IgnoreExitCode)) {
+            $exitOk = if ($scenario.ExpectExitZero) { $exitCode -eq 0 } else { $exitCode -ne 0 }
+            if (-not $exitOk) {
+                $expectation = if ($scenario.ExpectExitZero) { 'zero' } else { 'non-zero' }
+                $reasons += "expected $expectation exit, got $exitCode"
+            }
+        }
+        if ($scenario.Contains('MustMatch')) {
+            foreach ($pattern in $scenario.MustMatch) {
+                if ($output -notmatch $pattern) { $reasons += "output did not match /$pattern/" }
+            }
+        }
+        if ($scenario.Contains('MustNotMatch')) {
+            foreach ($pattern in $scenario.MustNotMatch) {
+                if ($output -match $pattern) { $reasons += "output unexpectedly matched /$pattern/" }
+            }
+        }
+
+        Write-TestResult $scenario.Name ($reasons.Count -eq 0) "$($reasons -join '; '). Exit: $exitCode. Output: $output"
+    }
+    catch {
+        Write-TestResult $scenario.Name $false "Exception: $_"
+    }
+}
+
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 if (Test-Path -LiteralPath $tempRoot) {
