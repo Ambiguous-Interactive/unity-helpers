@@ -158,6 +158,12 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   site. And `UnityEngine.Object.operator !=` is a native aliveness check at **3.380 ns** against
   **0.578 ns** for a managed reference compare -- 5.84x -- so a helper that has already established
   liveness should hand back a `bool` with an `out`, never a `Component` the caller must null-test.
+  **This is not licence to replace Unity null checks with `is not null`.** The Unity operator is the
+  only thing that detects a _destroyed_ object, so the check that first establishes liveness -- and
+  any defensive check on a reference of unknown provenance -- has to stay. The only removable one is
+  a re-ask of a question a `bool` already answered. Swept `Runtime/` and `Editor/`: 42 candidate
+  sites, all but a handful managed types where the compare is already cheap, and every remaining
+  Unity-typed one was a producing or defensive check. There was exactly one re-ask.
 - **Prefer `WallstopArrayPool<T>.Get(size, out T[] array)` over `System.Buffers.ArrayPool<T>.Shared`.**
   It returns an array of EXACTLY `size` (System's is power-of-two bucketed, so `.Length` lies),
   clears on release so a rent is already zeroed, and disposes through the `PooledArray<T>` handle --
