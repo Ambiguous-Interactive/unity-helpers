@@ -178,6 +178,61 @@ The rationale is required — the marker without an explanation is a maintenance
 
 ---
 
+## `Start-Process -ArgumentList` joins an array without quoting
+
+`Start-Process -FilePath pwsh -ArgumentList @('-NoProfile', '-File', $path)` concatenates the array
+with spaces and **adds no quoting**. A `$path` containing a space is split into separate arguments.
+
+The failure is not a clean error. Measured on this devcontainer with a fixture under
+`.../dir with space/probe.ps1`:
+
+```text
+exit   = 64
+stderr = The argument '/tmp/.../scratchpad/dir' is not recognized as the name of a script file.
+stdout = Usage: pwsh[.exe] [-Login] [[-File] <filePath> [args]] ...
+```
+
+**A non-zero exit and a usage banner.** Any caller asserting "the child failed" is satisfied by that,
+so a test harness reports green having launched nothing — the
+[#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) shape, found by Bugbot on
+PR #571 in a gate written for #556.
+
+Use `ProcessStartInfo.ArgumentList`, which escapes each argument individually:
+
+```powershell
+$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+$startInfo.FileName = 'pwsh'
+foreach ($argument in $argumentList) { [void]$startInfo.ArgumentList.Add($argument) }
+$startInfo.WorkingDirectory = $workingDirectory
+$startInfo.RedirectStandardOutput = $true
+$startInfo.RedirectStandardError = $true
+$startInfo.UseShellExecute = $false
+$process = [System.Diagnostics.Process]::Start($startInfo)
+# Drain BOTH streams from the moment it starts, or a full pipe deadlocks against WaitForExit.
+$standardOutput = $process.StandardOutput.ReadToEndAsync()
+$standardError = $process.StandardError.ReadToEndAsync()
+$process.WaitForExit()
+```
+
+Two caveats before converting a call site:
+
+- **`Start-Process -Wait` is not `Process.WaitForExit()`.** `-Wait` also waits on descendants, which
+  matters for an installer that hands off to a child. `scripts/unity/bootstrap-windows-runner.ps1`
+  is deliberately left on `Start-Process` for that reason, and because every caller passes fixed
+  switches (`/q`, `/install`, `/quiet`, `/norestart`) with no space to truncate.
+- **A test whose fixtures live under a spaceless path cannot see this.** Put the space in the
+  fixture root so the regression cannot come back quietly:
+  `Join-Path $tempBase "my-test $(Get-Random)"`. Reverting the launch mechanism under that root
+  reddens six of nine scenarios in `test-validate-lint-error-codes.ps1`; the two that stay green are
+  the ones asserting only a non-zero exit.
+
+**Not currently linted.** `PWS006` is the obvious home and is filed as
+[#572](https://github.com/Ambiguous-Interactive/unity-helpers/issues/572); until it exists this rule
+is documentation. The repository has exactly **two** tracked `Start-Process -ArgumentList` sites --
+`scripts/tests/test-validate-lint-error-codes.ps1`, which no longer uses it, and the installer
+above -- so check with `git ls-files` rather than a working-tree grep: `scripts/run-unity*` is
+gitignored, and an untracked local copy is not a call site this repository ships.
+
 ## Quick Reference
 
 | Context                     | Correct form                                                                                                              |

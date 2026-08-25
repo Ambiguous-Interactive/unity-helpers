@@ -221,7 +221,7 @@ private static readonly Color HighlightColor = new Color(0.3f, 0.6f, 1f);
 | `new List<T>()`                      | Heap allocation                 | `Buffers<T>.List.Get()`             |
 | Lambda capturing locals              | Closure allocation              | Static lambda or explicit loop      |
 | Boxing (`object x = struct`)         | Heap allocation                 | Generic methods                     |
-| `foreach` on `List<T>` (Mono)        | Enumerator boxing (24 bytes)    | `for` with indexer                  |
+| `foreach` through an INTERFACE       | Enumerator boxing (24 bytes)    | Iterate the concrete type           |
 | `params` methods                     | Array allocation per call       | Chain 2-arg overloads               |
 | Reflection                           | Slow, fragile, uncached         | Direct access, interfaces, generics |
 | Hand-rolled hash codes (`* 31`, XOR) | Inconsistent, non-deterministic | `Objects.HashCode()`                |

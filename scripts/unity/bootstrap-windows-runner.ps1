@@ -283,6 +283,10 @@ function Invoke-RunnerInstaller {
         Assert-RunnerMicrosoftAuthenticodeSignature -Path $installerPath
 
         Write-RunnerBootstrapInfo "Running $FileName $($Arguments -join ' ')"
+        # -ArgumentList joins an array without quoting, so a value containing a space would
+        # truncate. Safe here and deliberately left alone: every caller passes fixed switches
+        # (/q, /install, /quiet, /norestart) and -Wait waits for installer descendants in a way
+        # Process.WaitForExit does not.
         $process = Start-Process -FilePath $installerPath -ArgumentList $Arguments -Wait -PassThru
         if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
             throw "$FileName exited with code $($process.ExitCode)."

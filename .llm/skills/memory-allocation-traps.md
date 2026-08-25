@@ -10,7 +10,7 @@
 
 | Trap                           | Bytes Per Occurrence | Risk Level |
 | ------------------------------ | -------------------- | ---------- |
-| `foreach` on `List<T>` (Mono)  | 24 bytes             | 🔴 High    |
+| `foreach` through an interface | 24 bytes             | 🔴 High    |
 | LINQ `.Where()`                | 32+ bytes            | 🔴 High    |
 | LINQ `.Select()`               | 32+ bytes            | 🔴 High    |
 | Closure capturing local        | 32+ bytes            | 🔴 High    |
@@ -23,47 +23,44 @@
 
 ---
 
-## Trap 1: foreach on List<T> (Mono)
+## Trap 1: foreach through an interface
 
-Unity's Mono compiler boxes the `List<T>` enumerator, allocating 24 bytes per loop:
-
-```csharp
-// ❌ BAD: Allocates 24 bytes
-foreach (var item in myList)
-{
-    Process(item);
-}
-
-// ✅ GOOD: Zero allocation
-for (int i = 0; i < myList.Count; i++)
-{
-    Process(myList[i]);
-}
-```
-
-**Note**: `foreach` on arrays is optimized and does NOT allocate.
+The boxing is decided by the **static type you iterate**, not by `foreach`. `foreach` binds to
+whatever `GetEnumerator()` the type exposes; on a concrete collection that is a struct and nothing is
+allocated, and through an interface it is `IEnumerator<T>`, which is boxed once per loop.
 
 ```csharp
-// ✅ OK: Arrays are optimized
-foreach (var item in myArray)  // Zero allocation
-{
-    Process(item);
-}
+// ❌ BAD: 24 bytes per loop -- the interface forces IEnumerator<T>
+IReadOnlyList<Item> items = _items;
+foreach (Item item in items) { Process(item); }
+
+// ✅ GOOD: zero allocation -- List<T>.Enumerator is a struct
+foreach (Item item in _items) { Process(item); }
 ```
 
-### Non-Indexable Collections (HashSet, Dictionary)
+Measured on `6000.4.6f1`, 2,000,000 iterations over a 4-element list, against a known allocator that
+moved the counter by 54.7 MB:
 
-```csharp
-// ❌ BAD: foreach allocates enumerator
-foreach (var item in hashSet) { }
+| iterated as                    | bytes         |
+| ------------------------------ | ------------- |
+| `int[]`                        | 12,288        |
+| `List<T>`                      | 24,576        |
+| `for` with indexer             | 24,576        |
+| `list.GetEnumerator()` by hand | 20,480        |
+| `Dictionary<K,V>`              | 20,480        |
+| `Dictionary<K,V>.Values`       | 16,384        |
+| **`IEnumerable<T>`**           | **5,709,824** |
 
-// ✅ GOOD: Use struct enumerator directly
-var enumerator = hashSet.GetEnumerator();
-while (enumerator.MoveNext())
-{
-    var element = enumerator.Current;
-}
-```
+Everything concrete is one noise band; only the interface allocates. Two consequences:
+
+- **Do not rewrite a concrete `foreach` into a `for` loop to save allocation.** There is none to
+  save, `for` does not work on `HashSet`/`Dictionary`, and the indexer form is harder to read.
+- **Taking the enumerator by hand is a no-op.** It measured 20,480 bytes against `foreach`'s 24,576 --
+  the same band, because `foreach` already does exactly that.
+
+The rule to apply instead is about **types**: a field, parameter or local typed `IEnumerable<T>` /
+`IList<T>` / `IReadOnlyList<T>` allocates on every iteration of it. Where you own the declaration and
+the hot path iterates it, declare the concrete type.
 
 ---
 

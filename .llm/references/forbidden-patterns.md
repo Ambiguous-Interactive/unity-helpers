@@ -74,12 +74,18 @@ for (int i = 0; i < source.Length; i++)
 
 ## Collection Iteration
 
-| Forbidden                      | Use Instead                            | Reason                      |
-| ------------------------------ | -------------------------------------- | --------------------------- |
-| `foreach` on `List<T>` (Mono)  | `for (int i = 0; i < list.Count; i++)` | Boxes enumerator (24 bytes) |
-| `foreach` on `Dictionary<K,V>` | Use struct enumerator directly         | Boxes enumerator            |
-| `foreach` on `HashSet<T>`      | Use struct enumerator directly         | Boxes enumerator            |
-| `foreach` on arrays            | OK (optimized by compiler)             | No allocation               |
+| Forbidden                             | Use Instead                        | Reason                      |
+| ------------------------------------- | ---------------------------------- | --------------------------- |
+| Forbidden                             | Use Instead                        | Reason                      |
+| ------------------------------------- | ---------------------------------- | --------------------------- |
+| `foreach` over `IEnumerable<T>`       | Iterate the concrete type          | Boxes enumerator (24 bytes) |
+| `foreach` over `IList<T>` / `ISet<T>` | Iterate the concrete type          | Boxes enumerator (24 bytes) |
+| A field or parameter typed `IList<T>` | Type it `List<T>` where you own it | The boxing is at the TYPE   |
+
+`foreach` over a **concrete** `List<T>`, `Dictionary<K,V>`, `HashSet<T>` or array does **not**
+allocate: the C# compiler binds to the type's own struct enumerator by duck typing. Measured on `6000.4.6f1`, 2,000,000 iterations, against a known allocator that moved the counter by 54.7 MB: `foreach` over a concrete `List<T>` allocates **24,576 bytes** -- the same as a `for` indexer loop, and the same as doing nothing. The identical loop over the same list typed as `IEnumerable<T>` allocates **5,709,824 bytes**.
+Do not rewrite a concrete `foreach` into a `for` loop for allocation reasons -- there is nothing to
+save, and the indexer form does not work on the non-indexable collections.
 
 ### Struct Enumerator Pattern
 

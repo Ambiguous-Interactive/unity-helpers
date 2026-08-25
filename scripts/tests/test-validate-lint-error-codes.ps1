@@ -62,7 +62,12 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $validatorPath = Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1'
 
 $tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
-$tempRoot = Join-Path $tempBase "test-validate-lint-error-codes-$(Get-Random)"
+# The space is deliberate and load-bearing. `Start-Process -ArgumentList <array>` joins the array
+# WITHOUT quoting, so a spaced path silently truncates at the space and pwsh answers its usage banner
+# with exit 64 -- which reads as "the validator failed" and would keep the four failure-asserting
+# scenarios green while measuring nothing. Every fixture lives under a spaced path so that regression
+# cannot come back quietly.
+$tempRoot = Join-Path $tempBase "test-validate-lint-error-codes $(Get-Random)"
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 # Build a synthetic repo that mimics the real layout: scripts/lint-*.ps1 files
@@ -270,36 +275,35 @@ foreach ($scenario in $scenarios) {
         $argumentList = @('-NoProfile', '-File', $scriptPath, '-VerboseOutput')
     }
 
-    $outputPath = Join-Path $tempRoot "$($scenario.Name).out"
-    $errorPath = Join-Path $tempRoot "$($scenario.Name).err"
     Write-Info "Starting $($scenario.Name) in $workingDirectory"
-    $process = Start-Process -FilePath 'pwsh' -ArgumentList $argumentList `
-        -WorkingDirectory $workingDirectory -PassThru -NoNewWindow `
-        -RedirectStandardOutput $outputPath -RedirectStandardError $errorPath
+    # ProcessStartInfo.ArgumentList escapes each argument individually; Start-Process's -ArgumentList
+    # does not. Both streams are drained asynchronously from the moment the process starts, so a
+    # scenario that fills a pipe cannot deadlock against the WaitForExit below.
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'pwsh'
+    foreach ($argument in $argumentList) { [void]$startInfo.ArgumentList.Add($argument) }
+    $startInfo.WorkingDirectory = $workingDirectory
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.UseShellExecute = $false
+    $process = [System.Diagnostics.Process]::Start($startInfo)
     $running += @{
-        Scenario   = $scenario
-        Process    = $process
-        OutputPath = $outputPath
-        ErrorPath  = $errorPath
+        Scenario       = $scenario
+        Process        = $process
+        StandardOutput = $process.StandardOutput.ReadToEndAsync()
+        StandardError  = $process.StandardError.ReadToEndAsync()
     }
 }
 
 # ── Phase 2: wait, then assert in declaration order ──────────────────────────
-function Read-IfPresent {
-    param([string]$Path)
-    if (Test-Path -LiteralPath $Path) {
-        return (Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue)
-    }
-    return ''
-}
-
 foreach ($entry in $running) {
     $scenario = $entry.Scenario
     Write-Host "`n  Section: $($scenario.Name)" -ForegroundColor White
     try {
         $entry.Process.WaitForExit()
         $exitCode = $entry.Process.ExitCode
-        $output = (Read-IfPresent $entry.OutputPath) + (Read-IfPresent $entry.ErrorPath)
+        $output = $entry.StandardOutput.GetAwaiter().GetResult() +
+            $entry.StandardError.GetAwaiter().GetResult()
 
         $reasons = @()
         if (-not ($scenario.Contains('IgnoreExitCode') -and $scenario.IgnoreExitCode)) {

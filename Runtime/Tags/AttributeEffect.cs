@@ -223,9 +223,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             get
             {
-                for (int index = 0; index < cosmeticEffects.Count; ++index)
+                foreach (CosmeticEffectData cosmeticEffect in cosmeticEffects)
                 {
-                    if (cosmeticEffects[index] == null)
+                    if (cosmeticEffect == null)
                     {
                         return true;
                     }

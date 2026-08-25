@@ -137,39 +137,40 @@ Mathf.Max(Mathf.Max(a, b), c);
 
 ## Foreach Boxing on Collections
 
-Unity's old Mono compiler boxes enumerators for `List<T>` (24 bytes per loop). Arrays are optimized but Lists are not:
+The boxing is decided by the **static type being iterated**, not by `foreach`. A concrete collection
+exposes a struct enumerator and allocates nothing; an interface-typed reference forces
+`IEnumerator<T>`, which is boxed once per loop.
 
 ```csharp
-// ❌ BAD: Allocates 24 bytes on List<T>
-foreach (var item in myList) { }
+// ❌ BAD: 24 bytes per loop -- the interface forces IEnumerator<T>
+IReadOnlyList<Item> items = _items;
+foreach (Item item in items) { }
 
-// ✅ GOOD: Zero allocation
-for (int i = 0; i < myList.Count; i++)
-{
-    var item = myList[i];
-}
-
-// Note: foreach on arrays is OK (Mono optimizes this)
-foreach (var item in myArray) { }  // Zero allocation
+// ✅ GOOD: zero allocation on List<T>, Dictionary<K,V>, HashSet<T> and arrays alike
+foreach (Item item in _items) { }
 ```
 
-**For non-indexable collections (HashSet, Dictionary):**
+Measured on `6000.4.6f1`, 2,000,000 iterations, against a known allocator that moved the counter by
+54.7 MB: `List<T>` 24,576 bytes, a `for` indexer loop 24,576, `Dictionary<K,V>` 20,480, `int[]`
+12,288 -- one noise band -- against **5,709,824** for the same list typed as `IEnumerable<T>`.
+
+**Taking the enumerator by hand saves nothing**, because `foreach` over a concrete collection already
+compiles to exactly that. Measured over 2,000,000 iterations: `list.GetEnumerator()` in a `while`
+loop cost 20,480 bytes against `foreach`'s 24,576 -- the same noise band. Write the `foreach`.
+
+The hand-rolled form is still correct where you genuinely need the enumerator as a value (resuming
+it, passing it, interleaving two of them). If you write one, dispose it with `using` rather than an
+explicit call:
 
 ```csharp
-// ✅ Use struct enumerator with using statement
-using (HashSet<T>.Enumerator enumerator = hashSet.GetEnumerator())
+// A hand-held struct enumerator is disposed by `using`, never by an explicit Dispose().
+using (Dictionary<K, V>.Enumerator enumerator = dict.GetEnumerator())
 {
     while (enumerator.MoveNext())
     {
-        T element = enumerator.Current;
-        // process
+        KeyValuePair<K, V> entry = enumerator.Current;
     }
 }
-
-// ❌ NEVER use explicit Dispose - always use 'using' statement
-Dictionary<K, V>.Enumerator enumerator = dict.GetEnumerator();
-while (enumerator.MoveNext()) { }
-enumerator.Dispose();  // BAD - use 'using' instead!
 ```
 
 **IMPORTANT**: Always use `using` statements for struct enumerators, never explicit `Dispose()` calls. The `using` statement:
@@ -430,7 +431,7 @@ Before submitting code, verify:
 - [ ] No closures capturing variables in hot paths
 - [ ] No delegate assignments inside loops
 - [ ] No `params` method calls in loops (chain 2-arg overloads)
-- [ ] `foreach` uses `for` loop for `List<T>` in hot paths
+- [ ] Hot-path loops iterate the concrete collection, not an `IEnumerable<T>`/`IList<T>` reference
 - [ ] Structs implement `IEquatable<T>`
 - [ ] Enum dictionary keys use custom comparer or cast to int
 - [ ] Hash codes use `Objects.HashCode()`, not hand-rolled

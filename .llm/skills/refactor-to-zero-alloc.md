@@ -35,7 +35,7 @@ Follow these steps in order:
 5. **Apply StringBuilder patterns** - Replace string concatenation (see [use-pooling](./use-pooling.md#stringbuilder-pooling))
 6. **Use array pools** - Replace `new T[]` (see [use-array-pool](./use-array-pool.md))
 7. **Fix struct equality** - Implement `IEquatable<T>` (see [avoid-allocations](./avoid-allocations.md#implement-iequatablet-to-avoid-boxing))
-8. **Address foreach boxing** - Replace `foreach` on `List<T>` with `for` loops
+8. **Address foreach boxing** - Iterate the concrete collection, not an interface-typed reference to it
 
 ---
 
@@ -76,7 +76,7 @@ Use this matrix to decide when to use structs vs classes:
 | String operations   | String allocation   | `string.Format`, `$"..."`, `+` in loops                              |
 | Array creation      | Heap allocation     | `new T[`, `new byte[`, `new int[`                                    |
 | Boxing              | Box allocation      | Struct assigned to `object`, non-generic interfaces                  |
-| foreach on List     | Enumerator boxing   | `foreach` on `List<T>` (Mono compiler)                               |
+| Interface iteration | Enumerator boxing   | `foreach` over `IEnumerable<T>` / `IList<T>` / `IReadOnlyList<T>`    |
 | params methods      | Array allocation    | Method calls with `params` parameters                                |
 | Enum dictionary     | Boxing per lookup   | `Dictionary<MyEnum, T>` without custom comparer                      |
 
@@ -88,7 +88,7 @@ For detailed trap descriptions, see [memory-allocation-traps](./memory-allocatio
 LINQ:       \.Where\(|\.Select\(|\.Any\(|\.First\(|\.ToList\(|\.ToArray\(
 Collections: new List<|new Dictionary<|new HashSet<
 Closures:   => .*[^static]
-foreach:    foreach.*List<
+foreach:    foreach\s*\([^)]*\bin\s+\w*([Ii]Enumerable|IList|IReadOnlyList|ISet)
 ```
 
 ---
@@ -106,7 +106,7 @@ Once allocations are identified, apply the appropriate pattern from these skills
 | String concatenation | [use-pooling](./use-pooling.md#stringbuilder-pooling)                             |
 | Boxing (IEquatable)  | [avoid-allocations](./avoid-allocations.md#implement-iequatablet-to-avoid-boxing) |
 | Enum dictionary keys | [avoid-allocations](./avoid-allocations.md#enum-dictionary-keys-cause-boxing)     |
-| foreach on List      | [avoid-allocations](./avoid-allocations.md#foreach-boxing-on-collections)         |
+| Interface iteration  | [avoid-allocations](./avoid-allocations.md#foreach-boxing-on-collections)         |
 
 ---
 
