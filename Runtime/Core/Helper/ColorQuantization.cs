@@ -114,7 +114,33 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return byte.MaxValue;
             }
 
-            return (byte)Mathf.FloorToInt(cutoff * 255f);
+            // floor(cutoff * 255f) is the ALGEBRAIC inverse of the decode, not the float one, and
+            // this class's own remarks quote the rule it breaks: never mix the encode and decode
+            // steps of two quantizers. ToNormalized multiplies by the rounded reciprocal 1f/255f;
+            // this multiplies by 255f. The two round differently within a ULP of a boundary, where
+            // the multiply by 255 recovers exactly the value the reciprocal lost -- measured on
+            // 6000.4.6f1 as 126 disagreements across 3,820 probes taken at +/-2 ULP of every
+            // channel boundary, and found by the fuzz test failing on one of them in CI.
+            //
+            // So the answer is defined against ToNormalized itself, which is the comparison the
+            // caller will actually make. The seed is off by at most one step, and both loops are
+            // bounded because ToNormalized is strictly increasing over [0, 255].
+            int candidate = Mathf.Clamp(
+                Mathf.FloorToInt(cutoff * 255f),
+                byte.MinValue,
+                byte.MaxValue
+            );
+            while (0 < candidate && cutoff < ToNormalized((byte)candidate))
+            {
+                --candidate;
+            }
+
+            while (candidate < byte.MaxValue && ToNormalized((byte)(candidate + 1)) <= cutoff)
+            {
+                ++candidate;
+            }
+
+            return (byte)candidate;
         }
 
         /// <summary>

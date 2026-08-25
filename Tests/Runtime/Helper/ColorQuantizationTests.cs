@@ -108,6 +108,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        /// <remarks>
+        /// The fuzz test above found this and could only find it by luck: it disagrees when the
+        /// random cutoff lands within a ULP of a channel boundary. This walks every boundary
+        /// deliberately, which is the difference between a test that can fail and one that
+        /// sometimes does.
+        /// </remarks>
+        [Test]
+        public void ToThresholdByteAgreesWithToNormalizedAtEveryChannelBoundary()
+        {
+            for (int channel = 0; channel <= byte.MaxValue; ++channel)
+            {
+                float boundary = ColorQuantization.ToNormalized((byte)channel);
+                float[] cutoffs = { NextDown(boundary), boundary, NextUp(boundary) };
+
+                foreach (float cutoff in cutoffs)
+                {
+                    if (cutoff <= 0f || 1f <= cutoff)
+                    {
+                        continue;
+                    }
+
+                    byte threshold = ColorQuantization.ToThresholdByte(cutoff);
+                    for (
+                        int probe = Mathf.Max(0, channel - 1);
+                        probe <= Mathf.Min(byte.MaxValue, channel + 1);
+                        ++probe
+                    )
+                    {
+                        Assert.AreEqual(
+                            ColorQuantization.ToNormalized((byte)probe) <= cutoff,
+                            probe <= threshold,
+                            $"Cutoff {cutoff:R} disagreed at channel {probe} (threshold {threshold})."
+                        );
+                    }
+                }
+            }
+        }
+
+        /// <remarks>
+        /// The exact pair the standalone leg reported, pinned so the regression has a name rather
+        /// than a seed. floor(0.8862745f * 255f) is 226; 226 / 255f is greater than the cutoff, so
+        /// 225 is the only answer that reproduces the comparison.
+        /// </remarks>
+        [Test]
+        public void ToThresholdByteHandlesTheBoundaryCutoffThatFailedInCi()
+        {
+            const float cutoff = 0.8862745f;
+
+            Assert.IsFalse(ColorQuantization.ToNormalized(226) <= cutoff);
+            Assert.AreEqual(225, ColorQuantization.ToThresholdByte(cutoff));
+        }
+
+        private static float NextUp(float value)
+        {
+            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
+            bits = 0f <= value ? bits + 1 : bits - 1;
+            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
+        }
+
+        private static float NextDown(float value)
+        {
+            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
+            bits = 0f < value ? bits - 1 : bits + 1;
+            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
+        }
+
         [Test]
         public void ToThresholdByteReproducesTheFloatComparisonUnderFuzzing()
         {
