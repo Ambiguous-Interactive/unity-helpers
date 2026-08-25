@@ -457,9 +457,11 @@ deliberate act, not the tail of every commit.
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
   `Tests/Runtime/Serialization/`, and cost a full matrix run to discover. Grep for the affected byte
   literals in `Tests/` as well as `Generator~/`.
-- **Superseding your own run is pure waste**, and it also reds the previous commit: a stale run
-  fails with a `Stale pull request run for <sha>` annotation, which looks like breakage until you
-  read the annotations.
+- **Superseding your own run reds the previous SHA's Unity Tests entry; a QUEUED matrix is no
+  cheaper.** Every leg of the old run fails its `require-current-pr-head` guard as a stale run,
+  whether or not those legs started, so queue depth does not touch the cost -- session 223 pushed
+  four times on that reasoning and left three red runs. But **`Unity CI Success` is not fooled**:
+  it re-resolves the head last and passed all three, by design. Batch anyway; do not panic at it.
 
 ### Test Execution
 
