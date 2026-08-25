@@ -180,6 +180,50 @@ namespace WallstopStudios.UnityHelpers.Tags
         [JsonIgnore]
         public List<EffectBehavior> behaviors = new();
 
+        [NonSerialized]
+        private bool _instantWithHandleDataReported;
+
+        /// <summary>
+        /// Gets whether this effect is <see cref="ModifierDurationType.Instant"/> yet carries
+        /// periodic or behaviour data. Instant effects return no handle, so neither can ever run.
+        /// </summary>
+        internal bool IsInstantWithHandleData =>
+            durationType == ModifierDurationType.Instant
+            && ((periodicEffects is { Count: > 0 }) || (behaviors is { Count: > 0 }));
+
+        /// <summary>
+        /// Returns <c>true</c> the first time it is called on a misconfigured effect, and
+        /// <c>false</c> forever after.
+        /// </summary>
+        /// <remarks>
+        /// The condition is a static property of the asset, so reporting it on the per-application
+        /// path made a single authoring mistake cost a diagnostic on every hit, every tick, for the
+        /// whole session. Editing the effect re-arms the report through
+        /// <see cref="OnValidate"/>.
+        /// </remarks>
+        internal bool ShouldReportInstantWithHandleData()
+        {
+            if (_instantWithHandleDataReported || !IsInstantWithHandleData)
+            {
+                return false;
+            }
+
+            _instantWithHandleDataReported = true;
+            return true;
+        }
+
+        private void OnValidate()
+        {
+            _instantWithHandleDataReported = false;
+            if (IsInstantWithHandleData)
+            {
+                this.LogWarn(
+                    $"Effect {name} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
+                    stackTrace: false
+                );
+            }
+        }
+
         /// <summary>
         /// Determines how this effect groups stacks for stacking decisions.
         /// </summary>

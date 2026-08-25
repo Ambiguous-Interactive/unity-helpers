@@ -56,20 +56,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             get
             {
-#if UNITY_EDITOR
-                /*
-                    For some reason, there's a bug with loot tables where
-                    _currentValueCalculated will be true but the current
-                    value is not calculated, so ignore the flag if we're
-                    in editor mode, where this happens
-                 */
-                if (Application.isPlaying)
-#endif
+                // Unity writes _baseValue straight into the field on every deserialization -- an
+                // Inspector edit, a prefab apply, an undo -- without running any code that could
+                // invalidate the cache. Equals rather than == so a NaN base value still matches the
+                // NaN it was calculated from instead of recalculating on every read.
+                if (_currentValueCalculated && _calculatedFromBaseValue.Equals(_baseValue))
                 {
-                    if (_currentValueCalculated)
-                    {
-                        return _currentValue;
-                    }
+                    return _currentValue;
                 }
 
                 CalculateCurrentValue();
@@ -90,6 +83,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         private float _currentValue;
 
         private bool _currentValueCalculated;
+
+        private float _calculatedFromBaseValue;
 
         private readonly Dictionary<EffectHandle, List<AttributeModification>> _modifications =
             new();
@@ -127,6 +122,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             _baseValue = baseValue;
             _currentValue = currentValue;
             _currentValueCalculated = true;
+            _calculatedFromBaseValue = baseValue;
         }
 
         /// <summary>
@@ -145,6 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             _currentValue = calculatedValue;
             _currentValueCalculated = true;
+            _calculatedFromBaseValue = _baseValue;
         }
 
         /// <summary>

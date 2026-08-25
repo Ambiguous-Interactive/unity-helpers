@@ -1161,11 +1161,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new Regex("defines periodic or behaviour data but is Instant")
             );
 
-            // Counted, not just expected. ApplyEffect used to warn and then call InternalApplyEffect,
-            // which tested the same two conditions and warned again -- so one misconfigured effect
-            // produced two identical messages, each rendering the whole effect to JSON. A single
-            // LogAssert expectation matches one of them and an unexpected WARNING does not fail a
-            // Unity test, which is why the duplicate survived.
+            // Counted, not just expected, and counted across FOUR applications. The condition is
+            // a static property of the asset, so it used to be reported on every application --
+            // each one rendering the whole effect to JSON inside the interpolated string. A single
+            // LogAssert expectation matches one message of any number, and an unexpected WARNING
+            // does not fail a Unity test, which is why the repetition survived.
             int warnings = 0;
             void CountWarning(string condition, string stackTrace, LogType type)
             {
@@ -1179,10 +1179,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             }
 
             Application.logMessageReceived += CountWarning;
-            EffectHandle? handle;
+            EffectHandle? handle = null;
             try
             {
-                handle = handler.ApplyEffect(effect);
+                for (int application = 0; application < 4; ++application)
+                {
+                    handle = handler.ApplyEffect(effect);
+                }
             }
             finally
             {
@@ -1192,7 +1195,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsFalse(handle.HasValue);
             if (WallstopLoggingCompiledIn)
             {
-                Assert.AreEqual(1, warnings, "The Instant warning must be emitted exactly once.");
+                Assert.AreEqual(
+                    1,
+                    warnings,
+                    "The Instant warning must be emitted once per effect, not once per application."
+                );
             }
 
             int ticks = handler.ProcessPeriodicEffectsForTesting(

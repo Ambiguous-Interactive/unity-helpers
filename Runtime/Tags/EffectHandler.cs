@@ -157,13 +157,14 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             if (effect.durationType == ModifierDurationType.Instant)
             {
-                if (RequiresHandle(effect))
+                // A static property of the asset, so it is reported once per effect rather than on
+                // every application, and by name rather than by serializing the whole effect to
+                // JSON inside the interpolated string (#567). AttributeEffect.OnValidate reports
+                // the same mistake in the Inspector, where it is fixable.
+                if (effect.ShouldReportInstantWithHandleData())
                 {
-                    // Reported on every application of a misconfigured effect, so no stack trace:
-                    // it is the same path every time and costs 13.4x the log itself (#564). The
-                    // repetition and the {effect:json} render are tracked on #567.
                     this.LogWarn(
-                        $"Effect {effect:json} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
+                        $"Effect {effect.name} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
                         stackTrace: false
                     );
                 }
@@ -231,12 +232,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             RegisterStackHandle(stackKey, newHandle);
             InternalApplyEffect(newHandle, currentTime);
             return newHandle;
-        }
-
-        private static bool RequiresHandle(AttributeEffect effect)
-        {
-            return (effect.periodicEffects is { Count: > 0 })
-                || (effect.behaviors is { Count: > 0 });
         }
 
         private List<EffectHandle> TryGetStackHandles(EffectStackKey stackKey)
@@ -704,10 +699,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             OnEffectApplied?.Invoke(handle);
         }
 
-        // No Instant/RequiresHandle warning here. The one caller is ApplyEffect's Instant branch,
-        // which has already tested both halves and warned -- so this condition was always true and
-        // the message was always the second copy of one the console had just shown, each carrying a
-        // full JSON serialization of the effect and a stack trace capture.
+        // No Instant warning here. The one caller is ApplyEffect's Instant branch, which has
+        // already tested the condition -- so this one was always true and the message was always
+        // the second copy of one the console had just shown.
         private void InternalApplyEffect(AttributeEffect effect)
         {
             if (!_initialized && _tagHandler == null)

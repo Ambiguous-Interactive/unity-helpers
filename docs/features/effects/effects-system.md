@@ -272,6 +272,25 @@ void ApplyHealthBuff()
 - **Quest progress, Level** - progression state
 - **Input state, UI state** - transient application state
 
+### Saving and Loading an Attribute
+
+Only `BaseValue` and `CurrentValue` are serialized -- the active modifications are not -- so the two
+restore paths deliberately differ:
+
+- **JSON** (`Serializer.JsonStringify` / `JsonDeserialize`) keeps the `CurrentValue` that was
+  written. An attribute saved while buffed loads with the buff still in the number, because
+  recalculating from a base value with no modifications would silently drop it.
+- **Unity serialization** (a `[SerializeField]` on a `MonoBehaviour` or `ScriptableObject`)
+  recalculates from the base value on the first read, because the modifications that produced the
+  saved number belong to a session that has ended.
+
+Call `ClearCache()` after a JSON load if you intend to rebuild the modifications yourself and want
+the value to follow them.
+
+The cache also follows the base value. Writing `BaseValue` through the Inspector, a prefab apply or
+an undo assigns the field without running any code, so `CurrentValue` recalculates on the next read
+rather than reporting a number computed from the old base.
+
 ### Why This Matters
 
 When you use Attributes for frequently mutated "current" values:
@@ -1313,6 +1332,16 @@ Q: How do I query tag counts or check multiple tags at once?
 - Duration didn’t refresh on reapplication
   - Set `resetDurationOnReapplication = true` on the `AttributeEffect`.
 
+- "defines periodic or behaviour data but is Instant"
+  - An `Instant` effect returns no handle, so its `periodicEffects` and `behaviors` can never run.
+    Either give the effect a `Duration`/`Infinite` duration type or clear those lists. The message
+    appears in the Inspector when the effect is edited, and once per effect on the first
+    application.
+
+- A saved attribute loads without its buff
+  - JSON keeps the written `CurrentValue`; Unity serialization recalculates from the base value.
+    See [Saving and Loading an Attribute](#saving-and-loading-an-attribute).
+
 ## Advanced Scenarios: Beyond Buffs and Debuffs
 
 While the Effects System handles traditional buff/debuff mechanics well, it can also be used to build **robust capability systems** that drive complex gameplay decisions across your entire codebase. This section explores advanced patterns that use tags extensively for architectural purposes.
@@ -2207,6 +2236,8 @@ public class DebugConsole : MonoBehaviour
 - Attribute field discovery is cached (and can be precomputed by the Attribute Metadata Cache generator).
 - Tag queries provide overloads for lists to minimize allocations; prefer `IReadOnlyList<string>` overloads in hot paths.
 - Cosmetics can be a significant cost; prefer shared presenters when possible.
+- A misconfigured `Instant` effect is reported once per effect, not once per application. The message
+  used to render the whole effect to JSON, measured at 20.5 us each time on `6000.4.6f1`.
 
 ---
 
