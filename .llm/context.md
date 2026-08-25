@@ -451,7 +451,7 @@ deliberate act, not the tail of every commit.
     assembly does not reference them, and `using System.Reflection;` is refused -- but fully
     qualified reflection reaches everything, including generic package types and their private
     members. See
-    [unity-devcontainer-testing](./skills/unity-devcontainer-testing.md#no-license-the-mcp-editor-still-runs-the-real-fixtures)
+    [unity-mcp-fixture-runner](./skills/unity-mcp-fixture-runner.md)
     for the loop and its traps ([#435](https://github.com/Ambiguous-Interactive/unity-helpers/issues/435)).
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in

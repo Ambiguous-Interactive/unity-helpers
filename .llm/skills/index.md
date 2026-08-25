@@ -110,6 +110,8 @@ Invoke these skills for specific tasks.
 | [manage-assembly-definitions](./manage-assembly-definitions.md) | Assembly definition creation, splitting, and reference management |
 | [mcp-configuration](./mcp-configuration.md) | Configure/verify the per-developer Unity MCP client config; configs are gitignored and validated |
 | [unity-devcontainer-testing](./unity-devcontainer-testing.md) | Compile and test Unity C# code in devcontainer |
+| [unity-mcp-fixture-runner](./unity-mcp-fixture-runner.md) | Run the package's real test fixtures through the Unity MCP bridge without a license |
+| [unity-mcp-measurement](./unity-mcp-measurement.md) | Time and profile a change in the Unity MCP editor without fabricating a result |
 | [use-algorithmic-structures](./use-algorithmic-structures.md) | Connectivity, prefix search, bit manipulation, caching |
 | [use-data-structures](./use-data-structures.md) | Selecting appropriate data structures |
 | [use-discriminated-union](./use-discriminated-union.md) | OneOf/Result types, type-safe unions |

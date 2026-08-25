@@ -64,7 +64,7 @@ trust the editor.
 The container workspace and the host project's embedded package are the same filesystem, so the
 editor on the other end of this bridge builds the code you are editing. That makes the bridge a real
 test runner when no Unity license is available -- see
-[unity-devcontainer-testing](./unity-devcontainer-testing.md#no-license-the-mcp-editor-still-runs-the-real-fixtures)
+[unity-mcp-fixture-runner](./unity-mcp-fixture-runner.md)
 for the reflection loop and its three constraints.
 
 ## "My agent has no `Unity_*` tools"
@@ -100,3 +100,5 @@ When you add a new MCP client config path, update `clientConfigPaths` in
 ## Related Skills
 
 - [Unity devcontainer testing](./unity-devcontainer-testing.md) — running Unity from the devcontainer.
+- [Unity MCP fixture runner](./unity-mcp-fixture-runner.md) — running the real fixtures through the bridge.
+- [Unity MCP measurement](./unity-mcp-measurement.md) — timing and allocation probes that cannot fabricate a result.
