@@ -435,6 +435,20 @@ function Test-AssemblyReferenceEditorOnly([string]$asmrefPath) {
   }
 }
 
+function Get-FirstFileByName([string]$directory, [string]$pattern) {
+  $first = $null
+  foreach ($candidate in [System.IO.Directory]::EnumerateFiles($directory, $pattern)) {
+    if ($null -eq $first -or [string]::CompareOrdinal(
+        [System.IO.Path]::GetFileName($candidate),
+        [System.IO.Path]::GetFileName($first)
+      ) -lt 0) {
+      $first = $candidate
+    }
+  }
+
+  return $first
+}
+
 function Test-EditorOnlyAssemblyDefinition([string]$filePath, [string]$relPath) {
   $root = [System.IO.Path]::GetFullPath((Get-Location).Path).TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
@@ -442,26 +456,33 @@ function Test-EditorOnlyAssemblyDefinition([string]$filePath, [string]$relPath) 
   )
   $directory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($filePath))
 
+  # A directory with no asmdef/asmref of its own answers whatever its nearest ancestor answers, so
+  # every directory walked past is cached with the resolved value. Caching only the directory that
+  # SUPPLIES the answer left each leaf uncached forever, and this runs once per test file: the leaf
+  # was re-enumerated 1,121 times. Cost is the same reason the file scan uses EnumerateFiles below --
+  # Get-ChildItem measured 28.5 s against 0.8 s over this repository's C# files on the 9p mount.
+  $walked = [System.Collections.Generic.List[string]]::new()
+
   while (-not [string]::IsNullOrWhiteSpace($directory)) {
     if ($assemblyDefinitionEditorOnlyCache.ContainsKey($directory)) {
-      return $assemblyDefinitionEditorOnlyCache[$directory]
+      $cached = $assemblyDefinitionEditorOnlyCache[$directory]
+      foreach ($seen in $walked) { $assemblyDefinitionEditorOnlyCache[$seen] = $cached }
+      return $cached
     }
 
-    $asmref = Get-ChildItem -LiteralPath $directory -Filter '*.asmref' -File -ErrorAction SilentlyContinue |
-      Sort-Object -Property Name |
-      Select-Object -First 1
+    $walked.Add($directory)
+
+    $asmref = Get-FirstFileByName $directory '*.asmref'
     if ($null -ne $asmref) {
-      $editorOnly = Test-AssemblyReferenceEditorOnly $asmref.FullName
-      $assemblyDefinitionEditorOnlyCache[$directory] = $editorOnly
+      $editorOnly = Test-AssemblyReferenceEditorOnly $asmref
+      foreach ($seen in $walked) { $assemblyDefinitionEditorOnlyCache[$seen] = $editorOnly }
       return $editorOnly
     }
 
-    $asmdef = Get-ChildItem -LiteralPath $directory -Filter '*.asmdef' -File -ErrorAction SilentlyContinue |
-      Sort-Object -Property Name |
-      Select-Object -First 1
+    $asmdef = Get-FirstFileByName $directory '*.asmdef'
     if ($null -ne $asmdef) {
-      $editorOnly = Test-AssemblyDefinitionEditorOnly $asmdef.FullName
-      $assemblyDefinitionEditorOnlyCache[$directory] = $editorOnly
+      $editorOnly = Test-AssemblyDefinitionEditorOnly $asmdef
+      foreach ($seen in $walked) { $assemblyDefinitionEditorOnlyCache[$seen] = $editorOnly }
       return $editorOnly
     }
 
