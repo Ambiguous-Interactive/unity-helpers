@@ -59,8 +59,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             throw new JsonException("coefficients must be an array");
                         }
                         using (
-                            PooledArray<float> lease = WallstopFastArrayPool<float>.Get(
+                            // SystemArrayPool: every one of the 27 slots is written before it
+                            // is read, and the count is validated separately, so the exact-size
+                            // pool buys nothing here.
+                            PooledArray<float> lease = SystemArrayPool<float>.Get(
                                 27,
+                                clearArray: false,
                                 out float[] tmp
                             )
                         )

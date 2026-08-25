@@ -87,6 +87,7 @@ Invoke these skills for specific tasks.
 | [performance-audit](./performance-audit.md) | Reviewing performance-sensitive code |
 | [profile-debug-performance](./profile-debug-performance.md) | Profiling, debugging, measuring performance |
 | [refactor-to-zero-alloc](./refactor-to-zero-alloc.md) | Converting allocating code to zero-allocation |
+| [unity-api-costs](./unity-api-costs.md) | Measured costs of Unity and pool APIs |
 | [unity-frame-loop](./unity-frame-loop.md) | Per-frame callbacks, update managers, coroutine cost |
 | [unity-performance-patterns](./unity-performance-patterns.md) | Unity-specific optimizations (APIs, pooling) |
 | [use-array-pool](./use-array-pool.md) | Working with temporary arrays |

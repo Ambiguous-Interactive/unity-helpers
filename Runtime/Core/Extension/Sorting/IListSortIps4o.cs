@@ -88,16 +88,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledArray<T> pivotLease = SystemArrayPool<T>.Get(pivotCount, out T[] pivots);
             Ips4oSelectPivots(sample, sampleSize, pivots, bucketCount);
 
-            using PooledArray<int> countLease = WallstopArrayPool<int>.Get(
+            // SystemArrayPool, matching the buffer rent below: nothing here reads .Length, so an
+            // oversized rent is invisible and only a PRECISE length would justify the exact-size
+            // pool. clearArray is false throughout -- bucketCounts is cleared explicitly just
+            // below, bucketOffsets is filled by a full loop, and bucketPositions by Array.Copy.
+            using PooledArray<int> countLease = SystemArrayPool<int>.Get(
                 bucketCount,
+                clearArray: false,
                 out int[] bucketCounts
             );
-            using PooledArray<int> offsetLease = WallstopArrayPool<int>.Get(
+            using PooledArray<int> offsetLease = SystemArrayPool<int>.Get(
                 bucketCount,
+                clearArray: false,
                 out int[] bucketOffsets
             );
-            using PooledArray<int> positionLease = WallstopArrayPool<int>.Get(
+            using PooledArray<int> positionLease = SystemArrayPool<int>.Get(
                 bucketCount,
+                clearArray: false,
                 out int[] bucketPositions
             );
             Array.Clear(bucketCounts, 0, bucketCount);

@@ -151,31 +151,12 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses
   2021.3 reference assemblies and the MCP editor is on 6000.4, so it cost a full Unity matrix run to
   find. Same class as [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
-- **Every list-taking `Get*Components` overload clears the list itself, including on a zero-match
-  query** -- `GetComponents(Type, list)`, `GetComponents<T>(list)`, `GetComponentsInChildren`,
-  `GetComponentsInParent`. Measured on 6000.4.6f1. A `.Clear()` before one is dead code; a `.Clear()`
-  that guards a path which returns the buffer _without_ querying is not, so say which it is at the
-  site. And `UnityEngine.Object.operator !=` is a native aliveness check at **3.380 ns** against
-  **0.578 ns** for a managed reference compare -- 5.84x -- so a helper that has already established
-  liveness should hand back a `bool` with an `out`, never a `Component` the caller must null-test.
-  **This is not licence to replace Unity null checks with `is not null`.** The Unity operator is the
-  only thing that detects a _destroyed_ object, so the check that first establishes liveness -- and
-  any defensive check on a reference of unknown provenance -- has to stay. The only removable one is
-  a re-ask of a question a `bool` already answered. Swept `Runtime/` and `Editor/`: 42 candidate
-  sites, all but a handful managed types where the compare is already cheap, and every remaining
-  Unity-typed one was a producing or defensive check. There was exactly one re-ask.
-- **Reach for one of this package's pool handles rather than `System.Buffers.ArrayPool<T>.Shared`
-  directly -- and the choice between them turns on whether the size is bounded.**
-  `SystemArrayPool<T>.Get(len, clearArray, out T[] array)` is the default: it wraps the shared pool,
-  so a runtime size costs nothing extra, and it still disposes through the `PooledArray<T>` handle
-  (a `using`, not a `try`/`finally`). `WallstopArrayPool<T>` returns an array of EXACTLY the
-  requested length and clears on release, but it **keeps a permanent bucket per distinct size**, so
-  its own class doc lists `Get(collection.Count)` under "UNSAFE uses (will leak memory)" -- it is for
-  compile-time constants and algorithm-bounded sets (`IListSortIps4o` clamps to `[4, 32]`), never a
-  collection count. Session 222 put six spatial-structure rents on the wrong one and Bugbot caught
-  it: read the pool's **class** remarks, not just the `Get` overload's. Go to
-  `ArrayPool<T>.Shared` unwrapped only for a buffer whose lifetime is not scoped, as
-  `PooledBufferStream` does while growing.
+- **Three measured Unity/pool costs live in [unity-api-costs](./skills/unity-api-costs.md):** every
+  list-taking `Get*Components` overload clears the list for you (so a `.Clear()` before one is dead
+  code); `UnityEngine.Object`'s `!=` is a native aliveness check at 5.84x a managed compare (so a
+  helper that already knows should return a `bool` with an `out` -- but never replace a _liveness_
+  check with `is not null`); and `SystemArrayPool<T>` is the default array rent, with the exact-size
+  pools reserved for a consumer that rejects a longer array, because they leak a bucket per size.
 - **`UnityEngine.Object` declares `implicit operator bool`, so no `Component`-shaped expression is
   ever a type error in a boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A
   `bool`-returning method that ends `return FindTheThing(...);` compiles, converts the found object

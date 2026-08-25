@@ -36,8 +36,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         public static Rect GetWorldRect(this RectTransform transform)
         {
-            using PooledArray<Vector3> fourCornersResource = WallstopFastArrayPool<Vector3>.Get(
+            // SystemArrayPool: GetWorldCorners requires at least four elements, not exactly
+            // four -- measured on 6000.4.6f1, an eight-element array is accepted -- so this does not
+            // need the exact-size pool. clearArray is false because the call fills all four.
+            using PooledArray<Vector3> fourCornersResource = SystemArrayPool<Vector3>.Get(
                 4,
+                clearArray: false,
                 out Vector3[] fourCorners
             );
             transform.GetWorldCorners(fourCorners);
