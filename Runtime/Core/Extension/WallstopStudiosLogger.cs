@@ -186,14 +186,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
+        /// <param name="stackTrace">
+        /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
+        /// once per frame. Unity captures a managed stack trace for every log by default, measured
+        /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
+        /// names its component, field and type that stack is the same internal path every time.
+        /// </param>
         public static void Log(
             this Object component,
             FormattableString message,
             Exception e = null,
-            bool pretty = true
+            bool pretty = true,
+            bool stackTrace = true
         )
         {
-            LogDebugCore(component, message, e, pretty);
+            LogDebugCore(component, message, e, pretty, stackTrace);
         }
 
         [HideInCallstack]
@@ -202,14 +209,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
+        /// <param name="stackTrace">
+        /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
+        /// once per frame. Unity captures a managed stack trace for every log by default, measured
+        /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
+        /// names its component, field and type that stack is the same internal path every time.
+        /// </param>
         public static void LogDebug(
             this Object component,
             FormattableString message,
             Exception e = null,
-            bool pretty = true
+            bool pretty = true,
+            bool stackTrace = true
         )
         {
-            LogDebugCore(component, message, e, pretty);
+            LogDebugCore(component, message, e, pretty, stackTrace);
         }
 
         [HideInCallstack]
@@ -218,14 +232,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
+        /// <param name="stackTrace">
+        /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
+        /// once per frame. Unity captures a managed stack trace for every log by default, measured
+        /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
+        /// names its component, field and type that stack is the same internal path every time.
+        /// </param>
         public static void LogWarn(
             this Object component,
             FormattableString message,
             Exception e = null,
-            bool pretty = true
+            bool pretty = true,
+            bool stackTrace = true
         )
         {
-            LogWarnCore(component, message, e, pretty);
+            LogWarnCore(component, message, e, pretty, stackTrace);
         }
 
         [HideInCallstack]
@@ -234,14 +255,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.ErrorLogging)]
+        /// <param name="stackTrace">
+        /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
+        /// once per frame. Unity captures a managed stack trace for every log by default, measured
+        /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
+        /// names its component, field and type that stack is the same internal path every time.
+        /// </param>
         public static void LogError(
             this Object component,
             FormattableString message,
             Exception e = null,
-            bool pretty = true
+            bool pretty = true,
+            bool stackTrace = true
         )
         {
-            LogErrorCore(component, message, e, pretty);
+            LogErrorCore(component, message, e, pretty, stackTrace);
         }
 
         // The public entry points above are [Conditional], which strips the whole call site --
@@ -260,7 +288,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Object component,
             FormattableString message,
             Exception e,
-            bool pretty
+            bool pretty,
+            bool stackTrace = true
         )
         {
             if (!LoggingAllowed(component))
@@ -270,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (ShouldLogOnMainThread)
             {
-                LogInstance.Log(message, component, e, pretty);
+                LogInstance.Log(message, component, e, pretty, stackTrace);
             }
             else
             {
@@ -278,9 +307,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 Object localComponent = component;
                 Exception localE = e;
                 bool localPretty = pretty;
+                bool localStackTrace = stackTrace;
                 if (
                     !TryInvokeOnMainThread(() =>
-                        LogInstance.Log(localMessage, localComponent, localE, localPretty)
+                        LogInstance.Log(
+                            localMessage,
+                            localComponent,
+                            localE,
+                            localPretty,
+                            localStackTrace
+                        )
                     )
                 )
                 {
@@ -294,7 +330,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Object component,
             FormattableString message,
             Exception e,
-            bool pretty
+            bool pretty,
+            bool stackTrace = true
         )
         {
             if (!LoggingAllowed(component))
@@ -304,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (ShouldLogOnMainThread)
             {
-                LogInstance.LogWarn(message, component, e, pretty);
+                LogInstance.LogWarn(message, component, e, pretty, stackTrace);
             }
             else
             {
@@ -312,9 +349,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 Object localComponent = component;
                 Exception localE = e;
                 bool localPretty = pretty;
+                bool localStackTrace = stackTrace;
                 if (
                     !TryInvokeOnMainThread(() =>
-                        LogInstance.LogWarn(localMessage, localComponent, localE, localPretty)
+                        LogInstance.LogWarn(
+                            localMessage,
+                            localComponent,
+                            localE,
+                            localPretty,
+                            localStackTrace
+                        )
                     )
                 )
                 {
@@ -328,7 +372,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Object component,
             FormattableString message,
             Exception e,
-            bool pretty
+            bool pretty,
+            bool stackTrace = true
         )
         {
             if (!LoggingAllowed(component))
@@ -338,7 +383,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (ShouldLogOnMainThread)
             {
-                LogInstance.LogError(message, component, e, pretty);
+                LogInstance.LogError(message, component, e, pretty, stackTrace);
             }
             else
             {
@@ -346,9 +391,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 Object localComponent = component;
                 Exception localE = e;
                 bool localPretty = pretty;
+                bool localStackTrace = stackTrace;
                 if (
                     !TryInvokeOnMainThread(() =>
-                        LogInstance.LogError(localMessage, localComponent, localE, localPretty)
+                        LogInstance.LogError(
+                            localMessage,
+                            localComponent,
+                            localE,
+                            localPretty,
+                            localStackTrace
+                        )
                     )
                 )
                 {

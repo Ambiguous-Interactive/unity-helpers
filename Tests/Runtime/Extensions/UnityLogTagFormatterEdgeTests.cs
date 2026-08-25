@@ -149,6 +149,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        /// <remarks>
+        /// The stack trace is the entire cost of a repeated diagnostic: Unity captures one for every
+        /// log whose type is configured ScriptOnly, and that capture measured 178.4 us of a 178.4 us
+        /// call on 6000.4.6f1, against 13.3 us for the same message without it (#564). What must not
+        /// change is the message, so both halves are asserted: the rendered text is identical, and
+        /// only the delivered stack differs.
+        /// The default case is the CONTROL, and it decides whether this platform can be measured at
+        /// all -- a build with stack traces switched off delivers an empty stack for BOTH cases, and
+        /// asserting the subject there would be the absence of a measurement rather than a pass.
+        /// </remarks>
+        [Test]
+        public void SuppressingTheStackTraceKeepsTheMessage()
+        {
+            UnityLogTagFormatter formatter = new();
+            string message = nameof(SuppressingTheStackTraceKeepsTheMessage);
+
+            string capturedStack = null;
+            string capturedCondition = null;
+            void Capture(string condition, string stackTrace, LogType type)
+            {
+                if (type == LogType.Error && condition.Contains(message))
+                {
+                    capturedCondition = condition;
+                    capturedStack = stackTrace;
+                }
+            }
+
+            Application.logMessageReceived += Capture;
+            try
+            {
+                ExpectError(LogType.Error, new Regex($"(?s).*{message}.*"));
+                string withStack = formatter.LogError(
+                    $"{message}",
+                    context: null,
+                    e: null,
+                    pretty: false
+                );
+                string controlStack = capturedStack;
+                string controlCondition = capturedCondition;
+
+                if (string.IsNullOrEmpty(controlStack))
+                {
+                    Assert.Ignore(
+                        "This build delivers no stack trace for an error log, so suppressing one is not observable here."
+                    );
+                }
+
+                capturedStack = null;
+                capturedCondition = null;
+
+                ExpectError(LogType.Error, new Regex($"(?s).*{message}.*"));
+                string withoutStack = formatter.LogError(
+                    $"{message}",
+                    context: null,
+                    e: null,
+                    pretty: false,
+                    stackTrace: false
+                );
+
+                Assert.AreEqual(withStack, withoutStack, "The rendered message must not change.");
+                Assert.AreEqual(
+                    controlCondition,
+                    capturedCondition,
+                    "The console text must not change."
+                );
+                Assert.IsTrue(
+                    string.IsNullOrEmpty(capturedStack),
+                    $"Expected no stack trace, got: {capturedStack}"
+                );
+            }
+            finally
+            {
+                Application.logMessageReceived -= Capture;
+            }
+        }
+
         [Test]
         public void ExceptionLoggingFormatsOutput()
         {

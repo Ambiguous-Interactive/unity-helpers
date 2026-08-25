@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `stackTrace: false` to `Log`, `LogWarn` and `LogError`, for a diagnostic that repeats once per object or once per frame. Unity captures a stack trace for every log by default, measured at 178.4 us against 13.3 us without one. See [Logging Extensions](./docs/features/logging/logging-extensions.md) ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564)).
 - Add `RandomGeneratorMetadata.Period`, so every generator states its period where a caller can read it, and the [Random Generators](./docs/features/utilities/random-generators.md) table now carries a Period column that cannot drift from it. A published period is quoted; where none exists the value states the measured live state width instead ([#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516), [#285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/285)).
 - Add `SerializedMemberNames`, which converts between a property's source name and the `<Name>k__BackingField` Unity serializes it under, for anyone writing a drawer that resolves a member by name ([#550](https://github.com/Ambiguous-Interactive/unity-helpers/issues/550)).
 - Add `WUH002`, which warns when a Unity-serialized field resolves onto a collection of collections -- Unity drops every inner value and reports nothing. Covers public fields of nested `[Serializable]` types too. A warning at most, and switchable off. See [Performance Analyzers](./docs/performance/analyzers.md) ([#548](https://github.com/Ambiguous-Interactive/unity-helpers/issues/548)).
@@ -97,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A relational field that finds nothing is ~15x cheaper to assign: 366-431 us before, 25.1 us now, measured on `6000.4.6f1` against a control that did not move. Unity captured a stack trace for the error log on every assignment, and for a collection field finding nothing is a normal state ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564), [#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - **`RomuDuo` now implements published romuDuo, so a given seed produces a different sequence than in 3.5.1.** No saved seed or `RandomState` carries a sequence across this change; pin a generator whose stream is unchanged if you need one to ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
 - `DisjointSet.TryGetAllSets()` is 2.4x-3.2x faster and allocates no temporary lists. It gathered every element into a per-root scratch list and then copied all of them a second time; elements now go straight into their result list, found through a dense index rather than a hash lookup ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - `Serializer.ProtoSerialize(value, ref buffer)` no longer allocates a second full payload for the `Serializable` collection types. The overload exists so a per-frame serialize allocates nothing ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).

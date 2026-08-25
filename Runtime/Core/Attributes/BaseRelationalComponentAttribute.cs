@@ -595,6 +595,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return ValueHelpers.IsAssigned(currentValue);
         }
 
+        // No stack trace, and that is the whole cost of an unsatisfied field. A relational
+        // assignment that finds nothing measured 366-431 us against ~1.0 us for one that succeeds
+        // (#564) -- roughly 400x, paid on EVERY assignment rather than once. All of it is Unity
+        // capturing a managed stack trace for the log; the message itself is 13.3 us. For a
+        // collection field an empty result is a normal state, so a scene binding a few hundred
+        // objects at load paid that repeatedly, and the only symptom was "there are some errors in
+        // the console" -- which reads as a content problem, not a load-time stall.
+        //
+        // Every message survives, one per object, with its context still set so clicking it pings
+        // the object. What goes is a stack that is the same internal assignment path every time and
+        // names nothing the message does not already name.
         internal static void LogMissingComponentError<TAttribute>(
             Component component,
             FieldMetadata<TAttribute> metadata,
@@ -605,7 +616,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (!metadata.attribute.Optional)
             {
                 component.LogError(
-                    $"Unable to find {relationshipType} component of type {metadata.field.FieldType} for field '{metadata.field.Name}'"
+                    $"Unable to find {relationshipType} component of type {metadata.field.FieldType} for field '{metadata.field.Name}'",
+                    stackTrace: false
                 );
             }
         }
