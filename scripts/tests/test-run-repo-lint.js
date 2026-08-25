@@ -522,11 +522,22 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // reported success while checking nothing, all three by accident, because "found nothing" and
   // "looked at nothing" print the same thing (#556).
   //
-  // The property checked is that a linter has a self-test which INVOKES it and which some
-  // registered suite runs. A stronger-sounding "the self-test names a red half" was tried and
-  // dropped: every one of the 32 self-tests that exist already matches that vocabulary, so it
-  // discriminates nothing -- adding it would have been one more check that cannot go red, inside
-  // the test whose whole subject is checks that cannot go red.
+  // The property checked is that a linter is NAMED by a self-test which some registered suite runs.
+  // Three stronger-sounding predicates were written and measured; all three were dropped, and the
+  // reasons are worth keeping because each is the obvious next idea:
+  //
+  //   * "the self-test names a red half" (a case description matching fail/reject/violation) --
+  //     all 32 existing self-tests match it, so it discriminates nothing. Adding it would have
+  //     been one more check that cannot go red, inside the test whose subject is checks that
+  //     cannot go red.
+  //   * `fileInvokes()` from this file -- it is right there and looks correct, and it is WRONG for
+  //     this question. Its npm branch expands `npm run <aggregate>`, so `validate:local` resolves
+  //     to 31 scripts and every linter inside one reads as covered. Measured: five of the seven
+  //     below came back "invoked" by `test-sync-script-contracts.ps1`, which only quotes npm
+  //     script names in a string literal it is asserting the CONTENTS of. That helper answers
+  //     "does anything run this", which is the assertion above, not this one.
+  //   * a comment-stripped basename token, to exclude a linter named only in prose -- measured to
+  //     select exactly the same seven, so it is complexity with no present effect.
   //
   // Debt is carried here rather than hidden: each entry names the issue tracking the missing red
   // half, so the allowlist is a work list rather than an excuse.
