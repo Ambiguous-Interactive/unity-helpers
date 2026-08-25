@@ -219,3 +219,25 @@ moved. Discriminate on the console timestamps, not on how the tool call ended.
   `277 pass / 0 fail`, and the 51 methods reported unrunnable (`No log scope is available`) were
   exactly the ones asserting the error log the change touched. `0 fail` was true and answered a
   different question than the one being asked. Name the unrunnable set and say what it covered.
+
+### Three the bridge itself gets wrong (session 225)
+
+- **A run that emits a Unity WARNING is reported as `UNEXPECTED_ERROR: Command was executed
+partially, but reported warnings or errors`, with the complete result inside it.** The tool result
+  arrives as an error whose payload contains every logged line and the `result.Log` output in full.
+  Two probes this session were successes wearing that wrapper. Read the payload before concluding a
+  probe failed -- the discriminator is whether your RESULT line is present, not how the call ended.
+- **The sandbox wraps your script in `namespace Unity.AI.Assistant.Agent.Dynamic.Extension.Editor`,
+  so `Unity` is an enclosing namespace and any bare type name that collides with a child of it
+  fails to resolve.** `CompilationPipeline.GetAssemblies(...)`, with `using UnityEditor.Compilation;`
+  present, compiled to `CS0234: The type or namespace name 'GetAssemblies' does not exist in the
+namespace 'Unity.CompilationPipeline'` -- the name bound to a NAMESPACE, not to the type the
+  import provides. Fully qualify (`UnityEditor.Compilation.CompilationPipeline`), which is the same
+  habit the `System.Reflection` restriction already forces.
+- **`Application.isPlaying` is FALSE here, and package code branches on it.** A fixture that is green
+  in CI's playmode legs can fail here for a reason that is neither the harness nor your change:
+  `Attribute.CurrentValue` carried an `#if UNITY_EDITOR` branch keyed on exactly that, and two
+  serialization fixtures failed under this loop for three sessions before anyone read the getter
+  ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)). Before filing such a
+  failure as an artifact OR as a regression, grep the code under test for `Application.isPlaying`.
+  It is a third category: a real defect that only this harness can see.

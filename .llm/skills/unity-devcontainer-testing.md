@@ -212,6 +212,20 @@ limit ([#568](https://github.com/Ambiguous-Interactive/unity-helpers/issues/568)
 
 ## Limitations
 
+- **The editmode legs run 26 of the 33 test assemblies, and no editor version changes that.** Unity's
+  EditMode runner takes only assemblies flagged `EditorAssembly` -- an asmdef with
+  `"includePlatforms": ["Editor"]`. `WallstopStudios.UnityHelpers.Tests.Runtime` and its six
+  platform-neutral siblings are not, so **their fixtures run in playmode only**, whatever
+  `.github/unity-versions.json` says and whatever the editmode leg is handed. Measured on
+  `6000.4.6f1` with `CompilationPipeline.GetAssemblies(AssembliesType.Editor)`.
+
+  The consequence is a coverage hole with a specific shape: a `Runtime/` branch that only executes
+  with `Application.isPlaying` **false** has no CI coverage at all unless a `Tests/Editor/**` fixture
+  reaches it. That shipped one bug -- `Attribute.CurrentValue` discarded its cache on exactly that
+  branch, so a deserialized buff was dropped in the editor and every leg was green
+  ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)). When a change touches
+  an edit-mode branch of runtime code, the fixture belongs in an editor-only assembly.
+
 - `WaitForEndOfFrame` does not work in batch mode (PlayMode tests)
 - Xvfb provides 0 Hz virtual display - frame timing may differ from real editor
 - First run is slow (Docker image pull ~3-4 GB); subsequent runs use cached image
