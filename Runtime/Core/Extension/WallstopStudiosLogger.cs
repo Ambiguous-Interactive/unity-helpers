@@ -180,18 +180,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return value?.ToString();
         }
 
-        [HideInCallstack]
-        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
-        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
-        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
+        /// <summary>
+        /// Logs an informational message through the package formatter.
+        /// </summary>
+        /// <param name="component">The context object the log is attributed to.</param>
+        /// <param name="message">The interpolated message. Formatter tags such as <c>:json</c> apply.</param>
+        /// <param name="e">An optional exception to append.</param>
+        /// <param name="pretty">When <see langword="true"/>, prefixes the timestamp and context.</param>
         /// <param name="stackTrace">
         /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
         /// once per frame. Unity captures a managed stack trace for every log by default, measured
         /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
         /// names its component, field and type that stack is the same internal path every time.
         /// </param>
+        [HideInCallstack]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
         public static void Log(
             this Object component,
             FormattableString message,
@@ -203,18 +210,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             LogDebugCore(component, message, e, pretty, stackTrace);
         }
 
-        [HideInCallstack]
-        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
-        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
-        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
+        /// <summary>
+        /// Logs a debug message through the package formatter.
+        /// </summary>
+        /// <param name="component">The context object the log is attributed to.</param>
+        /// <param name="message">The interpolated message. Formatter tags such as <c>:json</c> apply.</param>
+        /// <param name="e">An optional exception to append.</param>
+        /// <param name="pretty">When <see langword="true"/>, prefixes the timestamp and context.</param>
         /// <param name="stackTrace">
         /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
         /// once per frame. Unity captures a managed stack trace for every log by default, measured
         /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
         /// names its component, field and type that stack is the same internal path every time.
         /// </param>
+        [HideInCallstack]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
         public static void LogDebug(
             this Object component,
             FormattableString message,
@@ -226,18 +240,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             LogDebugCore(component, message, e, pretty, stackTrace);
         }
 
-        [HideInCallstack]
-        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
-        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
-        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
-        [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
+        /// <summary>
+        /// Logs a warning through the package formatter.
+        /// </summary>
+        /// <param name="component">The context object the log is attributed to.</param>
+        /// <param name="message">The interpolated message. Formatter tags such as <c>:json</c> apply.</param>
+        /// <param name="e">An optional exception to append.</param>
+        /// <param name="pretty">When <see langword="true"/>, prefixes the timestamp and context.</param>
         /// <param name="stackTrace">
         /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
         /// once per frame. Unity captures a managed stack trace for every log by default, measured
         /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
         /// names its component, field and type that stack is the same internal path every time.
         /// </param>
+        [HideInCallstack]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
         public static void LogWarn(
             this Object component,
             FormattableString message,
@@ -249,18 +270,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             LogWarnCore(component, message, e, pretty, stackTrace);
         }
 
-        [HideInCallstack]
-        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
-        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
-        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
-        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
-        [System.Diagnostics.Conditional(CompilationSymbols.ErrorLogging)]
+        /// <summary>
+        /// Logs an error through the package formatter.
+        /// </summary>
+        /// <param name="component">The context object the log is attributed to.</param>
+        /// <param name="message">The interpolated message. Formatter tags such as <c>:json</c> apply.</param>
+        /// <param name="e">An optional exception to append.</param>
+        /// <param name="pretty">When <see langword="true"/>, prefixes the timestamp and context.</param>
         /// <param name="stackTrace">
         /// Pass <see langword="false"/> for a diagnostic that repeats -- once per object at load, or
         /// once per frame. Unity captures a managed stack trace for every log by default, measured
         /// on 6000.4.6f1 at 178.4 us against 13.3 us without it, and for a message that already
         /// names its component, field and type that stack is the same internal path every time.
         /// </param>
+        [HideInCallstack]
+        [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+        [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+        [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
+        [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
+        [System.Diagnostics.Conditional(CompilationSymbols.ErrorLogging)]
         public static void LogError(
             this Object component,
             FormattableString message,
