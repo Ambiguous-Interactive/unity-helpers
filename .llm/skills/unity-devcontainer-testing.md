@@ -459,6 +459,28 @@ success signal. A `RunCommand` whose body is `AssetDatabase.Refresh` timed out o
 **returned normally** on the next, and the second one had still recompiled -- the console timestamps
 moved. Discriminate on the console timestamps, not on how the tool call ended.
 
+### Four things the probe itself gets wrong (session 224)
+
+- **A timing cell that prints `0.000` measured nothing, and reads exactly like "free".** Session 224
+  timed a relational assignment at 40 iterations: the subject (25.1 us) was fine and the satisfied
+  and control cells both read `0.000`, because 40 x 1 us is 40 us against a ~0.5 ms clock floor.
+  Reported as-is that is "the control costs nothing", which is a fabricated result. Size each cell
+  for its OWN cost, and **end the probe with
+  `if (best <= 0.0) { result.LogError("A CELL READ ZERO -- raise the iteration count"); return; }`**
+  so a zero cannot be printed as a number.
+- **`Convert.ChangeType` on a `[TestCase]` argument throws for anything that is not `IConvertible`.**
+  A `Type` or enum argument gives `InvalidCastException: Object must implement IConvertible` and
+  kills the whole sweep from inside the harness. Coerce in three steps: `target.IsInstanceOfType(raw)`
+  first, then `System.Enum.ToObject` for an enum target, then `ChangeType` in a `try`.
+- **The bridge returns every Unity console line the command produced.** A probe that calls
+  `Debug.LogError` in a 200-iteration loop returns 600 lines and the response is truncated, taking
+  the RESULT line with it. Keep a logging probe under ~50 emissions per run, or measure the log call
+  in isolation and the call site separately.
+- **The fixtures that cannot run here can BE the coverage.** All 17 relational fixtures gave
+  `277 pass / 0 fail`, and the 51 methods reported unrunnable (`No log scope is available`) were
+  exactly the ones asserting the error log the change touched. `0 fail` was true and answered a
+  different question than the one being asked. Name the unrunnable set and say what it covered.
+
 ## Limitations
 
 - `WaitForEndOfFrame` does not work in batch mode (PlayMode tests)

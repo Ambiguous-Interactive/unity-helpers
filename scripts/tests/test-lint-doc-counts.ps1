@@ -19,8 +19,8 @@ Param(
     exactly that case.
 
     Green half:
-    - the real sync script, invoked through the wrapper, agrees the tree is in sync
-    - a stub that exits 0 makes the wrapper exit 0
+    - a stub that exits 0 makes the wrapper exit 0 (the real counts are checked by `lint:repo`,
+      so re-running them here would be a third invocation of a 26.7 s scan)
 
     Red halves:
     - a sync script path that does not exist
@@ -119,8 +119,11 @@ try {
   Write-Info "Workspace: $workspace"
 
   # ── Green half ────────────────────────────────────────────────────────────
-  Test-ExitCode -TestName 'the repository documentation counts are in sync' -Arguments @() -Expected 0
-
+  # Deliberately NOT "run the wrapper with no arguments and expect 0". That spawns the real
+  # sync-doc-counts.ps1 over the whole repository -- 26.7 s of this suite's wall clock -- to
+  # re-answer a question `lint:repo` (check id `doc-counts`) and `validate:content` both already
+  # ask. The stub below is the green half for THIS script's contract, which is the wrapper, not
+  # the counts (#543).
   $ok = New-SyncStub -Name 'exit-zero' -ExitCode 0
   Test-ExitCode -TestName 'a sync script that exits 0 makes the wrapper exit 0' `
     -Arguments @('-SyncScriptPath', $ok) -Expected 0 -ExpectedMessage 'STUB-RAN'
