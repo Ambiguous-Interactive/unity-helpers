@@ -45,23 +45,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public RandomQuality Quality { get; }
 
-        /// <summary>
-        /// The generator's output period, in the units a caller draws in.
-        /// </summary>
-        /// <remarks>
-        /// A published period is quoted as its specification states it. Where none is published the
-        /// value states the MEASURED live state width instead and says so, because a period of 2^128
-        /// cannot be observed and a number nobody measured is worse than an honest bound. Required
-        /// of every generator by <c>scripts/tests/test-random-periods.js</c>, which also refuses a
-        /// value the documentation does not carry.
-        /// </remarks>
-        public string Period { get; }
-
         public string Notes { get; }
 
         public string Reference { get; }
 
         public string ReferenceUrl { get; }
+
+        /// <summary>
+        /// The generator's output period, in the units a caller draws in.
+        /// </summary>
+        /// <remarks>
+        /// Every value is a claim, and it says whose: a published period is quoted as its
+        /// specification states it, and where none is published the value reports the measured live
+        /// state width instead and labels it as measured. A period of 2^128 cannot be observed, so
+        /// a bound that says what was actually seen is worth more than a number nobody checked.
+        /// </remarks>
+        public string Period { get; }
 
         public int QualitySortValue => (int)Quality;
     }
