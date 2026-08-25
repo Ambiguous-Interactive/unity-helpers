@@ -695,6 +695,23 @@ end up disagreeing about which pixels are transparent.
 
 All three clamp: values outside `[0, 1]` saturate and `NaN` encodes to `0`.
 
+#### `ChannelStep` is a step size, not a decode
+
+`ColorQuantization.ChannelStep` is `1f / 255f`, the distance between two adjacent channels. It is
+there to scale a tolerance expressed in channels — `WallMath` uses it that way. It is **not** how you
+decode:
+
+```csharp
+float wrong = channel * ColorQuantization.ChannelStep;   // multiply by a rounded reciprocal
+float right = ColorQuantization.ToNormalized(channel);   // a true division
+```
+
+Those disagree by one ULP on **126 of the 256 channels**, measured on `6000.4.6f1`. `ToNormalized`
+divides, which is bit-for-bit what Unity's own `Color32` to `Color` conversion gives you and what
+every `/ 255f` in your own code gives you — so a pixel is classified the same way whichever decoder
+reaches it first. A decoder that rounds differently from its callers is precisely the mistake this
+type exists to prevent.
+
 ### Readable Text on Any Background
 
 `ColorContrast` answers "can this be read against that?" the way
