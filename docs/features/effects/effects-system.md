@@ -1338,6 +1338,10 @@ Q: How do I query tag counts or check multiple tags at once?
     appears in the Inspector when the effect is edited, and once per effect on the first
     application.
 
+- "has an unassigned CosmeticEffectData entry"
+  - A slot in the effect's `Cosmetic Effects` list is empty. Empty slots cannot be instanced and are
+    skipped; remove the slot or assign a prefab.
+
 - A saved attribute loads without its buff
   - JSON keeps the written `CurrentValue`; Unity serialization recalculates from the base value.
     See [Saving and Loading an Attribute](#saving-and-loading-an-attribute).
@@ -2236,8 +2240,8 @@ public class DebugConsole : MonoBehaviour
 - Attribute field discovery is cached (and can be precomputed by the Attribute Metadata Cache generator).
 - Tag queries provide overloads for lists to minimize allocations; prefer `IReadOnlyList<string>` overloads in hot paths.
 - Cosmetics can be a significant cost; prefer shared presenters when possible.
-- A misconfigured `Instant` effect is reported once per effect, not once per application. The message
-  used to render the whole effect to JSON, measured at 20.5 us each time on `6000.4.6f1`.
+- An `AttributeEffect` authoring mistake is reported once per effect, not once per application. Each
+  report used to render the whole effect to JSON, measured at 20.5 us on `6000.4.6f1`.
 
 ---
 

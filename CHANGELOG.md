@@ -139,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Applying an `Instant` effect that also defines periodic or behaviour data now warns once per effect instead of on every application, and `AttributeEffect` reports it in the Inspector too. The message used to render the whole effect to JSON, 20.5 us each time ([#567](https://github.com/Ambiguous-Interactive/unity-helpers/issues/567)).
+- An `AttributeEffect` authoring mistake -- `Instant` with periodic or behaviour data, or an unassigned cosmetic entry -- is now reported once per effect and in the Inspector, not on every application. Each report rendered the whole effect to JSON, measured at 20.5 us ([#567](https://github.com/Ambiguous-Interactive/unity-helpers/issues/567)).
 - Fix `Attribute.CurrentValue` reporting the wrong number in the editor: outside play mode it discarded the cached value, so an attribute deserialized while buffed lost the buff, and in play mode an Inspector edit to the base value left the cache stale ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)).
 - Fix a single `[SiblingComponent]` or `[ChildComponent]` field binding a disabled component when `IncludeInactive = false`. With two candidates on one object and the first disabled, the disabled one was assigned instead of the enabled one behind it ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Fix a second `await` of the same `AsyncOperation` stopping the first one resuming. Two coroutines or tasks awaiting one `SceneManager.LoadSceneAsync` handle now both continue; previously only the last to register did.

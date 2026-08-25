@@ -80,6 +80,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsFalse(_effect.ShouldReportInstantWithHandleData());
         }
 
+        [TestCase(0, 0, false)]
+        [TestCase(1, 0, false)]
+        [TestCase(0, 1, true)]
+        [TestCase(2, 1, true)]
+        public void AnUnassignedCosmeticEntryIsDetectedWhereverItSits(
+            int assignedBefore,
+            int unassigned,
+            bool expected
+        )
+        {
+            for (int index = 0; index < assignedBefore; ++index)
+            {
+                GameObject host = Track(new GameObject($"CosmeticHost{index}"));
+                _effect.cosmeticEffects.Add(host.AddComponent<CosmeticEffectData>());
+            }
+
+            for (int index = 0; index < unassigned; ++index)
+            {
+                _effect.cosmeticEffects.Add(null);
+            }
+
+            Assert.AreEqual(expected, _effect.HasUnassignedCosmeticEffect);
+        }
+
+        [Test]
+        public void TheUnassignedCosmeticReportIsArmedOncePerEffectNotPerEntry()
+        {
+            _effect.cosmeticEffects.Add(null);
+            _effect.cosmeticEffects.Add(null);
+            _effect.cosmeticEffects.Add(null);
+
+            Assert.IsTrue(_effect.ShouldReportUnassignedCosmeticEffect());
+            Assert.IsFalse(_effect.ShouldReportUnassignedCosmeticEffect());
+            Assert.IsFalse(_effect.ShouldReportUnassignedCosmeticEffect());
+        }
+
+        [Test]
+        public void TheTwoAuthoringReportsAreIndependent()
+        {
+            _effect.durationType = ModifierDurationType.Instant;
+            _effect.periodicEffects.Add(new PeriodicEffectDefinition());
+            _effect.cosmeticEffects.Add(null);
+
+            // Arming one must not consume the other: a single effect can carry both mistakes.
+            Assert.IsTrue(_effect.ShouldReportInstantWithHandleData());
+            Assert.IsTrue(_effect.ShouldReportUnassignedCosmeticEffect());
+        }
+
         [Test]
         public void EditingTheEffectReArmsTheApplyPathReport()
         {
@@ -88,12 +136,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(_effect.ShouldReportInstantWithHandleData());
             Assert.IsFalse(_effect.ShouldReportInstantWithHandleData());
 
+            _effect.cosmeticEffects.Add(null);
+            Assert.IsTrue(_effect.ShouldReportUnassignedCosmeticEffect());
+            Assert.IsFalse(_effect.ShouldReportUnassignedCosmeticEffect());
+
             SerializedObject serialized = new(_effect);
             serialized.FindProperty(nameof(AttributeEffect.duration)).floatValue = 3f;
             Assert.IsTrue(serialized.ApplyModifiedPropertiesWithoutUndo());
 
             // ApplyModifiedProperties runs OnValidate, which is where the author sees the mistake.
             Assert.IsTrue(_effect.ShouldReportInstantWithHandleData());
+            Assert.IsTrue(_effect.ShouldReportUnassignedCosmeticEffect());
         }
     }
 #endif

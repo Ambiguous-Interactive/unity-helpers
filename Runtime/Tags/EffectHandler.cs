@@ -875,9 +875,17 @@ namespace WallstopStudios.UnityHelpers.Tags
                 CosmeticEffectData cosmeticEffect = cosmeticEffectData;
                 if (cosmeticEffect == null)
                 {
-                    this.LogError(
-                        $"CosmeticEffectData is null for effect {effect:json}, cannot determine instancing scheme."
-                    );
+                    // Same static-authoring shape as the Instant diagnostic above: once per
+                    // effect, by name rather than by serializing it, and no stack trace -- the
+                    // mistake is in the asset, not on this call stack (#567).
+                    if (effect.ShouldReportUnassignedCosmeticEffect())
+                    {
+                        this.LogError(
+                            $"Effect {effect.name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
+                            stackTrace: false
+                        );
+                    }
+
                     continue;
                 }
 
@@ -926,9 +934,14 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (cosmeticEffectData == null)
                 {
-                    this.LogError(
-                        $"CosmeticEffectData is null for effect {attributeEffect:json}, cannot determine instancing scheme."
-                    );
+                    if (attributeEffect.ShouldReportUnassignedCosmeticEffect())
+                    {
+                        this.LogError(
+                            $"Effect {attributeEffect.name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
+                            stackTrace: false
+                        );
+                    }
+
                     continue;
                 }
 
