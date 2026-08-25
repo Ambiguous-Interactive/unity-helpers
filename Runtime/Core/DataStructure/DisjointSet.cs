@@ -256,12 +256,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // list and then copied all of them a second time. The slot holds resultIndex + 1 so a
             // zero-filled array already means "unseen" and no sentinel fill pass is needed.
             //
-            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY
-            // elementCount, clears on release so the rent is already zeroed -- which is what makes
-            // the resultIndex + 1 encoding free -- and disposes through the PooledArray handle, so
-            // no try/finally is needed.
-            using PooledArray<int> rootLease = WallstopArrayPool<int>.Get(
+            // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+            // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+            // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+            // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+            // with no try/finally. clearArray is true because the slot is READ before it is written:
+            // that read is what "unseen" means, and the shared pool hands back dirty arrays.
+            using PooledArray<int> rootLease = SystemArrayPool<int>.Get(
                 elementCount,
+                clearArray: true,
                 out int[] rootToResult
             );
 

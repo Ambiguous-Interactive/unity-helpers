@@ -164,11 +164,18 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   a re-ask of a question a `bool` already answered. Swept `Runtime/` and `Editor/`: 42 candidate
   sites, all but a handful managed types where the compare is already cheap, and every remaining
   Unity-typed one was a producing or defensive check. There was exactly one re-ask.
-- **Prefer `WallstopArrayPool<T>.Get(size, out T[] array)` over `System.Buffers.ArrayPool<T>.Shared`.**
-  It returns an array of EXACTLY `size` (System's is power-of-two bucketed, so `.Length` lies),
-  clears on release so a rent is already zeroed, and disposes through the `PooledArray<T>` handle --
-  a `using`, not a `try`/`finally`. Reach for System's pool only for a buffer whose lifetime is not
-  scoped, as `PooledBufferStream` does while growing.
+- **Reach for one of this package's pool handles rather than `System.Buffers.ArrayPool<T>.Shared`
+  directly -- and the choice between them turns on whether the size is bounded.**
+  `SystemArrayPool<T>.Get(len, clearArray, out T[] array)` is the default: it wraps the shared pool,
+  so a runtime size costs nothing extra, and it still disposes through the `PooledArray<T>` handle
+  (a `using`, not a `try`/`finally`). `WallstopArrayPool<T>` returns an array of EXACTLY the
+  requested length and clears on release, but it **keeps a permanent bucket per distinct size**, so
+  its own class doc lists `Get(collection.Count)` under "UNSAFE uses (will leak memory)" -- it is for
+  compile-time constants and algorithm-bounded sets (`IListSortIps4o` clamps to `[4, 32]`), never a
+  collection count. Session 222 put six spatial-structure rents on the wrong one and Bugbot caught
+  it: read the pool's **class** remarks, not just the `Get` overload's. Go to
+  `ArrayPool<T>.Shared` unwrapped only for a buffer whose lifetime is not scoped, as
+  `PooledBufferStream` does while growing.
 - **`UnityEngine.Object` declares `implicit operator bool`, so no `Component`-shaped expression is
   ever a type error in a boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A
   `bool`-returning method that ends `return FindTheThing(...);` compiles, converts the found object

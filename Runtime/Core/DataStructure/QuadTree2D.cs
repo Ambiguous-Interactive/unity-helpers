@@ -208,11 +208,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucketSize = Math.Max(1, bucketSize);
-            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY the
-            // requested length, clears on release so the rent is already zeroed, and disposes
-            // through the PooledArray handle, so no try/finally is needed.
-            using PooledArray<int> scratchLease = WallstopArrayPool<int>.Get(
+            // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+            // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+            // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+            // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+            // with no try/finally. clearArray is false because the build writes every slot before
+            // reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+            using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
+                clearArray: false,
                 out int[] scratch
             );
             _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
@@ -296,11 +300,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elements = builder.MoveToImmutable();
             _bounds = bounds;
             bucketSize = Math.Max(1, bucketSize);
-            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY the
-            // requested length, clears on release so the rent is already zeroed, and disposes
-            // through the PooledArray handle, so no try/finally is needed.
-            using PooledArray<int> scratchLease = WallstopArrayPool<int>.Get(
+            // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+            // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+            // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+            // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+            // with no try/finally. clearArray is false because the build writes every slot before
+            // reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+            using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
+                clearArray: false,
                 out int[] scratch
             );
             _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
