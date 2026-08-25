@@ -139,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Applying an `Instant` effect that also defines periodic or behaviour data now warns once instead of twice, and without a stack trace. Both copies rendered the whole effect to JSON, on every application ([#567](https://github.com/Ambiguous-Interactive/unity-helpers/issues/567)).
 - Fix a single `[SiblingComponent]` or `[ChildComponent]` field binding a disabled component when `IncludeInactive = false`. With two candidates on one object and the first disabled, the disabled one was assigned instead of the enabled one behind it ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Fix a second `await` of the same `AsyncOperation` stopping the first one resuming. Two coroutines or tasks awaiting one `SceneManager.LoadSceneAsync` handle now both continue; previously only the last to register did.
 - Fix one refused protobuf surrogate registration disabling every registration after it, so `Vector3`, `Color` and `Bounds` silently encoded with different bytes. Each is now independent and names the type it could not register.

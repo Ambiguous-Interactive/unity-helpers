@@ -1161,8 +1161,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new Regex("defines periodic or behaviour data but is Instant")
             );
 
-            EffectHandle? handle = handler.ApplyEffect(effect);
+            // Counted, not just expected. ApplyEffect used to warn and then call InternalApplyEffect,
+            // which tested the same two conditions and warned again -- so one misconfigured effect
+            // produced two identical messages, each rendering the whole effect to JSON. A single
+            // LogAssert expectation matches one of them and an unexpected WARNING does not fail a
+            // Unity test, which is why the duplicate survived.
+            int warnings = 0;
+            void CountWarning(string condition, string stackTrace, LogType type)
+            {
+                if (
+                    type == LogType.Warning
+                    && condition.Contains("defines periodic or behaviour data but is Instant")
+                )
+                {
+                    ++warnings;
+                }
+            }
+
+            Application.logMessageReceived += CountWarning;
+            EffectHandle? handle;
+            try
+            {
+                handle = handler.ApplyEffect(effect);
+            }
+            finally
+            {
+                Application.logMessageReceived -= CountWarning;
+            }
+
             Assert.IsFalse(handle.HasValue);
+            if (WallstopLoggingCompiledIn)
+            {
+                Assert.AreEqual(1, warnings, "The Instant warning must be emitted exactly once.");
+            }
 
             int ticks = handler.ProcessPeriodicEffectsForTesting(
                 currentTime: 600f,

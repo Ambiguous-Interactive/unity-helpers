@@ -159,8 +159,12 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (RequiresHandle(effect))
                 {
+                    // Reported on every application of a misconfigured effect, so no stack trace:
+                    // it is the same path every time and costs 13.4x the log itself (#564). The
+                    // repetition and the {effect:json} render are tracked on #567.
                     this.LogWarn(
-                        $"Effect {effect:json} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect."
+                        $"Effect {effect:json} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
+                        stackTrace: false
                     );
                 }
 
@@ -700,15 +704,12 @@ namespace WallstopStudios.UnityHelpers.Tags
             OnEffectApplied?.Invoke(handle);
         }
 
+        // No Instant/RequiresHandle warning here. The one caller is ApplyEffect's Instant branch,
+        // which has already tested both halves and warned -- so this condition was always true and
+        // the message was always the second copy of one the console had just shown, each carrying a
+        // full JSON serialization of the effect and a stack trace capture.
         private void InternalApplyEffect(AttributeEffect effect)
         {
-            if (effect.durationType == ModifierDurationType.Instant && RequiresHandle(effect))
-            {
-                this.LogWarn(
-                    $"Effect {effect:json} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect."
-                );
-            }
-
             if (!_initialized && _tagHandler == null)
             {
                 this.AssignRelationalComponents();
