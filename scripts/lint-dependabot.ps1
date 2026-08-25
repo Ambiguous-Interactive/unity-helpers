@@ -46,6 +46,11 @@
     ./scripts/lint-dependabot.ps1 -Paths .github/dependabot.yml other/dependabot.yml
     Validate multiple explicit paths.
 #>
+# PositionalBinding = $false so a stray value cannot be captured by a named parameter before
+# the ValueFromRemainingArguments sibling sees it. With it on -- the default -- the sibling
+# only works when every other parameter is a switch, which is an accident of this param list
+# rather than a property of it (#556).
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$VerboseOutput,
     [string[]]$Paths,

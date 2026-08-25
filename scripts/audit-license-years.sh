@@ -392,9 +392,11 @@ if [[ "$OUTPUT_MODE" != "csv" ]]; then
             done
         fi
         exit 1
-    elif [[ $total_files -eq 0 ]]; then
-        # A walk that found no C# files means the corpus moved or `git ls-files` returned nothing,
-        # not that every header is correct (#556).
+    elif [[ $total_files -eq 0 && "$PATHS_MODE" == false ]]; then
+        # A repository-wide walk that found no C# files means the corpus moved or `git ls-files`
+        # returned nothing, not that every header is correct (#556). An explicit --paths filter
+        # matching no .cs file is ordinary -- a docs-only changed-file set is the common case -- so
+        # it stays a pass, matching lint-duplicate-usings.
         echo "ERROR: no .cs files were audited, so a pass here would mean nothing."
         exit 1
     else

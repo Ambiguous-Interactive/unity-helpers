@@ -66,7 +66,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         /// <summary>
         /// When true (default), includes disabled <see cref="Behaviour"/>s and components on inactive GameObjects.
-        /// When false, only enabled components on active-in-hierarchy GameObjects are assigned.
+        /// When false, only enabled components on active-in-hierarchy GameObjects are assigned --
+        /// except for <see cref="ParentComponentAttribute"/>, where this gates only
+        /// <c>GameObject.activeInHierarchy</c> and a disabled ancestor component is still assigned.
         /// </summary>
         public bool IncludeInactive { get; set; } = true;
 
@@ -832,21 +834,30 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         // The list is always the result of a Unity type query for elementType, so membership is
         // established before this runs; PassesStateAndFilters is the only remaining question and it
         // rejects a null (or destroyed) candidate itself.
-        private static Component FirstMatchingComponent(
+        //
+        // Returns bool rather than the Component so the caller never has to ask `!= null` about the
+        // answer: UnityEngine.Object's operator!= is a native aliveness check, measured at 3.380 ns
+        // against 0.578 ns for a managed reference compare on 6000.4.6f1 (5.84x). Returning a
+        // Component from a bool-shaped position is also the exact shape that let this method's
+        // result be silently discarded before (#529).
+        private static bool TryFirstMatchingComponent(
             List<Component> components,
             FilterParameters filters,
-            bool filterDisabledComponents
+            bool filterDisabledComponents,
+            out Component match
         )
         {
             for (int i = 0; i < components.Count; i++)
             {
                 if (PassesStateAndFilters(components[i], filters, filterDisabledComponents))
                 {
-                    return components[i];
+                    match = components[i];
+                    return true;
                 }
             }
 
-            return null;
+            match = null;
+            return false;
         }
 
         // internal static Component TryResolveSingleComponent(
@@ -912,22 +923,27 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             // former sweep of every component on the object could only have confirmed that.
             if (scratch != null)
             {
-                scratch.Clear();
+                // No Clear: every list-taking Get*Components overload clears the list itself, on a
+                // zero-match query too. Measured on 6000.4.6f1.
                 component.GetComponents(elementType, scratch);
-                singleComponent = FirstMatchingComponent(
+                return TryFirstMatchingComponent(
                     scratch,
                     filters,
-                    filterDisabledComponents
+                    filterDisabledComponents,
+                    out singleComponent
                 );
-                return singleComponent != null;
             }
 
             using PooledResource<List<Component>> pooled = Buffers<Component>.List.Get(
                 out List<Component> components
             );
             component.GetComponents(elementType, components);
-            singleComponent = FirstMatchingComponent(components, filters, filterDisabledComponents);
-            return singleComponent != null;
+            return TryFirstMatchingComponent(
+                components,
+                filters,
+                filterDisabledComponents,
+                out singleComponent
+            );
         }
 
         internal static List<Component> GetComponentsOfType(
@@ -938,8 +954,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             List<Component> buffer
         )
         {
-            buffer.Clear();
-
             // isInterface is true for any element type that is not sealed, so it covers the ordinary
             // base-class collection field -- Collider2D[], Renderer[] -- as well as a genuine
             // interface. Unity's own type query resolves both: measured on 6000.4.6f1, querying the
@@ -949,9 +963,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             // 1.35x-2.49x less time depending on how many components the object carries.
             if (isInterface && !allowInterfaces)
             {
+                // The only path that returns without querying, so the only one that has to empty
+                // the buffer itself.
+                buffer.Clear();
                 return buffer;
             }
 
+            // No Clear: every list-taking Get*Components overload clears the list itself, on a
+            // zero-match query too. Measured on 6000.4.6f1.
             component.GetComponents(elementType, buffer);
             return buffer;
         }

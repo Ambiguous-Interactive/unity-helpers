@@ -117,10 +117,14 @@ function Get-FilesToCheck {
   }
 
   $files = @()
-  foreach ($root in $sourceRoots) {
+  foreach ($rootName in $sourceRoots) {
+    # Anchored on the script's own location, not the caller's working directory: these roots are
+    # repository-relative, and resolving them against the cwd turned "run from anywhere else" into
+    # a hard failure once the missing-root guard below landed.
+    $root = Join-Path $PSScriptRoot '..' $rootName
     # Renaming a source root used to remove that whole tree from the scan silently (#556).
     if (-not (Test-Path $root)) {
-      Write-Host "[lint-csharp-naming] ERROR: source root not found: $root. If it moved, update `$sourceRoots in the same commit." -ForegroundColor Red
+      Write-Host "[lint-csharp-naming] ERROR: source root not found: $rootName. If it moved, update `$sourceRoots in the same commit." -ForegroundColor Red
       exit 1
     }
     # [IO.Directory]::EnumerateFiles rather than Get-ChildItem -Recurse -Include, which enumerates

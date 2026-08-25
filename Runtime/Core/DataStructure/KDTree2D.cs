@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
-    using System.Buffers;
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using Extension;
@@ -198,15 +197,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                int[] scratch = ArrayPool<int>.Shared.Rent(elementCount);
-                try
-                {
-                    root = BuildUnbalanced(0, elementCount, splitOnXAxis: true, scratch);
-                }
-                finally
-                {
-                    ArrayPool<int>.Shared.Return(scratch, clearArray: true);
-                }
+                // WallstopArrayPool rather than System's: it hands back an array of EXACTLY the
+                // requested length, clears on release so the rent is already zeroed, and disposes
+                // through the PooledArray handle, so no try/finally is needed.
+                using PooledArray<int> scratchLease = WallstopArrayPool<int>.Get(
+                    elementCount,
+                    out int[] scratch
+                );
+                root = BuildUnbalanced(0, elementCount, splitOnXAxis: true, scratch);
             }
 
             _head = root;

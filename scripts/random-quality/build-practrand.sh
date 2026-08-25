@@ -48,8 +48,13 @@ if [[ ! -x "${HOST}" ]]; then
 fi
 
 echo "[practrand] Self-test: ${CONTROL_GENERATOR} must FAIL, or this binary proves nothing"
+# `|| true` and a disabled pipefail for this one command: RNG_test stops reading at -tlmax, which
+# SIGPIPEs the producer, and under `set -euo pipefail` that would abort the script before the verdict
+# below -- turning the one check that matters into a bare non-zero exit.
+set +o pipefail
 control_output="$("${HOST}" --generator "${CONTROL_GENERATOR}" --width 32 --bytes "${CONTROL_BYTES}" \
-    | "${BUILD_ROOT}/RNG_test" stdin32 -tlmin 1KB -tlmax 16MB -tf 2 -te 0 -multithreaded 2>&1)"
+    | "${BUILD_ROOT}/RNG_test" stdin32 -tlmin 1KB -tlmax 16MB -tf 2 -te 0 -multithreaded 2>&1 || true)"
+set -o pipefail
 
 if ! grep -q 'FAIL' <<<"${control_output}"; then
     echo "[practrand] SELF-TEST FAILED: ${CONTROL_GENERATOR} produced no FAIL through ${CONTROL_BYTES} bytes."

@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
-    using System.Buffers;
     using System.Collections.Generic;
     using ProtoBuf;
     using UnityEngine;
@@ -256,47 +255,45 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // destination, where the previous shape gathered every element into a per-root scratch
             // list and then copied all of them a second time. The slot holds resultIndex + 1 so a
             // zero-filled array already means "unseen" and no sentinel fill pass is needed.
-            int[] rootToResult = ArrayPool<int>.Shared.Rent(elementCount);
-            try
+            //
+            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY
+            // elementCount, clears on release so the rent is already zeroed -- which is what makes
+            // the resultIndex + 1 encoding free -- and disposes through the PooledArray handle, so
+            // no try/finally is needed.
+            using PooledArray<int> rootLease = WallstopArrayPool<int>.Get(
+                elementCount,
+                out int[] rootToResult
+            );
+
+            for (int i = 0; i < elementCount; i++)
             {
-                Array.Clear(rootToResult, 0, elementCount);
-
-                for (int i = 0; i < elementCount; i++)
+                if (!TryFind(i, out int root))
                 {
-                    if (!TryFind(i, out int root))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    int slot = rootToResult[root];
-                    List<int> destination;
-                    if (0 < slot)
+                int slot = rootToResult[root];
+                List<int> destination;
+                if (0 < slot)
+                {
+                    destination = results[slot - 1];
+                }
+                else
+                {
+                    if (reuseStack.TryPop(out destination))
                     {
-                        destination = results[slot - 1];
+                        destination.Clear();
                     }
                     else
                     {
-                        if (reuseStack.TryPop(out destination))
-                        {
-                            destination.Clear();
-                        }
-                        else
-                        {
-                            destination = new List<int>();
-                        }
-
-                        results.Add(destination);
-                        rootToResult[root] = results.Count;
+                        destination = new List<int>();
                     }
 
-                    destination.Add(i);
+                    results.Add(destination);
+                    rootToResult[root] = results.Count;
                 }
-            }
-            finally
-            {
-                // Cleared on rent rather than on return: the clear only has to cover the prefix
-                // this call uses, and the pool hands back arrays at least that long.
-                ArrayPool<int>.Shared.Return(rootToResult, clearArray: false);
+
+                destination.Add(i);
             }
 
             return results;

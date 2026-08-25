@@ -658,6 +658,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentNullException(nameof(buffer));
             }
 
+            // Load-bearing, unlike a Clear that merely precedes a Get*Components call: a target
+            // that is neither a GameObject nor a Component matches no case below, and the caller
+            // must not be handed the previous contents.
             buffer.Clear();
 
             switch (target)

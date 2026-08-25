@@ -96,7 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`RomuDuo` now implements published romuDuo, so a given seed produces a different sequence than in 3.5.1.** Save a `RandomState` rather than a seed to carry an in-flight sequence across the upgrade ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
+- **`RomuDuo` now implements published romuDuo, so a given seed produces a different sequence than in 3.5.1.** No saved seed or `RandomState` carries a sequence across this change; pin a generator whose stream is unchanged if you need one to ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
 - `DisjointSet.TryGetAllSets()` is 2.4x-3.2x faster and allocates no temporary lists. It gathered every element into a per-root scratch list and then copied all of them a second time; elements now go straight into their result list, found through a dense index rather than a hash lookup ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
 - `Serializer.ProtoSerialize(value, ref buffer)` no longer allocates a second full payload for the `Serializable` collection types. The overload exists so a per-frame serialize allocates nothing ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - Serializing a `SerializableDictionary` or `SerializableHashSet` no longer resolves its protobuf wrapper type by reflection on every call; the type and its constructor are resolved once per element type ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
@@ -136,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix a single relational field binding a disabled component when `IncludeInactive = false`. With two candidates on one object and the first disabled, `[SiblingComponent]`, `[ChildComponent]` and `[ParentComponent]` assigned the disabled one instead of the enabled one behind it ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
+- Fix a single `[SiblingComponent]` or `[ChildComponent]` field binding a disabled component when `IncludeInactive = false`. With two candidates on one object and the first disabled, the disabled one was assigned instead of the enabled one behind it ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - Fix a second `await` of the same `AsyncOperation` stopping the first one resuming. Two coroutines or tasks awaiting one `SceneManager.LoadSceneAsync` handle now both continue; previously only the last to register did.
 - Fix one refused protobuf surrogate registration disabling every registration after it, so `Vector3`, `Color` and `Bounds` silently encoded with different bytes. Each is now independent and names the type it could not register.
 - Fix `UnityRandom` losing its position when saved: its snapshot now carries `UnityEngine.Random`'s state, so a restored generator resumes the exact sequence instead of continuing from wherever the engine is. Restoring writes that global back. See [Random Generators](./docs/features/utilities/random-generators.md#saving-and-restoring-a-generator) ([#521](https://github.com/Ambiguous-Interactive/unity-helpers/issues/521)).

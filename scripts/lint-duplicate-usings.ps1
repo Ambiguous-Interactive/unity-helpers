@@ -1,3 +1,8 @@
+# PositionalBinding = $false so a stray value cannot be captured by a named parameter before
+# the ValueFromRemainingArguments sibling sees it. With it on -- the default -- the sibling
+# only works when every other parameter is a switch, which is an accident of this param list
+# rather than a property of it (#556).
+[CmdletBinding(PositionalBinding = $false)]
 Param(
   [switch]$VerboseOutput,
   [switch]$StagedOnly,
@@ -193,7 +198,11 @@ function Get-FilesToScan {
   }
 
   $sourceRoots = @('Runtime', 'Editor', 'Tests', 'Samples~')
-  foreach ($root in $sourceRoots) {
+  foreach ($rootName in $sourceRoots) {
+    # Anchored on the script's own location, not the caller's working directory: these roots are
+    # repository-relative, and resolving them against the cwd made the zero-file guard below fire
+    # for anyone running the linter from elsewhere.
+    $root = Join-Path $PSScriptRoot '..' $rootName
     if (-not (Test-Path -LiteralPath $root)) {
       continue
     }

@@ -443,7 +443,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
             // at runtime in player builds). The List overload of the same query fills a caller
             // buffer instead of allocating an array per call.
-            results.Clear();
+            // No Clear: every list-taking Get*Components overload clears the list itself, on a
+            // zero-match query too. Measured on 6000.4.6f1.
             component.GetComponents(elementType, results);
             return results;
         }

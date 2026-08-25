@@ -341,6 +341,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             disabledChild.enabled = false;
             SphereCollider enabledChild = child.AddComponent<SphereCollider>();
 
+            GameObject parent = Track(new GameObject("ActiveOnlyParent"));
+            root.transform.SetParent(parent.transform);
+            CapsuleCollider disabledParent = parent.AddComponent<CapsuleCollider>();
+            disabledParent.enabled = false;
+            CapsuleCollider enabledParent = parent.AddComponent<CapsuleCollider>();
+
             RelationalActiveOnlyTester tester = root.AddComponent<RelationalActiveOnlyTester>();
 
             tester.AssignRelationalComponents();
@@ -359,6 +365,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 enabledChild,
                 tester.activeChild,
                 "The child shape must skip the disabled descendant component too."
+            );
+            Assert.AreSame(
+                disabledParent,
+                tester.firstParentEvenIfDisabled,
+                "The parent shape gates only activeInHierarchy, so a disabled ancestor component is "
+                    + "still bound -- every parent filter is per-GameObject, which is why the discard "
+                    + "bug above cannot arise there."
+            );
+            Assert.IsTrue(
+                enabledParent != null,
+                "The second ancestor collider exists; it is simply not the one the parent shape picks."
             );
 
             return;

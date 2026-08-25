@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+\.\d+\.\d+f\d+$')]
@@ -201,13 +201,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# `pwsh -File <script> -AdditionalScriptingDefines a b c` binds ONLY `a` and leaves `b c` unbound,
-# so a multi-value invocation would silently compile with one define. There is no safe way to guess
-# which array parameter the remainder belonged to, so catch it and refuse. Pass a comma-separated
-# list, or invoke the script with the call operator. See .llm/skills/bash-pwsh-invocation.md.
-if ($UnboundArguments -and $UnboundArguments.Count -gt 0) {
-    Write-Error "Unbound arguments: $($UnboundArguments -join ', '). `pwsh -File` binds only the first value of an array parameter; pass a comma-separated list, or invoke the script with the call operator."
-    exit 2
+# Adding a ValueFromRemainingArguments parameter is NOT enough on its own: with positional
+# binding on, `pwsh -File <script> -AdditionalScriptingDefines a b` binds 'b' to whichever named
+# parameter is positionally next, and the catch-all never sees it. Measured, not assumed.
+# PositionalBinding = $false on the param block above is what makes every stray value land
+# here; this then refuses it rather than guessing which array parameter it belonged to.
+# Pass a comma-separated list instead. See .llm/skills/bash-pwsh-invocation.md.
+if ($UnboundArguments -and 0 -lt $UnboundArguments.Count) {
+    # Not Write-Error: under $ErrorActionPreference = 'Stop' that terminates with exit 1, so
+    # the exit code would depend on where in the file this guard happens to sit. 64 is sysexits.h
+    # EX_USAGE and, unlike 1 or 2, is not already used by these scripts for a real failure.
+    [Console]::Error.WriteLine(
+        "Unbound arguments: $($UnboundArguments -join ', '). Pass a comma-separated list " +
+        "(-AdditionalScriptingDefines a,b,c) rather than space-separated values."
+    )
+    exit 64
 }
 
 # PowerShell 7.4 introduced $PSNativeCommandUseErrorActionPreference (stabilizing

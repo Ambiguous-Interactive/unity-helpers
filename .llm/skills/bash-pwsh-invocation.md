@@ -66,14 +66,17 @@ The [lint-dependabot](../../scripts/lint-dependabot.ps1) regression (2026) shipp
 
 ## `-Paths` Parameter Declaration Pattern
 
-To make `pwsh -NoProfile -File scripts/foo.ps1 -Paths a b c` bind ALL of `a b c` to `-Paths`, declare a sibling `ValueFromRemainingArguments` param. `pwsh -File` CLI mode binds the first token to `-Paths` and drops the rest unless there is a remaining-args param to catch them:
+`pwsh -File` CLI mode binds the first token after `-Paths` to `-Paths` and leaves the rest for
+positional binding. **Two things are needed, and the sibling alone is not enough.**
 
 ```powershell
+# PositionalBinding = $false is what routes a stray value to the catch-all. Without it, the
+# remainder is offered to every other named parameter positionally FIRST.
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$VerboseOutput,
     [string[]]$Paths,
-    # Catch trailing positional args that -File CLI mode fails to bind to -Paths
-    # when multiple values follow.
+    # Catches what -File CLI mode does not bind to -Paths when multiple values follow.
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AdditionalPaths
 )
@@ -82,6 +85,40 @@ $allPaths = @()
 if ($Paths) { $allPaths += $Paths }
 if ($AdditionalPaths) { $allPaths += $AdditionalPaths }
 ```
+
+### Why the sibling alone is not enough
+
+Measured, not reasoned about. With positional binding left on (the default), the remainder is
+offered to the other named parameters before it ever reaches the catch-all:
+
+```text
+param([string[]]$Paths, [string]$OutputDir = 'default', [VFRA][string[]]$AdditionalPaths)
+  pwsh -File s.ps1 -Paths a b c
+  ->  Paths=[a]  OutputDir=[b]  Additional=[c]       # 'b' silently became -OutputDir
+
+param([switch]$VerboseOutput, [string[]]$Paths, [switch]$FixNullChecks, [VFRA][string[]]$AdditionalPaths)
+  pwsh -File s.ps1 -Paths a b c
+  ->  Paths=[a]  Additional=[b,c]                    # works -- but only because the neighbours are switches
+```
+
+So a script whose other parameters happen to all be `[switch]` is correct **by accident of its
+parameter list**, and adding one `[string]` parameter later silently reintroduces the drop. A real
+case: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`, so the
+editor would have been installed to a directory named `b`. `PositionalBinding = $false` makes the
+property structural instead of incidental.
+
+**PWS005 enforces both halves.** It flags any script-level array parameter (`[string[]]`, `[int[]]`,
+anything) that lacks either the `ValueFromRemainingArguments` sibling or
+`[CmdletBinding(PositionalBinding = $false)]`, and it reports a script it cannot parse rather than
+skipping it.
+
+### What to do with the remainder
+
+Merging it into the array parameter is right when there is exactly one array parameter. With two
+there is no safe guess, so **refuse**: print the unbound values and `exit 64` (sysexits `EX_USAGE`).
+Use `[Console]::Error.WriteLine` rather than `Write-Error` — under
+`$ErrorActionPreference = 'Stop'` the latter terminates with exit 1, so the code would depend on
+where in the file the guard sits. See [`ensure-editor.ps1`](../../scripts/unity/ensure-editor.ps1).
 
 See [`lint-skill-sizes.ps1`](../../scripts/lint-skill-sizes.ps1) and [`lint-dependabot.ps1`](../../scripts/lint-dependabot.ps1) for the canonical shape.
 

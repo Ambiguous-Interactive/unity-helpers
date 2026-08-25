@@ -116,7 +116,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../.claude/settings.json) which ships with the repo) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit, so typos surface immediately; manual invocation before completion remains the expectation (the hook is a safety net, not a substitute -- it does not fire in CI or when editing outside Claude Code)
-- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script now declares a `ValueFromRemainingArguments` sibling -- `pwsh -File` binds the first token and drops the rest, so before that these commands linted ONE file and printed "No issues found". `PWS005` enforces the declaration
+- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbour happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
 - **Pre-push validation**: run `npm run validate:prepush` before push; it is a roughly one-second
@@ -151,6 +151,18 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses
   2021.3 reference assemblies and the MCP editor is on 6000.4, so it cost a full Unity matrix run to
   find. Same class as [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
+- **Every list-taking `Get*Components` overload clears the list itself, including on a zero-match
+  query** -- `GetComponents(Type, list)`, `GetComponents<T>(list)`, `GetComponentsInChildren`,
+  `GetComponentsInParent`. Measured on 6000.4.6f1. A `.Clear()` before one is dead code; a `.Clear()`
+  that guards a path which returns the buffer _without_ querying is not, so say which it is at the
+  site. And `UnityEngine.Object.operator !=` is a native aliveness check at **3.380 ns** against
+  **0.578 ns** for a managed reference compare -- 5.84x -- so a helper that has already established
+  liveness should hand back a `bool` with an `out`, never a `Component` the caller must null-test.
+- **Prefer `WallstopArrayPool<T>.Get(size, out T[] array)` over `System.Buffers.ArrayPool<T>.Shared`.**
+  It returns an array of EXACTLY `size` (System's is power-of-two bucketed, so `.Length` lies),
+  clears on release so a rent is already zeroed, and disposes through the `PooledArray<T>` handle --
+  a `using`, not a `try`/`finally`. Reach for System's pool only for a buffer whose lifetime is not
+  scoped, as `PooledBufferStream` does while growing.
 - **`UnityEngine.Object` declares `implicit operator bool`, so no `Component`-shaped expression is
   ever a type error in a boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A
   `bool`-returning method that ends `return FindTheThing(...);` compiles, converts the found object

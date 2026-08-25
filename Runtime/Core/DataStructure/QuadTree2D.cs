@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
-    using System.Buffers;
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using Extension;
@@ -209,15 +208,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucketSize = Math.Max(1, bucketSize);
-            int[] scratch = ArrayPool<int>.Shared.Rent(elementCount);
-            try
-            {
-                _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
-            }
-            finally
-            {
-                ArrayPool<int>.Shared.Return(scratch, clearArray: true);
-            }
+            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY the
+            // requested length, clears on release so the rent is already zeroed, and disposes
+            // through the PooledArray handle, so no try/finally is needed.
+            using PooledArray<int> scratchLease = WallstopArrayPool<int>.Get(
+                elementCount,
+                out int[] scratch
+            );
+            _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
         }
 
         /// <summary>
@@ -298,15 +296,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elements = builder.MoveToImmutable();
             _bounds = bounds;
             bucketSize = Math.Max(1, bucketSize);
-            int[] scratch = ArrayPool<int>.Shared.Rent(elementCount);
-            try
-            {
-                _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
-            }
-            finally
-            {
-                ArrayPool<int>.Shared.Return(scratch, clearArray: true);
-            }
+            // WallstopArrayPool rather than System's: it hands back an array of EXACTLY the
+            // requested length, clears on release so the rent is already zeroed, and disposes
+            // through the PooledArray handle, so no try/finally is needed.
+            using PooledArray<int> scratchLease = WallstopArrayPool<int>.Get(
+                elementCount,
+                out int[] scratch
+            );
+            _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
         }
 
         private QuadTreeNode BuildNode(

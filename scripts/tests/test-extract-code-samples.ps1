@@ -58,7 +58,9 @@ function Invoke-ExtractorForTree {
   try {
     $previous = $env:CODE_SAMPLES_ROOT
     $env:CODE_SAMPLES_ROOT = $tempDir
-    $output = & node $scriptPath --extract-only 2>&1
+    # --output-dir inside the fixture: DEFAULT_OUTPUT_DIR is pinned to the repository, so without
+    # this the self-test overwrites the real artifacts/code-samples report with fixture data.
+    $output = & node $scriptPath --extract-only --output-dir (Join-Path $tempDir 'artifacts') 2>&1
     $exitCode = $LASTEXITCODE
 
     return @{

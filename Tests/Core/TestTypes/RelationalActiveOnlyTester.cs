@@ -20,5 +20,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         [ChildComponent(IncludeInactive = false, OnlyDescendants = true)]
         public SphereCollider activeChild;
+
+        // Deliberately asymmetric with the two above: for parents, IncludeInactive gates only
+        // GameObject.activeInHierarchy, never per-component `enabled`. Asserted so the asymmetry
+        // is a decision on record rather than something a future sweep "fixes".
+        [ParentComponent(IncludeInactive = false, OnlyAncestors = true)]
+        public CapsuleCollider firstParentEvenIfDisabled;
     }
 }

@@ -1184,9 +1184,54 @@ Write-Host "unclosed param block"
     $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-broken\.ps1'
     Write-TestResult "Fail_Pws005UnparsableScriptIsReported" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 naming the unparsable script. Exit: $($result.ExitCode). Output: $($result.Output)"
 
-    # --- Pass_Pws005ArrayWithRemainingArgs ---
+    # --- Fail_Pws005SiblingWithoutPositionalBinding ---
+    # The sibling ALONE does not route stray values to itself: with positional binding on, they are
+    # offered to the other named parameters first. Measured -- ensure-editor.ps1 put a stray value in
+    # -InstallRoot. This is the half the rule originally mandated and that does not work by itself.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-sibling-only.ps1') -Value @'
+param(
+  [string[]]$Paths,
+  [string]$OutputDir = 'default',
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$AdditionalPaths
+)
+Write-Host $Paths
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-sibling-only\.ps1' -and $result.Output -match 'PositionalBinding'
+    Write-TestResult "Fail_Pws005SiblingWithoutPositionalBinding" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 naming PositionalBinding. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws005PositionalBindingWithoutSibling ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-binding-only.ps1') -Value @'
+[CmdletBinding(PositionalBinding = $false)]
+param(
+  [string[]]$Paths
+)
+Write-Host $Paths
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-binding-only\.ps1' -and $result.Output -match 'ValueFromRemainingArguments'
+    Write-TestResult "Fail_Pws005PositionalBindingWithoutSibling" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 naming the sibling. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws005NonStringArrayCovered ---
+    # The array-ness is what drops arguments; the element type is irrelevant.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/probe-int-array.ps1') -Value @'
+param(
+  [int[]]$Ports
+)
+Write-Host $Ports
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws005 = $result.Output -match 'PWS005' -and $result.Output -match 'probe-int-array\.ps1'
+    Write-TestResult "Fail_Pws005NonStringArrayCovered" ($result.ExitCode -ne 0 -and $hasPws005) "Expected exit != 0 + PWS005 for an [int[]] parameter. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws005ArrayWithBothHalves ---
     $root = New-FixtureRoot
     Set-Content -LiteralPath (Join-Path $root 'scripts/probe-ok.ps1') -Value @'
+[CmdletBinding(PositionalBinding = $false)]
 param(
   [string[]]$Paths,
   [Parameter(ValueFromRemainingArguments = $true)]
@@ -1196,7 +1241,7 @@ if ($AdditionalPaths) { $Paths = @($Paths) + @($AdditionalPaths) }
 Write-Host $Paths
 '@
     $result = Invoke-LintInFixture $root
-    Write-TestResult "Pass_Pws005ArrayWithRemainingArgs" ($result.ExitCode -eq 0) "Expected exit 0 when the sibling is declared. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Pass_Pws005ArrayWithBothHalves" ($result.ExitCode -eq 0) "Expected exit 0 when both halves are declared. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Pass_Pws005FunctionParameterNotFlagged ---
     # A function parameter is bound in process and never goes through -File argument binding.
