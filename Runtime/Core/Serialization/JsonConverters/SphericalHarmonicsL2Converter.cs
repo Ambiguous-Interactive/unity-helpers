@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using UnityEngine.Rendering;
-    using WallstopStudios.UnityHelpers.Utils;
 
     public sealed class SphericalHarmonicsL2Converter : JsonConverter<SphericalHarmonicsL2>
     {
@@ -28,13 +27,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 throw new JsonException($"Invalid token type {reader.TokenType}");
             }
 
-            float[] coeffs = null;
+            // stackalloc rather than a pooled rent: 27 floats is 108 bytes, and the previous shape
+            // assigned the rented array to a local that OUTLIVED its `using`, so the coefficients
+            // were read after the array had gone back to the pool. That survived only because the
+            // pool it used does not clear on release. It also validated the count by reading the
+            // array's own length, which silently required a pool returning the exact size asked for.
+            const int CoefficientCount = 27;
+            Span<float> coeffs = stackalloc float[CoefficientCount];
+            bool haveCoefficients = false;
 
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
                 {
-                    if (coeffs == null || coeffs.Length != 27)
+                    if (!haveCoefficients)
                     {
                         throw new JsonException("SphericalHarmonicsL2 requires 27 coefficients");
                     }
@@ -58,42 +64,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("coefficients must be an array");
                         }
-                        using (
-                            // SystemArrayPool: every one of the 27 slots is written before it
-                            // is read, and the count is validated separately, so the exact-size
-                            // pool buys nothing here.
-                            PooledArray<float> lease = SystemArrayPool<float>.Get(
-                                27,
-                                clearArray: false,
-                                out float[] tmp
-                            )
-                        )
+
+                        int i = 0;
+                        while (reader.Read())
                         {
-                            int i = 0;
-                            while (reader.Read())
+                            if (reader.TokenType == JsonTokenType.EndArray)
                             {
-                                if (reader.TokenType == JsonTokenType.EndArray)
-                                {
-                                    break;
-                                }
-
-                                if (27 <= i)
-                                {
-                                    throw new JsonException(
-                                        "Too many coefficients for SphericalHarmonicsL2"
-                                    );
-                                }
-
-                                tmp[i++] = reader.GetSingle();
+                                break;
                             }
-                            if (i != 27)
+
+                            if (CoefficientCount <= i)
                             {
                                 throw new JsonException(
-                                    "Expected 27 coefficients for SphericalHarmonicsL2"
+                                    "Too many coefficients for SphericalHarmonicsL2"
                                 );
                             }
-                            coeffs = tmp;
+
+                            coeffs[i++] = reader.GetSingle();
                         }
+                        if (i != CoefficientCount)
+                        {
+                            throw new JsonException(
+                                "Expected 27 coefficients for SphericalHarmonicsL2"
+                            );
+                        }
+                        haveCoefficients = true;
                     }
                     else
                     {

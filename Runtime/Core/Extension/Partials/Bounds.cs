@@ -36,11 +36,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         public static Rect GetWorldRect(this RectTransform transform)
         {
-            // SystemArrayPool: GetWorldCorners requires at least four elements, not exactly
-            // four -- measured on 6000.4.6f1, an eight-element array is accepted -- so this does not
-            // need the exact-size pool. clearArray is false because the call fills all four.
+            // SystemArrayPool: GetWorldCorners requires at least four elements, not exactly four --
+            // measured on 6000.4.6f1, an eight-element array is accepted -- so this does not need
+            // the exact-size pool. clearArray is false because the call fills all four.
+            const int CornerCount = 4;
             using PooledArray<Vector3> fourCornersResource = SystemArrayPool<Vector3>.Get(
-                4,
+                CornerCount,
                 clearArray: false,
                 out Vector3[] fourCorners
             );
@@ -49,8 +50,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float maxX = float.MinValue;
             float minY = float.MaxValue;
             float maxY = float.MinValue;
-            foreach (Vector3 corner in fourCorners)
+            // Indexed to CornerCount, NOT a foreach: this pool may hand back a LONGER array than
+            // requested, and folding its uninitialized tail into the bounds is exactly the bug that
+            // reddened every playmode leg once this stopped using an exact-size pool.
+            for (int i = 0; i < CornerCount; ++i)
             {
+                Vector3 corner = fourCorners[i];
                 minX = Mathf.Min(minX, corner.x);
                 maxX = Mathf.Max(maxX, corner.x);
                 minY = Mathf.Min(minY, corner.y);
