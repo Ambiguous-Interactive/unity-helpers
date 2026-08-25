@@ -174,7 +174,7 @@ jobs:
       # what "the battery" means.
       - name: Restore cached PractRand build
         id: cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .artifacts/random-quality/practrand
           key: practrand-${{ runner.os }}-${{ needs.resolve.outputs.practrand-sha256 }}
