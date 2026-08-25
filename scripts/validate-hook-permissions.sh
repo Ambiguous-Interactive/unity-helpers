@@ -7,9 +7,14 @@
 # .ps1 implementation files are invoked by those entrypoints and do not need +x.
 #
 # Usage:
-#   ./scripts/validate-hook-permissions.sh          # Check permissions
-#   ./scripts/validate-hook-permissions.sh --fix    # Fix permissions
-#   ./scripts/validate-hook-permissions.sh --help   # Show help
+#   ./scripts/validate-hook-permissions.sh                    # Check permissions
+#   ./scripts/validate-hook-permissions.sh --fix              # Fix permissions
+#   ./scripts/validate-hook-permissions.sh --repo-root <dir>  # Check another tree
+#   ./scripts/validate-hook-permissions.sh --help             # Show help
+#
+# --repo-root exists so the self-test can build a throwaway repository whose hook
+# entrypoint is tracked 100644. A green run over this repository proves these hooks
+# are executable, not that this script would still report one that is not.
 #
 # Exit codes:
 #   0 - All hook entrypoints have executable permissions
@@ -20,8 +25,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-cd "$REPO_ROOT"
 
 # Colors for output
 RED='\033[0;31m'
@@ -58,8 +61,9 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --fix     Fix non-executable hook files (git update-index --chmod=+x)"
-    echo "  --help    Show this help message"
+    echo "  --fix               Fix non-executable hook files (git update-index --chmod=+x)"
+    echo "  --repo-root <dir>   Repository to validate (default: this script's repository)"
+    echo "  --help              Show this help message"
     echo ""
     echo "Checks:"
     echo "  Verifies extensionless files in $HOOKS_DIR/ are tracked as 100755"
@@ -70,23 +74,35 @@ show_help() {
 }
 
 # Parse arguments
-case "${1:-}" in
-    --fix)
-        FIX_MODE=1
-        ;;
-    --help|-h)
-        show_help
-        exit 0
-        ;;
-    "")
-        # Default: check mode
-        ;;
-    *)
-        echo "Unknown option: $1"
-        show_help
-        exit 1
-        ;;
-esac
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --fix)
+            FIX_MODE=1
+            ;;
+        --repo-root)
+            if [ "$#" -lt 2 ]; then
+                echo "--repo-root requires a directory argument"
+                exit 1
+            fi
+            if [ ! -d "$2" ]; then
+                echo "--repo-root directory not found: $2"
+                exit 1
+            fi
+            REPO_ROOT="$(cd "$2" && pwd)"
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+    shift
+done
 
 cd "$REPO_ROOT"
 

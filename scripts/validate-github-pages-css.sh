@@ -159,23 +159,44 @@ check_pattern() {
     fi
 }
 
-# Simpler approach: check if both selector and property exist nearby
-# by flattening the CSS and searching
+# Extracts every top-level block opened by a line matching the selector pattern,
+# brace-depth counted so a nested at-rule cannot end the block early.
+extract_selector_blocks() {
+    local selector_pattern="$1"
+
+    awk -v pat="$selector_pattern" '
+        !inblock && $0 ~ pat { inblock = 1; depth = 0 }
+        inblock {
+            print
+            opens = gsub(/\{/, "{")
+            closes = gsub(/\}/, "}")
+            depth += opens - closes
+            if (depth <= 0) { inblock = 0 }
+        }
+    ' "$CSS_FILE"
+}
+
+# The property must be INSIDE the selector's own block. Searching the whole file
+# for each half independently answers "does this file contain a float: none
+# anywhere", which `section { float: none }` satisfies on behalf of `header` --
+# the rule then cannot report the removal it exists to catch (#556).
 check_css_rule() {
     local description="$1"
     local selector_pattern="$2"
     local property_pattern="$3"
     local required="${4:-true}"
 
-    # Check if selector exists
     local has_selector=0
     local has_property=0
+    local blocks
 
-    if $GREP -E "$selector_pattern" "$CSS_FILE" >/dev/null 2>&1; then
+    blocks="$(extract_selector_blocks "$selector_pattern")"
+
+    if [ -n "$blocks" ]; then
         has_selector=1
     fi
 
-    if $GREP -E "$property_pattern" "$CSS_FILE" >/dev/null 2>&1; then
+    if printf '%s\n' "$blocks" | $GREP -E "$property_pattern" >/dev/null 2>&1; then
         has_property=1
     fi
 

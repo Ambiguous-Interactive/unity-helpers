@@ -14,15 +14,33 @@
     fix is invisible: a NuGet refresh that drops a new DLL into Runtime/Binaries, or regenerates a
     .meta without the constraint, reintroduces the conflict with nothing to notice it. Every DLL
     must therefore be classified below, and its importer must match its classification.
+.PARAMETER BinariesRoot
+    Directory of bundled DLLs to classify. Defaults to Runtime/Binaries. Exists so the self-test
+    can drive every rule against a fixture directory -- a green run over the shipped binaries
+    proves those four DLLs are constrained, not that this linter still reports.
 #>
-[CmdletBinding()]
-param([switch]$VerboseOutput)
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [string]$BinariesRoot,
+    [switch]$VerboseOutput,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArguments
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
+    Write-Error "Unexpected arguments: $($RemainingArguments -join ', ')"
+    exit 1
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$binariesRoot = Join-Path $repoRoot 'Runtime/Binaries'
+$binariesRoot = if ([string]::IsNullOrWhiteSpace($BinariesRoot)) {
+    Join-Path $repoRoot 'Runtime/Binaries'
+} else {
+    $BinariesRoot
+}
 $guidePath = 'docs/guides/bundled-assembly-conflicts.md'
 
 # Unity began shipping these three from Editor/Data/BCLExtensions in 6000.5, at 8.0.0.0 against our

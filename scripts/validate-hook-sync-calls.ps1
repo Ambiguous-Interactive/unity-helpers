@@ -12,18 +12,34 @@
 
     This prevents regressions where new sync scripts are added to the
     repository but not wired into the pre-commit hook.
+.PARAMETER RepoRoot
+    Repository root to validate. Defaults to the parent of this script's directory. Exists so the
+    self-test can hand this validator a fixture tree with one required call removed -- a green run
+    over the real .githooks proves the hooks are wired, not that the validator still reports.
 .EXAMPLE
     pwsh -NoProfile -File scripts/validate-hook-sync-calls.ps1
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [switch]$VerboseOutput
+    [string]$RepoRoot,
+    [switch]$VerboseOutput,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArguments
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
+    Write-Error "Unexpected arguments: $($RemainingArguments -join ', ')"
+    exit 1
+}
+
+$repoRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    Split-Path -Parent $PSScriptRoot
+} else {
+    $RepoRoot
+}
 $preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit.ps1'
 
 if (-not (Test-Path $preCommitPath)) {

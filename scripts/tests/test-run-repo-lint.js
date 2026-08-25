@@ -541,15 +541,10 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   //
   // Debt is carried here rather than hidden: each entry names the issue tracking the missing red
   // half, so the allowlist is a work list rather than an excuse.
-  const missingRedHalf = new Map([
-    ["scripts/lint-bundled-assemblies.ps1", "#562"],
-    ["scripts/lint-doc-counts.ps1", "#562"],
-    ["scripts/lint-unity-test-modules.ps1", "#562"],
-    ["scripts/validate-devcontainer-config.ps1", "#562"],
-    ["scripts/validate-github-pages-css.sh", "#562"],
-    ["scripts/validate-hook-permissions.sh", "#562"],
-    ["scripts/validate-hook-sync-calls.ps1", "#562"]
-  ]);
+  // Emptied in session 224: all seven entries received a self-test with a red half per rule. The
+  // map stays, because the two assertions below it are the mechanism that keeps it a work list --
+  // an entry may not outlive its file, and may not outlive its coverage.
+  const missingRedHalf = new Map([]);
 
   // This file and its sibling are REGISTRIES: they name linters in allowlists rather than run
   // them, so scanning them for a mention counts an excuse as coverage. The first draft did, and

@@ -85,6 +85,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         /// <remarks>
+        /// The package must have exactly ONE decoder. <c>channel * ChannelStep</c> multiplies by the
+        /// rounded reciprocal of 255 and differs from a true division by one ULP on 126 of the 256
+        /// channels, so a caller that writes <c>c.a / 255f</c> and a caller that calls
+        /// <see cref="ColorQuantization.ToNormalized(byte)"/> would classify the same pixel differently.
+        /// That is the mistake the type's own remarks quote an article about.
+        /// </remarks>
+        [Test]
+        public void ToNormalizedIsATrueDivisionAtEveryChannel()
+        {
+            for (int channel = 0; channel <= byte.MaxValue; ++channel)
+            {
+                float decoded = ColorQuantization.ToNormalized((byte)channel);
+                float division = channel / 255f;
+                Assert.AreEqual(
+                    Bits(division),
+                    Bits(decoded),
+                    $"Channel {channel} decoded to {decoded:R}, but / 255f is {division:R}."
+                );
+            }
+        }
+
+        /// <remarks>
+        /// The other decoder every consumer is exposed to. A <see cref="Color32"/> assigned to a
+        /// <see cref="Color"/> is Unity's own decode, and it is the one a texture read hands back, so
+        /// disagreeing with it means disagreeing with the engine on 126 of 256 channels.
+        /// </remarks>
+        [Test]
+        public void ToNormalizedMatchesUnityColor32Conversion()
+        {
+            for (int channel = 0; channel <= byte.MaxValue; ++channel)
+            {
+                Color unity = new Color32(
+                    (byte)channel,
+                    (byte)channel,
+                    (byte)channel,
+                    (byte)channel
+                );
+                float decoded = ColorQuantization.ToNormalized((byte)channel);
+                Assert.AreEqual(
+                    Bits(unity.r),
+                    Bits(decoded),
+                    $"Channel {channel} decoded to {decoded:R}, but Unity decodes it to {unity.r:R}."
+                );
+            }
+        }
+
+        /// <remarks>
         /// The defining property: <c>channel &lt;= ToThresholdByte(cutoff)</c> must be the same question
         /// as <c>ToNormalized(channel) &lt;= cutoff</c>, for every channel and every cutoff. Rounding or
         /// ceiling the cutoff instead misclassifies the channel on the boundary, which is what let two
@@ -148,16 +195,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         /// <remarks>
         /// The exact pair the standalone leg reported, pinned so the regression has a name rather
-        /// than a seed. floor(0.8862745f * 255f) is 226; 226 / 255f is greater than the cutoff, so
-        /// 225 is the only answer that reproduces the comparison.
+        /// than a seed. This cutoff is not near a channel boundary - it IS one:
+        /// <c>0.8862745f</c> and <c>226 / 255f</c> are the same float, bit for bit. So 226 sits on
+        /// the cutoff and belongs under it. The answer used to be 225 only because the decoder
+        /// multiplied by the rounded reciprocal, which lifted channel 226 one ULP above its own
+        /// boundary; that is the disagreement the single decoder removes.
         /// </remarks>
         [Test]
         public void ToThresholdByteHandlesTheBoundaryCutoffThatFailedInCi()
         {
             const float cutoff = 0.8862745f;
 
-            Assert.IsFalse(ColorQuantization.ToNormalized(226) <= cutoff);
-            Assert.AreEqual(225, ColorQuantization.ToThresholdByte(cutoff));
+            Assert.AreEqual(Bits(cutoff), Bits(ColorQuantization.ToNormalized(226)));
+            Assert.IsTrue(ColorQuantization.ToNormalized(226) <= cutoff);
+            Assert.IsFalse(ColorQuantization.ToNormalized(227) <= cutoff);
+            Assert.AreEqual(226, ColorQuantization.ToThresholdByte(cutoff));
+        }
+
+        private static int Bits(float value)
+        {
+            return System.BitConverter.SingleToInt32Bits(value);
         }
 
         private static float NextUp(float value)

@@ -41,8 +41,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static class ColorQuantization
     {
         /// <summary>
-        /// The number of distinct steps between two adjacent 8-bit channel values, as a normalized float.
+        /// The distance between two adjacent 8-bit channel values, as a normalized float.
         /// </summary>
+        /// <remarks>
+        /// This is a step size, for scaling a tolerance expressed in channels. It is NOT the decode:
+        /// <c>channel * ChannelStep</c> is a multiply by the rounded reciprocal of 255 and differs from
+        /// <see cref="ToNormalized(byte)"/> by one ULP on 126 of the 256 channels. Use
+        /// <see cref="ToNormalized(byte)"/> to decode a channel.
+        /// </remarks>
         public const float ChannelStep = 1f / 255f;
 
         /// <summary>
@@ -50,10 +56,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="channel">The 8-bit channel value.</param>
         /// <returns>The channel divided by 255, so 0 maps to 0 and 255 maps to 1.</returns>
+        /// <remarks>
+        /// A true division, not a multiply by <see cref="ChannelStep"/>. The two disagree by one ULP on
+        /// 126 of the 256 channels, and every other decoder in reach - Unity's own
+        /// <see cref="Color32"/> to <see cref="Color"/> conversion, and the <c>/ 255f</c> the cited
+        /// article describes - divides. A decoder that rounds differently from its callers is the defect
+        /// this type exists to prevent.
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float ToNormalized(byte channel)
         {
-            return channel * ChannelStep;
+            return channel / 255f;
         }
 
         /// <summary>
@@ -116,11 +129,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             // floor(cutoff * 255f) is the ALGEBRAIC inverse of the decode, not the float one, and
             // this class's own remarks quote the rule it breaks: never mix the encode and decode
-            // steps of two quantizers. ToNormalized multiplies by the rounded reciprocal 1f/255f;
-            // this multiplies by 255f. The two round differently within a ULP of a boundary, where
-            // the multiply by 255 recovers exactly the value the reciprocal lost -- measured on
-            // 6000.4.6f1 as 126 disagreements across 3,820 probes taken at +/-2 ULP of every
-            // channel boundary, and found by the fuzz test failing on one of them in CI.
+            // steps of two quantizers. A multiply by 255f and a divide by 255f do not round alike
+            // within a ULP of a boundary, so the seed misclassifies the channel sitting on it --
+            // found by the fuzz test failing on one such cutoff in CI.
             //
             // So the answer is defined against ToNormalized itself, which is the comparison the
             // caller will actually make. The seed is off by at most one step, and both loops are

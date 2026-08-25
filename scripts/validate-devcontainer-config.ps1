@@ -9,18 +9,34 @@
 
     This prevents drift between the hook's formatting pipeline and the
     editor's formatter assignments.
+.PARAMETER RepoRoot
+    Repository root to validate. Defaults to the parent of this script's directory. Exists so the
+    self-test can drive each rule against a fixture tree -- a green run over the repository's own
+    configuration proves the configuration is consistent, not that the validator still reports.
 .EXAMPLE
     pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [switch]$VerboseOutput
+    [string]$RepoRoot,
+    [switch]$VerboseOutput,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArguments
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
+    Write-Error "Unexpected arguments: $($RemainingArguments -join ', ')"
+    exit 1
+}
+
+$repoRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    Split-Path -Parent $PSScriptRoot
+} else {
+    $RepoRoot
+}
 $devcontainerPath = Join-Path $repoRoot '.devcontainer' 'devcontainer.json'
 $preCommitPath = Join-Path $repoRoot '.githooks' 'pre-commit'
 $publishWorkflowPath = Join-Path $repoRoot '.github' 'workflows' 'build-publish-devcontainer.yml'
@@ -38,13 +54,11 @@ if (-not (Test-Path $preCommitPath)) {
     exit 1
 }
 
+# This subsumes a workflow-directory existence check, which used to sit below it and could never
+# fire: the publish workflow lives INSIDE that directory, so a missing directory always reported
+# here first. A guard that no input can reach is not a guard (#556).
 if (-not (Test-Path $publishWorkflowPath)) {
     Write-Error "Devcontainer publish workflow not found at: $publishWorkflowPath"
-    exit 1
-}
-
-if (-not (Test-Path $workflowDir)) {
-    Write-Error "Workflow directory not found at: $workflowDir"
     exit 1
 }
 

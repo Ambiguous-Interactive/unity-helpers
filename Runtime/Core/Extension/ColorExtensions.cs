@@ -141,6 +141,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesLAB(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
+                // The comparison below asks the same question per pixel that this asks once:
+                // which stored channels fall under the normalized cutoff.
+                byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 double l = 0;
                 double a = 0;
                 double b = 0;
@@ -166,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < n; ++i)
                         {
                             Color32 c = raw[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
@@ -184,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < px.Length; ++i)
                         {
                             Color32 c = px[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
@@ -204,6 +207,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesHSV(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
+                // The comparison below asks the same question per pixel that this asks once:
+                // which stored channels fall under the normalized cutoff.
+                byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 float sumCos = 0f;
                 float sumSin = 0f;
                 float sumS = 0f;
@@ -230,7 +236,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < n; ++i)
                         {
                             Color32 c = raw[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
@@ -250,7 +256,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < px.Length; ++i)
                         {
                             Color32 c = px[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
@@ -284,6 +290,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesWeighted(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
+                // The comparison below asks the same question per pixel that this asks once:
+                // which stored channels fall under the normalized cutoff.
+                byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 const float rW = 0.299f;
                 const float gW = 0.587f;
                 const float bW = 0.114f;
@@ -313,14 +322,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < n; ++i)
                         {
                             Color32 c = raw[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
-                            float rf = c.r / 255f;
-                            float gf = c.g / 255f;
-                            float bf = c.b / 255f;
-                            float af = c.a / 255f;
+                            float rf = ColorQuantization.ToNormalized(c.r);
+                            float gf = ColorQuantization.ToNormalized(c.g);
+                            float bf = ColorQuantization.ToNormalized(c.b);
+                            float af = ColorQuantization.ToNormalized(c.a);
                             float w = rf * rW + gf * gW + bf * bW;
                             r += rf * w;
                             g += gf * w;
@@ -335,14 +344,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < px.Length; ++i)
                         {
                             Color32 c = px[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
-                            float rf = c.r / 255f;
-                            float gf = c.g / 255f;
-                            float bf = c.b / 255f;
-                            float af = c.a / 255f;
+                            float rf = ColorQuantization.ToNormalized(c.r);
+                            float gf = ColorQuantization.ToNormalized(c.g);
+                            float bf = ColorQuantization.ToNormalized(c.b);
+                            float af = ColorQuantization.ToNormalized(c.a);
                             float w = rf * rW + gf * gW + bf * bW;
                             r += rf * w;
                             g += gf * w;
@@ -364,6 +373,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color DominantColorFromSprites(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
+                // The comparison below asks the same question per pixel that this asks once:
+                // which stored channels fall under the normalized cutoff.
+                byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 using PooledResource<Dictionary<FastVector3Int, int>> bucketsLease =
                     DictionaryBuffer<FastVector3Int, int>.Dictionary.Get(
                         out Dictionary<FastVector3Int, int> buckets
@@ -392,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < n; ++i)
                         {
                             Color32 c = raw[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }
@@ -415,7 +427,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         for (int i = 0; i < px.Length; ++i)
                         {
                             Color32 c = px[i];
-                            if (c.a / 255f <= alphaCutoff)
+                            if (c.a <= alphaThreshold)
                             {
                                 continue;
                             }

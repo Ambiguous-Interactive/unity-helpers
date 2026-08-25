@@ -67,6 +67,41 @@ const CHECKS = [
     run: "npm run test:lint-changelog"
   },
   {
+    id: "lint-unity-test-modules",
+    name: "Unity test-project module manifest linter self-test",
+    run: "npm run test:lint-unity-test-modules"
+  },
+  {
+    id: "lint-bundled-assemblies",
+    name: "Bundled assembly constraint linter self-test",
+    run: "npm run test:lint-bundled-assemblies"
+  },
+  {
+    id: "lint-doc-counts",
+    name: "Documentation count linter self-test",
+    run: "npm run test:lint-doc-counts"
+  },
+  {
+    id: "validate-devcontainer-config",
+    name: "Devcontainer configuration validator self-test",
+    run: "npm run test:validate-devcontainer-config"
+  },
+  {
+    id: "validate-hook-permissions",
+    name: "Git hook permission validator self-test",
+    run: "npm run test:validate-hook-permissions"
+  },
+  {
+    id: "validate-hook-sync-calls",
+    name: "Git hook sync-call validator self-test",
+    run: "npm run test:validate-hook-sync-calls"
+  },
+  {
+    id: "validate-github-pages-css",
+    name: "GitHub Pages CSS validator self-test",
+    run: "npm run test:validate-github-pages-css"
+  },
+  {
     id: "lint-dependabot",
     name: "Dependabot linter self-test",
     run: "npm run test:lint-dependabot"
