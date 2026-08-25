@@ -50,8 +50,6 @@ const ANALYZERS = [
   }
 ];
 const SHIPPED = "Runtime/Analyzers";
-/** Kept for the placement contract test, which enumerates the same shipped directory. */
-const PROJECTS = ANALYZERS.map((analyzer) => analyzer.project);
 
 function sha256(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -220,7 +218,7 @@ function main(argv) {
   }
 }
 
-module.exports = { ANALYZERS, PROJECTS, SHIPPED, verify };
+module.exports = { ANALYZERS, verify };
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));
