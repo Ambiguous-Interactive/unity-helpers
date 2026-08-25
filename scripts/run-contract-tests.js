@@ -40,6 +40,11 @@ const CHECKS = [
     run: "npm run test:analyzer-placement"
   },
   {
+    id: "verify-shipped-analyzers",
+    name: "Shipped analyzer freshness gate self-test",
+    run: "npm run test:verify-shipped-analyzers"
+  },
+  {
     id: "asset-postprocessor-reachability",
     name: "AssetPostprocessor reachability",
     run: "npm run test:asset-postprocessor-reachability"
