@@ -57,6 +57,11 @@ const CHECKS = [
 
   // Linter self-tests.
   {
+    id: "lint-changelog",
+    name: "Changelog linter self-test",
+    run: "npm run test:lint-changelog"
+  },
+  {
     id: "lint-dependabot",
     name: "Dependabot linter self-test",
     run: "npm run test:lint-dependabot"

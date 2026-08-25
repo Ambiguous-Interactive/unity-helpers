@@ -515,6 +515,129 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   );
 });
 
+runTest("no linter in scripts/ has been left unfalsifiable", () => {
+  // One level up from the assertion above. That one asks whether a linter RUNS; this one asks
+  // whether it can FAIL. For a scanner over a corpus that is clean by construction those are
+  // different questions, and only the first was being asked: session 221 hit three gates that
+  // reported success while checking nothing, all three by accident, because "found nothing" and
+  // "looked at nothing" print the same thing (#556).
+  //
+  // The property checked is that a linter has a self-test which INVOKES it and which some
+  // registered suite runs. A stronger-sounding "the self-test names a red half" was tried and
+  // dropped: every one of the 32 self-tests that exist already matches that vocabulary, so it
+  // discriminates nothing -- adding it would have been one more check that cannot go red, inside
+  // the test whose whole subject is checks that cannot go red.
+  //
+  // Debt is carried here rather than hidden: each entry names the issue tracking the missing red
+  // half, so the allowlist is a work list rather than an excuse.
+  const missingRedHalf = new Map([
+    ["scripts/lint-bundled-assemblies.ps1", "#562"],
+    ["scripts/lint-doc-counts.ps1", "#562"],
+    ["scripts/lint-unity-test-modules.ps1", "#562"],
+    ["scripts/validate-devcontainer-config.ps1", "#562"],
+    ["scripts/validate-github-pages-css.sh", "#562"],
+    ["scripts/validate-hook-permissions.sh", "#562"],
+    ["scripts/validate-hook-sync-calls.ps1", "#562"]
+  ]);
+
+  // This file and its sibling are REGISTRIES: they name linters in allowlists rather than run
+  // them, so scanning them for a mention counts an excuse as coverage. The first draft did, and
+  // every entry in the list above came back "settled" purely because the list itself names it --
+  // and `lint-unity-test-modules.ps1` read as covered because the runElsewhere map above mentions
+  // it. That is #556's own shape, inside the check written for #556; it was caught only because
+  // the settled assertion below is a red half for the allowlist.
+  const registries = new Set(["test-run-repo-lint.js", "test-run-contract-tests.js"]);
+
+  const testsDirectory = path.join(repoRoot, "scripts", "tests");
+  const selfTests = fs
+    .readdirSync(testsDirectory)
+    .filter((name) => /\.(?:ps1|sh|js|mjs)$/.test(name) && !registries.has(name));
+  const selfTestSource = new Map(
+    selfTests.map((name) => [
+      `scripts/tests/${name}`,
+      fs.readFileSync(path.join(testsDirectory, name), "utf8")
+    ])
+  );
+
+  // A self-test nothing runs is worth exactly as much as one that cannot fail, so reachability is
+  // part of the property rather than a separate assertion.
+  const reachableTests = new Set([
+    ...scriptPathsIn(
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+    ),
+    ...scriptPathsIn(leafCommands(CHECKS)),
+    ...scriptPathsIn(expandNpmScript("validate:tests"))
+  ]);
+
+  const linters = fs
+    .readdirSync(path.join(repoRoot, "scripts"))
+    .filter((name) => /^(?:lint|validate)-.*\.(?:ps1|sh|js|mjs)$/.test(name))
+    .sort();
+
+  const unfalsifiable = [];
+  for (const linter of linters) {
+    const relative = `scripts/${linter}`;
+    if (missingRedHalf.has(relative)) {
+      continue;
+    }
+    const covering = [...selfTestSource.entries()]
+      .filter(([, source]) => source.includes(linter))
+      .map(([file]) => file);
+    if (covering.length === 0) {
+      unfalsifiable.push(`${relative} (no self-test invokes it)`);
+      continue;
+    }
+    if (!covering.some((file) => reachableTests.has(file))) {
+      unfalsifiable.push(
+        `${relative} (self-test exists but no suite runs it: ${covering.join(", ")})`
+      );
+    }
+  }
+
+  assert.deepStrictEqual(
+    unfalsifiable,
+    [],
+    `these linters have no reachable self-test that can make them report, so a green run of them ` +
+      `is not evidence they still fire -- add one under scripts/tests/ and register it in ` +
+      `scripts/run-contract-tests.js: ${unfalsifiable.join(", ")}`
+  );
+
+  // Same rule as the allowlist above: an entry that outlives its file excuses nothing.
+  const staleDebt = [...missingRedHalf.keys()].filter(
+    (file) => !fs.existsSync(path.join(repoRoot, file))
+  );
+  assert.deepStrictEqual(
+    staleDebt,
+    [],
+    `the missing-red-half list names files that no longer exist: ${staleDebt.join(", ")}`
+  );
+
+  // And an entry that has since GROWN a self-test must leave, or the list quietly re-excuses a
+  // linter that is already covered and the next reader believes the debt is larger than it is.
+  const settled = [...missingRedHalf.keys()].filter((file) => {
+    const linter = path.basename(file);
+    return [...selfTestSource.entries()].some(
+      ([test, source]) => source.includes(linter) && reachableTests.has(test)
+    );
+  });
+  assert.deepStrictEqual(
+    settled,
+    [],
+    `these linters now have a reachable self-test and must come off the missing-red-half list: ` +
+      `${settled.join(", ")}`
+  );
+
+  // Every excuse points at a filed issue, so the debt is trackable rather than folklore.
+  const untracked = [...missingRedHalf.entries()]
+    .filter(([, issue]) => !/^#[0-9]+$/.test(issue))
+    .map(([file, issue]) => `${file} (claimed: ${issue})`);
+  assert.deepStrictEqual(
+    untracked,
+    [],
+    `every missing-red-half entry must name the issue tracking it: ${untracked.join(", ")}`
+  );
+});
+
 // Exported so scripts/tests/test-run-contract-tests.js can make the same "is this claim true"
 // assertions against the sibling registry without a second copy of the mention-stripping rules --
 // every one of which exists because a shape produced a false "this owner runs it".

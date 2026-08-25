@@ -1,6 +1,10 @@
 Param(
   [switch]$VerboseOutput,
-  [int]$MaxEntryLength = 300
+  [int]$MaxEntryLength = 300,
+  # Defaults to the repository's own CHANGELOG.md. It is a parameter so the linter can be pointed
+  # at a fixture: being hard-wired to one file is why it was the only linter in scripts/ with no
+  # self-test that could make it report (#556).
+  [string]$ChangelogPath
 )
 
 Set-StrictMode -Version Latest
@@ -49,7 +53,12 @@ $validChangeTypes = @(
 Write-Info "Starting CHANGELOG.md validation..."
 
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
-$changelogPath = Join-Path -Path $repoRoot -ChildPath 'CHANGELOG.md'
+$changelogPath = if ([string]::IsNullOrWhiteSpace($ChangelogPath)) {
+  Join-Path -Path $repoRoot -ChildPath 'CHANGELOG.md'
+}
+else {
+  $ChangelogPath
+}
 
 $errorList = @()
 $warningList = @()

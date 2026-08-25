@@ -188,6 +188,7 @@
     "test:configure-git-defaults": "bash scripts/tests/test-configure-git-defaults.sh",
     "test:github-token": "bash scripts/tests/test-github-token.sh",
     "test:normalize-container-git-config": "bash scripts/tests/test-normalize-container-git-config.sh",
+    "test:lint-changelog": "pwsh -NoProfile -File scripts/tests/test-lint-changelog.ps1 -VerboseOutput",
     "test:lint-dependabot": "pwsh -NoProfile -File scripts/tests/test-lint-dependabot.ps1 -VerboseOutput",
     "test:lint-duplicate-usings": "pwsh -NoProfile -File scripts/tests/test-lint-duplicate-usings.ps1 -VerboseOutput",
     "test:lint-preserve-attributes": "pwsh -NoProfile -File scripts/tests/test-lint-preserve-attributes.ps1 -VerboseOutput",
