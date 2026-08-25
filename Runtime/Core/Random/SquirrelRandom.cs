@@ -61,7 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Fair,
         "Hash-based generator built on Squirrel3. Measured: fails PractRand 0.95 FPF-14+6/16 at 1GB, reproducibly across four seeds. Good equidistribution for the table lookups it was designed for; not a general-purpose stream.",
         "Squirrel Eiserloh",
-        "https://youtu.be/LWFzPP8ZbdU?t=2673" // GDC talk on Squirrel noise
+        "https://youtu.be/LWFzPP8ZbdU?t=2673", // GDC talk on Squirrel noise
+        period: "2^32 (32-bit position counter)"
     )]
     [Serializable]
     [DataContract]

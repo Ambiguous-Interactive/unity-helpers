@@ -55,7 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.VeryGood,
         "Well-known SplitMix64 mixer; passes TestU01 BigCrush and PractRand up to large data sizes in literature.",
         "Vigna 2014",
-        "https://prng.di.unimi.it/splitmix64.c"
+        "https://prng.di.unimi.it/splitmix64.c",
+        period: "2^64 (published)"
     )]
     [Serializable]
     [DataContract]

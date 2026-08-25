@@ -66,7 +66,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Fair,
         "Mirrors UnityEngine.Random, documented by Unity as Xorshift 128; suitable for legacy compatibility but not high-stakes simulation.",
         "UnityEngine.Random",
-        "https://docs.unity3d.com/ScriptReference/Random.html"
+        "https://docs.unity3d.com/ScriptReference/Random.html",
+        period: "2^128-1 (Unity documents Xorshift 128)"
     )]
     [Serializable]
     [DataContract]

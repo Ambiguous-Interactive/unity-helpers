@@ -57,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.VeryGood,
         "Wyhash-based generator; published testing shows it clears BigCrush/PractRand with wide seed coverage.",
         "Wang Yi 2019",
-        "https://github.com/wangyi-fudan/wyhash"
+        "https://github.com/wangyi-fudan/wyhash",
+        period: "2^64 (published)"
     )]
     [Serializable]
     [DataContract]

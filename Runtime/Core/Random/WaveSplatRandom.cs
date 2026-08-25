@@ -55,7 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Experimental,
         "Single-word chaotic generator; author notes period 2^64 but provides no formal test results—treat as experimental.",
         "Will Stafford Parsons",
-        "" // Original repository wileylooper/wavesplat is offline
+        "", // Original repository wileylooper/wavesplat is offline
+        period: "2^64 (author's claim, unverified)"
     )]
     [Serializable]
     [DataContract]

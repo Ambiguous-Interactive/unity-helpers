@@ -72,7 +72,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Excellent,
         "Five-word rotate/xor/add generator driven by a 32-bit Weyl counter, and the generator PRNG.Instance returns. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author reports 64GB; that run cannot be checked -- the upstream repository is offline.",
         "Will Stafford Parsons",
-        "" // Original repository wileylooper/illusionflow is offline
+        "", // Original repository wileylooper/illusionflow is offline
+        period: "unpublished; 108/160 state bits live (measured)"
     )]
     [Serializable]
     [DataContract]

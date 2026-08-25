@@ -53,7 +53,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Poor,
         "Numerical Recipes 'quick and dirty' LCG (a=1664525, c=1013904223, m=2^32) returning the raw state, so bit k has period only 2^(k+1) -- measured linear complexity of bit k is 2^k+1, and bit 0 simply alternates. Cosmetic use only.",
         "Press et al., Numerical Recipes (ranqd1)",
-        ""
+        "",
+        period: "2^32; bit k only 2^(k+1)"
     )]
     [Serializable]
     [DataContract]

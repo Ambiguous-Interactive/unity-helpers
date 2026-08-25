@@ -76,7 +76,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Excellent,
         "xoshiro256** 1.0; the ** scrambler leaves no weak bit, and the native 64-bit word means NextUlong costs one state advance instead of the two every other 64-bit generator here needs.",
         "Blackman & Vigna 2018",
-        "https://prng.di.unimi.it/xoshiro256starstar.c"
+        "https://prng.di.unimi.it/xoshiro256starstar.c",
+        period: "2^256-1 (published)"
     )]
     [Serializable]
     [DataContract]

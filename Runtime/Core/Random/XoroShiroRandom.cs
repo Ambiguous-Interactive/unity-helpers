@@ -67,7 +67,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Good,
         "xoroshiro128+, returning the high 32 bits -- the half its authors recommend. The discarded low half is linear (bit 0 has linear complexity exactly 128); no output bit of the returned half is. A 64-bit draw costs two state advances, because a + scrambler has no strong 64-bit word to return.",
         "Blackman & Vigna 2018",
-        "https://prng.di.unimi.it/xoroshiro128plus.c"
+        "https://prng.di.unimi.it/xoroshiro128plus.c",
+        period: "2^128-1 (published)"
     )]
     [Serializable]
     [DataContract]

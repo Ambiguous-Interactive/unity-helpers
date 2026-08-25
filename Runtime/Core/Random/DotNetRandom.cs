@@ -55,7 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Poor,
         "Wraps System.Random, which on Mono and for seeded .NET Core is Knuth's subtractive lagged-Fibonacci generator (mod 2^31-1), not an LCG. The sequence is runtime-dependent, so do not rely on it for cross-platform determinism.",
         "System.Random considered harmful",
-        "https://nullprogram.com/blog/2017/09/21/"
+        "https://nullprogram.com/blog/2017/09/21/",
+        period: "runtime-dependent (System.Random); not fixed"
     )]
     [Serializable]
     [DataContract]

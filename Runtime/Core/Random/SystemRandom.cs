@@ -52,7 +52,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Poor,
         "Reimplements the classic .NET System.Random algorithm (Knuth subtractive lagged-Fibonacci, mod 2^31-1) so its sequence is serializable and stable across runtimes. Fails modern statistical batteries.",
         "System.Random considered harmful",
-        "https://nullprogram.com/blog/2017/09/21/"
+        "https://nullprogram.com/blog/2017/09/21/",
+        period: "unpublished; 1,717 state bits live (measured)"
     )]
     [Serializable]
     [DataContract]

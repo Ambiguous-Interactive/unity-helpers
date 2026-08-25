@@ -106,7 +106,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Excellent,
         "PCG XSH RR 64/32 variant; passes TestU01 BigCrush and PractRand in published results.",
         "O'Neill 2014",
-        "https://www.pcg-random.org/paper.html"
+        "https://www.pcg-random.org/paper.html",
+        period: "2^64 (published)"
     )]
     [Serializable]
     [DataContract]

@@ -58,7 +58,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Good,
         "Chaotic ARX mixer rather than a proven statistically optimal generator. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails.",
         "Will Stafford Parsons",
-        "" // Original repository wileylooper/blastcircuit is offline
+        "", // Original repository wileylooper/blastcircuit is offline
+        period: "unpublished; 251/256 state bits live (measured)"
     )]
     [Serializable]
     [DataContract]

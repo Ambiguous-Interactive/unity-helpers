@@ -73,7 +73,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Excellent,
         "xoshiro128** 1.1; the ** scrambler leaves no weak bit, so NextBool and low-bit masks are as strong as the full word. Native 32-bit output, so NextUint discards nothing.",
         "Blackman & Vigna 2018",
-        "https://prng.di.unimi.it/xoshiro128starstar.c"
+        "https://prng.di.unimi.it/xoshiro128starstar.c",
+        period: "2^128-1 (published)"
     )]
     [Serializable]
     [DataContract]

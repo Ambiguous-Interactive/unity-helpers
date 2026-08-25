@@ -67,7 +67,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         RandomQuality.Poor,
         "Index-into-array generator over a fixed 1024-entry table of 32-bit values. One entry serves one NextUint, so the period is exactly 1024 draws. Deterministic by design, not statistically random.",
         "",
-        ""
+        "",
+        period: "1024 draws (measured: 10 state bits live)"
     )]
     [Serializable]
     [DataContract]

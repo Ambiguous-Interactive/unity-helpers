@@ -40,6 +40,11 @@ const CHECKS = [
     run: "npm run test:analyzer-placement"
   },
   {
+    id: "random-periods",
+    name: "Generator period declarations and docs",
+    run: "npm run test:random-periods"
+  },
+  {
     id: "verify-shipped-analyzers",
     name: "Shipped analyzer freshness gate self-test",
     run: "npm run test:verify-shipped-analyzers"
