@@ -106,6 +106,25 @@ All generators implement the `IRandom` interface:
 | `DotNetRandom`                | Very Slow       | Poor         | runtime-dependent (System.Random); not fixed                                  | Bridging `System.Random` code to `IRandom`                    |
 | `WDoomRandom`                 | Fastest         | Poor         | 1024 draws (measured: 10 state bits live)                                     | Retro feel, deterministic replays                             |
 
+### Reading the Period column
+
+A period of 2^128 cannot be observed, so every value in that column is a claim and the column says
+whose. `(published)` quotes the algorithm's specification. `(author's claim, unverified)` is a
+number the upstream author states that nothing here has checked. And where nothing is published at
+all, the value reports what **was** measured instead: `state bits live (measured)` is the count of
+state bits observed to change over 3,000 `NextUint()` draws, out of the generator's declared state
+width.
+
+Read a live-state count as a **lower bound on state width, not a period**. Bits that did not move
+in 3,000 draws may still be live, and a wide state does not by itself guarantee a long cycle. It is
+there because it is the strongest honest statement available for a generator whose author published
+no period -- and because four `Excellent` ratings in this roster came from repositories that are now
+offline, so a quoted period with no source is exactly the failure this column is meant to avoid.
+
+Each generator declares its own value through `[RandomGeneratorMetadata(period: "...")]`, readable
+at run time as `RandomGeneratorMetadataRegistry.Snapshot(type).Period`. A contract test fails the
+build if a generator declares none, or if this table and the annotation disagree.
+
 `Xoshiro128StarStar` and `Xoshiro256StarStar` are new and have not been through the benchmark
 harness yet; their speed rows fill in the next time
 [Random Performance](../../performance/random-performance.md) is regenerated. Both are rated
