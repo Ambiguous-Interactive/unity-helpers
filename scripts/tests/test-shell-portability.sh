@@ -336,21 +336,43 @@ else
 fi
 
 echo ""
-echo "--- B3: Unity package export project stays below artifacts root ---"
+echo "--- B3: Unity package export project stays below an allowed root ---"
 
 run_test
 unity_export_package="$REPO_ROOT/scripts/unity/export-unitypackage.sh"
-root_guard_line=$(first_match_line -F '"${PROJECT_DIR}" == "${ARTIFACTS_ROOT}"' "$unity_export_package")
-outside_guard_line=$(first_match_line -F '"${PROJECT_DIR}" != "${ARTIFACTS_ROOT}/"*' "$unity_export_package")
+root_guard_line=$(first_match_line -F '"${PROJECT_DIR}" != "${allowed_root}"' "$unity_export_package")
+outside_guard_line=$(first_match_line -F '"${PROJECT_DIR}" == "${allowed_root}/"*' "$unity_export_package")
+allowed_roots_line=$(first_match_line -F 'for allowed_root in "${ARTIFACTS_ROOT}" "${TEMP_ROOT}"' "$unity_export_package")
 delete_line=$(first_match_line -F 'rm -rf "${PROJECT_DIR}"' "$unity_export_package")
-if [[ -z "$root_guard_line" || -z "$outside_guard_line" || -z "$delete_line" ]]; then
+if [[ -z "$root_guard_line" || -z "$outside_guard_line" || -z "$allowed_roots_line" || -z "$delete_line" ]]; then
     fail "Unity package export project guard is missing expected structure" \
-        "root_guard_line='${root_guard_line}', outside_guard_line='${outside_guard_line}', delete_line='${delete_line}'"
-elif (( root_guard_line < delete_line && outside_guard_line < delete_line )); then
-    pass "Unity package export refuses artifacts root before deleting the project directory"
+        "root_guard_line='${root_guard_line}', outside_guard_line='${outside_guard_line}', allowed_roots_line='${allowed_roots_line}', delete_line='${delete_line}'"
+elif (( root_guard_line < delete_line && outside_guard_line < delete_line && allowed_roots_line < delete_line )); then
+    pass "Unity package export refuses an allowed root itself before deleting the project directory"
 else
     fail "Unity package export validates project path too late" \
-        "Root guard line ${root_guard_line}, outside guard line ${outside_guard_line}, delete line ${delete_line}"
+        "Root guard line ${root_guard_line}, outside guard line ${outside_guard_line}, allowed roots line ${allowed_roots_line}, delete line ${delete_line}"
+fi
+
+# The structural check above cannot tell a guard that runs from one that is merely present, and
+# this guard stands in front of an `rm -rf` of a caller-supplied path. Drive it: both refusals
+# are cheap, because the guard is ahead of the npm pack (#556).
+run_test
+guard_refusals=()
+for refused_dir in "$REPO_ROOT/.artifacts" "$REPO_ROOT" "/"; do
+    guard_output="$(bash "$unity_export_package" --stage-only --project-dir "$refused_dir" 2>&1 || true)"
+    if ! grep -Fq 'Refusing to create the export project' <<<"$guard_output"; then
+        guard_refusals+=("$refused_dir")
+    fi
+done
+# The accepting half is B5 below, which stages into a strict subdirectory of the temp root and
+# asserts what lands there. Running an accepting case here too would pay for a second `npm pack`
+# (4.4 s) to learn the same thing.
+if (( ${#guard_refusals[@]} == 0 )); then
+    pass "Unity package export refuses the artifacts root, the repository root and /"
+else
+    fail "Unity package export accepted a project directory it must refuse" \
+        "Accepted: ${guard_refusals[*]}"
 fi
 
 echo ""
@@ -374,9 +396,12 @@ echo ""
 echo "--- B5: Unity package export stages package content roots ---"
 
 run_test
-stage_project="$REPO_ROOT/.artifacts/unity/shell-portability-unitypackage-stage"
+# Staged under the system temp directory, not .artifacts. Copying the packed package is ~1,900
+# files and 82 MB, and on a bind-mounted workspace that copy IS this check: 15.0 s against ~1 s
+# for the same --stage-only run into a temp directory, plus 1.4 s for each rm -rf (#540).
+stage_root="$(mktemp -d)"
+stage_project="$stage_root/unitypackage-stage"
 stage_log="$(mktemp)"
-rm -rf "$stage_project"
 if bash "$unity_export_package" --stage-only --project-dir "$stage_project" >"$stage_log" 2>&1; then
     staged_root="$stage_project/Assets/WallstopStudios/UnityHelpers"
     required_stage_entries=(
@@ -425,7 +450,7 @@ else
     stage_tail="$(tail -n 40 "$stage_log" 2>/dev/null || true)"
     fail "Unity package export stage-only command failed" "$stage_tail"
 fi
-rm -rf "$stage_project"
+rm -rf "$stage_root"
 rm -f "$stage_log"
 
 echo ""
