@@ -295,6 +295,30 @@ Tips
 - Capacity grows automatically when setting beyond bounds; prefer sizing appropriately upfront for fewer resizes.
 - Left/Right shift drop/zero-fill at the edges; use with care if capacity is small.
 
+## IntMap (Int-Keyed Open-Addressing Map)
+
+- What it is: `IntMap<TValue>`, a hash table with linear probing, a power-of-two table and keys compared as raw integers — no `IEqualityComparer` indirection anywhere on the lookup path.
+- Use for: read-mostly lookups keyed by entity ids, network ids, slot indices or any dense/sparse int id.
+- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 load factor.
+- Pros: measured 1.97x–2.19x faster than `Dictionary<int,int>` hit-heavy lookups on Unity 6000.4 editor Mono; 1.26x–1.65x at a 50% miss rate.
+- Cons: misses are where probing loses — a miss-dominated workload should stay on `Dictionary<int,int>`; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+var map = new IntMap<HealthState>();
+map.TrySet(entityId, HealthState.Poisoned);
+if (map.TryGet(entityId, out HealthState state)) { /* ... */ }
+map.TrySet(entityId, HealthState.Healthy);   // overwrite in place
+map.Remove(entityId);                        // leaves a tombstone, compacted at next resize
+```
+
+Tips and pitfalls
+
+- The published margins come from the protocol in the repository's benchmarks: counterbalanced orderings with a settled heap per slot, so the numbers describe the code rather than the machine. Re-measure before shipping a claim of your own.
+- Removed entries become tombstones that still occupy slots until growth compacts them away. Churning removals pays for its own churn.
+- Keys below `IntMap<TValue>.MinimumAllowedKey` name slot states and are refused by `TrySet`; the indexer throws for them.
+
 ## Quick Selection Guide
 
 - Need O(1) membership and dense iteration: Sparse Set
@@ -305,6 +329,7 @@ Tips
 - Need compact boolean set: Bitset
 - Need dynamic connectivity: Disjoint Set
 - Need auto-evicting key-value store: Cache
+- Need the fastest int-keyed lookups for a hit-heavy workload: IntMap
 
 Common pitfalls
 
@@ -322,6 +347,7 @@ Common pitfalls
 - Trie: insert/search O(m)
 - Bitset: set/test O(1), bitwise ops O(n/word_size)
 - Cache: get/set/remove O(1), expiration scan O(n)
+- IntMap: TryGet/TrySet/Remove amortized O(1), O(1) worst-case memory per slot; speed depends on hit rate
 
 Notes on constants
 
