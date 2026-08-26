@@ -1592,6 +1592,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(7)]
         [WProtoMember(7)]
         public Dictionary<string, TimeSpan> DurationsByName;
+
+        /// <summary>Travels as a plain varint of the code unit.</summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public char Code;
+
+        /// <summary>Travels as the UTF-8 bytes of OriginalString under one length prefix.</summary>
+        [ProtoMember(9)]
+        [WProtoMember(9)]
+        public Uri Source;
+
+        /// <summary>A repeated scalar whose elements are all written, zeros included.</summary>
+        [ProtoMember(10)]
+        [WProtoMember(10)]
+        public List<char> CodePoints;
     }
 
     /// <summary>BCL value types in the map-key position protobuf-net accepts.</summary>
@@ -1623,5 +1638,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(4)]
         [WProtoMember(4)]
         public Dictionary<decimal, int> ByAmount;
+
+        /// <summary>A char key, a plain varint like any other integer key.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public Dictionary<char, int> ByCode;
     }
 }

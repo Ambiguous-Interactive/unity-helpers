@@ -86,6 +86,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool IsReference;
 
         /// <summary>
+        /// Whether this shape opts out of packed runs despite carrying a packable wire type.
+        /// </summary>
+        /// <remarks>
+        /// Measured against protobuf-net 3.2.56: repeated <c>char</c> elements each carry their own
+        /// field key -- the oracle packs integers but refuses to pack code units, so one byte of
+        /// type eligibility differs between two shapes sharing a wire type.
+        /// </remarks>
+        internal bool NeverPacked;
+
+        /// <summary>
         /// Reports whether protobuf-net would accept this shape in a packed run.
         /// </summary>
         /// <remarks>
@@ -95,9 +105,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// payload for a member this package always writes unpacked.
         /// </remarks>
         internal bool Packable =>
-            WireType == Proto + ".WProtoWireType.Varint"
-            || WireType == Proto + ".WProtoWireType.Fixed32"
-            || WireType == Proto + ".WProtoWireType.Fixed64";
+            !NeverPacked
+            && (
+                WireType == Proto + ".WProtoWireType.Varint"
+                || WireType == Proto + ".WProtoWireType.Fixed32"
+                || WireType == Proto + ".WProtoWireType.Fixed64"
+            );
 
         /// <summary>
         /// Substitutes <paramref name="value"/> for the placeholder in <paramref name="fragment"/>.
@@ -316,6 +329,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     return Unsigned32(qualified, type.SpecialType == SpecialType.System_UInt32);
                 }
+                case SpecialType.System_Char:
+                {
+                    // Measured against both oracle majors: a code unit travels as a plain varint and
+                    // a member at '\0' is omitted, exactly like the unsigned half-width integers --
+                    // which is why this case sits beside them rather than among the wrapped BCL
+                    // messages below.
+                    return Char();
+                }
                 case SpecialType.System_Int64:
                 {
                     return new Shape
@@ -515,6 +536,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     shape.IsMessage = false;
                     return shape;
                 }
+                case "global::System.Uri":
+                {
+                    // Measured against both oracle majors: the payload is the UTF-8 bytes of
+                    // OriginalString with no inner field keys, wrapped in one length prefix under
+                    // the member's key -- identical form at a root, which is why it rides the
+                    // message factory rather than a scalar shape. The runtime formatter refuses an
+                    // empty or unreadable payload instead of manufacturing a Uri.
+                    Shape shape = Message(
+                        Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                        qualified,
+                        isValueType: false
+                    );
+                    shape.IsMessage = false;
+                    return shape;
+                }
                 default:
                 {
                     return null;
@@ -680,6 +716,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T
                 ? named.TypeArguments[0]
                 : type;
+        }
+
+        /// <summary>
+        /// The shape of a <see cref="char"/> code unit, a plain varint like the unsigned integers.
+        /// </summary>
+        /// <remarks>
+        /// The presence test is textual so the generated comparison states the value that is
+        /// actually omitted, mirroring how the oracle drops a member at its default. Packing stays
+        /// off because the oracle writes every repeated code unit under its own key -- see
+        /// <see cref="NeverPacked"/>.
+        /// </remarks>
+        private static Shape Char()
+        {
+            return new Shape
+            {
+                WireType = Proto + ".WProtoWireType.Varint",
+                PresenceTest = Placeholder + " != '\\0'",
+                SizeExpression = Proto + ".WProtoSizes.Varint32Size((uint)" + Placeholder + ")",
+                WriteMethod = "TryWriteVarint32",
+                ReadMethod = "TryReadVarint32",
+                ReadLocalType = "uint",
+                AssignExpression = "(char)" + Placeholder,
+                WriteCast = "(uint)",
+                NeverPacked = true,
+            };
         }
 
         private static Shape Unsigned32(string qualified, bool exact)

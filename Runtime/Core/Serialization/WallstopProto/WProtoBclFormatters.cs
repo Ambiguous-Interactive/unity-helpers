@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
     using System.Buffers.Binary;
     using System.Runtime.InteropServices;
+    using System.Text;
 
     /// <summary>
     /// Shared pieces of the wire encoding protobuf-net gives the base-class-library value types,
@@ -14,9 +15,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// Measured against protobuf-net 2.4.9 and 3.2.56: both majors emit identical bytes for every
-    /// <see cref="DateTime"/>, <see cref="TimeSpan"/>, <see cref="Guid"/> and <see cref="decimal"/>
-    /// probed, so one implementation serves both. A <see cref="DateTimeOffset"/> has no oracle
-    /// encoding at all -- both majors refuse it -- and stays a generator refusal here.
+    /// <see cref="DateTime"/>, <see cref="TimeSpan"/>, <see cref="Guid"/>, <see cref="decimal"/>,
+    /// <see cref="char"/> and single-valued <see cref="Uri"/> probed, so one implementation serves
+    /// both. The remaining base-class-library shapes stay refused deliberately rather than "yet":
+    /// a <see cref="DateTimeOffset"/> has no oracle encoding in either major, the two pointer
+    /// types are refused by 2.x outright while their serialized value outlives nothing it points
+    /// at, and a serialized <see cref="Type"/> is a runtime-bound assembly-qualified name that one
+    /// machine cannot read back on another.
     /// </remarks>
     internal static class WProtoBcl
     {
@@ -31,6 +36,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private static readonly IWProtoFormatter<decimal> DecimalRoot =
             new WProtoBclRootFormatter<decimal>();
+
+        private static readonly IWProtoFormatter<Uri> UriRoot = new WProtoBclRootFormatter<Uri>();
+
+        private static readonly IWProtoFormatter<char> CharRoot = new WProtoCharRootFormatter();
 
         /// <summary>The scale identifiers protobuf-net's <c>.bcl.TimeSpan</c> message carries.</summary>
         internal const int ScaleDays = 0;
@@ -217,13 +226,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Reports whether a closed generic type uses the BCL scalar-with-nested-payload semantics.
         /// </summary>
+        /// <summary>
+        /// Reports whether a closed generic type uses one of the base-class-library encodings that
+        /// is not a plain scalar.
+        /// </summary>
+        /// <remarks>
+        /// The pointer types and <see cref="char"/> are deliberately absent: protobuf-net treats
+        /// them as ordinary varint scalars, the same treatment the generated contract code gives
+        /// them directly, so routing them here would length-delimit a value the oracle writes raw.
+        /// </remarks>
         internal static bool IsBclType<T>()
         {
             Type type = typeof(T);
             return type == typeof(DateTime)
                 || type == typeof(TimeSpan)
                 || type == typeof(Guid)
-                || type == typeof(decimal);
+                || type == typeof(decimal)
+                || type == typeof(Uri);
         }
 
         /// <summary>Reports whether a BCL member is omitted at its declared default.</summary>
@@ -243,11 +262,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoFormatterProvider.Register(WProtoTimeSpanFormatter.Instance);
             WProtoFormatterProvider.Register(WProtoGuidFormatter.Instance);
             WProtoFormatterProvider.Register(WProtoDecimalFormatter.Instance);
+            WProtoFormatterProvider.Register(WProtoUriFormatter.Instance);
 
             WProtoRootMarshalProvider.Register(DateTimeRoot);
             WProtoRootMarshalProvider.Register(TimeSpanRoot);
             WProtoRootMarshalProvider.Register(GuidRoot);
             WProtoRootMarshalProvider.Register(DecimalRoot);
+            WProtoRootMarshalProvider.Register(UriRoot);
+            WProtoRootMarshalProvider.Register(CharRoot);
         }
 
         /// <summary>A scaled duration ready for the shared wire-field helpers.</summary>
@@ -896,6 +918,177 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 this = default(DecimalBits);
                 Value = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads and writes <see cref="char"/> exactly as protobuf-net does: the UTF-16 code unit as a
+    /// plain varint, omitted at <c>'\0'</c> in a member position but always written under the root
+    /// key -- including the zero that a member would have dropped.
+    /// </summary>
+    public sealed class WProtoCharFormatter : IWProtoFormatter<char>, IWProtoConditionalFormatter
+    {
+        /// <summary>The shared instance; the formatter holds no state.</summary>
+        public static readonly WProtoCharFormatter Instance = new WProtoCharFormatter();
+
+        private WProtoCharFormatter() { }
+
+        /// <inheritdoc />
+        public bool CanServe()
+        {
+            return true;
+        }
+
+        /// <inheritdoc />
+        public int Measure(in char value)
+        {
+            return WProtoSizes.Varint32Size(value);
+        }
+
+        /// <inheritdoc />
+        public bool Write(ref WProtoWriter writer, in char value)
+        {
+            return writer.TryWriteVarint32(value);
+        }
+
+        /// <inheritdoc />
+        public bool TryRead(ref WProtoReader reader, out char value)
+        {
+            if (!reader.TryReadVarint32(out uint raw))
+            {
+                value = default(char);
+                return false;
+            }
+
+            value = (char)raw;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Serves <see cref="char"/> where it is registered directly against
+    /// <see cref="WProtoRootMarshalProvider"/>: the root writes the code unit even when it is zero.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here needs the nested provider lookup of <see cref="WProtoBclRootFormatter{T}"/>
+    /// because the payload is not length-delimited -- it is one varint under the field-one key,
+    /// which is exactly the shape the root and a member share.
+    /// </remarks>
+    internal sealed class WProtoCharRootFormatter : IWProtoFormatter<char>
+    {
+        public int Measure(in char value)
+        {
+            return WProtoSizes.TagSize(1) + WProtoSizes.Varint32Size(value);
+        }
+
+        public bool Write(ref WProtoWriter writer, in char value)
+        {
+            return writer.TryWriteTag(1, WProtoWireType.Varint) && writer.TryWriteVarint32(value);
+        }
+
+        public bool TryRead(ref WProtoReader reader, out char value)
+        {
+            uint raw = 0U;
+            while (reader.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                if (fieldNumber == 1 && wireType == WProtoWireType.Varint)
+                {
+                    if (!reader.TryReadVarint32(out raw))
+                    {
+                        value = default(char);
+                        return false;
+                    }
+                }
+                else if (!reader.TrySkipField(fieldNumber, wireType))
+                {
+                    value = default(char);
+                    return false;
+                }
+            }
+
+            if (reader.Malformed)
+            {
+                value = default(char);
+                return false;
+            }
+
+            value = (char)raw;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Reads and writes <see cref="Uri"/> exactly as protobuf-net does: the UTF-8 bytes of
+    /// <see cref="Uri.OriginalString"/>, with no inner field keys. The measured originals keep
+    /// escapes and letter case exactly as constructed, which is what makes them byte-portable
+    /// across runtimes unlike a type name.
+    /// </summary>
+    /// <remarks>
+    /// The measure deliberately excludes every prefix: callers wrap this payload in a length or a
+    /// message envelope themselves, which is also how the oracle reaches an identical member and
+    /// root form. An empty region refuses rather than manufacturing a value no constructor could
+    /// have produced.
+    /// </remarks>
+    public sealed class WProtoUriFormatter : IWProtoFormatter<Uri>
+    {
+        /// <summary>The shared instance; the formatter holds no state.</summary>
+        public static readonly WProtoUriFormatter Instance = new WProtoUriFormatter();
+
+        // The BCL's Encoding.UTF8 replaces an invalid byte with U+FFFD instead of reporting it,
+        // which would turn corrupt bytes into a silently different Uri. A strict decoder is what
+        // makes a malformed region refuse instead of decode.
+        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+        private WProtoUriFormatter() { }
+
+        /// <inheritdoc />
+        public int Measure(in Uri value)
+        {
+            return StrictUtf8.GetByteCount(value.OriginalString);
+        }
+
+        /// <inheritdoc />
+        public bool Write(ref WProtoWriter writer, in Uri value)
+        {
+            byte[] encoded = StrictUtf8.GetBytes(value.OriginalString);
+            return writer.TryWriteRaw(encoded);
+        }
+
+        /// <inheritdoc />
+        public bool TryRead(ref WProtoReader reader, out Uri value)
+        {
+            if (!reader.TryReadRemaining(out ReadOnlySpan<byte> payload))
+            {
+                value = null;
+                return false;
+            }
+
+            string text;
+            try
+            {
+                text = StrictUtf8.GetString(payload);
+            }
+            catch (ArgumentException)
+            {
+                value = null;
+                return false;
+            }
+
+            try
+            {
+                value = new Uri(text, UriKind.RelativeOrAbsolute);
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                value = null;
+                return false;
+            }
+            catch (FormatException)
+            {
+                value = null;
+                return false;
             }
         }
     }

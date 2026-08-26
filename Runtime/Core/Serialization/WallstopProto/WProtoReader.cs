@@ -409,6 +409,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Reads every byte this reader has left, without copying it.
+        /// </summary>
+        /// <param name="value">Receives a view over the remaining bytes.</param>
+        /// <returns><c>true</c> when any bytes remained to claim; an empty region answers
+        /// <c>false</c>, because there is nothing for a caller shaped like a payload to decode.</returns>
+        /// <remarks>
+        /// The one formatter whose sub-message content is not a field sequence but the raw text
+        /// itself. A length-delimited region reader scoped by <see cref="TryReadMessage"/> normally
+        /// walks tags; this consumes its whole window instead and is deliberately an explicit ask,
+        /// so nothing else can mistake an unterminated message for one.
+        /// </remarks>
+        public bool TryReadRemaining(out ReadOnlySpan<byte> value)
+        {
+            int remaining = Remaining;
+            if (remaining <= 0)
+            {
+                value = default;
+                return false;
+            }
+
+            value = _buffer.Slice(_position);
+            _position = _buffer.Length;
+            return true;
+        }
+
+        /// <summary>
         /// Reads a length-delimited UTF-8 string.
         /// </summary>
         /// <param name="value">Receives the decoded string, or <c>null</c> on failure.</param>

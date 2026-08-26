@@ -1599,16 +1599,37 @@ formatter.Write(ref writer, state);
 alternative under IL2CPP is an `ExecutionEngineException` from inside the runtime that names nothing.
 
 Hand-written formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid`, `RandomState`,
-`DateTime`, `TimeSpan`, `Guid` and `decimal`; everything else this package serializes through
+`DateTime`, `TimeSpan`, `Guid`, `decimal` and `Uri`; everything else this package serializes through
 WallstopProto is generated from its annotations.
 
-The four base-class-library values use protobuf-net's `bcl.proto` representation, measured against
-both protobuf-net 2.4.9 and 3.2.56. They are available as roots, ordinary and nullable members,
+The base-class-library values use protobuf-net's representation, measured against both protobuf-net
+2.4.9 and 3.2.56. They are available as roots, ordinary and nullable members,
 collection elements, map keys and values, and generic contract closures. Their default-member and repeated
 field behavior also follows protobuf-net: `DateTime.MinValue` is written, default `TimeSpan`, empty
 `Guid`, and zero `decimal` members are omitted, and duplicate scalar occurrences take the last
-value. `DateTimeOffset` is deliberately unsupported because neither measured protobuf-net version
-provides an implicit wire shape for it.
+value.
+
+Two further standard-library types are measured and served on the same terms:
+
+- **`char`** — a plain varint of the UTF-16 code unit. A member at `'\0'` is omitted exactly like a
+  zero integer; a root always writes the key, so the zero still travels as two bytes.
+- **`Uri`** — the UTF-8 bytes of `Uri.OriginalString` under one length prefix,
+  identical form at a member and at a root. Because the bytes carry the original spelling (letter
+  case, escapes, no invented trailing slash), reading is byte-portable across runtimes: relative and
+  absolute forms survive as constructed, malformed text refuses rather than decoding into some other
+  value, and an empty region refuses outright.
+
+The rest of the standard library stays refused deliberately, each with its reason recorded here:
+
+| Type                | Why it is refused                                                                                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DateTimeOffset`    | Neither measured protobuf-net version provides any wire shape for it                                                                                           |
+| `IntPtr`, `UIntPtr` | protobuf-net 2.x has no serializer for them, the width differs by platform, and the value names nothing once its process ends                                  |
+| `Type`              | The oracle writes a runtime-bound assembly-qualified name whose assembly name and version differ per runtime, so one machine's bytes do not resolve on another |
+
+If you genuinely need one of these, write the formatter yourself and register it with
+`WProtoFormatterProvider.Register<T>` — the refusal is about which bytes this package will stand
+behind, not what a consumer may implement.
 
 #### Derived members are not carried
 

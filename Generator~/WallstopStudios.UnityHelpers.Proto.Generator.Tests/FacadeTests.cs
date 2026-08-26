@@ -56,9 +56,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AnUnregisteredTypeIsUnhandledRatherThanAnError()
         {
             // The other half of the same distinction: no formatter means "not ours", which must stay
-            // a quiet false so the caller falls back. This is what keeps the port incremental.
-            Assert.IsFalse(WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out Uri _));
-            Assert.IsFalse(WProtoFacade.TrySerialize(new Uri("https://example.com"), out byte[] _));
+            // a quiet false so the caller falls back. This is what keeps the port incremental. Uri
+            // left this club when it gained a built-in formatter; Type is the standing resident,
+            // refused at generation time for carrying a runtime-bound type name.
+            Assert.IsFalse(WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out Type _));
+            Assert.IsFalse(WProtoFacade.TrySerialize(typeof(string), out byte[] _));
         }
 
         [Test]
@@ -126,10 +128,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             byte[] buffer = new byte[8];
             byte[] original = buffer;
 
-            WProtoWriteResult result = WProtoFacade.Serialize(
-                new Uri("https://example.com"),
-                ref buffer
-            );
+            WProtoWriteResult result = WProtoFacade.Serialize(typeof(string), ref buffer);
 
             Assert.IsFalse(result.Served);
             Assert.IsNull(result.BytesWritten);

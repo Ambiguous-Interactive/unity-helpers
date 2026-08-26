@@ -482,6 +482,53 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoMember(8)] public System.Collections.Generic.List<System.DateTime[]> Batches;
                       [WProtoMember(9)] public System.Collections.Generic.Dictionary<string, System.Guid> IdsByName;
                       [WProtoMember(10)] public System.Collections.Generic.List<decimal> Amounts;
+                      [WProtoMember(11)] public char Code;
+                      [WProtoMember(12)] public System.Uri Source;
+                      [WProtoMember(13)] public char? MaybeCode;
+                      [WProtoMember(14)] public System.Collections.Generic.List<char> CodePoints;
+                      [WProtoMember(15)] public char[,] Grid2;
+                      [WProtoMember(16)] public System.Collections.Generic.Dictionary<string, System.Uri> HomeByUser;
+                  }"
+            );
+        }
+
+        [Test]
+        public void ThePointerAndTypeRefusalsAreDeliberate()
+        {
+            // These four were measured, not skipped: DateTimeOffset has no encoding in either oracle
+            // major, the pointer types have none in 2.x while the value they carry names nothing
+            // once its process ends, and Type writes a runtime-bound assembly-qualified name. The
+            // refusal is the deliverable; these rows keep it an error rather than a shrug.
+            AssertDiagnostic(
+                "WPROTO003",
+                "Handle",
+                @"[WProtoContract] public sealed partial class Refused
+                  {
+                      [WProtoMember(1)] public System.IntPtr Handle;
+                  }"
+            );
+            AssertDiagnostic(
+                "WPROTO003",
+                "Handle",
+                @"[WProtoContract] public sealed partial class Refused
+                  {
+                      [WProtoMember(1)] public System.UIntPtr Handle;
+                  }"
+            );
+            AssertDiagnostic(
+                "WPROTO003",
+                "Kind",
+                @"[WProtoContract] public sealed partial class Refused
+                  {
+                      [WProtoMember(1)] public System.Type Kind;
+                  }"
+            );
+            AssertDiagnostic(
+                "WPROTO003",
+                "Kind",
+                @"[WProtoContract] public sealed partial class Refused
+                  {
+                      [WProtoMember(1)] public System.Type[] Kinds;
                   }"
             );
         }

@@ -151,6 +151,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             AssertRootMatches(0.5m, WProtoDecimalFormatter.Instance, "0A0408051802");
 
+            // The char root keeps writing even where a member would omit: the zero travels as
+            // "08 00", the shape both majors emit for a bare-root code unit. These go through the
+            // facade because the root formatters are marshal-registered rather than served by
+            // Get<T>() -- which is exactly what AssertRootMatches verifies for the others.
+            FacadeRootRoundTrips('A', "0841");
+            FacadeRootRoundTrips('\0', "0800");
+#if !PROTOBUF_NET_ORACLE_V2
+            FacadeRootRoundTrips(
+                new Uri("https://EXAMPLE.com/PaTh?q=1"),
+                "0A1C68747470733A2F2F4558414D504C452E636F6D2F506154683F713D31"
+            );
+            FacadeRootRoundTrips(
+                new Uri("/relative/path", UriKind.RelativeOrAbsolute),
+                "0A0E2F72656C61746976652F70617468"
+            );
+#endif
+
             Assert.IsTrue(
                 WProtoFacade.TryDeserialize(Parse("0A0208020A021003"), out DateTime lastRootWins)
             );
@@ -160,6 +177,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFacade.TryDeserialize(Parse("0A04080210030A00"), out DateTime emptyLastWins)
             );
             Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), emptyLastWins);
+        }
+
+        /// <summary>
+        /// Round-trips one root value through the facade against a transcribed byte vector.
+        /// </summary>
+        /// <typeparam name="T">The value's type.</typeparam>
+        /// <param name="value">The value.</param>
+        /// <param name="rootHex">The exact bytes the oracle writes for this root.</param>
+        /// <remarks>
+        /// Both directions assert the transcribed vector, so neither side can drift: the writer has
+        /// to produce those bytes, and the reader has to accept them back into an equal value.
+        /// </remarks>
+        private static void FacadeRootRoundTrips<T>(T value, string rootHex)
+        {
+            byte[] encoded;
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out encoded), typeof(T).Name);
+            Assert.AreEqual(rootHex, ToHex(encoded), typeof(T).Name);
+
+            byte[] payload = Parse(rootHex);
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(payload, out T restored),
+                typeof(T).Name + " read"
+            );
+            Assert.AreEqual(value, restored, typeof(T).Name + " value");
         }
 
         [Test]
@@ -175,6 +216,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ByDuration = new Dictionary<TimeSpan, int> { { duration, 7 } },
                 ByIdentifier = new Dictionary<Guid, int> { { identifier, 7 } },
                 ByAmount = new Dictionary<decimal, int> { { amount, 7 } },
+                ByCode = new Dictionary<char, int> { { 'A', 7 }, { '\u00E9', 0 } },
             };
 
             string oracle = OracleHex(value);
@@ -190,6 +232,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(7, restored.ByDuration[duration]);
             Assert.AreEqual(7, restored.ByIdentifier[identifier]);
             Assert.AreEqual(7, restored.ByAmount[amount]);
+            Assert.AreEqual(7, restored.ByCode['A']);
+            Assert.AreEqual(0, restored.ByCode['\u00E9']);
         }
 
         [Test]
@@ -235,6 +279,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(
                 TryRead("090102", WProtoGuidFormatter.Instance, out Guid _),
                 "truncated Guid fixed64"
+            );
+            Assert.IsFalse(
+                TryRead("FFFE", WProtoUriFormatter.Instance, out Uri _),
+                "invalid UTF-8 inside a Uri region"
+            );
+            Assert.IsFalse(
+                TryRead("", WProtoUriFormatter.Instance, out Uri _),
+                "an empty Uri region refuses rather than manufacturing a value"
+            );
+            Assert.IsFalse(
+                TryRead(
+                    "68747470733A2F2F4558414D504C452E636F6D3AEFBFBD2F",
+                    WProtoUriFormatter.Instance,
+                    out Uri _
+                ),
+                "text that no Uri constructor accepts is refused, not defaulted"
             );
             Assert.Throws<InvalidOperationException>(
                 () => WProtoFacade.TryDeserialize(Parse("0A050801"), out DateTime _),
@@ -300,6 +360,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 -7.9228162514264337593543950335m,
             };
 
+            char[] codes =
+            {
+                '\0',
+                'A',
+                '\u00E9',
+                '\u07FF',
+                '\u0800',
+                '\uD800',
+                '\uDFFF',
+                '\uFFFF',
+            };
+
+            foreach (char code in codes)
+            {
+                yield return new BclScalarContract { Code = code };
+            }
+
+#if !PROTOBUF_NET_ORACLE_V2
+            Uri[] sources = SourceCorpus();
+            foreach (Uri source in sources)
+            {
+                yield return new BclScalarContract { Source = source };
+            }
+#endif
+
             foreach (DateTime when in dates)
             {
                 yield return new BclScalarContract { When = when };
@@ -330,12 +415,64 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Duration = TimeSpan.FromTicks(ticks),
                     Identifier = NewRandomGuid(random),
                     Amount = random.Next(-1000000000, 1000000000) * DivisorOf(random),
+                    Code = (char)random.Next(0, 1 << 16),
+#if !PROTOBUF_NET_ORACLE_V2
+                    Source = SourceAt(random, index),
+#endif
                     NullableWhen =
                         index % 3 == 0 ? null : new DateTime?(dates[index % dates.Length]),
                     Timeline = BuildTimeline(random, index),
+                    CodePoints = BuildCodePoints(random, index),
                     DurationsByName = BuildDurations(random, index),
                 };
             }
+        }
+
+        /// <summary>
+        /// The Uri values the differential sweeps, chosen so each wire-relevant quirk appears once.
+        /// </summary>
+        /// <remarks>
+        /// Letter case and escapes prove which string property reached the bytes; the relative form
+        /// proves <see cref="UriKind.RelativeOrAbsolute"/> reading; the port-omitted form survives
+        /// round trips under <see cref="Uri.Equals"/> only through its original spelling.
+        /// </remarks>
+        private static Uri[] SourceCorpus()
+        {
+            return new[]
+            {
+                new Uri("https://EXAMPLE.com/PaTh?q=1"),
+                new Uri("http://example.com/%41%2Fb"),
+                new Uri("http://example.com/\u00E9\u4E2D"),
+                new Uri("/relative/path", UriKind.RelativeOrAbsolute),
+                new Uri("//hostless/path", UriKind.RelativeOrAbsolute),
+                new Uri("mailto:user@example.com"),
+            };
+        }
+
+        private static Uri SourceAt(Random random, int index)
+        {
+            if (index % 4 == 3)
+            {
+                return null;
+            }
+
+            return SourceCorpus()[index % SourceCorpus().Length];
+        }
+
+        private static List<char> BuildCodePoints(Random random, int index)
+        {
+            if (index % 6 == 5)
+            {
+                return null;
+            }
+
+            List<char> codePoints = new List<char>();
+            for (int entry = 0; entry <= index % 4; entry++)
+            {
+                codePoints.Add((char)random.Next(0, 1 << 16));
+            }
+
+            return codePoints;
         }
 
         private static decimal DivisorOf(Random random)
@@ -439,6 +576,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(expected.Duration, actual.Duration, context + " Duration");
             Assert.AreEqual(expected.Identifier, actual.Identifier, context + " Identifier");
             Assert.AreEqual(expected.Amount, actual.Amount, context + " Amount");
+            Assert.AreEqual(expected.Code, actual.Code, context + " Code");
+
+            CollectionAssert.AreEqual(
+                expected.CodePoints,
+                actual.CodePoints,
+                context + " CodePoints"
+            );
+
+#if !PROTOBUF_NET_ORACLE_V2
+            if (expected.Source == null || actual.Source == null)
+            {
+                Assert.IsTrue(expected.Source == null, context + " Source null only");
+                Assert.IsTrue(actual.Source == null, context + " Source null only");
+            }
+            else
+            {
+                // OriginalString rather than Uri.Equals: the equality the wire cares about is the
+                // spelling that produced these bytes, and Uri.Equals treats some distinct
+                // spellings as one value.
+                Assert.AreEqual(
+                    expected.Source.OriginalString,
+                    actual.Source.OriginalString,
+                    context + " Source"
+                );
+                Assert.AreEqual(
+                    expected.Source.IsAbsoluteUri,
+                    actual.Source.IsAbsoluteUri,
+                    context + " Source kind"
+                );
+            }
+#endif
             Assert.AreEqual(
                 expected.NullableWhen.HasValue,
                 actual.NullableWhen.HasValue,
