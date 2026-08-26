@@ -98,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- An attribute with only additive modifications recalculates 2.85x faster: 0.4563 us before, 0.1600 us now, measured on `6000.4.6f1`. Addition, Multiplication and Override each got a full pass over every modification whether or not any carried that action ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - A relational field that finds nothing is ~15x cheaper to assign: 366-431 us before, 25.1 us now, measured on `6000.4.6f1` against a control that did not move. Unity captured a stack trace for the error log on every assignment, and for a collection field finding nothing is a normal state ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564), [#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - **`RomuDuo` now implements published romuDuo, so a given seed produces a different sequence than in 3.5.1.** No saved seed or `RandomState` carries a sequence across this change; pin a generator whose stream is unchanged if you need one to ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
 - `DisjointSet.TryGetAllSets()` is 2.4x-3.2x faster and allocates no temporary lists. It gathered every element into a per-root scratch list and then copied all of them a second time; elements now go straight into their result list, found through a dense index rather than a hash lookup ([#309](https://github.com/Ambiguous-Interactive/unity-helpers/issues/309)).
