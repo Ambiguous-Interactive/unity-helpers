@@ -376,6 +376,13 @@ Samples~/**/*.rsp.meta
 Generator~/**/bin/**
 Generator~/**/obj/**
 
+# The TestU01 stream driver. Same reason as Generator~ one rule up: the trailing ~ is what keeps
+# Unity from compiling it, because a `.c` anywhere in this package is native plugin source and
+# IL2CPP then fails the standalone player build on includes that only exist next to a TestU01
+# checkout. `*~` above would otherwise drop it from the repository entirely.
+!scripts/random-quality/testu01~/
+!scripts/random-quality/testu01~/**
+
 artifacts*/
 artifacts/**
 artifacts.meta
