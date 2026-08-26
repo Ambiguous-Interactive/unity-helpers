@@ -13,14 +13,39 @@
 
 export const DECISIVE = 1e-10;
 
-// `eps` is TestU01's rendering of a p-value below 1e-300 and `eps1` of one below 1e-15; the
-// `1 - ...` forms are the same thing at the top of the interval.
+// `eps` is TestU01's rendering of a p-value below 1e-300 and `eps1` of one below 1e-15.
 const SENTINELS = new Map([
   ["eps", 0],
-  ["eps1", 1e-16],
-  ["1 - eps", 0],
-  ["1 - eps1", 1e-16]
+  ["eps1", 1e-16]
 ]);
+
+/**
+ * The distance from the nearest end of [0, 1] that a printed p-value represents, or null when the
+ * text is not one.
+ *
+ * TestU01 renders the top of the interval as `1 - <value>`: `1 - eps1` for a sentinel, and
+ * `1 - 1.4e-11` for a plain number. Handling only the sentinel spellings drops every high-side
+ * NUMERIC failure on the floor, and a dropped row is indistinguishable from a passing one -- so a
+ * decisive failure at the top of the interval would read as clean.
+ */
+export function extremity(raw) {
+  const text = String(raw).trim();
+  const complement = /^1\s*-\s*(\S+)$/.exec(text);
+  const body = complement === null ? text : complement[1];
+  if (SENTINELS.has(body)) {
+    return SENTINELS.get(body);
+  }
+  // `Number("")` is 0, and 0 is the most extreme p-value there is -- so an empty column would read
+  // as the most decisive failure this can report rather than as the absence of a reading.
+  if (body === "") {
+    return null;
+  }
+  const value = Number(body);
+  if (!Number.isFinite(value) || value < 0 || 1 < value) {
+    return null;
+  }
+  return complement === null ? Math.min(value, 1 - value) : value;
+}
 
 /** The p-values a report names, as distances from the nearest end of [0, 1]. */
 export function extremities(report) {
@@ -31,15 +56,11 @@ export function extremities(report) {
       continue;
     }
     const raw = match[2].trim();
-    if (SENTINELS.has(raw)) {
-      found.push({ test: match[1].trim(), raw, extremity: SENTINELS.get(raw) });
+    const distance = extremity(raw);
+    if (distance === null) {
       continue;
     }
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || 1 < value) {
-      continue;
-    }
-    found.push({ test: match[1].trim(), raw, extremity: Math.min(value, 1 - value) });
+    found.push({ test: match[1].trim(), raw, extremity: distance });
   }
   return found;
 }

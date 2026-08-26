@@ -6,7 +6,7 @@
 // permanently red, and if the control ever stops reading as one the battery is decorative.
 
 import assert from "node:assert";
-import { DECISIVE, extremities, verdict } from "../random-quality/evaluate-testu01.mjs";
+import { DECISIVE, extremities, extremity, verdict } from "../random-quality/evaluate-testu01.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -114,6 +114,34 @@ runTest("a report with no summary is not a pass", () => {
   for (const empty of ["", null, undefined, "wallstop-testu01: input stream exhausted after 12"]) {
     const result = verdict(empty);
     assert.strictEqual(result.ranBattery, false, `expected a harness fault for: ${empty}`);
+  }
+});
+
+runTest("a decisive failure at the TOP of the interval is not dropped", () => {
+  // TestU01 prints these as `1 - <value>`. Reading only the `1 - eps` spellings drops every
+  // high-side NUMERIC row, and a dropped row is indistinguishable from a passing one.
+  const report = `
+       Test                          p-value
+ ----------------------------------------------
+  4  Something                      1 - 1.4e-11
+ ----------------------------------------------
+`;
+  const result = verdict("The following tests gave p-values outside [0.001, 0.9990]:" + report);
+  assert.strictEqual(result.failed, true, "1 - 1.4e-11 is as decisive as 1.4e-11");
+  assert.deepStrictEqual(
+    result.decisive.map((row) => row.raw),
+    ["1 - 1.4e-11"]
+  );
+});
+
+runTest("a marginal at the top of the interval is still marginal", () => {
+  assert.strictEqual(extremity("1 - 7.2e-4"), 7.2e-4);
+  assert.ok(DECISIVE <= extremity("1 - 7.2e-4"));
+});
+
+runTest("text that is not a p-value is refused rather than read as zero", () => {
+  for (const raw of ["nonsense", "", "1 - nonsense", "-0.5", "2.0"]) {
+    assert.strictEqual(extremity(raw), null, `expected null for ${JSON.stringify(raw)}`);
   }
 });
 

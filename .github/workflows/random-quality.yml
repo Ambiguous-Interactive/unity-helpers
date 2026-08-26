@@ -265,8 +265,12 @@ jobs:
           path: .artifacts/random-quality/testu01
           key: testu01-${{ runner.os }}-${{ hashFiles('scripts/random-quality/testu01-driver.c', 'scripts/random-quality/build-testu01.sh') }}
 
-      - name: Build TestU01 and prove it can fail
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      # Deliberately NOT gated on a cache miss. The script skips the compile when the driver is
+      # already there and runs the self-test either way, and the self-test is the only step that
+      # proves the battery can report a failure. Gating it on a cold cache would mean that after
+      # the first warm run a decorative driver printing "All tests were passed" makes this job
+      # green -- the #556 failure class this script exists to stop, reintroduced by the caching.
+      - name: Build TestU01 if needed, and prove it can fail
         env:
           TESTU01_BUILD_ROOT: ${{ github.workspace }}/.artifacts/random-quality/testu01
         run: bash scripts/random-quality/build-testu01.sh
