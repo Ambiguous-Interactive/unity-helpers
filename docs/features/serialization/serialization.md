@@ -1198,7 +1198,7 @@ public sealed partial class Inventory
 or any type that implements `ICollection<T>` exactly once, has a public parameterless constructor,
 and has a public `Add(T)` — `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collection<T>`,
 `ObservableCollection<T>` and your own types. The element may be any scalar shape, an enum, a
-`byte[]`, or another `[WProtoContract]`.
+`byte[]`, `DateTime`, `TimeSpan`, `Guid`, `decimal`, or another `[WProtoContract]`.
 
 | Declared member type                                                                         | Notes                                                                     |
 | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -1598,8 +1598,17 @@ formatter.Write(ref writer, state);
 `InvalidOperationException` that names the type and how to annotate it, which is the whole point: the
 alternative under IL2CPP is an `ExecutionEngineException` from inside the runtime that names nothing.
 
-Hand-written formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid` and `RandomState`;
-everything else this package serializes through WallstopProto is generated from its annotations.
+Hand-written formatters ship for `FastVector2Int`, `FastVector3Int`, `WGuid`, `RandomState`,
+`DateTime`, `TimeSpan`, `Guid` and `decimal`; everything else this package serializes through
+WallstopProto is generated from its annotations.
+
+The four base-class-library values use protobuf-net's `bcl.proto` representation, measured against
+both protobuf-net 2.4.9 and 3.2.56. They are available as roots, ordinary and nullable members,
+collection elements, map keys and values, and generic contract closures. Their default-member and repeated
+field behavior also follows protobuf-net: `DateTime.MinValue` is written, default `TimeSpan`, empty
+`Guid`, and zero `decimal` members are omitted, and duplicate scalar occurrences take the last
+value. `DateTimeOffset` is deliberately unsupported because neither measured protobuf-net version
+provides an implicit wire shape for it.
 
 #### Derived members are not carried
 

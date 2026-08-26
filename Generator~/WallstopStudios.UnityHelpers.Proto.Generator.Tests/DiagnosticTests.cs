@@ -390,18 +390,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         // The remaining entries are element-shape refusals: a consumer's own collection interface
         // (protobuf-net writes it and throws InvalidCastException reading it back -- measured), a
         // nullable element (protobuf-net refuses a null element, so Nullable<T>[] is a collection
-        // that can only hold values it cannot write), and a BCL type with no mapping. The nested and
-        // rectangular spellings of each are here too, because a wrapper must not launder an element
-        // its own member would have refused.
+        // that can only hold values it cannot write), and a BCL type with no mapping in either
+        // oracle major. The nested and rectangular spellings of each are here too, because a
+        // wrapper must not launder an element its own member would have refused.
         [TestCase("Consumer.IOwnList<int>")]
         [TestCase("System.Collections.Generic.List<Consumer.IOwnList<int>>")]
         [TestCase("Consumer.IOwnList<int>[,]")]
         [TestCase("int?[]")]
         [TestCase("int?[][]")]
         [TestCase("int?[,]")]
-        [TestCase("System.DateTime")]
-        [TestCase("System.Collections.Generic.List<System.DateTime[]>")]
-        [TestCase("System.DateTime[,]")]
+        [TestCase("System.DateTimeOffset")]
+        [TestCase("System.Collections.Generic.List<System.DateTimeOffset[]>")]
+        [TestCase("System.DateTimeOffset[,]")]
         public void AnUnsupportedMemberTypeIsAnError(string declaredType)
         {
             AssertDiagnostic(
@@ -458,6 +458,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoMember(6)] public System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>> Tables;
                       [WProtoMember(7)] public System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> Lookup;
                       [WProtoMember(8)] public System.Collections.Generic.Queue<System.Collections.Generic.Stack<string>> Pipelines;
+                  }"
+            );
+        }
+
+        [Test]
+        public void EveryBclValueTypeIsAccepted()
+        {
+            // The counterpart for the base-class-library sweep: DateTime was WPROTO003 until the
+            // built-in formatters landed, so acceptance here is the flip side of the same evidence
+            // rule. The bytes themselves are pinned against both oracle majors by
+            // BclDifferentialTests.
+            AssertNoDiagnostics(
+                @"[WProtoContract] public sealed partial class Supported
+                  {
+                      [WProtoMember(1)] public System.DateTime When;
+                      [WProtoMember(2)] public System.TimeSpan Duration;
+                      [WProtoMember(3)] public System.Guid Identifier;
+                      [WProtoMember(4)] public decimal Amount;
+                      [WProtoMember(5)] public System.DateTime? MaybeWhen;
+                      [WProtoMember(6)] public System.Collections.Generic.List<System.DateTime> Timeline;
+                      [WProtoMember(7)] public System.DateTime[,] Grid;
+                      [WProtoMember(8)] public System.Collections.Generic.List<System.DateTime[]> Batches;
+                      [WProtoMember(9)] public System.Collections.Generic.Dictionary<string, System.Guid> IdsByName;
+                      [WProtoMember(10)] public System.Collections.Generic.List<decimal> Amounts;
                   }"
             );
         }

@@ -128,9 +128,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// without being a message, and merging one would concatenate two strings into a third.
         /// </para>
         /// <para>
-        /// This is the same condition <see cref="TryReadValue(ref WProtoReader, out T)"/> branches
-        /// on, exposed rather than restated, so emitted code and this type cannot disagree about
-        /// which path a closure takes.
+        /// This property controls duplicate-occurrence semantics in emitted readers. The BCL value
+        /// types still use a nested formatter to decode their length-delimited payload, but report
+        /// <c>false</c> here because protobuf scalar occurrences are last-wins rather than merged.
         /// </para>
         /// </remarks>
         public static bool IsMessage
@@ -138,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             get
             {
                 Resolve();
-                return _scalar == null;
+                return _scalar == null && !WProtoBcl.IsBclType<T>();
             }
         }
 
@@ -175,6 +175,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return Omit(value, required)
                     ? 0
                     : WProtoSizes.TagSize(tag) + _scalar.MeasureValue(value);
+            }
+
+            if (!required && WProtoBcl.IsBclType<T>() && WProtoBcl.OmitsMember(value))
+            {
+                return 0;
             }
 
             // A message: a null reference is omitted, a struct is always written. Both measured.
@@ -215,6 +220,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 return writer.TryWriteTag(tag, _scalar.WireType)
                     && _scalar.WriteValue(ref writer, value);
+            }
+
+            if (!required && WProtoBcl.IsBclType<T>() && WProtoBcl.OmitsMember(value))
+            {
+                return true;
             }
 
             if (IsReferenceType && value == null)

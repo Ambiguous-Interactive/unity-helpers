@@ -249,6 +249,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 || WProtoDeclaredRootProvider.TryGetFormatter(out formatter)
             )
             {
+                if (WProtoBcl.IsBclType<T>())
+                {
+                    return WProtoRootMarshalProvider.TryGet(out formatter) && CanEncode(formatter);
+                }
+
                 if (CanEncode(formatter) && CanServe(value, formatter))
                 {
                     return true;
@@ -280,6 +285,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 || WProtoDeclaredRootProvider.TryGetFormatter(out formatter)
             )
             {
+                if (WProtoBcl.IsBclType<T>())
+                {
+                    return WProtoRootMarshalProvider.TryGet(out formatter) && CanEncode(formatter);
+                }
+
                 if (CanEncode(formatter) && CanRead(formatter, concrete))
                 {
                     return true;

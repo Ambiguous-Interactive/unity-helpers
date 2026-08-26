@@ -199,8 +199,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="nested">
         /// The contract's wrapper-message registry, or <c>null</c> where a collection has no
         /// encoding in this position. Passing it is what makes a collection of collections
-        /// expressible; a map <b>key</b> is the one position that passes <c>null</c>, because a
-        /// proto3 map key is a scalar and a collection has no scalar spelling to offer.
+        /// expressible. A map <b>key</b> passes <c>null</c> so a collection cannot become a key;
+        /// protobuf-net does accept formatter-backed BCL values as keys even though proto3's schema
+        /// grammar lists only scalars, and their ordinary shapes remain available here.
         /// </param>
         /// <param name="memberName">The declaring member, for a null element's runtime message.</param>
         internal static Shape For(
@@ -387,6 +388,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
+            // The base-class-library value types protobuf-net encodes as its own sub-messages.
+            // Measured: both majors emit identical bytes for these four, and DateTimeOffset has no
+            // encoding in either -- it stays refused below. A surrogated type never reaches this
+            // point, so a consumer who prefers a different wire form for one of these can still
+            // substitute.
+            Shape bclShape = BclMessageShape(type, qualified);
+            if (bclShape != null)
+            {
+                return bclShape;
+            }
+
             if (IsByteArray(type))
             {
                 return new Shape
@@ -431,6 +443,83 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return type is IArrayTypeSymbol array
                 && array.Rank == 1
                 && array.ElementType.SpecialType == SpecialType.System_Byte;
+        }
+
+        /// <summary>
+        /// The built-in formatter serving one of the base-class-library value types, or
+        /// <c>null</c> for everything else.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="SpecialType"/> identifies the framework types for which Roslyn provides one;
+        /// the remaining structs are matched by fully-qualified display name. A consumer's own
+        /// <c>Guid</c> in another namespace therefore stays unmatched, while the real types resolve
+        /// no matter which using directives the declaring file had.
+        /// </remarks>
+        private static Shape BclMessageShape(ITypeSymbol type, string qualified)
+        {
+            if (!(type is INamedTypeSymbol))
+            {
+                return null;
+            }
+
+            switch (type.SpecialType)
+            {
+                case SpecialType.System_DateTime:
+                {
+                    Shape shape = Message(
+                        Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                        qualified,
+                        isValueType: true
+                    );
+                    shape.IsMessage = false;
+                    return shape;
+                }
+                case SpecialType.System_Decimal:
+                {
+                    Shape shape = Message(
+                        Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                        qualified,
+                        isValueType: true
+                    );
+                    shape.PresenceTest = Placeholder + " != default(decimal)";
+                    shape.IsMessage = false;
+                    return shape;
+                }
+                default:
+                {
+                    break;
+                }
+            }
+
+            switch (type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            {
+                case "global::System.TimeSpan":
+                {
+                    Shape shape = Message(
+                        Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                        qualified,
+                        isValueType: true
+                    );
+                    shape.PresenceTest = Placeholder + " != default(global::System.TimeSpan)";
+                    shape.IsMessage = false;
+                    return shape;
+                }
+                case "global::System.Guid":
+                {
+                    Shape shape = Message(
+                        Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
+                        qualified,
+                        isValueType: true
+                    );
+                    shape.PresenceTest = Placeholder + " != default(global::System.Guid)";
+                    shape.IsMessage = false;
+                    return shape;
+                }
+                default:
+                {
+                    return null;
+                }
+            }
         }
 
         /// <summary>

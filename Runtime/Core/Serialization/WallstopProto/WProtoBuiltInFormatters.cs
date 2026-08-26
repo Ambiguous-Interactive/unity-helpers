@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>
         /// The flag is published <b>after</b> the registrations and read through
         /// <see cref="Volatile"/>. Setting it first left a window where a second thread saw
-        /// "already registered" and serialized against a provider that had none of these four yet,
+        /// "already registered" and serialized against a provider that had none of these eight yet,
         /// which surfaces as "no formatter is registered for FastVector2Int" from a type this
         /// package ships a formatter for.
         /// </remarks>
@@ -65,6 +65,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 WProtoFormatterProvider.Register(FastVector3Int.WProtoFormatter.Instance);
                 WProtoFormatterProvider.Register(WGuid.WProtoFormatter.Instance);
                 WProtoFormatterProvider.Register(RandomState.WProtoFormatter.Instance);
+                WProtoBcl.RegisterAll();
 
                 Volatile.Write(ref _registered, true);
             }

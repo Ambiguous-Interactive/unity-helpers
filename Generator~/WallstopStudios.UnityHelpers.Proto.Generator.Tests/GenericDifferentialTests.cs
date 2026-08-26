@@ -23,6 +23,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class GenericDifferentialTests
     {
+        [OneTimeSetUp]
+        public void RegisterBclFormatters()
+        {
+            WProtoBcl.RegisterAll();
+        }
+
         [Test]
         public void TheFieldKeyChangesWithTheClosure()
         {
@@ -69,6 +75,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         default,
                         new Outer.Point { X = 3 },
                     },
+                }
+            );
+
+            AssertMatches(
+                new Box<DateTime>
+                {
+                    Value = new DateTime(2026, 8, 26, 12, 34, 56, DateTimeKind.Utc),
+                    Many = new[] { DateTime.MinValue, DateTime.MaxValue },
+                }
+            );
+            AssertMatches(
+                new Box<TimeSpan>
+                {
+                    Value = TimeSpan.FromHours(-3.25),
+                    Many = new[] { TimeSpan.Zero, TimeSpan.MinValue },
+                }
+            );
+            AssertMatches(
+                new Box<Guid>
+                {
+                    Value = new Guid("12345678-1234-1234-1234-123456789abc"),
+                    Many = new[] { Guid.Empty, new Guid("ffffffff-eeee-dddd-cccc-bbbb99998888") },
+                }
+            );
+            AssertMatches(
+                new Box<decimal>
+                {
+                    Value = -1234567.891m,
+                    Many = new[] { 0m, decimal.Negate(decimal.Zero), decimal.MaxValue },
                 }
             );
         }
@@ -190,6 +225,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<double>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<string>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<Outer.Point>>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<DateTime>>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<TimeSpan>>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<Guid>>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<decimal>>());
         }
 
         [Test]
@@ -201,6 +240,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(string.Empty, Encode(new Box<double> { Value = 0 }));
             Assert.AreEqual(string.Empty, Encode(new Box<string> { Value = null }));
             Assert.AreEqual("0A00", Encode(new Box<string> { Value = string.Empty }));
+            Assert.AreEqual("0A040801100F", Encode(new Box<DateTime>()));
+            Assert.AreEqual(string.Empty, Encode(new Box<TimeSpan>()));
+            Assert.AreEqual(string.Empty, Encode(new Box<Guid>()));
+            Assert.AreEqual(string.Empty, Encode(new Box<decimal>()));
+        }
+
+        [Test]
+        public void AGenericBclMemberTakesTheLastOccurrence()
+        {
+            byte[] payload = ParseHex("0A0208020A021003");
+            Box<DateTime> oracle = Deserialize<Box<DateTime>>(payload);
+
+            WProtoReader reader = new WProtoReader(payload);
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<Box<DateTime>>()
+                    .TryRead(ref reader, out Box<DateTime> restored)
+            );
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), oracle.Value);
+            Assert.AreEqual(oracle.Value, restored.Value);
         }
 
         [Test]
@@ -272,6 +331,58 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // absorbed silently by comparing two things that moved together.
             Assert.AreEqual("0800", Encode(new RequiredBox<int> { Value = 0 }));
             Assert.AreEqual(string.Empty, Encode(new RequiredBox<string> { Value = null }));
+        }
+
+        [Test]
+        public void ARegisteredBclOverrideServesRootsGeneratedMembersAndGenericClosures()
+        {
+            IWProtoFormatter<DateTime> original = WProtoFormatterProvider.Get<DateTime>();
+            CountingDateTimeFormatter custom = new CountingDateTimeFormatter(original);
+            DateTime expected = new DateTime(2026, 8, 26, 12, 34, 56, DateTimeKind.Utc);
+
+            try
+            {
+                WProtoFormatterProvider.Register(custom);
+
+                custom.Reset();
+                Assert.IsTrue(WProtoFacade.TrySerialize(expected, out byte[] rootBytes));
+                Assert.IsTrue(WProtoFacade.TryDeserialize(rootBytes, out DateTime root));
+                Assert.AreEqual(expected, root);
+                AssertUsed(custom, "root");
+
+                custom.Reset();
+                byte[] memberBytes = ParseHex(Encode(new BclScalarContract { When = expected }));
+                WProtoReader memberReader = new WProtoReader(memberBytes);
+                Assert.IsTrue(
+                    WProtoFormatterProvider
+                        .Get<BclScalarContract>()
+                        .TryRead(ref memberReader, out BclScalarContract member)
+                );
+                Assert.AreEqual(expected, member.When);
+                AssertUsed(custom, "generated member");
+
+                custom.Reset();
+                byte[] genericBytes = ParseHex(Encode(new Box<DateTime> { Value = expected }));
+                WProtoReader genericReader = new WProtoReader(genericBytes);
+                Assert.IsTrue(
+                    WProtoFormatterProvider
+                        .Get<Box<DateTime>>()
+                        .TryRead(ref genericReader, out Box<DateTime> generic)
+                );
+                Assert.AreEqual(expected, generic.Value);
+                AssertUsed(custom, "generic closure");
+
+                WProtoFormatterProvider.Register<DateTime>(null);
+                Assert.IsFalse(WProtoFacade.TrySerialize(expected, out byte[] _));
+
+                custom.Enabled = false;
+                WProtoFormatterProvider.Register(custom);
+                Assert.IsFalse(WProtoFacade.TrySerialize(expected, out byte[] _));
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
         }
 
         private static T Deserialize<T>(byte[] bytes)
@@ -363,6 +474,62 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoReader reader = new WProtoReader(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        private static void AssertUsed(CountingDateTimeFormatter formatter, string path)
+        {
+            Assert.Greater(formatter.MeasureCount, 0, path + " measure");
+            Assert.Greater(formatter.WriteCount, 0, path + " write");
+            Assert.Greater(formatter.ReadCount, 0, path + " read");
+        }
+
+        private sealed class CountingDateTimeFormatter
+            : IWProtoFormatter<DateTime>,
+                IWProtoConditionalFormatter
+        {
+            private readonly IWProtoFormatter<DateTime> _inner;
+
+            internal int MeasureCount { get; private set; }
+            internal int WriteCount { get; private set; }
+            internal int ReadCount { get; private set; }
+            internal bool Enabled { get; set; } = true;
+
+            internal CountingDateTimeFormatter(IWProtoFormatter<DateTime> inner)
+            {
+                _inner = inner;
+            }
+
+            public int Measure(in DateTime value)
+            {
+                MeasureCount++;
+                return _inner.Measure(value);
+            }
+
+            public bool Write(ref WProtoWriter writer, in DateTime value)
+            {
+                WriteCount++;
+                return _inner.Write(ref writer, value);
+            }
+
+            public bool TryRead(ref WProtoReader reader, out DateTime value)
+            {
+                bool read = _inner.TryRead(ref reader, out DateTime decoded);
+                ReadCount++;
+                value = decoded;
+                return read;
+            }
+
+            public bool CanServe()
+            {
+                return Enabled;
+            }
+
+            internal void Reset()
+            {
+                MeasureCount = 0;
+                WriteCount = 0;
+                ReadCount = 0;
+            }
         }
     }
 }

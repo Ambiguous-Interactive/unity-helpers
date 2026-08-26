@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
+    using System;
     using System.Collections.Generic;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -1457,6 +1458,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <summary>A message closure, so the sub-message path is covered too.</summary>
         public static Box<Outer.Point> Points;
+
+        /// <summary>A base-class-library message closure.</summary>
+        public static Box<DateTime> DateTimes;
+
+        /// <summary>A duration message closure.</summary>
+        public static Box<TimeSpan> TimeSpans;
+
+        /// <summary>An identifier message closure.</summary>
+        public static Box<Guid> Guids;
+
+        /// <summary>A decimal message closure, including signed zero.</summary>
+        public static Box<decimal> Decimals;
     }
 
     /// <summary>
@@ -1530,5 +1543,85 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <summary>protobuf-net needs one; the generated constructor is separate.</summary>
         public ImmutableRecord() { }
+    }
+
+    /// <summary>
+    /// The base-class-library value types both protobuf-net majors encode identically (#399).
+    /// </summary>
+    /// <remarks>
+    /// Annotated for both serializers at identical field numbers, so the differential can hand the
+    /// same instance to each. The membership is a measurement: DateTime, TimeSpan, Guid and decimal
+    /// produce identical bytes on 2.4.9 and 3.2.56, while DateTimeOffset has no encoding in either
+    /// major and stays a generator refusal.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class BclScalarContract
+    {
+        /// <summary>Travels as ticks since 1970 under the largest whole unit.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public DateTime When;
+
+        /// <summary>Travels as a scaled tick count.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public TimeSpan Duration;
+
+        /// <summary>Travels as two fixed-64 halves.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public Guid Identifier;
+
+        /// <summary>Travels as mantissa varints plus a sign-and-scale field.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public decimal Amount;
+
+        /// <summary>Nullable of a message-encoded value: omitted when null, sub-message when not.</summary>
+        [ProtoMember(5)]
+        [WProtoMember(5)]
+        public DateTime? NullableWhen;
+
+        /// <summary>A repeated message-encoded element, which can never be packed.</summary>
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        public List<DateTime> Timeline;
+
+        /// <summary>A map whose value is message-encoded.</summary>
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        public Dictionary<string, TimeSpan> DurationsByName;
+    }
+
+    /// <summary>BCL value types in the map-key position protobuf-net accepts.</summary>
+    /// <remarks>
+    /// These are outside proto3's schema grammar but have stable protobuf-net encodings in both
+    /// oracle majors. Keeping them separate from <see cref="BclScalarContract"/> makes the expanded
+    /// key surface explicit without multiplying every corpus case.
+    /// </remarks>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class BclKeyContract
+    {
+        /// <summary>A DateTime key.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public Dictionary<DateTime, int> ByDate;
+
+        /// <summary>A TimeSpan key.</summary>
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public Dictionary<TimeSpan, int> ByDuration;
+
+        /// <summary>A Guid key.</summary>
+        [ProtoMember(3)]
+        [WProtoMember(3)]
+        public Dictionary<Guid, int> ByIdentifier;
+
+        /// <summary>A decimal key.</summary>
+        [ProtoMember(4)]
+        [WProtoMember(4)]
+        public Dictionary<decimal, int> ByAmount;
     }
 }

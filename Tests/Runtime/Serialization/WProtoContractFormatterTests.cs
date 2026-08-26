@@ -278,11 +278,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<FastVector3Int>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WGuid>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<RandomState>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<DateTime>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<TimeSpan>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Guid>());
+            Assert.IsTrue(WProtoFormatterProvider.IsRegistered<decimal>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<DateTime>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<TimeSpan>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Guid>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<decimal>());
 
             Assert.IsTrue(
                 ReferenceEquals(
                     WProtoFormatterProvider.Get<RandomState>(),
                     RandomState.WProtoFormatter.Instance
+                )
+            );
+            Assert.IsTrue(
+                ReferenceEquals(
+                    WProtoFormatterProvider.Get<DateTime>(),
+                    WProtoDateTimeFormatter.Instance
                 )
             );
         }
