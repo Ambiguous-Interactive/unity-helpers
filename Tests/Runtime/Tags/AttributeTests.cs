@@ -182,6 +182,106 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.Throws<ArgumentException>(() => attribute.Divide(0f));
         }
 
+        // Addition, Multiplication and Override each get their own pass, and a pass is skipped
+        // when the first one reports that nothing in the attribute carries that action. Every
+        // combination is driven, from both authoring orders and across two handles, because a
+        // pass skipped when it should not be produces a plausible number rather than an error.
+        [TestCase("A", 15f)]
+        [TestCase("M", 20f)]
+        [TestCase("O", 42f)]
+        [TestCase("AA", 20f)]
+        [TestCase("MM", 40f)]
+        [TestCase("AM", 30f)]
+        [TestCase("MA", 30f)]
+        [TestCase("AAM", 40f)]
+        [TestCase("AO", 42f)]
+        [TestCase("OA", 42f)]
+        [TestCase("MO", 42f)]
+        [TestCase("OM", 42f)]
+        [TestCase("AMO", 42f)]
+        [TestCase("OMA", 42f)]
+        public void CurrentValueAppliesEveryActionRegardlessOfAuthoringOrder(
+            string actions,
+            float expected
+        )
+        {
+            foreach (bool splitAcrossHandles in new[] { false, true })
+            {
+                Attribute attribute = new(10f);
+                AttributeEffect effect = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+                effect.name = "Combination";
+                EffectHandle sharedHandle = EffectHandle.CreateInstance(effect);
+
+                for (int index = 0; index < actions.Length; index++)
+                {
+                    EffectHandle handle = splitAcrossHandles
+                        ? EffectHandle.CreateInstance(effect)
+                        : sharedHandle;
+                    attribute.ApplyAttributeModification(
+                        new AttributeModification
+                        {
+                            attribute = "health",
+                            action = ActionFor(actions[index]),
+                            value = ValueFor(actions[index]),
+                        },
+                        handle
+                    );
+                }
+
+                Assert.AreEqual(
+                    expected,
+                    attribute.CurrentValue,
+                    $"actions={actions} splitAcrossHandles={splitAcrossHandles}"
+                );
+            }
+        }
+
+        private static ModificationAction ActionFor(char action)
+        {
+            switch (action)
+            {
+                case 'A':
+                {
+                    return ModificationAction.Addition;
+                }
+                case 'M':
+                {
+                    return ModificationAction.Multiplication;
+                }
+                case 'O':
+                {
+                    return ModificationAction.Override;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+                }
+            }
+        }
+
+        private static float ValueFor(char action)
+        {
+            switch (action)
+            {
+                case 'A':
+                {
+                    return 5f;
+                }
+                case 'M':
+                {
+                    return 2f;
+                }
+                case 'O':
+                {
+                    return 42f;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+                }
+            }
+        }
+
         [Test]
         public void ArithmeticHelpersThrowWhenValueIsNotFinite()
         {

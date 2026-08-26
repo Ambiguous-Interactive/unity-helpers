@@ -134,9 +134,40 @@ namespace WallstopStudios.UnityHelpers.Tags
             float calculatedValue = _baseValue;
             if (0 < _modifications.Count)
             {
-                ApplyModificationsInOrder(ModificationAction.Addition, ref calculatedValue);
-                ApplyModificationsInOrder(ModificationAction.Multiplication, ref calculatedValue);
-                ApplyModificationsInOrder(ModificationAction.Override, ref calculatedValue);
+                // The Addition pass has to visit every modification anyway, so it reports which
+                // other actions are present and the other two passes are skipped when they would
+                // find nothing. Most effects use one action, so this is usually one traversal
+                // rather than three: measured 0.464 us -> 0.171 us for three handles of two
+                // additions, on 6000.4.6f1 (#529).
+                //
+                // The passes stay separate and in this order. Addition, Multiplication and
+                // Override are not interchangeable, and a single pass accumulating them would
+                // also change the ORDER of the float additions, which changes their result.
+                ApplyModificationsInOrder(
+                    ModificationAction.Addition,
+                    ref calculatedValue,
+                    out bool hasMultiplication,
+                    out bool hasOverride
+                );
+                if (hasMultiplication)
+                {
+                    ApplyModificationsInOrder(
+                        ModificationAction.Multiplication,
+                        ref calculatedValue,
+                        out _,
+                        out _
+                    );
+                }
+
+                if (hasOverride)
+                {
+                    ApplyModificationsInOrder(
+                        ModificationAction.Override,
+                        ref calculatedValue,
+                        out _,
+                        out _
+                    );
+                }
             }
 
             _currentValue = calculatedValue;
@@ -283,8 +314,15 @@ namespace WallstopStudios.UnityHelpers.Tags
             _currentValueCalculated = false;
         }
 
-        private void ApplyModificationsInOrder(ModificationAction action, ref float value)
+        private void ApplyModificationsInOrder(
+            ModificationAction action,
+            ref float value,
+            out bool hasMultiplication,
+            out bool hasOverride
+        )
         {
+            hasMultiplication = false;
+            hasOverride = false;
             foreach (
                 KeyValuePair<EffectHandle, List<AttributeModification>> entry in _modifications
             )
@@ -293,9 +331,25 @@ namespace WallstopStudios.UnityHelpers.Tags
                 for (int index = 0; index < modifications.Count; index++)
                 {
                     AttributeModification modification = modifications[index];
-                    if (modification.action == action)
+                    ModificationAction modificationAction = modification.action;
+                    if (modificationAction == action)
                     {
                         ApplyAttributeModification(modification, ref value);
+                        continue;
+                    }
+
+                    switch (modificationAction)
+                    {
+                        case ModificationAction.Multiplication:
+                        {
+                            hasMultiplication = true;
+                            break;
+                        }
+                        case ModificationAction.Override:
+                        {
+                            hasOverride = true;
+                            break;
+                        }
                     }
                 }
             }
