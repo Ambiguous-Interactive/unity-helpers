@@ -8,6 +8,24 @@ and GUID scratch buffer. Repair is not repeated in a draw method, so malformed/d
 state is repaired before the first draw without adding a guard to every later draw. PhotonSpin's
 one-time warmup priming also happens there, leaving only its block-boundary check in the draw path.
 
+## How the Speed column is measured
+
+The ops/s columns are each generator measured on its own, one after another. That answers "how fast
+is this generator here" and it is the wrong instrument for "which generator is faster": the roster
+takes minutes to walk, and anything that changed on the machine in between lands on whichever
+generator was being measured at the time.
+
+The **Speed** column is measured differently. Every generator is compared against `IllusionFlow`
+(what `PRNG.Instance` returns) in a fixed `ABBABAAB` batch, so each of the four readings that make
+up a ratio sits next to the reading it is divided by, and both generators occupy the same mean
+position in the batch. A drift that is linear across the batch cancels rather than being attributed
+to one side. The four raw readings per side are kept, and their spread is what decides whether the
+ratio is worth publishing: if the machine moved more than 3% between adjacent cycles, that
+generator falls back to the un-paired number and the run says so.
+
+So a Speed bucket is a claim about the generators; an ops/s figure is a claim about this machine on
+that day.
+
 For statistical batteries, the repository's
 `Generator~/WallstopStudios.UnityHelpers.RandomQuality` host emits a reproducible little-endian byte
 stream from an explicit generator, GUID seed and byte count. Long PractRand/TestU01 runs belong in

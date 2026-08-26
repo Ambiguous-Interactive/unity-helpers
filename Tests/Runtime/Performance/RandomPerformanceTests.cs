@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Diagnostics;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [Category("Performance")]
@@ -21,6 +22,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int GuidSeedOffset = 10_000;
         private const int WarmupIterations = 5_000;
 
+        // One slot of the counterbalanced ranking pass. Enough draws that the slot lasts tens of
+        // milliseconds on every generator here, so timer resolution is not part of the reading.
+        private const int RankingDrawsPerSlot = 20_000_000;
+
         [Test, Timeout(0)]
         public void Benchmark()
         {
@@ -29,13 +34,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             UnityEngine.Random.State originalUnityRandomState = UnityEngine.Random.state;
             try
             {
-                List<RandomBenchmarkResult> results = new();
-                foreach (IRandom random in CreateDeterministicGenerators())
+                List<IRandom> generators = new(CreateDeterministicGenerators());
+                List<RandomBenchmarkResult> results = new(generators.Count);
+                foreach (IRandom random in generators)
                 {
                     results.Add(RunBenchmark(random, timeout));
                 }
 
-                ApplySpeedBuckets(results);
+                ApplySpeedBuckets(results, generators);
 
                 List<string> markdown = RandomBenchmarkMarkdownBuilder.BuildTables(results);
 
@@ -151,33 +157,143 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        private static void ApplySpeedBuckets(List<RandomBenchmarkResult> results)
+        /// <summary>
+        /// Ranks the roster from measurements taken against one pivot generator, interleaved.
+        /// </summary>
+        /// <remarks>
+        /// The seven ops/s columns are each generator measured on its own, one after another, over
+        /// a couple of minutes. That is fine for "how fast is this" and wrong for "which is
+        /// faster": anything that changed between the first generator and the twentieth lands on
+        /// the twentieth. #285 recorded the consequence -- the committed table and a fresh run
+        /// disagreeing by up to 9x with inverted rankings -- and could not act on it.
+        ///
+        /// Every ratio here is instead measured against the same pivot in an ABBABAAB batch, so
+        /// each pair of readings is adjacent in time (#573). A comparison the machine was too busy
+        /// to give falls back to the absolute numbers rather than blocking the run, and says so.
+        /// </remarks>
+        private static void ApplySpeedBuckets(
+            List<RandomBenchmarkResult> results,
+            List<IRandom> generators
+        )
         {
             if (results == null || results.Count == 0)
             {
                 return;
             }
 
-            double maxNextUint = 0;
-            foreach (RandomBenchmarkResult result in results)
+            double[] ratios = new double[results.Count];
+            List<string> unstable = new();
+            int pivotIndex = FindPivotIndex(generators, results);
+
+            if (0 <= pivotIndex && generators != null && generators.Count == results.Count)
             {
-                if (maxNextUint < result.NextUintPerSecond)
+                IRandom pivot = generators[pivotIndex];
+                WarmupGenerator(pivot);
+                for (int index = 0; index < results.Count; index++)
                 {
-                    maxNextUint = result.NextUintPerSecond;
+                    if (index == pivotIndex)
+                    {
+                        ratios[index] = 1;
+                        continue;
+                    }
+
+                    IRandom subject = generators[index];
+                    WarmupGenerator(subject);
+                    PairedMeasurement measurement = BenchmarkProtocol.MeasurePaired(
+                        () => MeasureNextUintThroughput(pivot),
+                        () => MeasureNextUintThroughput(subject)
+                    );
+
+                    if (measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
+                    {
+                        ratios[index] = measurement.Ratio;
+                        continue;
+                    }
+
+                    unstable.Add($"{results[index].DisplayName} ({measurement})");
                 }
             }
 
-            if (maxNextUint <= 0)
+            double pivotThroughput = 0 <= pivotIndex ? results[pivotIndex].NextUintPerSecond : 0;
+            for (int index = 0; index < results.Count; index++)
+            {
+                if (ratios[index] <= 0)
+                {
+                    // No usable pairing: fall back to the independently measured number, which is
+                    // the only thing this table had before.
+                    ratios[index] =
+                        0 < pivotThroughput
+                            ? results[index].NextUintPerSecond / pivotThroughput
+                            : 0;
+                }
+            }
+
+            double best = 0;
+            foreach (double ratio in ratios)
+            {
+                if (best < ratio)
+                {
+                    best = ratio;
+                }
+            }
+
+            if (best <= 0)
             {
                 return;
             }
 
-            foreach (RandomBenchmarkResult result in results)
+            for (int index = 0; index < results.Count; index++)
             {
-                double ratio = result.NextUintPerSecond / maxNextUint;
-                result.SpeedRatio = ratio;
-                result.SpeedBucket = RandomSpeedBucketExtensions.FromRatio(ratio);
+                double normalized = ratios[index] / best;
+                results[index].SpeedRatio = normalized;
+                results[index].SpeedBucket = RandomSpeedBucketExtensions.FromRatio(normalized);
             }
+
+            if (0 < unstable.Count)
+            {
+                UnityEngine.Debug.LogWarning(
+                    "Random benchmark ranking fell back to un-paired numbers for "
+                        + $"{unstable.Count} of {results.Count} generators; the machine moved more "
+                        + $"than {BenchmarkProtocol.DefaultSpreadLimit:P0} between adjacent cycles: "
+                        + string.Join(", ", unstable)
+                );
+            }
+        }
+
+        // The package default, so every published ratio reads as "against what PRNG.Instance gives
+        // you". Falls back to the first entry if the roster ever stops carrying it.
+        private static int FindPivotIndex(
+            List<IRandom> generators,
+            List<RandomBenchmarkResult> results
+        )
+        {
+            if (generators == null || generators.Count == 0 || generators.Count != results.Count)
+            {
+                return -1;
+            }
+
+            for (int index = 0; index < generators.Count; index++)
+            {
+                if (generators[index] is IllusionFlow)
+                {
+                    return index;
+                }
+            }
+
+            return 0;
+        }
+
+        private static double MeasureNextUintThroughput(IRandom random)
+        {
+            Stopwatch timer = Stopwatch.StartNew();
+            for (int draw = 0; draw < RankingDrawsPerSlot; ++draw)
+            {
+                _ = random.NextUint();
+            }
+
+            timer.Stop();
+            double seconds = timer.Elapsed.TotalSeconds;
+            return seconds <= 0 ? 0 : RankingDrawsPerSlot / seconds;
         }
 
         // Copy-pasta'd for maximum speed
