@@ -125,6 +125,32 @@ if (condition)
 - Organize code through class structure and file organization instead
 - See [no-regions](./no-regions.md) for alternatives
 
+### 5b. Nested Types Go LAST
+
+A nested `class`, `struct`, `enum`, `interface` or `record` belongs at the **end** of its
+containing type, or in its own file. Never between members.
+
+```csharp
+public sealed class Attribute
+{
+    public float CurrentValue => ...;
+
+    private RemainingActions ApplyModificationsInOrder(...) { ... }
+
+    // ✅ every member first, the nested type last
+    private readonly struct RemainingActions
+    {
+        public readonly bool hasMultiplication;
+    }
+}
+```
+
+A reader scrolling for a method should not have to step over a type declaration to find it, and a
+nested type in the middle reads as the start of a new file's worth of content. Owner review, PR
+\#574. The existing backlog -- 249 sites across 178 files when the rule was written -- is tracked
+on [#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575); it is not a licence
+to add more.
+
 ### 6. NEVER Use Nullable Reference Types
 
 - ❌ `string?`, `object?`, `List<string>?`, `MyClass?`

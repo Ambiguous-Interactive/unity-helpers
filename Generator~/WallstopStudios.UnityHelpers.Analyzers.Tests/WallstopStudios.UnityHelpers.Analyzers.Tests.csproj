@@ -11,6 +11,13 @@
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
+    <!--
+      Warnings are NOT errors here, unlike everywhere else under Generator~. Two reasons, both
+      about what this project compiles: its fixtures deliberately trigger the generator's own
+      WPROTO diagnostics (that is the test data), and it pulls in Runtime/ sources under a net9.0
+      TFM, where the .NET CA analyzers are on by default and report the inventory recorded on #378.
+    -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <AssemblyName>WallstopStudios.UnityHelpers.Analyzers.Tests</AssemblyName>

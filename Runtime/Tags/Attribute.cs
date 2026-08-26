@@ -305,21 +305,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             _currentValueCalculated = false;
         }
 
-        // Returned rather than reported through `out` parameters: these accumulate across the
-        // whole traversal, and an `out` assigned anywhere but immediately before the return is the
-        // shape that lets a later path forget to write it.
-        private readonly struct RemainingActions
-        {
-            public readonly bool hasMultiplication;
-            public readonly bool hasOverride;
-
-            public RemainingActions(bool hasMultiplication, bool hasOverride)
-            {
-                this.hasMultiplication = hasMultiplication;
-                this.hasOverride = hasOverride;
-            }
-        }
-
         private RemainingActions ApplyModificationsInOrder(
             ModificationAction action,
             ref float value
@@ -581,6 +566,21 @@ namespace WallstopStudios.UnityHelpers.Tags
         public override string ToString()
         {
             return ((float)this).ToString(CultureInfo.InvariantCulture);
+        }
+
+        // Returned rather than reported through `out` parameters: these accumulate across the
+        // whole traversal, and an `out` assigned anywhere but immediately before the return is the
+        // shape that lets a later path forget to write it.
+        private readonly struct RemainingActions
+        {
+            public readonly bool hasMultiplication;
+            public readonly bool hasOverride;
+
+            public RemainingActions(bool hasMultiplication, bool hasOverride)
+            {
+                this.hasMultiplication = hasMultiplication;
+                this.hasOverride = hasOverride;
+            }
         }
     }
 }

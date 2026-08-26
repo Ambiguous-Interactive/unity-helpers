@@ -51,16 +51,26 @@ fi
 # --stage-only run (#540).
 ARTIFACTS_ROOT="$(realpath -m "${REPO_ROOT}/.artifacts")"
 TEMP_ROOT="$(realpath -m "${TMPDIR:-/tmp}")"
+RESOLVED_REPO_ROOT="$(realpath -m "${REPO_ROOT}")"
 PROJECT_DIR="$(realpath -m "${PROJECT_DIR}")"
+
+# .artifacts is unconditionally fine -- it IS the repository's scratch directory. The temp root is
+# fine only outside the checkout, because a checkout can live under it: a CI runner working
+# directory, or a container whose workspace is a temp mount. Without the second test, --project-dir
+# pointing at the repository root would be accepted there and then deleted (Bugbot, PR #574).
 PROJECT_DIR_ALLOWED=0
-for allowed_root in "${ARTIFACTS_ROOT}" "${TEMP_ROOT}"; do
-    if [[ "${PROJECT_DIR}" != "${allowed_root}" && "${PROJECT_DIR}" == "${allowed_root}/"* ]]; then
+if [[ "${PROJECT_DIR}" != "${ARTIFACTS_ROOT}" && "${PROJECT_DIR}" == "${ARTIFACTS_ROOT}/"* ]]; then
+    PROJECT_DIR_ALLOWED=1
+elif [[ "${PROJECT_DIR}" != "${TEMP_ROOT}" && "${PROJECT_DIR}" == "${TEMP_ROOT}/"* ]]; then
+    # Neither the checkout, nor anything inside it, nor anything containing it.
+    if [[ "${PROJECT_DIR}" != "${RESOLVED_REPO_ROOT}" &&
+          "${PROJECT_DIR}" != "${RESOLVED_REPO_ROOT}/"* &&
+          "${RESOLVED_REPO_ROOT}" != "${PROJECT_DIR}/"* ]]; then
         PROJECT_DIR_ALLOWED=1
-        break
     fi
-done
+fi
 if (( PROJECT_DIR_ALLOWED == 0 )); then
-    echo "ERROR: Refusing to create the export project unless it is a subdirectory under ${ARTIFACTS_ROOT} or ${TEMP_ROOT}: ${PROJECT_DIR}" >&2
+    echo "ERROR: Refusing to create the export project unless it is a subdirectory under ${ARTIFACTS_ROOT}, or under ${TEMP_ROOT} and outside ${RESOLVED_REPO_ROOT}: ${PROJECT_DIR}" >&2
     exit 1
 fi
 

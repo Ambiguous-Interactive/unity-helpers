@@ -340,9 +340,9 @@ echo "--- B3: Unity package export project stays below an allowed root ---"
 
 run_test
 unity_export_package="$REPO_ROOT/scripts/unity/export-unitypackage.sh"
-root_guard_line=$(first_match_line -F '"${PROJECT_DIR}" != "${allowed_root}"' "$unity_export_package")
-outside_guard_line=$(first_match_line -F '"${PROJECT_DIR}" == "${allowed_root}/"*' "$unity_export_package")
-allowed_roots_line=$(first_match_line -F 'for allowed_root in "${ARTIFACTS_ROOT}" "${TEMP_ROOT}"' "$unity_export_package")
+root_guard_line=$(first_match_line -F '"${PROJECT_DIR}" != "${ARTIFACTS_ROOT}"' "$unity_export_package")
+outside_guard_line=$(first_match_line -F '"${PROJECT_DIR}" == "${ARTIFACTS_ROOT}/"*' "$unity_export_package")
+allowed_roots_line=$(first_match_line -F '"${RESOLVED_REPO_ROOT}" != "${PROJECT_DIR}/"*' "$unity_export_package")
 delete_line=$(first_match_line -F 'rm -rf "${PROJECT_DIR}"' "$unity_export_package")
 if [[ -z "$root_guard_line" || -z "$outside_guard_line" || -z "$allowed_roots_line" || -z "$delete_line" ]]; then
     fail "Unity package export project guard is missing expected structure" \
@@ -365,6 +365,25 @@ for refused_dir in "$REPO_ROOT/.artifacts" "$REPO_ROOT" "/"; do
         guard_refusals+=("$refused_dir")
     fi
 done
+
+# A checkout can live UNDER the temp root -- a CI runner working directory, a container whose
+# workspace is a temp mount -- and then "a subdirectory of the temp root" would accept the
+# repository itself and delete it. Driven from a copy of the script inside a fake checkout under
+# the temp root, so the layout is real rather than argued: the script derives its own repo root
+# from its location.
+guard_fake_root="$(mktemp -d)"
+mkdir -p "$guard_fake_root/scripts/unity" "$guard_fake_root/.github"
+cp "$unity_export_package" "$guard_fake_root/scripts/unity/export-unitypackage.sh"
+cp "$REPO_ROOT/package.json" "$guard_fake_root/package.json"
+cp "$REPO_ROOT/.github/unity-versions.json" "$guard_fake_root/.github/unity-versions.json"
+for refused_dir in "$guard_fake_root" "$guard_fake_root/scripts" "$(dirname "$guard_fake_root")"; do
+    guard_output="$(bash "$guard_fake_root/scripts/unity/export-unitypackage.sh" \
+        --stage-only --project-dir "$refused_dir" 2>&1 || true)"
+    if ! grep -Fq 'Refusing to create the export project' <<<"$guard_output"; then
+        guard_refusals+=("under-temp-root:$refused_dir")
+    fi
+done
+rm -rf "$guard_fake_root"
 # The accepting half is B5 below, which stages into a strict subdirectory of the temp root and
 # asserts what lands there. Running an accepting case here too would pay for a second `npm pack`
 # (4.4 s) to learn the same thing.

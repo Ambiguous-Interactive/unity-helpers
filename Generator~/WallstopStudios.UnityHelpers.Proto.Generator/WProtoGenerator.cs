@@ -1093,8 +1093,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // uninitialized allocation leaves at its default, so the property it belongs to is
                 // what the developer has to be pointed at. Its own attributes are the ones that
                 // matter, including the [WProtoMember] that would put it on the wire.
+                // ReferenceEquals, not `!=`: the question is identity -- did the null-coalesce
+                // above hand back the associated property rather than the field itself -- and
+                // RS1024 rejects `==`/`!=` on symbols because it cannot tell that apart from a
+                // value comparison across compilations.
                 ISymbol declared = field.AssociatedSymbol ?? field;
-                if (declared != field && HasAttribute(declared, MemberAttribute))
+                if (!ReferenceEquals(declared, field) && HasAttribute(declared, MemberAttribute))
                 {
                     continue;
                 }
