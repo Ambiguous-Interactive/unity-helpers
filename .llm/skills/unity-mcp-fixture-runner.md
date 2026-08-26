@@ -92,6 +92,14 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   Arity matching avoids both failure modes, but only if the arity is the _right_ one: selecting
   `JsonSerialize` on `ps.Length >= 1` picked a five-parameter overload and cost a round to
   `TargetParameterCountException`. Pin the return type too when overloads differ by it.
+- **The sandbox wraps your class in `Unity.AI.Assistant.Agent.Dynamic.Extension.Editor`, so a
+  `using UnityEditor.Compilation;` does not make `CompilationPipeline` resolve.** C# searches
+  enclosing namespaces before imports, `Unity.CompilationPipeline` exists, and it wins -- the error
+  is `CS0234: The type or namespace name 'GetAssemblies' does not exist in the namespace
+'Unity.CompilationPipeline'`, which reads as a missing assembly reference rather than a name
+  collision. Fully qualify (`UnityEditor.Compilation.CompilationPipeline`) and the same call
+  compiles unchanged. Anything under a `Unity.*` namespace is exposed to this; the returned
+  `localFixedCode` shows the wrapper, so read it before believing a reference is missing.
 - **A second edit in the same session may not auto-compile, and the refresh that forces it kills its
   own command.** The first write of a session was picked up on its own within ~90 s; a later one was
   still not compiled after ~110 s with `IsCompiling: false`. A `RunCommand` whose whole body is

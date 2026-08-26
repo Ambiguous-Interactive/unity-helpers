@@ -50,8 +50,16 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-docs.txt
 
+      # uv resolves and installs by hard-linking from its cache instead of unpacking wheels.
+      # Measured on this repository's requirements-docs.txt into a fresh environment, both with a
+      # warm cache: pip 5.20 s best of three, uv 0.06 s -- and this step is 11 s of a 31 s job
+      # (#338). pip installs uv itself in ~2 s, which keeps setup-python's cache doing the
+      # downloading and adds no new action to pin.
       - name: Install dependencies
-        run: pip install -r requirements-docs.txt
+        run: |
+          set -euo pipefail
+          pip install uv==0.12.6
+          uv pip install --system -r requirements-docs.txt
 
       - name: Build MkDocs site
         run: mkdocs build --strict
