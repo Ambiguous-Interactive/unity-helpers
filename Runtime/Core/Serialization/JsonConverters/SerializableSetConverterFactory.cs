@@ -119,17 +119,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         continue;
                     }
 
-                    string propertyName = reader.GetString();
-                    reader.Read();
-
-                    if (
-                        string.Equals(
-                            propertyName,
-                            ItemsPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    if (reader.ValueTextEquals(ItemsPropertyName))
                     {
+                        reader.Read();
                         itemsArray = WJsonArray.ReadArray<T>(
                             ref reader,
                             options,
@@ -236,17 +228,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         continue;
                     }
 
-                    string propertyName = reader.GetString();
-                    reader.Read();
-
-                    if (
-                        string.Equals(
-                            propertyName,
-                            ItemsPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    if (reader.ValueTextEquals(ItemsPropertyName))
                     {
+                        reader.Read();
                         itemsArray = WJsonArray.ReadArray<T>(
                             ref reader,
                             options,

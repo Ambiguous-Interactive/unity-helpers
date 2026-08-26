@@ -74,18 +74,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("keys must be an array");
                         }
-                        using PooledResource<List<Keyframe>> pooled = Buffers<Keyframe>.List.Get(
-                            out List<Keyframe> list
-                        );
+                        JsonArrayAccumulator<Keyframe> accumulator = default;
                         while (reader.Read())
                         {
                             if (reader.TokenType == JsonTokenType.EndArray)
                             {
                                 break;
                             }
-                            list.Add(ReadKeyframe(ref reader));
+                            accumulator.Add(ReadKeyframe(ref reader));
                         }
-                        keys = list.Count == 0 ? Array.Empty<Keyframe>() : list.ToArray();
+                        keys = accumulator.Finish();
                     }
                     else if (reader.ValueTextEquals("preWrapMode"))
                     {

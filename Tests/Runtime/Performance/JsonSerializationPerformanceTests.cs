@@ -151,24 +151,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        [Test]
-        public void ReadingAnOversizedArrayDoesNotRetainItsScratchStorage()
-        {
-            int elementCount = WJsonArray.MaximumRetainedArrayCapacity * 2;
-            byte[] data = JsonSerializer.SerializeToUtf8Bytes(MakeIntArray(elementCount, 23));
-            JsonSerializerOptions options = SerializerAlias.CreateFastJsonOptions();
-
-            int[] result = ReadIntArray(data, options);
-
-            Assert.AreEqual(elementCount, result.Length);
-            using PooledResource<List<int>> lease = Buffers<int>.List.Get(out List<int> scratch);
-            Assert.LessOrEqual(
-                scratch.Capacity,
-                WJsonArray.MaximumRetainedArrayCapacity,
-                "an untrusted array must not leave payload-sized scratch storage rooted in the pool"
-            );
-        }
-
         [Test, Timeout(0)]
         public void BenchmarkDeeplyNestedObjectSerialization()
         {

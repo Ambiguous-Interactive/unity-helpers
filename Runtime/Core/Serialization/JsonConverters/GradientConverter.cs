@@ -76,8 +76,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("colorKeys must be an array");
                         }
-                        using PooledResource<List<GradientColorKey>> pooled =
-                            Buffers<GradientColorKey>.List.Get(out List<GradientColorKey> list);
+                        JsonArrayAccumulator<GradientColorKey> colorAccumulator = default;
                         while (reader.Read())
                         {
                             if (reader.TokenType == JsonTokenType.EndArray)
@@ -85,11 +84,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                                 break;
                             }
 
-                            list.Add(ReadColorKey(ref reader, options));
+                            colorAccumulator.Add(ReadColorKey(ref reader, options));
                         }
-                        RefuseKeyOverflow(list.Count, "colorKeys");
-                        colorKeys =
-                            list.Count == 0 ? Array.Empty<GradientColorKey>() : list.ToArray();
+                        RefuseKeyOverflow(colorAccumulator.Count, "colorKeys");
+                        colorKeys = colorAccumulator.Finish();
                     }
                     else if (reader.ValueTextEquals("alphaKeys"))
                     {
@@ -98,8 +96,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("alphaKeys must be an array");
                         }
-                        using PooledResource<List<GradientAlphaKey>> pooled =
-                            Buffers<GradientAlphaKey>.List.Get(out List<GradientAlphaKey> list);
+                        JsonArrayAccumulator<GradientAlphaKey> alphaAccumulator = default;
                         while (reader.Read())
                         {
                             if (reader.TokenType == JsonTokenType.EndArray)
@@ -107,11 +104,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                                 break;
                             }
 
-                            list.Add(ReadAlphaKey(ref reader));
+                            alphaAccumulator.Add(ReadAlphaKey(ref reader));
                         }
-                        RefuseKeyOverflow(list.Count, "alphaKeys");
-                        alphaKeys =
-                            list.Count == 0 ? Array.Empty<GradientAlphaKey>() : list.ToArray();
+                        RefuseKeyOverflow(alphaAccumulator.Count, "alphaKeys");
+                        alphaKeys = alphaAccumulator.Finish();
                     }
                     else
                     {

@@ -110,31 +110,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         continue;
                     }
 
-                    string propertyName = reader.GetString();
-                    reader.Read();
-
-                    if (
-                        string.Equals(
-                            propertyName,
-                            KeysPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    if (reader.ValueTextEquals(KeysPropertyName))
                     {
+                        reader.Read();
                         keysArray = WJsonArray.ReadArray<TKey>(
                             ref reader,
                             options,
                             "SerializableSortedDictionary<TKey, TValue>"
                         );
                     }
-                    else if (
-                        string.Equals(
-                            propertyName,
-                            ValuesPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    else if (reader.ValueTextEquals(ValuesPropertyName))
                     {
+                        reader.Read();
                         valuesArray = WJsonArray.ReadArray<TValue>(
                             ref reader,
                             options,
@@ -237,31 +224,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         continue;
                     }
 
-                    string propertyName = reader.GetString();
-                    reader.Read();
-
-                    if (
-                        string.Equals(
-                            propertyName,
-                            KeysPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    if (reader.ValueTextEquals(KeysPropertyName))
                     {
+                        reader.Read();
                         keysArray = WJsonArray.ReadArray<TKey>(
                             ref reader,
                             options,
                             "SerializableSortedDictionary<TKey, TValue, TValueCache>"
                         );
                     }
-                    else if (
-                        string.Equals(
-                            propertyName,
-                            ValuesPropertyName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
+                    else if (reader.ValueTextEquals(ValuesPropertyName))
                     {
+                        reader.Read();
                         valuesArray = WJsonArray.ReadArray<TValueCache>(
                             ref reader,
                             options,
