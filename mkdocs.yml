@@ -224,6 +224,7 @@ nav:
       - Relational Components: performance/relational-components-performance.md
       - Reflection Helpers: performance/reflection-performance.md
       - IList Sorting: performance/ilist-sorting-performance.md
+      - Dictionary Key Performance: performance/dictionary-key-performance.md
       - Baseline Tests: performance/baseline-tests-performance.md
   - Guides:
       - Odin Migration: guides/odin-migration-guide.md
