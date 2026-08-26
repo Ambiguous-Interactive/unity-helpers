@@ -145,7 +145,11 @@ check_exclude_file_pattern "*.swo"              "Vim swap files"
 
 echo ""
 echo "--- Directory pattern exclusions (excludeDirPatterns) ---"
-check_exclude_dir_pattern "Samples~" "Unity sample folder convention"
+# Asserted as the PROPERTY rather than the literal entry: what matters is that a `~` folder is
+# excluded, not which spelling the array uses. The literal `Samples~` was the entry until a nested
+# `testu01~` needed the same treatment, and a test pinned to the spelling turns a correct
+# generalization into a failure with no correct fix.
+check_exclude_dir_pattern "*~" "any Unity-ignored ~ folder (Samples~, Generator~, nested ones)"
 
 # =============================================================================
 # Part 2: Functional Tests (run the lint against controlled workspaces)
@@ -540,6 +544,17 @@ else
     true
   }
 
+  setup_nested_tilde() {
+    local ws="$1"
+    mkdir -p "$ws/scripts/tool~/inner"
+    touch "$ws/scripts.meta"
+    # A native source file has to live where Unity cannot see it: Unity compiles any .c it finds
+    # into the IL2CPP player, and the standalone build then dies on the missing includes.
+    echo "int main(void) { return 0; }" > "$ws/scripts/tool~/inner/driver.c"
+    echo "notes" > "$ws/scripts/tool~/README.md"
+    # No .meta anywhere under tool~ - Unity ignores ~ dirs at any depth, not just at the root
+  }
+
   setup_samples_tilde() {
     local ws="$1"
     mkdir -p "$ws/Samples~/ExampleScene"
@@ -610,6 +625,7 @@ else
 
   directory_pattern_cases=(
     "Samples~ dir excluded (no .meta needed)|setup_samples_tilde"
+    "nested ~ dir excluded (no .meta needed)|setup_nested_tilde"
   )
 
   orphaned_excluded_cases=(

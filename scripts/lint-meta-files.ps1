@@ -33,10 +33,15 @@ $excludeFilePatterns = @(
   '*.swo'                      # Vim swap files
 )
 
-# Directory patterns to exclude from requiring meta files
-# Folders ending with ~ are ignored by Unity (used for package samples)
+# Directory patterns to exclude from requiring meta files.
+#
+# ANY directory whose name ends with `~` is excluded, not just the two this repository happens to
+# have today. Unity ignores such a directory entirely, so it never generates a .meta inside one and
+# a hand-written .meta there is an orphan that nothing maintains. Naming them individually meant the
+# next one was a lint failure with no correct fix: a `.c` file has to live somewhere Unity cannot
+# see it, because Unity compiles any native source it CAN see into the IL2CPP player.
 $excludeDirPatterns = @(
-  'Samples~'                   # Unity sample folder convention (~ suffix ignored by Unity)
+  '*~'                         # Unity ignores any folder with a ~ suffix (Samples~, Generator~, ...)
 )
 
 function Get-RelativePath([string]$path) {
@@ -58,10 +63,17 @@ function Test-ShouldExclude([string]$relativePath, [bool]$isDirectory) {
     }
   }
 
-  # Check directory pattern exclusions (applies to both files and directories inside matched dirs)
+  # Check directory pattern exclusions (applies to both files and directories inside matched dirs).
+  # The segment walk is what makes a nested `foo~/` work: matching only the whole relative path
+  # would exclude `Samples~/x` and miss `scripts/random-quality/testu01~/x`.
   foreach ($pattern in $excludeDirPatterns) {
     if ($relativePath -like $pattern -or $relativePath -eq $pattern -or $relativePath -like "$pattern/*") {
       return $true
+    }
+    foreach ($segment in ($relativePath -split '/')) {
+      if ($segment -like $pattern) {
+        return $true
+      }
     }
   }
 

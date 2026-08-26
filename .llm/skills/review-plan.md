@@ -130,6 +130,7 @@ Plan Review Summary:
 
 ## Related Skills
 
+- [maintain-plan](./maintain-plan.md) - Keep the working plan limited to actionable work.
 - [review-code-changes](./review-code-changes.md) - Post-implementation code review
 - [validate-before-commit](./validate-before-commit.md) - Pre-commit validation
 - [performance-audit](./performance-audit.md) - Performance-specific review

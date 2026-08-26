@@ -263,7 +263,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .artifacts/random-quality/testu01
-          key: testu01-${{ runner.os }}-${{ hashFiles('scripts/random-quality/testu01-driver.c', 'scripts/random-quality/build-testu01.sh') }}
+          key: testu01-${{ runner.os }}-${{ hashFiles('scripts/random-quality/testu01~/testu01-driver.c', 'scripts/random-quality/build-testu01.sh') }}
 
       # Deliberately NOT gated on a cache miss. The script skips the compile when the driver is
       # already there and runs the self-test either way, and the self-test is the only step that

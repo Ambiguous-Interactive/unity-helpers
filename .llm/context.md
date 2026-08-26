@@ -50,8 +50,7 @@ Samples~/                  # Sample projects (imported via Package Manager)
 
 ## Skills Reference
 
-The full skill catalog, grouped by category, is in the generated
-**[Skills Index](./skills/index.md)**. Regenerate it after adding or editing any
+See the generated [Skills Index](./skills/index.md). Regenerate it after adding or editing any
 skill's trigger comment with `pwsh -NoProfile -File scripts/generate-skills-index.ps1`
 (validated by `scripts/lint-llm-instructions.ps1`).
 
@@ -66,7 +65,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 3. Explicit types over `var`
 4. **NEVER use `#region` or `#endregion`** (see [no-regions](./skills/no-regions.md))
 5. NEVER use nullable reference types (`string?`)
-6. One file per MonoBehaviour/ScriptableObject (production AND tests); a nested type goes at the END of its containing type or in its own file, never between members. `npm run lint:nested-type-placement` enforces it over `Runtime/`, `Editor/`, `Tests/` and `Generator~` and runs in `lint:repo`; `npm run lint:nested-type-placement:fix` moves what it can and reports the rest. A type that would cross a `#if` boundary is reported and never moved ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575))
+6. One file per MonoBehaviour/ScriptableObject (production AND tests); a nested type goes at the END of its containing type or in its own file, never between members. `npm run lint:nested-type-placement` enforces it and `:fix` moves what it can; a type that would cross a `#if` boundary is reported, never moved ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575))
 7. NEVER use `?.`, `??`, `??=` on UnityEngine.Object types
 8. Minimal comments -- only explain **why**, never **what**
 9. Generate `.meta` files after creating ANY file/folder (see [create-unity-meta](./skills/create-unity-meta.md)); exception: no `.meta` for dot folders (`.llm/`, `.github/`, `.git/`, `.vscode/`). Use `./scripts/generate-meta.sh <path>` for new or empty folders, then run `npm run agent:preflight:fix` for changed-file `.meta` recovery.
@@ -116,7 +115,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../.claude/settings.json) which ships with the repo) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit, so typos surface immediately; manual invocation before completion remains the expectation (the hook is a safety net, not a substitute -- it does not fire in CI or when editing outside Claude Code)
-- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbour happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
+- **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbor happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
 - **Pre-push validation**: run `npm run validate:prepush` before push; it is a roughly one-second
@@ -312,6 +311,7 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 ## Agent-Specific Rules
 
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
+- Keep the working plan under 150 lines and actionable; follow [maintain-plan](./skills/maintain-plan.md).
 - Follow `.editorconfig` formatting rules strictly
 - NEVER pipe output to `/dev/null`; NEVER hard-code machine-specific absolute paths
 - Agents may stage, commit, and push completed work when the task calls for publication. Use the

@@ -703,6 +703,16 @@ function Test-MetaRequiredPath {
         return $false
     }
 
+    # Unity ignores any directory whose name ends with `~` at any depth, so it never generates a
+    # .meta inside one and a hand-written .meta there is an orphan nothing maintains. This mirrors
+    # $excludeDirPatterns in scripts/lint-meta-files.ps1, which is the policy's source of truth;
+    # the two drifted once and cost four gated standalone legs.
+    foreach ($segment in ($RelativePath -split '/')) {
+        if ($segment -like '*~') {
+            return $false
+        }
+    }
+
     $leaf = Split-Path -Path $RelativePath -Leaf
     if ($RelativePath -like '*.meta') { return $false }
     if ($leaf -eq 'package-lock.json') { return $false }

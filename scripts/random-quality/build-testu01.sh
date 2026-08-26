@@ -15,6 +15,12 @@
 #     with `libtestu01.so.0: cannot open shared object file` unless LD_LIBRARY_PATH is set. The
 #     driver is linked against the STATIC archives so the binary is self-contained, which is what a
 #     CI leg and a developer's shell both want.
+#   * The driver lives under `testu01~/` because **Unity compiles any `.c` it can see**. This
+#     repository IS the package, so a `.c` anywhere under it is picked up as native plugin source
+#     and handed to IL2CPP, which then fails the standalone player build on
+#     `fatal error C1083: Cannot open include file: 'bbattery.h'` and never produces
+#     GameAssembly.dll. Measured: all four gated standalone legs, twice. A `~` suffix is the
+#     directory Unity ignores, the same convention `Samples~` and `Generator~` use.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,7 +60,7 @@ if [[ ! -x "${DRIVER}" ]]; then
     fi
 
     echo "[testu01] Linking the stream driver"
-    gcc -O2 -I"${BUILD_ROOT}/install/include" -o "${DRIVER}" "${SCRIPT_DIR}/testu01-driver.c" \
+    gcc -O2 -I"${BUILD_ROOT}/install/include" -o "${DRIVER}" "${SCRIPT_DIR}/testu01~/testu01-driver.c" \
         "${BUILD_ROOT}/install/lib/libtestu01.a" \
         "${BUILD_ROOT}/install/lib/libprobdist.a" \
         "${BUILD_ROOT}/install/lib/libmylib.a" -lm

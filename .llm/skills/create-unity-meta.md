@@ -145,6 +145,37 @@ dotnet tool run csharpier format .
 
 ---
 
+## Files Unity Must Not See At All
+
+A `.meta` says "Unity, track this asset". Some files need the opposite, and there is exactly one way
+to say it: **put them in a directory whose name ends with `~`, and give that directory no `.meta`.**
+Unity ignores such a directory at any depth. `Samples~` and `Generator~` are the existing ones.
+
+This matters most for **native source**. A `.c`, `.cpp` or `.h` anywhere in this repository is
+native plugin source as far as Unity is concerned -- the repository IS the package, so there is no
+`Assets/` boundary to hide behind. Unity hands the file to IL2CPP, the generated C++ fails to find
+its includes, `GameAssembly.dll` is never produced, and every gated standalone leg fails with:
+
+```text
+Editor build produced invalid unity-helpers test player output at ...\UhTestPlayer.exe
+(missing GameAssembly.dll (IL2CPP native compile/link did not complete); build exit code 3)
+```
+
+which names the player, not the file that broke it. The real cause is further up the log:
+
+```text
+il2cppOutput\cpp\<yours>.c(19): fatal error C1083: Cannot open include file: '<yours>.h'
+```
+
+`.cs` is exempt for a different reason -- a script outside any asmdef is skipped with a warning --
+so C# in `scripts/` is fine and native source in `scripts/` is not. Measured: all four gated
+standalone legs, twice, for one 50-line TestU01 driver.
+
+Both meta gates know this rule: `$excludeDirPatterns` in `scripts/lint-meta-files.ps1` is its source
+of truth, and `Test-MetaRequiredPath` in `scripts/agent-preflight.ps1` mirrors it. They drifted once.
+
+---
+
 ## Checklist Before Proceeding
 
 After creating any file or folder, verify:
