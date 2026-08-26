@@ -143,30 +143,21 @@ namespace WallstopStudios.UnityHelpers.Tags
                 // The passes stay separate and in this order. Addition, Multiplication and
                 // Override are not interchangeable, and a single pass accumulating them would
                 // also change the ORDER of the float additions, which changes their result.
-                ApplyModificationsInOrder(
+                RemainingActions remaining = ApplyModificationsInOrder(
                     ModificationAction.Addition,
-                    ref calculatedValue,
-                    out bool hasMultiplication,
-                    out bool hasOverride
+                    ref calculatedValue
                 );
-                if (hasMultiplication)
+                if (remaining.hasMultiplication)
                 {
-                    ApplyModificationsInOrder(
+                    _ = ApplyModificationsInOrder(
                         ModificationAction.Multiplication,
-                        ref calculatedValue,
-                        out _,
-                        out _
+                        ref calculatedValue
                     );
                 }
 
-                if (hasOverride)
+                if (remaining.hasOverride)
                 {
-                    ApplyModificationsInOrder(
-                        ModificationAction.Override,
-                        ref calculatedValue,
-                        out _,
-                        out _
-                    );
+                    _ = ApplyModificationsInOrder(ModificationAction.Override, ref calculatedValue);
                 }
             }
 
@@ -314,15 +305,28 @@ namespace WallstopStudios.UnityHelpers.Tags
             _currentValueCalculated = false;
         }
 
-        private void ApplyModificationsInOrder(
+        // Returned rather than reported through `out` parameters: these accumulate across the
+        // whole traversal, and an `out` assigned anywhere but immediately before the return is the
+        // shape that lets a later path forget to write it.
+        private readonly struct RemainingActions
+        {
+            public readonly bool hasMultiplication;
+            public readonly bool hasOverride;
+
+            public RemainingActions(bool hasMultiplication, bool hasOverride)
+            {
+                this.hasMultiplication = hasMultiplication;
+                this.hasOverride = hasOverride;
+            }
+        }
+
+        private RemainingActions ApplyModificationsInOrder(
             ModificationAction action,
-            ref float value,
-            out bool hasMultiplication,
-            out bool hasOverride
+            ref float value
         )
         {
-            hasMultiplication = false;
-            hasOverride = false;
+            bool hasMultiplication = false;
+            bool hasOverride = false;
             foreach (
                 KeyValuePair<EffectHandle, List<AttributeModification>> entry in _modifications
             )
@@ -353,6 +357,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                 }
             }
+
+            return new RemainingActions(hasMultiplication, hasOverride);
         }
 
         private static void ValidateInput(float value, [CallerMemberName] string caller = null)
