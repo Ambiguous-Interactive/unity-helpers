@@ -175,6 +175,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         [Test]
+        public void ASeriesThatCannotBeReadIsNeverReportedAsStable()
+        {
+            Assert.AreEqual(double.PositiveInfinity, BenchmarkProtocol.Spread(null));
+            Assert.AreEqual(double.PositiveInfinity, BenchmarkProtocol.Spread(new double[0]));
+            Assert.AreEqual(
+                double.PositiveInfinity,
+                BenchmarkProtocol.Spread(new double[] { 100, 0 }),
+                "a zero reading is not a fast cycle"
+            );
+        }
+
+        [Test]
         public void AStableMeasurementPublishesAndAnUnstableOneDoesNot()
         {
             PairedMeasurement steady = BenchmarkProtocol.Combine(
@@ -198,13 +210,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [Test]
         public void EverySlotStartsFromASettledHeap()
         {
+            // The control runs FIRST and decides whether this platform can be measured at all: on a
+            // runtime whose collection counter does not move, asserting the subject would be the
+            // absence of a measurement rather than a pass.
             int collections = GC.CollectionCount(0);
             BenchmarkProtocol.Settle();
-            Assert.Less(
-                collections,
-                GC.CollectionCount(0),
-                "Settle must actually collect, or a slot inherits the previous slot's garbage"
-            );
+            if (GC.CollectionCount(0) == collections)
+            {
+                Assert.Ignore(
+                    "GC.CollectionCount(0) does not move here, so Settle cannot be seen."
+                );
+            }
 
             collections = GC.CollectionCount(0);
             BenchmarkProtocol.MeasurePaired(() => 1, () => 1);

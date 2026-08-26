@@ -178,13 +178,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         /// <summary>
         /// Relative spread of a series: <c>(max - min) / min</c>. Zero for a series that never
-        /// moved, and negative infinity is impossible because a non-measurable value is refused.
+        /// moved, and <see cref="double.PositiveInfinity"/> for one this cannot read -- returning
+        /// zero there would report a series of garbage as perfectly stable, which is the one answer
+        /// a stability check must never give.
         /// </summary>
         public static double Spread(double[] values)
         {
             if (values == null || values.Length == 0)
             {
-                return 0;
+                return double.PositiveInfinity;
             }
 
             double lowest = double.MaxValue;
@@ -193,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 if (!IsMeasurable(value))
                 {
-                    return 0;
+                    return double.PositiveInfinity;
                 }
 
                 if (value < lowest)

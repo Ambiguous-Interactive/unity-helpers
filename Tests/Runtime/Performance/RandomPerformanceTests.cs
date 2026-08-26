@@ -214,17 +214,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 }
             }
 
+            // The fallback divides by the pivot's own absolute number so paired and un-paired
+            // ratios stay on one scale. With no pivot at all it divides by 1, which leaves the
+            // ranking the absolute numbers gave before any of this; the normalization below puts
+            // it back on the same scale either way.
             double pivotThroughput = 0 <= pivotIndex ? results[pivotIndex].NextUintPerSecond : 0;
+            double divisor = 0 < pivotThroughput ? pivotThroughput : 1;
             for (int index = 0; index < results.Count; index++)
             {
                 if (ratios[index] <= 0)
                 {
-                    // No usable pairing: fall back to the independently measured number, which is
-                    // the only thing this table had before.
-                    ratios[index] =
-                        0 < pivotThroughput
-                            ? results[index].NextUintPerSecond / pivotThroughput
-                            : 0;
+                    ratios[index] = results[index].NextUintPerSecond / divisor;
                 }
             }
 

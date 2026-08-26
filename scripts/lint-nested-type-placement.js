@@ -344,9 +344,7 @@ function membersOf(text, masked, bodyStart, bodyEnd) {
       headerStart,
       isType,
       kind: isType ? match[1] : null,
-      name: isType ? match[2] : null,
-      innerBody:
-        isType && 0 <= bodyBrace ? [bodyBrace + 1, skipBalanced(masked, bodyBrace) - 1] : null
+      name: isType ? match[2] : null
     });
     cursor = end;
   }
