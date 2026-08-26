@@ -215,12 +215,22 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
                 case EffectStackingMode.Stack:
                 {
-                    if (existingHandles is { Count: > 0 } && 0 < effect.maximumStacks)
+                    if (0 < effect.maximumStacks)
                     {
-                        while (effect.maximumStacks <= existingHandles.Count)
+                        // Re-resolved every iteration, never held across RemoveEffect. Removing
+                        // the last handle for a stack key returns that list to the shared buffer
+                        // pool, and RemoveEffect also invokes OnEffectRemoved -- so a subscriber
+                        // that applies an effect, or rents a list of its own, can be handed the
+                        // very list this loop was reading. Replace, three cases up, copies for
+                        // the same reason.
+                        List<EffectHandle> stackHandles = existingHandles;
+                        while (
+                            stackHandles is { Count: > 0 }
+                            && effect.maximumStacks <= stackHandles.Count
+                        )
                         {
-                            EffectHandle oldestHandle = existingHandles[0];
-                            RemoveEffect(oldestHandle);
+                            RemoveEffect(stackHandles[0]);
+                            stackHandles = TryGetStackHandles(stackKey);
                         }
                     }
 
