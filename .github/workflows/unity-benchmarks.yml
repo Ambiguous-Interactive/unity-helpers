@@ -606,14 +606,22 @@ jobs:
       # git-auto-commit-action is a no-op when there is no diff, so a run that
       # produced no new results does not create an empty commit.
       #
-      # TODO(unity-helpers): if the default branch is protected such that the
-      # built-in GITHUB_TOKEN cannot push (branch protection / required reviews),
-      # this direct commit will be REJECTED. DxMessaging's perf-numbers.yml hit
-      # exactly this and switched to a GitHub App installation token
-      # (actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1) that opens an auto-merge PR instead.
-      # If that happens here, provision an App token and mirror that rationale;
-      # the default below is the simplest path that works on an UNprotected
-      # default branch.
+      # A direct push to main is permitted today, and that was measured rather than
+      # assumed (#515). `"protected": true` on the branch object is set by ANY
+      # ruleset, including ones that allow pushes: GET /branches/main/protection
+      # returns 404 "Branch not protected", and the only rules on main come from
+      # ruleset 15358326 -- deletion, non_fast_forward and copilot_code_review.
+      # None of those blocks a fast-forward push, there is no pull_request rule
+      # and no required_status_checks rule, and 10 of the last 100 commits on main
+      # were pushed by bots.
+      #
+      # The moment a pull_request or required_status_checks rule is added, this
+      # push starts failing on the following Sunday. The fallback is DxMessaging's
+      # perf-numbers.yml: a GitHub App installation token
+      # (actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1)
+      # that opens an auto-merge PR. It has to be an App token, not the built-in
+      # one -- a pull request opened with GITHUB_TOKEN does not trigger workflows,
+      # so its required checks never start and auto-merge stalls forever.
       - name: Commit perf results
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
