@@ -1,7 +1,5 @@
 # Random Number Generator Performance Benchmarks
 
-> Auto-generated via RandomPerformanceTests.Benchmark. Run the test to refresh these summary and detail tables.
-
 State repair for a generator restored from JSON or protobuf happens in its constructor or the shared
 after-deserialization callback. This includes each generator's state, the shared bit/byte reservoirs
 and GUID scratch buffer. Repair is not repeated in a draw method, so malformed/default serialized
@@ -126,3 +124,7 @@ little-endian, so their 64-bit stream is the 32-bit one with each adjacent word 
 exactly 8GB and is clean through 8GB at 64-bit. Every "clean through 8GB" above is the 32-bit
 figure; the 64-bit outcomes are recorded per generator in
 `scripts/random-quality/expected-outcomes.json`.
+
+## Refreshing these numbers
+
+Run `RandomPerformanceTests.Benchmark` from Unity's Test Runner, or let the weekly `Unity Benchmarks` workflow do it. Both rewrite the tables in place.

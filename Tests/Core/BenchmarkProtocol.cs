@@ -27,6 +27,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// <para>The four raw values per side are retained rather than averaged away, because their
     /// spread is the only evidence that the machine held still. A caller publishes a ratio only
     /// when <see cref="PairedMeasurement.IsStable"/> agrees.</para>
+    /// <para>Every slot is preceded by <see cref="Settle"/>, so no slot pays for the garbage the
+    /// previous one left (#431).</para>
     /// </remarks>
     public static class BenchmarkProtocol
     {
@@ -102,6 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 for (int slot = 0; slot < BatchSlots.Length; slot++)
                 {
+                    Settle();
                     if (BatchSlots[slot])
                     {
                         subjectCycles[subjectCount++] = subject();
@@ -152,6 +155,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Spread(subjectCycles),
                 referenceCycles.Length
             );
+        }
+
+        /// <summary>
+        /// Puts the heap in a known state so a slot does not pay for the garbage the previous slot
+        /// left, and so a collection that was going to happen anyway happens before the clock
+        /// starts rather than in the middle of the window.
+        /// </summary>
+        /// <remarks>
+        /// Two collections with the finalizer queue drained between them, because the first one
+        /// can only queue a finalizable object -- the memory it holds comes back on the second.
+        /// This is the in-process half of what the sister repository got from a fresh player per
+        /// roster (#431); it does not reset JIT tiering or native allocator state, and a
+        /// comparison that needs those still needs a new process.
+        /// </remarks>
+        public static void Settle()
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
 
         /// <summary>

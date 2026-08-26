@@ -2,13 +2,7 @@
 
 Relational component attributes (`[SiblingComponent]`, `[ParentComponent]`, `[ChildComponent]`) remove repetitive `GetComponent*` code. These benchmarks quantify the runtime cost of calling `Assign*Components` for common field shapes (single component, array, `List<T>`, and `HashSet<T>`) against hand-written lookups.
 
-**How to refresh these tables:**
-
-1. Open Unity’s Test Runner (EditMode/PlayMode as appropriate for your setup).
-2. Run `RelationalComponentBenchmarkTests.Benchmark` inside `Tests/Runtime/Performance`.
-3. The test logs the tables to the console and rewrites the section that matches the current operating system.
-
-The script executes the benchmark test in batch mode, captures the markdown tables to `BenchmarkLogs/RelationalBenchmark.log`, and preserves the raw `TestResults.xml` when `-KeepResults` is specified.
+Numbers below are grouped by operating system. A section reading `pending` means nobody has run this suite on that platform, not that the attributes are slow there.
 
 ## Windows (Editor/Player)
 
@@ -72,3 +66,7 @@ Pending — run the relational component benchmark suite on Linux to capture res
 Pending — run the relational component benchmark suite on the target platform to capture results.
 
 <!-- RELATIONAL_COMPONENTS_OTHER_END -->
+
+## Refreshing these numbers
+
+Run `RelationalComponentBenchmarkTests.Benchmark` from Unity's Test Runner. It rewrites the section matching the operating system it ran on and leaves the others alone.

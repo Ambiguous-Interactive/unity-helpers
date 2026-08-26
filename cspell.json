@@ -363,7 +363,9 @@
         "blittable",
         "IVT",
         "undefining",
-        "undefines"
+        "undefines",
+        "finalizable",
+        "finalizer"
       ]
     },
     {

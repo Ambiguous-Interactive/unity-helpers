@@ -1,7 +1,5 @@
 # Performance Baseline Tests
 
-> Auto-generated via PerformanceBaselineTests.GeneratePerformanceBaselineReport. Run the test explicitly to refresh these tables.
-
 These tests serve as automated CI regression guards. They verify that critical operations complete within acceptable time bounds, detecting performance regressions before they reach production.
 
 ## Baseline Philosophy
@@ -136,3 +134,7 @@ These tests run automatically during CI to catch regressions. To generate fresh 
 - **Baseline (ms)**: Maximum allowed time before test failure
 - **% of Baseline**: How much of the baseline budget was used (lower is better)
 - **Status**: Pass if within baseline, Fail if exceeded
+
+## Refreshing these numbers
+
+Run `PerformanceBaselineTests.GeneratePerformanceBaselineReport` from Unity's Test Runner.

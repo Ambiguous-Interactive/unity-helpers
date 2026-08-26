@@ -196,6 +196,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         [Test]
+        public void EverySlotStartsFromASettledHeap()
+        {
+            int collections = GC.CollectionCount(0);
+            BenchmarkProtocol.Settle();
+            Assert.Less(
+                collections,
+                GC.CollectionCount(0),
+                "Settle must actually collect, or a slot inherits the previous slot's garbage"
+            );
+
+            collections = GC.CollectionCount(0);
+            BenchmarkProtocol.MeasurePaired(() => 1, () => 1);
+            Assert.LessOrEqual(
+                collections + 8,
+                GC.CollectionCount(0),
+                "one settle per slot, eight slots per batch"
+            );
+        }
+
+        [Test]
         public void AnUnusableMeasurementIsNeverStable()
         {
             Assert.IsFalse(PairedMeasurement.Unusable.IsUsable);

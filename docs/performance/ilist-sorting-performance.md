@@ -27,7 +27,7 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 
 > **What does “stable” mean?** Stable sorting algorithms preserve the relative order of elements that compare as equal. This matters when items carry secondary keys (e.g., sorting people by last name but keeping first-name order deterministic). Unstable algorithms can reshuffle equal entries, which is usually fine for numeric keys but can break deterministic pipelines.
 >
-> **Heads up:** The original Ghost Sort repository was formerly hosted on GitHub under `wstaffordp/ghostsort`, but it currently returns 404. The Unity Helpers implementation remains based on that source; we will relink if/when an official mirror returns.
+> **Heads up:** Ghost Sort and Meteor Sort have no reachable upstream. Both were published by Will Stafford Parsons and both repositories now return 404, so the implementation in this package is the reference for what these algorithms do here. Anything a third party reports about them cannot be checked against a source.
 
 ## Where the Time Actually Goes
 
@@ -137,9 +137,7 @@ cannot change length underneath one.
 - **Nearly Sorted (2% swaps)** – deterministic neighbor swaps introduce light disorder to expose adaptive optimizations.
 - **Shuffled (deterministic)** – Fisher–Yates shuffle using a fixed seed for reproducibility across runs and machines.
 
-Each benchmark sorts a fresh copy of the dataset once and reports wall-clock duration. If a cell still shows `pending`, re-run the benchmark suite to collect fresh data for that algorithm/dataset size.
-
-Run the `IListSortingPerformanceTests.Benchmark` test inside Unity’s Test Runner to refresh the tables below. Results automatically land in the section that matches the current operating system.
+Each benchmark sorts a fresh copy of the dataset once and reports wall-clock duration. A cell reading `pending` means nobody has run this suite on that operating system, not that the algorithm is slow there.
 
 ## Windows (Editor/Player)
 
@@ -273,3 +271,7 @@ Pending — run the IList sorting benchmark suite on Linux to capture results.
 Pending — run the IList sorting benchmark suite on the target platform to capture results.
 
 <!-- ILIST_SORT_OTHER_END -->
+
+## Refreshing these numbers
+
+Run `IListSortingPerformanceTests.Benchmark` from Unity's Test Runner. It rewrites the section matching the operating system it ran on and leaves the others alone.
