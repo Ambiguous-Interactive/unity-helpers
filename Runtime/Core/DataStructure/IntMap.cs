@@ -192,12 +192,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            value = _values[slot];
+            TValue removed = _values[slot];
             _values[slot] = default(TValue);
             _keys[slot] = TombstoneSlot;
             --_count;
             ++_tombstones;
             ++_version;
+            value = removed;
             return true;
         }
 

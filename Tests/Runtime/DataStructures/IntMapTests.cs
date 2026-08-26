@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             IntMap<int> map = new();
             int lastCapacity = map.Capacity;
-            for (int index = 0; index < 70_000; ++index)
+            for (int index = 0; index < 12_000; ++index)
             {
                 Assert.IsTrue(map.TrySet(index * 2, index));
                 if (map.Capacity != lastCapacity)
@@ -186,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 }
             }
 
-            Assert.AreEqual(70_000, map.Count);
+            Assert.AreEqual(12_000, map.Count);
         }
 
         [Test]

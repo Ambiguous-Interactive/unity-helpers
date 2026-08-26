@@ -429,8 +429,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            value = _buffer.Slice(_position);
+            ReadOnlySpan<byte> claimed = _buffer.Slice(_position);
             _position = _buffer.Length;
+            value = claimed;
             return true;
         }
 
