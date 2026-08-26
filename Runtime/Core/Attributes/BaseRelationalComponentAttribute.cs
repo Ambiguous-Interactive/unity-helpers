@@ -132,34 +132,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </remarks>
         internal const int MaximumRetainedScratchCapacity = 4_096;
 
-        internal enum FieldKind : byte
-        {
-            Single = 0,
-            Array = 1,
-            List = 2,
-            HashSet = 3,
-        }
-
-        internal readonly struct FilterParameters
-        {
-            internal readonly bool _checkHierarchy;
-            internal readonly bool _checkTag;
-            internal readonly bool _checkName;
-            internal readonly string _tag;
-            internal readonly string _nameSubstring;
-
-            internal FilterParameters(BaseRelationalComponentAttribute attribute)
-            {
-                _checkHierarchy = !attribute.IncludeInactive;
-                _tag = attribute.TagFilter;
-                _nameSubstring = attribute.NameFilter;
-                _checkTag = _tag != null;
-                _checkName = _nameSubstring != null;
-            }
-
-            internal bool RequiresPostProcessing => _checkHierarchy || _checkTag || _checkName;
-        }
-
         // Map from cache enum to processor enum
 
         private static FieldKind MapFieldKind(AttributeMetadataCache.FieldKind cacheKind)
@@ -209,122 +181,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             elementType = fieldType;
             return FieldKind.Single;
-        }
-
-        internal readonly struct FieldMetadata<TAttribute>
-            where TAttribute : BaseRelationalComponentAttribute
-        {
-            public readonly FieldInfo field;
-            public readonly TAttribute attribute;
-            private readonly FieldAccessor accessor;
-            private readonly FilterParameters filters;
-            public readonly FieldKind kind;
-            public readonly Type elementType;
-            public readonly Func<int, Array> arrayCreator;
-            public readonly Func<int, IList> listCreator;
-            public readonly Func<int, object> hashSetCreator;
-            public readonly Action<object, object> hashSetAdder;
-            public readonly Action<object> hashSetClearer;
-            public readonly bool isInterface;
-
-            public FieldMetadata(
-                FieldInfo field,
-                TAttribute attribute,
-                FilterParameters filters,
-                FieldAccessor accessor,
-                FieldKind kind,
-                Type elementType,
-                Func<int, Array> arrayCreator,
-                Func<int, IList> listCreator,
-                Func<int, object> hashSetCreator,
-                Action<object, object> hashSetAdder,
-                Action<object> hashSetClearer,
-                bool isInterface
-            )
-            {
-                this.field = field;
-                this.attribute = attribute;
-                this.accessor = accessor ?? FieldAccessor.Null;
-                this.filters = filters;
-                this.kind = kind;
-                this.elementType = elementType;
-                this.arrayCreator = arrayCreator;
-                this.listCreator = listCreator;
-                this.hashSetCreator = hashSetCreator;
-                this.hashSetAdder = hashSetAdder;
-                this.hashSetClearer = hashSetClearer;
-                this.isInterface = isInterface;
-            }
-
-            public bool HasFilters => filters.RequiresPostProcessing;
-
-            public FilterParameters Filters => filters;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public object GetValue(Component component)
-            {
-                return accessor.Get(component);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void SetValue(Component component, object value)
-            {
-                accessor.Set(component, value);
-            }
-        }
-
-        internal abstract class FieldAccessor
-        {
-            public static readonly FieldAccessor Null = new NullFieldAccessor();
-
-            public abstract object Get(Component component);
-            public abstract void Set(Component component, object value);
-
-            private sealed class NullFieldAccessor : FieldAccessor
-            {
-                public override object Get(Component component)
-                {
-                    return null;
-                }
-
-                public override void Set(Component component, object value) { }
-            }
-        }
-
-        private sealed class FieldAccessor<TComponent, TValue> : FieldAccessor
-            where TComponent : Component
-        {
-            private readonly FieldSetter<TComponent, TValue> setter;
-            private readonly Func<TComponent, TValue> getter;
-
-            public FieldAccessor(FieldInfo field)
-            {
-                setter = ReflectionHelpers.GetFieldSetter<TComponent, TValue>(field);
-                getter = ReflectionHelpers.GetFieldGetter<TComponent, TValue>(field);
-            }
-
-            public override object Get(Component component)
-            {
-                if (component == null)
-                {
-                    return null;
-                }
-
-                TComponent typedComponent = (TComponent)component;
-                return getter(typedComponent);
-            }
-
-            public override void Set(Component component, object value)
-            {
-                if (component == null)
-                {
-                    return;
-                }
-
-                TComponent typedComponent = (TComponent)component;
-                TValue typedValue = value != null ? (TValue)value : default;
-                setter(ref typedComponent, typedValue);
-            }
         }
 
         private static FieldAccessor CreateFieldAccessor(Type componentType, FieldInfo field)
@@ -985,6 +841,150 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             // zero-match query too. Measured on 6000.4.6f1.
             component.GetComponents(elementType, buffer);
             return buffer;
+        }
+
+        internal enum FieldKind : byte
+        {
+            Single = 0,
+            Array = 1,
+            List = 2,
+            HashSet = 3,
+        }
+
+        internal readonly struct FilterParameters
+        {
+            internal readonly bool _checkHierarchy;
+            internal readonly bool _checkTag;
+            internal readonly bool _checkName;
+            internal readonly string _tag;
+            internal readonly string _nameSubstring;
+
+            internal FilterParameters(BaseRelationalComponentAttribute attribute)
+            {
+                _checkHierarchy = !attribute.IncludeInactive;
+                _tag = attribute.TagFilter;
+                _nameSubstring = attribute.NameFilter;
+                _checkTag = _tag != null;
+                _checkName = _nameSubstring != null;
+            }
+
+            internal bool RequiresPostProcessing => _checkHierarchy || _checkTag || _checkName;
+        }
+
+        internal readonly struct FieldMetadata<TAttribute>
+            where TAttribute : BaseRelationalComponentAttribute
+        {
+            public readonly FieldInfo field;
+            public readonly TAttribute attribute;
+            private readonly FieldAccessor accessor;
+            private readonly FilterParameters filters;
+            public readonly FieldKind kind;
+            public readonly Type elementType;
+            public readonly Func<int, Array> arrayCreator;
+            public readonly Func<int, IList> listCreator;
+            public readonly Func<int, object> hashSetCreator;
+            public readonly Action<object, object> hashSetAdder;
+            public readonly Action<object> hashSetClearer;
+            public readonly bool isInterface;
+
+            public FieldMetadata(
+                FieldInfo field,
+                TAttribute attribute,
+                FilterParameters filters,
+                FieldAccessor accessor,
+                FieldKind kind,
+                Type elementType,
+                Func<int, Array> arrayCreator,
+                Func<int, IList> listCreator,
+                Func<int, object> hashSetCreator,
+                Action<object, object> hashSetAdder,
+                Action<object> hashSetClearer,
+                bool isInterface
+            )
+            {
+                this.field = field;
+                this.attribute = attribute;
+                this.accessor = accessor ?? FieldAccessor.Null;
+                this.filters = filters;
+                this.kind = kind;
+                this.elementType = elementType;
+                this.arrayCreator = arrayCreator;
+                this.listCreator = listCreator;
+                this.hashSetCreator = hashSetCreator;
+                this.hashSetAdder = hashSetAdder;
+                this.hashSetClearer = hashSetClearer;
+                this.isInterface = isInterface;
+            }
+
+            public bool HasFilters => filters.RequiresPostProcessing;
+
+            public FilterParameters Filters => filters;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public object GetValue(Component component)
+            {
+                return accessor.Get(component);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void SetValue(Component component, object value)
+            {
+                accessor.Set(component, value);
+            }
+        }
+
+        internal abstract class FieldAccessor
+        {
+            public static readonly FieldAccessor Null = new NullFieldAccessor();
+
+            public abstract object Get(Component component);
+            public abstract void Set(Component component, object value);
+
+            private sealed class NullFieldAccessor : FieldAccessor
+            {
+                public override object Get(Component component)
+                {
+                    return null;
+                }
+
+                public override void Set(Component component, object value) { }
+            }
+        }
+
+        private sealed class FieldAccessor<TComponent, TValue> : FieldAccessor
+            where TComponent : Component
+        {
+            private readonly FieldSetter<TComponent, TValue> setter;
+            private readonly Func<TComponent, TValue> getter;
+
+            public FieldAccessor(FieldInfo field)
+            {
+                setter = ReflectionHelpers.GetFieldSetter<TComponent, TValue>(field);
+                getter = ReflectionHelpers.GetFieldGetter<TComponent, TValue>(field);
+            }
+
+            public override object Get(Component component)
+            {
+                if (component == null)
+                {
+                    return null;
+                }
+
+                TComponent typedComponent = (TComponent)component;
+                return getter(typedComponent);
+            }
+
+            public override void Set(Component component, object value)
+            {
+                if (component == null)
+                {
+                    return;
+                }
+
+                TComponent typedComponent = (TComponent)component;
+                TValue typedValue = value != null ? (TValue)value : default;
+                setter(ref typedComponent, typedValue);
+            }
         }
     }
 }

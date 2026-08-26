@@ -14,62 +14,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class TextureSettingsApplierAPI
     {
-        [Serializable]
-        public struct PlatformOverride
-        {
-            public string name; // e.g. "DefaultTexturePlatform", "Standalone", "iPhone", "Android"
-
-            public bool applyResizeAlgorithm;
-            public TextureResizeAlgorithm resizeAlgorithm;
-            public bool applyMaxTextureSize;
-            public int maxTextureSize;
-            public bool applyFormat;
-            public TextureImporterFormat format;
-            public bool applyCompression;
-            public TextureImporterCompression compression;
-            public bool applyCrunchCompression;
-            public bool useCrunchCompression;
-        }
-
-        [Serializable]
-        public struct Config
-        {
-            // Read/Write
-            public bool applyReadWriteEnabled;
-            public bool readWriteEnabled;
-
-            // MipMaps
-            public bool applyMipMaps;
-            public bool generateMipMaps;
-
-            // Sampler
-            public bool applyWrapMode;
-            public TextureWrapMode wrapMode;
-            public bool applyFilterMode;
-            public FilterMode filterMode;
-
-            // Importer-level compression convenience (kept for parity with Sprite API)
-            public bool applyCompression;
-            public TextureImporterCompression compression;
-            public bool applyCrunchCompression;
-            public bool useCrunchCompression;
-
-            // Default Platform Settings overrides
-            public bool applyPlatformResizeAlgorithm;
-            public TextureResizeAlgorithm platformResizeAlgorithm;
-            public bool applyPlatformMaxTextureSize;
-            public int platformMaxTextureSize;
-            public bool applyPlatformFormat;
-            public TextureImporterFormat platformFormat;
-            public bool applyPlatformCompression;
-            public TextureImporterCompression platformCompression;
-            public bool applyPlatformCrunchCompression;
-            public bool platformUseCrunchCompression;
-
-            // Optional set of named per-platform overrides.
-            public PlatformOverride[] platformOverrides;
-        }
-
         public static bool WillTextureSettingsChange(
             string assetPath,
             in Config config,
@@ -382,6 +326,62 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Undo.RecordObject(localTextureImporter, "Apply Texture Settings");
                 undoRecorded = true;
             }
+        }
+
+        [Serializable]
+        public struct PlatformOverride
+        {
+            public string name; // e.g. "DefaultTexturePlatform", "Standalone", "iPhone", "Android"
+
+            public bool applyResizeAlgorithm;
+            public TextureResizeAlgorithm resizeAlgorithm;
+            public bool applyMaxTextureSize;
+            public int maxTextureSize;
+            public bool applyFormat;
+            public TextureImporterFormat format;
+            public bool applyCompression;
+            public TextureImporterCompression compression;
+            public bool applyCrunchCompression;
+            public bool useCrunchCompression;
+        }
+
+        [Serializable]
+        public struct Config
+        {
+            // Read/Write
+            public bool applyReadWriteEnabled;
+            public bool readWriteEnabled;
+
+            // MipMaps
+            public bool applyMipMaps;
+            public bool generateMipMaps;
+
+            // Sampler
+            public bool applyWrapMode;
+            public TextureWrapMode wrapMode;
+            public bool applyFilterMode;
+            public FilterMode filterMode;
+
+            // Importer-level compression convenience (kept for parity with Sprite API)
+            public bool applyCompression;
+            public TextureImporterCompression compression;
+            public bool applyCrunchCompression;
+            public bool useCrunchCompression;
+
+            // Default Platform Settings overrides
+            public bool applyPlatformResizeAlgorithm;
+            public TextureResizeAlgorithm platformResizeAlgorithm;
+            public bool applyPlatformMaxTextureSize;
+            public int platformMaxTextureSize;
+            public bool applyPlatformFormat;
+            public TextureImporterFormat platformFormat;
+            public bool applyPlatformCompression;
+            public TextureImporterCompression platformCompression;
+            public bool applyPlatformCrunchCompression;
+            public bool platformUseCrunchCompression;
+
+            // Optional set of named per-platform overrides.
+            public PlatformOverride[] platformOverrides;
         }
     }
 #endif

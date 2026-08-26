@@ -100,31 +100,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             set => Volatile.Write(ref _waitInstructionUseLruEvictionFlag, value ? 1 : 0);
         }
 
-        /// <summary>
-        /// Stores a cached wait instruction alongside its position in the LRU ordering.
-        /// </summary>
-        /// <typeparam name="TInstruction">The type of wait instruction (WaitForSeconds or WaitForSecondsRealtime).</typeparam>
-        /// <remarks>
-        /// By storing the <see cref="LinkedListNode{T}"/> directly, we achieve O(1) complexity for:
-        /// <list type="bullet">
-        ///   <item><description>Removing the entry from its current position: <see cref="LinkedList{T}.Remove(LinkedListNode{T})"/> is O(1)</description></item>
-        ///   <item><description>Moving the entry to the end (most recently used): <see cref="LinkedList{T}.AddLast(LinkedListNode{T})"/> is O(1)</description></item>
-        ///   <item><description>Evicting the oldest entry: <see cref="LinkedList{T}.First"/> and <see cref="LinkedList{T}.RemoveFirst"/> are O(1)</description></item>
-        /// </list>
-        /// This avoids the O(n) traversal that would be required if we only stored keys and had to search for them.
-        /// </remarks>
-        private readonly struct WaitInstructionCacheEntry<TInstruction>
-        {
-            internal readonly TInstruction _value;
-            internal readonly LinkedListNode<float> _node;
-
-            internal WaitInstructionCacheEntry(TInstruction value, LinkedListNode<float> node)
-            {
-                this._value = value;
-                this._node = node;
-            }
-        }
-
         private static readonly Dictionary<
             float,
             WaitInstructionCacheEntry<WaitForSeconds>
@@ -623,6 +598,31 @@ namespace WallstopStudios.UnityHelpers.Utils
                 internal List<float> Order { get; }
             }
         }
+
+        /// <summary>
+        /// Stores a cached wait instruction alongside its position in the LRU ordering.
+        /// </summary>
+        /// <typeparam name="TInstruction">The type of wait instruction (WaitForSeconds or WaitForSecondsRealtime).</typeparam>
+        /// <remarks>
+        /// By storing the <see cref="LinkedListNode{T}"/> directly, we achieve O(1) complexity for:
+        /// <list type="bullet">
+        ///   <item><description>Removing the entry from its current position: <see cref="LinkedList{T}.Remove(LinkedListNode{T})"/> is O(1)</description></item>
+        ///   <item><description>Moving the entry to the end (most recently used): <see cref="LinkedList{T}.AddLast(LinkedListNode{T})"/> is O(1)</description></item>
+        ///   <item><description>Evicting the oldest entry: <see cref="LinkedList{T}.First"/> and <see cref="LinkedList{T}.RemoveFirst"/> are O(1)</description></item>
+        /// </list>
+        /// This avoids the O(n) traversal that would be required if we only stored keys and had to search for them.
+        /// </remarks>
+        private readonly struct WaitInstructionCacheEntry<TInstruction>
+        {
+            internal readonly TInstruction _value;
+            internal readonly LinkedListNode<float> _node;
+
+            internal WaitInstructionCacheEntry(TInstruction value, LinkedListNode<float> node)
+            {
+                this._value = value;
+                this._node = node;
+            }
+        }
     }
 
     public readonly struct WaitInstructionCacheDiagnostics
@@ -1116,12 +1116,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
-        private struct PooledEntry
-        {
-            public T Value;
-            public float ReturnTime;
-        }
-
         /// <summary>
         /// Gets the current number of instances in the pool.
         /// </summary>
@@ -1972,6 +1966,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             _pool.Clear();
         }
+
+        private struct PooledEntry
+        {
+            public T Value;
+            public float ReturnTime;
+        }
     }
 #else
     /// <summary>
@@ -2016,12 +2016,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
-        private struct PooledEntry
-        {
-            public T Value;
-            public float ReturnTime;
-        }
-
         /// <summary>
         /// Gets the current number of instances in the pool.
         /// </summary>
@@ -3048,6 +3042,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 InvokeOnDispose(toDispose[i].Value);
             }
+        }
+
+        private struct PooledEntry
+        {
+            public T Value;
+            public float ReturnTime;
         }
     }
 #endif

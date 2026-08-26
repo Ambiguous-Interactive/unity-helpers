@@ -34,23 +34,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Immutable snapshot of a captured log message.
-        /// </summary>
-        public readonly struct LogRecord
-        {
-            public LogRecord(LogType type, string condition, string stackTrace)
-            {
-                Type = type;
-                Condition = condition ?? string.Empty;
-                StackTrace = stackTrace ?? string.Empty;
-            }
-
-            public LogType Type { get; }
-            public string Condition { get; }
-            public string StackTrace { get; }
-        }
-
-        /// <summary>
         /// All warning messages captured since the scope was created.
         /// </summary>
         public IReadOnlyList<LogRecord> Warnings
@@ -190,6 +173,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// Immutable snapshot of a captured log message.
+        /// </summary>
+        public readonly struct LogRecord
+        {
+            public LogRecord(LogType type, string condition, string stackTrace)
+            {
+                Type = type;
+                Condition = condition ?? string.Empty;
+                StackTrace = stackTrace ?? string.Empty;
+            }
+
+            public LogType Type { get; }
+            public string Condition { get; }
+            public string StackTrace { get; }
         }
     }
 }

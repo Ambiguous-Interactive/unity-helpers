@@ -18,12 +18,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(SerializableType))]
     public sealed class SerializableTypeDrawer : PropertyDrawer
     {
-        private sealed class CachedProperty
-        {
-            public SerializedProperty typeNameProperty;
-            public int lastCacheFrame = -1;
-        }
-
         private static readonly Dictionary<string, CachedProperty> PropertyCache = new(
             StringComparer.Ordinal
         );
@@ -86,6 +80,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             cached.lastCacheFrame = currentFrame;
             return cached.typeNameProperty;
+        }
+
+        private sealed class CachedProperty
+        {
+            public SerializedProperty typeNameProperty;
+            public int lastCacheFrame = -1;
         }
     }
 #endif

@@ -17,19 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoRoundtripComprehensiveTests
     {
-        [ProtoContract]
-        private sealed class WGuidCollection
-        {
-            [ProtoMember(1)]
-            public WGuid single;
-
-            [ProtoMember(2)]
-            public WGuid[] array;
-
-            [ProtoMember(3)]
-            public List<WGuid> list;
-        }
-
         private static T RoundTrip<T>(T value)
         {
             byte[] bytes = Serializer.ProtoSerialize(value);
@@ -228,34 +215,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        [ProtoContract]
-        private sealed class Composite
-        {
-            [ProtoMember(1)]
-            public FastVector2Int fv2;
-
-            [ProtoMember(2)]
-            public FastVector3Int fv3;
-
-            [ProtoMember(4)]
-            public Line2D l2;
-
-            [ProtoMember(5)]
-            public Line3D l3;
-
-            [ProtoMember(6)]
-            public Range<int> ri;
-
-            [ProtoMember(7)]
-            public List<FastVector3Int> list;
-
-            [ProtoMember(8)]
-            public Dictionary<string, FastVector2Int> map;
-
-            [ProtoMember(9)]
-            public Range<float> rf;
-        }
-
         [Test]
         public void CompositePayloadWithCollectionsRoundTrips()
         {
@@ -325,6 +284,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Serializer.ProtoDeserialize<T>(bytes),
                 $"{typeof(T).Name} should read back what it wrote"
             );
+        }
+
+        [ProtoContract]
+        private sealed class WGuidCollection
+        {
+            [ProtoMember(1)]
+            public WGuid single;
+
+            [ProtoMember(2)]
+            public WGuid[] array;
+
+            [ProtoMember(3)]
+            public List<WGuid> list;
+        }
+
+        [ProtoContract]
+        private sealed class Composite
+        {
+            [ProtoMember(1)]
+            public FastVector2Int fv2;
+
+            [ProtoMember(2)]
+            public FastVector3Int fv3;
+
+            [ProtoMember(4)]
+            public Line2D l2;
+
+            [ProtoMember(5)]
+            public Line3D l3;
+
+            [ProtoMember(6)]
+            public Range<int> ri;
+
+            [ProtoMember(7)]
+            public List<FastVector3Int> list;
+
+            [ProtoMember(8)]
+            public Dictionary<string, FastVector2Int> map;
+
+            [ProtoMember(9)]
+            public Range<float> rf;
         }
     }
 }

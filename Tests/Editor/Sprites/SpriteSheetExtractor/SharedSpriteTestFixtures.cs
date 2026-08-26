@@ -81,52 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private const string DynamicAssetsDir = "Assets/Temp/DynamicSpriteFixtures";
 
         /// <summary>
-        /// Represents a dynamically generated sprite sheet fixture with its associated metadata.
-        /// </summary>
-        public sealed class DynamicFixture
-        {
-            /// <summary>
-            /// The asset path of the dynamic fixture.
-            /// </summary>
-            public string AssetPath { get; internal set; }
-
-            /// <summary>
-            /// The cached texture for the dynamic fixture.
-            /// </summary>
-            public Texture2D Texture { get; internal set; }
-
-            /// <summary>
-            /// The cached texture importer for the dynamic fixture.
-            /// </summary>
-            public TextureImporter Importer { get; internal set; }
-
-            /// <summary>
-            /// The width of the texture in pixels.
-            /// </summary>
-            public int Width { get; internal set; }
-
-            /// <summary>
-            /// The height of the texture in pixels.
-            /// </summary>
-            public int Height { get; internal set; }
-
-            /// <summary>
-            /// The number of columns in the sprite grid.
-            /// </summary>
-            public int Columns { get; internal set; }
-
-            /// <summary>
-            /// The number of rows in the sprite grid.
-            /// </summary>
-            public int Rows { get; internal set; }
-
-            /// <summary>
-            /// The texture format used for this fixture.
-            /// </summary>
-            public TextureFormat Format { get; internal set; }
-        }
-
-        /// <summary>
         /// Path to the shared 2x2 sprite sheet fixture (64x64 pixels).
         /// </summary>
         public static string Shared2x2Path { get; private set; }
@@ -948,6 +902,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // Clear cached directory object
             _cachedDirectoryObject = null;
+        }
+
+        /// <summary>
+        /// Represents a dynamically generated sprite sheet fixture with its associated metadata.
+        /// </summary>
+        public sealed class DynamicFixture
+        {
+            /// <summary>
+            /// The asset path of the dynamic fixture.
+            /// </summary>
+            public string AssetPath { get; internal set; }
+
+            /// <summary>
+            /// The cached texture for the dynamic fixture.
+            /// </summary>
+            public Texture2D Texture { get; internal set; }
+
+            /// <summary>
+            /// The cached texture importer for the dynamic fixture.
+            /// </summary>
+            public TextureImporter Importer { get; internal set; }
+
+            /// <summary>
+            /// The width of the texture in pixels.
+            /// </summary>
+            public int Width { get; internal set; }
+
+            /// <summary>
+            /// The height of the texture in pixels.
+            /// </summary>
+            public int Height { get; internal set; }
+
+            /// <summary>
+            /// The number of columns in the sprite grid.
+            /// </summary>
+            public int Columns { get; internal set; }
+
+            /// <summary>
+            /// The number of rows in the sprite grid.
+            /// </summary>
+            public int Rows { get; internal set; }
+
+            /// <summary>
+            /// The texture format used for this fixture.
+            /// </summary>
+            public TextureFormat Format { get; internal set; }
         }
     }
 #endif

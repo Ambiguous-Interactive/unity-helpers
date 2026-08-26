@@ -97,6 +97,91 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public List<AnimationDataEntry> animationEntries = new();
 
         /// <summary>
+        /// Gets the config file path for a given folder path.
+        /// </summary>
+        /// <param name="folderPath">The path to the source folder.</param>
+        /// <returns>The config file path within the folder.</returns>
+        public static string GetConfigPath(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath))
+            {
+                return string.Empty;
+            }
+
+            string normalized = folderPath.TrimEnd('/', '\\');
+            return normalized + "/" + FileName;
+        }
+
+        /// <summary>
+        /// Migrates a configuration from an older version to the current version.
+        /// Currently a no-op for version 1, but provides the hook for future migrations.
+        /// </summary>
+        /// <param name="config">The configuration to migrate.</param>
+        public static void MigrateConfig(AnimationCreatorConfig config)
+        {
+            if (config == null || CurrentVersion <= config.version)
+            {
+                return;
+            }
+
+            // Future migrations go here
+            config.version = CurrentVersion;
+        }
+
+        /// <summary>
+        /// Converts an AnimationCurve to a list of serializable keyframes.
+        /// </summary>
+        /// <param name="curve">The curve to serialize.</param>
+        /// <returns>A list of CurveKeyframes.</returns>
+        public static List<CurveKeyframe> SerializeCurve(AnimationCurve curve)
+        {
+            List<CurveKeyframe> keyframes = new();
+            if (curve == null)
+            {
+                return keyframes;
+            }
+
+            for (int i = 0; i < curve.length; i++)
+            {
+                keyframes.Add(CurveKeyframe.FromKeyframe(curve[i]));
+            }
+
+            return keyframes;
+        }
+
+        /// <summary>
+        /// Converts a list of serializable keyframes back to an AnimationCurve.
+        /// </summary>
+        /// <param name="keyframes">The keyframes to deserialize.</param>
+        /// <param name="preWrapMode">The pre-wrap mode for the curve.</param>
+        /// <param name="postWrapMode">The post-wrap mode for the curve.</param>
+        /// <returns>An AnimationCurve.</returns>
+        public static AnimationCurve DeserializeCurve(
+            List<CurveKeyframe> keyframes,
+            WrapMode preWrapMode,
+            WrapMode postWrapMode
+        )
+        {
+            if (keyframes == null || keyframes.Count == 0)
+            {
+                return AnimationCurve.Constant(0f, 1f, AnimationData.DefaultFramesPerSecond);
+            }
+
+            Keyframe[] unityKeyframes = new Keyframe[keyframes.Count];
+            for (int i = 0; i < keyframes.Count; i++)
+            {
+                unityKeyframes[i] = keyframes[i].ToKeyframe();
+            }
+
+            AnimationCurve curve = new(unityKeyframes)
+            {
+                preWrapMode = preWrapMode,
+                postWrapMode = postWrapMode,
+            };
+            return curve;
+        }
+
+        /// <summary>
         /// Serializable version of AnimationData for JSON persistence.
         /// Does not include transient/UI-only fields like showPreview.
         /// </summary>
@@ -225,91 +310,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     weightedMode = weightedMode,
                 };
             }
-        }
-
-        /// <summary>
-        /// Gets the config file path for a given folder path.
-        /// </summary>
-        /// <param name="folderPath">The path to the source folder.</param>
-        /// <returns>The config file path within the folder.</returns>
-        public static string GetConfigPath(string folderPath)
-        {
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                return string.Empty;
-            }
-
-            string normalized = folderPath.TrimEnd('/', '\\');
-            return normalized + "/" + FileName;
-        }
-
-        /// <summary>
-        /// Migrates a configuration from an older version to the current version.
-        /// Currently a no-op for version 1, but provides the hook for future migrations.
-        /// </summary>
-        /// <param name="config">The configuration to migrate.</param>
-        public static void MigrateConfig(AnimationCreatorConfig config)
-        {
-            if (config == null || CurrentVersion <= config.version)
-            {
-                return;
-            }
-
-            // Future migrations go here
-            config.version = CurrentVersion;
-        }
-
-        /// <summary>
-        /// Converts an AnimationCurve to a list of serializable keyframes.
-        /// </summary>
-        /// <param name="curve">The curve to serialize.</param>
-        /// <returns>A list of CurveKeyframes.</returns>
-        public static List<CurveKeyframe> SerializeCurve(AnimationCurve curve)
-        {
-            List<CurveKeyframe> keyframes = new();
-            if (curve == null)
-            {
-                return keyframes;
-            }
-
-            for (int i = 0; i < curve.length; i++)
-            {
-                keyframes.Add(CurveKeyframe.FromKeyframe(curve[i]));
-            }
-
-            return keyframes;
-        }
-
-        /// <summary>
-        /// Converts a list of serializable keyframes back to an AnimationCurve.
-        /// </summary>
-        /// <param name="keyframes">The keyframes to deserialize.</param>
-        /// <param name="preWrapMode">The pre-wrap mode for the curve.</param>
-        /// <param name="postWrapMode">The post-wrap mode for the curve.</param>
-        /// <returns>An AnimationCurve.</returns>
-        public static AnimationCurve DeserializeCurve(
-            List<CurveKeyframe> keyframes,
-            WrapMode preWrapMode,
-            WrapMode postWrapMode
-        )
-        {
-            if (keyframes == null || keyframes.Count == 0)
-            {
-                return AnimationCurve.Constant(0f, 1f, AnimationData.DefaultFramesPerSecond);
-            }
-
-            Keyframe[] unityKeyframes = new Keyframe[keyframes.Count];
-            for (int i = 0; i < keyframes.Count; i++)
-            {
-                unityKeyframes[i] = keyframes[i].ToKeyframe();
-            }
-
-            AnimationCurve curve = new(unityKeyframes)
-            {
-                preWrapMode = preWrapMode,
-                postWrapMode = postWrapMode,
-            };
-            return curve;
         }
     }
 #endif

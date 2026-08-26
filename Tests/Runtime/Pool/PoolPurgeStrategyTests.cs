@@ -13,23 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     internal sealed class PoolPurgeStrategyTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -760,6 +743,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"After dispose, Get() returned item with Id={item.Id}");
 
             Assert.IsTrue(item != null, "Disposed pool should still produce items via Get()");
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
         }
     }
 }

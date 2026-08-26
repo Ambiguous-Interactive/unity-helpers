@@ -59,71 +59,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             private const byte StrategyUnavailableSentinel = 0;
 
-            private readonly struct CapabilityKey<T> : IEquatable<CapabilityKey<T>>
-            {
-                internal CapabilityKey(T member, ReflectionDelegateStrategy strategy)
-                {
-                    Member = member;
-                    Strategy = strategy;
-                }
-
-                internal T Member { get; }
-
-                internal ReflectionDelegateStrategy Strategy { get; }
-
-                public bool Equals(CapabilityKey<T> other)
-                {
-                    return Strategy == other.Strategy
-                        && EqualityComparer<T>.Default.Equals(Member, other.Member);
-                }
-
-                public override bool Equals(object obj)
-                {
-                    if (obj is CapabilityKey<T> other)
-                    {
-                        return Equals(other);
-                    }
-
-                    return false;
-                }
-
-                public override int GetHashCode()
-                {
-                    return Objects.HashCode(Member, Strategy);
-                }
-            }
-
-            private sealed class StrategyHolder
-            {
-                internal StrategyHolder(
-                    ReflectionDelegateStrategy strategy,
-                    object memberKey,
-                    Type delegateType
-                )
-                {
-                    Strategy = strategy;
-                    MemberKey = memberKey;
-                    DelegateType = delegateType;
-                }
-
-                internal ReflectionDelegateStrategy Strategy { get; }
-
-                internal object MemberKey { get; }
-
-                internal Type DelegateType { get; }
-
-                internal static StrategyHolder Create<TMember>(
-                    CapabilityKey<TMember> key,
-                    Type delegateType
-                )
-                {
-                    object memberKey = key.Member is null ? NullMemberKey : key.Member;
-                    return new StrategyHolder(key.Strategy, memberKey, delegateType);
-                }
-
-                private static readonly object NullMemberKey = new();
-            }
-
             private static readonly ConditionalWeakTable<
                 Delegate,
                 StrategyHolder
@@ -5170,6 +5105,71 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
                 return (Action<TInstance, T1, T2, T3, T4>)del;
 #endif
+            }
+
+            private readonly struct CapabilityKey<T> : IEquatable<CapabilityKey<T>>
+            {
+                internal CapabilityKey(T member, ReflectionDelegateStrategy strategy)
+                {
+                    Member = member;
+                    Strategy = strategy;
+                }
+
+                internal T Member { get; }
+
+                internal ReflectionDelegateStrategy Strategy { get; }
+
+                public bool Equals(CapabilityKey<T> other)
+                {
+                    return Strategy == other.Strategy
+                        && EqualityComparer<T>.Default.Equals(Member, other.Member);
+                }
+
+                public override bool Equals(object obj)
+                {
+                    if (obj is CapabilityKey<T> other)
+                    {
+                        return Equals(other);
+                    }
+
+                    return false;
+                }
+
+                public override int GetHashCode()
+                {
+                    return Objects.HashCode(Member, Strategy);
+                }
+            }
+
+            private sealed class StrategyHolder
+            {
+                internal StrategyHolder(
+                    ReflectionDelegateStrategy strategy,
+                    object memberKey,
+                    Type delegateType
+                )
+                {
+                    Strategy = strategy;
+                    MemberKey = memberKey;
+                    DelegateType = delegateType;
+                }
+
+                internal ReflectionDelegateStrategy Strategy { get; }
+
+                internal object MemberKey { get; }
+
+                internal Type DelegateType { get; }
+
+                internal static StrategyHolder Create<TMember>(
+                    CapabilityKey<TMember> key,
+                    Type delegateType
+                )
+                {
+                    object memberKey = key.Member is null ? NullMemberKey : key.Member;
+                    return new StrategyHolder(key.Strategy, memberKey, delegateType);
+                }
+
+                private static readonly object NullMemberKey = new();
             }
         }
     }

@@ -151,80 +151,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static bool IsRunningInBatchMode => Application.isBatchMode;
 
         /// <summary>
-        /// Environment variable names commonly set by CI systems.
-        /// Use these constants when checking for specific CI environments.
-        /// </summary>
-        public static class CiEnvironmentVariables
-        {
-            /// <summary>Generic CI indicator, set by many CI systems.</summary>
-            public const string Ci = "CI";
-
-            /// <summary>GitHub Actions environment indicator.</summary>
-            public const string GitHubActions = "GITHUB_ACTIONS";
-
-            /// <summary>GitLab CI environment indicator.</summary>
-            public const string GitLabCi = "GITLAB_CI";
-
-            /// <summary>Jenkins URL, set when running in Jenkins.</summary>
-            public const string JenkinsUrl = "JENKINS_URL";
-
-            /// <summary>Travis CI environment indicator.</summary>
-            public const string TravisCi = "TRAVIS";
-
-            /// <summary>CircleCI environment indicator.</summary>
-            public const string CircleCi = "CIRCLECI";
-
-            /// <summary>Azure Pipelines environment indicator.</summary>
-            public const string AzurePipelines = "TF_BUILD";
-
-            /// <summary>TeamCity environment indicator.</summary>
-            public const string TeamCity = "TEAMCITY_VERSION";
-
-            /// <summary>Buildkite environment indicator.</summary>
-            public const string Buildkite = "BUILDKITE";
-
-            /// <summary>AWS CodeBuild environment indicator.</summary>
-            public const string AwsCodeBuild = "CODEBUILD_BUILD_ID";
-
-            /// <summary>Bitbucket Pipelines environment indicator.</summary>
-            public const string BitbucketPipelines = "BITBUCKET_BUILD_NUMBER";
-
-            /// <summary>AppVeyor environment indicator.</summary>
-            public const string AppVeyor = "APPVEYOR";
-
-            /// <summary>Drone CI environment indicator.</summary>
-            public const string DroneCi = "DRONE";
-
-            /// <summary>Unity-specific CI environment indicator.</summary>
-            public const string UnityCi = "UNITY_CI";
-
-            /// <summary>Unity test runner environment indicator.</summary>
-            public const string UnityTests = "UNITY_TESTS";
-
-            /// <summary>
-            /// All environment variable names checked by <see cref="IsRunningInContinuousIntegration"/>.
-            /// </summary>
-            public static readonly string[] All =
-            {
-                Ci,
-                GitHubActions,
-                GitLabCi,
-                JenkinsUrl,
-                TravisCi,
-                CircleCi,
-                AzurePipelines,
-                TeamCity,
-                Buildkite,
-                AwsCodeBuild,
-                BitbucketPipelines,
-                AppVeyor,
-                DroneCi,
-                UnityCi,
-                UnityTests,
-            };
-        }
-
-        /// <summary>
         /// Indicates whether the process appears to be running under a CI system.
         /// </summary>
         /// <remarks>
@@ -1665,6 +1591,80 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 bounds.yMax = position.y;
             }
+        }
+
+        /// <summary>
+        /// Environment variable names commonly set by CI systems.
+        /// Use these constants when checking for specific CI environments.
+        /// </summary>
+        public static class CiEnvironmentVariables
+        {
+            /// <summary>Generic CI indicator, set by many CI systems.</summary>
+            public const string Ci = "CI";
+
+            /// <summary>GitHub Actions environment indicator.</summary>
+            public const string GitHubActions = "GITHUB_ACTIONS";
+
+            /// <summary>GitLab CI environment indicator.</summary>
+            public const string GitLabCi = "GITLAB_CI";
+
+            /// <summary>Jenkins URL, set when running in Jenkins.</summary>
+            public const string JenkinsUrl = "JENKINS_URL";
+
+            /// <summary>Travis CI environment indicator.</summary>
+            public const string TravisCi = "TRAVIS";
+
+            /// <summary>CircleCI environment indicator.</summary>
+            public const string CircleCi = "CIRCLECI";
+
+            /// <summary>Azure Pipelines environment indicator.</summary>
+            public const string AzurePipelines = "TF_BUILD";
+
+            /// <summary>TeamCity environment indicator.</summary>
+            public const string TeamCity = "TEAMCITY_VERSION";
+
+            /// <summary>Buildkite environment indicator.</summary>
+            public const string Buildkite = "BUILDKITE";
+
+            /// <summary>AWS CodeBuild environment indicator.</summary>
+            public const string AwsCodeBuild = "CODEBUILD_BUILD_ID";
+
+            /// <summary>Bitbucket Pipelines environment indicator.</summary>
+            public const string BitbucketPipelines = "BITBUCKET_BUILD_NUMBER";
+
+            /// <summary>AppVeyor environment indicator.</summary>
+            public const string AppVeyor = "APPVEYOR";
+
+            /// <summary>Drone CI environment indicator.</summary>
+            public const string DroneCi = "DRONE";
+
+            /// <summary>Unity-specific CI environment indicator.</summary>
+            public const string UnityCi = "UNITY_CI";
+
+            /// <summary>Unity test runner environment indicator.</summary>
+            public const string UnityTests = "UNITY_TESTS";
+
+            /// <summary>
+            /// All environment variable names checked by <see cref="IsRunningInContinuousIntegration"/>.
+            /// </summary>
+            public static readonly string[] All =
+            {
+                Ci,
+                GitHubActions,
+                GitLabCi,
+                JenkinsUrl,
+                TravisCi,
+                CircleCi,
+                AzurePipelines,
+                TeamCity,
+                Buildkite,
+                AwsCodeBuild,
+                BitbucketPipelines,
+                AppVeyor,
+                DroneCi,
+                UnityCi,
+                UnityTests,
+            };
         }
     }
 }

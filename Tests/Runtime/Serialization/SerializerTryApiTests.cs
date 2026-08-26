@@ -20,16 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerTryApiTests
     {
-        [ProtoContract]
-        private sealed class Sample
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
         // ---------------------------------------------------------------------------
         // Happy path: Try* returns true for a valid roundtrip.
         // ---------------------------------------------------------------------------
@@ -169,19 +159,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(ok);
         }
 
-        // ---------------------------------------------------------------------------
-        // Programmer errors still throw — Try* does NOT swallow Type/Configuration failures.
-        // ---------------------------------------------------------------------------
-
-        private interface IUnregistered { }
-
-        [ProtoContract]
-        private sealed class Unregistered : IUnregistered
-        {
-            [ProtoMember(1)]
-            public int X { get; set; }
-        }
-
         [Test]
         public void TryProtoDeserializeUnresolvedInterfaceStillThrowsTypeException()
         {
@@ -206,6 +183,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.TryProtoDeserialize(data, null, out object _)
             );
+        }
+
+        [ProtoContract]
+        private sealed class Sample
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        // ---------------------------------------------------------------------------
+        // Programmer errors still throw — Try* does NOT swallow Type/Configuration failures.
+        // ---------------------------------------------------------------------------
+
+        private interface IUnregistered { }
+
+        [ProtoContract]
+        private sealed class Unregistered : IUnregistered
+        {
+            [ProtoMember(1)]
+            public int X { get; set; }
         }
     }
 }

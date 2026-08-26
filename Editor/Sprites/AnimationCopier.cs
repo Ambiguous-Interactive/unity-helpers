@@ -127,32 +127,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal bool _filterUseRegex;
         internal bool _sortAscending = true;
 
-        public enum AnimationStatus
-        {
-            Unknown = 0,
-            New = 1,
-            Changed = 2,
-            Unchanged = 3,
-        }
-
-        internal enum CopyMode
-        {
-            All,
-            Changed,
-            New,
-        }
-
-        internal sealed class AnimationFileInfo
-        {
-            public string RelativePath { get; set; }
-            public string FullPath { get; set; }
-            public string FileName { get; set; }
-            public string RelativeDirectory { get; set; }
-            public AnimationStatus Status { get; set; } = AnimationStatus.Unknown;
-            public string DestinationRelativePath { get; set; }
-            public bool Selected { get; set; } = true;
-        }
-
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Animation Copier", priority = -2)]
         public static void ShowWindow()
         {
@@ -2096,6 +2070,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 this.LogError($"Failed to open folder '{relativeAssetsPath}'", e);
             }
+        }
+
+        public enum AnimationStatus
+        {
+            Unknown = 0,
+            New = 1,
+            Changed = 2,
+            Unchanged = 3,
+        }
+
+        internal enum CopyMode
+        {
+            All,
+            Changed,
+            New,
+        }
+
+        internal sealed class AnimationFileInfo
+        {
+            public string RelativePath { get; set; }
+            public string FullPath { get; set; }
+            public string FileName { get; set; }
+            public string RelativeDirectory { get; set; }
+            public AnimationStatus Status { get; set; } = AnimationStatus.Unknown;
+            public string DestinationRelativePath { get; set; }
+            public bool Selected { get; set; } = true;
         }
     }
 #endif

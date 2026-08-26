@@ -135,96 +135,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
     internal static class GroupGUIWidthUtility
     {
-        private sealed class WidthPaddingScope : IDisposable
-        {
-            private readonly float _padding;
-            private readonly float _leftPadding;
-            private readonly float _rightPadding;
-            private readonly bool _trackScopeDepth;
-            private bool _disposed;
-
-            internal WidthPaddingScope(float horizontalPadding)
-            {
-                float resolved = Mathf.Max(0f, horizontalPadding);
-                float split = resolved * 0.5f;
-                _padding = resolved;
-                _leftPadding = split;
-                _rightPadding = resolved - split;
-
-                // Only track scope depth if there's actual padding to apply
-                // Zero padding should not increase scope depth as it has no visual effect
-                _trackScopeDepth = 0f < _padding;
-
-                if (_trackScopeDepth)
-                {
-                    _scopeDepth++;
-                    _totalPadding += _padding;
-                    _totalLeftPadding += _leftPadding;
-                    _totalRightPadding += _rightPadding;
-                }
-            }
-
-            internal WidthPaddingScope(
-                float horizontalPadding,
-                float leftPadding,
-                float rightPadding
-            )
-            {
-                _leftPadding = Mathf.Max(0f, leftPadding);
-                _rightPadding = Mathf.Max(0f, rightPadding);
-                float combined = Mathf.Max(0f, horizontalPadding);
-                if (combined <= 0f)
-                {
-                    combined = _leftPadding + _rightPadding;
-                }
-
-                // Only track scope depth if there's actual padding to apply
-                // Zero padding should not increase scope depth as it has no visual effect
-                if (combined <= 0f)
-                {
-                    _padding = 0f;
-                    _leftPadding = 0f;
-                    _rightPadding = 0f;
-                    _trackScopeDepth = false;
-                    return;
-                }
-
-                _padding = combined;
-                float resolvedLeft = _leftPadding;
-                float resolvedRight = _rightPadding;
-                if (resolvedLeft <= 0f && resolvedRight <= 0f)
-                {
-                    float split = combined * 0.5f;
-                    resolvedLeft = split;
-                    resolvedRight = combined - split;
-                }
-
-                _leftPadding = resolvedLeft;
-                _rightPadding = resolvedRight;
-                _trackScopeDepth = true;
-
-                _scopeDepth++;
-                _totalPadding += _padding;
-                _totalLeftPadding += _leftPadding;
-                _totalRightPadding += _rightPadding;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed || !_trackScopeDepth)
-                {
-                    return;
-                }
-
-                _disposed = true;
-
-                _totalPadding = Mathf.Max(0f, _totalPadding - _padding);
-                _totalLeftPadding = Mathf.Max(0f, _totalLeftPadding - _leftPadding);
-                _totalRightPadding = Mathf.Max(0f, _totalRightPadding - _rightPadding);
-                _scopeDepth = Mathf.Max(0, _scopeDepth - 1);
-            }
-        }
-
         private static float _totalPadding;
         private static float _totalLeftPadding;
         private static float _totalRightPadding;
@@ -468,54 +378,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return isExpanded;
         }
 
-        /// <summary>
-        /// Stores saved WGroup GUI colors for temporary restoration.
-        /// </summary>
-        internal struct WGroupSavedColors
-        {
-            public Color ContentColor;
-            public Color Color;
-            public Color BackgroundColor;
-        }
-
-        /// <summary>
-        /// Saved state for a GUIStyle, used to restore EditorStyles after exiting WGroup theming.
-        /// </summary>
-        private struct StyleState
-        {
-            public Texture2D NormalBackground;
-            public Texture2D FocusedBackground;
-            public Texture2D ActiveBackground;
-            public Texture2D HoverBackground;
-            public Texture2D OnNormalBackground;
-            public Texture2D OnFocusedBackground;
-            public Texture2D OnActiveBackground;
-            public Texture2D OnHoverBackground;
-            public Color NormalTextColor;
-            public Color FocusedTextColor;
-            public Color ActiveTextColor;
-            public Color HoverTextColor;
-            public Color OnNormalTextColor;
-            public Color OnFocusedTextColor;
-            public Color OnActiveTextColor;
-            public Color OnHoverTextColor;
-            public bool IsValid;
-        }
-
-        internal readonly struct WGroupThemeState
-        {
-            public readonly Color GuiColor;
-            public readonly Color ContentColor;
-            public readonly Color BackgroundColor;
-
-            internal WGroupThemeState(Color guiColor, Color contentColor, Color backgroundColor)
-            {
-                GuiColor = guiColor;
-                ContentColor = contentColor;
-                BackgroundColor = backgroundColor;
-            }
-        }
-
         private static StyleState SaveFullStyleState(GUIStyle style)
         {
             if (style == null)
@@ -568,6 +430,210 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             style.onFocused.textColor = saved.OnFocusedTextColor;
             style.onActive.textColor = saved.OnActiveTextColor;
             style.onHover.textColor = saved.OnHoverTextColor;
+        }
+
+        internal static IDisposable PushContentPadding(float horizontalPadding)
+        {
+            return new WidthPaddingScope(horizontalPadding);
+        }
+
+        internal static IDisposable PushContentPadding(
+            float horizontalPadding,
+            float leftPadding,
+            float rightPadding
+        )
+        {
+            return new WidthPaddingScope(horizontalPadding, leftPadding, rightPadding);
+        }
+
+        internal static Rect ApplyCurrentPadding(Rect rect)
+        {
+            float leftPadding = _totalLeftPadding;
+            float rightPadding = _totalRightPadding;
+            if (leftPadding <= 0f && rightPadding <= 0f)
+            {
+                return rect;
+            }
+
+            Rect adjusted = rect;
+            adjusted.xMin += leftPadding;
+            adjusted.xMax -= rightPadding;
+            if (adjusted.width < 0f || float.IsNaN(adjusted.width))
+            {
+                adjusted.width = 0f;
+            }
+
+            return adjusted;
+        }
+
+        internal static float CalculateHorizontalPadding(GUIStyle containerStyle)
+        {
+            return CalculateHorizontalPadding(containerStyle, out _, out _);
+        }
+
+        internal static float CalculateHorizontalPadding(
+            GUIStyle containerStyle,
+            out float leftPadding,
+            out float rightPadding
+        )
+        {
+            if (containerStyle == null)
+            {
+                leftPadding = 0f;
+                rightPadding = 0f;
+                return 0f;
+            }
+
+            RectOffset padding = containerStyle.padding;
+            if (padding == null)
+            {
+                leftPadding = 0f;
+                rightPadding = 0f;
+                return 0f;
+            }
+
+            int total = padding.left + padding.right;
+            leftPadding = Mathf.Max(0f, padding.left);
+            rightPadding = Mathf.Max(0f, padding.right);
+            return Mathf.Max(0f, total);
+        }
+
+        private sealed class WidthPaddingScope : IDisposable
+        {
+            private readonly float _padding;
+            private readonly float _leftPadding;
+            private readonly float _rightPadding;
+            private readonly bool _trackScopeDepth;
+            private bool _disposed;
+
+            internal WidthPaddingScope(float horizontalPadding)
+            {
+                float resolved = Mathf.Max(0f, horizontalPadding);
+                float split = resolved * 0.5f;
+                _padding = resolved;
+                _leftPadding = split;
+                _rightPadding = resolved - split;
+
+                // Only track scope depth if there's actual padding to apply
+                // Zero padding should not increase scope depth as it has no visual effect
+                _trackScopeDepth = 0f < _padding;
+
+                if (_trackScopeDepth)
+                {
+                    _scopeDepth++;
+                    _totalPadding += _padding;
+                    _totalLeftPadding += _leftPadding;
+                    _totalRightPadding += _rightPadding;
+                }
+            }
+
+            internal WidthPaddingScope(
+                float horizontalPadding,
+                float leftPadding,
+                float rightPadding
+            )
+            {
+                _leftPadding = Mathf.Max(0f, leftPadding);
+                _rightPadding = Mathf.Max(0f, rightPadding);
+                float combined = Mathf.Max(0f, horizontalPadding);
+                if (combined <= 0f)
+                {
+                    combined = _leftPadding + _rightPadding;
+                }
+
+                // Only track scope depth if there's actual padding to apply
+                // Zero padding should not increase scope depth as it has no visual effect
+                if (combined <= 0f)
+                {
+                    _padding = 0f;
+                    _leftPadding = 0f;
+                    _rightPadding = 0f;
+                    _trackScopeDepth = false;
+                    return;
+                }
+
+                _padding = combined;
+                float resolvedLeft = _leftPadding;
+                float resolvedRight = _rightPadding;
+                if (resolvedLeft <= 0f && resolvedRight <= 0f)
+                {
+                    float split = combined * 0.5f;
+                    resolvedLeft = split;
+                    resolvedRight = combined - split;
+                }
+
+                _leftPadding = resolvedLeft;
+                _rightPadding = resolvedRight;
+                _trackScopeDepth = true;
+
+                _scopeDepth++;
+                _totalPadding += _padding;
+                _totalLeftPadding += _leftPadding;
+                _totalRightPadding += _rightPadding;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed || !_trackScopeDepth)
+                {
+                    return;
+                }
+
+                _disposed = true;
+
+                _totalPadding = Mathf.Max(0f, _totalPadding - _padding);
+                _totalLeftPadding = Mathf.Max(0f, _totalLeftPadding - _leftPadding);
+                _totalRightPadding = Mathf.Max(0f, _totalRightPadding - _rightPadding);
+                _scopeDepth = Mathf.Max(0, _scopeDepth - 1);
+            }
+        }
+
+        /// <summary>
+        /// Stores saved WGroup GUI colors for temporary restoration.
+        /// </summary>
+        internal struct WGroupSavedColors
+        {
+            public Color ContentColor;
+            public Color Color;
+            public Color BackgroundColor;
+        }
+
+        /// <summary>
+        /// Saved state for a GUIStyle, used to restore EditorStyles after exiting WGroup theming.
+        /// </summary>
+        private struct StyleState
+        {
+            public Texture2D NormalBackground;
+            public Texture2D FocusedBackground;
+            public Texture2D ActiveBackground;
+            public Texture2D HoverBackground;
+            public Texture2D OnNormalBackground;
+            public Texture2D OnFocusedBackground;
+            public Texture2D OnActiveBackground;
+            public Texture2D OnHoverBackground;
+            public Color NormalTextColor;
+            public Color FocusedTextColor;
+            public Color ActiveTextColor;
+            public Color HoverTextColor;
+            public Color OnNormalTextColor;
+            public Color OnFocusedTextColor;
+            public Color OnActiveTextColor;
+            public Color OnHoverTextColor;
+            public bool IsValid;
+        }
+
+        internal readonly struct WGroupThemeState
+        {
+            public readonly Color GuiColor;
+            public readonly Color ContentColor;
+            public readonly Color BackgroundColor;
+
+            internal WGroupThemeState(Color guiColor, Color contentColor, Color backgroundColor)
+            {
+                GuiColor = guiColor;
+                ContentColor = contentColor;
+                BackgroundColor = backgroundColor;
+            }
         }
 
         private sealed class ExitWGroupThemingScope : IDisposable
@@ -895,72 +961,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _disposed = true;
                 _isInsideWGroupPropertyDraw = _previousValue;
             }
-        }
-
-        internal static IDisposable PushContentPadding(float horizontalPadding)
-        {
-            return new WidthPaddingScope(horizontalPadding);
-        }
-
-        internal static IDisposable PushContentPadding(
-            float horizontalPadding,
-            float leftPadding,
-            float rightPadding
-        )
-        {
-            return new WidthPaddingScope(horizontalPadding, leftPadding, rightPadding);
-        }
-
-        internal static Rect ApplyCurrentPadding(Rect rect)
-        {
-            float leftPadding = _totalLeftPadding;
-            float rightPadding = _totalRightPadding;
-            if (leftPadding <= 0f && rightPadding <= 0f)
-            {
-                return rect;
-            }
-
-            Rect adjusted = rect;
-            adjusted.xMin += leftPadding;
-            adjusted.xMax -= rightPadding;
-            if (adjusted.width < 0f || float.IsNaN(adjusted.width))
-            {
-                adjusted.width = 0f;
-            }
-
-            return adjusted;
-        }
-
-        internal static float CalculateHorizontalPadding(GUIStyle containerStyle)
-        {
-            return CalculateHorizontalPadding(containerStyle, out _, out _);
-        }
-
-        internal static float CalculateHorizontalPadding(
-            GUIStyle containerStyle,
-            out float leftPadding,
-            out float rightPadding
-        )
-        {
-            if (containerStyle == null)
-            {
-                leftPadding = 0f;
-                rightPadding = 0f;
-                return 0f;
-            }
-
-            RectOffset padding = containerStyle.padding;
-            if (padding == null)
-            {
-                leftPadding = 0f;
-                rightPadding = 0f;
-                return 0f;
-            }
-
-            int total = padding.left + padding.right;
-            leftPadding = Mathf.Max(0f, padding.left);
-            rightPadding = Mathf.Max(0f, padding.right);
-            return Mathf.Max(0f, total);
         }
     }
 #endif

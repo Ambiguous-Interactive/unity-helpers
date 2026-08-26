@@ -17,24 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class GlobalPoolRegistryTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-            public bool WasDisposed { get; set; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -739,6 +721,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
 
             return false;
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+            public bool WasDisposed { get; set; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
         }
     }
 }

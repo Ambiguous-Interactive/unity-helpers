@@ -625,71 +625,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        private sealed class StrategyConfig
-        {
-            internal StrategyConfig(
-                string label,
-                bool? expressionsOverride,
-                bool? dynamicIlOverride
-            )
-            {
-                Label = label;
-                ExpressionsOverride = expressionsOverride;
-                DynamicIlOverride = dynamicIlOverride;
-            }
-
-            internal string Label { get; }
-
-            internal bool? ExpressionsOverride { get; }
-
-            internal bool? DynamicIlOverride { get; }
-
-            internal bool RequiresOverride =>
-                ExpressionsOverride.HasValue || DynamicIlOverride.HasValue;
-        }
-
-        private sealed class StrategyRunResult
-        {
-            private StrategyRunResult(
-                string label,
-                bool supported,
-                List<ScenarioResult> boxed,
-                List<ScenarioResult> typed,
-                string skipReason
-            )
-            {
-                Label = label;
-                Supported = supported;
-                BoxedResults = boxed ?? new List<ScenarioResult>();
-                TypedResults = typed ?? new List<ScenarioResult>();
-                SkipReason = skipReason;
-            }
-
-            internal string Label { get; }
-
-            internal bool Supported { get; }
-
-            internal IReadOnlyList<ScenarioResult> BoxedResults { get; }
-
-            internal IReadOnlyList<ScenarioResult> TypedResults { get; }
-
-            internal string SkipReason { get; }
-
-            internal static StrategyRunResult Create(
-                string label,
-                List<ScenarioResult> boxed,
-                List<ScenarioResult> typed
-            )
-            {
-                return new StrategyRunResult(label, true, boxed, typed, null);
-            }
-
-            internal static StrategyRunResult CreateUnsupported(string label, string reason)
-            {
-                return new StrategyRunResult(label, false, null, null, reason);
-            }
-        }
-
         private static IEnumerable<Scenario> CreateTypedScenarios(ReflectionPerfTarget instance)
         {
             Type targetType = typeof(ReflectionPerfTarget);
@@ -1291,6 +1226,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             public static int StaticCombine(int first, int second)
             {
                 return StaticField + first + second;
+            }
+        }
+
+        private sealed class StrategyConfig
+        {
+            internal StrategyConfig(
+                string label,
+                bool? expressionsOverride,
+                bool? dynamicIlOverride
+            )
+            {
+                Label = label;
+                ExpressionsOverride = expressionsOverride;
+                DynamicIlOverride = dynamicIlOverride;
+            }
+
+            internal string Label { get; }
+
+            internal bool? ExpressionsOverride { get; }
+
+            internal bool? DynamicIlOverride { get; }
+
+            internal bool RequiresOverride =>
+                ExpressionsOverride.HasValue || DynamicIlOverride.HasValue;
+        }
+
+        private sealed class StrategyRunResult
+        {
+            private StrategyRunResult(
+                string label,
+                bool supported,
+                List<ScenarioResult> boxed,
+                List<ScenarioResult> typed,
+                string skipReason
+            )
+            {
+                Label = label;
+                Supported = supported;
+                BoxedResults = boxed ?? new List<ScenarioResult>();
+                TypedResults = typed ?? new List<ScenarioResult>();
+                SkipReason = skipReason;
+            }
+
+            internal string Label { get; }
+
+            internal bool Supported { get; }
+
+            internal IReadOnlyList<ScenarioResult> BoxedResults { get; }
+
+            internal IReadOnlyList<ScenarioResult> TypedResults { get; }
+
+            internal string SkipReason { get; }
+
+            internal static StrategyRunResult Create(
+                string label,
+                List<ScenarioResult> boxed,
+                List<ScenarioResult> typed
+            )
+            {
+                return new StrategyRunResult(label, true, boxed, typed, null);
+            }
+
+            internal static StrategyRunResult CreateUnsupported(string label, string reason)
+            {
+                return new StrategyRunResult(label, false, null, null, reason);
             }
         }
     }

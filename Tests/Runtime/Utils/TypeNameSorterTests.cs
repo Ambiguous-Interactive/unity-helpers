@@ -12,10 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class TypeNameSorterTests
     {
-        private sealed class Alpha { }
-
-        private sealed class Beta { }
-
         [Test]
         public void CompareOrdersByTypeNameIgnoringCase()
         {
@@ -35,5 +31,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.Less(compareNullAgainstType, 0);
             Assert.Greater(compareTypeAgainstNull, 0);
         }
+
+        private sealed class Alpha { }
+
+        private sealed class Beta { }
     }
 }

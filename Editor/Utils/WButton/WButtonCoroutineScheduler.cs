@@ -44,6 +44,108 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal static class WButtonCoroutineScheduler
     {
+        private static readonly List<CoroutineInstance> Instances = new();
+        private static bool _isSubscribed;
+
+        internal static WButtonCoroutineTicket Schedule(
+            System.Collections.IEnumerator routine,
+            CancellationTokenSource cancellationSource,
+            Action onCompleted,
+            Action<Exception> onFaulted,
+            Action onCancelled
+        )
+        {
+            if (routine == null)
+            {
+                throw new ArgumentNullException(nameof(routine));
+            }
+
+            IEnumerator<object> wrapped = WrapLegacyEnumerator(routine);
+            CoroutineInstance instance = new(
+                wrapped,
+                cancellationSource,
+                onCompleted,
+                onFaulted,
+                onCancelled
+            );
+            Instances.Add(instance);
+            EnsureSubscribed();
+            return new WButtonCoroutineTicket(instance.Id);
+        }
+
+        internal static void Cancel(WButtonCoroutineTicket ticket)
+        {
+            if (ticket.Equals(WButtonCoroutineTicket.None))
+            {
+                return;
+            }
+
+            foreach (CoroutineInstance instance in Instances)
+            {
+                if (instance.Id == ticket.Id)
+                {
+                    instance.RequestCancel();
+                    break;
+                }
+            }
+        }
+
+        private static void EnsureSubscribed()
+        {
+            if (_isSubscribed)
+            {
+                return;
+            }
+
+            EditorApplication.update += Update;
+            _isSubscribed = true;
+        }
+
+        private static void Update()
+        {
+            if (Instances.Count == 0)
+            {
+                if (_isSubscribed)
+                {
+                    EditorApplication.update -= Update;
+                    _isSubscribed = false;
+                }
+                return;
+            }
+
+            for (int index = Instances.Count - 1; 0 <= index; index--)
+            {
+                CoroutineInstance instance = Instances[index];
+                instance.Tick();
+                if (instance.IsCompleted)
+                {
+                    Instances.RemoveAt(index);
+                }
+            }
+        }
+
+        private static IEnumerator<object> WrapLegacyEnumerator(
+            System.Collections.IEnumerator enumerator
+        )
+        {
+            while (enumerator.MoveNext())
+            {
+                object yielded = enumerator.Current;
+                if (yielded is IEnumerator<object> typed)
+                {
+                    yield return typed;
+                }
+                else if (yielded is System.Collections.IEnumerator legacy)
+                {
+                    yield return WrapLegacyEnumerator(legacy);
+                }
+                else
+                {
+                    yield return null;
+                }
+            }
+        }
+
         private sealed class CoroutineInstance
         {
             private readonly Stack<IEnumerator<object>> _stack = new();
@@ -149,108 +251,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
                 IsCompleted = true;
                 _onCompleted?.Invoke();
-            }
-        }
-
-        private static readonly List<CoroutineInstance> Instances = new();
-        private static bool _isSubscribed;
-
-        internal static WButtonCoroutineTicket Schedule(
-            System.Collections.IEnumerator routine,
-            CancellationTokenSource cancellationSource,
-            Action onCompleted,
-            Action<Exception> onFaulted,
-            Action onCancelled
-        )
-        {
-            if (routine == null)
-            {
-                throw new ArgumentNullException(nameof(routine));
-            }
-
-            IEnumerator<object> wrapped = WrapLegacyEnumerator(routine);
-            CoroutineInstance instance = new(
-                wrapped,
-                cancellationSource,
-                onCompleted,
-                onFaulted,
-                onCancelled
-            );
-            Instances.Add(instance);
-            EnsureSubscribed();
-            return new WButtonCoroutineTicket(instance.Id);
-        }
-
-        internal static void Cancel(WButtonCoroutineTicket ticket)
-        {
-            if (ticket.Equals(WButtonCoroutineTicket.None))
-            {
-                return;
-            }
-
-            foreach (CoroutineInstance instance in Instances)
-            {
-                if (instance.Id == ticket.Id)
-                {
-                    instance.RequestCancel();
-                    break;
-                }
-            }
-        }
-
-        private static void EnsureSubscribed()
-        {
-            if (_isSubscribed)
-            {
-                return;
-            }
-
-            EditorApplication.update += Update;
-            _isSubscribed = true;
-        }
-
-        private static void Update()
-        {
-            if (Instances.Count == 0)
-            {
-                if (_isSubscribed)
-                {
-                    EditorApplication.update -= Update;
-                    _isSubscribed = false;
-                }
-                return;
-            }
-
-            for (int index = Instances.Count - 1; 0 <= index; index--)
-            {
-                CoroutineInstance instance = Instances[index];
-                instance.Tick();
-                if (instance.IsCompleted)
-                {
-                    Instances.RemoveAt(index);
-                }
-            }
-        }
-
-        private static IEnumerator<object> WrapLegacyEnumerator(
-            System.Collections.IEnumerator enumerator
-        )
-        {
-            while (enumerator.MoveNext())
-            {
-                object yielded = enumerator.Current;
-                if (yielded is IEnumerator<object> typed)
-                {
-                    yield return typed;
-                }
-                else if (yielded is System.Collections.IEnumerator legacy)
-                {
-                    yield return WrapLegacyEnumerator(legacy);
-                }
-                else
-                {
-                    yield return null;
-                }
             }
         }
     }

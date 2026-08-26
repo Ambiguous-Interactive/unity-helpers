@@ -28,46 +28,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class Heap<T> : IReadOnlyList<T>
     {
-        public struct HeapEnumerator : IEnumerator<T>
-        {
-            private readonly T[] _items;
-            private readonly int _count;
-            private int _index;
-            private T _current;
-
-            internal HeapEnumerator(T[] items, int count)
-            {
-                _items = items;
-                _count = count;
-                _index = -1;
-                _current = default;
-            }
-
-            public bool MoveNext()
-            {
-                if (++_index < _count)
-                {
-                    _current = _items[_index];
-                    return true;
-                }
-
-                _current = default;
-                return false;
-            }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
-
-            public void Reset()
-            {
-                _index = -1;
-                _current = default;
-            }
-
-            public void Dispose() { }
-        }
-
         private const int DefaultCapacity = 16;
         private const int MinimumGrowth = 4;
 
@@ -523,6 +483,46 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        public struct HeapEnumerator : IEnumerator<T>
+        {
+            private readonly T[] _items;
+            private readonly int _count;
+            private int _index;
+            private T _current;
+
+            internal HeapEnumerator(T[] items, int count)
+            {
+                _items = items;
+                _count = count;
+                _index = -1;
+                _current = default;
+            }
+
+            public bool MoveNext()
+            {
+                if (++_index < _count)
+                {
+                    _current = _items[_index];
+                    return true;
+                }
+
+                _current = default;
+                return false;
+            }
+
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
+            public void Reset()
+            {
+                _index = -1;
+                _current = default;
+            }
+
+            public void Dispose() { }
         }
     }
 }

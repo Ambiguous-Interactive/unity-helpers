@@ -18,23 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class MemoryPressureTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
 
         private float TestTimeProvider()
@@ -1207,6 +1190,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
 
             Assert.IsEmpty(exceptions, "Concurrent property reads and writes should not throw");
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
         }
     }
 }

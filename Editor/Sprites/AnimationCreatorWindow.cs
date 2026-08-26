@@ -232,68 +232,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private float _lastScrollY;
         private const float ScrollThresholdForRepaint = 1f;
 
-        private readonly struct CachedElementProperties
-        {
-            public readonly SerializedProperty animationNameProp;
-            public readonly SerializedProperty framesProp;
-            public readonly SerializedProperty loopProp;
-            public readonly SerializedProperty framerateModeProp;
-            public readonly SerializedProperty fpsProp;
-            public readonly SerializedProperty curveProp;
-            public readonly SerializedProperty cycleOffsetProp;
-            public readonly int arrayIndex;
-            public readonly int frameCount;
-
-            public CachedElementProperties(
-                SerializedProperty elementProp,
-                int index,
-                int frameCount
-            )
-            {
-                this.arrayIndex = index;
-                this.frameCount = frameCount;
-                animationNameProp = elementProp.FindPropertyRelative(
-                    nameof(AnimationData.animationName)
-                );
-                framesProp = elementProp.FindPropertyRelative(nameof(AnimationData.frames));
-                loopProp = elementProp.FindPropertyRelative(nameof(AnimationData.loop));
-                framerateModeProp = elementProp.FindPropertyRelative(
-                    nameof(AnimationData.framerateMode)
-                );
-                fpsProp = elementProp.FindPropertyRelative(nameof(AnimationData.framesPerSecond));
-                curveProp = elementProp.FindPropertyRelative(
-                    nameof(AnimationData.framesPerSecondCurve)
-                );
-                cycleOffsetProp = elementProp.FindPropertyRelative(
-                    nameof(AnimationData.cycleOffset)
-                );
-            }
-        }
-
         private readonly Dictionary<int, CachedElementProperties> _cachedElementProperties = new();
         private int _lastCacheFrame = -1;
         private int _animationDataPageIndex;
         private const int AnimationDataPageSize = 20;
 
-        private sealed class AutoParsePreviewRecord
-        {
-            public string folder;
-            public string baseName;
-            public int count;
-            public bool hasIndex;
-        }
-
         private readonly List<AutoParsePreviewRecord> _autoParsePreview = new();
-
-        private sealed class AutoParseDryRunRecord
-        {
-            public string folderPath;
-            public string finalName;
-            public string finalAssetPath;
-            public int count;
-            public bool hasIndex;
-            public bool duplicateResolved;
-        }
 
         private readonly List<AutoParseDryRunRecord> _autoParseDryRun = new();
 
@@ -2977,6 +2921,62 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 this.LogError($"Failed to delete config at '{folderPath}'", e);
                 return false;
             }
+        }
+
+        private readonly struct CachedElementProperties
+        {
+            public readonly SerializedProperty animationNameProp;
+            public readonly SerializedProperty framesProp;
+            public readonly SerializedProperty loopProp;
+            public readonly SerializedProperty framerateModeProp;
+            public readonly SerializedProperty fpsProp;
+            public readonly SerializedProperty curveProp;
+            public readonly SerializedProperty cycleOffsetProp;
+            public readonly int arrayIndex;
+            public readonly int frameCount;
+
+            public CachedElementProperties(
+                SerializedProperty elementProp,
+                int index,
+                int frameCount
+            )
+            {
+                this.arrayIndex = index;
+                this.frameCount = frameCount;
+                animationNameProp = elementProp.FindPropertyRelative(
+                    nameof(AnimationData.animationName)
+                );
+                framesProp = elementProp.FindPropertyRelative(nameof(AnimationData.frames));
+                loopProp = elementProp.FindPropertyRelative(nameof(AnimationData.loop));
+                framerateModeProp = elementProp.FindPropertyRelative(
+                    nameof(AnimationData.framerateMode)
+                );
+                fpsProp = elementProp.FindPropertyRelative(nameof(AnimationData.framesPerSecond));
+                curveProp = elementProp.FindPropertyRelative(
+                    nameof(AnimationData.framesPerSecondCurve)
+                );
+                cycleOffsetProp = elementProp.FindPropertyRelative(
+                    nameof(AnimationData.cycleOffset)
+                );
+            }
+        }
+
+        private sealed class AutoParsePreviewRecord
+        {
+            public string folder;
+            public string baseName;
+            public int count;
+            public bool hasIndex;
+        }
+
+        private sealed class AutoParseDryRunRecord
+        {
+            public string folderPath;
+            public string finalName;
+            public string finalAssetPath;
+            public int count;
+            public bool hasIndex;
+            public bool duplicateResolved;
         }
     }
 

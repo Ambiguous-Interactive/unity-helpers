@@ -190,19 +190,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Unity inspector helper for identifying serialized array property names.
-        /// </summary>
-        internal static class SerializedPropertyNames
-        {
-            private sealed class NameHolder : SerializableHashSet<T>
-            {
-                public const string ItemsName = nameof(_items);
-            }
-
-            internal const string ItemsNameInternal = NameHolder.ItemsName;
-        }
-
-        /// <summary>
         /// Adds an element to the set and updates the serialized cache when the value was not already present.
         /// </summary>
         /// <param name="item">The element to insert.</param>
@@ -1295,6 +1282,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             result = default;
             return false;
         }
+
+        /// <summary>
+        /// Unity inspector helper for identifying serialized array property names.
+        /// </summary>
+        internal static class SerializedPropertyNames
+        {
+            internal const string ItemsNameInternal = NameHolder.ItemsName;
+
+            private sealed class NameHolder : SerializableHashSet<T>
+            {
+                public const string ItemsName = nameof(_items);
+            }
+        }
     }
 
     /// <summary>
@@ -1319,37 +1319,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     public class SerializableHashSet<T> : SerializableSetBase<T, HashSet<T>>
     {
-        private sealed class StorageSet : HashSet<T>
-        {
-            /// <summary>
-            /// Initializes an empty storage set using the default comparer.
-            /// </summary>
-            public StorageSet() { }
-
-            /// <summary>
-            /// Initializes an empty storage set that uses the provided comparer.
-            /// </summary>
-            /// <param name="comparer">Comparer passed to <see cref="HashSet{T}"/>.</param>
-            public StorageSet(IEqualityComparer<T> comparer)
-                : base(comparer) { }
-
-            /// <summary>
-            /// Initializes the storage set with the supplied elements and comparer.
-            /// </summary>
-            /// <param name="collection">Elements to copy into the backing set.</param>
-            /// <param name="comparer">Comparer used to determine uniqueness.</param>
-            public StorageSet(IEnumerable<T> collection, IEqualityComparer<T> comparer)
-                : base(collection, comparer) { }
-
-            /// <summary>
-            /// Deserialization constructor used by <see cref="ISerializable"/>.
-            /// </summary>
-            /// <param name="info">Serialized data describing the set.</param>
-            /// <param name="context">Context describing the serialization source.</param>
-            public StorageSet(SerializationInfo info, StreamingContext context)
-                : base(info, context) { }
-        }
-
         /// <summary>
         /// Initializes an empty hash set compatible with Unity and ProtoBuf serialization.
         /// </summary>
@@ -1444,6 +1413,37 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         protected override bool TryGetValueCore(T equalValue, out T actualValue)
         {
             return Set.TryGetValue(equalValue, out actualValue);
+        }
+
+        private sealed class StorageSet : HashSet<T>
+        {
+            /// <summary>
+            /// Initializes an empty storage set using the default comparer.
+            /// </summary>
+            public StorageSet() { }
+
+            /// <summary>
+            /// Initializes an empty storage set that uses the provided comparer.
+            /// </summary>
+            /// <param name="comparer">Comparer passed to <see cref="HashSet{T}"/>.</param>
+            public StorageSet(IEqualityComparer<T> comparer)
+                : base(comparer) { }
+
+            /// <summary>
+            /// Initializes the storage set with the supplied elements and comparer.
+            /// </summary>
+            /// <param name="collection">Elements to copy into the backing set.</param>
+            /// <param name="comparer">Comparer used to determine uniqueness.</param>
+            public StorageSet(IEnumerable<T> collection, IEqualityComparer<T> comparer)
+                : base(collection, comparer) { }
+
+            /// <summary>
+            /// Deserialization constructor used by <see cref="ISerializable"/>.
+            /// </summary>
+            /// <param name="info">Serialized data describing the set.</param>
+            /// <param name="context">Context describing the serialization source.</param>
+            public StorageSet(SerializationInfo info, StreamingContext context)
+                : base(info, context) { }
         }
     }
 

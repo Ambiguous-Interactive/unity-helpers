@@ -134,49 +134,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly ConcurrentDictionary<Type, byte> UnsupportedParameterlessTypes =
             new();
 
-        /// <summary>
-        /// Struct key for MainFoldoutAnimations cache to avoid string allocations.
-        /// Uses (instanceId, propertyPath) pair for cache identity.
-        /// </summary>
-        private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
-        {
-            public readonly long InstanceId;
-            public readonly string PropertyPath;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public MainFoldoutCacheKey(long instanceId, string propertyPath)
-            {
-                InstanceId = instanceId;
-                PropertyPath = propertyPath;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(MainFoldoutCacheKey other)
-            {
-                return InstanceId == other.InstanceId
-                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is MainFoldoutCacheKey other && Equals(other);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(InstanceId, PropertyPath);
-            }
-
-            /// <summary>
-            /// Converts to string representation for test verification.
-            /// </summary>
-            public override string ToString()
-            {
-                return $"{InstanceId}:{PropertyPath}";
-            }
-        }
-
         // Main foldout animation cache - static because property drawers can be recreated
         // Keys include the target object's instance ID to prevent cache collisions between different objects
         private static readonly Dictionary<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
@@ -220,72 +177,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private int _lastRowRenderCacheFrame = -1;
         private int _lastItemsPropertyCacheFrame = -1;
 
-        private sealed class CachedItemsProperty
-        {
-            public SerializedProperty itemsProperty;
-        }
-
-        private sealed class SortedSetCacheEntry
-        {
-            public bool isSorted;
-            public int frameNumber;
-        }
-
-        private sealed class InspectorCacheEntry
-        {
-            public ISerializableSetInspector inspector;
-            public int frameNumber;
-        }
-
-        private sealed class HeightCacheEntry
-        {
-            public float height;
-            public int arraySize;
-            public int pageIndex;
-            public bool isExpanded;
-            public bool hasNullEntries;
-            public bool hasDuplicates;
-            public bool pendingIsExpanded;
-            public float pendingFoldoutProgress;
-            public float mainFoldoutProgress;
-            public int frameNumber;
-        }
-
-        private readonly struct RowRenderKey : IEquatable<RowRenderKey>
-        {
-            public readonly string listKey;
-            public readonly int globalIndex;
-
-            public RowRenderKey(string listKey, int globalIndex)
-            {
-                this.listKey = listKey;
-                this.globalIndex = globalIndex;
-            }
-
-            public bool Equals(RowRenderKey other)
-            {
-                return globalIndex == other.globalIndex && listKey == other.listKey;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is RowRenderKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(listKey, globalIndex);
-            }
-        }
-
-        private sealed class RowRenderData
-        {
-            public SerializedProperty itemProperty;
-            public float rowHeight;
-            public float itemHeight;
-            public bool isValid;
-        }
-
         internal Rect LastResolvedPosition { get; private set; }
         internal Rect LastItemsContainerRect { get; private set; }
         internal bool HasItemsContainerRect { get; private set; }
@@ -314,188 +205,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// When this matches the current frame, the row render cache should be invalidated.
         /// </summary>
         private static int _childHeightChangedFrame = -1;
-
-        internal sealed class PaginationState
-        {
-            public int page;
-            public int pageSize = DefaultPageSize;
-            public int selectedIndex = -1;
-        }
-
-        internal sealed class DuplicateState
-        {
-            public bool hasDuplicates;
-            public readonly HashSet<int> duplicateIndices = new();
-            public string summary = string.Empty;
-            public readonly Dictionary<int, double> animationStartTimes = new();
-            public readonly Dictionary<int, bool> primaryFlags = new();
-            public readonly Dictionary<object, List<int>> grouping = new();
-            public readonly Dictionary<List<int>, PooledResource<List<int>>> groupingLeases = new();
-            public readonly List<int> animationKeysScratch = new();
-            public readonly List<object> groupingKeysScratch = new();
-            private bool _lastHadDuplicates;
-            private int _lastArraySize = -1;
-            private bool _animationsCompleted;
-
-            public bool IsDirty => _lastArraySize < 0;
-
-            public bool IsAnimating => hasDuplicates && !_animationsCompleted;
-
-            public void MarkDirty()
-            {
-                _lastArraySize = -1;
-            }
-
-            public void UpdateArraySize(int newSize)
-            {
-                _lastArraySize = newSize;
-            }
-
-            public void UpdateLastHadDuplicates(bool hadDuplicates, bool forceReset = false)
-            {
-                bool changed = hasDuplicates != _lastHadDuplicates;
-                _lastHadDuplicates = hadDuplicates;
-                if ((changed || forceReset) && hasDuplicates)
-                {
-                    _animationsCompleted = false;
-                }
-            }
-
-            public bool ShouldSkipRefresh(int currentArraySize)
-            {
-                return currentArraySize == _lastArraySize && !_lastHadDuplicates && !hasDuplicates;
-            }
-
-            public void CheckAnimationCompletion(double currentTime, int cycleLimit)
-            {
-                if (_animationsCompleted || !hasDuplicates || cycleLimit <= 0)
-                {
-                    return;
-                }
-
-                double cycleDuration = (2d * Math.PI) / DuplicateShakeFrequency;
-                double maxDuration = cycleDuration * cycleLimit;
-
-                bool allComplete = true;
-                foreach (KeyValuePair<int, double> entry in animationStartTimes)
-                {
-                    double elapsed = currentTime - entry.Value;
-                    if (elapsed < maxDuration)
-                    {
-                        allComplete = false;
-                        break;
-                    }
-                }
-
-                if (allComplete)
-                {
-                    _animationsCompleted = true;
-                }
-            }
-
-            public void ClearAnimationTracking()
-            {
-                _lastHadDuplicates = false;
-                _lastArraySize = -1;
-                animationStartTimes.Clear();
-            }
-
-            public float GetAnimationOffset(int arrayIndex, double currentTime, int cycleLimit)
-            {
-                if (!animationStartTimes.TryGetValue(arrayIndex, out double startTime))
-                {
-                    startTime = currentTime;
-                    animationStartTimes[arrayIndex] = startTime;
-                    _animationsCompleted = false;
-                }
-
-                return EvaluateDuplicateShakeOffset(arrayIndex, startTime, currentTime, cycleLimit);
-            }
-        }
-
-        internal sealed class NullEntryState
-        {
-            public bool hasNullEntries;
-            public readonly HashSet<int> nullIndices = new();
-            public readonly Dictionary<int, string> tooltips = new();
-            public string summary = string.Empty;
-            public readonly List<int> scratch = new();
-        }
-
-        internal sealed class PendingEntry
-        {
-            public object value;
-            public bool isExpanded;
-            public bool isSorted;
-            public Type elementType;
-            public string errorMessage;
-            public AnimBool foldoutAnim;
-            public PendingValueWrapper valueWrapper;
-            public SerializedObject valueWrapperSerialized;
-            public SerializedProperty valueWrapperProperty;
-            public bool valueWrapperDirty = true;
-        }
-
-        private struct SetElementData
-        {
-            public SerializedPropertyType propertyType;
-            public object comparable;
-            public object value;
-        }
-
-        internal sealed class SetListRenderContext
-        {
-            public SerializedProperty setProperty;
-            public SerializedProperty itemsProperty;
-            public DuplicateState duplicateState;
-            public NullEntryState nullState;
-            public Type elementType;
-            public bool needsDuplicateRefresh;
-        }
-
-        private readonly struct RowFoldoutKey : IEquatable<RowFoldoutKey>
-        {
-            public RowFoldoutKey(string cacheKey, int index)
-            {
-                CacheKey = cacheKey;
-                Index = index;
-            }
-
-            public string CacheKey { get; }
-
-            private int Index { get; }
-
-            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
-
-            public bool Equals(RowFoldoutKey other)
-            {
-                return Index == other.Index && string.Equals(CacheKey, other.CacheKey);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is RowFoldoutKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(CacheKey, Index);
-            }
-        }
-
-        internal sealed class ListPageCache
-        {
-            public readonly List<PageEntry> entries = new();
-            public int pageIndex = -1;
-            public int pageSize = -1;
-            public int itemCount = -1;
-            public bool dirty = true;
-        }
-
-        internal sealed class PageEntry
-        {
-            public int arrayIndex;
-        }
 
         private static float GetFooterHeight()
         {
@@ -624,13 +333,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 ? new Color(0.25f, 0.25f, 0.25f, 1f)
                 : new Color(0.7f, 0.7f, 0.7f, 1f);
             EditorGUI.DrawRect(rect, borderColor);
-        }
-
-        private enum PaginationControlLayout
-        {
-            None,
-            PrevNext,
-            Full,
         }
 
         private static GUIStyle BuildButtonStyle(Color baseColor)
@@ -1621,40 +1323,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             _cachedPropertyPath = propertyPath;
             _cachedListKey = key;
             return key;
-        }
-
-        /// <summary>
-        /// Struct key for static property cache lookup to avoid string allocations.
-        /// </summary>
-        private readonly struct PropertyCacheKey : IEquatable<PropertyCacheKey>
-        {
-            public readonly long InstanceId;
-            public readonly string PropertyPath;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public PropertyCacheKey(long instanceId, string propertyPath)
-            {
-                InstanceId = instanceId;
-                PropertyPath = propertyPath;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(PropertyCacheKey other)
-            {
-                return InstanceId == other.InstanceId
-                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is PropertyCacheKey other && Equals(other);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(InstanceId, PropertyPath);
-            }
         }
 
         // Static cache for single-target property cache keys to avoid repeated string allocations
@@ -4321,51 +3989,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return left.Equals(right);
-        }
-
-        internal sealed class PendingValueWrapper : ScriptableObject
-        {
-            internal const string PropertyName = "boxedValue";
-
-            [SerializeReference]
-            private object boxedValue;
-
-            public object GetValue()
-            {
-                return boxedValue;
-            }
-
-            public void SetValue(object incoming)
-            {
-                boxedValue = incoming;
-            }
-
-            public SerializedProperty FindValueProperty(SerializedObject serializedObject)
-            {
-                return serializedObject.FindProperty(PropertyName);
-            }
-        }
-
-        private readonly struct PendingWrapperContext
-        {
-            public static readonly PendingWrapperContext Empty = new(null, null, null);
-
-            public PendingWrapperContext(
-                PendingValueWrapper wrapper,
-                SerializedObject serialized,
-                SerializedProperty property
-            )
-            {
-                Wrapper = wrapper;
-                Serialized = serialized;
-                Property = property;
-            }
-
-            public PendingValueWrapper Wrapper { get; }
-
-            public SerializedObject Serialized { get; }
-
-            public SerializedProperty Property { get; }
         }
 
         private static void SnapSelectionToPage(PaginationState pagination, int totalCount)
@@ -7456,6 +7079,383 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             return TrySortElements(ref property, propertyPath, itemsProperty);
+        }
+
+        /// <summary>
+        /// Struct key for MainFoldoutAnimations cache to avoid string allocations.
+        /// Uses (instanceId, propertyPath) pair for cache identity.
+        /// </summary>
+        private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
+        {
+            public readonly long InstanceId;
+            public readonly string PropertyPath;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public MainFoldoutCacheKey(long instanceId, string propertyPath)
+            {
+                InstanceId = instanceId;
+                PropertyPath = propertyPath;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(MainFoldoutCacheKey other)
+            {
+                return InstanceId == other.InstanceId
+                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is MainFoldoutCacheKey other && Equals(other);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(InstanceId, PropertyPath);
+            }
+
+            /// <summary>
+            /// Converts to string representation for test verification.
+            /// </summary>
+            public override string ToString()
+            {
+                return $"{InstanceId}:{PropertyPath}";
+            }
+        }
+
+        private sealed class CachedItemsProperty
+        {
+            public SerializedProperty itemsProperty;
+        }
+
+        private sealed class SortedSetCacheEntry
+        {
+            public bool isSorted;
+            public int frameNumber;
+        }
+
+        private sealed class InspectorCacheEntry
+        {
+            public ISerializableSetInspector inspector;
+            public int frameNumber;
+        }
+
+        private sealed class HeightCacheEntry
+        {
+            public float height;
+            public int arraySize;
+            public int pageIndex;
+            public bool isExpanded;
+            public bool hasNullEntries;
+            public bool hasDuplicates;
+            public bool pendingIsExpanded;
+            public float pendingFoldoutProgress;
+            public float mainFoldoutProgress;
+            public int frameNumber;
+        }
+
+        private readonly struct RowRenderKey : IEquatable<RowRenderKey>
+        {
+            public readonly string listKey;
+            public readonly int globalIndex;
+
+            public RowRenderKey(string listKey, int globalIndex)
+            {
+                this.listKey = listKey;
+                this.globalIndex = globalIndex;
+            }
+
+            public bool Equals(RowRenderKey other)
+            {
+                return globalIndex == other.globalIndex && listKey == other.listKey;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is RowRenderKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(listKey, globalIndex);
+            }
+        }
+
+        private sealed class RowRenderData
+        {
+            public SerializedProperty itemProperty;
+            public float rowHeight;
+            public float itemHeight;
+            public bool isValid;
+        }
+
+        internal sealed class PaginationState
+        {
+            public int page;
+            public int pageSize = DefaultPageSize;
+            public int selectedIndex = -1;
+        }
+
+        internal sealed class DuplicateState
+        {
+            public bool hasDuplicates;
+            public readonly HashSet<int> duplicateIndices = new();
+            public string summary = string.Empty;
+            public readonly Dictionary<int, double> animationStartTimes = new();
+            public readonly Dictionary<int, bool> primaryFlags = new();
+            public readonly Dictionary<object, List<int>> grouping = new();
+            public readonly Dictionary<List<int>, PooledResource<List<int>>> groupingLeases = new();
+            public readonly List<int> animationKeysScratch = new();
+            public readonly List<object> groupingKeysScratch = new();
+            private bool _lastHadDuplicates;
+            private int _lastArraySize = -1;
+            private bool _animationsCompleted;
+
+            public bool IsDirty => _lastArraySize < 0;
+
+            public bool IsAnimating => hasDuplicates && !_animationsCompleted;
+
+            public void MarkDirty()
+            {
+                _lastArraySize = -1;
+            }
+
+            public void UpdateArraySize(int newSize)
+            {
+                _lastArraySize = newSize;
+            }
+
+            public void UpdateLastHadDuplicates(bool hadDuplicates, bool forceReset = false)
+            {
+                bool changed = hasDuplicates != _lastHadDuplicates;
+                _lastHadDuplicates = hadDuplicates;
+                if ((changed || forceReset) && hasDuplicates)
+                {
+                    _animationsCompleted = false;
+                }
+            }
+
+            public bool ShouldSkipRefresh(int currentArraySize)
+            {
+                return currentArraySize == _lastArraySize && !_lastHadDuplicates && !hasDuplicates;
+            }
+
+            public void CheckAnimationCompletion(double currentTime, int cycleLimit)
+            {
+                if (_animationsCompleted || !hasDuplicates || cycleLimit <= 0)
+                {
+                    return;
+                }
+
+                double cycleDuration = (2d * Math.PI) / DuplicateShakeFrequency;
+                double maxDuration = cycleDuration * cycleLimit;
+
+                bool allComplete = true;
+                foreach (KeyValuePair<int, double> entry in animationStartTimes)
+                {
+                    double elapsed = currentTime - entry.Value;
+                    if (elapsed < maxDuration)
+                    {
+                        allComplete = false;
+                        break;
+                    }
+                }
+
+                if (allComplete)
+                {
+                    _animationsCompleted = true;
+                }
+            }
+
+            public void ClearAnimationTracking()
+            {
+                _lastHadDuplicates = false;
+                _lastArraySize = -1;
+                animationStartTimes.Clear();
+            }
+
+            public float GetAnimationOffset(int arrayIndex, double currentTime, int cycleLimit)
+            {
+                if (!animationStartTimes.TryGetValue(arrayIndex, out double startTime))
+                {
+                    startTime = currentTime;
+                    animationStartTimes[arrayIndex] = startTime;
+                    _animationsCompleted = false;
+                }
+
+                return EvaluateDuplicateShakeOffset(arrayIndex, startTime, currentTime, cycleLimit);
+            }
+        }
+
+        internal sealed class NullEntryState
+        {
+            public bool hasNullEntries;
+            public readonly HashSet<int> nullIndices = new();
+            public readonly Dictionary<int, string> tooltips = new();
+            public string summary = string.Empty;
+            public readonly List<int> scratch = new();
+        }
+
+        internal sealed class PendingEntry
+        {
+            public object value;
+            public bool isExpanded;
+            public bool isSorted;
+            public Type elementType;
+            public string errorMessage;
+            public AnimBool foldoutAnim;
+            public PendingValueWrapper valueWrapper;
+            public SerializedObject valueWrapperSerialized;
+            public SerializedProperty valueWrapperProperty;
+            public bool valueWrapperDirty = true;
+        }
+
+        private struct SetElementData
+        {
+            public SerializedPropertyType propertyType;
+            public object comparable;
+            public object value;
+        }
+
+        internal sealed class SetListRenderContext
+        {
+            public SerializedProperty setProperty;
+            public SerializedProperty itemsProperty;
+            public DuplicateState duplicateState;
+            public NullEntryState nullState;
+            public Type elementType;
+            public bool needsDuplicateRefresh;
+        }
+
+        private readonly struct RowFoldoutKey : IEquatable<RowFoldoutKey>
+        {
+            public RowFoldoutKey(string cacheKey, int index)
+            {
+                CacheKey = cacheKey;
+                Index = index;
+            }
+
+            public string CacheKey { get; }
+
+            private int Index { get; }
+
+            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
+
+            public bool Equals(RowFoldoutKey other)
+            {
+                return Index == other.Index && string.Equals(CacheKey, other.CacheKey);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is RowFoldoutKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(CacheKey, Index);
+            }
+        }
+
+        internal sealed class ListPageCache
+        {
+            public readonly List<PageEntry> entries = new();
+            public int pageIndex = -1;
+            public int pageSize = -1;
+            public int itemCount = -1;
+            public bool dirty = true;
+        }
+
+        internal sealed class PageEntry
+        {
+            public int arrayIndex;
+        }
+
+        private enum PaginationControlLayout
+        {
+            None,
+            PrevNext,
+            Full,
+        }
+
+        /// <summary>
+        /// Struct key for static property cache lookup to avoid string allocations.
+        /// </summary>
+        private readonly struct PropertyCacheKey : IEquatable<PropertyCacheKey>
+        {
+            public readonly long InstanceId;
+            public readonly string PropertyPath;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public PropertyCacheKey(long instanceId, string propertyPath)
+            {
+                InstanceId = instanceId;
+                PropertyPath = propertyPath;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(PropertyCacheKey other)
+            {
+                return InstanceId == other.InstanceId
+                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is PropertyCacheKey other && Equals(other);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(InstanceId, PropertyPath);
+            }
+        }
+
+        internal sealed class PendingValueWrapper : ScriptableObject
+        {
+            internal const string PropertyName = "boxedValue";
+
+            [SerializeReference]
+            private object boxedValue;
+
+            public object GetValue()
+            {
+                return boxedValue;
+            }
+
+            public void SetValue(object incoming)
+            {
+                boxedValue = incoming;
+            }
+
+            public SerializedProperty FindValueProperty(SerializedObject serializedObject)
+            {
+                return serializedObject.FindProperty(PropertyName);
+            }
+        }
+
+        private readonly struct PendingWrapperContext
+        {
+            public static readonly PendingWrapperContext Empty = new(null, null, null);
+
+            public PendingWrapperContext(
+                PendingValueWrapper wrapper,
+                SerializedObject serialized,
+                SerializedProperty property
+            )
+            {
+                Wrapper = wrapper;
+                Serialized = serialized;
+                Property = property;
+            }
+
+            public PendingValueWrapper Wrapper { get; }
+
+            public SerializedObject Serialized { get; }
+
+            public SerializedProperty Property { get; }
         }
     }
 

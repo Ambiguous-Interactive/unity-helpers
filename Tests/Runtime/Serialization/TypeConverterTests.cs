@@ -14,11 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class TypeConverterTests
     {
-        private sealed class TypeHolder
-        {
-            public Type T { get; set; }
-        }
-
         [Test]
         public void JsonTypeConverterResolvesTypes()
         {
@@ -34,6 +29,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             TypeHolder roundtrip = JsonSerializer.Deserialize<TypeHolder>(json, options);
             Assert.IsTrue(roundtrip != null, "Deserialized TypeHolder should not be null");
             Assert.AreEqual(typeof(ReflectionHelpers), roundtrip.T);
+        }
+
+        private sealed class TypeHolder
+        {
+            public Type T { get; set; }
         }
     }
 }

@@ -16,173 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class EnumExtensionTests : CommonTestBase
     {
-        private enum TestEnum
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            All = First | Second | Third,
-        }
-
-        private enum TinyTestEnum : byte
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            Fourth = 1 << 3,
-            Fifth = 1 << 4,
-            Sixth = 1 << 5,
-            Seventh = 1 << 6,
-            Eighth = 1 << 7,
-            All = First | Second | Third | Fourth | Fifth | Sixth | Seventh | Eighth,
-        }
-
-        private enum SmallTestEnum : short
-        {
-            None = 0,
-
-            [EnumDisplayName("TestFirst")]
-            First = 1 << 0,
-
-            [EnumDisplayName("TestSecond")]
-            Second = 1 << 1,
-
-            [EnumDisplayName("TestThird")]
-            Third = 1 << 2,
-        }
-
-        private enum BigTestEnum : long
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            VeryLarge = 1L << 62,
-        }
-
-        private enum SignedByteEnum : sbyte
-        {
-            NegativeValue = -1,
-            Zero = 0,
-            PositiveValue = 1,
-            MaxValue = 127,
-        }
-
-        // Signed enums whose members straddle zero. Every one of these lost the
-        // array-indexed name lookup before the underlying-type-aware conversion,
-        // because zero-extending a negative member made a four-value enum measure
-        // billions of slots wide.
-        private enum SignedByteFlagsEnum : sbyte
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            All = -1,
-        }
-
-        private enum SignedShortNearEnum : short
-        {
-            MinusTwo = -2,
-            MinusOne = -1,
-            Zero = 0,
-            One = 1,
-        }
-
-        private enum SignedIntNearEnum
-        {
-            MinusTwo = -2,
-
-            [EnumDisplayName("Minus One")]
-            MinusOne = -1,
-            Zero = 0,
-            One = 1,
-        }
-
-        private enum SignedLongNearEnum : long
-        {
-            MinusTwo = -2,
-            MinusOne = -1,
-            Zero = 0,
-            One = 1,
-        }
-
-        private enum SignedIntWideEnum
-        {
-            Minimum = int.MinValue,
-            MinusOne = -1,
-            Zero = 0,
-            Maximum = int.MaxValue,
-        }
-
-        private enum SignedLongAllNegativeEnum : long
-        {
-            Lowest = -3,
-            Middle = -2,
-            Highest = -1,
-        }
-
-        private enum UnsignedShortEnum : ushort
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            Large = 1 << 15,
-        }
-
-        private enum UnsignedIntEnum : uint
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            Large = 1u << 31,
-        }
-
-        private enum UnsignedLongEnum : ulong
-        {
-            None = 0,
-            First = 1 << 0,
-            Second = 1 << 1,
-            Third = 1 << 2,
-            VeryLarge = 1UL << 63,
-        }
-
-        private enum SingleValueEnum
-        {
-            OnlyValue = 42,
-        }
-
-        private enum NonFlagsEnum
-        {
-            Red = 1,
-            Green = 2,
-            Blue = 3,
-            Yellow = 4,
-        }
-
-        private enum ComplexDisplayNameEnum
-        {
-            [EnumDisplayName("")]
-            EmptyDisplayName = 0,
-
-            [EnumDisplayName("Display with spaces")]
-            WithSpaces = 1,
-
-            [EnumDisplayName("Display-with-special!@#$%characters")]
-            SpecialChars = 2,
-
-            NoAttribute = 3,
-
-            [EnumDisplayName(
-                "VeryLongDisplayNameThatCouldPotentiallyCauseIssuesWithBufferSizesOrMemoryAllocation"
-            )]
-            VeryLongName = 4,
-        }
-
         [Test]
         public void DisplayName()
         {
@@ -1139,6 +972,173 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
             Assert.AreEqual(nameof(SignedIntNearEnum.Zero), SignedIntNearEnum.Zero.ToDisplayName());
             Assert.AreEqual(nameof(SignedIntNearEnum.One), SignedIntNearEnum.One.ToDisplayName());
+        }
+
+        private enum TestEnum
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            All = First | Second | Third,
+        }
+
+        private enum TinyTestEnum : byte
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            Fourth = 1 << 3,
+            Fifth = 1 << 4,
+            Sixth = 1 << 5,
+            Seventh = 1 << 6,
+            Eighth = 1 << 7,
+            All = First | Second | Third | Fourth | Fifth | Sixth | Seventh | Eighth,
+        }
+
+        private enum SmallTestEnum : short
+        {
+            None = 0,
+
+            [EnumDisplayName("TestFirst")]
+            First = 1 << 0,
+
+            [EnumDisplayName("TestSecond")]
+            Second = 1 << 1,
+
+            [EnumDisplayName("TestThird")]
+            Third = 1 << 2,
+        }
+
+        private enum BigTestEnum : long
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            VeryLarge = 1L << 62,
+        }
+
+        private enum SignedByteEnum : sbyte
+        {
+            NegativeValue = -1,
+            Zero = 0,
+            PositiveValue = 1,
+            MaxValue = 127,
+        }
+
+        // Signed enums whose members straddle zero. Every one of these lost the
+        // array-indexed name lookup before the underlying-type-aware conversion,
+        // because zero-extending a negative member made a four-value enum measure
+        // billions of slots wide.
+        private enum SignedByteFlagsEnum : sbyte
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            All = -1,
+        }
+
+        private enum SignedShortNearEnum : short
+        {
+            MinusTwo = -2,
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedIntNearEnum
+        {
+            MinusTwo = -2,
+
+            [EnumDisplayName("Minus One")]
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedLongNearEnum : long
+        {
+            MinusTwo = -2,
+            MinusOne = -1,
+            Zero = 0,
+            One = 1,
+        }
+
+        private enum SignedIntWideEnum
+        {
+            Minimum = int.MinValue,
+            MinusOne = -1,
+            Zero = 0,
+            Maximum = int.MaxValue,
+        }
+
+        private enum SignedLongAllNegativeEnum : long
+        {
+            Lowest = -3,
+            Middle = -2,
+            Highest = -1,
+        }
+
+        private enum UnsignedShortEnum : ushort
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            Large = 1 << 15,
+        }
+
+        private enum UnsignedIntEnum : uint
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            Large = 1u << 31,
+        }
+
+        private enum UnsignedLongEnum : ulong
+        {
+            None = 0,
+            First = 1 << 0,
+            Second = 1 << 1,
+            Third = 1 << 2,
+            VeryLarge = 1UL << 63,
+        }
+
+        private enum SingleValueEnum
+        {
+            OnlyValue = 42,
+        }
+
+        private enum NonFlagsEnum
+        {
+            Red = 1,
+            Green = 2,
+            Blue = 3,
+            Yellow = 4,
+        }
+
+        private enum ComplexDisplayNameEnum
+        {
+            [EnumDisplayName("")]
+            EmptyDisplayName = 0,
+
+            [EnumDisplayName("Display with spaces")]
+            WithSpaces = 1,
+
+            [EnumDisplayName("Display-with-special!@#$%characters")]
+            SpecialChars = 2,
+
+            NoAttribute = 3,
+
+            [EnumDisplayName(
+                "VeryLongDisplayNameThatCouldPotentiallyCauseIssuesWithBufferSizesOrMemoryAllocation"
+            )]
+            VeryLongName = 4,
         }
     }
 }

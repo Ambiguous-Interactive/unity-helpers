@@ -45,43 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
-        [Serializable]
-        [ProtoContract]
-        private sealed class TestMessage
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public List<int> Values { get; set; }
-        }
-
-        [Serializable]
-        [ProtoContract]
-        private sealed class ComplexMessage
-        {
-            [ProtoMember(1)]
-            public int Integer { get; set; }
-
-            [ProtoMember(2)]
-            public double Double { get; set; }
-
-            [ProtoMember(3)]
-            public string Text { get; set; }
-
-            [ProtoMember(4)]
-            public byte[] Data { get; set; }
-
-            [ProtoMember(5)]
-            public List<string> StringList { get; set; }
-
-            [ProtoMember(6)]
-            public Dictionary<string, int> Dictionary { get; set; }
-        }
-
         [Test]
         public void BinarySerializeSimpleObjectReturnsValidByteArray()
         {
@@ -925,6 +888,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.ReadFromJsonFile<TestMessage>(filePath)
             );
+        }
+
+        [Serializable]
+        [ProtoContract]
+        private sealed class TestMessage
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public List<int> Values { get; set; }
+        }
+
+        [Serializable]
+        [ProtoContract]
+        private sealed class ComplexMessage
+        {
+            [ProtoMember(1)]
+            public int Integer { get; set; }
+
+            [ProtoMember(2)]
+            public double Double { get; set; }
+
+            [ProtoMember(3)]
+            public string Text { get; set; }
+
+            [ProtoMember(4)]
+            public byte[] Data { get; set; }
+
+            [ProtoMember(5)]
+            public List<string> StringList { get; set; }
+
+            [ProtoMember(6)]
+            public Dictionary<string, int> Dictionary { get; set; }
         }
     }
 }

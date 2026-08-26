@@ -138,35 +138,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return ProtoBuf.Serializer.Deserialize<ImmutableRecord>(stream);
         }
 
-        [ProtoBuf.ProtoContract]
-        private sealed class Seed
-        {
-            [ProtoBuf.ProtoMember(1)]
-            public int X;
-
-            [ProtoBuf.ProtoMember(2)]
-            public int Y;
-
-            [ProtoBuf.ProtoMember(3)]
-            public string Label;
-
-            [ProtoBuf.ProtoMember(4)]
-            public int[] Marks;
-        }
-
-        [ProtoBuf.ProtoContract]
-        private sealed class RecordSeed
-        {
-            [ProtoBuf.ProtoMember(1)]
-            public int Id;
-
-            [ProtoBuf.ProtoMember(2)]
-            public string Name;
-
-            [ProtoBuf.ProtoMember(3)]
-            public int[] Tags;
-        }
-
         private static string Describe(ImmutablePoint value)
         {
             return "("
@@ -256,6 +227,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoReader reader = new(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        [ProtoBuf.ProtoContract]
+        private sealed class Seed
+        {
+            [ProtoBuf.ProtoMember(1)]
+            public int X;
+
+            [ProtoBuf.ProtoMember(2)]
+            public int Y;
+
+            [ProtoBuf.ProtoMember(3)]
+            public string Label;
+
+            [ProtoBuf.ProtoMember(4)]
+            public int[] Marks;
+        }
+
+        [ProtoBuf.ProtoContract]
+        private sealed class RecordSeed
+        {
+            [ProtoBuf.ProtoMember(1)]
+            public int Id;
+
+            [ProtoBuf.ProtoMember(2)]
+            public string Name;
+
+            [ProtoBuf.ProtoMember(3)]
+            public int[] Tags;
         }
     }
 }

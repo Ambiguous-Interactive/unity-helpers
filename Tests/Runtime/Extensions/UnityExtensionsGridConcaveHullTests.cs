@@ -832,30 +832,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 #endif
         }
 
-        /// <summary>
-        /// Represents a rectangular cavity region to be carved out of a grid.
-        /// </summary>
-        public readonly struct CavityRect
-        {
-            public readonly int MinX;
-            public readonly int MaxX;
-            public readonly int MinY;
-            public readonly int MaxY;
-
-            public CavityRect(int minX, int maxX, int minY, int maxY)
-            {
-                MinX = minX;
-                MaxX = maxX;
-                MinY = minY;
-                MaxY = maxY;
-            }
-
-            public bool Contains(int x, int y)
-            {
-                return MinX <= x && x <= MaxX && MinY <= y && y <= MaxY;
-            }
-        }
-
         private static IEnumerable<TestCaseData> CavityShapeCases()
         {
             // Single rectangular cavity (like the large samples test)
@@ -1277,6 +1253,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
 
             return points;
+        }
+
+        /// <summary>
+        /// Represents a rectangular cavity region to be carved out of a grid.
+        /// </summary>
+        public readonly struct CavityRect
+        {
+            public readonly int MinX;
+            public readonly int MaxX;
+            public readonly int MinY;
+            public readonly int MaxY;
+
+            public CavityRect(int minX, int maxX, int minY, int maxY)
+            {
+                MinX = minX;
+                MaxX = maxX;
+                MinY = minY;
+                MaxY = maxY;
+            }
+
+            public bool Contains(int x, int y)
+            {
+                return MinX <= x && x <= MaxX && MinY <= y && y <= MaxY;
+            }
         }
     }
 }

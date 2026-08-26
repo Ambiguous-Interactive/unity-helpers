@@ -72,51 +72,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static readonly object[] Empty = Array.Empty<object>();
         private static readonly Func<object, object[]> EmptyFactory = _ => Empty;
 
-        private sealed class InstanceProviderEntry
-        {
-            internal readonly MethodInfo Method;
-            internal readonly bool IsStatic;
-            internal readonly Func<object, object[], object> InstanceInvoker;
-            internal readonly Func<object[], object> StaticInvoker;
-
-            internal InstanceProviderEntry(
-                MethodInfo method,
-                Func<object, object[], object> instanceInvoker,
-                Func<object[], object> staticInvoker
-            )
-            {
-                Method = method;
-                IsStatic = method.IsStatic;
-                InstanceInvoker = instanceInvoker;
-                StaticInvoker = staticInvoker;
-            }
-
-            internal object Invoke(object context)
-            {
-                return IsStatic
-                    ? StaticInvoker?.Invoke(Array.Empty<object>())
-                    : InstanceInvoker?.Invoke(context, Array.Empty<object>());
-            }
-        }
-
-        private readonly struct MethodValidationResult
-        {
-            internal readonly bool MethodFound;
-            internal readonly bool HasValidReturnType;
-            internal readonly Type ElementType;
-
-            internal MethodValidationResult(
-                bool methodFound,
-                bool hasValidReturnType,
-                Type elementType
-            )
-            {
-                MethodFound = methodFound;
-                HasValidReturnType = hasValidReturnType;
-                ElementType = elementType;
-            }
-        }
-
         private readonly Func<object, object[]> _getOptions;
         private readonly bool _requiresInstanceContext;
         private readonly string _instanceMethodName;
@@ -778,6 +733,51 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return _ => provider();
+        }
+
+        private sealed class InstanceProviderEntry
+        {
+            internal readonly MethodInfo Method;
+            internal readonly bool IsStatic;
+            internal readonly Func<object, object[], object> InstanceInvoker;
+            internal readonly Func<object[], object> StaticInvoker;
+
+            internal InstanceProviderEntry(
+                MethodInfo method,
+                Func<object, object[], object> instanceInvoker,
+                Func<object[], object> staticInvoker
+            )
+            {
+                Method = method;
+                IsStatic = method.IsStatic;
+                InstanceInvoker = instanceInvoker;
+                StaticInvoker = staticInvoker;
+            }
+
+            internal object Invoke(object context)
+            {
+                return IsStatic
+                    ? StaticInvoker?.Invoke(Array.Empty<object>())
+                    : InstanceInvoker?.Invoke(context, Array.Empty<object>());
+            }
+        }
+
+        private readonly struct MethodValidationResult
+        {
+            internal readonly bool MethodFound;
+            internal readonly bool HasValidReturnType;
+            internal readonly Type ElementType;
+
+            internal MethodValidationResult(
+                bool methodFound,
+                bool hasValidReturnType,
+                Type elementType
+            )
+            {
+                MethodFound = methodFound;
+                HasValidReturnType = hasValidReturnType;
+                ElementType = elementType;
+            }
         }
     }
 }

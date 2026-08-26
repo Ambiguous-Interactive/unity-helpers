@@ -57,57 +57,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private const string DirToolName = "SpriteAnimationEditor";
         private const string DirContextKey = "Clips";
 
-        internal sealed class EditorLayerData
-        {
-            public AnimationClip SourceClip { get; }
-            public List<Sprite> Sprites { get; }
-            public string ClipName => SourceClip != null ? SourceClip.name : "Unnamed Layer";
-            public float OriginalClipFps { get; }
-            public string BindingPath { get; }
-
-            public EditorLayerData(AnimationClip clip)
-            {
-                SourceClip = clip;
-                Sprites = new List<Sprite>();
-                if (clip != null)
-                {
-                    foreach (Sprite s in clip.GetSpritesFromClip())
-                    {
-                        if (s != null)
-                        {
-                            Sprites.Add(s);
-                        }
-                    }
-                }
-                OriginalClipFps =
-                    0 < clip.frameRate ? clip.frameRate : AnimatedSpriteLayer.FrameRate;
-
-                BindingPath = string.Empty;
-                if (SourceClip != null)
-                {
-                    foreach (
-                        EditorCurveBinding binding in AnimationUtility.GetObjectReferenceCurveBindings(
-                            SourceClip
-                        )
-                    )
-                    {
-                        if (
-                            binding.type == typeof(SpriteRenderer)
-                            && string.Equals(
-                                binding.propertyName,
-                                UnityExtensions.SpriteBindingProperty,
-                                StringComparison.Ordinal
-                            )
-                        )
-                        {
-                            BindingPath = binding.path;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Animation Editor")]
         public static void ShowWindow()
         {
@@ -1583,6 +1532,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _previewPanelHost.Remove(_animationPreview);
             }
             _animationPreview = null;
+        }
+
+        internal sealed class EditorLayerData
+        {
+            public AnimationClip SourceClip { get; }
+            public List<Sprite> Sprites { get; }
+            public string ClipName => SourceClip != null ? SourceClip.name : "Unnamed Layer";
+            public float OriginalClipFps { get; }
+            public string BindingPath { get; }
+
+            public EditorLayerData(AnimationClip clip)
+            {
+                SourceClip = clip;
+                Sprites = new List<Sprite>();
+                if (clip != null)
+                {
+                    foreach (Sprite s in clip.GetSpritesFromClip())
+                    {
+                        if (s != null)
+                        {
+                            Sprites.Add(s);
+                        }
+                    }
+                }
+                OriginalClipFps =
+                    0 < clip.frameRate ? clip.frameRate : AnimatedSpriteLayer.FrameRate;
+
+                BindingPath = string.Empty;
+                if (SourceClip != null)
+                {
+                    foreach (
+                        EditorCurveBinding binding in AnimationUtility.GetObjectReferenceCurveBindings(
+                            SourceClip
+                        )
+                    )
+                    {
+                        if (
+                            binding.type == typeof(SpriteRenderer)
+                            && string.Equals(
+                                binding.propertyName,
+                                UnityExtensions.SpriteBindingProperty,
+                                StringComparison.Ordinal
+                            )
+                        )
+                        {
+                            BindingPath = binding.path;
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 #endif

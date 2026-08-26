@@ -1615,67 +1615,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public const float DefaultBudgetEnforcementIntervalSeconds = 30f;
 
-        /// <summary>
-        /// Interface for pools that can be purged via the global registry.
-        /// </summary>
-        public interface IPurgeable
-        {
-            /// <summary>
-            /// Purges items from the pool with the specified reason.
-            /// </summary>
-            /// <param name="reason">The reason for purging.</param>
-            /// <param name="ignoreHysteresis">
-            /// If <c>true</c>, bypasses the hysteresis check and purges immediately.
-            /// Used for emergency purges (e.g., low memory situations).
-            /// </param>
-            /// <returns>The number of items purged.</returns>
-            /// <remarks>
-            /// This method purges all eligible items without respecting <c>MaxPurgesPerOperation</c> limits.
-            /// It is treated as an explicit cleanup operation similar to <see cref="ForceFullPurge"/>.
-            /// </remarks>
-            int Purge(PurgeReason reason, bool ignoreHysteresis = false);
-
-            /// <summary>
-            /// Forces a full purge with a specified reason, bypassing <c>MaxPurgesPerOperation</c> limits.
-            /// </summary>
-            /// <param name="reason">The reason for purging (used in callbacks).</param>
-            /// <param name="ignoreHysteresis">
-            /// If <c>true</c>, bypasses the hysteresis check and purges immediately.
-            /// Used for emergency purges (e.g., low memory situations).
-            /// </param>
-            /// <returns>The number of items purged.</returns>
-            int ForceFullPurge(PurgeReason reason, bool ignoreHysteresis = false);
-        }
-
-        /// <summary>
-        /// Interface for pools that provide statistics for global budget tracking.
-        /// Extends <see cref="IPurgeable"/> with the ability to report current size and last access time.
-        /// </summary>
-        public interface IPoolStatistics : IPurgeable
-        {
-            /// <summary>
-            /// Gets the current number of items in the pool.
-            /// </summary>
-            int CurrentPooledCount { get; }
-
-            /// <summary>
-            /// Gets the time (in seconds since pool creation or epoch) when the pool was last accessed.
-            /// Used for LRU-based purging when the global budget is exceeded.
-            /// </summary>
-            float LastAccessTime { get; }
-
-            /// <summary>
-            /// Purges a specific number of items from the pool for budget enforcement.
-            /// </summary>
-            /// <param name="count">The maximum number of items to purge.</param>
-            /// <returns>The actual number of items purged (may be less than requested if pool has fewer items).</returns>
-            /// <remarks>
-            /// This method is called by <see cref="GlobalPoolRegistry.EnforceBudget"/> to reduce pool size.
-            /// It respects <see cref="PoolOptions{T}.MinRetainCount"/> and will not purge below that threshold.
-            /// </remarks>
-            int PurgeForBudget(int count);
-        }
-
         private static readonly object RegistryLock = new object();
         private static readonly List<WeakReference<IPurgeable>> RegisteredPools =
             new List<WeakReference<IPurgeable>>();
@@ -2170,6 +2109,67 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 pools[j + 1] = key;
             }
+        }
+
+        /// <summary>
+        /// Interface for pools that can be purged via the global registry.
+        /// </summary>
+        public interface IPurgeable
+        {
+            /// <summary>
+            /// Purges items from the pool with the specified reason.
+            /// </summary>
+            /// <param name="reason">The reason for purging.</param>
+            /// <param name="ignoreHysteresis">
+            /// If <c>true</c>, bypasses the hysteresis check and purges immediately.
+            /// Used for emergency purges (e.g., low memory situations).
+            /// </param>
+            /// <returns>The number of items purged.</returns>
+            /// <remarks>
+            /// This method purges all eligible items without respecting <c>MaxPurgesPerOperation</c> limits.
+            /// It is treated as an explicit cleanup operation similar to <see cref="ForceFullPurge"/>.
+            /// </remarks>
+            int Purge(PurgeReason reason, bool ignoreHysteresis = false);
+
+            /// <summary>
+            /// Forces a full purge with a specified reason, bypassing <c>MaxPurgesPerOperation</c> limits.
+            /// </summary>
+            /// <param name="reason">The reason for purging (used in callbacks).</param>
+            /// <param name="ignoreHysteresis">
+            /// If <c>true</c>, bypasses the hysteresis check and purges immediately.
+            /// Used for emergency purges (e.g., low memory situations).
+            /// </param>
+            /// <returns>The number of items purged.</returns>
+            int ForceFullPurge(PurgeReason reason, bool ignoreHysteresis = false);
+        }
+
+        /// <summary>
+        /// Interface for pools that provide statistics for global budget tracking.
+        /// Extends <see cref="IPurgeable"/> with the ability to report current size and last access time.
+        /// </summary>
+        public interface IPoolStatistics : IPurgeable
+        {
+            /// <summary>
+            /// Gets the current number of items in the pool.
+            /// </summary>
+            int CurrentPooledCount { get; }
+
+            /// <summary>
+            /// Gets the time (in seconds since pool creation or epoch) when the pool was last accessed.
+            /// Used for LRU-based purging when the global budget is exceeded.
+            /// </summary>
+            float LastAccessTime { get; }
+
+            /// <summary>
+            /// Purges a specific number of items from the pool for budget enforcement.
+            /// </summary>
+            /// <param name="count">The maximum number of items to purge.</param>
+            /// <returns>The actual number of items purged (may be less than requested if pool has fewer items).</returns>
+            /// <remarks>
+            /// This method is called by <see cref="GlobalPoolRegistry.EnforceBudget"/> to reduce pool size.
+            /// It respects <see cref="PoolOptions{T}.MinRetainCount"/> and will not purge below that threshold.
+            /// </remarks>
+            int PurgeForBudget(int count);
         }
     }
 

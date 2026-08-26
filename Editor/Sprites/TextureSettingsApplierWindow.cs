@@ -18,52 +18,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class TextureSettingsApplierWindow : EditorWindow
     {
-        [Serializable]
-        public sealed class PlatformOverrideEntry
-        {
-            public string platformName = TexturePlatformNameHelper.DefaultPlatformName; // DefaultTexturePlatform, Standalone, iPhone, Android, WebGL, etc.
-
-            public bool applyResizeAlgorithm;
-
-            [WShowIf(nameof(applyResizeAlgorithm))]
-            public TextureResizeAlgorithm resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
-
-            public bool applyMaxTextureSize;
-
-            [WShowIf(nameof(applyMaxTextureSize))]
-            public int maxTextureSize = SetTextureImportData.MaxTextureSize;
-
-            public bool applyFormat;
-
-            [WShowIf(nameof(applyFormat))]
-            public TextureImporterFormat format = TextureImporterFormat.Automatic;
-
-            public bool applyCompression;
-
-            [WShowIf(nameof(applyCompression))]
-            public TextureImporterCompression compression = TextureImporterCompression.Compressed;
-
-            public bool applyCrunchCompression;
-
-            [WShowIf(nameof(applyCrunchCompression))]
-            public bool useCrunchCompression;
-
-            internal static class SerializedPropertyNames
-            {
-                internal const string PlatformName = nameof(platformName);
-                internal const string ApplyResizeAlgorithm = nameof(applyResizeAlgorithm);
-                internal const string ResizeAlgorithm = nameof(resizeAlgorithm);
-                internal const string ApplyMaxTextureSize = nameof(applyMaxTextureSize);
-                internal const string MaxTextureSize = nameof(maxTextureSize);
-                internal const string ApplyFormat = nameof(applyFormat);
-                internal const string Format = nameof(format);
-                internal const string ApplyCompression = nameof(applyCompression);
-                internal const string Compression = nameof(compression);
-                internal const string ApplyCrunchCompression = nameof(applyCrunchCompression);
-                internal const string UseCrunchCompression = nameof(useCrunchCompression);
-            }
-        }
-
         // Basic importer settings
         public bool applyReadOnly;
         public bool isReadOnly;
@@ -687,6 +641,52 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // Reset stats to force recalculation next time
             _totalTexturesToProcess = -1;
             _texturesThatWillChange = -1;
+        }
+
+        [Serializable]
+        public sealed class PlatformOverrideEntry
+        {
+            public string platformName = TexturePlatformNameHelper.DefaultPlatformName; // DefaultTexturePlatform, Standalone, iPhone, Android, WebGL, etc.
+
+            public bool applyResizeAlgorithm;
+
+            [WShowIf(nameof(applyResizeAlgorithm))]
+            public TextureResizeAlgorithm resizeAlgorithm = TextureResizeAlgorithm.Bilinear;
+
+            public bool applyMaxTextureSize;
+
+            [WShowIf(nameof(applyMaxTextureSize))]
+            public int maxTextureSize = SetTextureImportData.MaxTextureSize;
+
+            public bool applyFormat;
+
+            [WShowIf(nameof(applyFormat))]
+            public TextureImporterFormat format = TextureImporterFormat.Automatic;
+
+            public bool applyCompression;
+
+            [WShowIf(nameof(applyCompression))]
+            public TextureImporterCompression compression = TextureImporterCompression.Compressed;
+
+            public bool applyCrunchCompression;
+
+            [WShowIf(nameof(applyCrunchCompression))]
+            public bool useCrunchCompression;
+
+            internal static class SerializedPropertyNames
+            {
+                internal const string PlatformName = nameof(platformName);
+                internal const string ApplyResizeAlgorithm = nameof(applyResizeAlgorithm);
+                internal const string ResizeAlgorithm = nameof(resizeAlgorithm);
+                internal const string ApplyMaxTextureSize = nameof(applyMaxTextureSize);
+                internal const string MaxTextureSize = nameof(maxTextureSize);
+                internal const string ApplyFormat = nameof(applyFormat);
+                internal const string Format = nameof(format);
+                internal const string ApplyCompression = nameof(applyCompression);
+                internal const string Compression = nameof(compression);
+                internal const string ApplyCrunchCompression = nameof(applyCrunchCompression);
+                internal const string UseCrunchCompression = nameof(useCrunchCompression);
+            }
         }
     }
 #endif

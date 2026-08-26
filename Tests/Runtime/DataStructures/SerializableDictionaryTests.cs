@@ -900,48 +900,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        [Serializable]
-        internal sealed class IntCache : SerializableDictionary.Cache<int> { }
-
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class CaseInsensitiveDictionaryKey
-            : IEquatable<CaseInsensitiveDictionaryKey>
-        {
-            public CaseInsensitiveDictionaryKey(string token)
-            {
-                Token = token;
-            }
-
-            public string Token { get; }
-
-            public bool Equals(CaseInsensitiveDictionaryKey other)
-            {
-                if (other == null)
-                {
-                    return false;
-                }
-
-                return string.Equals(Token, other.Token, StringComparison.OrdinalIgnoreCase);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return Equals(obj as CaseInsensitiveDictionaryKey);
-            }
-
-            public override int GetHashCode()
-            {
-                if (Token == null)
-                {
-                    return 0;
-                }
-
-                return StringComparer.OrdinalIgnoreCase.GetHashCode(Token);
-            }
-        }
-
         // Order Preservation Tests
 
         [Test]
@@ -2049,6 +2007,48 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 dictionary._keys,
                 "A case-insensitive comparer must not merge keys that differ by more than case."
             );
+        }
+
+        [Serializable]
+        internal sealed class IntCache : SerializableDictionary.Cache<int> { }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveDictionaryKey
+            : IEquatable<CaseInsensitiveDictionaryKey>
+        {
+            public CaseInsensitiveDictionaryKey(string token)
+            {
+                Token = token;
+            }
+
+            public string Token { get; }
+
+            public bool Equals(CaseInsensitiveDictionaryKey other)
+            {
+                if (other == null)
+                {
+                    return false;
+                }
+
+                return string.Equals(Token, other.Token, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return Equals(obj as CaseInsensitiveDictionaryKey);
+            }
+
+            public override int GetHashCode()
+            {
+                if (Token == null)
+                {
+                    return 0;
+                }
+
+                return StringComparer.OrdinalIgnoreCase.GetHashCode(Token);
+            }
         }
     }
 }

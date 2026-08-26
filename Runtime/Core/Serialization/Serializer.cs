@@ -547,39 +547,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 && type.GetGenericTypeDefinition() == typeof(SerializableList<>);
         }
 
-        /// <summary>
-        /// The collection-shape answers for one closed <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">The declared type being serialized.</typeparam>
-        /// <remarks>
-        /// Each predicate is a pure function of the type, and the callers ask on the path this file
-        /// annotates as the one a caller serializing every frame uses. Reaching <c>typeof(T)</c>
-        /// inside a generic method is not free for a reference-type closure -- those share one
-        /// canonical instantiation, so the handle is looked up per call, measured at 18ns against
-        /// 2ns for this field read on Unity 6000.4 -- so the answers resolve once per closure.
-        /// </remarks>
-        private static class CollectionShape<T>
-        {
-            internal static readonly bool IsSerializableCollection = IsSerializableCollectionType(
-                typeof(T)
-            );
-            internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
-            internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
-
-            // The wrapper type and its constructor are a pure function of T, and resolving them per
-            // call cost a Type[] from GetGenericArguments, a MakeGenericType lookup and a reflection
-            // Activator invoke on the same path the field above is cached for. Null for anything
-            // that is not a supported serializable collection; BuildCollectionWrapper rejects those.
-            internal static readonly Type WrapperType = IsSerializableCollection
-                ? ResolveCollectionWrapperType(typeof(T))
-                : null;
-
-            internal static readonly Func<object> WrapperFactory =
-                WrapperType == null
-                    ? null
-                    : ReflectionHelpers.GetParameterlessConstructor(WrapperType);
-        }
-
         private static Type ResolveCollectionWrapperType(Type type)
         {
             if (!type.IsGenericType)
@@ -613,274 +580,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Cached reflection accessors for protobuf collection wrapper serialization.
-        /// Uses ReflectionHelpers for cached delegate generation and nameof() for compile-time safety.
-        /// </summary>
-        private static class CollectionProtoAccessors
-        {
-            // Field names using nameof() for compile-time safety via internal access
-            internal const string ItemsFieldName = SerializableHashSetSerializedPropertyNames.Items;
-            internal const string KeysFieldName =
-                SerializableDictionarySerializedPropertyNames.Keys;
-            internal const string ValuesFieldName =
-                SerializableDictionarySerializedPropertyNames.Values;
-
-            // Use nameof() directly for fields accessible within this assembly
-            internal const string PreserveSerializedEntriesFieldName = nameof(
-                SerializableHashSet<int>._preserveSerializedEntries
-            );
-            internal const string OnBeforeSerializeMethodName = nameof(
-                SerializableHashSet<int>.OnBeforeSerialize
-            );
-            internal const string OnAfterDeserializeMethodName = nameof(
-                SerializableHashSet<int>.OnAfterDeserialize
-            );
-
-            // Wrapper field names (public fields, nameof() safe)
-            internal const string WrapperItemsFieldName = nameof(
-                SerializableHashSetProtoWrapper<int>.Items
-            );
-            internal const string WrapperKeysFieldName = nameof(
-                SerializableDictionaryProtoWrapper<int, int>.Keys
-            );
-            internal const string WrapperValuesFieldName = nameof(
-                SerializableDictionaryProtoWrapper<int, int>.Values
-            );
-
-            // Binding flags for field/method lookup
-            private const BindingFlags InstanceFieldFlags =
-                BindingFlags.NonPublic
-                | BindingFlags.Public
-                | BindingFlags.Instance
-                | BindingFlags.FlattenHierarchy;
-            private const BindingFlags InstanceMethodFlags =
-                BindingFlags.Public | BindingFlags.Instance;
-
-            // Cached accessors per closed generic type
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > TypeAccessors = new();
-
-            // C# 9 does not cache a method-group conversion, so passing CreateAccessors directly
-            // allocated a delegate on every GetAccessors call -- cache hit included.
-            private static readonly Func<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > CreateAccessorsFactory = CreateAccessors;
-
-            /// <summary>
-            /// Gets or creates cached accessors for the specified collection type.
-            /// </summary>
-            internal static (
-                Func<object, object> GetItems,
-                Action<object, object> SetItems,
-                Func<object, object> GetKeys,
-                Action<object, object> SetKeys,
-                Func<object, object> GetValues,
-                Action<object, object> SetValues,
-                Action<object, object> SetPreserve,
-                Action<object> OnBeforeSerialize,
-                Action<object> OnAfterDeserialize
-            ) GetAccessors(Type collectionType)
-            {
-                return TypeAccessors.GetOrAdd(collectionType, CreateAccessorsFactory);
-            }
-
-            private static (
-                Func<object, object> GetItems,
-                Action<object, object> SetItems,
-                Func<object, object> GetKeys,
-                Action<object, object> SetKeys,
-                Func<object, object> GetValues,
-                Action<object, object> SetValues,
-                Action<object, object> SetPreserve,
-                Action<object> OnBeforeSerialize,
-                Action<object> OnAfterDeserialize
-            ) CreateAccessors(Type type)
-            {
-                Type genericDef = type.GetGenericTypeDefinition();
-                bool isSet =
-                    genericDef == typeof(SerializableHashSet<>)
-                    || genericDef == typeof(SerializableSortedSet<>);
-
-                // Items field (for sets)
-                Func<object, object> getItems = null;
-                Action<object, object> setItems = null;
-                if (isSet)
-                {
-                    FieldInfo itemsField = type.GetField(ItemsFieldName, InstanceFieldFlags);
-                    if (itemsField != null)
-                    {
-                        getItems = ReflectionHelpers.GetFieldGetter(itemsField);
-                        setItems = ReflectionHelpers.GetFieldSetter(itemsField);
-                    }
-                }
-
-                // Keys/Values fields (for dictionaries)
-                Func<object, object> getKeys = null;
-                Action<object, object> setKeys = null;
-                Func<object, object> getValues = null;
-                Action<object, object> setValues = null;
-                if (!isSet)
-                {
-                    FieldInfo keysField = type.GetField(KeysFieldName, InstanceFieldFlags);
-                    FieldInfo valuesField = type.GetField(ValuesFieldName, InstanceFieldFlags);
-                    if (keysField != null)
-                    {
-                        getKeys = ReflectionHelpers.GetFieldGetter(keysField);
-                        setKeys = ReflectionHelpers.GetFieldSetter(keysField);
-                    }
-                    if (valuesField != null)
-                    {
-                        getValues = ReflectionHelpers.GetFieldGetter(valuesField);
-                        setValues = ReflectionHelpers.GetFieldSetter(valuesField);
-                    }
-                }
-
-                // PreserveSerializedEntries field
-                Action<object, object> setPreserve = null;
-                FieldInfo preserveField = type.GetField(
-                    PreserveSerializedEntriesFieldName,
-                    InstanceFieldFlags
-                );
-                if (preserveField != null)
-                {
-                    setPreserve = ReflectionHelpers.GetFieldSetter(preserveField);
-                }
-
-                // Lifecycle methods
-                Action<object> onBeforeSerialize = null;
-                Action<object> onAfterDeserialize = null;
-
-                MethodInfo beforeMethod = type.GetMethod(
-                    OnBeforeSerializeMethodName,
-                    InstanceMethodFlags
-                );
-                if (beforeMethod != null)
-                {
-                    onBeforeSerialize = obj => beforeMethod.Invoke(obj, null);
-                }
-
-                MethodInfo afterMethod = type.GetMethod(
-                    OnAfterDeserializeMethodName,
-                    InstanceMethodFlags
-                );
-                if (afterMethod != null)
-                {
-                    onAfterDeserialize = obj => afterMethod.Invoke(obj, null);
-                }
-
-                return (
-                    getItems,
-                    setItems,
-                    getKeys,
-                    setKeys,
-                    getValues,
-                    setValues,
-                    setPreserve,
-                    onBeforeSerialize,
-                    onAfterDeserialize
-                );
-            }
-
-            /// <summary>
-            /// Gets cached accessors for protobuf wrapper types.
-            /// </summary>
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues
-                )
-            > WrapperAccessors = new();
-
-            internal static (
-                Func<object, object> GetItems,
-                Action<object, object> SetItems,
-                Func<object, object> GetKeys,
-                Action<object, object> SetKeys,
-                Func<object, object> GetValues,
-                Action<object, object> SetValues
-            ) GetWrapperAccessors(Type wrapperType, bool isSet)
-            {
-                return WrapperAccessors.GetOrAdd(
-                    wrapperType,
-                    static (type, forSet) => CreateWrapperAccessors(type, forSet),
-                    isSet
-                );
-            }
-
-            private static (
-                Func<object, object> GetItems,
-                Action<object, object> SetItems,
-                Func<object, object> GetKeys,
-                Action<object, object> SetKeys,
-                Func<object, object> GetValues,
-                Action<object, object> SetValues
-            ) CreateWrapperAccessors(Type wrapperType, bool isSet)
-            {
-                Func<object, object> getItems = null;
-                Action<object, object> setItems = null;
-                Func<object, object> getKeys = null;
-                Action<object, object> setKeys = null;
-                Func<object, object> getValues = null;
-                Action<object, object> setValues = null;
-
-                if (isSet)
-                {
-                    FieldInfo itemsField = wrapperType.GetField(WrapperItemsFieldName);
-                    if (itemsField != null)
-                    {
-                        getItems = ReflectionHelpers.GetFieldGetter(itemsField);
-                        setItems = ReflectionHelpers.GetFieldSetter(itemsField);
-                    }
-                }
-                else
-                {
-                    FieldInfo keysField = wrapperType.GetField(WrapperKeysFieldName);
-                    FieldInfo valuesField = wrapperType.GetField(WrapperValuesFieldName);
-                    if (keysField != null)
-                    {
-                        getKeys = ReflectionHelpers.GetFieldGetter(keysField);
-                        setKeys = ReflectionHelpers.GetFieldSetter(keysField);
-                    }
-                    if (valuesField != null)
-                    {
-                        getValues = ReflectionHelpers.GetFieldGetter(valuesField);
-                        setValues = ReflectionHelpers.GetFieldSetter(valuesField);
-                    }
-                }
-
-                return (getItems, setItems, getKeys, setKeys, getValues, setValues);
-            }
         }
 
         /// <summary>
@@ -3343,25 +3042,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return SerializerEncoding.Encoding.GetString(bufferWriter.WrittenSpan);
         }
 
-        // Reference-equality comparer for the cycle guard so distinct-but-equal objects are not
-        // mistaken for a cycle (and value-equal-but-different graph nodes are still written).
-        private sealed class ReferenceComparer : IEqualityComparer<object>
-        {
-            internal static readonly ReferenceComparer Instance = new();
-
-            private ReferenceComparer() { }
-
-            bool IEqualityComparer<object>.Equals(object x, object y)
-            {
-                return ReferenceEquals(x, y);
-            }
-
-            int IEqualityComparer<object>.GetHashCode(object obj)
-            {
-                return RuntimeHelpers.GetHashCode(obj);
-            }
-        }
-
         /// <summary>
         /// Serializes an instance to a JSON string.
         /// </summary>
@@ -3682,6 +3362,326 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (error != null)
             {
                 ExceptionDispatchInfo.Capture(error).Throw();
+            }
+        }
+
+        /// <summary>
+        /// The collection-shape answers for one closed <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The declared type being serialized.</typeparam>
+        /// <remarks>
+        /// Each predicate is a pure function of the type, and the callers ask on the path this file
+        /// annotates as the one a caller serializing every frame uses. Reaching <c>typeof(T)</c>
+        /// inside a generic method is not free for a reference-type closure -- those share one
+        /// canonical instantiation, so the handle is looked up per call, measured at 18ns against
+        /// 2ns for this field read on Unity 6000.4 -- so the answers resolve once per closure.
+        /// </remarks>
+        private static class CollectionShape<T>
+        {
+            internal static readonly bool IsSerializableCollection = IsSerializableCollectionType(
+                typeof(T)
+            );
+            internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
+            internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
+
+            // The wrapper type and its constructor are a pure function of T, and resolving them per
+            // call cost a Type[] from GetGenericArguments, a MakeGenericType lookup and a reflection
+            // Activator invoke on the same path the field above is cached for. Null for anything
+            // that is not a supported serializable collection; BuildCollectionWrapper rejects those.
+            internal static readonly Type WrapperType = IsSerializableCollection
+                ? ResolveCollectionWrapperType(typeof(T))
+                : null;
+
+            internal static readonly Func<object> WrapperFactory =
+                WrapperType == null
+                    ? null
+                    : ReflectionHelpers.GetParameterlessConstructor(WrapperType);
+        }
+
+        /// <summary>
+        /// Cached reflection accessors for protobuf collection wrapper serialization.
+        /// Uses ReflectionHelpers for cached delegate generation and nameof() for compile-time safety.
+        /// </summary>
+        private static class CollectionProtoAccessors
+        {
+            // Field names using nameof() for compile-time safety via internal access
+            internal const string ItemsFieldName = SerializableHashSetSerializedPropertyNames.Items;
+            internal const string KeysFieldName =
+                SerializableDictionarySerializedPropertyNames.Keys;
+            internal const string ValuesFieldName =
+                SerializableDictionarySerializedPropertyNames.Values;
+
+            // Use nameof() directly for fields accessible within this assembly
+            internal const string PreserveSerializedEntriesFieldName = nameof(
+                SerializableHashSet<int>._preserveSerializedEntries
+            );
+            internal const string OnBeforeSerializeMethodName = nameof(
+                SerializableHashSet<int>.OnBeforeSerialize
+            );
+            internal const string OnAfterDeserializeMethodName = nameof(
+                SerializableHashSet<int>.OnAfterDeserialize
+            );
+
+            // Wrapper field names (public fields, nameof() safe)
+            internal const string WrapperItemsFieldName = nameof(
+                SerializableHashSetProtoWrapper<int>.Items
+            );
+            internal const string WrapperKeysFieldName = nameof(
+                SerializableDictionaryProtoWrapper<int, int>.Keys
+            );
+            internal const string WrapperValuesFieldName = nameof(
+                SerializableDictionaryProtoWrapper<int, int>.Values
+            );
+
+            // Binding flags for field/method lookup
+            private const BindingFlags InstanceFieldFlags =
+                BindingFlags.NonPublic
+                | BindingFlags.Public
+                | BindingFlags.Instance
+                | BindingFlags.FlattenHierarchy;
+            private const BindingFlags InstanceMethodFlags =
+                BindingFlags.Public | BindingFlags.Instance;
+
+            // Cached accessors per closed generic type
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > TypeAccessors = new();
+
+            // C# 9 does not cache a method-group conversion, so passing CreateAccessors directly
+            // allocated a delegate on every GetAccessors call -- cache hit included.
+            private static readonly Func<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > CreateAccessorsFactory = CreateAccessors;
+
+            /// <summary>
+            /// Gets or creates cached accessors for the specified collection type.
+            /// </summary>
+            internal static (
+                Func<object, object> GetItems,
+                Action<object, object> SetItems,
+                Func<object, object> GetKeys,
+                Action<object, object> SetKeys,
+                Func<object, object> GetValues,
+                Action<object, object> SetValues,
+                Action<object, object> SetPreserve,
+                Action<object> OnBeforeSerialize,
+                Action<object> OnAfterDeserialize
+            ) GetAccessors(Type collectionType)
+            {
+                return TypeAccessors.GetOrAdd(collectionType, CreateAccessorsFactory);
+            }
+
+            private static (
+                Func<object, object> GetItems,
+                Action<object, object> SetItems,
+                Func<object, object> GetKeys,
+                Action<object, object> SetKeys,
+                Func<object, object> GetValues,
+                Action<object, object> SetValues,
+                Action<object, object> SetPreserve,
+                Action<object> OnBeforeSerialize,
+                Action<object> OnAfterDeserialize
+            ) CreateAccessors(Type type)
+            {
+                Type genericDef = type.GetGenericTypeDefinition();
+                bool isSet =
+                    genericDef == typeof(SerializableHashSet<>)
+                    || genericDef == typeof(SerializableSortedSet<>);
+
+                // Items field (for sets)
+                Func<object, object> getItems = null;
+                Action<object, object> setItems = null;
+                if (isSet)
+                {
+                    FieldInfo itemsField = type.GetField(ItemsFieldName, InstanceFieldFlags);
+                    if (itemsField != null)
+                    {
+                        getItems = ReflectionHelpers.GetFieldGetter(itemsField);
+                        setItems = ReflectionHelpers.GetFieldSetter(itemsField);
+                    }
+                }
+
+                // Keys/Values fields (for dictionaries)
+                Func<object, object> getKeys = null;
+                Action<object, object> setKeys = null;
+                Func<object, object> getValues = null;
+                Action<object, object> setValues = null;
+                if (!isSet)
+                {
+                    FieldInfo keysField = type.GetField(KeysFieldName, InstanceFieldFlags);
+                    FieldInfo valuesField = type.GetField(ValuesFieldName, InstanceFieldFlags);
+                    if (keysField != null)
+                    {
+                        getKeys = ReflectionHelpers.GetFieldGetter(keysField);
+                        setKeys = ReflectionHelpers.GetFieldSetter(keysField);
+                    }
+                    if (valuesField != null)
+                    {
+                        getValues = ReflectionHelpers.GetFieldGetter(valuesField);
+                        setValues = ReflectionHelpers.GetFieldSetter(valuesField);
+                    }
+                }
+
+                // PreserveSerializedEntries field
+                Action<object, object> setPreserve = null;
+                FieldInfo preserveField = type.GetField(
+                    PreserveSerializedEntriesFieldName,
+                    InstanceFieldFlags
+                );
+                if (preserveField != null)
+                {
+                    setPreserve = ReflectionHelpers.GetFieldSetter(preserveField);
+                }
+
+                // Lifecycle methods
+                Action<object> onBeforeSerialize = null;
+                Action<object> onAfterDeserialize = null;
+
+                MethodInfo beforeMethod = type.GetMethod(
+                    OnBeforeSerializeMethodName,
+                    InstanceMethodFlags
+                );
+                if (beforeMethod != null)
+                {
+                    onBeforeSerialize = obj => beforeMethod.Invoke(obj, null);
+                }
+
+                MethodInfo afterMethod = type.GetMethod(
+                    OnAfterDeserializeMethodName,
+                    InstanceMethodFlags
+                );
+                if (afterMethod != null)
+                {
+                    onAfterDeserialize = obj => afterMethod.Invoke(obj, null);
+                }
+
+                return (
+                    getItems,
+                    setItems,
+                    getKeys,
+                    setKeys,
+                    getValues,
+                    setValues,
+                    setPreserve,
+                    onBeforeSerialize,
+                    onAfterDeserialize
+                );
+            }
+
+            /// <summary>
+            /// Gets cached accessors for protobuf wrapper types.
+            /// </summary>
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues
+                )
+            > WrapperAccessors = new();
+
+            internal static (
+                Func<object, object> GetItems,
+                Action<object, object> SetItems,
+                Func<object, object> GetKeys,
+                Action<object, object> SetKeys,
+                Func<object, object> GetValues,
+                Action<object, object> SetValues
+            ) GetWrapperAccessors(Type wrapperType, bool isSet)
+            {
+                return WrapperAccessors.GetOrAdd(
+                    wrapperType,
+                    static (type, forSet) => CreateWrapperAccessors(type, forSet),
+                    isSet
+                );
+            }
+
+            private static (
+                Func<object, object> GetItems,
+                Action<object, object> SetItems,
+                Func<object, object> GetKeys,
+                Action<object, object> SetKeys,
+                Func<object, object> GetValues,
+                Action<object, object> SetValues
+            ) CreateWrapperAccessors(Type wrapperType, bool isSet)
+            {
+                Func<object, object> getItems = null;
+                Action<object, object> setItems = null;
+                Func<object, object> getKeys = null;
+                Action<object, object> setKeys = null;
+                Func<object, object> getValues = null;
+                Action<object, object> setValues = null;
+
+                if (isSet)
+                {
+                    FieldInfo itemsField = wrapperType.GetField(WrapperItemsFieldName);
+                    if (itemsField != null)
+                    {
+                        getItems = ReflectionHelpers.GetFieldGetter(itemsField);
+                        setItems = ReflectionHelpers.GetFieldSetter(itemsField);
+                    }
+                }
+                else
+                {
+                    FieldInfo keysField = wrapperType.GetField(WrapperKeysFieldName);
+                    FieldInfo valuesField = wrapperType.GetField(WrapperValuesFieldName);
+                    if (keysField != null)
+                    {
+                        getKeys = ReflectionHelpers.GetFieldGetter(keysField);
+                        setKeys = ReflectionHelpers.GetFieldSetter(keysField);
+                    }
+                    if (valuesField != null)
+                    {
+                        getValues = ReflectionHelpers.GetFieldGetter(valuesField);
+                        setValues = ReflectionHelpers.GetFieldSetter(valuesField);
+                    }
+                }
+
+                return (getItems, setItems, getKeys, setKeys, getValues, setValues);
+            }
+        }
+
+        // Reference-equality comparer for the cycle guard so distinct-but-equal objects are not
+        // mistaken for a cycle (and value-equal-but-different graph nodes are still written).
+        private sealed class ReferenceComparer : IEqualityComparer<object>
+        {
+            internal static readonly ReferenceComparer Instance = new();
+
+            private ReferenceComparer() { }
+
+            bool IEqualityComparer<object>.Equals(object x, object y)
+            {
+                return ReferenceEquals(x, y);
+            }
+
+            int IEqualityComparer<object>.GetHashCode(object obj)
+            {
+                return RuntimeHelpers.GetHashCode(obj);
             }
         }
     }

@@ -1293,30 +1293,6 @@ namespace LargeTest
         }
 
         /// <summary>
-        /// Captures diagnostic information about an analysis wait operation.
-        /// </summary>
-        private struct AnalysisWaitResult
-        {
-            public float WaitTime;
-            public int FrameCount;
-            public bool AnalysisTaskCompleted;
-            public TaskStatus AnalysisTaskStatus;
-            public bool CompletionSourceSignaled;
-            public TaskStatus CompletionSourceStatus;
-            public bool IsAnalyzing;
-            public float Progress;
-            public string StatusMessage;
-
-            public override readonly string ToString()
-            {
-                return $"WaitTime: {WaitTime:F2}s, Frames: {FrameCount}, "
-                    + $"AnalysisTaskCompleted: {AnalysisTaskCompleted}, AnalysisTaskStatus: {AnalysisTaskStatus}, "
-                    + $"TCSCompleted: {CompletionSourceSignaled}, TCSStatus: {CompletionSourceStatus}, "
-                    + $"IsAnalyzing: {IsAnalyzing}, Progress: {Progress}, Status: '{StatusMessage}'";
-            }
-        }
-
-        /// <summary>
         /// Waits for the analysis to complete and captures diagnostic information.
         /// First waits for the underlying analysis task, then repeatedly flushes
         /// the main thread queue until the completion callback has been processed.
@@ -3222,6 +3198,30 @@ namespace LargeTest
                 completed,
                 $"SemaphoreSlim.WaitAsync should complete. Status: {semaphoreTask.Status}"
             );
+        }
+
+        /// <summary>
+        /// Captures diagnostic information about an analysis wait operation.
+        /// </summary>
+        private struct AnalysisWaitResult
+        {
+            public float WaitTime;
+            public int FrameCount;
+            public bool AnalysisTaskCompleted;
+            public TaskStatus AnalysisTaskStatus;
+            public bool CompletionSourceSignaled;
+            public TaskStatus CompletionSourceStatus;
+            public bool IsAnalyzing;
+            public float Progress;
+            public string StatusMessage;
+
+            public override readonly string ToString()
+            {
+                return $"WaitTime: {WaitTime:F2}s, Frames: {FrameCount}, "
+                    + $"AnalysisTaskCompleted: {AnalysisTaskCompleted}, AnalysisTaskStatus: {AnalysisTaskStatus}, "
+                    + $"TCSCompleted: {CompletionSourceSignaled}, TCSStatus: {CompletionSourceStatus}, "
+                    + $"IsAnalyzing: {IsAnalyzing}, Progress: {Progress}, Status: '{StatusMessage}'";
+            }
         }
     }
 }

@@ -900,68 +900,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             UnityEngine.TestTools.LogAssert.Expect(type, pattern);
         }
 
-        // Custom log handler: for Error/Warning/Assert/Exception logs matching a registered expected
-        // pattern (same LogType), record the match and SUPPRESS (do not forward to the inner handler,
-        // which is what keeps it out of LogAssert/the console). Everything else forwards unchanged.
-        private sealed class ExpectedErrorSuppressingHandler : UnityEngine.ILogHandler
-        {
-            private readonly UnityEngine.ILogHandler _inner;
-
-            public ExpectedErrorSuppressingHandler(UnityEngine.ILogHandler inner)
-            {
-                _inner = inner;
-            }
-
-            public void LogFormat(
-                UnityEngine.LogType logType,
-                UnityEngine.Object context,
-                string format,
-                params object[] args
-            )
-            {
-                if (
-                    logType == UnityEngine.LogType.Error
-                    || logType == UnityEngine.LogType.Warning
-                    || logType == UnityEngine.LogType.Assert
-                    || logType == UnityEngine.LogType.Exception
-                )
-                {
-                    string message;
-                    try
-                    {
-                        message =
-                            args != null && 0 < args.Length ? string.Format(format, args) : format;
-                    }
-                    catch
-                    {
-                        message = format;
-                    }
-
-                    lock (_expectedErrorLock)
-                    {
-                        for (int i = 0; i < _expectedErrors.Count; i++)
-                        {
-                            if (
-                                _expectedErrors[i].type == logType
-                                && _expectedErrors[i].pattern.IsMatch(message)
-                            )
-                            {
-                                _matchedExpectedErrors.Add(_expectedErrors[i].pattern);
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                _inner.LogFormat(logType, context, format, args);
-            }
-
-            public void LogException(System.Exception exception, UnityEngine.Object context)
-            {
-                _inner.LogException(exception, context);
-            }
-        }
-
         private static void InstallExpectedErrorSuppression()
         {
             if (_expectErrorHandler != null)
@@ -2606,36 +2544,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Internal test hooks for verifying protection path logic.
-        /// </summary>
-        protected internal static class ProtectionTestHooks
-        {
-            /// <summary>
-            /// Exposes IsProtectedPath for testing.
-            /// </summary>
-            public static bool TestIsProtectedPath(string path) => IsProtectedPath(path);
-
-            /// <summary>
-            /// Exposes IsKnownDuplicatePollution for testing.
-            /// </summary>
-            public static bool TestIsKnownDuplicatePollution(string path) =>
-                IsKnownDuplicatePollution(path);
-
-            /// <summary>
-            /// Gets the list of protected folders for verification.
-            /// </summary>
-            public static string[] GetProtectedFolders() => ProtectedFolders;
-
-            /// <summary>
-            /// Gets the list of known duplicate folder patterns for verification.
-            /// </summary>
-            public static (
-                string parentPath,
-                string baseName
-            )[] GetKnownDuplicateFolderPatterns() => KnownDuplicateFolderPatterns;
-        }
-
-        /// <summary>
         /// Deletes a folder and all its contents through AssetDatabase.
         /// IMPORTANT: Will NOT delete protected production folders.
         /// </summary>
@@ -2835,6 +2743,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 // Ignore enumeration errors
             }
+        }
+#endif
+
+        // Custom log handler: for Error/Warning/Assert/Exception logs matching a registered expected
+        // pattern (same LogType), record the match and SUPPRESS (do not forward to the inner handler,
+        // which is what keeps it out of LogAssert/the console). Everything else forwards unchanged.
+        private sealed class ExpectedErrorSuppressingHandler : UnityEngine.ILogHandler
+        {
+            private readonly UnityEngine.ILogHandler _inner;
+
+            public ExpectedErrorSuppressingHandler(UnityEngine.ILogHandler inner)
+            {
+                _inner = inner;
+            }
+
+            public void LogFormat(
+                UnityEngine.LogType logType,
+                UnityEngine.Object context,
+                string format,
+                params object[] args
+            )
+            {
+                if (
+                    logType == UnityEngine.LogType.Error
+                    || logType == UnityEngine.LogType.Warning
+                    || logType == UnityEngine.LogType.Assert
+                    || logType == UnityEngine.LogType.Exception
+                )
+                {
+                    string message;
+                    try
+                    {
+                        message =
+                            args != null && 0 < args.Length ? string.Format(format, args) : format;
+                    }
+                    catch
+                    {
+                        message = format;
+                    }
+
+                    lock (_expectedErrorLock)
+                    {
+                        for (int i = 0; i < _expectedErrors.Count; i++)
+                        {
+                            if (
+                                _expectedErrors[i].type == logType
+                                && _expectedErrors[i].pattern.IsMatch(message)
+                            )
+                            {
+                                _matchedExpectedErrors.Add(_expectedErrors[i].pattern);
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                _inner.LogFormat(logType, context, format, args);
+            }
+
+            public void LogException(System.Exception exception, UnityEngine.Object context)
+            {
+                _inner.LogException(exception, context);
+            }
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Internal test hooks for verifying protection path logic.
+        /// </summary>
+        protected internal static class ProtectionTestHooks
+        {
+            /// <summary>
+            /// Exposes IsProtectedPath for testing.
+            /// </summary>
+            public static bool TestIsProtectedPath(string path) => IsProtectedPath(path);
+
+            /// <summary>
+            /// Exposes IsKnownDuplicatePollution for testing.
+            /// </summary>
+            public static bool TestIsKnownDuplicatePollution(string path) =>
+                IsKnownDuplicatePollution(path);
+
+            /// <summary>
+            /// Gets the list of protected folders for verification.
+            /// </summary>
+            public static string[] GetProtectedFolders() => ProtectedFolders;
+
+            /// <summary>
+            /// Gets the list of known duplicate folder patterns for verification.
+            /// </summary>
+            public static (
+                string parentPath,
+                string baseName
+            )[] GetKnownDuplicateFolderPatterns() => KnownDuplicateFolderPatterns;
         }
 #endif
     }

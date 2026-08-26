@@ -20,16 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerExceptionContractTests
     {
-        [ProtoContract]
-        private sealed class Sample
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
         // ---------------------------------------------------------------------------
         // Null input — InputException, never a framework exception.
         // ---------------------------------------------------------------------------
@@ -203,19 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // ---------------------------------------------------------------------------
-        // Type-resolution failures — TypeException (not swallowed by Try*).
-        // ---------------------------------------------------------------------------
-
-        private interface IUnregistered { }
-
-        [ProtoContract]
-        private sealed class Unregistered : IUnregistered
-        {
-            [ProtoMember(1)]
-            public int X { get; set; }
-        }
-
         [Test]
         public void ProtoDeserializeUnresolvedInterfaceThrowsSerializationTypeException()
         {
@@ -353,6 +330,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     );
                 }
             }
+        }
+
+        [ProtoContract]
+        private sealed class Sample
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        // ---------------------------------------------------------------------------
+        // Type-resolution failures — TypeException (not swallowed by Try*).
+        // ---------------------------------------------------------------------------
+
+        private interface IUnregistered { }
+
+        [ProtoContract]
+        private sealed class Unregistered : IUnregistered
+        {
+            [ProtoMember(1)]
+            public int X { get; set; }
         }
     }
 }

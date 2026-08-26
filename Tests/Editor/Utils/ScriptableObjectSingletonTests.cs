@@ -1041,46 +1041,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        public readonly struct MetadataScenario
-        {
-            private readonly Action _createAsset;
-
-            public MetadataScenario(
-                string description,
-                Action createAsset,
-                Type singletonType,
-                string expectedLoadPath,
-                string expectedFolder
-            )
-            {
-                if (createAsset == null)
-                {
-                    throw new ArgumentNullException(nameof(createAsset));
-                }
-
-                if (singletonType == null)
-                {
-                    throw new ArgumentNullException(nameof(singletonType));
-                }
-
-                Description = description ?? string.Empty;
-                _createAsset = createAsset;
-                SingletonType = singletonType;
-                ExpectedLoadPath = expectedLoadPath ?? string.Empty;
-                ExpectedFolder = expectedFolder ?? string.Empty;
-            }
-
-            public string Description { get; }
-            public Type SingletonType { get; }
-            public string ExpectedLoadPath { get; }
-            public string ExpectedFolder { get; }
-
-            public void CreateAsset()
-            {
-                _createAsset();
-            }
-        }
-
         private static System.Collections.Generic.IEnumerable<MetadataScenario> MetadataEntryScenarios()
         {
             yield return new MetadataScenario(
@@ -1142,102 +1102,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "CustomPath/CustomPathSingleton",
                 "CustomPath"
             );
-        }
-
-        private sealed class SingletonCreatorTestScope : IDisposable
-        {
-            private readonly bool _previousIncludeTests;
-            private readonly bool _previousIgnoreExclusion;
-            private readonly bool _previousAllowAssetCreation;
-            private readonly bool _previousIgnoreCompilationState;
-            private readonly Func<Type, bool> _previousFilter;
-
-            private SingletonCreatorTestScope(Type[] allowedTypes)
-            {
-                if (allowedTypes == null || allowedTypes.Length == 0)
-                {
-                    throw new ArgumentException(
-                        "allowedTypes must contain at least one type.",
-                        nameof(allowedTypes)
-                    );
-                }
-
-                // Ensure the metadata folder exists to prevent modal dialogs
-                EnsureMetadataFolder();
-
-                System.Collections.Generic.HashSet<Type> allowed = new(allowedTypes);
-                _previousIncludeTests = ScriptableObjectSingletonCreator.IncludeTestAssemblies;
-                _previousIgnoreExclusion =
-                    ScriptableObjectSingletonCreator.IgnoreExclusionAttribute;
-                _previousAllowAssetCreation =
-                    ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
-                _previousIgnoreCompilationState =
-                    ScriptableObjectSingletonCreator.IgnoreCompilationState;
-                _previousFilter = ScriptableObjectSingletonCreator.TypeFilter;
-                ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute = true;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-                // Bypass compilation state check - Unity may report isCompiling/isUpdating
-                // as true during test runs after AssetDatabase operations
-                ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-                ScriptableObjectSingletonCreator.TypeFilter = type =>
-                {
-                    if (!allowed.Contains(type))
-                    {
-                        return false;
-                    }
-
-                    return _previousFilter == null || _previousFilter(type);
-                };
-            }
-
-            public static SingletonCreatorTestScope RestrictTo(params Type[] allowedTypes)
-            {
-                return new SingletonCreatorTestScope(allowedTypes);
-            }
-
-            public void Dispose()
-            {
-                ScriptableObjectSingletonCreator.TypeFilter = _previousFilter;
-                ScriptableObjectSingletonCreator.IncludeTestAssemblies = _previousIncludeTests;
-                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute =
-                    _previousIgnoreExclusion;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
-                    _previousAllowAssetCreation;
-                ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                    _previousIgnoreCompilationState;
-            }
-
-            private static void EnsureMetadataFolder()
-            {
-                const string folderPath = "Assets/Resources/Wallstop Studios/Unity Helpers";
-                string projectRoot = Path.GetDirectoryName(Application.dataPath);
-                if (!string.IsNullOrEmpty(projectRoot))
-                {
-                    string absoluteDirectory = Path.Combine(projectRoot, folderPath);
-                    if (!Directory.Exists(absoluteDirectory))
-                    {
-                        Directory.CreateDirectory(absoluteDirectory);
-                    }
-                }
-
-                if (AssetDatabase.IsValidFolder(folderPath))
-                {
-                    return;
-                }
-
-                string[] parts = folderPath.Split('/');
-                string current = parts[0];
-                for (int i = 1; i < parts.Length; i++)
-                {
-                    string next = current + "/" + parts[i];
-                    if (!AssetDatabase.IsValidFolder(next))
-                    {
-                        AssetDatabase.CreateFolder(current, parts[i]);
-                    }
-                    current = next;
-                }
-            }
         }
 
         [UnityTest]
@@ -1358,6 +1222,142 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsFalse(task.IsFaulted);
             Assert.AreSame(instance, task.Result);
+        }
+
+        public readonly struct MetadataScenario
+        {
+            private readonly Action _createAsset;
+
+            public MetadataScenario(
+                string description,
+                Action createAsset,
+                Type singletonType,
+                string expectedLoadPath,
+                string expectedFolder
+            )
+            {
+                if (createAsset == null)
+                {
+                    throw new ArgumentNullException(nameof(createAsset));
+                }
+
+                if (singletonType == null)
+                {
+                    throw new ArgumentNullException(nameof(singletonType));
+                }
+
+                Description = description ?? string.Empty;
+                _createAsset = createAsset;
+                SingletonType = singletonType;
+                ExpectedLoadPath = expectedLoadPath ?? string.Empty;
+                ExpectedFolder = expectedFolder ?? string.Empty;
+            }
+
+            public string Description { get; }
+            public Type SingletonType { get; }
+            public string ExpectedLoadPath { get; }
+            public string ExpectedFolder { get; }
+
+            public void CreateAsset()
+            {
+                _createAsset();
+            }
+        }
+
+        private sealed class SingletonCreatorTestScope : IDisposable
+        {
+            private readonly bool _previousIncludeTests;
+            private readonly bool _previousIgnoreExclusion;
+            private readonly bool _previousAllowAssetCreation;
+            private readonly bool _previousIgnoreCompilationState;
+            private readonly Func<Type, bool> _previousFilter;
+
+            private SingletonCreatorTestScope(Type[] allowedTypes)
+            {
+                if (allowedTypes == null || allowedTypes.Length == 0)
+                {
+                    throw new ArgumentException(
+                        "allowedTypes must contain at least one type.",
+                        nameof(allowedTypes)
+                    );
+                }
+
+                // Ensure the metadata folder exists to prevent modal dialogs
+                EnsureMetadataFolder();
+
+                System.Collections.Generic.HashSet<Type> allowed = new(allowedTypes);
+                _previousIncludeTests = ScriptableObjectSingletonCreator.IncludeTestAssemblies;
+                _previousIgnoreExclusion =
+                    ScriptableObjectSingletonCreator.IgnoreExclusionAttribute;
+                _previousAllowAssetCreation =
+                    ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
+                _previousIgnoreCompilationState =
+                    ScriptableObjectSingletonCreator.IgnoreCompilationState;
+                _previousFilter = ScriptableObjectSingletonCreator.TypeFilter;
+                ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
+                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute = true;
+                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+                // Bypass compilation state check - Unity may report isCompiling/isUpdating
+                // as true during test runs after AssetDatabase operations
+                ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
+                ScriptableObjectSingletonCreator.TypeFilter = type =>
+                {
+                    if (!allowed.Contains(type))
+                    {
+                        return false;
+                    }
+
+                    return _previousFilter == null || _previousFilter(type);
+                };
+            }
+
+            public static SingletonCreatorTestScope RestrictTo(params Type[] allowedTypes)
+            {
+                return new SingletonCreatorTestScope(allowedTypes);
+            }
+
+            public void Dispose()
+            {
+                ScriptableObjectSingletonCreator.TypeFilter = _previousFilter;
+                ScriptableObjectSingletonCreator.IncludeTestAssemblies = _previousIncludeTests;
+                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute =
+                    _previousIgnoreExclusion;
+                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
+                    _previousAllowAssetCreation;
+                ScriptableObjectSingletonCreator.IgnoreCompilationState =
+                    _previousIgnoreCompilationState;
+            }
+
+            private static void EnsureMetadataFolder()
+            {
+                const string folderPath = "Assets/Resources/Wallstop Studios/Unity Helpers";
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                if (!string.IsNullOrEmpty(projectRoot))
+                {
+                    string absoluteDirectory = Path.Combine(projectRoot, folderPath);
+                    if (!Directory.Exists(absoluteDirectory))
+                    {
+                        Directory.CreateDirectory(absoluteDirectory);
+                    }
+                }
+
+                if (AssetDatabase.IsValidFolder(folderPath))
+                {
+                    return;
+                }
+
+                string[] parts = folderPath.Split('/');
+                string current = parts[0];
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    string next = current + "/" + parts[i];
+                    if (!AssetDatabase.IsValidFolder(next))
+                    {
+                        AssetDatabase.CreateFolder(current, parts[i]);
+                    }
+                    current = next;
+                }
+            }
         }
     }
 #endif

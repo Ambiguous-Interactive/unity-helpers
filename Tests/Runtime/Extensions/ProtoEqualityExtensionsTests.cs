@@ -15,74 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoEqualityExtensionsTests : CommonTestBase
     {
-        [ProtoContract]
-        private sealed class SimpleMessage
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class ComplexMessage
-        {
-            [ProtoMember(1)]
-            public int Value { get; set; }
-
-            [ProtoMember(2)]
-            public string Text { get; set; }
-
-            [ProtoMember(3)]
-            public List<int> Numbers { get; set; }
-
-            [ProtoMember(4)]
-            public SimpleMessage Nested { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class CollectionMessage
-        {
-            [ProtoMember(1)]
-            public List<int> IntList { get; set; }
-
-            [ProtoMember(2)]
-            public List<string> StringList { get; set; }
-
-            [ProtoMember(3)]
-            public byte[] ByteArray { get; set; }
-        }
-
-        [ProtoContract]
-        private struct ValueTypeMessage
-        {
-            [ProtoMember(1)]
-            public int X { get; set; }
-
-            [ProtoMember(2)]
-            public int Y { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class NumericMessage
-        {
-            [ProtoMember(1)]
-            public int IntValue { get; set; }
-
-            [ProtoMember(2)]
-            public long LongValue { get; set; }
-
-            [ProtoMember(3)]
-            public float FloatValue { get; set; }
-
-            [ProtoMember(4)]
-            public double DoubleValue { get; set; }
-
-            [ProtoMember(5)]
-            public bool BoolValue { get; set; }
-        }
-
         [Test]
         public void ProtoEqualsIdenticalSimpleObjectsReturnsTrue()
         {
@@ -567,6 +499,74 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 result,
                 "ProtoEquals should return false when one has null nested object"
             );
+        }
+
+        [ProtoContract]
+        private sealed class SimpleMessage
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class ComplexMessage
+        {
+            [ProtoMember(1)]
+            public int Value { get; set; }
+
+            [ProtoMember(2)]
+            public string Text { get; set; }
+
+            [ProtoMember(3)]
+            public List<int> Numbers { get; set; }
+
+            [ProtoMember(4)]
+            public SimpleMessage Nested { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class CollectionMessage
+        {
+            [ProtoMember(1)]
+            public List<int> IntList { get; set; }
+
+            [ProtoMember(2)]
+            public List<string> StringList { get; set; }
+
+            [ProtoMember(3)]
+            public byte[] ByteArray { get; set; }
+        }
+
+        [ProtoContract]
+        private struct ValueTypeMessage
+        {
+            [ProtoMember(1)]
+            public int X { get; set; }
+
+            [ProtoMember(2)]
+            public int Y { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class NumericMessage
+        {
+            [ProtoMember(1)]
+            public int IntValue { get; set; }
+
+            [ProtoMember(2)]
+            public long LongValue { get; set; }
+
+            [ProtoMember(3)]
+            public float FloatValue { get; set; }
+
+            [ProtoMember(4)]
+            public double DoubleValue { get; set; }
+
+            [ProtoMember(5)]
+            public bool BoolValue { get; set; }
         }
     }
 }

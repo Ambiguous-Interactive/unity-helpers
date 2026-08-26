@@ -22,70 +22,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         > Handlers = new();
         private static readonly ConcurrentDictionary<AsyncOperation, Action> Continuations = new();
 
-        /// <summary>
-        /// Provides an awaiter for Unity AsyncOperation objects, enabling async/await syntax.
-        /// </summary>
-        /// <remarks>
-        /// <para>This struct is used internally to enable async/await on AsyncOperation.</para>
-        /// <para>Thread safety: Thread-safe using concurrent dictionaries for handler storage. Must complete on Unity main thread.</para>
-        /// <para>Performance: O(1) for completion checks. Allocations occur for continuation storage in dictionaries.</para>
-        /// <para>Allocations: Allocates dictionary entries for tracking completions. Cleaned up on completion.</para>
-        /// </remarks>
-        public readonly struct AsyncOperationAwaiter : INotifyCompletion
-        {
-            private readonly AsyncOperation _operation;
-
-            /// <summary>
-            /// Initializes a new instance of the AsyncOperationAwaiter struct.
-            /// </summary>
-            /// <param name="operation">The AsyncOperation to await.</param>
-            /// <exception cref="ArgumentNullException">Thrown when operation is null.</exception>
-            public AsyncOperationAwaiter(AsyncOperation operation)
-            {
-                _operation = operation ?? throw new ArgumentNullException(nameof(operation));
-            }
-
-            /// <summary>
-            /// Gets a value indicating whether the async operation has completed.
-            /// </summary>
-            public bool IsCompleted => _operation.isDone;
-
-            /// <summary>
-            /// Schedules the continuation action to be invoked when the operation completes.
-            /// </summary>
-            /// <param name="continuation">The action to invoke when the operation completes.</param>
-            public void OnCompleted(Action continuation)
-            {
-                if (continuation == null)
-                {
-                    return;
-                }
-
-                // Every await of the same operation registers here. Storing through the indexer made
-                // the second registration overwrite the first, so the first awaiter never resumed;
-                // combining leaves every awaiter's continuation to run.
-                Continuations.AddOrUpdate(
-                    _operation,
-                    static (_, added) => added,
-                    static (_, existing, added) => existing + added,
-                    continuation
-                );
-
-                Action<AsyncOperation> handler = CachedHandler;
-                if (!Handlers.TryAdd(_operation, handler))
-                {
-                    return;
-                }
-
-                _operation.completed += handler;
-            }
-
-            /// <summary>
-            /// Gets the result of the async operation. Since AsyncOperation has no return value, this is a no-op.
-            /// </summary>
-            public void GetResult() { }
-        }
-
         private static readonly Action<AsyncOperation> CachedHandler = OnOperationCompleted;
 
         private static void OnOperationCompleted(AsyncOperation operation)
@@ -536,6 +472,70 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 await Task.Yield();
             }
+        }
+
+        /// <summary>
+        /// Provides an awaiter for Unity AsyncOperation objects, enabling async/await syntax.
+        /// </summary>
+        /// <remarks>
+        /// <para>This struct is used internally to enable async/await on AsyncOperation.</para>
+        /// <para>Thread safety: Thread-safe using concurrent dictionaries for handler storage. Must complete on Unity main thread.</para>
+        /// <para>Performance: O(1) for completion checks. Allocations occur for continuation storage in dictionaries.</para>
+        /// <para>Allocations: Allocates dictionary entries for tracking completions. Cleaned up on completion.</para>
+        /// </remarks>
+        public readonly struct AsyncOperationAwaiter : INotifyCompletion
+        {
+            private readonly AsyncOperation _operation;
+
+            /// <summary>
+            /// Initializes a new instance of the AsyncOperationAwaiter struct.
+            /// </summary>
+            /// <param name="operation">The AsyncOperation to await.</param>
+            /// <exception cref="ArgumentNullException">Thrown when operation is null.</exception>
+            public AsyncOperationAwaiter(AsyncOperation operation)
+            {
+                _operation = operation ?? throw new ArgumentNullException(nameof(operation));
+            }
+
+            /// <summary>
+            /// Gets a value indicating whether the async operation has completed.
+            /// </summary>
+            public bool IsCompleted => _operation.isDone;
+
+            /// <summary>
+            /// Schedules the continuation action to be invoked when the operation completes.
+            /// </summary>
+            /// <param name="continuation">The action to invoke when the operation completes.</param>
+            public void OnCompleted(Action continuation)
+            {
+                if (continuation == null)
+                {
+                    return;
+                }
+
+                // Every await of the same operation registers here. Storing through the indexer made
+                // the second registration overwrite the first, so the first awaiter never resumed;
+                // combining leaves every awaiter's continuation to run.
+                Continuations.AddOrUpdate(
+                    _operation,
+                    static (_, added) => added,
+                    static (_, existing, added) => existing + added,
+                    continuation
+                );
+
+                Action<AsyncOperation> handler = CachedHandler;
+                if (!Handlers.TryAdd(_operation, handler))
+                {
+                    return;
+                }
+
+                _operation.completed += handler;
+            }
+
+            /// <summary>
+            /// Gets the result of the async operation. Since AsyncOperation has no return value, this is a no-op.
+            /// </summary>
+            public void GetResult() { }
         }
     }
 }

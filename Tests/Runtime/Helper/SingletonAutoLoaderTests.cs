@@ -32,27 +32,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ScriptableMismatchSingleton.ClearForTests();
         }
 
-        private sealed class AutoRuntimeSingleton : RuntimeSingleton<AutoRuntimeSingleton>
-        {
-            public static int AwakenCount;
-
-            protected override void Awake()
-            {
-                base.Awake();
-                AwakenCount++;
-            }
-
-            public static void ClearForTests()
-            {
-                AwakenCount = 0;
-                if (HasInstance)
-                {
-                    DestroyImmediate(_instance.gameObject);
-                }
-                _instance = null;
-            }
-        }
-
         private static readonly RuntimeInitializeLoadType[] RuntimeLoadTypes =
         {
             RuntimeInitializeLoadType.AfterAssembliesLoaded,
@@ -296,6 +275,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 SingletonAutoLoadKind.ScriptableObject,
                 loadType
             );
+        }
+
+        private sealed class AutoRuntimeSingleton : RuntimeSingleton<AutoRuntimeSingleton>
+        {
+            public static int AwakenCount;
+
+            protected override void Awake()
+            {
+                base.Awake();
+                AwakenCount++;
+            }
+
+            public static void ClearForTests()
+            {
+                AwakenCount = 0;
+                if (HasInstance)
+                {
+                    DestroyImmediate(_instance.gameObject);
+                }
+                _instance = null;
+            }
         }
     }
 }

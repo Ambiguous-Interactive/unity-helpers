@@ -24,90 +24,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static partial class UnityExtensions
     {
 #if ENABLE_CONCAVE_HULL_STATS
-        public sealed class ConcaveHullRepairStats
-        {
-            public ConcaveHullRepairStats(int startHullCount, int originalPointsCount)
-            {
-                StartHullCount = startHullCount;
-                OriginalPointsCount = originalPointsCount;
-            }
-
-            public int StartHullCount { get; }
-            public int OriginalPointsCount { get; }
-            public int FinalHullCount { get; private set; }
-            public int AxisCornerInsertions { get; private set; }
-            public int AxisPathInsertions { get; private set; }
-            public int CandidateConnections { get; private set; }
-            public int DuplicateRemovals { get; private set; }
-            public int DiagonalPruned { get; private set; }
-            public int AxisNeighborVisits { get; private set; }
-            public int MaxFrontierSize { get; private set; }
-
-            internal ConcaveHullRepairStats Clone()
-            {
-                ConcaveHullRepairStats clone = new(StartHullCount, OriginalPointsCount)
-                {
-                    FinalHullCount = FinalHullCount,
-                    AxisCornerInsertions = AxisCornerInsertions,
-                    AxisPathInsertions = AxisPathInsertions,
-                    CandidateConnections = CandidateConnections,
-                    DuplicateRemovals = DuplicateRemovals,
-                    DiagonalPruned = DiagonalPruned,
-                    AxisNeighborVisits = AxisNeighborVisits,
-                    MaxFrontierSize = MaxFrontierSize,
-                };
-                return clone;
-            }
-
-            internal void IncrementAxisCornerInsertions()
-            {
-                AxisCornerInsertions++;
-            }
-
-            internal void IncrementAxisPathInsertions(int amount)
-            {
-                if (0 < amount)
-                {
-                    AxisPathInsertions += amount;
-                }
-            }
-
-            internal void IncrementCandidateConnections()
-            {
-                CandidateConnections++;
-            }
-
-            internal void IncrementDuplicateRemovals()
-            {
-                DuplicateRemovals++;
-            }
-
-            internal void IncrementDiagonalPruned()
-            {
-                DiagonalPruned++;
-            }
-
-            internal void IncrementAxisNeighborVisits()
-            {
-                AxisNeighborVisits++;
-            }
-
-            internal void MaybeRecordFrontierSize(int size)
-            {
-                if (MaxFrontierSize < size)
-                {
-                    MaxFrontierSize = size;
-                }
-            }
-
-            internal void MarkFinalHullCount(int count)
-            {
-                FinalHullCount = count;
-            }
-        }
-#endif
-
-#if ENABLE_CONCAVE_HULL_STATS
         private static readonly ConditionalWeakTable<
             List<FastVector3Int>,
             ConcaveHullRepairStats
@@ -949,13 +865,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 && Math.Min(p.y, r.y) <= q.y;
         }
 
-        public enum OrientationType
-        {
-            Colinear = 0,
-            Clockwise = 1,
-            Counterclockwise = 2,
-        }
-
         public static OrientationType Orientation(Vector2 p, Vector2 q, Vector2 r)
         {
             float value = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
@@ -1072,5 +981,96 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             stats?.MarkFinalHullCount(hull.Count);
 #endif
         }
+
+        public enum OrientationType
+        {
+            Colinear = 0,
+            Clockwise = 1,
+            Counterclockwise = 2,
+        }
+
+#if ENABLE_CONCAVE_HULL_STATS
+        public sealed class ConcaveHullRepairStats
+        {
+            public ConcaveHullRepairStats(int startHullCount, int originalPointsCount)
+            {
+                StartHullCount = startHullCount;
+                OriginalPointsCount = originalPointsCount;
+            }
+
+            public int StartHullCount { get; }
+            public int OriginalPointsCount { get; }
+            public int FinalHullCount { get; private set; }
+            public int AxisCornerInsertions { get; private set; }
+            public int AxisPathInsertions { get; private set; }
+            public int CandidateConnections { get; private set; }
+            public int DuplicateRemovals { get; private set; }
+            public int DiagonalPruned { get; private set; }
+            public int AxisNeighborVisits { get; private set; }
+            public int MaxFrontierSize { get; private set; }
+
+            internal ConcaveHullRepairStats Clone()
+            {
+                ConcaveHullRepairStats clone = new(StartHullCount, OriginalPointsCount)
+                {
+                    FinalHullCount = FinalHullCount,
+                    AxisCornerInsertions = AxisCornerInsertions,
+                    AxisPathInsertions = AxisPathInsertions,
+                    CandidateConnections = CandidateConnections,
+                    DuplicateRemovals = DuplicateRemovals,
+                    DiagonalPruned = DiagonalPruned,
+                    AxisNeighborVisits = AxisNeighborVisits,
+                    MaxFrontierSize = MaxFrontierSize,
+                };
+                return clone;
+            }
+
+            internal void IncrementAxisCornerInsertions()
+            {
+                AxisCornerInsertions++;
+            }
+
+            internal void IncrementAxisPathInsertions(int amount)
+            {
+                if (0 < amount)
+                {
+                    AxisPathInsertions += amount;
+                }
+            }
+
+            internal void IncrementCandidateConnections()
+            {
+                CandidateConnections++;
+            }
+
+            internal void IncrementDuplicateRemovals()
+            {
+                DuplicateRemovals++;
+            }
+
+            internal void IncrementDiagonalPruned()
+            {
+                DiagonalPruned++;
+            }
+
+            internal void IncrementAxisNeighborVisits()
+            {
+                AxisNeighborVisits++;
+            }
+
+            internal void MaybeRecordFrontierSize(int size)
+            {
+                if (MaxFrontierSize < size)
+                {
+                    MaxFrontierSize = size;
+                }
+            }
+
+            internal void MarkFinalHullCount(int count)
+            {
+                FinalHullCount = count;
+            }
+        }
+#endif
     }
 }

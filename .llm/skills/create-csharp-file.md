@@ -147,9 +147,10 @@ public sealed class Attribute
 
 A reader scrolling for a method should not have to step over a type declaration to find it, and a
 nested type in the middle reads as the start of a new file's worth of content. Owner review, PR
-\#574. The existing backlog -- 249 sites across 178 files when the rule was written -- is tracked
-on [#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575); it is not a licence
-to add more.
+\#574. `npm run lint:nested-type-placement` enforces it; `--fix` moves what it can, and refuses a
+type whose move would take it across a `#if` boundary into a different build. The backlog it was
+written for -- 459 sites across 177 files -- is swept to zero
+([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575)).
 
 ### 6. NEVER Use Nullable Reference Types
 

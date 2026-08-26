@@ -910,39 +910,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class SampleValue
-        {
-            public SampleValue(string identifier)
-            {
-                Identifier = identifier;
-            }
-
-            public string Identifier { get; }
-
-            public override bool Equals(object candidate)
-            {
-                if (candidate is SampleValue other)
-                {
-                    return string.Equals(Identifier, other.Identifier, StringComparison.Ordinal);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                if (Identifier == null)
-                {
-                    return 0;
-                }
-
-                return Identifier.GetHashCode(StringComparison.Ordinal);
-            }
-        }
-
         [Test]
         public void EnumeratorIsValueTypeAndSupportsForEach()
         {
@@ -1599,6 +1566,39 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(2, set.Count);
             CollectionAssert.AreEquivalent(new[] { 11, 13 }, set.SerializedItems);
             Assert.IsTrue(set.PreserveSerializedEntries);
+        }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class SampleValue
+        {
+            public SampleValue(string identifier)
+            {
+                Identifier = identifier;
+            }
+
+            public string Identifier { get; }
+
+            public override bool Equals(object candidate)
+            {
+                if (candidate is SampleValue other)
+                {
+                    return string.Equals(Identifier, other.Identifier, StringComparison.Ordinal);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                if (Identifier == null)
+                {
+                    return 0;
+                }
+
+                return Identifier.GetHashCode(StringComparison.Ordinal);
+            }
         }
     }
 }

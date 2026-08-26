@@ -42,45 +42,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private const string TestAssemblyPrefix = "WallstopStudios.UnityHelpers.Tests";
 
         /// <summary>
-        /// Reflected information cached once per handler type.
-        /// </summary>
-        private sealed class HandlerEntry
-        {
-            internal Type HandlerType;
-            internal Action ClearAction;
-            internal Func<int> RecordedContextsCountGetter;
-            internal Func<int> RecordedInstancesCountGetter;
-            internal Func<IEnumerable<object>> RecordedContextsEnumerator;
-            internal Func<IEnumerable<object>> RecordedInstancesEnumerator;
-            internal bool RecordedInstancesAreUnityObjects;
-            internal Action ResetShouldThrowAction;
-
-            /// <summary>
-            /// Additional pollution surfaces (counters, side-channel recorded lists,
-            /// and array-shaped "last observed" properties) not covered by the canonical
-            /// RecordedContexts/RecordedInstances pair. Each entry produces a diagnostic
-            /// line when non-zero/non-empty so authors of alternate-shaped handlers
-            /// (e.g. InvocationCount counters, RecordedInvocations, RecordedCreated,
-            /// RecordedDeletedPaths, LastCreatedAssets[], LastDeletedPaths[]) get the
-            /// same pollution observability as the canonical pair.
-            /// </summary>
-            internal List<PollutionProbe> ExtraPollutionProbes = new();
-        }
-
-        /// <summary>
-        /// Observes one pollution surface on a handler. <see cref="IsDirty"/> returns
-        /// <see langword="true"/> when the surface has non-default content (non-zero
-        /// count, non-zero counter, non-empty array). <see cref="Describe"/> formats
-        /// the surface for the pollution diagnostic message.
-        /// </summary>
-        private sealed class PollutionProbe
-        {
-            internal string SurfaceName;
-            internal Func<bool> IsDirty;
-            internal Func<string> Describe;
-        }
-
-        /// <summary>
         /// Discovery cache, initialized lazily on first use and retained for the
         /// lifetime of the app domain. Domain reloads (assembly rebuilds, play-mode
         /// enter with reload enabled) reset the cache implicitly because the static
@@ -885,6 +846,45 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             return "null";
+        }
+
+        /// <summary>
+        /// Reflected information cached once per handler type.
+        /// </summary>
+        private sealed class HandlerEntry
+        {
+            internal Type HandlerType;
+            internal Action ClearAction;
+            internal Func<int> RecordedContextsCountGetter;
+            internal Func<int> RecordedInstancesCountGetter;
+            internal Func<IEnumerable<object>> RecordedContextsEnumerator;
+            internal Func<IEnumerable<object>> RecordedInstancesEnumerator;
+            internal bool RecordedInstancesAreUnityObjects;
+            internal Action ResetShouldThrowAction;
+
+            /// <summary>
+            /// Additional pollution surfaces (counters, side-channel recorded lists,
+            /// and array-shaped "last observed" properties) not covered by the canonical
+            /// RecordedContexts/RecordedInstances pair. Each entry produces a diagnostic
+            /// line when non-zero/non-empty so authors of alternate-shaped handlers
+            /// (e.g. InvocationCount counters, RecordedInvocations, RecordedCreated,
+            /// RecordedDeletedPaths, LastCreatedAssets[], LastDeletedPaths[]) get the
+            /// same pollution observability as the canonical pair.
+            /// </summary>
+            internal List<PollutionProbe> ExtraPollutionProbes = new();
+        }
+
+        /// <summary>
+        /// Observes one pollution surface on a handler. <see cref="IsDirty"/> returns
+        /// <see langword="true"/> when the surface has non-default content (non-zero
+        /// count, non-zero counter, non-empty array). <see cref="Describe"/> formats
+        /// the surface for the pollution diagnostic message.
+        /// </summary>
+        private sealed class PollutionProbe
+        {
+            internal string SurfaceName;
+            internal Func<bool> IsDirty;
+            internal Func<string> Describe;
         }
     }
 }

@@ -361,16 +361,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     {
         private const int NumTries = 1_000;
 
-        private sealed class NoParameterlessCtor
-        {
-            public int V { get; }
-
-            public NoParameterlessCtor(int v)
-            {
-                V = v;
-            }
-        }
-
         [Test]
         public void GetFieldGetterClassMemberField()
         {
@@ -2914,6 +2904,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             IndexerClass obj = new();
             Assert.Throws<IndexOutOfRangeException>(() => getter(obj, new object[] { }));
             Assert.Throws<IndexOutOfRangeException>(() => setter(obj, 1, new object[] { }));
+        }
+
+        private sealed class NoParameterlessCtor
+        {
+            public int V { get; }
+
+            public NoParameterlessCtor(int v)
+            {
+                V = v;
+            }
         }
     }
 }

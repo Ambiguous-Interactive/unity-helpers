@@ -16,25 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class WallstopGenericPoolTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-            public bool WasReset { get; set; }
-            public bool WasDisposed { get; set; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -2424,20 +2405,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 MemoryPressureMonitor.Enabled = false;
             }
         }
-    }
 
-    /// <summary>
-    ///     Tests for pool edge cases related to time=0 and initialization states.
-    ///     Time=0 is a special case in the pool system because it is treated as "uninitialized"
-    ///     by the idle time tracker.
-    /// </summary>
-    [TestFixture]
-    [NUnit.Framework.Category("Fast")]
-    public sealed class PoolTimeZeroEdgeCaseTests
-    {
         private sealed class TestPoolItem
         {
             public int Id { get; }
+            public bool WasReset { get; set; }
+            public bool WasDisposed { get; set; }
 
             private static int _nextId;
 
@@ -2451,7 +2424,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 _nextId = 0;
             }
         }
+    }
 
+    /// <summary>
+    ///     Tests for pool edge cases related to time=0 and initialization states.
+    ///     Time=0 is a special case in the pool system because it is treated as "uninitialized"
+    ///     by the idle time tracker.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class PoolTimeZeroEdgeCaseTests
+    {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -2592,15 +2575,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     + "Note: Pre-warmed items may have special idle tracking behavior."
             );
         }
-    }
 
-    /// <summary>
-    ///     Tests for pool purge edge cases with negative and boundary budget values.
-    /// </summary>
-    [TestFixture]
-    [NUnit.Framework.Category("Fast")]
-    public sealed class PoolPurgeBudgetEdgeCaseTests
-    {
         private sealed class TestPoolItem
         {
             public int Id { get; }
@@ -2617,7 +2592,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 _nextId = 0;
             }
         }
+    }
 
+    /// <summary>
+    ///     Tests for pool purge edge cases with negative and boundary budget values.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class PoolPurgeBudgetEdgeCaseTests
+    {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -2767,15 +2750,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Should not have pending purges when all items purged"
             );
         }
-    }
 
-    /// <summary>
-    ///     Tests for pool statistics edge cases when no operations have occurred.
-    /// </summary>
-    [TestFixture]
-    [NUnit.Framework.Category("Fast")]
-    public sealed class PoolStatisticsEdgeCaseTests
-    {
         private sealed class TestPoolItem
         {
             public int Id { get; }
@@ -2792,7 +2767,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 _nextId = 0;
             }
         }
+    }
 
+    /// <summary>
+    ///     Tests for pool statistics edge cases when no operations have occurred.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class PoolStatisticsEdgeCaseTests
+    {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -3182,6 +3165,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"Default pool should handle {iterations} Get/Return cycles in under 5 seconds"
             );
         }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
+        }
     }
 
     /// <summary>
@@ -3205,23 +3205,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class AutoPurgeThrottleTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -3612,6 +3595,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 hitsAfterAuto + 1,
                 "Explicit purge must fire OnPurge even when auto-purge throttle is active"
             );
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
         }
     }
 }

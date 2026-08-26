@@ -104,20 +104,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoInclude(119, typeof(Xoshiro256StarStar))]
     public abstract partial class AbstractRandom : IRandom
     {
-        /// <summary>
-        /// The values of one enum type, materialized once by its own static initializer.
-        /// </summary>
-        /// <typeparam name="T">The enum type.</typeparam>
-        /// <remarks>
-        /// A closed generic type gets its own copy of this field, so the lookup that a dictionary
-        /// keyed by <see cref="Type"/> would perform on every roll costs nothing at all.
-        /// </remarks>
-        private static class EnumValues<T>
-            where T : unmanaged, Enum
-        {
-            internal static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
-        }
-
         protected const float MagicFloat = 5.960465E-008F;
         private const ulong LongBias = 1UL << 63;
         private const int MaxRejectionAttempts32 = 1 << 16;
@@ -1498,6 +1484,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 z ^= z >> 31;
                 return (uint)z;
             }
+        }
+
+        /// <summary>
+        /// The values of one enum type, materialized once by its own static initializer.
+        /// </summary>
+        /// <typeparam name="T">The enum type.</typeparam>
+        /// <remarks>
+        /// A closed generic type gets its own copy of this field, so the lookup that a dictionary
+        /// keyed by <see cref="Type"/> would perform on every roll costs nothing at all.
+        /// </remarks>
+        private static class EnumValues<T>
+            where T : unmanaged, Enum
+        {
+            internal static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
         }
     }
 }

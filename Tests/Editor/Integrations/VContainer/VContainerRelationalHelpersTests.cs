@@ -17,15 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
     [NUnit.Framework.Category("Integration")]
     public sealed class VContainerRelationalHelpersTests : CommonTestBase
     {
-        private sealed class TestComponent : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
-
         [Test]
         public void InjectWithRelationsAssignsFields()
         {
@@ -167,6 +158,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
         }
 
         private sealed class DerivedWithSibling : BaseWithSibling { }
+
+        private sealed class TestComponent : MonoBehaviour
+        {
+            [ParentComponent(OnlyAncestors = true)]
+            public Rigidbody parentBody;
+
+            [ChildComponent(OnlyDescendants = true)]
+            public CapsuleCollider childCollider;
+        }
     }
 }
 #endif

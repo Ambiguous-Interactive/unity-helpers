@@ -403,32 +403,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsFalse(AssetDatabase.IsValidFolder(scenario.FolderPath + " 1"));
         }
 
-        public sealed class DiskFolderScenario
-        {
-            public DiskFolderScenario(
-                string name,
-                string folderPath,
-                string assetPath,
-                Type singletonType
-            )
-            {
-                Name = name;
-                FolderPath = folderPath;
-                AssetPath = assetPath;
-                SingletonType = singletonType;
-            }
-
-            public string Name { get; }
-            public string FolderPath { get; }
-            public string AssetPath { get; }
-            public Type SingletonType { get; }
-
-            public override string ToString()
-            {
-                return string.IsNullOrEmpty(Name) ? base.ToString() : Name;
-            }
-        }
-
         [UnityTest]
         public IEnumerator SkipsCreationWhenAssetFileExistsButIsNotImported()
         {
@@ -662,6 +636,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
             {
                 File.Delete(metaPath);
+            }
+        }
+
+        public sealed class DiskFolderScenario
+        {
+            public DiskFolderScenario(
+                string name,
+                string folderPath,
+                string assetPath,
+                Type singletonType
+            )
+            {
+                Name = name;
+                FolderPath = folderPath;
+                AssetPath = assetPath;
+                SingletonType = singletonType;
+            }
+
+            public string Name { get; }
+            public string FolderPath { get; }
+            public string AssetPath { get; }
+            public Type SingletonType { get; }
+
+            public override string ToString()
+            {
+                return string.IsNullOrEmpty(Name) ? base.ToString() : Name;
             }
         }
     }

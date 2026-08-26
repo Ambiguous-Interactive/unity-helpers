@@ -742,27 +742,6 @@ namespace WallstopStudios.UnityHelpers.Editor
         }
 
         /// <summary>
-        /// Pure result of the fit-size computation (no Unity asset I/O), so the
-        /// power-of-two / clamp / direction behavior can be unit-tested without importing
-        /// textures.
-        /// </summary>
-        internal readonly struct FitComputation
-        {
-            public readonly int TargetSize;
-            public readonly bool NeedsChange;
-            public readonly bool Grew;
-            public readonly bool Shrank;
-
-            public FitComputation(int targetSize, bool needsChange, bool grew, bool shrank)
-            {
-                TargetSize = targetSize;
-                NeedsChange = needsChange;
-                Grew = grew;
-                Shrank = shrank;
-            }
-        }
-
-        /// <summary>
         /// Computes the target <c>maxTextureSize</c> for a source texture given its dimensions,
         /// its current max size, the fit mode, and the allowed min/max bounds. Pure: depends only
         /// on integers, performs NO AssetDatabase/importer I/O, so it is exercised by fast unit
@@ -885,6 +864,27 @@ namespace WallstopStudios.UnityHelpers.Editor
                 _maxAllowedTextureSize
             );
             importer.SetPlatformTextureSettings(settings);
+        }
+
+        /// <summary>
+        /// Pure result of the fit-size computation (no Unity asset I/O), so the
+        /// power-of-two / clamp / direction behavior can be unit-tested without importing
+        /// textures.
+        /// </summary>
+        internal readonly struct FitComputation
+        {
+            public readonly int TargetSize;
+            public readonly bool NeedsChange;
+            public readonly bool Grew;
+            public readonly bool Shrank;
+
+            public FitComputation(int targetSize, bool needsChange, bool grew, bool shrank)
+            {
+                TargetSize = targetSize;
+                NeedsChange = needsChange;
+                Grew = grew;
+                Shrank = shrank;
+            }
         }
     }
 #endif

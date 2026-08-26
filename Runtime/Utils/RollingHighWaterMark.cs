@@ -40,18 +40,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private const int MaxSampleCount = 10000;
 
-        internal readonly struct Sample
-        {
-            public readonly float Time;
-            public readonly int Value;
-
-            public Sample(float time, int value)
-            {
-                Time = time;
-                Value = value;
-            }
-        }
-
         private readonly CyclicBuffer<Sample> _samples;
         private readonly CyclicBuffer<Sample> _peakDeque;
         private readonly object _lock = new object();
@@ -282,6 +270,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _cachedPeak = 0 < _peakDeque.Count ? _peakDeque[0].Value : 0;
+        }
+
+        internal readonly struct Sample
+        {
+            public readonly float Time;
+            public readonly int Value;
+
+            public Sample(float time, int value)
+            {
+                Time = time;
+                Value = value;
+            }
         }
     }
 

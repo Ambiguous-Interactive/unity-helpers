@@ -12,13 +12,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
     /// </summary>
     internal sealed class NestedClassTarget : ScriptableObject
     {
+        public NestedData nested;
+
         [Serializable]
         public class NestedData
         {
             public int value;
         }
-
-        public NestedData nested;
     }
 }
 #endif

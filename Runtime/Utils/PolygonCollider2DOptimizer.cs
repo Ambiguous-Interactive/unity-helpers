@@ -20,19 +20,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     [RequireComponent(typeof(PolygonCollider2D))]
     public sealed class PolygonCollider2DOptimizer : MonoBehaviour
     {
-        [Serializable]
-        private sealed class Path
-        {
-            public List<Vector2> points = new();
-
-            public Path() { }
-
-            public Path(IEnumerable<Vector2> points)
-            {
-                this.points.AddRange(points);
-            }
-        }
-
         public double tolerance;
 
         [SiblingComponent]
@@ -104,6 +91,19 @@ namespace WallstopStudios.UnityHelpers.Utils
                 EditorUtility.SetDirty(this);
             }
 #endif
+        }
+
+        [Serializable]
+        private sealed class Path
+        {
+            public List<Vector2> points = new();
+
+            public Path() { }
+
+            public Path(IEnumerable<Vector2> points)
+            {
+                this.points.AddRange(points);
+            }
         }
     }
 }

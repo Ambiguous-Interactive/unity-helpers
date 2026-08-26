@@ -17,97 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class ObjectsTests : CommonTestBase
     {
-        private sealed class CustomClass
-        {
-            public int Value { get; set; }
-
-            public override int GetHashCode()
-            {
-                return Value;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is CustomClass other && Value == other.Value;
-            }
-        }
-
-        private sealed class CustomEnumerable : IEnumerable<int>
-        {
-            private readonly List<int> _items;
-
-            public CustomEnumerable(params int[] items)
-            {
-                _items = new List<int>(items);
-            }
-
-            public IEnumerator<int> GetEnumerator()
-            {
-                return _items.GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
-            }
-        }
-
-        private sealed class DisposableEnumerator : IEnumerator<int>
-        {
-            private readonly List<int> _items;
-            private int _position = -1;
-
-            public DisposableEnumerator(List<int> items)
-            {
-                _items = items;
-            }
-
-            public int Current => _items[_position];
-
-            object IEnumerator.Current => Current;
-
-            public bool WasDisposed { get; private set; }
-
-            public bool MoveNext()
-            {
-                _position++;
-                return _position < _items.Count;
-            }
-
-            public void Reset()
-            {
-                _position = -1;
-            }
-
-            public void Dispose()
-            {
-                WasDisposed = true;
-            }
-        }
-
-        private sealed class DisposableEnumerable : IEnumerable<int>
-        {
-            private readonly List<int> _items;
-
-            public DisposableEnumerable(params int[] items)
-            {
-                _items = new List<int>(items);
-            }
-
-            public DisposableEnumerator LastEnumerator { get; private set; }
-
-            public IEnumerator<int> GetEnumerator()
-            {
-                LastEnumerator = new DisposableEnumerator(_items);
-                return LastEnumerator;
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
-            }
-        }
-
         [UnityTest]
         public IEnumerator NullReturnsTrueForNullUnityObject()
         {
@@ -468,6 +377,97 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             public override int GetHashCode()
             {
                 return _value;
+            }
+        }
+
+        private sealed class CustomClass
+        {
+            public int Value { get; set; }
+
+            public override int GetHashCode()
+            {
+                return Value;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is CustomClass other && Value == other.Value;
+            }
+        }
+
+        private sealed class CustomEnumerable : IEnumerable<int>
+        {
+            private readonly List<int> _items;
+
+            public CustomEnumerable(params int[] items)
+            {
+                _items = new List<int>(items);
+            }
+
+            public IEnumerator<int> GetEnumerator()
+            {
+                return _items.GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+        }
+
+        private sealed class DisposableEnumerator : IEnumerator<int>
+        {
+            private readonly List<int> _items;
+            private int _position = -1;
+
+            public DisposableEnumerator(List<int> items)
+            {
+                _items = items;
+            }
+
+            public int Current => _items[_position];
+
+            object IEnumerator.Current => Current;
+
+            public bool WasDisposed { get; private set; }
+
+            public bool MoveNext()
+            {
+                _position++;
+                return _position < _items.Count;
+            }
+
+            public void Reset()
+            {
+                _position = -1;
+            }
+
+            public void Dispose()
+            {
+                WasDisposed = true;
+            }
+        }
+
+        private sealed class DisposableEnumerable : IEnumerable<int>
+        {
+            private readonly List<int> _items;
+
+            public DisposableEnumerable(params int[] items)
+            {
+                _items = new List<int>(items);
+            }
+
+            public DisposableEnumerator LastEnumerator { get; private set; }
+
+            public IEnumerator<int> GetEnumerator()
+            {
+                LastEnumerator = new DisposableEnumerator(_items);
+                return LastEnumerator;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
             }
         }
     }

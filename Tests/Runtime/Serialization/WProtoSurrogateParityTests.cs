@@ -94,12 +94,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
         }
 
-        private enum Mode
-        {
-            Bytes = 0,
-            CrossRead = 1,
-        }
-
         private static void RunEveryCase(List<string> mismatches, Mode mode)
         {
             AssertParity(
@@ -484,6 +478,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return builder.ToString();
+        }
+
+        private enum Mode
+        {
+            Bytes = 0,
+            CrossRead = 1,
         }
     }
 }

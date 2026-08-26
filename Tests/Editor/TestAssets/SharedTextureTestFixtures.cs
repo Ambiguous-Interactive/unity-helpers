@@ -200,27 +200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             (2, 4),
         };
 
-        /// <summary>
-        /// Represents a dynamically generated texture fixture with its associated metadata.
-        /// </summary>
-        public sealed class DynamicTextureFixture
-        {
-            /// <summary>
-            /// The asset path of the dynamic fixture.
-            /// </summary>
-            public string AssetPath { get; internal set; }
-
-            /// <summary>
-            /// The cached texture for the dynamic fixture.
-            /// </summary>
-            public Texture2D Texture { get; internal set; }
-
-            /// <summary>
-            /// The cached texture importer for the dynamic fixture.
-            /// </summary>
-            public TextureImporter Importer { get; internal set; }
-        }
-
         // Path properties for base textures
 
         /// <summary>
@@ -1117,6 +1096,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 AssetDatabase.LoadAssetAtPath<Texture2D>(Solid450x254Path) != null,
                 $"Missing texture fixture: {Solid450x254Path}"
             );
+        }
+
+        /// <summary>
+        /// Represents a dynamically generated texture fixture with its associated metadata.
+        /// </summary>
+        public sealed class DynamicTextureFixture
+        {
+            /// <summary>
+            /// The asset path of the dynamic fixture.
+            /// </summary>
+            public string AssetPath { get; internal set; }
+
+            /// <summary>
+            /// The cached texture for the dynamic fixture.
+            /// </summary>
+            public Texture2D Texture { get; internal set; }
+
+            /// <summary>
+            /// The cached texture importer for the dynamic fixture.
+            /// </summary>
+            public TextureImporter Importer { get; internal set; }
         }
     }
 #endif

@@ -33,62 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class KdTree3D<T> : ISpatialTree3D<T>
     {
-        private readonly struct Neighbor
-        {
-            public readonly int index;
-            public readonly float sqrDistance;
-
-            public Neighbor(int index, float sqrDistance)
-            {
-                this.index = index;
-                this.sqrDistance = sqrDistance;
-            }
-        }
-
-        [Serializable]
-        public sealed class KdTreeNode
-        {
-            public readonly Bounds boundary;
-            public readonly KdTreeNode left;
-            public readonly KdTreeNode right;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-
-            private KdTreeNode(
-                Bounds boundary,
-                KdTreeNode left,
-                KdTreeNode right,
-                int startIndex,
-                int count,
-                bool isTerminal
-            )
-            {
-                this.boundary = boundary;
-                this.left = left;
-                this.right = right;
-                _startIndex = startIndex;
-                _count = count;
-                this.isTerminal = isTerminal;
-            }
-
-            internal static KdTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
-            {
-                return new KdTreeNode(boundary, null, null, startIndex, count, true);
-            }
-
-            internal static KdTreeNode CreateInternal(
-                Bounds boundary,
-                KdTreeNode left,
-                KdTreeNode right,
-                int startIndex,
-                int count
-            )
-            {
-                return new KdTreeNode(boundary, left, right, startIndex, count, false);
-            }
-        }
-
         private const float MinimumNodeSize = 0.001f;
         private const int SmallPartitionThreshold = 32;
 
@@ -938,6 +882,62 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public int Compare(Neighbor x, Neighbor y)
             {
                 return x.sqrDistance.CompareTo(y.sqrDistance);
+            }
+        }
+
+        private readonly struct Neighbor
+        {
+            public readonly int index;
+            public readonly float sqrDistance;
+
+            public Neighbor(int index, float sqrDistance)
+            {
+                this.index = index;
+                this.sqrDistance = sqrDistance;
+            }
+        }
+
+        [Serializable]
+        public sealed class KdTreeNode
+        {
+            public readonly Bounds boundary;
+            public readonly KdTreeNode left;
+            public readonly KdTreeNode right;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+
+            private KdTreeNode(
+                Bounds boundary,
+                KdTreeNode left,
+                KdTreeNode right,
+                int startIndex,
+                int count,
+                bool isTerminal
+            )
+            {
+                this.boundary = boundary;
+                this.left = left;
+                this.right = right;
+                _startIndex = startIndex;
+                _count = count;
+                this.isTerminal = isTerminal;
+            }
+
+            internal static KdTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
+            {
+                return new KdTreeNode(boundary, null, null, startIndex, count, true);
+            }
+
+            internal static KdTreeNode CreateInternal(
+                Bounds boundary,
+                KdTreeNode left,
+                KdTreeNode right,
+                int startIndex,
+                int count
+            )
+            {
+                return new KdTreeNode(boundary, left, right, startIndex, count, false);
             }
         }
     }

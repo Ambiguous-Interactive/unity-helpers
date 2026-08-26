@@ -39,51 +39,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         [ThreadStatic]
         private static bool _sizePlanCapturing;
 
-        internal readonly ref struct SizePlanScope
-        {
-            private readonly int _previousArenaCount;
-            private readonly int _previousStart;
-            private readonly int _previousCount;
-            private readonly bool _previousCapturing;
-            private readonly int _start;
-
-            internal SizePlanScope(bool begin)
-            {
-                _previousArenaCount = _sizePlanArenaCount;
-                _previousStart = _sizePlanStart;
-                _previousCount = _sizePlanCount;
-                _previousCapturing = _sizePlanCapturing;
-                _start = _sizePlanArenaCount;
-
-                _sizePlanStart = _start;
-                _sizePlanCount = 0;
-                _sizePlanCapturing = begin;
-            }
-
-            internal ReadOnlySpan<int> Freeze()
-            {
-                if (_sizePlanStart != _start || !_sizePlanCapturing)
-                {
-                    throw new InvalidOperationException(
-                        "WallstopProto size-plan scopes must be frozen in nesting order."
-                    );
-                }
-
-                _sizePlanCapturing = false;
-                return _sizePlanCount == 0
-                    ? ReadOnlySpan<int>.Empty
-                    : new ReadOnlySpan<int>(_sizePlanArena, _sizePlanStart, _sizePlanCount);
-            }
-
-            public void Dispose()
-            {
-                _sizePlanArenaCount = _previousArenaCount;
-                _sizePlanStart = _previousStart;
-                _sizePlanCount = _previousCount;
-                _sizePlanCapturing = _previousCapturing;
-            }
-        }
-
         internal static SizePlanScope BeginSizePlan()
         {
             return new SizePlanScope(true);
@@ -328,6 +283,51 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             return Encoding.UTF8.GetByteCount(value);
+        }
+
+        internal readonly ref struct SizePlanScope
+        {
+            private readonly int _previousArenaCount;
+            private readonly int _previousStart;
+            private readonly int _previousCount;
+            private readonly bool _previousCapturing;
+            private readonly int _start;
+
+            internal SizePlanScope(bool begin)
+            {
+                _previousArenaCount = _sizePlanArenaCount;
+                _previousStart = _sizePlanStart;
+                _previousCount = _sizePlanCount;
+                _previousCapturing = _sizePlanCapturing;
+                _start = _sizePlanArenaCount;
+
+                _sizePlanStart = _start;
+                _sizePlanCount = 0;
+                _sizePlanCapturing = begin;
+            }
+
+            internal ReadOnlySpan<int> Freeze()
+            {
+                if (_sizePlanStart != _start || !_sizePlanCapturing)
+                {
+                    throw new InvalidOperationException(
+                        "WallstopProto size-plan scopes must be frozen in nesting order."
+                    );
+                }
+
+                _sizePlanCapturing = false;
+                return _sizePlanCount == 0
+                    ? ReadOnlySpan<int>.Empty
+                    : new ReadOnlySpan<int>(_sizePlanArena, _sizePlanStart, _sizePlanCount);
+            }
+
+            public void Dispose()
+            {
+                _sizePlanArenaCount = _previousArenaCount;
+                _sizePlanStart = _previousStart;
+                _sizePlanCount = _previousCount;
+                _sizePlanCapturing = _previousCapturing;
+            }
         }
     }
 }

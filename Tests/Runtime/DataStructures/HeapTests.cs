@@ -729,41 +729,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class CustomComparerHeapTests
     {
-        private class Person
-        {
-            public string Name { get; set; }
-            public int Age { get; set; }
-
-            public Person(string name, int age)
-            {
-                Name = name;
-                Age = age;
-            }
-        }
-
-        private class PersonAgeComparer : IComparer<Person>
-        {
-            public int Compare(Person x, Person y)
-            {
-                if (x == null && y == null)
-                {
-                    return 0;
-                }
-
-                if (x == null)
-                {
-                    return -1;
-                }
-
-                if (y == null)
-                {
-                    return 1;
-                }
-
-                return x.Age.CompareTo(y.Age);
-            }
-        }
-
         [Test]
         public void HeapWorksWithCustomComparer()
         {
@@ -817,6 +782,41 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(heap.TryPeek(out Person oldest));
             Assert.AreEqual("Charlie", oldest.Name);
             Assert.AreEqual(35, oldest.Age);
+        }
+
+        private class Person
+        {
+            public string Name { get; set; }
+            public int Age { get; set; }
+
+            public Person(string name, int age)
+            {
+                Name = name;
+                Age = age;
+            }
+        }
+
+        private class PersonAgeComparer : IComparer<Person>
+        {
+            public int Compare(Person x, Person y)
+            {
+                if (x == null && y == null)
+                {
+                    return 0;
+                }
+
+                if (x == null)
+                {
+                    return -1;
+                }
+
+                if (y == null)
+                {
+                    return 1;
+                }
+
+                return x.Age.CompareTo(y.Age);
+            }
         }
     }
 

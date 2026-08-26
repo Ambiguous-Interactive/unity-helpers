@@ -16,27 +16,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     internal static class RuntimeSingletonRegistry
     {
-        private sealed class RuntimeSingletonRegistration
-        {
-            internal readonly Type type;
-            internal readonly Action clearAction;
-            internal readonly Func<UnityEngine.Object> getCachedInstance;
-            internal readonly Func<UnityEngine.Object[]> findLiveInstances;
-
-            internal RuntimeSingletonRegistration(
-                Type type,
-                Action clearAction,
-                Func<UnityEngine.Object> getCachedInstance,
-                Func<UnityEngine.Object[]> findLiveInstances
-            )
-            {
-                this.type = type;
-                this.clearAction = clearAction;
-                this.getCachedInstance = getCachedInstance;
-                this.findLiveInstances = findLiveInstances;
-            }
-        }
-
         private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
             new();
 
@@ -170,6 +149,27 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return builder?.ToString().Trim();
+        }
+
+        private sealed class RuntimeSingletonRegistration
+        {
+            internal readonly Type type;
+            internal readonly Action clearAction;
+            internal readonly Func<UnityEngine.Object> getCachedInstance;
+            internal readonly Func<UnityEngine.Object[]> findLiveInstances;
+
+            internal RuntimeSingletonRegistration(
+                Type type,
+                Action clearAction,
+                Func<UnityEngine.Object> getCachedInstance,
+                Func<UnityEngine.Object[]> findLiveInstances
+            )
+            {
+                this.type = type;
+                this.clearAction = clearAction;
+                this.getCachedInstance = getCachedInstance;
+                this.findLiveInstances = findLiveInstances;
+            }
         }
     }
 }

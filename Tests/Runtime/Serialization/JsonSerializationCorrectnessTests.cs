@@ -15,51 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class JsonSerializationCorrectnessTests
     {
-        private sealed class SimpleMessage
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public List<int> Values { get; set; }
-        }
-
-        private sealed class NumericBoundariesMessage
-        {
-            public int IntMin { get; set; }
-            public int IntMax { get; set; }
-            public long LongMin { get; set; }
-            public long LongMax { get; set; }
-            public float FloatMin { get; set; }
-            public float FloatMax { get; set; }
-            public double DoubleMin { get; set; }
-            public double DoubleMax { get; set; }
-            public float NaN { get; set; }
-            public float PositiveInfinity { get; set; }
-            public float NegativeInfinity { get; set; }
-            public double DoubleNaN { get; set; }
-            public double DoublePositiveInfinity { get; set; }
-            public double DoubleNegativeInfinity { get; set; }
-        }
-
-        private sealed class NestedMessage
-        {
-            public string Title { get; set; }
-            public SimpleMessage Inner { get; set; }
-        }
-
-        private sealed class DeeplyNestedMessage
-        {
-            public int Level { get; set; }
-            public DeeplyNestedMessage Child { get; set; }
-        }
-
-        private sealed class CollectionsMessage
-        {
-            public List<string> StringList { get; set; }
-            public Dictionary<string, int> StringIntMap { get; set; }
-            public int[] IntArray { get; set; }
-            public List<SimpleMessage> ObjectList { get; set; }
-        }
-
         [Test]
         public void RoundTripSimpleObject()
         {
@@ -493,6 +448,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     CollectionAssert.AreEqual(msg.Values, clone.Values);
                 }
             }
+        }
+
+        private sealed class SimpleMessage
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public List<int> Values { get; set; }
+        }
+
+        private sealed class NumericBoundariesMessage
+        {
+            public int IntMin { get; set; }
+            public int IntMax { get; set; }
+            public long LongMin { get; set; }
+            public long LongMax { get; set; }
+            public float FloatMin { get; set; }
+            public float FloatMax { get; set; }
+            public double DoubleMin { get; set; }
+            public double DoubleMax { get; set; }
+            public float NaN { get; set; }
+            public float PositiveInfinity { get; set; }
+            public float NegativeInfinity { get; set; }
+            public double DoubleNaN { get; set; }
+            public double DoublePositiveInfinity { get; set; }
+            public double DoubleNegativeInfinity { get; set; }
+        }
+
+        private sealed class NestedMessage
+        {
+            public string Title { get; set; }
+            public SimpleMessage Inner { get; set; }
+        }
+
+        private sealed class DeeplyNestedMessage
+        {
+            public int Level { get; set; }
+            public DeeplyNestedMessage Child { get; set; }
+        }
+
+        private sealed class CollectionsMessage
+        {
+            public List<string> StringList { get; set; }
+            public Dictionary<string, int> StringIntMap { get; set; }
+            public int[] IntArray { get; set; }
+            public List<SimpleMessage> ObjectList { get; set; }
         }
     }
 }

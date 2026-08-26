@@ -216,43 +216,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
-        private sealed class RawPayload
-        {
-            internal RawPayload(int length)
-            {
-                Length = length;
-            }
-
-            internal int Length { get; }
-        }
-
-        private sealed class RawPayloadFormatter : IWProtoFormatter<RawPayload>
-        {
-            public int Measure(in RawPayload value)
-            {
-                return value.Length;
-            }
-
-            public bool Write(ref WProtoWriter writer, in RawPayload value)
-            {
-                for (int index = 0; index < value.Length; index++)
-                {
-                    if (!writer.TryWriteVarint32(0))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            public bool TryRead(ref WProtoReader reader, out RawPayload value)
-            {
-                value = null;
-                return false;
-            }
-        }
-
         [Test]
         [Category("Performance")]
         public void PlannedPrefixesAvoidTheDeepLargePayloadBackpatchCost()
@@ -593,6 +556,43 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             public bool TryRead(ref WProtoReader reader, out ThrowOnceContract value)
+            {
+                value = null;
+                return false;
+            }
+        }
+
+        private sealed class RawPayload
+        {
+            internal RawPayload(int length)
+            {
+                Length = length;
+            }
+
+            internal int Length { get; }
+        }
+
+        private sealed class RawPayloadFormatter : IWProtoFormatter<RawPayload>
+        {
+            public int Measure(in RawPayload value)
+            {
+                return value.Length;
+            }
+
+            public bool Write(ref WProtoWriter writer, in RawPayload value)
+            {
+                for (int index = 0; index < value.Length; index++)
+                {
+                    if (!writer.TryWriteVarint32(0))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out RawPayload value)
             {
                 value = null;
                 return false;

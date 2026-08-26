@@ -49,12 +49,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </example>
     public sealed class TextureResizerWizard : ScriptableWizard
     {
-        public enum ResizeAlgorithm
-        {
-            Bilinear,
-            Point,
-        }
-
         public List<Texture2D> textures = new();
 
         [FormerlySerializedAs("animationSources")]
@@ -453,6 +447,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 _ = Directory.CreateDirectory(fullDir);
             }
+        }
+
+        public enum ResizeAlgorithm
+        {
+            Bilinear,
+            Point,
         }
     }
 #endif

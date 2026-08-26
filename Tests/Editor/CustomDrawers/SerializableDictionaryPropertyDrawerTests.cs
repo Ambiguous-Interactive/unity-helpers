@@ -6174,55 +6174,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        private sealed class DictionaryTweenDisabledScope : IDisposable
-        {
-            private readonly bool originalValue;
-            private bool disposed;
-
-            public DictionaryTweenDisabledScope()
-            {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
-                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
-            }
-
-            public void Dispose()
-            {
-                if (disposed)
-                {
-                    return;
-                }
-
-                disposed = true;
-                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(originalValue);
-            }
-        }
-
-        private sealed class SortedDictionaryTweenDisabledScope : IDisposable
-        {
-            private readonly bool originalValue;
-            private bool disposed;
-
-            public SortedDictionaryTweenDisabledScope()
-            {
-                originalValue =
-                    UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts();
-                UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(false);
-            }
-
-            public void Dispose()
-            {
-                if (disposed)
-                {
-                    return;
-                }
-
-                disposed = true;
-                UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(
-                    originalValue
-                );
-            }
-        }
-
         /// <summary>
         /// Regression test: Verifies that CommitEntry correctly adds entries to
         /// UnityHelpersSettings palette dictionaries (ScriptableSingleton targets).
@@ -8250,6 +8201,55 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 info2.isPrimary,
                 "Third occurrence (index 2) should NOT be marked as primary."
             );
+        }
+
+        private sealed class DictionaryTweenDisabledScope : IDisposable
+        {
+            private readonly bool originalValue;
+            private bool disposed;
+
+            public DictionaryTweenDisabledScope()
+            {
+                originalValue = UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
+                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(originalValue);
+            }
+        }
+
+        private sealed class SortedDictionaryTweenDisabledScope : IDisposable
+        {
+            private readonly bool originalValue;
+            private bool disposed;
+
+            public SortedDictionaryTweenDisabledScope()
+            {
+                originalValue =
+                    UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts();
+                UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(false);
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+                UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(
+                    originalValue
+                );
+            }
         }
     }
 }

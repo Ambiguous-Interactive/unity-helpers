@@ -1462,20 +1462,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 .boolValue;
         }
 
-        private readonly struct PaletteEntrySnapshot
-        {
-            public PaletteEntrySnapshot(bool exists, Color button, Color text)
-            {
-                Exists = exists;
-                Button = button;
-                Text = text;
-            }
-
-            public bool Exists { get; }
-            public Color Button { get; }
-            public Color Text { get; }
-        }
-
         private static PaletteEntrySnapshot CapturePaletteEntrySnapshot(
             SerializedProperty dictionaryProperty,
             string key,
@@ -1497,30 +1483,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
             Color text = valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
             return new PaletteEntrySnapshot(true, button, text);
-        }
-
-        private sealed class PaletteDictionarySnapshot
-        {
-            public PaletteDictionarySnapshot(IReadOnlyList<PaletteDictionaryEntrySnapshot> entries)
-            {
-                Entries = entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
-            }
-
-            public IReadOnlyList<PaletteDictionaryEntrySnapshot> Entries { get; }
-        }
-
-        private readonly struct PaletteDictionaryEntrySnapshot
-        {
-            public PaletteDictionaryEntrySnapshot(string key, Color button, Color text)
-            {
-                Key = key;
-                Button = button;
-                Text = text;
-            }
-
-            public string Key { get; }
-            public Color Button { get; }
-            public Color Text { get; }
         }
 
         private static PaletteDictionarySnapshot CapturePaletteDictionarySnapshot(
@@ -3220,6 +3182,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             return 0 < propertyNames.Count
                 ? string.Join(", ", propertyNames)
                 : "(no visible properties found)";
+        }
+
+        private readonly struct PaletteEntrySnapshot
+        {
+            public PaletteEntrySnapshot(bool exists, Color button, Color text)
+            {
+                Exists = exists;
+                Button = button;
+                Text = text;
+            }
+
+            public bool Exists { get; }
+            public Color Button { get; }
+            public Color Text { get; }
+        }
+
+        private sealed class PaletteDictionarySnapshot
+        {
+            public PaletteDictionarySnapshot(IReadOnlyList<PaletteDictionaryEntrySnapshot> entries)
+            {
+                Entries = entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
+            }
+
+            public IReadOnlyList<PaletteDictionaryEntrySnapshot> Entries { get; }
+        }
+
+        private readonly struct PaletteDictionaryEntrySnapshot
+        {
+            public PaletteDictionaryEntrySnapshot(string key, Color button, Color text)
+            {
+                Key = key;
+                Button = button;
+                Text = text;
+            }
+
+            public string Key { get; }
+            public Color Button { get; }
+            public Color Text { get; }
         }
     }
 }

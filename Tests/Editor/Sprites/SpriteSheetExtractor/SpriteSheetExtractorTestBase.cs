@@ -864,55 +864,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         /// <summary>
-        /// Represents the configuration for a sprite sheet to be created in a batch operation.
-        /// </summary>
-        public readonly struct SpriteSheetConfig
-        {
-            /// <summary>
-            /// The name of the sprite sheet file (without extension).
-            /// </summary>
-            public readonly string Name;
-
-            /// <summary>
-            /// The width of the texture in pixels.
-            /// </summary>
-            public readonly int Width;
-
-            /// <summary>
-            /// The height of the texture in pixels.
-            /// </summary>
-            public readonly int Height;
-
-            /// <summary>
-            /// The number of columns in the sprite grid.
-            /// </summary>
-            public readonly int GridColumns;
-
-            /// <summary>
-            /// The number of rows in the sprite grid.
-            /// </summary>
-            public readonly int GridRows;
-
-            /// <summary>
-            /// Creates a new sprite sheet configuration.
-            /// </summary>
-            public SpriteSheetConfig(
-                string name,
-                int width,
-                int height,
-                int gridColumns,
-                int gridRows
-            )
-            {
-                Name = name;
-                Width = width;
-                Height = height;
-                GridColumns = gridColumns;
-                GridRows = gridRows;
-            }
-        }
-
-        /// <summary>
         /// Creates multiple sprite sheets in a single batch operation, significantly reducing
         /// AssetDatabase overhead compared to creating them one at a time.
         /// </summary>
@@ -1084,6 +1035,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             if (AssetDatabase.IsValidFolder(SharedDir))
             {
                 AssetDatabase.DeleteAsset(SharedDir);
+            }
+        }
+
+        /// <summary>
+        /// Represents the configuration for a sprite sheet to be created in a batch operation.
+        /// </summary>
+        public readonly struct SpriteSheetConfig
+        {
+            /// <summary>
+            /// The name of the sprite sheet file (without extension).
+            /// </summary>
+            public readonly string Name;
+
+            /// <summary>
+            /// The width of the texture in pixels.
+            /// </summary>
+            public readonly int Width;
+
+            /// <summary>
+            /// The height of the texture in pixels.
+            /// </summary>
+            public readonly int Height;
+
+            /// <summary>
+            /// The number of columns in the sprite grid.
+            /// </summary>
+            public readonly int GridColumns;
+
+            /// <summary>
+            /// The number of rows in the sprite grid.
+            /// </summary>
+            public readonly int GridRows;
+
+            /// <summary>
+            /// Creates a new sprite sheet configuration.
+            /// </summary>
+            public SpriteSheetConfig(
+                string name,
+                int width,
+                int height,
+                int gridColumns,
+                int gridRows
+            )
+            {
+                Name = name;
+                Width = width;
+                Height = height;
+                GridColumns = gridColumns;
+                GridRows = gridRows;
             }
         }
     }

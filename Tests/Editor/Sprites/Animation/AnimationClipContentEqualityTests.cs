@@ -215,22 +215,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        // ===================== AnimationClipSettings (return false) =====================
-
-        public enum SettingsField
-        {
-            LoopTime,
-            LoopBlend,
-            CycleOffset,
-            KeepOriginalOrientation,
-            KeepOriginalPositionXZ,
-            KeepOriginalPositionY,
-            HeightFromFeet,
-            Mirror,
-            StartTime,
-            StopTime,
-        }
-
         [Test]
         public void DifferingClipSettingsFieldIsDetected([Values] SettingsField field)
         {
@@ -859,6 +843,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 }
             );
             Assert.IsFalse(Equal(a, b));
+        }
+
+        // ===================== AnimationClipSettings (return false) =====================
+
+        public enum SettingsField
+        {
+            LoopTime,
+            LoopBlend,
+            CycleOffset,
+            KeepOriginalOrientation,
+            KeepOriginalPositionXZ,
+            KeepOriginalPositionY,
+            HeightFromFeet,
+            Mirror,
+            StartTime,
+            StopTime,
         }
     }
 #endif

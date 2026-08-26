@@ -19,16 +19,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(PoolTypeConfiguration))]
     public sealed class PoolTypeConfigurationDrawer : PropertyDrawer
     {
-        internal sealed class DrawerState
-        {
-            public string lastTypeName = string.Empty;
-            public Type resolvedType;
-            public bool isValid;
-            public string statusMessage = string.Empty;
-            public MessageType messageType = MessageType.None;
-            public readonly GUIContent statusContent = new();
-        }
-
         private const string TypeNameFieldName = nameof(PoolTypeConfiguration._typeName);
         private const string EnabledFieldName = nameof(PoolTypeConfiguration._enabled);
         private const string IdleTimeoutFieldName = nameof(
@@ -429,6 +419,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 return MinStatusBoxWidth;
             }
+        }
+
+        internal sealed class DrawerState
+        {
+            public string lastTypeName = string.Empty;
+            public Type resolvedType;
+            public bool isValid;
+            public string statusMessage = string.Empty;
+            public MessageType messageType = MessageType.None;
+            public readonly GUIContent statusContent = new();
         }
     }
 }

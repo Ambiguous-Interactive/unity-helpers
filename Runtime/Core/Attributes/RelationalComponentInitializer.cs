@@ -26,43 +26,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     public static class RelationalComponentInitializer
     {
         /// <summary>
-        /// Report with summary statistics for a pre-warm run.
-        /// </summary>
-        public sealed class Report
-        {
-            /// <summary>Total types visited (either provided or discovered).</summary>
-            public int TypesVisited { get; internal set; }
-
-            /// <summary>Types that had at least one relational field warmed.</summary>
-            public int TypesWarmed { get; internal set; }
-
-            /// <summary>Total number of relational fields warmed.</summary>
-            public int FieldsWarmed { get; internal set; }
-
-            /// <summary>Non-fatal issues (e.g., missing fields/types) encountered.</summary>
-            public int Warnings { get; internal set; }
-
-            /// <summary>Fatal errors encountered while processing a type.</summary>
-            public int Errors { get; internal set; }
-
-            /// <summary>
-            /// Optional per-type breakdown for diagnostics. Not serialized.
-            /// </summary>
-            public readonly Dictionary<Type, int> WarmedFieldsPerType = new();
-
-            internal void AddTypeResult(Type type, int warmedCount)
-            {
-                if (warmedCount <= 0)
-                {
-                    return;
-                }
-                TypesWarmed++;
-                FieldsWarmed += warmedCount;
-                WarmedFieldsPerType[type] = warmedCount;
-            }
-        }
-
-        /// <summary>
         /// Pre-warms caches for relational attributes on the provided <paramref name="types"/>.
         /// If <paramref name="types"/> is null, scans all loaded <see cref="UnityEngine.Component"/> types.
         /// </summary>
@@ -348,6 +311,43 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             AttributeMetadataCache.ResolvedRelationalFieldMetadata[] array = result.ToArray();
             resultLease.Dispose();
             return array;
+        }
+
+        /// <summary>
+        /// Report with summary statistics for a pre-warm run.
+        /// </summary>
+        public sealed class Report
+        {
+            /// <summary>Total types visited (either provided or discovered).</summary>
+            public int TypesVisited { get; internal set; }
+
+            /// <summary>Types that had at least one relational field warmed.</summary>
+            public int TypesWarmed { get; internal set; }
+
+            /// <summary>Total number of relational fields warmed.</summary>
+            public int FieldsWarmed { get; internal set; }
+
+            /// <summary>Non-fatal issues (e.g., missing fields/types) encountered.</summary>
+            public int Warnings { get; internal set; }
+
+            /// <summary>Fatal errors encountered while processing a type.</summary>
+            public int Errors { get; internal set; }
+
+            /// <summary>
+            /// Optional per-type breakdown for diagnostics. Not serialized.
+            /// </summary>
+            public readonly Dictionary<Type, int> WarmedFieldsPerType = new();
+
+            internal void AddTypeResult(Type type, int warmedCount)
+            {
+                if (warmedCount <= 0)
+                {
+                    return;
+                }
+                TypesWarmed++;
+                FieldsWarmed += warmedCount;
+                WarmedFieldsPerType[type] = warmedCount;
+            }
         }
     }
 }

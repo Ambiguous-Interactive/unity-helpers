@@ -325,6 +325,44 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return selector;
         }
 
+        private static string GetTypeMismatchMessage(SerializedProperty property)
+        {
+            string fieldName = property.displayName;
+            string actualType = GetPropertyTypeName(property);
+            return $"[IntDropDown] Type mismatch: '{fieldName}' is {actualType}, but IntDropDown requires int. Change the field type to int.";
+        }
+
+        private static string GetPropertyTypeName(SerializedProperty property)
+        {
+            return property.propertyType switch
+            {
+                SerializedPropertyType.String => "a string",
+                SerializedPropertyType.Float => "a float",
+                SerializedPropertyType.Boolean => "a bool",
+                SerializedPropertyType.Enum => "an enum",
+                SerializedPropertyType.ObjectReference => "an object reference",
+                SerializedPropertyType.Vector2 => "a Vector2",
+                SerializedPropertyType.Vector3 => "a Vector3",
+                SerializedPropertyType.Vector4 => "a Vector4",
+                SerializedPropertyType.Color => "a Color",
+                SerializedPropertyType.Rect => "a Rect",
+                SerializedPropertyType.ArraySize => "an array size",
+                SerializedPropertyType.Character => "a char",
+                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
+                SerializedPropertyType.Bounds => "a Bounds",
+                SerializedPropertyType.Quaternion => "a Quaternion",
+                SerializedPropertyType.ExposedReference => "an exposed reference",
+                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
+                SerializedPropertyType.Vector2Int => "a Vector2Int",
+                SerializedPropertyType.Vector3Int => "a Vector3Int",
+                SerializedPropertyType.RectInt => "a RectInt",
+                SerializedPropertyType.BoundsInt => "a BoundsInt",
+                SerializedPropertyType.ManagedReference => "a managed reference",
+                SerializedPropertyType.Hash128 => "a Hash128",
+                _ => $"type '{property.propertyType}'",
+            };
+        }
+
         /// <summary>
         /// UI Toolkit popup selector element for IntDropDown with large option lists.
         /// Uses IMGUI rendering via IMGUIContainer to show the popup button.
@@ -435,44 +473,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             protected override int GetDefaultValue() => 0 < _options.Length ? _options[0] : 0;
 
             protected override string UndoActionName => "Change IntDropDown Selection";
-        }
-
-        private static string GetTypeMismatchMessage(SerializedProperty property)
-        {
-            string fieldName = property.displayName;
-            string actualType = GetPropertyTypeName(property);
-            return $"[IntDropDown] Type mismatch: '{fieldName}' is {actualType}, but IntDropDown requires int. Change the field type to int.";
-        }
-
-        private static string GetPropertyTypeName(SerializedProperty property)
-        {
-            return property.propertyType switch
-            {
-                SerializedPropertyType.String => "a string",
-                SerializedPropertyType.Float => "a float",
-                SerializedPropertyType.Boolean => "a bool",
-                SerializedPropertyType.Enum => "an enum",
-                SerializedPropertyType.ObjectReference => "an object reference",
-                SerializedPropertyType.Vector2 => "a Vector2",
-                SerializedPropertyType.Vector3 => "a Vector3",
-                SerializedPropertyType.Vector4 => "a Vector4",
-                SerializedPropertyType.Color => "a Color",
-                SerializedPropertyType.Rect => "a Rect",
-                SerializedPropertyType.ArraySize => "an array size",
-                SerializedPropertyType.Character => "a char",
-                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
-                SerializedPropertyType.Bounds => "a Bounds",
-                SerializedPropertyType.Quaternion => "a Quaternion",
-                SerializedPropertyType.ExposedReference => "an exposed reference",
-                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
-                SerializedPropertyType.Vector2Int => "a Vector2Int",
-                SerializedPropertyType.Vector3Int => "a Vector3Int",
-                SerializedPropertyType.RectInt => "a RectInt",
-                SerializedPropertyType.BoundsInt => "a BoundsInt",
-                SerializedPropertyType.ManagedReference => "a managed reference",
-                SerializedPropertyType.Hash128 => "a Hash128",
-                _ => $"type '{property.propertyType}'",
-            };
         }
     }
 #endif

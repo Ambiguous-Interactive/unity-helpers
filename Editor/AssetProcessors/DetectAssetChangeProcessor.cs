@@ -30,100 +30,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static readonly Func<double> DefaultTimeProvider = () =>
             EditorApplication.timeSinceStartup;
 
-        internal enum SubscriptionParameterMode
-        {
-            None = 0,
-            Context = 1,
-            CreatedAndDeleted = 2,
-        }
-
-        internal sealed class MethodSubscription
-        {
-            internal Type _declaringType;
-            internal MethodInfo _method;
-            internal AssetChangeFlags _flags;
-            internal SubscriptionParameterMode _parameterMode;
-            internal Type _createdParameterElementType;
-            internal bool _searchPrefabs;
-            internal bool _searchSceneObjects;
-        }
-
-        internal sealed class AssetWatcherSettings
-        {
-            internal bool IncludeAssignableTypes { get; set; }
-            internal bool SearchPrefabs { get; set; }
-            internal bool SearchSceneObjects { get; set; }
-            internal HashSet<string> KnownAssetPaths { get; set; }
-            internal List<MethodSubscription> Subscriptions { get; set; }
-            internal Dictionary<Type, AssetWatcher> WatchersByAssetType { get; set; } = new();
-            internal Queue<PendingAssetChangeSet> PendingAssetChanges { get; set; } = new();
-            internal bool Initialized { get; set; }
-            internal bool IncludeTestAssets { get; set; }
-            internal IReadOnlyList<string> TestAssetFolderAllowlist { get; set; }
-            internal bool ProcessingAssetChanges { get; set; }
-            internal bool LoopProtectionActive { get; set; }
-            internal int ConsecutiveChangeBatches { get; set; }
-            internal double LastChangeProcessTimestamp { get; set; }
-            internal Func<double> TimeProvider { get; set; } = DefaultTimeProvider;
-            internal double? LoopWindowSecondsOverride { get; set; }
-            internal bool DiagnosticsEnabled { get; set; }
-            internal bool? EnabledOverride { get; set; }
-        }
-
-        internal sealed class AssetWatcher
-        {
-            internal AssetWatcher(Type assetType, bool includeAssignableTypes)
-            {
-                AssetType = assetType;
-                IncludeAssignableTypes = includeAssignableTypes;
-                KnownAssetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                Subscriptions = new List<MethodSubscription>();
-            }
-
-            internal Type AssetType { get; }
-            internal bool IncludeAssignableTypes { get; private set; }
-            internal bool SearchPrefabs { get; private set; }
-            internal bool SearchSceneObjects { get; private set; }
-            internal HashSet<string> KnownAssetPaths { get; }
-            internal List<MethodSubscription> Subscriptions { get; }
-
-            internal void EnableAssignableMatching()
-            {
-                IncludeAssignableTypes = true;
-            }
-
-            internal void EnablePrefabSearch()
-            {
-                SearchPrefabs = true;
-            }
-
-            internal void EnableSceneObjectSearch()
-            {
-                SearchSceneObjects = true;
-            }
-        }
-
-        internal sealed class PendingAssetChangeSet
-        {
-            internal PendingAssetChangeSet(
-                IReadOnlyList<string> imported,
-                IReadOnlyList<string> deleted,
-                IReadOnlyList<string> moved,
-                IReadOnlyList<string> movedFrom
-            )
-            {
-                Imported = imported ?? Array.Empty<string>();
-                Deleted = deleted ?? Array.Empty<string>();
-                Moved = moved ?? Array.Empty<string>();
-                MovedFrom = movedFrom ?? Array.Empty<string>();
-            }
-
-            internal IReadOnlyList<string> Imported { get; }
-            internal IReadOnlyList<string> Deleted { get; }
-            internal IReadOnlyList<string> Moved { get; }
-            internal IReadOnlyList<string> MovedFrom { get; }
-        }
-
         private static readonly Dictionary<Type, AssetWatcher> WatchersByAssetType = new();
         private static readonly Queue<PendingAssetChangeSet> PendingAssetChanges = new();
         private static bool _initialized;
@@ -1709,6 +1615,100 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         {
             return assetPath != null
                 && assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal enum SubscriptionParameterMode
+        {
+            None = 0,
+            Context = 1,
+            CreatedAndDeleted = 2,
+        }
+
+        internal sealed class MethodSubscription
+        {
+            internal Type _declaringType;
+            internal MethodInfo _method;
+            internal AssetChangeFlags _flags;
+            internal SubscriptionParameterMode _parameterMode;
+            internal Type _createdParameterElementType;
+            internal bool _searchPrefabs;
+            internal bool _searchSceneObjects;
+        }
+
+        internal sealed class AssetWatcherSettings
+        {
+            internal bool IncludeAssignableTypes { get; set; }
+            internal bool SearchPrefabs { get; set; }
+            internal bool SearchSceneObjects { get; set; }
+            internal HashSet<string> KnownAssetPaths { get; set; }
+            internal List<MethodSubscription> Subscriptions { get; set; }
+            internal Dictionary<Type, AssetWatcher> WatchersByAssetType { get; set; } = new();
+            internal Queue<PendingAssetChangeSet> PendingAssetChanges { get; set; } = new();
+            internal bool Initialized { get; set; }
+            internal bool IncludeTestAssets { get; set; }
+            internal IReadOnlyList<string> TestAssetFolderAllowlist { get; set; }
+            internal bool ProcessingAssetChanges { get; set; }
+            internal bool LoopProtectionActive { get; set; }
+            internal int ConsecutiveChangeBatches { get; set; }
+            internal double LastChangeProcessTimestamp { get; set; }
+            internal Func<double> TimeProvider { get; set; } = DefaultTimeProvider;
+            internal double? LoopWindowSecondsOverride { get; set; }
+            internal bool DiagnosticsEnabled { get; set; }
+            internal bool? EnabledOverride { get; set; }
+        }
+
+        internal sealed class AssetWatcher
+        {
+            internal AssetWatcher(Type assetType, bool includeAssignableTypes)
+            {
+                AssetType = assetType;
+                IncludeAssignableTypes = includeAssignableTypes;
+                KnownAssetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                Subscriptions = new List<MethodSubscription>();
+            }
+
+            internal Type AssetType { get; }
+            internal bool IncludeAssignableTypes { get; private set; }
+            internal bool SearchPrefabs { get; private set; }
+            internal bool SearchSceneObjects { get; private set; }
+            internal HashSet<string> KnownAssetPaths { get; }
+            internal List<MethodSubscription> Subscriptions { get; }
+
+            internal void EnableAssignableMatching()
+            {
+                IncludeAssignableTypes = true;
+            }
+
+            internal void EnablePrefabSearch()
+            {
+                SearchPrefabs = true;
+            }
+
+            internal void EnableSceneObjectSearch()
+            {
+                SearchSceneObjects = true;
+            }
+        }
+
+        internal sealed class PendingAssetChangeSet
+        {
+            internal PendingAssetChangeSet(
+                IReadOnlyList<string> imported,
+                IReadOnlyList<string> deleted,
+                IReadOnlyList<string> moved,
+                IReadOnlyList<string> movedFrom
+            )
+            {
+                Imported = imported ?? Array.Empty<string>();
+                Deleted = deleted ?? Array.Empty<string>();
+                Moved = moved ?? Array.Empty<string>();
+                MovedFrom = movedFrom ?? Array.Empty<string>();
+            }
+
+            internal IReadOnlyList<string> Imported { get; }
+            internal IReadOnlyList<string> Deleted { get; }
+            internal IReadOnlyList<string> Moved { get; }
+            internal IReadOnlyList<string> MovedFrom { get; }
         }
     }
 }

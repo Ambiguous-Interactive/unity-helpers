@@ -158,51 +158,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             out byte[] encoded
         );
 
-        /// <summary>
-        /// A decode target: the seeds a mutator starts from, and the reads under test.
-        /// </summary>
-        private sealed class Target
-        {
-            internal Target(
-                string name,
-                IReadOnlyList<byte[]> seeds,
-                IReadOnlyList<int> members,
-                ReadPayload read,
-                ReEncodePayload reEncode,
-                FacadeReadPayload facadeRead,
-                WriteGeneratedValue writeGenerated
-            )
-            {
-                Name = name;
-                Seeds = seeds;
-                Members = members;
-                Read = read;
-                ReEncode = reEncode;
-                FacadeRead = facadeRead;
-                WriteGenerated = writeGenerated;
-            }
-
-            internal string Name { get; }
-
-            internal IReadOnlyList<byte[]> Seeds { get; }
-
-            /// <summary>
-            /// The wire keys this contract's members occupy -- <c>(field &lt;&lt; 3) | wireType</c>
-            /// -- read out of the seeds rather than declared here. A member added to a contract and
-            /// set in its sample is covered by the gate automatically; a list written down beside it
-            /// would have to be remembered.
-            /// </summary>
-            internal IReadOnlyList<int> Members { get; }
-
-            internal ReadPayload Read { get; }
-
-            internal ReEncodePayload ReEncode { get; }
-
-            internal FacadeReadPayload FacadeRead { get; }
-
-            internal WriteGeneratedValue WriteGenerated { get; }
-        }
-
         private static byte[] Encode<T>(IWProtoFormatter<T> formatter, T value)
         {
             byte[] buffer = new byte[formatter.Measure(value)];
@@ -902,118 +857,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             return payload;
-        }
-
-        /// <summary>
-        /// A seeded generator, so a finding is a test case rather than an anecdote. Xorshift64* is
-        /// used rather than <see cref="Random"/> because its sequence is fixed by this file, and a
-        /// runtime that re-tunes its own generator would otherwise silently change the corpus.
-        /// </summary>
-        private struct FuzzRandom
-        {
-            private ulong _state;
-
-            internal FuzzRandom(ulong seed)
-            {
-                _state = seed == 0 ? 0x9E3779B97F4A7C15UL : seed;
-            }
-
-            internal ulong Next()
-            {
-                _state ^= _state >> 12;
-                _state ^= _state << 25;
-                _state ^= _state >> 27;
-                return _state * 0x2545F4914F6CDD1DUL;
-            }
-
-            internal int Next(int exclusiveUpperBound)
-            {
-                return exclusiveUpperBound <= 0 ? 0 : (int)(Next() % (ulong)exclusiveUpperBound);
-            }
-
-            internal byte NextByte()
-            {
-                return (byte)Next();
-            }
-        }
-
-        /// <summary>
-        /// How many payloads a strategy produced, and how many the reader accepted. A fuzzer whose
-        /// payloads are all refused by the first tag exercises the tag reader and nothing else, and
-        /// it passes exactly as loudly as one that reaches every member. The counts are asserted,
-        /// not merely printed.
-        /// </summary>
-        private sealed class Coverage
-        {
-            /// <summary>
-            /// A payload dying at its first key consumes one or two bytes. Past that, a member
-            /// reader ran. Read from the reader's Position AFTER a failure, which is where it
-            /// stopped rather than what it successfully decoded -- that is the question here, and
-            /// an unknown field skipped along the way counts as reached because the skip is code
-            /// under test too.
-            /// </summary>
-            private const int PastTheFirstKey = 4;
-
-            internal int Payloads;
-
-            internal int Accepted;
-
-            internal int Reached;
-
-            /// <summary>
-            /// How many payloads got as far as dispatching on each field number. The corpus-wide
-            /// reach rate cannot answer this: a strategy that reaches the tag reader on every
-            /// payload and then always dies on field 1 scores 100% while nine members are untouched.
-            /// </summary>
-            private readonly Dictionary<int, int> _byMember = new Dictionary<int, int>();
-
-            internal void Record(bool accepted, int consumed, byte[] payload)
-            {
-                Payloads += 1;
-                Accepted += accepted ? 1 : 0;
-                Reached += accepted || PastTheFirstKey <= consumed ? 1 : 0;
-
-                SortedSet<int> fields = new SortedSet<int>();
-                ScanTopLevelFields(payload, accepted ? payload.Length : consumed, fields);
-                foreach (int field in fields)
-                {
-                    _byMember.TryGetValue(field, out int hits);
-                    _byMember[field] = hits + 1;
-                }
-            }
-
-            internal int HitsFor(int member)
-            {
-                _byMember.TryGetValue(member, out int hits);
-                return hits;
-            }
-
-            internal double AcceptanceRate => Payloads == 0 ? 0 : (double)Accepted / Payloads;
-
-            internal double ReachRate => Payloads == 0 ? 0 : (double)Reached / Payloads;
-
-            internal string Describe(string target)
-            {
-                return $"{target}: {Payloads} payloads, {Accepted} accepted, {Reached} reaching a "
-                    + "member reader";
-            }
-
-            internal string DescribeMembers(string target, IReadOnlyList<int> members)
-            {
-                StringBuilder text = new StringBuilder(Describe(target));
-                text.Append("; per member (field/wire=hits):");
-                foreach (int member in members)
-                {
-                    text.Append(' ')
-                        .Append(member >> 3)
-                        .Append('/')
-                        .Append(member & 7)
-                        .Append('=')
-                        .Append(HitsFor(member));
-                }
-
-                return text.ToString();
-            }
         }
 
         /// <summary>
@@ -1843,6 +1686,163 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             foreach (Target target in Targets())
             {
                 AssertDecodeIsSafe(target, payload, $"strategy=regression hex={hex}");
+            }
+        }
+
+        /// <summary>
+        /// A decode target: the seeds a mutator starts from, and the reads under test.
+        /// </summary>
+        private sealed class Target
+        {
+            internal Target(
+                string name,
+                IReadOnlyList<byte[]> seeds,
+                IReadOnlyList<int> members,
+                ReadPayload read,
+                ReEncodePayload reEncode,
+                FacadeReadPayload facadeRead,
+                WriteGeneratedValue writeGenerated
+            )
+            {
+                Name = name;
+                Seeds = seeds;
+                Members = members;
+                Read = read;
+                ReEncode = reEncode;
+                FacadeRead = facadeRead;
+                WriteGenerated = writeGenerated;
+            }
+
+            internal string Name { get; }
+
+            internal IReadOnlyList<byte[]> Seeds { get; }
+
+            /// <summary>
+            /// The wire keys this contract's members occupy -- <c>(field &lt;&lt; 3) | wireType</c>
+            /// -- read out of the seeds rather than declared here. A member added to a contract and
+            /// set in its sample is covered by the gate automatically; a list written down beside it
+            /// would have to be remembered.
+            /// </summary>
+            internal IReadOnlyList<int> Members { get; }
+
+            internal ReadPayload Read { get; }
+
+            internal ReEncodePayload ReEncode { get; }
+
+            internal FacadeReadPayload FacadeRead { get; }
+
+            internal WriteGeneratedValue WriteGenerated { get; }
+        }
+
+        /// <summary>
+        /// A seeded generator, so a finding is a test case rather than an anecdote. Xorshift64* is
+        /// used rather than <see cref="Random"/> because its sequence is fixed by this file, and a
+        /// runtime that re-tunes its own generator would otherwise silently change the corpus.
+        /// </summary>
+        private struct FuzzRandom
+        {
+            private ulong _state;
+
+            internal FuzzRandom(ulong seed)
+            {
+                _state = seed == 0 ? 0x9E3779B97F4A7C15UL : seed;
+            }
+
+            internal ulong Next()
+            {
+                _state ^= _state >> 12;
+                _state ^= _state << 25;
+                _state ^= _state >> 27;
+                return _state * 0x2545F4914F6CDD1DUL;
+            }
+
+            internal int Next(int exclusiveUpperBound)
+            {
+                return exclusiveUpperBound <= 0 ? 0 : (int)(Next() % (ulong)exclusiveUpperBound);
+            }
+
+            internal byte NextByte()
+            {
+                return (byte)Next();
+            }
+        }
+
+        /// <summary>
+        /// How many payloads a strategy produced, and how many the reader accepted. A fuzzer whose
+        /// payloads are all refused by the first tag exercises the tag reader and nothing else, and
+        /// it passes exactly as loudly as one that reaches every member. The counts are asserted,
+        /// not merely printed.
+        /// </summary>
+        private sealed class Coverage
+        {
+            /// <summary>
+            /// A payload dying at its first key consumes one or two bytes. Past that, a member
+            /// reader ran. Read from the reader's Position AFTER a failure, which is where it
+            /// stopped rather than what it successfully decoded -- that is the question here, and
+            /// an unknown field skipped along the way counts as reached because the skip is code
+            /// under test too.
+            /// </summary>
+            private const int PastTheFirstKey = 4;
+
+            internal int Payloads;
+
+            internal int Accepted;
+
+            internal int Reached;
+
+            /// <summary>
+            /// How many payloads got as far as dispatching on each field number. The corpus-wide
+            /// reach rate cannot answer this: a strategy that reaches the tag reader on every
+            /// payload and then always dies on field 1 scores 100% while nine members are untouched.
+            /// </summary>
+            private readonly Dictionary<int, int> _byMember = new Dictionary<int, int>();
+
+            internal void Record(bool accepted, int consumed, byte[] payload)
+            {
+                Payloads += 1;
+                Accepted += accepted ? 1 : 0;
+                Reached += accepted || PastTheFirstKey <= consumed ? 1 : 0;
+
+                SortedSet<int> fields = new SortedSet<int>();
+                ScanTopLevelFields(payload, accepted ? payload.Length : consumed, fields);
+                foreach (int field in fields)
+                {
+                    _byMember.TryGetValue(field, out int hits);
+                    _byMember[field] = hits + 1;
+                }
+            }
+
+            internal int HitsFor(int member)
+            {
+                _byMember.TryGetValue(member, out int hits);
+                return hits;
+            }
+
+            internal double AcceptanceRate => Payloads == 0 ? 0 : (double)Accepted / Payloads;
+
+            internal double ReachRate => Payloads == 0 ? 0 : (double)Reached / Payloads;
+
+            internal string Describe(string target)
+            {
+                return $"{target}: {Payloads} payloads, {Accepted} accepted, {Reached} reaching a "
+                    + "member reader";
+            }
+
+            internal string DescribeMembers(string target, IReadOnlyList<int> members)
+            {
+                StringBuilder text = new StringBuilder(Describe(target));
+                text.Append("; per member (field/wire=hits):");
+                foreach (int member in members)
+                {
+                    text.Append(' ')
+                        .Append(member >> 3)
+                        .Append('/')
+                        .Append(member & 7)
+                        .Append('=')
+                        .Append(HitsFor(member));
+                }
+
+                return text.ToString();
             }
         }
     }

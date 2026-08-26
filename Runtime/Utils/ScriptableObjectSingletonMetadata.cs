@@ -43,17 +43,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal const string LegacyAssetPath =
             "Assets/Resources/ScriptableObjectSingletonMetadata.asset";
 
-        [Serializable]
-        public struct Entry
-        {
-            public string assemblyQualifiedTypeName;
-            public string resourcesLoadPath;
-            public string resourcesPath;
-
-            // ReSharper disable once NotAccessedField.Global
-            public string assetGuid;
-        }
-
         [FormerlySerializedAs("entries")]
         [SerializeField]
         private List<Entry> _entries = new();
@@ -215,5 +204,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 #endif
+
+        [Serializable]
+        public struct Entry
+        {
+            public string assemblyQualifiedTypeName;
+            public string resourcesLoadPath;
+            public string resourcesPath;
+
+            // ReSharper disable once NotAccessedField.Global
+            public string assetGuid;
+        }
     }
 }

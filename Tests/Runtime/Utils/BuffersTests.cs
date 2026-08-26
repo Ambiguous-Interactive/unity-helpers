@@ -876,16 +876,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
 #if !SINGLE_THREADED
-        private enum ConcurrentScenarioName
-        {
-            WallstopFastArrayPoolConcurrentAccessDifferentSizes,
-            WallstopFastArrayPoolConcurrentAccessSameSize,
-            WallstopFastArrayPoolConcurrentAccessMixedSizes,
-            WallstopFastArrayPoolConcurrentAccessRapidAllocationDeallocation,
-            WallstopFastArrayPoolConcurrentOutOfOrderDispose,
-            WallstopArrayPoolClearOnReuse,
-            WallstopArrayPoolConcurrentMixedSizesClearCheck,
-        }
 
         [TestCaseSource(nameof(WallstopFastArrayPoolConcurrentScenarioCases))]
         public void WallstopFastArrayPoolConcurrentAccessScenarios(ConcurrentScenario scenario)
@@ -1321,37 +1311,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             return new TestCaseData(scenario).SetName(scenario.Name);
-        }
-
-        public sealed class ConcurrentScenario
-        {
-            public ConcurrentScenario(string name, int threadCount, Func<int, Task> work)
-            {
-                Name = name;
-                ThreadCount = threadCount;
-                Work = work;
-            }
-
-            public string Name { get; }
-            public int ThreadCount { get; }
-            public Func<int, Task> Work { get; }
-
-            public override string ToString()
-            {
-                return Name;
-            }
-        }
-
-        private sealed class ScenarioException
-        {
-            public ScenarioException(int threadId, Exception exception)
-            {
-                ThreadId = threadId;
-                Exception = exception;
-            }
-
-            public int ThreadId { get; }
-            public Exception Exception { get; }
         }
 
         [Test]
@@ -2651,5 +2610,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             public int value;
         }
+
+#if !SINGLE_THREADED
+        private enum ConcurrentScenarioName
+        {
+            WallstopFastArrayPoolConcurrentAccessDifferentSizes,
+            WallstopFastArrayPoolConcurrentAccessSameSize,
+            WallstopFastArrayPoolConcurrentAccessMixedSizes,
+            WallstopFastArrayPoolConcurrentAccessRapidAllocationDeallocation,
+            WallstopFastArrayPoolConcurrentOutOfOrderDispose,
+            WallstopArrayPoolClearOnReuse,
+            WallstopArrayPoolConcurrentMixedSizesClearCheck,
+        }
+
+        public sealed class ConcurrentScenario
+        {
+            public ConcurrentScenario(string name, int threadCount, Func<int, Task> work)
+            {
+                Name = name;
+                ThreadCount = threadCount;
+                Work = work;
+            }
+
+            public string Name { get; }
+            public int ThreadCount { get; }
+            public Func<int, Task> Work { get; }
+
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
+
+        private sealed class ScenarioException
+        {
+            public ScenarioException(int threadId, Exception exception)
+            {
+                ThreadId = threadId;
+                Exception = exception;
+            }
+
+            public int ThreadId { get; }
+            public Exception Exception { get; }
+        }
+#endif
     }
 }

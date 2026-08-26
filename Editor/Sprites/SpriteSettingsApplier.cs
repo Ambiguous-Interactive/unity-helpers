@@ -13,17 +13,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     [Serializable]
     public sealed class SpriteSettings
     {
-        public enum MatchMode
-        {
-            [Obsolete("Default is invalid. Choose a specific match mode.", false)]
-            None = 0,
-            Any = 1,
-            NameContains = 2,
-            PathContains = 3,
-            Regex = 4,
-            Extension = 5,
-        }
-
         public MatchMode matchBy = MatchMode.Any;
         public string matchPattern = string.Empty;
         public int priority;
@@ -91,6 +80,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         [WShowIf(nameof(applyTextureType))]
         public TextureImporterType textureType = TextureImporterType.Sprite;
+
+        public enum MatchMode
+        {
+            [Obsolete("Default is invalid. Choose a specific match mode.", false)]
+            None = 0,
+            Any = 1,
+            NameContains = 2,
+            PathContains = 3,
+            Regex = 4,
+            Extension = 5,
+        }
     }
 #endif
 }

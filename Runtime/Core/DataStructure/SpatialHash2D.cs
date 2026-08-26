@@ -27,45 +27,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class SpatialHash2D<T> : ISpatialHash2D<T>
     {
-        private readonly struct Entry
-        {
-            public readonly Vector2 position;
-            public readonly T item;
-
-            public Entry(Vector2 position, T item)
-            {
-                this.position = position;
-                this.item = item;
-            }
-        }
-
-        private struct EntryBucket : IDisposable
-        {
-            private List<Entry> _entries;
-            private PooledResource<List<Entry>> _lease;
-
-            public List<Entry> Entries => _entries;
-
-            public static EntryBucket Rent()
-            {
-                EntryBucket bucket = default;
-                bucket._lease = Buffers<Entry>.List.Get(out bucket._entries);
-                return bucket;
-            }
-
-            public void Dispose()
-            {
-                if (_entries == null)
-                {
-                    return;
-                }
-
-                _lease.Dispose();
-                _lease = default;
-                _entries = null;
-            }
-        }
-
         private readonly Dictionary<FastVector2Int, EntryBucket> _grid;
         private readonly float _cellSize;
         private readonly IEqualityComparer<T> _comparer;
@@ -359,6 +320,45 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             Clear();
             SetBuffers<T>.DestroyHashSetPool(_comparer);
+        }
+
+        private readonly struct Entry
+        {
+            public readonly Vector2 position;
+            public readonly T item;
+
+            public Entry(Vector2 position, T item)
+            {
+                this.position = position;
+                this.item = item;
+            }
+        }
+
+        private struct EntryBucket : IDisposable
+        {
+            private List<Entry> _entries;
+            private PooledResource<List<Entry>> _lease;
+
+            public List<Entry> Entries => _entries;
+
+            public static EntryBucket Rent()
+            {
+                EntryBucket bucket = default;
+                bucket._lease = Buffers<Entry>.List.Get(out bucket._entries);
+                return bucket;
+            }
+
+            public void Dispose()
+            {
+                if (_entries == null)
+                {
+                    return;
+                }
+
+                _lease.Dispose();
+                _lease = default;
+                _entries = null;
+            }
         }
     }
 }

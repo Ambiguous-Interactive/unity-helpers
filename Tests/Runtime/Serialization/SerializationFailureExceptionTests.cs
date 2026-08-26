@@ -210,9 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(originalMessage, copy.Message);
         }
 
-        [Serializable]
-        public sealed class PublicNestedSample { }
-
         [Test]
         public void ExceptionRoundTripsWithNestedTypeReference()
         {
@@ -238,5 +235,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(typeof(PublicNestedSample), copy.DeclaredType);
         }
 #pragma warning restore SYSLIB0011
+
+        [Serializable]
+        public sealed class PublicNestedSample { }
     }
 }

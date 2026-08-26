@@ -1435,43 +1435,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        private enum BodySearchStatus
-        {
-            NotFound,
-            Found,
-            ReadError,
-        }
-
-        private readonly struct MethodBodySearchResult
-        {
-            public BodySearchStatus Status { get; }
-            public string Body { get; }
-            public string SourcePath { get; }
-            public string Detail { get; }
-
-            private MethodBodySearchResult(
-                BodySearchStatus status,
-                string body,
-                string sourcePath,
-                string detail
-            )
-            {
-                Status = status;
-                Body = body;
-                SourcePath = sourcePath;
-                Detail = detail;
-            }
-
-            public static MethodBodySearchResult NotFound() =>
-                new(BodySearchStatus.NotFound, null, null, null);
-
-            public static MethodBodySearchResult Found(string body, string sourcePath) =>
-                new(BodySearchStatus.Found, body, sourcePath, null);
-
-            public static MethodBodySearchResult ReadError(string detail) =>
-                new(BodySearchStatus.ReadError, null, null, detail);
-        }
-
         private static MethodBodySearchResult TryExtractBodyAcrossFiles(
             IReadOnlyList<string> sourcePaths,
             string methodName
@@ -2039,6 +2002,43 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             return fired;
+        }
+
+        private enum BodySearchStatus
+        {
+            NotFound,
+            Found,
+            ReadError,
+        }
+
+        private readonly struct MethodBodySearchResult
+        {
+            public BodySearchStatus Status { get; }
+            public string Body { get; }
+            public string SourcePath { get; }
+            public string Detail { get; }
+
+            private MethodBodySearchResult(
+                BodySearchStatus status,
+                string body,
+                string sourcePath,
+                string detail
+            )
+            {
+                Status = status;
+                Body = body;
+                SourcePath = sourcePath;
+                Detail = detail;
+            }
+
+            public static MethodBodySearchResult NotFound() =>
+                new(BodySearchStatus.NotFound, null, null, null);
+
+            public static MethodBodySearchResult Found(string body, string sourcePath) =>
+                new(BodySearchStatus.Found, body, sourcePath, null);
+
+            public static MethodBodySearchResult ReadError(string detail) =>
+                new(BodySearchStatus.ReadError, null, null, detail);
         }
     }
 }

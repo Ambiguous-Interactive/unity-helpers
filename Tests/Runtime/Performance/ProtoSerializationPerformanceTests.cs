@@ -17,57 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed partial class ProtoSerializationPerformanceTests
     {
-        [ProtoContract]
-        [WProtoContract]
-        internal sealed partial class SmallMsg
-        {
-            [ProtoMember(1)]
-            [WProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            [WProtoMember(2)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        [WProtoContract]
-        internal sealed partial class MediumMsg
-        {
-            [ProtoMember(1)]
-            [WProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            [WProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            [WProtoMember(3)]
-            public int[] Values { get; set; }
-        }
-
-        [ProtoContract]
-        [WProtoContract]
-        internal sealed partial class LargeMsg
-        {
-            [ProtoMember(1)]
-            [WProtoMember(1)]
-            public string Identifier { get; set; }
-
-            [ProtoMember(2)]
-            [WProtoMember(2)]
-            public string Description { get; set; }
-
-            [ProtoMember(3)]
-            [WProtoMember(3)]
-            public byte[] Blob { get; set; }
-
-            [ProtoMember(4)]
-            [WProtoMember(4)]
-            public MediumMsg Nested { get; set; }
-        }
-
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -218,6 +167,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class SmallMsg
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            [WProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class MediumMsg
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            [WProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            [WProtoMember(3)]
+            public int[] Values { get; set; }
+        }
+
+        [ProtoContract]
+        [WProtoContract]
+        internal sealed partial class LargeMsg
+        {
+            [ProtoMember(1)]
+            [WProtoMember(1)]
+            public string Identifier { get; set; }
+
+            [ProtoMember(2)]
+            [WProtoMember(2)]
+            public string Description { get; set; }
+
+            [ProtoMember(3)]
+            [WProtoMember(3)]
+            public byte[] Blob { get; set; }
+
+            [ProtoMember(4)]
+            [WProtoMember(4)]
+            public MediumMsg Nested { get; set; }
         }
     }
 }

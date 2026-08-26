@@ -477,15 +477,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, producerCalls);
         }
 
-        private sealed class ManualTimeSource
-        {
-            public float Now;
-
-            public float Get() => Now;
-
-            public void Advance(float delta) => Now += delta;
-        }
-
         [UnityTest]
         public IEnumerator ResetAfterJitterDoesNotReapplyJitter()
         {
@@ -977,6 +968,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int value = cache.Value;
             Assert.AreEqual(3, value);
             Assert.AreEqual(3, producerCalls);
+        }
+
+        private sealed class ManualTimeSource
+        {
+            public float Now;
+
+            public float Get() => Now;
+
+            public void Advance(float delta) => Now += delta;
         }
     }
 }

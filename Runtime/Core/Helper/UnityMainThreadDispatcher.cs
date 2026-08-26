@@ -259,133 +259,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Disposable helper that temporarily overrides <see cref="AutoCreationEnabled"/> and (optionally) destroys dispatcher instances on enter/exit.
-        /// Use this to keep tests and integration setups deterministic without hand-written <c>try/finally</c> blocks.
-        /// </summary>
-        /// <remarks>
-        /// The scope records the previous <see cref="AutoCreationEnabled"/> value, switches to the desired state, and restores the original value on dispose.
-        /// It also exposes knobs for destroying existing dispatcher GameObjects immediately (ideal for EditMode tests) or on dispose.
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// using UnityMainThreadDispatcher.AutoCreationScope scope =
-        ///     UnityMainThreadDispatcher.AutoCreationScope.Disabled(
-        ///         destroyExistingInstanceOnEnter: true,
-        ///         destroyInstancesOnDispose: true,
-        ///         destroyImmediate: true);
-        ///
-        /// // Inside the scope auto-creation is off, so tests can create/destroy the dispatcher manually.
-        /// UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
-        /// UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
-        /// </code>
-        /// </example>
-        public sealed class AutoCreationScope : IDisposable
-        {
-            private readonly bool _previousState;
-            private readonly bool _destroyOnDispose;
-            private readonly bool _destroyImmediate;
-            private bool _disposed;
-
-            private AutoCreationScope(
-                bool desiredAutoCreationState,
-                bool destroyExistingInstance,
-                bool destroyInstancesOnDispose,
-                bool destroyImmediate
-            )
-            {
-                _previousState = AutoCreationEnabled;
-                _destroyOnDispose = destroyInstancesOnDispose;
-                _destroyImmediate = destroyImmediate;
-
-                SetAutoCreationEnabled(desiredAutoCreationState);
-
-                if (destroyExistingInstance)
-                {
-                    DestroyExistingDispatcher(destroyImmediate);
-                }
-            }
-
-            /// <summary>
-            /// Creates a scope that disables auto-creation and (by default) destroys dispatcher instances both when entering and leaving the scope.
-            /// </summary>
-            /// <param name="destroyExistingInstanceOnEnter">Set to <c>false</c> if the caller wants to keep the current dispatcher alive while auto-creation is disabled.</param>
-            /// <param name="destroyInstancesOnDispose">When <c>true</c>, any dispatcher created while the scope was active is destroyed as soon as the scope is disposed.</param>
-            /// <param name="destroyImmediate">
-            /// Uses <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> when <c>true</c> (ideal for EditMode tests) and <see cref="UnityEngine.Object.Destroy(UnityEngine.Object)"/> otherwise.
-            /// </param>
-            /// <returns>A disposable scope that restores the previous <see cref="AutoCreationEnabled"/> value on dispose.</returns>
-            /// <example>
-            /// <code>
-            /// using UnityMainThreadDispatcher.AutoCreationScope scope =
-            ///     UnityMainThreadDispatcher.AutoCreationScope.Disabled(destroyImmediate: Application.isEditor);
-            /// // Perform work that must not auto-create the dispatcher.
-            /// </code>
-            /// </example>
-            public static AutoCreationScope Disabled(
-                bool destroyExistingInstanceOnEnter = true,
-                bool destroyInstancesOnDispose = true,
-                bool destroyImmediate = true
-            )
-            {
-                return new AutoCreationScope(
-                    desiredAutoCreationState: false,
-                    destroyExistingInstance: destroyExistingInstanceOnEnter,
-                    destroyInstancesOnDispose: destroyInstancesOnDispose,
-                    destroyImmediate: destroyImmediate
-                );
-            }
-
-            /// <summary>
-            /// Creates a scope that forces auto-creation on even if callers disabled it previously.
-            /// This is useful for integration tests that temporarily require the dispatcher before restoring the prior state.
-            /// </summary>
-            /// <param name="destroyExistingInstanceOnEnter">Destroy the dispatcher before enabling auto-creation (rare).</param>
-            /// <param name="destroyInstancesOnDispose">Destroy any instances created during the scope once it ends.</param>
-            /// <param name="destroyImmediate">Choose between <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> and <see cref="UnityEngine.Object.Destroy(UnityEngine.Object)"/> for cleanup.</param>
-            /// <returns>A scope that restores <see cref="AutoCreationEnabled"/> to its previous value when disposed.</returns>
-            /// <example>
-            /// <code>
-            /// using UnityMainThreadDispatcher.AutoCreationScope scope =
-            ///     UnityMainThreadDispatcher.AutoCreationScope.Enabled();
-            /// // Dispatcher is guaranteed to auto-create when accessed here.
-            /// </code>
-            /// </example>
-            public static AutoCreationScope Enabled(
-                bool destroyExistingInstanceOnEnter = false,
-                bool destroyInstancesOnDispose = false,
-                bool destroyImmediate = true
-            )
-            {
-                return new AutoCreationScope(
-                    desiredAutoCreationState: true,
-                    destroyExistingInstance: destroyExistingInstanceOnEnter,
-                    destroyInstancesOnDispose: destroyInstancesOnDispose,
-                    destroyImmediate: destroyImmediate
-                );
-            }
-
-            /// <summary>
-            /// Restores the previously captured <see cref="AutoCreationEnabled"/> value and optionally destroys dispatcher instances created inside the scope.
-            /// </summary>
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _disposed = true;
-
-                SetAutoCreationEnabled(_previousState);
-
-                if (_destroyOnDispose)
-                {
-                    DestroyExistingDispatcher(_destroyImmediate);
-                }
-            }
-        }
-
-        /// <summary>
         /// Creates a dispatcher test scope that follows the recommended pattern: disable auto-creation, destroy lingering instances immediately, re-enable auto-creation for the test body, and clean everything up on dispose.
         /// </summary>
         /// <param name="destroyImmediate">When <c>true</c>, uses <see cref="Object.DestroyImmediate(Object)"/> for cleanup. Set to <c>false</c> in play mode so Unity can process destruction safely.</param>
@@ -894,5 +767,132 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 #endif
+
+        /// <summary>
+        /// Disposable helper that temporarily overrides <see cref="AutoCreationEnabled"/> and (optionally) destroys dispatcher instances on enter/exit.
+        /// Use this to keep tests and integration setups deterministic without hand-written <c>try/finally</c> blocks.
+        /// </summary>
+        /// <remarks>
+        /// The scope records the previous <see cref="AutoCreationEnabled"/> value, switches to the desired state, and restores the original value on dispose.
+        /// It also exposes knobs for destroying existing dispatcher GameObjects immediately (ideal for EditMode tests) or on dispose.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// using UnityMainThreadDispatcher.AutoCreationScope scope =
+        ///     UnityMainThreadDispatcher.AutoCreationScope.Disabled(
+        ///         destroyExistingInstanceOnEnter: true,
+        ///         destroyInstancesOnDispose: true,
+        ///         destroyImmediate: true);
+        ///
+        /// // Inside the scope auto-creation is off, so tests can create/destroy the dispatcher manually.
+        /// UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
+        /// UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
+        /// </code>
+        /// </example>
+        public sealed class AutoCreationScope : IDisposable
+        {
+            private readonly bool _previousState;
+            private readonly bool _destroyOnDispose;
+            private readonly bool _destroyImmediate;
+            private bool _disposed;
+
+            private AutoCreationScope(
+                bool desiredAutoCreationState,
+                bool destroyExistingInstance,
+                bool destroyInstancesOnDispose,
+                bool destroyImmediate
+            )
+            {
+                _previousState = AutoCreationEnabled;
+                _destroyOnDispose = destroyInstancesOnDispose;
+                _destroyImmediate = destroyImmediate;
+
+                SetAutoCreationEnabled(desiredAutoCreationState);
+
+                if (destroyExistingInstance)
+                {
+                    DestroyExistingDispatcher(destroyImmediate);
+                }
+            }
+
+            /// <summary>
+            /// Creates a scope that disables auto-creation and (by default) destroys dispatcher instances both when entering and leaving the scope.
+            /// </summary>
+            /// <param name="destroyExistingInstanceOnEnter">Set to <c>false</c> if the caller wants to keep the current dispatcher alive while auto-creation is disabled.</param>
+            /// <param name="destroyInstancesOnDispose">When <c>true</c>, any dispatcher created while the scope was active is destroyed as soon as the scope is disposed.</param>
+            /// <param name="destroyImmediate">
+            /// Uses <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> when <c>true</c> (ideal for EditMode tests) and <see cref="UnityEngine.Object.Destroy(UnityEngine.Object)"/> otherwise.
+            /// </param>
+            /// <returns>A disposable scope that restores the previous <see cref="AutoCreationEnabled"/> value on dispose.</returns>
+            /// <example>
+            /// <code>
+            /// using UnityMainThreadDispatcher.AutoCreationScope scope =
+            ///     UnityMainThreadDispatcher.AutoCreationScope.Disabled(destroyImmediate: Application.isEditor);
+            /// // Perform work that must not auto-create the dispatcher.
+            /// </code>
+            /// </example>
+            public static AutoCreationScope Disabled(
+                bool destroyExistingInstanceOnEnter = true,
+                bool destroyInstancesOnDispose = true,
+                bool destroyImmediate = true
+            )
+            {
+                return new AutoCreationScope(
+                    desiredAutoCreationState: false,
+                    destroyExistingInstance: destroyExistingInstanceOnEnter,
+                    destroyInstancesOnDispose: destroyInstancesOnDispose,
+                    destroyImmediate: destroyImmediate
+                );
+            }
+
+            /// <summary>
+            /// Creates a scope that forces auto-creation on even if callers disabled it previously.
+            /// This is useful for integration tests that temporarily require the dispatcher before restoring the prior state.
+            /// </summary>
+            /// <param name="destroyExistingInstanceOnEnter">Destroy the dispatcher before enabling auto-creation (rare).</param>
+            /// <param name="destroyInstancesOnDispose">Destroy any instances created during the scope once it ends.</param>
+            /// <param name="destroyImmediate">Choose between <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> and <see cref="UnityEngine.Object.Destroy(UnityEngine.Object)"/> for cleanup.</param>
+            /// <returns>A scope that restores <see cref="AutoCreationEnabled"/> to its previous value when disposed.</returns>
+            /// <example>
+            /// <code>
+            /// using UnityMainThreadDispatcher.AutoCreationScope scope =
+            ///     UnityMainThreadDispatcher.AutoCreationScope.Enabled();
+            /// // Dispatcher is guaranteed to auto-create when accessed here.
+            /// </code>
+            /// </example>
+            public static AutoCreationScope Enabled(
+                bool destroyExistingInstanceOnEnter = false,
+                bool destroyInstancesOnDispose = false,
+                bool destroyImmediate = true
+            )
+            {
+                return new AutoCreationScope(
+                    desiredAutoCreationState: true,
+                    destroyExistingInstance: destroyExistingInstanceOnEnter,
+                    destroyInstancesOnDispose: destroyInstancesOnDispose,
+                    destroyImmediate: destroyImmediate
+                );
+            }
+
+            /// <summary>
+            /// Restores the previously captured <see cref="AutoCreationEnabled"/> value and optionally destroys dispatcher instances created inside the scope.
+            /// </summary>
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+
+                SetAutoCreationEnabled(_previousState);
+
+                if (_destroyOnDispose)
+                {
+                    DestroyExistingDispatcher(_destroyImmediate);
+                }
+            }
+        }
     }
 }

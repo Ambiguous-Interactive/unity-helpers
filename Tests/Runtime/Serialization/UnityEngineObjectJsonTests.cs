@@ -173,16 +173,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(JsonValueKind.Null, deadEl.ValueKind);
         }
 
-        private sealed class GoHolder
-        {
-            public GameObject Go { get; set; }
-        }
-
-        private sealed class GoFieldHolder
-        {
-            public GameObject go;
-        }
-
         [Test]
         public void NestedObjectSerializationWithGameObjectProperty()
         {
@@ -250,6 +240,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             JsonElement root = doc.RootElement;
             Assert.AreEqual("BufferedGO", root.GetProperty("name").GetString());
             Assert.AreEqual(expectedId, root.GetProperty("instanceId").GetInt64());
+        }
+
+        private sealed class GoHolder
+        {
+            public GameObject Go { get; set; }
+        }
+
+        private sealed class GoFieldHolder
+        {
+            public GameObject go;
         }
     }
 }

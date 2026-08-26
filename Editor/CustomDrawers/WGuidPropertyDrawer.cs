@@ -16,27 +16,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(WGuid))]
     public sealed class WGuidPropertyDrawer : PropertyDrawer
     {
-        internal sealed class DrawerState
-        {
-            public string displayText = string.Empty;
-            public string serializedText = string.Empty;
-            public bool hasPendingInvalid;
-            public string warningMessage = string.Empty;
-            public SerializedProperty cachedLowProperty;
-            public SerializedProperty cachedHighProperty;
-            public SerializedObject cachedSerializedObject;
-            public int lastCacheFrame = -1;
-            public readonly GUIContent warningContent = new();
-
-            public void InvalidateCache()
-            {
-                cachedLowProperty = null;
-                cachedHighProperty = null;
-                cachedSerializedObject = null;
-                lastCacheFrame = -1;
-            }
-        }
-
         private const float ButtonWidth = 24f;
         private const string ClearUndoLabel = nameof(WGuid) + ".Clear";
         private const string SetUndoLabel = nameof(WGuid) + ".Set";
@@ -399,6 +378,27 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             catch (ArgumentException)
             {
                 return 400f;
+            }
+        }
+
+        internal sealed class DrawerState
+        {
+            public string displayText = string.Empty;
+            public string serializedText = string.Empty;
+            public bool hasPendingInvalid;
+            public string warningMessage = string.Empty;
+            public SerializedProperty cachedLowProperty;
+            public SerializedProperty cachedHighProperty;
+            public SerializedObject cachedSerializedObject;
+            public int lastCacheFrame = -1;
+            public readonly GUIContent warningContent = new();
+
+            public void InvalidateCache()
+            {
+                cachedLowProperty = null;
+                cachedHighProperty = null;
+                cachedSerializedObject = null;
+                lastCacheFrame = -1;
             }
         }
     }

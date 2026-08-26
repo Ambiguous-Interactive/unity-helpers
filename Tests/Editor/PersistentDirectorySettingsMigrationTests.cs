@@ -1397,35 +1397,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             return 0 < unexpected.Count ? string.Join(", ", unexpected) : "(none)";
         }
 
-        public sealed class CleanupScenario
-        {
-            public string Description { get; }
-            public string[] FoldersToCreate { get; }
-            public string[] AssetPaths { get; }
-            public string[] ExpectedDeleted { get; }
-            public string[] ExpectedPreserved { get; }
-            public int CleanupInvocationCount { get; }
-
-            public CleanupScenario(
-                string description,
-                string[] foldersToCreate,
-                string[] assetPaths,
-                string[] expectedDeleted,
-                string[] expectedPreserved,
-                int cleanupInvocationCount = 1
-            )
-            {
-                Description = description;
-                FoldersToCreate = foldersToCreate ?? Array.Empty<string>();
-                AssetPaths = assetPaths ?? Array.Empty<string>();
-                ExpectedDeleted = expectedDeleted ?? Array.Empty<string>();
-                ExpectedPreserved = expectedPreserved ?? Array.Empty<string>();
-                CleanupInvocationCount = 0 < cleanupInvocationCount ? cleanupInvocationCount : 1;
-            }
-
-            public override string ToString() => Description;
-        }
-
         private static IEnumerable<CleanupScenario> CleanupScenarios()
         {
             // Note: These tests use TestCleanup subfolder to avoid interfering with real production data
@@ -1641,6 +1612,35 @@ namespace WallstopStudios.UnityHelpers.Tests
                         + $"After cleanup - SubFolders: [{string.Join(", ", subFoldersAfterCleanup)}]"
                 );
             }
+        }
+
+        public sealed class CleanupScenario
+        {
+            public string Description { get; }
+            public string[] FoldersToCreate { get; }
+            public string[] AssetPaths { get; }
+            public string[] ExpectedDeleted { get; }
+            public string[] ExpectedPreserved { get; }
+            public int CleanupInvocationCount { get; }
+
+            public CleanupScenario(
+                string description,
+                string[] foldersToCreate,
+                string[] assetPaths,
+                string[] expectedDeleted,
+                string[] expectedPreserved,
+                int cleanupInvocationCount = 1
+            )
+            {
+                Description = description;
+                FoldersToCreate = foldersToCreate ?? Array.Empty<string>();
+                AssetPaths = assetPaths ?? Array.Empty<string>();
+                ExpectedDeleted = expectedDeleted ?? Array.Empty<string>();
+                ExpectedPreserved = expectedPreserved ?? Array.Empty<string>();
+                CleanupInvocationCount = 0 < cleanupInvocationCount ? cleanupInvocationCount : 1;
+            }
+
+            public override string ToString() => Description;
         }
     }
 #endif

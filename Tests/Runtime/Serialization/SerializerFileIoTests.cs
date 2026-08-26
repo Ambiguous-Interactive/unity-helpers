@@ -49,46 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             base.TearDown();
         }
 
-        private sealed class Sample
-        {
-            public int a;
-            public string b;
-        }
-
-        /// <summary>
-        /// Makes the allocation test's same-thread completion contract explicit and can cancel
-        /// precisely after EOF, after at least one chunk has already been consumed.
-        /// </summary>
-        private sealed class InlineReadStream : MemoryStream
-        {
-            private readonly CancellationTokenSource _cancelWhenExhausted;
-
-            public InlineReadStream(
-                byte[] buffer,
-                CancellationTokenSource cancelWhenExhausted = null
-            )
-                : base(buffer, writable: false)
-            {
-                _cancelWhenExhausted = cancelWhenExhausted;
-            }
-
-            public override Task<int> ReadAsync(
-                byte[] buffer,
-                int offset,
-                int count,
-                CancellationToken cancellationToken
-            )
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                int read = Read(buffer, offset, count);
-                if (read == 0)
-                {
-                    _cancelWhenExhausted?.Cancel();
-                }
-                return Task.FromResult(read);
-            }
-        }
-
         [Test]
         public void TryWriteAndTryReadRoundTrip()
         {
@@ -294,6 +254,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .GetAwaiter()
                     .GetResult()
             );
+        }
+
+        private sealed class Sample
+        {
+            public int a;
+            public string b;
+        }
+
+        /// <summary>
+        /// Makes the allocation test's same-thread completion contract explicit and can cancel
+        /// precisely after EOF, after at least one chunk has already been consumed.
+        /// </summary>
+        private sealed class InlineReadStream : MemoryStream
+        {
+            private readonly CancellationTokenSource _cancelWhenExhausted;
+
+            public InlineReadStream(
+                byte[] buffer,
+                CancellationTokenSource cancelWhenExhausted = null
+            )
+                : base(buffer, writable: false)
+            {
+                _cancelWhenExhausted = cancelWhenExhausted;
+            }
+
+            public override Task<int> ReadAsync(
+                byte[] buffer,
+                int offset,
+                int count,
+                CancellationToken cancellationToken
+            )
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int read = Read(buffer, offset, count);
+                if (read == 0)
+                {
+                    _cancelWhenExhausted?.Cancel();
+                }
+                return Task.FromResult(read);
+            }
         }
     }
 }

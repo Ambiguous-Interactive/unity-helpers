@@ -22,16 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int Iterations = 1024;
 
-        [ProtoContract]
-        private sealed class Sample
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
         [Test]
         public void ProtoDeserializeRandomBytesOnlyLeaksSerializationFailureException()
         {
@@ -265,6 +255,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] buf = new byte[count];
             rng.NextBytes(buf);
             return buf;
+        }
+
+        [ProtoContract]
+        private sealed class Sample
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
         }
     }
 }

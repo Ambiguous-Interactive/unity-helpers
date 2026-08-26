@@ -17,14 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             "F2E9A25A-9D23-4C9E-AD4F-5FF9C0E8ABCD"
         );
 
-        private enum TinyEnum
-        {
-            Alpha,
-            Beta,
-            Gamma,
-            Delta,
-        }
-
         [Test]
         public void NextUlongUsesBitMaskForPowerOfTwoBounds()
         {
@@ -308,6 +300,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             {
                 throw new NotSupportedException("DeterministicRandom does not support cloning.");
             }
+        }
+
+        private enum TinyEnum
+        {
+            Alpha,
+            Beta,
+            Gamma,
+            Delta,
         }
     }
 }

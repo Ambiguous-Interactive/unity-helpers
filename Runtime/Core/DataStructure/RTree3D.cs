@@ -33,96 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         internal const float MinimumNodeSize = 0.001f;
 
-        [Serializable]
-        internal struct ElementData
-        {
-            internal T _value;
-            internal BoundingBox3D _bounds;
-            internal Vector3 _center;
-            internal ulong _sortKey;
-        }
-
-        [Serializable]
-        public sealed class RTreeNode
-        {
-            public readonly BoundingBox3D boundary;
-            internal readonly RTreeNode[] _children;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-
-            private RTreeNode(
-                int startIndex,
-                int count,
-                BoundingBox3D boundary,
-                RTreeNode[] children
-            )
-            {
-                _startIndex = startIndex;
-                _count = count;
-                this.boundary = boundary;
-                _children = children ?? Array.Empty<RTreeNode>();
-                isTerminal = _children.Length == 0;
-            }
-
-            internal static RTreeNode CreateEmpty()
-            {
-                return new RTreeNode(0, 0, BoundingBox3D.Empty, Array.Empty<RTreeNode>());
-            }
-
-            internal static RTreeNode CreateLeaf(ElementData[] elements, int startIndex, int count)
-            {
-                BoundingBox3D nodeBounds = CalculateBounds(elements, startIndex, count);
-                return new RTreeNode(startIndex, count, nodeBounds, Array.Empty<RTreeNode>());
-            }
-
-            internal static RTreeNode CreateInternal(RTreeNode[] children)
-            {
-                if (children.Length == 0)
-                {
-                    return CreateEmpty();
-                }
-
-                int startIndex = children[0]._startIndex;
-                int lastChildIndex = children.Length - 1;
-                RTreeNode lastChild = children[lastChildIndex];
-                int endIndex = lastChild._startIndex + lastChild._count;
-                BoundingBox3D nodeBounds = children[0].boundary;
-                for (int i = 1; i < children.Length; ++i)
-                {
-                    nodeBounds = nodeBounds.ExpandToInclude(children[i].boundary);
-                }
-
-                nodeBounds = EnsureMinimumBounds(nodeBounds);
-                return new RTreeNode(startIndex, endIndex - startIndex, nodeBounds, children);
-            }
-        }
-
-        private readonly struct NodeDistance
-        {
-            internal readonly RTreeNode _node;
-            internal readonly float _distanceSquared;
-
-            internal NodeDistance(RTreeNode node, float distanceSquared)
-            {
-                _node = node;
-                _distanceSquared = distanceSquared;
-            }
-        }
-
-        private sealed class CandidateComparer : IComparer<(int index, float distanceSquared)>
-        {
-            internal static readonly CandidateComparer Instance = new();
-
-            public int Compare(
-                (int index, float distanceSquared) x,
-                (int index, float distanceSquared) y
-            )
-            {
-                return x.distanceSquared.CompareTo(y.distanceSquared);
-            }
-        }
-
         /// <summary>Default number of elements per leaf node.</summary>
         public const int DefaultBucketSize = 10;
         public const int DefaultBranchFactor = 4;
@@ -782,6 +692,96 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             value = (value | (value << 4)) & 0xC30C30C3;
             value = (value | (value << 2)) & 0x49249249;
             return value;
+        }
+
+        [Serializable]
+        internal struct ElementData
+        {
+            internal T _value;
+            internal BoundingBox3D _bounds;
+            internal Vector3 _center;
+            internal ulong _sortKey;
+        }
+
+        [Serializable]
+        public sealed class RTreeNode
+        {
+            public readonly BoundingBox3D boundary;
+            internal readonly RTreeNode[] _children;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+
+            private RTreeNode(
+                int startIndex,
+                int count,
+                BoundingBox3D boundary,
+                RTreeNode[] children
+            )
+            {
+                _startIndex = startIndex;
+                _count = count;
+                this.boundary = boundary;
+                _children = children ?? Array.Empty<RTreeNode>();
+                isTerminal = _children.Length == 0;
+            }
+
+            internal static RTreeNode CreateEmpty()
+            {
+                return new RTreeNode(0, 0, BoundingBox3D.Empty, Array.Empty<RTreeNode>());
+            }
+
+            internal static RTreeNode CreateLeaf(ElementData[] elements, int startIndex, int count)
+            {
+                BoundingBox3D nodeBounds = CalculateBounds(elements, startIndex, count);
+                return new RTreeNode(startIndex, count, nodeBounds, Array.Empty<RTreeNode>());
+            }
+
+            internal static RTreeNode CreateInternal(RTreeNode[] children)
+            {
+                if (children.Length == 0)
+                {
+                    return CreateEmpty();
+                }
+
+                int startIndex = children[0]._startIndex;
+                int lastChildIndex = children.Length - 1;
+                RTreeNode lastChild = children[lastChildIndex];
+                int endIndex = lastChild._startIndex + lastChild._count;
+                BoundingBox3D nodeBounds = children[0].boundary;
+                for (int i = 1; i < children.Length; ++i)
+                {
+                    nodeBounds = nodeBounds.ExpandToInclude(children[i].boundary);
+                }
+
+                nodeBounds = EnsureMinimumBounds(nodeBounds);
+                return new RTreeNode(startIndex, endIndex - startIndex, nodeBounds, children);
+            }
+        }
+
+        private readonly struct NodeDistance
+        {
+            internal readonly RTreeNode _node;
+            internal readonly float _distanceSquared;
+
+            internal NodeDistance(RTreeNode node, float distanceSquared)
+            {
+                _node = node;
+                _distanceSquared = distanceSquared;
+            }
+        }
+
+        private sealed class CandidateComparer : IComparer<(int index, float distanceSquared)>
+        {
+            internal static readonly CandidateComparer Instance = new();
+
+            public int Compare(
+                (int index, float distanceSquared) x,
+                (int index, float distanceSquared) y
+            )
+            {
+                return x.distanceSquared.CompareTo(y.distanceSquared);
+            }
         }
     }
 }

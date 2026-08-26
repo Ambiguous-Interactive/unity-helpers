@@ -59,6 +59,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         [SerializeReference]
         public ProbePayload payload;
 
+        /// <summary>Reads the private fields so nothing warns them unused.</summary>
+        /// <returns>The count of both private caches, or zero.</returns>
+        public int PrivateEntryCount()
+        {
+            return (_ordered?.Count ?? 0) + (_privateCache?.Count ?? 0);
+        }
+
         /// <summary>
         /// A polymorphic payload, held through <c>[SerializeReference]</c>.
         /// </summary>
@@ -88,13 +95,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
             /// <summary>Serialized, so the nested walk is not simply reporting everything.</summary>
             public int nestedCount;
-        }
-
-        /// <summary>Reads the private fields so nothing warns them unused.</summary>
-        /// <returns>The count of both private caches, or zero.</returns>
-        public int PrivateEntryCount()
-        {
-            return (_ordered?.Count ?? 0) + (_privateCache?.Count ?? 0);
         }
     }
 }

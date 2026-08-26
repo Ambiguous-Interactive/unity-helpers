@@ -29,23 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class SceneUnloadPurgeTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = Interlocked.Increment(ref _nextId);
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -826,6 +809,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(preWarmCount, purged);
             Assert.AreEqual(0, pool.Count);
             Assert.IsFalse(pool.HasPendingPurges);
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = Interlocked.Increment(ref _nextId);
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
+            }
         }
     }
 }

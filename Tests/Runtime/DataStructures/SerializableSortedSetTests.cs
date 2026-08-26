@@ -824,88 +824,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, roundTrip.SerializedItems);
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class SortedSample : IComparable<SortedSample>, IComparable
-        {
-            public SortedSample(string token)
-            {
-                Token = token;
-            }
-
-            public string Token { get; }
-
-            public override bool Equals(object candidate)
-            {
-                if (candidate is SortedSample other)
-                {
-                    return string.Equals(Token, other.Token, StringComparison.Ordinal);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                if (Token == null)
-                {
-                    return 0;
-                }
-
-                return Token.GetHashCode(StringComparison.Ordinal);
-            }
-
-            public int CompareTo(SortedSample other)
-            {
-                if (other == null)
-                {
-                    return 1;
-                }
-
-                return string.CompareOrdinal(Token, other.Token);
-            }
-
-            int IComparable.CompareTo(object obj)
-            {
-                if (obj is SortedSample other)
-                {
-                    return CompareTo(other);
-                }
-
-                return -1;
-            }
-        }
-
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class ScriptableSample
-            : ScriptableObject,
-                IComparable<ScriptableSample>,
-                IComparable
-        {
-            public int CompareTo(ScriptableSample other)
-            {
-                if (other == null)
-                {
-                    return 1;
-                }
-
-                return UnityObjectNameComparer<ScriptableSample>.Instance.Compare(this, other);
-            }
-
-            public int CompareTo(object obj)
-            {
-                if (obj is ScriptableSample other)
-                {
-                    return CompareTo(other);
-                }
-
-                return -1;
-            }
-        }
-
         [Test]
         public void EnumeratorIsValueTypeAndMaintainsSortOrder()
         {
@@ -1029,63 +947,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] expected = { "alpha", "bravo", "charlie" };
             CollectionAssert.AreEqual(expected, roundTrip.ToArray());
-        }
-
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class CaseInsensitiveString
-            : IComparable<CaseInsensitiveString>,
-                IComparable
-        {
-            public CaseInsensitiveString(string value)
-            {
-                Value = value;
-            }
-
-            public string Value { get; }
-
-            public int CompareTo(CaseInsensitiveString other)
-            {
-                return other == null
-                    ? 1
-                    : string.Compare(Value, other.Value, StringComparison.OrdinalIgnoreCase);
-            }
-
-            int IComparable.CompareTo(object obj)
-            {
-                if (ReferenceEquals(this, obj))
-                {
-                    return 0;
-                }
-
-                if (obj is CaseInsensitiveString candidate)
-                {
-                    return CompareTo(candidate);
-                }
-
-                return 1;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is CaseInsensitiveString other)
-                {
-                    return string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                return Value == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
-            }
-
-            public override string ToString()
-            {
-                return Value ?? string.Empty;
-            }
         }
 
         [Test]
@@ -1766,6 +1627,145 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             first[0] = 999;
             Assert.AreEqual(1, set.ToArray()[0]);
+        }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class SortedSample : IComparable<SortedSample>, IComparable
+        {
+            public SortedSample(string token)
+            {
+                Token = token;
+            }
+
+            public string Token { get; }
+
+            public override bool Equals(object candidate)
+            {
+                if (candidate is SortedSample other)
+                {
+                    return string.Equals(Token, other.Token, StringComparison.Ordinal);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                if (Token == null)
+                {
+                    return 0;
+                }
+
+                return Token.GetHashCode(StringComparison.Ordinal);
+            }
+
+            public int CompareTo(SortedSample other)
+            {
+                if (other == null)
+                {
+                    return 1;
+                }
+
+                return string.CompareOrdinal(Token, other.Token);
+            }
+
+            int IComparable.CompareTo(object obj)
+            {
+                if (obj is SortedSample other)
+                {
+                    return CompareTo(other);
+                }
+
+                return -1;
+            }
+        }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class ScriptableSample
+            : ScriptableObject,
+                IComparable<ScriptableSample>,
+                IComparable
+        {
+            public int CompareTo(ScriptableSample other)
+            {
+                if (other == null)
+                {
+                    return 1;
+                }
+
+                return UnityObjectNameComparer<ScriptableSample>.Instance.Compare(this, other);
+            }
+
+            public int CompareTo(object obj)
+            {
+                if (obj is ScriptableSample other)
+                {
+                    return CompareTo(other);
+                }
+
+                return -1;
+            }
+        }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveString
+            : IComparable<CaseInsensitiveString>,
+                IComparable
+        {
+            public CaseInsensitiveString(string value)
+            {
+                Value = value;
+            }
+
+            public string Value { get; }
+
+            public int CompareTo(CaseInsensitiveString other)
+            {
+                return other == null
+                    ? 1
+                    : string.Compare(Value, other.Value, StringComparison.OrdinalIgnoreCase);
+            }
+
+            int IComparable.CompareTo(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return 0;
+                }
+
+                if (obj is CaseInsensitiveString candidate)
+                {
+                    return CompareTo(candidate);
+                }
+
+                return 1;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is CaseInsensitiveString other)
+                {
+                    return string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return Value == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
+            }
+
+            public override string ToString()
+            {
+                return Value ?? string.Empty;
+            }
         }
     }
 }

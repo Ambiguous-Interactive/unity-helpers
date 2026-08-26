@@ -17,18 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class ListExtensionPerformanceTests
     {
-        private sealed class IntComparer : IComparer<int>
-        {
-            public static readonly IntComparer Instance = new();
-
-            private IntComparer() { }
-
-            public int Compare(int x, int y)
-            {
-                return x.CompareTo(y);
-            }
-        }
-
         [Test]
         public void SortPerformanceTest()
         {
@@ -77,6 +65,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 } while (timer.Elapsed < timeout);
 
                 return count;
+            }
+        }
+
+        private sealed class IntComparer : IComparer<int>
+        {
+            public static readonly IntComparer Instance = new();
+
+            private IntComparer() { }
+
+            public int Compare(int x, int y)
+            {
+                return x.CompareTo(y);
             }
         }
     }

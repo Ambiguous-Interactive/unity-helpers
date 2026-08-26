@@ -73,6 +73,44 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     public abstract class SerializableDictionaryBase
     {
+        /// <summary>
+        /// Produces a JSON string that mirrors the serialized key and value arrays, which is useful for debugging.
+        /// </summary>
+        /// <returns>A JSON representation of the dictionary contents.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// AbilityDictionary abilityLookup = new AbilityDictionary();
+        /// abilityLookup["Dash"] = dashDefinition;
+        /// string preview = abilityLookup.ToString();
+        /// Debug.Log(preview);
+        /// ]]></code>
+        /// </example>
+        public override string ToString()
+        {
+            return this.ToJson();
+        }
+
+        internal abstract void EditorAfterDeserialize();
+
+        /// <summary>
+        /// Rebuilds the runtime dictionary from the managed key/value arrays the CALLER has just
+        /// written, rather than from whatever Unity last serialized.
+        /// </summary>
+        /// <remarks>
+        /// The two differ only for a value type whose values live in the boxed array: there,
+        /// <see cref="EditorAfterDeserialize"/> must refill the values array from the boxed one,
+        /// while a caller that has just populated the values array itself needs that refill
+        /// skipped or its write is overwritten by a copy that is stale until the next serialize.
+        /// </remarks>
+        internal abstract void EditorAfterDeserializeFromManagedArrays();
+
+        /// <summary>
+        /// Syncs the runtime dictionary state to the serialized arrays (_keys and _values).
+        /// This is the inverse of EditorAfterDeserialize - it writes runtime state to serialized state.
+        /// Used by editor code when directly modifying the dictionary and needing to persist changes.
+        /// </summary>
+        internal abstract void EditorSyncSerializedArrays();
+
         protected internal class Dictionary<TKey, TValue>
             : System.Collections.Generic.Dictionary<TKey, TValue>
         {
@@ -166,44 +204,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         [Serializable]
         public abstract class Cache { }
-
-        /// <summary>
-        /// Produces a JSON string that mirrors the serialized key and value arrays, which is useful for debugging.
-        /// </summary>
-        /// <returns>A JSON representation of the dictionary contents.</returns>
-        /// <example>
-        /// <code><![CDATA[
-        /// AbilityDictionary abilityLookup = new AbilityDictionary();
-        /// abilityLookup["Dash"] = dashDefinition;
-        /// string preview = abilityLookup.ToString();
-        /// Debug.Log(preview);
-        /// ]]></code>
-        /// </example>
-        public override string ToString()
-        {
-            return this.ToJson();
-        }
-
-        internal abstract void EditorAfterDeserialize();
-
-        /// <summary>
-        /// Rebuilds the runtime dictionary from the managed key/value arrays the CALLER has just
-        /// written, rather than from whatever Unity last serialized.
-        /// </summary>
-        /// <remarks>
-        /// The two differ only for a value type whose values live in the boxed array: there,
-        /// <see cref="EditorAfterDeserialize"/> must refill the values array from the boxed one,
-        /// while a caller that has just populated the values array itself needs that refill
-        /// skipped or its write is overwritten by a copy that is stale until the next serialize.
-        /// </remarks>
-        internal abstract void EditorAfterDeserializeFromManagedArrays();
-
-        /// <summary>
-        /// Syncs the runtime dictionary state to the serialized arrays (_keys and _values).
-        /// This is the inverse of EditorAfterDeserialize - it writes runtime state to serialized state.
-        /// Used by editor code when directly modifying the dictionary and needing to persist changes.
-        /// </summary>
-        internal abstract void EditorSyncSerializedArrays();
     }
 
     /// <summary>
@@ -378,20 +378,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         )
         {
             _dictionary = new Dictionary<TKey, TValue>(serializationInfo, streamingContext);
-        }
-
-        internal static class SerializedPropertyNames
-        {
-            private sealed class NameHolder : SerializableDictionary<TKey, TValue>
-            {
-                public const string KeysName = nameof(_keys);
-                public const string ValuesName = nameof(_values);
-                public const string BoxedValuesName = nameof(_boxedValues);
-            }
-
-            internal const string KeysNameInternal = NameHolder.KeysName;
-            internal const string ValuesNameInternal = NameHolder.ValuesName;
-            internal const string BoxedValuesNameInternal = NameHolder.BoxedValuesName;
         }
 
         /// <summary>
@@ -1643,6 +1629,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             void IEnumerator.Reset()
             {
                 throw new NotSupportedException("Reset is not supported.");
+            }
+        }
+
+        internal static class SerializedPropertyNames
+        {
+            internal const string KeysNameInternal = NameHolder.KeysName;
+            internal const string ValuesNameInternal = NameHolder.ValuesName;
+            internal const string BoxedValuesNameInternal = NameHolder.BoxedValuesName;
+
+            private sealed class NameHolder : SerializableDictionary<TKey, TValue>
+            {
+                public const string KeysName = nameof(_keys);
+                public const string ValuesName = nameof(_values);
+                public const string BoxedValuesName = nameof(_boxedValues);
             }
         }
     }

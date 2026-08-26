@@ -749,46 +749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        // Serialization Baselines
-
-        /// <summary>
-        /// Test data class for JSON serialization performance testing.
-        /// Contains a variety of field types to simulate realistic serialization workloads.
-        /// </summary>
-        [Serializable]
-        private sealed class JsonTestData
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public float Score { get; set; }
-            public bool IsActive { get; set; }
-            public List<int> Values { get; set; }
-        }
-
-        /// <summary>
-        /// Test data class for Protobuf serialization performance testing.
-        /// Decorated with ProtoContract and ProtoMember attributes for protobuf-net compatibility.
-        /// </summary>
-        [Serializable]
-        [ProtoContract]
-        private sealed class ProtoTestData
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public float Score { get; set; }
-
-            [ProtoMember(4)]
-            public bool IsActive { get; set; }
-
-            [ProtoMember(5)]
-            public List<int> Values { get; set; }
-        }
-
         /// <summary>
         /// Verifies JSON serialization performance meets baseline requirements.
         /// Baseline: 10K serialize operations in less than 500ms.
@@ -1859,35 +1819,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return number.ToString();
         }
 
-        private readonly struct BaselineTestResult
-        {
-            public readonly string Category;
-            public readonly string TestName;
-            public readonly int Iterations;
-            public readonly long TimeMs;
-            public readonly long BaselineMs;
-            public readonly string Description;
-            public readonly bool Passed;
-
-            public BaselineTestResult(
-                string category,
-                string testName,
-                int iterations,
-                long timeMs,
-                long baselineMs,
-                string description
-            )
-            {
-                Category = category;
-                TestName = testName;
-                Iterations = iterations;
-                TimeMs = timeMs;
-                BaselineMs = baselineMs;
-                Description = description;
-                Passed = timeMs <= baselineMs;
-            }
-        }
-
         /// <summary>
         /// Verifies Protobuf is faster than JSON for serialization.
         /// This test ensures Protobuf maintains its expected performance advantage over JSON.
@@ -2023,6 +1954,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static Bounds CreatePointBounds(Vector2 point)
         {
             return new Bounds(new Vector3(point.x, point.y, 0f), new Vector3(0.01f, 0.01f, 1f));
+        }
+
+        // Serialization Baselines
+
+        /// <summary>
+        /// Test data class for JSON serialization performance testing.
+        /// Contains a variety of field types to simulate realistic serialization workloads.
+        /// </summary>
+        [Serializable]
+        private sealed class JsonTestData
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public float Score { get; set; }
+            public bool IsActive { get; set; }
+            public List<int> Values { get; set; }
+        }
+
+        /// <summary>
+        /// Test data class for Protobuf serialization performance testing.
+        /// Decorated with ProtoContract and ProtoMember attributes for protobuf-net compatibility.
+        /// </summary>
+        [Serializable]
+        [ProtoContract]
+        private sealed class ProtoTestData
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public float Score { get; set; }
+
+            [ProtoMember(4)]
+            public bool IsActive { get; set; }
+
+            [ProtoMember(5)]
+            public List<int> Values { get; set; }
+        }
+
+        private readonly struct BaselineTestResult
+        {
+            public readonly string Category;
+            public readonly string TestName;
+            public readonly int Iterations;
+            public readonly long TimeMs;
+            public readonly long BaselineMs;
+            public readonly string Description;
+            public readonly bool Passed;
+
+            public BaselineTestResult(
+                string category,
+                string testName,
+                int iterations,
+                long timeMs,
+                long baselineMs,
+                string description
+            )
+            {
+                Category = category;
+                TestName = testName;
+                Iterations = iterations;
+                TimeMs = timeMs;
+                BaselineMs = baselineMs;
+                Description = description;
+                Passed = timeMs <= baselineMs;
+            }
         }
     }
 }

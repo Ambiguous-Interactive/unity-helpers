@@ -1270,47 +1270,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             this.Log($"Auto-fix complete: Removed missing scripts in selected folders.");
         }
 
-        [Serializable]
-        internal sealed class ScanReport
-        {
-            public readonly string[] folders;
-            public readonly List<Item> items = new();
-
-            public ScanReport(IEnumerable<string> folders)
-            {
-                if (folders == null)
-                {
-                    this.folders = Array.Empty<string>();
-                    return;
-                }
-                // Manual copy to avoid LINQ
-                using PooledResource<List<string>> folderBuffer = Buffers<string>.List.Get(
-                    out List<string> list
-                );
-
-                foreach (string s in folders)
-                {
-                    list.Add(s);
-                }
-                this.folders = list.ToArray();
-            }
-
-            [Serializable]
-            internal sealed class Item
-            {
-                public string path;
-                public string[] messages;
-            }
-
-            public void Add(string path, List<string> messages)
-            {
-                string[] arr = messages is { Count: > 0 }
-                    ? messages.ToArray()
-                    : Array.Empty<string>();
-                items.Add(new Item { path = path, messages = arr });
-            }
-        }
-
         private ScanReport _lastReport;
 
         private void ExportLastReport()
@@ -1390,6 +1349,47 @@ namespace WallstopStudios.UnityHelpers.Editor
             catch (Exception e)
             {
                 this.LogError($"Failed to save CSV", e);
+            }
+        }
+
+        [Serializable]
+        internal sealed class ScanReport
+        {
+            public readonly string[] folders;
+            public readonly List<Item> items = new();
+
+            public ScanReport(IEnumerable<string> folders)
+            {
+                if (folders == null)
+                {
+                    this.folders = Array.Empty<string>();
+                    return;
+                }
+                // Manual copy to avoid LINQ
+                using PooledResource<List<string>> folderBuffer = Buffers<string>.List.Get(
+                    out List<string> list
+                );
+
+                foreach (string s in folders)
+                {
+                    list.Add(s);
+                }
+                this.folders = list.ToArray();
+            }
+
+            public void Add(string path, List<string> messages)
+            {
+                string[] arr = messages is { Count: > 0 }
+                    ? messages.ToArray()
+                    : Array.Empty<string>();
+                items.Add(new Item { path = path, messages = arr });
+            }
+
+            [Serializable]
+            internal sealed class Item
+            {
+                public string path;
+                public string[] messages;
             }
         }
     }

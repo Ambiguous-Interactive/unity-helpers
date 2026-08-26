@@ -65,27 +65,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     public sealed class WGroupAttribute : Attribute
     {
         /// <summary>
-        /// Represents how collapsible groups determine their default foldout state.
-        /// </summary>
-        public enum WGroupCollapseBehavior
-        {
-            /// <summary>
-            /// Uses the Unity Helpers project setting to decide whether the header starts collapsed.
-            /// </summary>
-            UseProjectSetting = 0,
-
-            /// <summary>
-            /// Forces the header to start expanded regardless of project defaults.
-            /// </summary>
-            ForceExpanded = 1,
-
-            /// <summary>
-            /// Forces the header to start collapsed regardless of project defaults.
-            /// </summary>
-            ForceCollapsed = 2,
-        }
-
-        /// <summary>
         /// Sentinel value instructing the drawer to keep auto including members until a matching <see cref="WGroupEndAttribute"/> is reached.
         /// </summary>
         public const int InfiniteAutoInclude = -1;
@@ -199,6 +178,27 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return autoIncludeCount < 0 ? UseGlobalAutoInclude : autoIncludeCount;
+        }
+
+        /// <summary>
+        /// Represents how collapsible groups determine their default foldout state.
+        /// </summary>
+        public enum WGroupCollapseBehavior
+        {
+            /// <summary>
+            /// Uses the Unity Helpers project setting to decide whether the header starts collapsed.
+            /// </summary>
+            UseProjectSetting = 0,
+
+            /// <summary>
+            /// Forces the header to start expanded regardless of project defaults.
+            /// </summary>
+            ForceExpanded = 1,
+
+            /// <summary>
+            /// Forces the header to start collapsed regardless of project defaults.
+            /// </summary>
+            ForceCollapsed = 2,
         }
     }
 }

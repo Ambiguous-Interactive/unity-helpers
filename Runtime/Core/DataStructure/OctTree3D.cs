@@ -34,190 +34,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const float MinimumNodeSize = 0.001f;
         private const int NumChildren = 8;
 
-        [Serializable]
-        public readonly struct Entry
-        {
-            public readonly T value;
-            public readonly Vector3 position;
-
-            public Entry(T value, Vector3 position)
-            {
-                this.value = value;
-                this.position = position;
-            }
-        }
-
-        [Serializable]
-        public sealed class OctTreeNode
-        {
-            public readonly BoundingBox3D boundary;
-            internal readonly OctTreeNode[] _children;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-            public readonly Bounds unityBoundary;
-
-            private OctTreeNode(
-                BoundingBox3D boundary,
-                int startIndex,
-                int count,
-                bool isTerminal,
-                OctTreeNode[] children,
-                Bounds unityBoundary
-            )
-            {
-                this.boundary = boundary;
-                _startIndex = startIndex;
-                _count = count;
-                this.isTerminal = isTerminal;
-                _children = children ?? Array.Empty<OctTreeNode>();
-                this.unityBoundary = unityBoundary;
-            }
-
-            internal static OctTreeNode CreateLeaf(
-                BoundingBox3D boundary,
-                int startIndex,
-                int count,
-                Bounds unityBoundary
-            )
-            {
-                return new OctTreeNode(
-                    boundary,
-                    startIndex,
-                    count,
-                    true,
-                    Array.Empty<OctTreeNode>(),
-                    unityBoundary
-                );
-            }
-
-            internal static OctTreeNode CreateInternal(
-                BoundingBox3D boundary,
-                OctTreeNode[] children,
-                int startIndex,
-                int count,
-                Bounds unityBoundary
-            )
-            {
-                return new OctTreeNode(boundary, startIndex, count, false, children, unityBoundary);
-            }
-        }
-
-        private readonly struct NodeDistance
-        {
-            internal readonly OctTreeNode _node;
-            internal readonly float _distanceSquared;
-
-            internal NodeDistance(OctTreeNode node, float distanceSquared)
-            {
-                _node = node;
-                _distanceSquared = distanceSquared;
-            }
-        }
-
-        private readonly struct EntryDistance
-        {
-            internal readonly Entry entry;
-            internal readonly float distanceSquared;
-
-            internal EntryDistance(Entry entry, float distanceSquared)
-            {
-                this.entry = entry;
-                this.distanceSquared = distanceSquared;
-            }
-        }
-
-        private sealed class EntryDistanceComparer : IComparer<EntryDistance>
-        {
-            internal static readonly EntryDistanceComparer Instance = new();
-
-            public int Compare(EntryDistance x, EntryDistance y)
-            {
-                return x.distanceSquared.CompareTo(y.distanceSquared);
-            }
-        }
-
         public const int DefaultBucketSize = 12;
-
-        public enum NodeVisitKind
-        {
-            FullyContainedInternal,
-            FullyContainedLeaf,
-            PartiallyContainedInternal,
-            PartiallyContainedLeaf,
-        }
-
-        public enum NodePruneReason
-        {
-            EmptyOrNullChild,
-            NoIntersection,
-        }
-
-        public readonly struct BoundsQueryNodeTrace
-        {
-            public BoundsQueryNodeTrace(
-                BoundingBox3D boundary,
-                Bounds unityBounds,
-                int count,
-                bool isTerminal,
-                bool nodeFullyContained
-            )
-            {
-                Boundary = boundary;
-                UnityBounds = unityBounds;
-                Count = count;
-                IsTerminal = isTerminal;
-                NodeFullyContained = nodeFullyContained;
-                VisitKind = DetermineVisitKind(isTerminal, nodeFullyContained);
-            }
-
-            public BoundingBox3D Boundary { get; }
-
-            public Bounds UnityBounds { get; }
-
-            public int Count { get; }
-
-            public bool IsTerminal { get; }
-
-            public bool NodeFullyContained { get; }
-
-            public NodeVisitKind VisitKind { get; }
-
-            private static NodeVisitKind DetermineVisitKind(
-                bool isTerminal,
-                bool nodeFullyContained
-            )
-            {
-                if (nodeFullyContained)
-                {
-                    return isTerminal
-                        ? NodeVisitKind.FullyContainedLeaf
-                        : NodeVisitKind.FullyContainedInternal;
-                }
-
-                return isTerminal
-                    ? NodeVisitKind.PartiallyContainedLeaf
-                    : NodeVisitKind.PartiallyContainedInternal;
-            }
-        }
-
-        public interface IOctTreeBoundsQueryLogger
-        {
-            void OnQueryInitialized(
-                Bounds closedQuery,
-                BoundingBox3D halfOpenQuery,
-                BoundingBox3D treeBounds
-            );
-            void OnRootPruned();
-            void OnNodeVisited(in BoundsQueryNodeTrace trace);
-            void OnBulkAppend(
-                in BoundsQueryNodeTrace trace,
-                int appendedCount,
-                bool viaClosedContainment
-            );
-            void OnPointEvaluated(Vector3 position, bool included, in BoundsQueryNodeTrace trace);
-            void OnChildPruned(BoundingBox3D childBounds, NodePruneReason reason);
-        }
 
         public readonly ImmutableArray<T> elements;
         public Bounds Boundary => _boundary;
@@ -1211,6 +1028,189 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 candidates[worstIndex] = new EntryDistance(entry, distanceSquared);
                 return replaced;
             }
+        }
+
+        [Serializable]
+        public readonly struct Entry
+        {
+            public readonly T value;
+            public readonly Vector3 position;
+
+            public Entry(T value, Vector3 position)
+            {
+                this.value = value;
+                this.position = position;
+            }
+        }
+
+        [Serializable]
+        public sealed class OctTreeNode
+        {
+            public readonly BoundingBox3D boundary;
+            internal readonly OctTreeNode[] _children;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+            public readonly Bounds unityBoundary;
+
+            private OctTreeNode(
+                BoundingBox3D boundary,
+                int startIndex,
+                int count,
+                bool isTerminal,
+                OctTreeNode[] children,
+                Bounds unityBoundary
+            )
+            {
+                this.boundary = boundary;
+                _startIndex = startIndex;
+                _count = count;
+                this.isTerminal = isTerminal;
+                _children = children ?? Array.Empty<OctTreeNode>();
+                this.unityBoundary = unityBoundary;
+            }
+
+            internal static OctTreeNode CreateLeaf(
+                BoundingBox3D boundary,
+                int startIndex,
+                int count,
+                Bounds unityBoundary
+            )
+            {
+                return new OctTreeNode(
+                    boundary,
+                    startIndex,
+                    count,
+                    true,
+                    Array.Empty<OctTreeNode>(),
+                    unityBoundary
+                );
+            }
+
+            internal static OctTreeNode CreateInternal(
+                BoundingBox3D boundary,
+                OctTreeNode[] children,
+                int startIndex,
+                int count,
+                Bounds unityBoundary
+            )
+            {
+                return new OctTreeNode(boundary, startIndex, count, false, children, unityBoundary);
+            }
+        }
+
+        private readonly struct NodeDistance
+        {
+            internal readonly OctTreeNode _node;
+            internal readonly float _distanceSquared;
+
+            internal NodeDistance(OctTreeNode node, float distanceSquared)
+            {
+                _node = node;
+                _distanceSquared = distanceSquared;
+            }
+        }
+
+        private readonly struct EntryDistance
+        {
+            internal readonly Entry entry;
+            internal readonly float distanceSquared;
+
+            internal EntryDistance(Entry entry, float distanceSquared)
+            {
+                this.entry = entry;
+                this.distanceSquared = distanceSquared;
+            }
+        }
+
+        private sealed class EntryDistanceComparer : IComparer<EntryDistance>
+        {
+            internal static readonly EntryDistanceComparer Instance = new();
+
+            public int Compare(EntryDistance x, EntryDistance y)
+            {
+                return x.distanceSquared.CompareTo(y.distanceSquared);
+            }
+        }
+
+        public enum NodeVisitKind
+        {
+            FullyContainedInternal,
+            FullyContainedLeaf,
+            PartiallyContainedInternal,
+            PartiallyContainedLeaf,
+        }
+
+        public enum NodePruneReason
+        {
+            EmptyOrNullChild,
+            NoIntersection,
+        }
+
+        public readonly struct BoundsQueryNodeTrace
+        {
+            public BoundsQueryNodeTrace(
+                BoundingBox3D boundary,
+                Bounds unityBounds,
+                int count,
+                bool isTerminal,
+                bool nodeFullyContained
+            )
+            {
+                Boundary = boundary;
+                UnityBounds = unityBounds;
+                Count = count;
+                IsTerminal = isTerminal;
+                NodeFullyContained = nodeFullyContained;
+                VisitKind = DetermineVisitKind(isTerminal, nodeFullyContained);
+            }
+
+            public BoundingBox3D Boundary { get; }
+
+            public Bounds UnityBounds { get; }
+
+            public int Count { get; }
+
+            public bool IsTerminal { get; }
+
+            public bool NodeFullyContained { get; }
+
+            public NodeVisitKind VisitKind { get; }
+
+            private static NodeVisitKind DetermineVisitKind(
+                bool isTerminal,
+                bool nodeFullyContained
+            )
+            {
+                if (nodeFullyContained)
+                {
+                    return isTerminal
+                        ? NodeVisitKind.FullyContainedLeaf
+                        : NodeVisitKind.FullyContainedInternal;
+                }
+
+                return isTerminal
+                    ? NodeVisitKind.PartiallyContainedLeaf
+                    : NodeVisitKind.PartiallyContainedInternal;
+            }
+        }
+
+        public interface IOctTreeBoundsQueryLogger
+        {
+            void OnQueryInitialized(
+                Bounds closedQuery,
+                BoundingBox3D halfOpenQuery,
+                BoundingBox3D treeBounds
+            );
+            void OnRootPruned();
+            void OnNodeVisited(in BoundsQueryNodeTrace trace);
+            void OnBulkAppend(
+                in BoundsQueryNodeTrace trace,
+                int appendedCount,
+                bool viaClosedContainment
+            );
+            void OnPointEvaluated(Vector3 position, bool included, in BoundsQueryNodeTrace trace);
+            void OnChildPruned(BoundingBox3D childBounds, NodePruneReason reason);
         }
     }
 }

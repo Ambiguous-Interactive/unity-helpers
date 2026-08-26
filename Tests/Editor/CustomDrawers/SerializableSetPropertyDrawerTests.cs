@@ -84,13 +84,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
-        [Serializable]
-        private sealed class CloneableSample
-        {
-            public int number = 5;
-            public string label = "alpha";
-        }
-
         [Test]
         public void GetPropertyHeightClampsPageSize()
         {
@@ -3947,52 +3940,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        private sealed class SetTweenDisabledScope : IDisposable
-        {
-            private readonly bool originalValue;
-            private bool disposed;
-
-            public SetTweenDisabledScope()
-            {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
-                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
-            }
-
-            public void Dispose()
-            {
-                if (disposed)
-                {
-                    return;
-                }
-
-                disposed = true;
-                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(originalValue);
-            }
-        }
-
-        private sealed class SortedSetTweenDisabledScope : IDisposable
-        {
-            private readonly bool originalValue;
-            private bool disposed;
-
-            public SortedSetTweenDisabledScope()
-            {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts();
-                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(false);
-            }
-
-            public void Dispose()
-            {
-                if (disposed)
-                {
-                    return;
-                }
-
-                disposed = true;
-                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(originalValue);
-            }
-        }
-
         [Test]
         public void DuplicateDetectionTriggersImmediatelyWhenElementEditedToMatchAnother()
         {
@@ -5955,6 +5902,59 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     state.animationStartTimes.ContainsKey(i),
                     $"Index {i} should have animation start time."
                 );
+            }
+        }
+
+        [Serializable]
+        private sealed class CloneableSample
+        {
+            public int number = 5;
+            public string label = "alpha";
+        }
+
+        private sealed class SetTweenDisabledScope : IDisposable
+        {
+            private readonly bool originalValue;
+            private bool disposed;
+
+            public SetTweenDisabledScope()
+            {
+                originalValue = UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
+                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(originalValue);
+            }
+        }
+
+        private sealed class SortedSetTweenDisabledScope : IDisposable
+        {
+            private readonly bool originalValue;
+            private bool disposed;
+
+            public SortedSetTweenDisabledScope()
+            {
+                originalValue = UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts();
+                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(false);
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(originalValue);
             }
         }
     }

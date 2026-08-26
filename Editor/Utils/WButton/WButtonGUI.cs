@@ -682,72 +682,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         }
 
         /// <summary>
-        /// Information about conflicting draw orders within a named group.
-        /// </summary>
-        internal readonly struct DrawOrderConflictInfo
-        {
-            // ReSharper disable once NotAccessedField.Global
-            internal readonly string _groupName;
-            internal readonly int _canonicalDrawOrder;
-            internal readonly HashSet<int> _allDrawOrders;
-
-            internal DrawOrderConflictInfo(
-                string groupName,
-                int canonicalDrawOrder,
-                HashSet<int> allDrawOrders
-            )
-            {
-                _groupName = groupName;
-                _canonicalDrawOrder = canonicalDrawOrder;
-                _allDrawOrders = allDrawOrders;
-            }
-        }
-
-        /// <summary>
-        /// Information about conflicting group priorities within a named group.
-        /// </summary>
-        internal readonly struct GroupPriorityConflictInfo
-        {
-            // ReSharper disable once NotAccessedField.Global
-            internal readonly string _groupName;
-            internal readonly int _canonicalGroupPriority;
-            internal readonly HashSet<int> _allGroupPriorities;
-
-            internal GroupPriorityConflictInfo(
-                string groupName,
-                int canonicalGroupPriority,
-                HashSet<int> allGroupPriorities
-            )
-            {
-                _groupName = groupName;
-                _canonicalGroupPriority = canonicalGroupPriority;
-                _allGroupPriorities = allGroupPriorities;
-            }
-        }
-
-        /// <summary>
-        /// Information about conflicting group placements within a named group.
-        /// </summary>
-        internal readonly struct GroupPlacementConflictInfo
-        {
-            // ReSharper disable once NotAccessedField.Global
-            internal readonly string _groupName;
-            internal readonly WButtonGroupPlacement _canonicalGroupPlacement;
-            internal readonly HashSet<WButtonGroupPlacement> _allGroupPlacements;
-
-            internal GroupPlacementConflictInfo(
-                string groupName,
-                WButtonGroupPlacement canonicalGroupPlacement,
-                HashSet<WButtonGroupPlacement> allGroupPlacements
-            )
-            {
-                _groupName = groupName;
-                _canonicalGroupPlacement = canonicalGroupPlacement;
-                _allGroupPlacements = allGroupPlacements;
-            }
-        }
-
-        /// <summary>
         /// Warnings about groups with conflicting draw orders. Populated during grouping.
         /// </summary>
         private static readonly Dictionary<
@@ -1613,6 +1547,72 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             return state;
+        }
+
+        /// <summary>
+        /// Information about conflicting draw orders within a named group.
+        /// </summary>
+        internal readonly struct DrawOrderConflictInfo
+        {
+            // ReSharper disable once NotAccessedField.Global
+            internal readonly string _groupName;
+            internal readonly int _canonicalDrawOrder;
+            internal readonly HashSet<int> _allDrawOrders;
+
+            internal DrawOrderConflictInfo(
+                string groupName,
+                int canonicalDrawOrder,
+                HashSet<int> allDrawOrders
+            )
+            {
+                _groupName = groupName;
+                _canonicalDrawOrder = canonicalDrawOrder;
+                _allDrawOrders = allDrawOrders;
+            }
+        }
+
+        /// <summary>
+        /// Information about conflicting group priorities within a named group.
+        /// </summary>
+        internal readonly struct GroupPriorityConflictInfo
+        {
+            // ReSharper disable once NotAccessedField.Global
+            internal readonly string _groupName;
+            internal readonly int _canonicalGroupPriority;
+            internal readonly HashSet<int> _allGroupPriorities;
+
+            internal GroupPriorityConflictInfo(
+                string groupName,
+                int canonicalGroupPriority,
+                HashSet<int> allGroupPriorities
+            )
+            {
+                _groupName = groupName;
+                _canonicalGroupPriority = canonicalGroupPriority;
+                _allGroupPriorities = allGroupPriorities;
+            }
+        }
+
+        /// <summary>
+        /// Information about conflicting group placements within a named group.
+        /// </summary>
+        internal readonly struct GroupPlacementConflictInfo
+        {
+            // ReSharper disable once NotAccessedField.Global
+            internal readonly string _groupName;
+            internal readonly WButtonGroupPlacement _canonicalGroupPlacement;
+            internal readonly HashSet<WButtonGroupPlacement> _allGroupPlacements;
+
+            internal GroupPlacementConflictInfo(
+                string groupName,
+                WButtonGroupPlacement canonicalGroupPlacement,
+                HashSet<WButtonGroupPlacement> allGroupPlacements
+            )
+            {
+                _groupName = groupName;
+                _canonicalGroupPlacement = canonicalGroupPlacement;
+                _allGroupPlacements = allGroupPlacements;
+            }
         }
     }
 

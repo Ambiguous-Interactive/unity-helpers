@@ -66,11 +66,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             AnimBool
         >(System.StringComparer.Ordinal);
 
-        private sealed class InspectorHeightInfoCacheEntry
-        {
-            public InspectorHeightInfo heightInfo;
-        }
-
         // Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
         // our GetPropertyHeight recursively
         [System.ThreadStatic]
@@ -1041,36 +1036,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return true;
         }
 
-        private readonly struct InspectorHeightInfo
-        {
-            public InspectorHeightInfo(
-                float contentHeight,
-                float displayHeight,
-                bool usesSerializedInspector,
-                float horizontalScrollbarHeight,
-                bool requiresHorizontalScrollbar,
-                float paddingHeight
-            )
-            {
-                ContentHeight = Mathf.Max(0f, contentHeight);
-                DisplayHeight = Mathf.Max(0f, displayHeight);
-                UsesSerializedInspector = usesSerializedInspector;
-                HorizontalScrollbarHeight = Mathf.Max(0f, horizontalScrollbarHeight);
-                RequiresHorizontalScrollbar = requiresHorizontalScrollbar;
-                PaddingHeight = Mathf.Max(0f, paddingHeight);
-            }
-
-            public float ContentHeight { get; }
-            public float DisplayHeight { get; }
-            public bool UsesSerializedInspector { get; }
-            public float HorizontalScrollbarHeight { get; }
-            public bool RequiresHorizontalScrollbar { get; }
-            public float PaddingHeight { get; }
-
-            public static InspectorHeightInfo Empty =>
-                new InspectorHeightInfo(0f, 0f, false, 0f, false, 0f);
-        }
-
         private static Rect GetInlineContentRect(Rect backgroundRect)
         {
             return new Rect(
@@ -1581,6 +1546,41 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static float CalculateLabelWidthForTesting(float availableWidth)
         {
             return availableWidth * InLineEditorShared.DefaultLabelWidthRatio;
+        }
+
+        private sealed class InspectorHeightInfoCacheEntry
+        {
+            public InspectorHeightInfo heightInfo;
+        }
+
+        private readonly struct InspectorHeightInfo
+        {
+            public InspectorHeightInfo(
+                float contentHeight,
+                float displayHeight,
+                bool usesSerializedInspector,
+                float horizontalScrollbarHeight,
+                bool requiresHorizontalScrollbar,
+                float paddingHeight
+            )
+            {
+                ContentHeight = Mathf.Max(0f, contentHeight);
+                DisplayHeight = Mathf.Max(0f, displayHeight);
+                UsesSerializedInspector = usesSerializedInspector;
+                HorizontalScrollbarHeight = Mathf.Max(0f, horizontalScrollbarHeight);
+                RequiresHorizontalScrollbar = requiresHorizontalScrollbar;
+                PaddingHeight = Mathf.Max(0f, paddingHeight);
+            }
+
+            public float ContentHeight { get; }
+            public float DisplayHeight { get; }
+            public bool UsesSerializedInspector { get; }
+            public float HorizontalScrollbarHeight { get; }
+            public bool RequiresHorizontalScrollbar { get; }
+            public float PaddingHeight { get; }
+
+            public static InspectorHeightInfo Empty =>
+                new InspectorHeightInfo(0f, 0f, false, 0f, false, 0f);
         }
     }
 }

@@ -65,11 +65,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonIgnore]
         private bool _resolutionAttempted;
 
-        internal static class SerializedPropertyNames
-        {
-            internal const string AssemblyQualifiedName = nameof(_assemblyQualifiedName);
-        }
-
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializableType"/> struct.
         /// </summary>
@@ -386,6 +381,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             return string.Empty;
+        }
+
+        internal static class SerializedPropertyNames
+        {
+            internal const string AssemblyQualifiedName = nameof(_assemblyQualifiedName);
         }
     }
 
@@ -1329,6 +1329,45 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 
+        internal static bool ShouldSkipType(Type type)
+        {
+            if (type == null)
+            {
+                return true;
+            }
+
+            if (
+                ReflectionHelpers.HasAttributeSafe<CompilerGeneratedAttribute>(type, inherit: false)
+            )
+            {
+                return true;
+            }
+
+            return MatchesConfiguredIgnorePattern(type);
+        }
+
+        private readonly struct TypeSignature
+        {
+            /// <summary>
+            /// Snapshot of type metadata used for filtering results.
+            /// </summary>
+            /// <param name="name">Short type name.</param>
+            /// <param name="fullName">Fully qualified name.</param>
+            /// <param name="assemblyQualifiedName">String emitted during serialization.</param>
+            public TypeSignature(string name, string fullName, string assemblyQualifiedName)
+            {
+                Name = name ?? string.Empty;
+                FullName = fullName ?? string.Empty;
+                AssemblyQualifiedName = assemblyQualifiedName ?? string.Empty;
+            }
+
+            public string Name { get; }
+
+            public string FullName { get; }
+
+            public string AssemblyQualifiedName { get; }
+        }
+
         /// <summary>
         /// Provides quick insight into a regex ignore pattern.
         /// </summary>
@@ -1444,45 +1483,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                 return false;
             }
-        }
-
-        internal static bool ShouldSkipType(Type type)
-        {
-            if (type == null)
-            {
-                return true;
-            }
-
-            if (
-                ReflectionHelpers.HasAttributeSafe<CompilerGeneratedAttribute>(type, inherit: false)
-            )
-            {
-                return true;
-            }
-
-            return MatchesConfiguredIgnorePattern(type);
-        }
-
-        private readonly struct TypeSignature
-        {
-            /// <summary>
-            /// Snapshot of type metadata used for filtering results.
-            /// </summary>
-            /// <param name="name">Short type name.</param>
-            /// <param name="fullName">Fully qualified name.</param>
-            /// <param name="assemblyQualifiedName">String emitted during serialization.</param>
-            public TypeSignature(string name, string fullName, string assemblyQualifiedName)
-            {
-                Name = name ?? string.Empty;
-                FullName = fullName ?? string.Empty;
-                AssemblyQualifiedName = assemblyQualifiedName ?? string.Empty;
-            }
-
-            public string Name { get; }
-
-            public string FullName { get; }
-
-            public string AssemblyQualifiedName { get; }
         }
     }
 

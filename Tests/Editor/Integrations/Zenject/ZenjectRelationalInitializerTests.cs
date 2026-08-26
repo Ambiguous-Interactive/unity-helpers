@@ -18,16 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
     [NUnit.Framework.Category("Integration")]
     public sealed class ZenjectRelationalInitializerTests : CommonTestBase
     {
-        private sealed class Consumer : MonoBehaviour
-        {
-            [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-            internal SpriteRenderer _spriteRenderer;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
-
-            public SpriteRenderer SR => _spriteRenderer;
-        }
-
         [UnityTest]
         public IEnumerator InitializerAssignsSiblingOnActiveScene()
         {
@@ -81,6 +71,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
                 consumer.SR != null,
                 "Relational field should be assigned by initializer"
             );
+        }
+
+        private sealed class Consumer : MonoBehaviour
+        {
+            [SiblingComponent]
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+            internal SpriteRenderer _spriteRenderer;
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
+
+            public SpriteRenderer SR => _spriteRenderer;
         }
     }
 }

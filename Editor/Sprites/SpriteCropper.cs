@@ -67,13 +67,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private const float AlphaThreshold = 0.01f;
 
-        internal enum OutputReadability
-        {
-            MirrorSource = 0,
-            Readable = 1,
-            NotReadable = 2,
-        }
-
         [SerializeField]
         internal List<Object> _inputDirectories = new();
 
@@ -724,54 +717,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private enum ProcessOutcome
-        {
-            Success,
-            SkippedNoChange,
-            RetryableError,
-            FatalError,
-        }
-
-        /// <summary>
-        /// Pure result of the crop geometry computation (no Unity asset I/O), so the
-        /// dimension/padding/pivot behavior can be unit-tested without importing textures.
-        /// </summary>
-        internal readonly struct CropComputation
-        {
-            public readonly bool HasVisible;
-            public readonly bool ShouldSkipNoChange;
-            public readonly int VisibleMinX;
-            public readonly int VisibleMinY;
-            public readonly int VisibleMaxX;
-            public readonly int VisibleMaxY;
-            public readonly int CropWidth;
-            public readonly int CropHeight;
-            public readonly Vector2 NewPivot;
-
-            public CropComputation(
-                bool hasVisible,
-                bool shouldSkipNoChange,
-                int visibleMinX,
-                int visibleMinY,
-                int visibleMaxX,
-                int visibleMaxY,
-                int cropWidth,
-                int cropHeight,
-                Vector2 newPivot
-            )
-            {
-                HasVisible = hasVisible;
-                ShouldSkipNoChange = shouldSkipNoChange;
-                VisibleMinX = visibleMinX;
-                VisibleMinY = visibleMinY;
-                VisibleMaxX = visibleMaxX;
-                VisibleMaxY = visibleMaxY;
-                CropWidth = cropWidth;
-                CropHeight = cropHeight;
-                NewPivot = newPivot;
-            }
-        }
-
         /// <summary>
         /// Computes the tight alpha-bounded crop rect (with padding) and the adjusted sprite
         /// pivot for a source image. Pure: depends only on pixels + parameters, performs NO
@@ -1108,6 +1053,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return new Vector2(0.5f, 0.5f);
+        }
+
+        internal enum OutputReadability
+        {
+            MirrorSource = 0,
+            Readable = 1,
+            NotReadable = 2,
+        }
+
+        private enum ProcessOutcome
+        {
+            Success,
+            SkippedNoChange,
+            RetryableError,
+            FatalError,
+        }
+
+        /// <summary>
+        /// Pure result of the crop geometry computation (no Unity asset I/O), so the
+        /// dimension/padding/pivot behavior can be unit-tested without importing textures.
+        /// </summary>
+        internal readonly struct CropComputation
+        {
+            public readonly bool HasVisible;
+            public readonly bool ShouldSkipNoChange;
+            public readonly int VisibleMinX;
+            public readonly int VisibleMinY;
+            public readonly int VisibleMaxX;
+            public readonly int VisibleMaxY;
+            public readonly int CropWidth;
+            public readonly int CropHeight;
+            public readonly Vector2 NewPivot;
+
+            public CropComputation(
+                bool hasVisible,
+                bool shouldSkipNoChange,
+                int visibleMinX,
+                int visibleMinY,
+                int visibleMaxX,
+                int visibleMaxY,
+                int cropWidth,
+                int cropHeight,
+                Vector2 newPivot
+            )
+            {
+                HasVisible = hasVisible;
+                ShouldSkipNoChange = shouldSkipNoChange;
+                VisibleMinX = visibleMinX;
+                VisibleMinY = visibleMinY;
+                VisibleMaxX = visibleMaxX;
+                VisibleMaxY = visibleMaxY;
+                CropWidth = cropWidth;
+                CropHeight = cropHeight;
+                NewPivot = newPivot;
+            }
         }
     }
 #endif

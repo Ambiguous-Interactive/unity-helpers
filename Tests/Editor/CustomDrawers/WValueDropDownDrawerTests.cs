@@ -704,22 +704,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             yield return new TestCaseData("hello").SetName("Option.String");
         }
 
-        private sealed class EmptyToStringHelper
-        {
-            public override string ToString()
-            {
-                return "";
-            }
-        }
-
-        private sealed class NullToStringHelper
-        {
-            public override string ToString()
-            {
-                return null;
-            }
-        }
-
         private static void InvokeApplyOption(SerializedProperty property, object value)
         {
             WValueDropDownDrawer.ApplyOption(property, value);
@@ -739,6 +723,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
             );
             dropDownSelector.ApplySelection(optionIndex);
+        }
+
+        private sealed class EmptyToStringHelper
+        {
+            public override string ToString()
+            {
+                return "";
+            }
+        }
+
+        private sealed class NullToStringHelper
+        {
+            public override string ToString()
+            {
+                return null;
+            }
         }
     }
 #endif

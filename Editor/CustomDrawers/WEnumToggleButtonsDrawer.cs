@@ -1506,22 +1506,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
     internal static class WEnumToggleButtonsLayoutCache
     {
-        private sealed class Entry
-        {
-            internal Entry(LayoutSignature signature, float width, float height)
-            {
-                Signature = signature;
-                Width = width;
-                Height = height;
-            }
-
-            internal LayoutSignature Signature { get; }
-
-            internal float Width { get; }
-
-            internal float Height { get; }
-        }
-
         private static readonly Dictionary<string, Entry> Entries = new(StringComparer.Ordinal);
 
         internal static LayoutSignature CreateSignature(
@@ -1614,6 +1598,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string pathPart = property.propertyPath ?? string.Empty;
             return instancePart + ":" + pathPart;
         }
+
+        private sealed class Entry
+        {
+            internal Entry(LayoutSignature signature, float width, float height)
+            {
+                Signature = signature;
+                Width = width;
+                Height = height;
+            }
+
+            internal LayoutSignature Signature { get; }
+
+            internal float Width { get; }
+
+            internal float Height { get; }
+        }
     }
 
     internal readonly struct LayoutMetrics
@@ -1659,63 +1659,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
     internal static class WEnumToggleButtonsPagination
     {
-        internal sealed class PaginationState
-        {
-            private int _pageIndex;
-
-            internal int PageSize { get; set; }
-
-            internal int TotalItems { get; set; }
-
-            internal int PageIndex
-            {
-                get => _pageIndex;
-                set => _pageIndex = value;
-            }
-
-            internal int TotalPages
-            {
-                get
-                {
-                    if (PageSize <= 0)
-                    {
-                        return 1;
-                    }
-
-                    return Mathf.Max(1, Mathf.CeilToInt(TotalItems / (float)PageSize));
-                }
-            }
-
-            internal int StartIndex
-            {
-                get
-                {
-                    if (TotalItems <= 0 || PageSize <= 0)
-                    {
-                        return 0;
-                    }
-
-                    int clampedIndex = Mathf.Clamp(PageIndex, 0, TotalPages - 1);
-                    return clampedIndex * PageSize;
-                }
-            }
-
-            internal int VisibleCount
-            {
-                get
-                {
-                    if (TotalItems <= 0 || PageSize <= 0)
-                    {
-                        return 0;
-                    }
-
-                    int clampedIndex = Mathf.Clamp(PageIndex, 0, TotalPages - 1);
-                    int start = clampedIndex * PageSize;
-                    return Mathf.Clamp(TotalItems - start, 0, PageSize);
-                }
-            }
-        }
-
         private static readonly Dictionary<string, PaginationState> States = new(
             StringComparer.Ordinal
         );
@@ -1771,6 +1714,63 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 .ToString("X8", CultureInfo.InvariantCulture);
             string pathPart = property.propertyPath ?? string.Empty;
             return instancePart + ":" + pathPart;
+        }
+
+        internal sealed class PaginationState
+        {
+            private int _pageIndex;
+
+            internal int PageSize { get; set; }
+
+            internal int TotalItems { get; set; }
+
+            internal int PageIndex
+            {
+                get => _pageIndex;
+                set => _pageIndex = value;
+            }
+
+            internal int TotalPages
+            {
+                get
+                {
+                    if (PageSize <= 0)
+                    {
+                        return 1;
+                    }
+
+                    return Mathf.Max(1, Mathf.CeilToInt(TotalItems / (float)PageSize));
+                }
+            }
+
+            internal int StartIndex
+            {
+                get
+                {
+                    if (TotalItems <= 0 || PageSize <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int clampedIndex = Mathf.Clamp(PageIndex, 0, TotalPages - 1);
+                    return clampedIndex * PageSize;
+                }
+            }
+
+            internal int VisibleCount
+            {
+                get
+                {
+                    if (TotalItems <= 0 || PageSize <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int clampedIndex = Mathf.Clamp(PageIndex, 0, TotalPages - 1);
+                    int start = clampedIndex * PageSize;
+                    return Mathf.Clamp(TotalItems - start, 0, PageSize);
+                }
+            }
         }
     }
 }

@@ -63,92 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
-        private sealed class TestRuntimeSingleton : RuntimeSingleton<TestRuntimeSingleton>
-        {
-            public int testValue = 42;
-        }
-
-        private sealed class PreservableSingleton : RuntimeSingleton<PreservableSingleton>
-        {
-            protected override bool Preserve => true;
-            public bool awakeWasCalled = false;
-
-            protected override void Awake()
-            {
-                base.Awake();
-                awakeWasCalled = true;
-            }
-        }
-
-        private sealed class NonPreservableSingleton : RuntimeSingleton<NonPreservableSingleton>
-        {
-            protected override bool Preserve => false;
-            public bool wasPreserved = false;
-
-            protected override void Awake()
-            {
-                base.Awake();
-                wasPreserved = transform.parent == null;
-            }
-        }
-
-        private sealed class CustomAwakeSingleton : RuntimeSingleton<CustomAwakeSingleton>
-        {
-            public int awakeCallCount = 0;
-
-            protected override void Awake()
-            {
-                base.Awake();
-                awakeCallCount++;
-            }
-        }
-
-        private sealed class CustomStartSingleton : RuntimeSingleton<CustomStartSingleton>
-        {
-            public int startCallCount = 0;
-
-            protected override void Start()
-            {
-                base.Start();
-                startCallCount++;
-            }
-        }
-
-        private sealed class CustomDestroyableSingleton
-            : RuntimeSingleton<CustomDestroyableSingleton>
-        {
-            public static bool destroyWasCalled = false;
-
-            protected override void OnDestroy()
-            {
-                base.OnDestroy();
-                destroyWasCalled = true;
-            }
-        }
-
-        private sealed class ApplicationQuitSingleton : RuntimeSingleton<ApplicationQuitSingleton>
-        {
-            public static bool quitWasCalled = false;
-
-            protected override void OnApplicationQuit()
-            {
-                base.OnApplicationQuit();
-                quitWasCalled = true;
-            }
-        }
-
-        [SingletonCreation(SingletonCreationPolicy.NeverCreate)]
-        private sealed class NeverCreatedSingleton : RuntimeSingleton<NeverCreatedSingleton>
-        {
-            public int authoredValue = 7;
-        }
-
-        // A value this build does not recognize must not be read as a refusal: a singleton silently
-        // ceasing to exist is a worse answer to an unknown policy than creating one.
-        [SingletonCreation((SingletonCreationPolicy)200)]
-        private sealed class UnrecognizedPolicySingleton
-            : RuntimeSingleton<UnrecognizedPolicySingleton> { }
-
         private static readonly Regex RefusalPattern = new(
             $".*{nameof(NeverCreatedSingleton)}.*{nameof(SingletonCreationPolicy.NeverCreate)}.*"
         );
@@ -1111,5 +1025,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(11, instance.authoredValue);
             Assert.IsTrue(NeverCreatedSingleton.HasInstance);
         }
+
+        private sealed class TestRuntimeSingleton : RuntimeSingleton<TestRuntimeSingleton>
+        {
+            public int testValue = 42;
+        }
+
+        private sealed class PreservableSingleton : RuntimeSingleton<PreservableSingleton>
+        {
+            protected override bool Preserve => true;
+            public bool awakeWasCalled = false;
+
+            protected override void Awake()
+            {
+                base.Awake();
+                awakeWasCalled = true;
+            }
+        }
+
+        private sealed class NonPreservableSingleton : RuntimeSingleton<NonPreservableSingleton>
+        {
+            protected override bool Preserve => false;
+            public bool wasPreserved = false;
+
+            protected override void Awake()
+            {
+                base.Awake();
+                wasPreserved = transform.parent == null;
+            }
+        }
+
+        private sealed class CustomAwakeSingleton : RuntimeSingleton<CustomAwakeSingleton>
+        {
+            public int awakeCallCount = 0;
+
+            protected override void Awake()
+            {
+                base.Awake();
+                awakeCallCount++;
+            }
+        }
+
+        private sealed class CustomStartSingleton : RuntimeSingleton<CustomStartSingleton>
+        {
+            public int startCallCount = 0;
+
+            protected override void Start()
+            {
+                base.Start();
+                startCallCount++;
+            }
+        }
+
+        private sealed class CustomDestroyableSingleton
+            : RuntimeSingleton<CustomDestroyableSingleton>
+        {
+            public static bool destroyWasCalled = false;
+
+            protected override void OnDestroy()
+            {
+                base.OnDestroy();
+                destroyWasCalled = true;
+            }
+        }
+
+        private sealed class ApplicationQuitSingleton : RuntimeSingleton<ApplicationQuitSingleton>
+        {
+            public static bool quitWasCalled = false;
+
+            protected override void OnApplicationQuit()
+            {
+                base.OnApplicationQuit();
+                quitWasCalled = true;
+            }
+        }
+
+        [SingletonCreation(SingletonCreationPolicy.NeverCreate)]
+        private sealed class NeverCreatedSingleton : RuntimeSingleton<NeverCreatedSingleton>
+        {
+            public int authoredValue = 7;
+        }
+
+        // A value this build does not recognize must not be read as a refusal: a singleton silently
+        // ceasing to exist is a worse answer to an unknown policy than creating one.
+        [SingletonCreation((SingletonCreationPolicy)200)]
+        private sealed class UnrecognizedPolicySingleton
+            : RuntimeSingleton<UnrecognizedPolicySingleton> { }
     }
 }

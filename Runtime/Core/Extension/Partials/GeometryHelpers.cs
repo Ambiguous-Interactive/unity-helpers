@@ -143,14 +143,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        public enum ConvexHullAlgorithm
-        {
-            [Obsolete("Do not use default value; specify an algorithm explicitly.")]
-            Unknown = 0,
-            MonotoneChain = 1,
-            Jarvis = 2,
-        }
-
         private static int FindLowestGridPointIndex(List<FastVector3Int> points, Grid grid)
         {
             if (points == null || points.Count == 0)
@@ -1190,6 +1182,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return converted;
+        }
+
+        public enum ConvexHullAlgorithm
+        {
+            [Obsolete("Do not use default value; specify an algorithm explicitly.")]
+            Unknown = 0,
+            MonotoneChain = 1,
+            Jarvis = 2,
         }
     }
 }

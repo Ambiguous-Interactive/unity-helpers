@@ -253,13 +253,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors,
         };
 
-        internal enum DrawerApplyResult
-        {
-            UndoPathSucceeded,
-            FallbackPathSucceeded,
-            Failed,
-        }
-
         internal static bool IsPaletteProperty(string propertyPath)
         {
             if (string.IsNullOrEmpty(propertyPath))
@@ -481,6 +474,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             return builder.ToString();
+        }
+
+        internal enum DrawerApplyResult
+        {
+            UndoPathSucceeded,
+            FallbackPathSucceeded,
+            Failed,
         }
     }
 }

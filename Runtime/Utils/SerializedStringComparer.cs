@@ -22,28 +22,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     [Serializable]
     public sealed class SerializedStringComparer : IEqualityComparer<string>
     {
-        /// <summary>The comparison rule a <see cref="SerializedStringComparer"/> applies.</summary>
-        public enum StringCompareMode
-        {
-            /// <summary>Compares by code unit. The default, and the right choice for identifiers.</summary>
-            Ordinal = 0,
-
-            /// <summary>Compares by code unit, ignoring case.</summary>
-            OrdinalIgnoreCase = 1,
-
-            /// <summary>Compares using the current culture's linguistic rules.</summary>
-            CurrentCulture = 2,
-
-            /// <summary>Compares using the current culture's linguistic rules, ignoring case.</summary>
-            CurrentCultureIgnoreCase = 3,
-
-            /// <summary>Compares using culture-independent linguistic rules.</summary>
-            InvariantCulture = 4,
-
-            /// <summary>Compares using culture-independent linguistic rules, ignoring case.</summary>
-            InvariantCultureIgnoreCase = 5,
-        }
-
         /// <summary>The comparison rule this instance applies.</summary>
         public StringCompareMode compareMode = StringCompareMode.Ordinal;
 
@@ -98,6 +76,28 @@ namespace WallstopStudios.UnityHelpers.Utils
                     StringComparer.InvariantCultureIgnoreCase,
                 _ => StringComparer.Ordinal,
             };
+        }
+
+        /// <summary>The comparison rule a <see cref="SerializedStringComparer"/> applies.</summary>
+        public enum StringCompareMode
+        {
+            /// <summary>Compares by code unit. The default, and the right choice for identifiers.</summary>
+            Ordinal = 0,
+
+            /// <summary>Compares by code unit, ignoring case.</summary>
+            OrdinalIgnoreCase = 1,
+
+            /// <summary>Compares using the current culture's linguistic rules.</summary>
+            CurrentCulture = 2,
+
+            /// <summary>Compares using the current culture's linguistic rules, ignoring case.</summary>
+            CurrentCultureIgnoreCase = 3,
+
+            /// <summary>Compares using culture-independent linguistic rules.</summary>
+            InvariantCulture = 4,
+
+            /// <summary>Compares using culture-independent linguistic rules, ignoring case.</summary>
+            InvariantCultureIgnoreCase = 5,
         }
     }
 }

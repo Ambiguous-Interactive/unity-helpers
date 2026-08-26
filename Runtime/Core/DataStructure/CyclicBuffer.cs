@@ -35,45 +35,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoIgnore]
         private PooledResource<List<T>> _serializedItemsLease;
 
-        public struct CyclicBufferEnumerator : IEnumerator<T>
-        {
-            private readonly CyclicBuffer<T> _buffer;
-
-            private int _index;
-            private T _current;
-
-            internal CyclicBufferEnumerator(CyclicBuffer<T> buffer)
-            {
-                _buffer = buffer;
-                _index = -1;
-                _current = default;
-            }
-
-            public bool MoveNext()
-            {
-                if (++_index < _buffer.Count)
-                {
-                    _current = _buffer._buffer[_buffer.AdjustedIndexFor(_index)];
-                    return true;
-                }
-
-                _current = default;
-                return false;
-            }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
-
-            public void Reset()
-            {
-                _index = -1;
-                _current = default;
-            }
-
-            public void Dispose() { }
-        }
-
         [ProtoMember(1)]
         [field: SerializeField]
         public int Capacity { get; private set; }
@@ -504,6 +465,45 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private bool InBounds(int index)
         {
             return 0 <= index && index < Count;
+        }
+
+        public struct CyclicBufferEnumerator : IEnumerator<T>
+        {
+            private readonly CyclicBuffer<T> _buffer;
+
+            private int _index;
+            private T _current;
+
+            internal CyclicBufferEnumerator(CyclicBuffer<T> buffer)
+            {
+                _buffer = buffer;
+                _index = -1;
+                _current = default;
+            }
+
+            public bool MoveNext()
+            {
+                if (++_index < _buffer.Count)
+                {
+                    _current = _buffer._buffer[_buffer.AdjustedIndexFor(_index)];
+                    return true;
+                }
+
+                _current = default;
+                return false;
+            }
+
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
+            public void Reset()
+            {
+                _index = -1;
+                _current = default;
+            }
+
+            public void Dispose() { }
         }
     }
 }

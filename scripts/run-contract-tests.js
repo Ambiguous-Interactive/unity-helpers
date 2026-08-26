@@ -132,6 +132,11 @@ const CHECKS = [
     run: "npm run test:lint-comparison-direction"
   },
   {
+    id: "lint-nested-type-placement",
+    name: "Nested-type placement linter self-test",
+    run: "npm run test:lint-nested-type-placement"
+  },
+  {
     id: "lint-concurrent-cache-fill",
     name: "Concurrent cache fill linter self-test",
     run: "npm run test:lint-concurrent-cache-fill"

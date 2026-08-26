@@ -60,63 +60,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             ("1 neighbor", 1),
         };
 
-        internal readonly struct DatasetSpec
-        {
-            public DatasetSpec(string label, Vector3Int gridSize)
-            {
-                Label = label;
-                GridSize = gridSize;
-                TotalPoints = gridSize.x * gridSize.y * gridSize.z;
-                Span = new Vector3(
-                    Mathf.Max(gridSize.x - 1, 1),
-                    Mathf.Max(gridSize.y - 1, 1),
-                    Mathf.Max(gridSize.z - 1, 1)
-                );
-                BoundsCenter = new Vector3(
-                    (gridSize.x - 1) * 0.5f,
-                    (gridSize.y - 1) * 0.5f,
-                    (gridSize.z - 1) * 0.5f
-                );
-                BoundsSize = Span;
-                MaxSpan = Mathf.Max(Span.x, Mathf.Max(Span.y, Span.z));
-            }
-
-            public string Label { get; }
-            public Vector3Int GridSize { get; }
-            public int TotalPoints { get; }
-            public Vector3 Span { get; }
-            public Vector3 BoundsCenter { get; }
-            public Vector3 BoundsSize { get; }
-            public float MaxSpan { get; }
-        }
-
-        private readonly struct TreeSpec
-        {
-            public TreeSpec(
-                string name,
-                Func<IEnumerable<Vector3>, ISpatialTree3D<Vector3>> factory
-            )
-            {
-                Name = name;
-                Factory = factory;
-            }
-
-            public string Name { get; }
-            public Func<IEnumerable<Vector3>, ISpatialTree3D<Vector3>> Factory { get; }
-        }
-
-        private readonly struct BoundsSpec
-        {
-            public BoundsSpec(string label, Bounds bounds)
-            {
-                Label = label;
-                Bounds = bounds;
-            }
-
-            public string Label { get; }
-            public Bounds Bounds { get; }
-        }
-
         [UnityTest]
         [Timeout(BenchmarkTimeoutMilliseconds)]
         public IEnumerator Benchmark()
@@ -694,6 +637,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 point,
                 new Vector3(PointBoundsSize, PointBoundsSize, PointBoundsSize)
             );
+        }
+
+        internal readonly struct DatasetSpec
+        {
+            public DatasetSpec(string label, Vector3Int gridSize)
+            {
+                Label = label;
+                GridSize = gridSize;
+                TotalPoints = gridSize.x * gridSize.y * gridSize.z;
+                Span = new Vector3(
+                    Mathf.Max(gridSize.x - 1, 1),
+                    Mathf.Max(gridSize.y - 1, 1),
+                    Mathf.Max(gridSize.z - 1, 1)
+                );
+                BoundsCenter = new Vector3(
+                    (gridSize.x - 1) * 0.5f,
+                    (gridSize.y - 1) * 0.5f,
+                    (gridSize.z - 1) * 0.5f
+                );
+                BoundsSize = Span;
+                MaxSpan = Mathf.Max(Span.x, Mathf.Max(Span.y, Span.z));
+            }
+
+            public string Label { get; }
+            public Vector3Int GridSize { get; }
+            public int TotalPoints { get; }
+            public Vector3 Span { get; }
+            public Vector3 BoundsCenter { get; }
+            public Vector3 BoundsSize { get; }
+            public float MaxSpan { get; }
+        }
+
+        private readonly struct TreeSpec
+        {
+            public TreeSpec(
+                string name,
+                Func<IEnumerable<Vector3>, ISpatialTree3D<Vector3>> factory
+            )
+            {
+                Name = name;
+                Factory = factory;
+            }
+
+            public string Name { get; }
+            public Func<IEnumerable<Vector3>, ISpatialTree3D<Vector3>> Factory { get; }
+        }
+
+        private readonly struct BoundsSpec
+        {
+            public BoundsSpec(string label, Bounds bounds)
+            {
+                Label = label;
+                Bounds = bounds;
+            }
+
+            public string Label { get; }
+            public Bounds Bounds { get; }
         }
     }
 }

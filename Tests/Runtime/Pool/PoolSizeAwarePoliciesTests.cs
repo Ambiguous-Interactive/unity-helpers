@@ -17,187 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class PoolSizeAwarePoliciesTests
     {
-        /// <summary>
-        /// A struct with a reference field for testing size estimation.
-        /// Note: MarshalAs only affects P/Invoke marshalling, not managed size.
-        /// The managed size is just a reference (pointer) to the array.
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential)]
-        private struct StructWithArrayReference
-        {
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 25000)]
-            public int[] Data;
-        }
-
-        /// <summary>
-        /// A small struct well below the LOH threshold.
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential)]
-        private struct SmallStruct
-        {
-            public int Value1;
-            public int Value2;
-            public int Value3;
-            public int Value4;
-        }
-
-        /// <summary>
-        /// A class that wraps a large array.
-        /// </summary>
-        private sealed class LargeArrayWrapper
-        {
-            public byte[] Data { get; } = new byte[100000];
-        }
-
-        /// <summary>
-        /// A simple small class.
-        /// </summary>
-        private sealed class SmallClass
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-        }
-
-        /// <summary>
-        /// A genuinely large struct that will exceed common test thresholds.
-        /// Uses multiple fields to ensure a known managed size without requiring unsafe code.
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential)]
-        private struct GenuinelyLargeStruct
-        {
-            // 64 longs = 512 bytes
-            public long L01,
-                L02,
-                L03,
-                L04,
-                L05,
-                L06,
-                L07,
-                L08;
-            public long L09,
-                L10,
-                L11,
-                L12,
-                L13,
-                L14,
-                L15,
-                L16;
-            public long L17,
-                L18,
-                L19,
-                L20,
-                L21,
-                L22,
-                L23,
-                L24;
-            public long L25,
-                L26,
-                L27,
-                L28,
-                L29,
-                L30,
-                L31,
-                L32;
-            public long L33,
-                L34,
-                L35,
-                L36,
-                L37,
-                L38,
-                L39,
-                L40;
-            public long L41,
-                L42,
-                L43,
-                L44,
-                L45,
-                L46,
-                L47,
-                L48;
-            public long L49,
-                L50,
-                L51,
-                L52,
-                L53,
-                L54,
-                L55,
-                L56;
-            public long L57,
-                L58,
-                L59,
-                L60,
-                L61,
-                L62,
-                L63,
-                L64;
-
-            // Another 64 longs = 512 bytes, total 1024 bytes
-            public long M01,
-                M02,
-                M03,
-                M04,
-                M05,
-                M06,
-                M07,
-                M08;
-            public long M09,
-                M10,
-                M11,
-                M12,
-                M13,
-                M14,
-                M15,
-                M16;
-            public long M17,
-                M18,
-                M19,
-                M20,
-                M21,
-                M22,
-                M23,
-                M24;
-            public long M25,
-                M26,
-                M27,
-                M28,
-                M29,
-                M30,
-                M31,
-                M32;
-            public long M33,
-                M34,
-                M35,
-                M36,
-                M37,
-                M38,
-                M39,
-                M40;
-            public long M41,
-                M42,
-                M43,
-                M44,
-                M45,
-                M46,
-                M47,
-                M48;
-            public long M49,
-                M50,
-                M51,
-                M52,
-                M53,
-                M54,
-                M55,
-                M56;
-            public long M57,
-                M58,
-                M59,
-                M60,
-                M61,
-                M62,
-                M63,
-                M64;
-        }
-
         private bool _wasMemoryPressureEnabled;
 
         [SetUp]
@@ -1080,6 +899,187 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 PoolPurgeSettings.LargeObjectWarmRetainCount,
                 sizeAwareOptions.WarmRetainCount
             );
+        }
+
+        /// <summary>
+        /// A struct with a reference field for testing size estimation.
+        /// Note: MarshalAs only affects P/Invoke marshalling, not managed size.
+        /// The managed size is just a reference (pointer) to the array.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct StructWithArrayReference
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 25000)]
+            public int[] Data;
+        }
+
+        /// <summary>
+        /// A small struct well below the LOH threshold.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SmallStruct
+        {
+            public int Value1;
+            public int Value2;
+            public int Value3;
+            public int Value4;
+        }
+
+        /// <summary>
+        /// A class that wraps a large array.
+        /// </summary>
+        private sealed class LargeArrayWrapper
+        {
+            public byte[] Data { get; } = new byte[100000];
+        }
+
+        /// <summary>
+        /// A simple small class.
+        /// </summary>
+        private sealed class SmallClass
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+        }
+
+        /// <summary>
+        /// A genuinely large struct that will exceed common test thresholds.
+        /// Uses multiple fields to ensure a known managed size without requiring unsafe code.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GenuinelyLargeStruct
+        {
+            // 64 longs = 512 bytes
+            public long L01,
+                L02,
+                L03,
+                L04,
+                L05,
+                L06,
+                L07,
+                L08;
+            public long L09,
+                L10,
+                L11,
+                L12,
+                L13,
+                L14,
+                L15,
+                L16;
+            public long L17,
+                L18,
+                L19,
+                L20,
+                L21,
+                L22,
+                L23,
+                L24;
+            public long L25,
+                L26,
+                L27,
+                L28,
+                L29,
+                L30,
+                L31,
+                L32;
+            public long L33,
+                L34,
+                L35,
+                L36,
+                L37,
+                L38,
+                L39,
+                L40;
+            public long L41,
+                L42,
+                L43,
+                L44,
+                L45,
+                L46,
+                L47,
+                L48;
+            public long L49,
+                L50,
+                L51,
+                L52,
+                L53,
+                L54,
+                L55,
+                L56;
+            public long L57,
+                L58,
+                L59,
+                L60,
+                L61,
+                L62,
+                L63,
+                L64;
+
+            // Another 64 longs = 512 bytes, total 1024 bytes
+            public long M01,
+                M02,
+                M03,
+                M04,
+                M05,
+                M06,
+                M07,
+                M08;
+            public long M09,
+                M10,
+                M11,
+                M12,
+                M13,
+                M14,
+                M15,
+                M16;
+            public long M17,
+                M18,
+                M19,
+                M20,
+                M21,
+                M22,
+                M23,
+                M24;
+            public long M25,
+                M26,
+                M27,
+                M28,
+                M29,
+                M30,
+                M31,
+                M32;
+            public long M33,
+                M34,
+                M35,
+                M36,
+                M37,
+                M38,
+                M39,
+                M40;
+            public long M41,
+                M42,
+                M43,
+                M44,
+                M45,
+                M46,
+                M47,
+                M48;
+            public long M49,
+                M50,
+                M51,
+                M52,
+                M53,
+                M54,
+                M55,
+                M56;
+            public long M57,
+                M58,
+                M59,
+                M60,
+                M61,
+                M62,
+                M63,
+                M64;
         }
     }
 }

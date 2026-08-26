@@ -18,17 +18,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class SpriteSettingsApplierAPI
     {
-        public sealed class PreparedProfile
-        {
-            public SpriteSettings settings;
-            public SpriteSettings.MatchMode mode;
-            public string nameLower;
-            public string patternLower;
-            public string extWithDot;
-            public Regex regex;
-            public int priority;
-        }
-
         public static List<PreparedProfile> PrepareProfiles(List<SpriteSettings> profiles)
         {
             List<PreparedProfile> result = new(profiles?.Count ?? 0);
@@ -165,67 +154,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             return best;
-        }
-
-        /// <summary>
-        /// Snapshot of the texture-import values that <see cref="WouldTextureSettingsChange"/>
-        /// compares against a profile. Captures both the live <see cref="TextureImporter"/>
-        /// properties and the <see cref="TextureImporterSettings"/> fields read during a
-        /// change check, so the decision can be exercised by fast unit tests
-        /// (<c>SpriteSettingsApplierLogicTests</c>) without importing a texture asset.
-        /// </summary>
-        internal readonly struct TextureSettingsState
-        {
-            // Read from the live TextureImporter.
-            public readonly float SpritePixelsPerUnit;
-            public readonly Vector2 SpritePivot;
-            public readonly bool MipmapEnabled;
-            public readonly bool CrunchedCompression;
-            public readonly TextureImporterCompression TextureCompression;
-            public readonly TextureImporterType TextureType;
-            public readonly SpriteImportMode SpriteImportMode;
-
-            // Read from TextureImporterSettings (ReadTextureSettings buffer).
-            public readonly int SpriteAlignment;
-            public readonly bool AlphaIsTransparency;
-            public readonly bool Readable;
-            public readonly int SpriteMode;
-            public readonly uint SpriteExtrude;
-            public readonly TextureWrapMode WrapMode;
-            public readonly FilterMode FilterMode;
-
-            public TextureSettingsState(
-                float spritePixelsPerUnit,
-                Vector2 spritePivot,
-                bool mipmapEnabled,
-                bool crunchedCompression,
-                TextureImporterCompression textureCompression,
-                TextureImporterType textureType,
-                SpriteImportMode spriteImportMode,
-                int spriteAlignment,
-                bool alphaIsTransparency,
-                bool readable,
-                int spriteMode,
-                uint spriteExtrude,
-                TextureWrapMode wrapMode,
-                FilterMode filterMode
-            )
-            {
-                SpritePixelsPerUnit = spritePixelsPerUnit;
-                SpritePivot = spritePivot;
-                MipmapEnabled = mipmapEnabled;
-                CrunchedCompression = crunchedCompression;
-                TextureCompression = textureCompression;
-                TextureType = textureType;
-                SpriteImportMode = spriteImportMode;
-                SpriteAlignment = spriteAlignment;
-                AlphaIsTransparency = alphaIsTransparency;
-                Readable = readable;
-                SpriteMode = spriteMode;
-                SpriteExtrude = spriteExtrude;
-                WrapMode = wrapMode;
-                FilterMode = filterMode;
-            }
         }
 
         /// <summary>
@@ -578,6 +506,78 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 Undo.RecordObject(localTextureImporter, "Apply Sprite Settings");
                 undoRecorded = true;
+            }
+        }
+
+        public sealed class PreparedProfile
+        {
+            public SpriteSettings settings;
+            public SpriteSettings.MatchMode mode;
+            public string nameLower;
+            public string patternLower;
+            public string extWithDot;
+            public Regex regex;
+            public int priority;
+        }
+
+        /// <summary>
+        /// Snapshot of the texture-import values that <see cref="WouldTextureSettingsChange"/>
+        /// compares against a profile. Captures both the live <see cref="TextureImporter"/>
+        /// properties and the <see cref="TextureImporterSettings"/> fields read during a
+        /// change check, so the decision can be exercised by fast unit tests
+        /// (<c>SpriteSettingsApplierLogicTests</c>) without importing a texture asset.
+        /// </summary>
+        internal readonly struct TextureSettingsState
+        {
+            // Read from the live TextureImporter.
+            public readonly float SpritePixelsPerUnit;
+            public readonly Vector2 SpritePivot;
+            public readonly bool MipmapEnabled;
+            public readonly bool CrunchedCompression;
+            public readonly TextureImporterCompression TextureCompression;
+            public readonly TextureImporterType TextureType;
+            public readonly SpriteImportMode SpriteImportMode;
+
+            // Read from TextureImporterSettings (ReadTextureSettings buffer).
+            public readonly int SpriteAlignment;
+            public readonly bool AlphaIsTransparency;
+            public readonly bool Readable;
+            public readonly int SpriteMode;
+            public readonly uint SpriteExtrude;
+            public readonly TextureWrapMode WrapMode;
+            public readonly FilterMode FilterMode;
+
+            public TextureSettingsState(
+                float spritePixelsPerUnit,
+                Vector2 spritePivot,
+                bool mipmapEnabled,
+                bool crunchedCompression,
+                TextureImporterCompression textureCompression,
+                TextureImporterType textureType,
+                SpriteImportMode spriteImportMode,
+                int spriteAlignment,
+                bool alphaIsTransparency,
+                bool readable,
+                int spriteMode,
+                uint spriteExtrude,
+                TextureWrapMode wrapMode,
+                FilterMode filterMode
+            )
+            {
+                SpritePixelsPerUnit = spritePixelsPerUnit;
+                SpritePivot = spritePivot;
+                MipmapEnabled = mipmapEnabled;
+                CrunchedCompression = crunchedCompression;
+                TextureCompression = textureCompression;
+                TextureType = textureType;
+                SpriteImportMode = spriteImportMode;
+                SpriteAlignment = spriteAlignment;
+                AlphaIsTransparency = alphaIsTransparency;
+                Readable = readable;
+                SpriteMode = spriteMode;
+                SpriteExtrude = spriteExtrude;
+                WrapMode = wrapMode;
+                FilterMode = filterMode;
             }
         }
     }

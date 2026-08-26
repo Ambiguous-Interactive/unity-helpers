@@ -124,31 +124,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             window.minSize = new Vector2(600, 700);
         }
 
-        [Serializable]
-        [DataContract]
-        public sealed class AnimationDefinition
-        {
-            public string Name = "New Animation";
-            public bool loop;
-            public float cycleOffset;
-            public int StartSpriteIndex;
-            public int EndSpriteIndex;
-            public float DefaultFrameRate = 12f;
-            public AnimationCurve FrameRateCurve = AnimationCurve.Constant(0, 1, 12f);
-            public List<Sprite> SpritesToAnimate = new();
-
-            public TextField nameField;
-            public IntegerField startIndexField;
-            public IntegerField endIndexField;
-            public FloatField defaultFrameRateField;
-            public CurveField frameRateCurveField;
-            public Label spriteCountLabel;
-            public Button previewButton;
-            public Button removeButton;
-            public Toggle loopingField;
-            public FloatField cycleOffsetField;
-        }
-
         public SpriteSheetAnimationCreator()
         {
             _editorUpdateCallback = OnEditorUpdate;
@@ -1007,20 +982,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return container;
         }
 
-        private class AnimationDefUITags
-        {
-            public TextField nameField;
-            public IntegerField startIndexField;
-            public IntegerField endIndexField;
-            public FloatField defaultFrameRateField;
-            public CurveField frameRateCurveField;
-            public Label spriteCountLabel;
-            public Button previewButton;
-            public Button removeButton;
-            public Toggle looping;
-            public FloatField cycleOffset;
-        }
-
         private void BindAnimationDefinitionItem(VisualElement element, int index)
         {
             AnimationDefinition definition = _animationDefinitions[index];
@@ -1598,6 +1559,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             rootVisualElement.UnregisterCallback<DragUpdatedEvent>(OnRootDragUpdated);
             rootVisualElement.UnregisterCallback<DragPerformEvent>(OnRootDragPerform);
+        }
+
+        [Serializable]
+        [DataContract]
+        public sealed class AnimationDefinition
+        {
+            public string Name = "New Animation";
+            public bool loop;
+            public float cycleOffset;
+            public int StartSpriteIndex;
+            public int EndSpriteIndex;
+            public float DefaultFrameRate = 12f;
+            public AnimationCurve FrameRateCurve = AnimationCurve.Constant(0, 1, 12f);
+            public List<Sprite> SpritesToAnimate = new();
+
+            public TextField nameField;
+            public IntegerField startIndexField;
+            public IntegerField endIndexField;
+            public FloatField defaultFrameRateField;
+            public CurveField frameRateCurveField;
+            public Label spriteCountLabel;
+            public Button previewButton;
+            public Button removeButton;
+            public Toggle loopingField;
+            public FloatField cycleOffsetField;
+        }
+
+        private class AnimationDefUITags
+        {
+            public TextField nameField;
+            public IntegerField startIndexField;
+            public IntegerField endIndexField;
+            public FloatField defaultFrameRateField;
+            public CurveField frameRateCurveField;
+            public Label spriteCountLabel;
+            public Button previewButton;
+            public Button removeButton;
+            public Toggle looping;
+            public FloatField cycleOffset;
         }
     }
 #endif

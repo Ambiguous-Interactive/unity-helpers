@@ -294,16 +294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
         }
 
-        private sealed class StructuralEqualityTarget
-        {
-            public int CallCount;
-
-            public void Drain()
-            {
-                CallCount++;
-            }
-        }
-
         /// <summary>
         /// Verifies that a drain which throws an exception is caught, logged,
         /// and does not abort processing of subsequent drains queued in the
@@ -331,6 +321,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 secondCallCount,
                 "Second drain should still run even after the first threw."
             );
+        }
+
+        private sealed class StructuralEqualityTarget
+        {
+            public int CallCount;
+
+            public void Drain()
+            {
+                CallCount++;
+            }
         }
     }
 }

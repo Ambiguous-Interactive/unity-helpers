@@ -44,22 +44,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <typeparam name="TValue">The type of values in the cache.</typeparam>
     public sealed class Cache<TKey, TValue> : IDisposable
     {
-        [StructLayout(LayoutKind.Sequential)]
-        private struct CacheEntry
-        {
-            public TKey Key;
-            public TValue Value;
-            public float WriteTime;
-            public float AccessTime;
-            public float ExpirationTime;
-            public int Frequency;
-            public int PrevIndex;
-            public int NextIndex;
-            public byte SegmentIndex;
-            public bool IsAlive;
-            public long Weight;
-        }
-
         private const int InvalidIndex = -1;
         private const int ProbationSegment = 0;
         private const int ProtectedSegment = 1;
@@ -1614,6 +1598,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 // Swallow exceptions from callbacks
             }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CacheEntry
+        {
+            public TKey Key;
+            public TValue Value;
+            public float WriteTime;
+            public float AccessTime;
+            public float ExpirationTime;
+            public int Frequency;
+            public int PrevIndex;
+            public int NextIndex;
+            public byte SegmentIndex;
+            public bool IsAlive;
+            public long Weight;
         }
     }
 }

@@ -756,15 +756,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // Note: TypeConverter is tested within object contexts in JsonSerializationTest.SerializationWorks
-        // Direct Type serialization tests are covered by the existing test suite
-
-        private class TypeContainerForTest
-        {
-            public Type TypeProperty { get; set; }
-            public System.Collections.Generic.List<Type> TypeList { get; set; }
-        }
-
         [Test]
         public void TypeConverterWithinObjectSuccess()
         {
@@ -1289,6 +1280,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             [System.Text.Json.Serialization.JsonPropertyName("y")]
             public int Y { get; set; }
+        }
+
+        // Note: TypeConverter is tested within object contexts in JsonSerializationTest.SerializationWorks
+        // Direct Type serialization tests are covered by the existing test suite
+
+        private class TypeContainerForTest
+        {
+            public Type TypeProperty { get; set; }
+            public System.Collections.Generic.List<Type> TypeList { get; set; }
         }
     }
 }

@@ -13,34 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class ProtoEqualityPolymorphismTests : CommonTestBase
     {
-        public interface IAnimal
-        {
-            string Name { get; set; }
-        }
-
-        [ProtoContract]
-        [ProtoInclude(100, typeof(Dog))]
-        [ProtoInclude(200, typeof(Cat))]
-        public abstract class AnimalBase : IAnimal
-        {
-            [ProtoMember(1)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        public sealed class Dog : AnimalBase
-        {
-            [ProtoMember(1)]
-            public int Age { get; set; }
-        }
-
-        [ProtoContract]
-        public sealed class Cat : AnimalBase
-        {
-            [ProtoMember(1)]
-            public int Lives { get; set; }
-        }
-
         [Test]
         public void ProtoEqualsAbstractBaseWithSameDerivedReturnsTrue()
         {
@@ -100,6 +72,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 addedDifferent,
                 "HashSet should accept different derived object via proto comparer"
             );
+        }
+
+        public interface IAnimal
+        {
+            string Name { get; set; }
+        }
+
+        [ProtoContract]
+        [ProtoInclude(100, typeof(Dog))]
+        [ProtoInclude(200, typeof(Cat))]
+        public abstract class AnimalBase : IAnimal
+        {
+            [ProtoMember(1)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        public sealed class Dog : AnimalBase
+        {
+            [ProtoMember(1)]
+            public int Age { get; set; }
+        }
+
+        [ProtoContract]
+        public sealed class Cat : AnimalBase
+        {
+            [ProtoMember(1)]
+            public int Lives { get; set; }
         }
     }
 }

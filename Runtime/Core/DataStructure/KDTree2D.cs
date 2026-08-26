@@ -31,75 +31,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class KdTree2D<T> : ISpatialTree2D<T>
     {
-        [Serializable]
-        public readonly struct Entry
-        {
-            public readonly T value;
-            public readonly Vector2 position;
-
-            public Entry(T value, Vector2 position)
-            {
-                this.value = value;
-                this.position = position;
-            }
-        }
-
-        private readonly struct Neighbor
-        {
-            public readonly T value;
-            public readonly float sqrDistance;
-
-            public Neighbor(T value, float sqrDistance)
-            {
-                this.value = value;
-                this.sqrDistance = sqrDistance;
-            }
-        }
-
-        [Serializable]
-        public sealed class KdTreeNode
-        {
-            public readonly Bounds boundary;
-            public readonly KdTreeNode left;
-            public readonly KdTreeNode right;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-
-            private KdTreeNode(
-                Bounds boundary,
-                KdTreeNode left,
-                KdTreeNode right,
-                int startIndex,
-                int count,
-                bool isTerminal
-            )
-            {
-                this.boundary = boundary;
-                this.left = left;
-                this.right = right;
-                _startIndex = startIndex;
-                _count = count;
-                this.isTerminal = isTerminal;
-            }
-
-            internal static KdTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
-            {
-                return new KdTreeNode(boundary, null, null, startIndex, count, true);
-            }
-
-            internal static KdTreeNode CreateInternal(
-                Bounds boundary,
-                KdTreeNode left,
-                KdTreeNode right,
-                int startIndex,
-                int count
-            )
-            {
-                return new KdTreeNode(boundary, left, right, startIndex, count, false);
-            }
-        }
-
         private const float MinimumNodeSize = 0.001f;
         private const int SmallPartitionThreshold = 32;
 
@@ -858,6 +789,75 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public int Compare(Neighbor x, Neighbor y)
             {
                 return x.sqrDistance.CompareTo(y.sqrDistance);
+            }
+        }
+
+        [Serializable]
+        public readonly struct Entry
+        {
+            public readonly T value;
+            public readonly Vector2 position;
+
+            public Entry(T value, Vector2 position)
+            {
+                this.value = value;
+                this.position = position;
+            }
+        }
+
+        private readonly struct Neighbor
+        {
+            public readonly T value;
+            public readonly float sqrDistance;
+
+            public Neighbor(T value, float sqrDistance)
+            {
+                this.value = value;
+                this.sqrDistance = sqrDistance;
+            }
+        }
+
+        [Serializable]
+        public sealed class KdTreeNode
+        {
+            public readonly Bounds boundary;
+            public readonly KdTreeNode left;
+            public readonly KdTreeNode right;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+
+            private KdTreeNode(
+                Bounds boundary,
+                KdTreeNode left,
+                KdTreeNode right,
+                int startIndex,
+                int count,
+                bool isTerminal
+            )
+            {
+                this.boundary = boundary;
+                this.left = left;
+                this.right = right;
+                _startIndex = startIndex;
+                _count = count;
+                this.isTerminal = isTerminal;
+            }
+
+            internal static KdTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
+            {
+                return new KdTreeNode(boundary, null, null, startIndex, count, true);
+            }
+
+            internal static KdTreeNode CreateInternal(
+                Bounds boundary,
+                KdTreeNode left,
+                KdTreeNode right,
+                int startIndex,
+                int count
+            )
+            {
+                return new KdTreeNode(boundary, left, right, startIndex, count, false);
             }
         }
     }

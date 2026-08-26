@@ -315,12 +315,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 
-        internal static class SerializedPropertyNames
-        {
-            internal const string HasValue = nameof(_hasValue);
-            internal const string Value = nameof(_value);
-        }
-
         internal void ForceStateForTesting(bool hasValue, T rawValue)
         {
             _hasValue = hasValue;
@@ -348,6 +342,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             )
                 ? attribute
                 : null;
+        }
+
+        internal static class SerializedPropertyNames
+        {
+            internal const string HasValue = nameof(_hasValue);
+            internal const string Value = nameof(_value);
         }
     }
 

@@ -143,6 +143,11 @@ const CHECKS = [
     run: "npm run lint:comparison-direction"
   },
   {
+    id: "nested-type-placement",
+    name: "Nested types at the end of their containing type",
+    run: "npm run lint:nested-type-placement"
+  },
+  {
     id: "shipped-analyzers",
     name: "Shipped analyzer assemblies match their sources",
     run: "npm run verify:shipped-analyzers"

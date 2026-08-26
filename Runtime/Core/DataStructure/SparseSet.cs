@@ -33,46 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #pragma warning restore WPROTO030
     public sealed class SparseSet : IReadOnlyList<int>
     {
-        public struct SparseSetEnumerator : IEnumerator<int>
-        {
-            private readonly int[] _dense;
-            private readonly int _count;
-            private int _index;
-            private int _current;
-
-            internal SparseSetEnumerator(int[] dense, int count)
-            {
-                _dense = dense;
-                _count = count;
-                _index = -1;
-                _current = default;
-            }
-
-            public bool MoveNext()
-            {
-                if (++_index < _count)
-                {
-                    _current = _dense[_index];
-                    return true;
-                }
-
-                _current = default;
-                return false;
-            }
-
-            public int Current => _current;
-
-            object IEnumerator.Current => Current;
-
-            public void Reset()
-            {
-                _index = -1;
-                _current = default;
-            }
-
-            public void Dispose() { }
-        }
-
         [SerializeField]
         [ProtoMember(1)]
         private int[] _sparse;
@@ -303,52 +263,27 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             return GetEnumerator();
         }
-    }
 
-    /// <summary>
-    /// A generic sparse set that maps elements of type T to internal indices.
-    /// Provides O(1) operations with support for any element type.
-    /// </summary>
-    [Serializable]
-    public sealed class SparseSet<T> : IReadOnlyList<T>
-    {
-        public struct SparseSetEnumerator : IEnumerator<T>
+        public struct SparseSetEnumerator : IEnumerator<int>
         {
-            private readonly T[] _elements;
             private readonly int[] _dense;
             private readonly int _count;
-            private PooledArray<T> _pooledArray;
             private int _index;
-            private T _current;
-            private bool _initialized;
+            private int _current;
 
-            internal SparseSetEnumerator(T[] elements, int[] dense, int count)
+            internal SparseSetEnumerator(int[] dense, int count)
             {
-                _elements = elements;
                 _dense = dense;
                 _count = count;
                 _index = -1;
                 _current = default;
-                _initialized = false;
-                _pooledArray = default;
-
-                // Rent array and populate on first use
-                if (0 < count)
-                {
-                    _pooledArray = SystemArrayPool<T>.Get(count, out T[] temp);
-                    for (int i = 0; i < count; i++)
-                    {
-                        temp[i] = elements[dense[i]];
-                    }
-                    _initialized = true;
-                }
             }
 
             public bool MoveNext()
             {
                 if (++_index < _count)
                 {
-                    _current = _pooledArray.array[_index];
+                    _current = _dense[_index];
                     return true;
                 }
 
@@ -356,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            public T Current => _current;
+            public int Current => _current;
 
             object IEnumerator.Current => Current;
 
@@ -366,16 +301,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
             }
 
-            public void Dispose()
-            {
-                if (_initialized)
-                {
-                    _pooledArray.Dispose();
-                    _initialized = false;
-                }
-            }
+            public void Dispose() { }
         }
+    }
 
+    /// <summary>
+    /// A generic sparse set that maps elements of type T to internal indices.
+    /// Provides O(1) operations with support for any element type.
+    /// </summary>
+    [Serializable]
+    public sealed class SparseSet<T> : IReadOnlyList<T>
+    {
         private readonly Dictionary<T, int> _elementToIndex;
         private readonly T[] _elements;
         private readonly int[] _sparse;
@@ -607,6 +543,70 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        public struct SparseSetEnumerator : IEnumerator<T>
+        {
+            private readonly T[] _elements;
+            private readonly int[] _dense;
+            private readonly int _count;
+            private PooledArray<T> _pooledArray;
+            private int _index;
+            private T _current;
+            private bool _initialized;
+
+            internal SparseSetEnumerator(T[] elements, int[] dense, int count)
+            {
+                _elements = elements;
+                _dense = dense;
+                _count = count;
+                _index = -1;
+                _current = default;
+                _initialized = false;
+                _pooledArray = default;
+
+                // Rent array and populate on first use
+                if (0 < count)
+                {
+                    _pooledArray = SystemArrayPool<T>.Get(count, out T[] temp);
+                    for (int i = 0; i < count; i++)
+                    {
+                        temp[i] = elements[dense[i]];
+                    }
+                    _initialized = true;
+                }
+            }
+
+            public bool MoveNext()
+            {
+                if (++_index < _count)
+                {
+                    _current = _pooledArray.array[_index];
+                    return true;
+                }
+
+                _current = default;
+                return false;
+            }
+
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
+            public void Reset()
+            {
+                _index = -1;
+                _current = default;
+            }
+
+            public void Dispose()
+            {
+                if (_initialized)
+                {
+                    _pooledArray.Dispose();
+                    _initialized = false;
+                }
+            }
         }
     }
 }

@@ -24,23 +24,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     [NUnit.Framework.Category("Fast")]
     public sealed class PoolAccessFrequencyTests
     {
-        private sealed class TestPoolItem
-        {
-            public int Id { get; }
-
-            private static int _nextId;
-
-            public TestPoolItem()
-            {
-                Id = ++_nextId;
-            }
-
-            public static void ResetIdCounter()
-            {
-                _nextId = 0;
-            }
-        }
-
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -1469,16 +1452,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Rentals per minute should be greater than 1.0 after increased activity"
             );
         }
-    }
 
-    /// <summary>
-    /// Tests to verify that GetStatistics calls do not incorrectly inflate rental counts.
-    /// These tests ensure statistics queries are read-only operations.
-    /// </summary>
-    [TestFixture]
-    [NUnit.Framework.Category("Fast")]
-    public sealed class PoolStatisticsInvariantTests
-    {
         private sealed class TestPoolItem
         {
             public int Id { get; }
@@ -1495,7 +1469,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 _nextId = 0;
             }
         }
+    }
 
+    /// <summary>
+    /// Tests to verify that GetStatistics calls do not incorrectly inflate rental counts.
+    /// These tests ensure statistics queries are read-only operations.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class PoolStatisticsInvariantTests
+    {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -1861,17 +1844,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Final rent count should be exactly 10"
             );
         }
-    }
 
-    /// <summary>
-    /// Tests for idle timeout purge behavior at comfortable size boundaries and during hysteresis.
-    /// These tests validate bug fixes where idle timeout purges were incorrectly blocked by
-    /// comfortable size checks or hysteresis protection.
-    /// </summary>
-    [TestFixture]
-    [NUnit.Framework.Category("Fast")]
-    public sealed class IdleTimeoutComfortableSizeEdgeCaseTests
-    {
         private sealed class TestPoolItem
         {
             public int Id { get; }
@@ -1888,7 +1861,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 _nextId = 0;
             }
         }
+    }
 
+    /// <summary>
+    /// Tests for idle timeout purge behavior at comfortable size boundaries and during hysteresis.
+    /// These tests validate bug fixes where idle timeout purges were incorrectly blocked by
+    /// comfortable size checks or hysteresis protection.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class IdleTimeoutComfortableSizeEdgeCaseTests
+    {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
@@ -2451,6 +2434,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     1,
                     "Idle timeout purge should occur regardless of hysteresis length relationship"
                 );
+            }
+        }
+
+        private sealed class TestPoolItem
+        {
+            public int Id { get; }
+
+            private static int _nextId;
+
+            public TestPoolItem()
+            {
+                Id = ++_nextId;
+            }
+
+            public static void ResetIdCounter()
+            {
+                _nextId = 0;
             }
         }
     }

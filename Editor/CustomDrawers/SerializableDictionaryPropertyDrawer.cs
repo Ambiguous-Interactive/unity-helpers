@@ -605,64 +605,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private int _lastPropertyPairCacheFrame = -1;
         private int _lastPrimedFoldoutFrame = -1;
 
-        private sealed class CachedPropertyPair
-        {
-            public SerializedProperty keysProperty;
-            public SerializedProperty valuesProperty;
-        }
-
-        private sealed class HeightCacheEntry
-        {
-            public float height;
-            public int arraySize;
-            public int pageIndex;
-            public bool isExpanded;
-            public bool hasNullKeys;
-            public bool hasDuplicates;
-            public bool pendingIsExpanded;
-            public float pendingFoldoutProgress;
-            public float mainFoldoutProgress;
-            public int frameNumber;
-        }
-
-        private readonly struct RowRenderKey : IEquatable<RowRenderKey>
-        {
-            public readonly string listKey;
-            public readonly int globalIndex;
-
-            public RowRenderKey(string listKey, int globalIndex)
-            {
-                this.listKey = listKey;
-                this.globalIndex = globalIndex;
-            }
-
-            public bool Equals(RowRenderKey other)
-            {
-                return globalIndex == other.globalIndex && listKey == other.listKey;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is RowRenderKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(listKey, globalIndex);
-            }
-        }
-
-        private sealed class RowRenderData
-        {
-            public SerializedProperty keyProperty;
-            public SerializedProperty valueProperty;
-            public float rowHeight;
-            public float keyHeight;
-            public float valueHeight;
-            public bool valueSupportsFoldout;
-            public bool isValid;
-        }
-
         internal Rect LastResolvedPosition { get; private set; }
         internal Rect LastListRect { get; private set; }
         internal bool HasLastListRect { get; private set; }
@@ -4867,32 +4809,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return height;
         }
 
-        private readonly struct PendingSectionMetrics
-        {
-            public float CollapsedHeight { get; }
-            public float ExpandedExtraHeight { get; }
-            public float KeyHeight { get; }
-            public float ValueHeight { get; }
-
-            public PendingSectionMetrics(
-                float collapsedHeight,
-                float expandedExtraHeight,
-                float keyHeight,
-                float valueHeight
-            )
-            {
-                CollapsedHeight = collapsedHeight;
-                ExpandedExtraHeight = expandedExtraHeight;
-                KeyHeight = keyHeight;
-                ValueHeight = valueHeight;
-            }
-
-            public float EvaluateHeight(float foldoutProgress)
-            {
-                return CollapsedHeight + ExpandedExtraHeight * Mathf.Clamp01(foldoutProgress);
-            }
-        }
-
         internal CommitResult CommitEntry(
             SerializedProperty keysProperty,
             SerializedProperty valuesProperty,
@@ -6137,54 +6053,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private sealed class KeyValueSnapshot
-        {
-            public object key;
-            public object value;
-            public int originalIndex;
-        }
-
-        private sealed class KeyValueSnapshotComparer : IComparer<KeyValueSnapshot>
-        {
-            private readonly Func<object, object, int> _comparison;
-
-            public KeyValueSnapshotComparer(Func<object, object, int> comparison)
-            {
-                _comparison = comparison;
-            }
-
-            public int Compare(KeyValueSnapshot x, KeyValueSnapshot y)
-            {
-                if (ReferenceEquals(x, y))
-                {
-                    return 0;
-                }
-
-                if (x == null)
-                {
-                    return -1;
-                }
-
-                if (y == null)
-                {
-                    return 1;
-                }
-
-                if (_comparison == null)
-                {
-                    return 0;
-                }
-
-                int comparisonResult = _comparison(x.key, y.key);
-                if (comparisonResult != 0)
-                {
-                    return comparisonResult;
-                }
-
-                return x.originalIndex.CompareTo(y.originalIndex);
-            }
-        }
-
         private static void EnsureParallelArraySizes(
             SerializedProperty keysProperty,
             SerializedProperty valuesProperty
@@ -6288,40 +6156,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             _cachedSerializedObject = serializedObject;
             _cachedListKey = key;
             return key;
-        }
-
-        /// <summary>
-        /// Struct key for static property cache lookup to avoid string allocations.
-        /// </summary>
-        private readonly struct PropertyCacheKey : IEquatable<PropertyCacheKey>
-        {
-            public readonly long InstanceId;
-            public readonly string PropertyPath;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public PropertyCacheKey(long instanceId, string propertyPath)
-            {
-                InstanceId = instanceId;
-                PropertyPath = propertyPath;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(PropertyCacheKey other)
-            {
-                return InstanceId == other.InstanceId
-                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is PropertyCacheKey other && Equals(other);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(InstanceId, PropertyPath);
-            }
         }
 
         // Static cache for single-target property cache keys to avoid repeated string allocations
@@ -6888,49 +6722,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (anim != null)
             {
                 anim.target = expanded;
-            }
-        }
-
-        /// <summary>
-        /// Struct key for MainFoldoutAnimations cache to avoid string allocations.
-        /// Uses (instanceId, propertyPath) pair for cache identity.
-        /// </summary>
-        private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
-        {
-            public readonly long InstanceId;
-            public readonly string PropertyPath;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public MainFoldoutCacheKey(long instanceId, string propertyPath)
-            {
-                InstanceId = instanceId;
-                PropertyPath = propertyPath;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(MainFoldoutCacheKey other)
-            {
-                return InstanceId == other.InstanceId
-                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is MainFoldoutCacheKey other && Equals(other);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(InstanceId, PropertyPath);
-            }
-
-            /// <summary>
-            /// Converts to string representation for test verification.
-            /// </summary>
-            public override string ToString()
-            {
-                return $"{InstanceId}:{PropertyPath}";
             }
         }
 
@@ -8496,97 +8287,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal sealed class PendingValueWrapper : ScriptableObject
-        {
-            private const string PropertyName = nameof(boxedValue);
-
-            [SerializeReference]
-            private object boxedValue;
-
-            public object GetValue()
-            {
-                return boxedValue;
-            }
-
-            public void SetValue(object incoming)
-            {
-                boxedValue = incoming;
-            }
-
-            public SerializedProperty FindValueProperty(SerializedObject serializedObject)
-            {
-                return serializedObject.FindProperty(PropertyName);
-            }
-        }
-
-        internal readonly struct PendingWrapperContext
-        {
-            public static readonly PendingWrapperContext Empty = new(null, null, null);
-
-            public PendingWrapperContext(
-                PendingValueWrapper wrapper,
-                SerializedObject serialized,
-                SerializedProperty property
-            )
-            {
-                Wrapper = wrapper;
-                Serialized = serialized;
-                Property = property;
-            }
-
-            public PendingValueWrapper Wrapper { get; }
-
-            public SerializedObject Serialized { get; }
-
-            public SerializedProperty Property { get; }
-        }
-
-        private readonly struct LabelWidthScope : IDisposable
-        {
-            private readonly float _previousWidth;
-
-            public LabelWidthScope(float width)
-            {
-                _previousWidth = EditorGUIUtility.labelWidth;
-                EditorGUIUtility.labelWidth = width;
-            }
-
-            public void Dispose()
-            {
-                EditorGUIUtility.labelWidth = _previousWidth;
-            }
-        }
-
-        internal readonly struct RowFoldoutKey : IEquatable<RowFoldoutKey>
-        {
-            public RowFoldoutKey(string cacheKey, int index)
-            {
-                CacheKey = cacheKey;
-                Index = index;
-            }
-
-            public string CacheKey { get; }
-
-            public int Index { get; }
-
-            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
-
-            public bool Equals(RowFoldoutKey other)
-            {
-                return Index == other.Index && string.Equals(CacheKey, other.CacheKey);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is RowFoldoutKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(CacheKey, Index);
-            }
-        }
-
         private static Dictionary<Type, PaletteValueRenderer> BuildPaletteValueRenderers()
         {
             Dictionary<Type, PaletteValueRenderer> renderers = new();
@@ -8723,205 +8423,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             GUIContent label,
             ref object value
         );
-
-        internal sealed class PaletteValueRenderer
-        {
-            private readonly Type _targetType;
-            private readonly Func<float> _heightProvider;
-            private readonly PaletteValueDrawHandler _drawHandler;
-
-            private PaletteValueRenderer(
-                Type targetType,
-                Func<float> heightProvider,
-                PaletteValueDrawHandler drawHandler
-            )
-            {
-                _targetType = targetType;
-                _heightProvider = heightProvider;
-                _drawHandler = drawHandler;
-            }
-
-            public float Height => _heightProvider();
-
-            public void Draw(Rect rect, GUIContent label, ref object value)
-            {
-                _drawHandler(rect, label, ref value);
-            }
-
-            public static PaletteValueRenderer CreateDualColorRenderer(
-                Type targetType,
-                FieldInfo firstField,
-                GUIContent firstLabel,
-                FieldInfo secondField,
-                GUIContent secondLabel
-            )
-            {
-                if (
-                    targetType == null
-                    || firstField == null
-                    || secondField == null
-                    || firstLabel == null
-                    || secondLabel == null
-                )
-                {
-                    return null;
-                }
-
-                return new PaletteValueRenderer(
-                    targetType,
-                    static () => EditorGUIUtility.singleLineHeight,
-                    delegate(Rect rect, GUIContent label, ref object instance)
-                    {
-                        instance = EnsurePaletteValueInstance(instance, targetType);
-                        Rect contentRect = EditorGUI.PrefixLabel(rect, label);
-                        float spacing = EditorGUIUtility.standardVerticalSpacing;
-                        float halfWidth = Mathf.Max(0f, (contentRect.width - spacing) * 0.5f);
-                        Rect firstRect = new(
-                            contentRect.x,
-                            contentRect.y,
-                            halfWidth,
-                            EditorGUIUtility.singleLineHeight
-                        );
-                        Rect secondRect = new(
-                            firstRect.xMax + spacing,
-                            contentRect.y,
-                            halfWidth,
-                            EditorGUIUtility.singleLineHeight
-                        );
-
-                        Color first = (Color)(firstField.GetValue(instance) ?? Color.clear);
-                        Color updatedFirst = EditorGUI.ColorField(firstRect, firstLabel, first);
-                        if (updatedFirst != first)
-                        {
-                            firstField.SetValue(instance, updatedFirst);
-                        }
-
-                        Color second = (Color)(secondField.GetValue(instance) ?? Color.clear);
-                        Color updatedSecond = EditorGUI.ColorField(secondRect, secondLabel, second);
-                        if (updatedSecond != second)
-                        {
-                            secondField.SetValue(instance, updatedSecond);
-                        }
-                    }
-                );
-            }
-
-            public static PaletteValueRenderer CreateWEnumRenderer(
-                Type targetType,
-                FieldInfo selectedBgField,
-                GUIContent selectedBgLabel,
-                FieldInfo selectedTextField,
-                GUIContent selectedTextLabel,
-                FieldInfo inactiveBgField,
-                GUIContent inactiveBgLabel,
-                FieldInfo inactiveTextField,
-                GUIContent inactiveTextLabel
-            )
-            {
-                if (
-                    targetType == null
-                    || selectedBgField == null
-                    || selectedTextField == null
-                    || inactiveBgField == null
-                    || inactiveTextField == null
-                )
-                {
-                    return null;
-                }
-
-                return new PaletteValueRenderer(
-                    targetType,
-                    static () =>
-                        (EditorGUIUtility.singleLineHeight * 2f)
-                        + EditorGUIUtility.standardVerticalSpacing,
-                    delegate(Rect rect, GUIContent label, ref object instance)
-                    {
-                        instance = EnsurePaletteValueInstance(instance, targetType);
-                        Rect contentRect = EditorGUI.PrefixLabel(rect, label);
-                        float rowHeight = EditorGUIUtility.singleLineHeight;
-                        float spacing = EditorGUIUtility.standardVerticalSpacing;
-                        float halfWidth = Mathf.Max(0f, (contentRect.width - spacing) * 0.5f);
-
-                        Rect selectedBgRect = new(
-                            contentRect.x,
-                            contentRect.y,
-                            halfWidth,
-                            rowHeight
-                        );
-                        Rect selectedTextRect = new(
-                            selectedBgRect.xMax + spacing,
-                            contentRect.y,
-                            halfWidth,
-                            rowHeight
-                        );
-                        Rect inactiveBgRect = new(
-                            contentRect.x,
-                            contentRect.y + rowHeight + spacing,
-                            halfWidth,
-                            rowHeight
-                        );
-                        Rect inactiveTextRect = new(
-                            inactiveBgRect.xMax + spacing,
-                            inactiveBgRect.y,
-                            halfWidth,
-                            rowHeight
-                        );
-
-                        Color selectedBg = (Color)(
-                            selectedBgField.GetValue(instance) ?? Color.clear
-                        );
-                        Color updatedSelectedBg = EditorGUI.ColorField(
-                            selectedBgRect,
-                            selectedBgLabel,
-                            selectedBg
-                        );
-                        if (updatedSelectedBg != selectedBg)
-                        {
-                            selectedBgField.SetValue(instance, updatedSelectedBg);
-                        }
-
-                        Color selectedText = (Color)(
-                            selectedTextField.GetValue(instance) ?? Color.clear
-                        );
-                        Color updatedSelectedText = EditorGUI.ColorField(
-                            selectedTextRect,
-                            selectedTextLabel,
-                            selectedText
-                        );
-                        if (updatedSelectedText != selectedText)
-                        {
-                            selectedTextField.SetValue(instance, updatedSelectedText);
-                        }
-
-                        Color inactiveBg = (Color)(
-                            inactiveBgField.GetValue(instance) ?? Color.clear
-                        );
-                        Color updatedInactiveBg = EditorGUI.ColorField(
-                            inactiveBgRect,
-                            inactiveBgLabel,
-                            inactiveBg
-                        );
-                        if (updatedInactiveBg != inactiveBg)
-                        {
-                            inactiveBgField.SetValue(instance, updatedInactiveBg);
-                        }
-
-                        Color inactiveText = (Color)(
-                            inactiveTextField.GetValue(instance) ?? Color.clear
-                        );
-                        Color updatedInactiveText = EditorGUI.ColorField(
-                            inactiveTextRect,
-                            inactiveTextLabel,
-                            inactiveText
-                        );
-                        if (updatedInactiveText != inactiveText)
-                        {
-                            inactiveTextField.SetValue(instance, updatedInactiveText);
-                        }
-                    }
-                );
-            }
-        }
 
         internal static void SetPropertyValue(SerializedProperty property, object value, Type type)
         {
@@ -9448,6 +8949,968 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return null;
+        }
+
+        internal static void SyncRuntimeDictionary(SerializedProperty dictionaryProperty)
+        {
+            SerializedObject serializedObject = dictionaryProperty.serializedObject;
+            Object[] targets = serializedObject.targetObjects;
+            string propertyPath = dictionaryProperty.propertyPath;
+
+            foreach (Object target in targets)
+            {
+                object dictionaryInstance = GetTargetObjectOfProperty(target, propertyPath);
+                bool isSerializableDictionaryBase =
+                    dictionaryInstance is SerializableDictionaryBase;
+                bool calledSave = false;
+                bool isScriptableSingletonTarget = IsScriptableSingletonType(target);
+
+                // For ScriptableSingleton targets, we must NOT call EditorAfterDeserialize()
+                // immediately after ApplyModifiedProperties because the managed serialized fields
+                // (_keys, _values) are not yet updated by Unity's serialization system.
+                // Calling EditorAfterDeserialize would read stale data and overwrite our changes.
+                // Instead, we use ForwardSyncFromSerializedProperties to read the current values
+                // directly from the SerializedProperties and update the runtime dictionary.
+                if (
+                    isScriptableSingletonTarget
+                    && dictionaryInstance is SerializableDictionaryBase baseDictionary
+                )
+                {
+                    ForwardSyncFromSerializedProperties(dictionaryProperty, baseDictionary);
+                    EditorUtility.SetDirty(target);
+                    if (target is UnityHelpersSettings unitySettings)
+                    {
+                        unitySettings.SaveSettings();
+                    }
+                    else
+                    {
+                        SaveScriptableSingleton(target);
+                    }
+                    calledSave = true;
+                }
+                else if (dictionaryInstance is SerializableDictionaryBase nonSingletonDictionary)
+                {
+                    nonSingletonDictionary.EditorAfterDeserialize();
+                    EditorUtility.SetDirty(target);
+                }
+                else if (dictionaryInstance is ISerializationCallbackReceiver receiver)
+                {
+                    receiver.OnAfterDeserialize();
+                    EditorUtility.SetDirty(target);
+                }
+
+                PaletteSerializationDiagnostics.ReportSyncRuntimeDictionary(
+                    serializedObject,
+                    propertyPath,
+                    dictionaryInstance,
+                    isSerializableDictionaryBase,
+                    calledSave
+                );
+            }
+
+            serializedObject.UpdateIfRequiredOrScript();
+        }
+
+        /// <summary>
+        /// Performs a forward sync from SerializedProperties to the runtime dictionary.
+        /// This is used for ScriptableSingleton targets where the managed fields are stale
+        /// after ApplyModifiedProperties. Instead of reading from the managed fields (which
+        /// would give us stale data), we read directly from the SerializedProperties which
+        /// have the current values.
+        /// </summary>
+        private static void ForwardSyncFromSerializedProperties(
+            SerializedProperty dictionaryProperty,
+            SerializableDictionaryBase baseDictionary
+        )
+        {
+            // First, call OnBeforeSerialize to ensure the managed arrays are in sync with runtime
+            // (This writes runtime state to managed arrays, which is the opposite of what we want,
+            // but it's necessary to prepare for the next step)
+            // Actually, we need to update the managed arrays FROM the SerializedProperties first
+
+            // The managed arrays (_keys and _values) need to be updated from the SerializedProperties.
+            // We'll read all key-value pairs from the SerializedProperties and rebuild the runtime dictionary.
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            if (
+                keysProperty == null
+                || valuesProperty == null
+                || !keysProperty.isArray
+                || !valuesProperty.isArray
+            )
+            {
+                return;
+            }
+
+            int count = Mathf.Min(keysProperty.arraySize, valuesProperty.arraySize);
+
+            // We need to update the managed arrays so that EditorAfterDeserialize reads current data.
+            // The cleanest way is to directly set the managed field values using reflection.
+            Type dictionaryType = baseDictionary.GetType();
+            Type baseType = dictionaryType;
+            while (baseType != null && !baseType.IsGenericType)
+            {
+                baseType = baseType.BaseType;
+            }
+
+            if (baseType == null)
+            {
+                // Fallback: just call EditorAfterDeserialize and hope the timing works out
+                baseDictionary.EditorAfterDeserialize();
+                return;
+            }
+
+            // Get the key and value types from the generic type arguments
+            Type[] genericArgs = baseType.GetGenericArguments();
+            if (genericArgs.Length < 2)
+            {
+                baseDictionary.EditorAfterDeserialize();
+                return;
+            }
+
+            Type keyType = genericArgs[0];
+            Type valueType = 2 <= genericArgs.Length ? genericArgs[1] : null;
+
+            // Get the _keys and _values fields
+            FieldInfo keysField = FindFieldInHierarchy(
+                dictionaryType,
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            FieldInfo valuesField = FindFieldInHierarchy(
+                dictionaryType,
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            if (keysField == null || valuesField == null)
+            {
+                baseDictionary.EditorAfterDeserialize();
+                return;
+            }
+
+            // Create new arrays with the correct size
+            Array keysArray = Array.CreateInstance(keyType, count);
+            Array valuesArray = Array.CreateInstance(valueType, count);
+
+            // Copy values from SerializedProperties to the arrays
+            for (int i = 0; i < count; i++)
+            {
+                SerializedProperty keyProp = keysProperty.GetArrayElementAtIndex(i);
+                SerializedProperty valueProp = GetValueElement(valuesProperty, i);
+
+                object keyValue = GetPropertyValueBoxed(keyProp, keyType);
+                object valueValue = GetPropertyValueBoxed(valueProp, valueType);
+
+                if (keyValue != null || !keyType.IsValueType)
+                {
+                    keysArray.SetValue(keyValue, i);
+                }
+                if (valueValue != null || !valueType.IsValueType)
+                {
+                    valuesArray.SetValue(valueValue, i);
+                }
+            }
+
+            // Set the managed fields directly
+            keysField.SetValue(baseDictionary, keysArray);
+            valuesField.SetValue(baseDictionary, valuesArray);
+
+            // The managed arrays above are the fresh copy, so ask for the rebuild that trusts them.
+            // The plain EditorAfterDeserialize would refill the values array from the boxed one --
+            // correct for every OTHER caller here, which reaches it without writing anything, and
+            // wrong for this one, which would lose the write it just made.
+            baseDictionary.EditorAfterDeserializeFromManagedArrays();
+        }
+
+        private static FieldInfo FindFieldInHierarchy(Type type, string fieldName)
+        {
+            while (type != null)
+            {
+                FieldInfo field = type.GetField(
+                    fieldName,
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+                );
+                if (field != null)
+                {
+                    return field;
+                }
+                type = type.BaseType;
+            }
+            return null;
+        }
+
+        private static object GetPropertyValueBoxed(SerializedProperty property, Type targetType)
+        {
+            if (property == null)
+            {
+                return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+            }
+
+            return property.propertyType switch
+            {
+                SerializedPropertyType.Integer => property.intValue,
+                SerializedPropertyType.Boolean => property.boolValue,
+                SerializedPropertyType.Float => property.floatValue,
+                SerializedPropertyType.String => property.stringValue,
+                SerializedPropertyType.Color => property.colorValue,
+                SerializedPropertyType.ObjectReference => property.objectReferenceValue,
+                SerializedPropertyType.Enum => property.enumValueIndex,
+                SerializedPropertyType.Vector2 => property.vector2Value,
+                SerializedPropertyType.Vector3 => property.vector3Value,
+                SerializedPropertyType.Vector4 => property.vector4Value,
+                SerializedPropertyType.Rect => property.rectValue,
+                SerializedPropertyType.ArraySize => property.intValue,
+                SerializedPropertyType.Character => (char)property.intValue,
+                SerializedPropertyType.AnimationCurve => property.animationCurveValue,
+                SerializedPropertyType.Bounds => property.boundsValue,
+                SerializedPropertyType.Quaternion => property.quaternionValue,
+                SerializedPropertyType.Vector2Int => property.vector2IntValue,
+                SerializedPropertyType.Vector3Int => property.vector3IntValue,
+                SerializedPropertyType.RectInt => property.rectIntValue,
+                SerializedPropertyType.BoundsInt => property.boundsIntValue,
+                SerializedPropertyType.ManagedReference => property.managedReferenceValue,
+                _ => GetComplexPropertyValue(property, targetType),
+            };
+        }
+
+        private static object GetComplexPropertyValue(SerializedProperty property, Type targetType)
+        {
+            // For complex types (structs, classes), we need to create an instance and populate its fields
+            if (targetType == null || property == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                object instance = CreateInstanceSafe(targetType);
+                if (instance == null)
+                {
+                    return null;
+                }
+
+                // Iterate through the property's children and set field values
+                SerializedProperty iterator = property.Copy();
+                SerializedProperty endProperty = property.GetEndProperty();
+                bool enterChildren = true;
+                int depth = property.depth;
+
+                while (
+                    iterator.NextVisible(enterChildren)
+                    && !SerializedProperty.EqualContents(iterator, endProperty)
+                )
+                {
+                    enterChildren = false;
+                    if (iterator.depth <= depth)
+                    {
+                        break;
+                    }
+
+                    string fieldName = iterator.name;
+                    FieldInfo field = FindFieldInHierarchy(targetType, fieldName);
+                    if (field != null)
+                    {
+                        object fieldValue = GetPropertyValueBoxed(iterator, field.FieldType);
+                        field.SetValue(instance, fieldValue);
+                    }
+                }
+
+                return instance;
+            }
+            catch
+            {
+                return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+            }
+        }
+
+        private static object CreateInstanceSafe(Type type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                // Try default constructor first
+                return Activator.CreateInstance(type);
+            }
+            catch
+            {
+                // For types without default constructor, try FormatterServices
+                try
+                {
+                    return System.Runtime.Serialization.FormatterServices.GetUninitializedObject(
+                        type
+                    );
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        private static object GetTargetObjectOfProperty(object target, string propertyPath)
+        {
+            if (target == null || string.IsNullOrEmpty(propertyPath))
+            {
+                return null;
+            }
+
+            string path = propertyPath.Replace(".Array.data[", "[");
+            string[] elements = path.Split('.');
+
+            object current = target;
+            Type currentType = current.GetType();
+
+            foreach (string elementWithPotentialIndex in elements)
+            {
+                if (current == null)
+                {
+                    return null;
+                }
+
+                string element = elementWithPotentialIndex;
+                int index = -1;
+                int bracketIndex = element.IndexOf('[', StringComparison.Ordinal);
+                if (0 <= bracketIndex)
+                {
+                    int endBracket = element.IndexOf(']', bracketIndex + 1);
+                    if (endBracket < 0)
+                    {
+                        return null;
+                    }
+
+                    string indexString = element.Substring(
+                        bracketIndex + 1,
+                        endBracket - bracketIndex - 1
+                    );
+                    if (!int.TryParse(indexString, out index))
+                    {
+                        return null;
+                    }
+
+                    element = element.Substring(0, bracketIndex);
+                }
+
+                if (!string.IsNullOrEmpty(element))
+                {
+                    // Use cached reflection lookups for better performance
+                    if (
+                        ReflectionHelpers.TryGetField(
+                            currentType,
+                            element,
+                            out FieldInfo field,
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        )
+                    )
+                    {
+                        Func<object, object> getter = ReflectionHelpers.GetFieldGetter(field);
+                        current = getter(current);
+                        currentType = current?.GetType();
+                    }
+                    else if (
+                        ReflectionHelpers.TryGetProperty(
+                            currentType,
+                            element,
+                            out PropertyInfo propertyInfo,
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        )
+                    )
+                    {
+                        Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(
+                            propertyInfo
+                        );
+                        current = getter(current);
+                        currentType = current?.GetType();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+
+                if (0 <= index)
+                {
+                    if (current is IList list)
+                    {
+                        if (list.Count <= index)
+                        {
+                            return null;
+                        }
+
+                        current = list[index];
+                        currentType = current?.GetType();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            }
+
+            return current;
+        }
+
+        /// <summary>
+        /// Gets a cached string representation of an integer.
+        /// Delegates to <see cref="EditorCacheHelper.GetCachedIntString"/> for shared LRU caching.
+        /// </summary>
+        private static string GetCachedIntString(int value)
+        {
+            return EditorCacheHelper.GetCachedIntString(value);
+        }
+
+        /// <summary>
+        /// Gets a cached pagination label in the format "Page X / Y".
+        /// Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/> for shared LRU caching.
+        /// </summary>
+        private static string GetPaginationLabel(int currentPage, int totalPages)
+        {
+            return EditorCacheHelper.GetPaginationLabel(currentPage, totalPages);
+        }
+
+        private static string GetRangeLabel(int start, int end, int total)
+        {
+            (int, int, int) key = (start, end, total);
+            if (RangeLabelCache.TryGetValue(key, out string cached))
+            {
+                return cached;
+            }
+
+            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
+                32,
+                out StringBuilder builder
+            );
+            builder.Clear();
+            builder.Append(start);
+            builder.Append('-');
+            builder.Append(end);
+            builder.Append(" of ");
+            builder.Append(total);
+            string result = builder.ToString();
+
+            if (RangeLabelCache.Count < 10000)
+            {
+                RangeLabelCache[key] = result;
+            }
+
+            return result;
+        }
+
+        internal void InvokeClearDictionary(
+            SerializedProperty dictionaryProperty,
+            SerializedProperty keysProperty,
+            SerializedProperty valuesProperty,
+            PaginationState pagination,
+            ReorderableList list
+        )
+        {
+            ClearDictionary(dictionaryProperty, keysProperty, valuesProperty, pagination, list);
+        }
+
+        private sealed class CachedPropertyPair
+        {
+            public SerializedProperty keysProperty;
+            public SerializedProperty valuesProperty;
+        }
+
+        private sealed class HeightCacheEntry
+        {
+            public float height;
+            public int arraySize;
+            public int pageIndex;
+            public bool isExpanded;
+            public bool hasNullKeys;
+            public bool hasDuplicates;
+            public bool pendingIsExpanded;
+            public float pendingFoldoutProgress;
+            public float mainFoldoutProgress;
+            public int frameNumber;
+        }
+
+        private readonly struct RowRenderKey : IEquatable<RowRenderKey>
+        {
+            public readonly string listKey;
+            public readonly int globalIndex;
+
+            public RowRenderKey(string listKey, int globalIndex)
+            {
+                this.listKey = listKey;
+                this.globalIndex = globalIndex;
+            }
+
+            public bool Equals(RowRenderKey other)
+            {
+                return globalIndex == other.globalIndex && listKey == other.listKey;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is RowRenderKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(listKey, globalIndex);
+            }
+        }
+
+        private sealed class RowRenderData
+        {
+            public SerializedProperty keyProperty;
+            public SerializedProperty valueProperty;
+            public float rowHeight;
+            public float keyHeight;
+            public float valueHeight;
+            public bool valueSupportsFoldout;
+            public bool isValid;
+        }
+
+        private readonly struct PendingSectionMetrics
+        {
+            public float CollapsedHeight { get; }
+            public float ExpandedExtraHeight { get; }
+            public float KeyHeight { get; }
+            public float ValueHeight { get; }
+
+            public PendingSectionMetrics(
+                float collapsedHeight,
+                float expandedExtraHeight,
+                float keyHeight,
+                float valueHeight
+            )
+            {
+                CollapsedHeight = collapsedHeight;
+                ExpandedExtraHeight = expandedExtraHeight;
+                KeyHeight = keyHeight;
+                ValueHeight = valueHeight;
+            }
+
+            public float EvaluateHeight(float foldoutProgress)
+            {
+                return CollapsedHeight + ExpandedExtraHeight * Mathf.Clamp01(foldoutProgress);
+            }
+        }
+
+        private sealed class KeyValueSnapshot
+        {
+            public object key;
+            public object value;
+            public int originalIndex;
+        }
+
+        private sealed class KeyValueSnapshotComparer : IComparer<KeyValueSnapshot>
+        {
+            private readonly Func<object, object, int> _comparison;
+
+            public KeyValueSnapshotComparer(Func<object, object, int> comparison)
+            {
+                _comparison = comparison;
+            }
+
+            public int Compare(KeyValueSnapshot x, KeyValueSnapshot y)
+            {
+                if (ReferenceEquals(x, y))
+                {
+                    return 0;
+                }
+
+                if (x == null)
+                {
+                    return -1;
+                }
+
+                if (y == null)
+                {
+                    return 1;
+                }
+
+                if (_comparison == null)
+                {
+                    return 0;
+                }
+
+                int comparisonResult = _comparison(x.key, y.key);
+                if (comparisonResult != 0)
+                {
+                    return comparisonResult;
+                }
+
+                return x.originalIndex.CompareTo(y.originalIndex);
+            }
+        }
+
+        /// <summary>
+        /// Struct key for static property cache lookup to avoid string allocations.
+        /// </summary>
+        private readonly struct PropertyCacheKey : IEquatable<PropertyCacheKey>
+        {
+            public readonly long InstanceId;
+            public readonly string PropertyPath;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public PropertyCacheKey(long instanceId, string propertyPath)
+            {
+                InstanceId = instanceId;
+                PropertyPath = propertyPath;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(PropertyCacheKey other)
+            {
+                return InstanceId == other.InstanceId
+                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is PropertyCacheKey other && Equals(other);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(InstanceId, PropertyPath);
+            }
+        }
+
+        /// <summary>
+        /// Struct key for MainFoldoutAnimations cache to avoid string allocations.
+        /// Uses (instanceId, propertyPath) pair for cache identity.
+        /// </summary>
+        private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
+        {
+            public readonly long InstanceId;
+            public readonly string PropertyPath;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public MainFoldoutCacheKey(long instanceId, string propertyPath)
+            {
+                InstanceId = instanceId;
+                PropertyPath = propertyPath;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(MainFoldoutCacheKey other)
+            {
+                return InstanceId == other.InstanceId
+                    && string.Equals(PropertyPath, other.PropertyPath, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is MainFoldoutCacheKey other && Equals(other);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(InstanceId, PropertyPath);
+            }
+
+            /// <summary>
+            /// Converts to string representation for test verification.
+            /// </summary>
+            public override string ToString()
+            {
+                return $"{InstanceId}:{PropertyPath}";
+            }
+        }
+
+        internal sealed class PendingValueWrapper : ScriptableObject
+        {
+            private const string PropertyName = nameof(boxedValue);
+
+            [SerializeReference]
+            private object boxedValue;
+
+            public object GetValue()
+            {
+                return boxedValue;
+            }
+
+            public void SetValue(object incoming)
+            {
+                boxedValue = incoming;
+            }
+
+            public SerializedProperty FindValueProperty(SerializedObject serializedObject)
+            {
+                return serializedObject.FindProperty(PropertyName);
+            }
+        }
+
+        internal readonly struct PendingWrapperContext
+        {
+            public static readonly PendingWrapperContext Empty = new(null, null, null);
+
+            public PendingWrapperContext(
+                PendingValueWrapper wrapper,
+                SerializedObject serialized,
+                SerializedProperty property
+            )
+            {
+                Wrapper = wrapper;
+                Serialized = serialized;
+                Property = property;
+            }
+
+            public PendingValueWrapper Wrapper { get; }
+
+            public SerializedObject Serialized { get; }
+
+            public SerializedProperty Property { get; }
+        }
+
+        private readonly struct LabelWidthScope : IDisposable
+        {
+            private readonly float _previousWidth;
+
+            public LabelWidthScope(float width)
+            {
+                _previousWidth = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = width;
+            }
+
+            public void Dispose()
+            {
+                EditorGUIUtility.labelWidth = _previousWidth;
+            }
+        }
+
+        internal readonly struct RowFoldoutKey : IEquatable<RowFoldoutKey>
+        {
+            public RowFoldoutKey(string cacheKey, int index)
+            {
+                CacheKey = cacheKey;
+                Index = index;
+            }
+
+            public string CacheKey { get; }
+
+            public int Index { get; }
+
+            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
+
+            public bool Equals(RowFoldoutKey other)
+            {
+                return Index == other.Index && string.Equals(CacheKey, other.CacheKey);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is RowFoldoutKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(CacheKey, Index);
+            }
+        }
+
+        internal sealed class PaletteValueRenderer
+        {
+            private readonly Type _targetType;
+            private readonly Func<float> _heightProvider;
+            private readonly PaletteValueDrawHandler _drawHandler;
+
+            private PaletteValueRenderer(
+                Type targetType,
+                Func<float> heightProvider,
+                PaletteValueDrawHandler drawHandler
+            )
+            {
+                _targetType = targetType;
+                _heightProvider = heightProvider;
+                _drawHandler = drawHandler;
+            }
+
+            public float Height => _heightProvider();
+
+            public void Draw(Rect rect, GUIContent label, ref object value)
+            {
+                _drawHandler(rect, label, ref value);
+            }
+
+            public static PaletteValueRenderer CreateDualColorRenderer(
+                Type targetType,
+                FieldInfo firstField,
+                GUIContent firstLabel,
+                FieldInfo secondField,
+                GUIContent secondLabel
+            )
+            {
+                if (
+                    targetType == null
+                    || firstField == null
+                    || secondField == null
+                    || firstLabel == null
+                    || secondLabel == null
+                )
+                {
+                    return null;
+                }
+
+                return new PaletteValueRenderer(
+                    targetType,
+                    static () => EditorGUIUtility.singleLineHeight,
+                    delegate(Rect rect, GUIContent label, ref object instance)
+                    {
+                        instance = EnsurePaletteValueInstance(instance, targetType);
+                        Rect contentRect = EditorGUI.PrefixLabel(rect, label);
+                        float spacing = EditorGUIUtility.standardVerticalSpacing;
+                        float halfWidth = Mathf.Max(0f, (contentRect.width - spacing) * 0.5f);
+                        Rect firstRect = new(
+                            contentRect.x,
+                            contentRect.y,
+                            halfWidth,
+                            EditorGUIUtility.singleLineHeight
+                        );
+                        Rect secondRect = new(
+                            firstRect.xMax + spacing,
+                            contentRect.y,
+                            halfWidth,
+                            EditorGUIUtility.singleLineHeight
+                        );
+
+                        Color first = (Color)(firstField.GetValue(instance) ?? Color.clear);
+                        Color updatedFirst = EditorGUI.ColorField(firstRect, firstLabel, first);
+                        if (updatedFirst != first)
+                        {
+                            firstField.SetValue(instance, updatedFirst);
+                        }
+
+                        Color second = (Color)(secondField.GetValue(instance) ?? Color.clear);
+                        Color updatedSecond = EditorGUI.ColorField(secondRect, secondLabel, second);
+                        if (updatedSecond != second)
+                        {
+                            secondField.SetValue(instance, updatedSecond);
+                        }
+                    }
+                );
+            }
+
+            public static PaletteValueRenderer CreateWEnumRenderer(
+                Type targetType,
+                FieldInfo selectedBgField,
+                GUIContent selectedBgLabel,
+                FieldInfo selectedTextField,
+                GUIContent selectedTextLabel,
+                FieldInfo inactiveBgField,
+                GUIContent inactiveBgLabel,
+                FieldInfo inactiveTextField,
+                GUIContent inactiveTextLabel
+            )
+            {
+                if (
+                    targetType == null
+                    || selectedBgField == null
+                    || selectedTextField == null
+                    || inactiveBgField == null
+                    || inactiveTextField == null
+                )
+                {
+                    return null;
+                }
+
+                return new PaletteValueRenderer(
+                    targetType,
+                    static () =>
+                        (EditorGUIUtility.singleLineHeight * 2f)
+                        + EditorGUIUtility.standardVerticalSpacing,
+                    delegate(Rect rect, GUIContent label, ref object instance)
+                    {
+                        instance = EnsurePaletteValueInstance(instance, targetType);
+                        Rect contentRect = EditorGUI.PrefixLabel(rect, label);
+                        float rowHeight = EditorGUIUtility.singleLineHeight;
+                        float spacing = EditorGUIUtility.standardVerticalSpacing;
+                        float halfWidth = Mathf.Max(0f, (contentRect.width - spacing) * 0.5f);
+
+                        Rect selectedBgRect = new(
+                            contentRect.x,
+                            contentRect.y,
+                            halfWidth,
+                            rowHeight
+                        );
+                        Rect selectedTextRect = new(
+                            selectedBgRect.xMax + spacing,
+                            contentRect.y,
+                            halfWidth,
+                            rowHeight
+                        );
+                        Rect inactiveBgRect = new(
+                            contentRect.x,
+                            contentRect.y + rowHeight + spacing,
+                            halfWidth,
+                            rowHeight
+                        );
+                        Rect inactiveTextRect = new(
+                            inactiveBgRect.xMax + spacing,
+                            inactiveBgRect.y,
+                            halfWidth,
+                            rowHeight
+                        );
+
+                        Color selectedBg = (Color)(
+                            selectedBgField.GetValue(instance) ?? Color.clear
+                        );
+                        Color updatedSelectedBg = EditorGUI.ColorField(
+                            selectedBgRect,
+                            selectedBgLabel,
+                            selectedBg
+                        );
+                        if (updatedSelectedBg != selectedBg)
+                        {
+                            selectedBgField.SetValue(instance, updatedSelectedBg);
+                        }
+
+                        Color selectedText = (Color)(
+                            selectedTextField.GetValue(instance) ?? Color.clear
+                        );
+                        Color updatedSelectedText = EditorGUI.ColorField(
+                            selectedTextRect,
+                            selectedTextLabel,
+                            selectedText
+                        );
+                        if (updatedSelectedText != selectedText)
+                        {
+                            selectedTextField.SetValue(instance, updatedSelectedText);
+                        }
+
+                        Color inactiveBg = (Color)(
+                            inactiveBgField.GetValue(instance) ?? Color.clear
+                        );
+                        Color updatedInactiveBg = EditorGUI.ColorField(
+                            inactiveBgRect,
+                            inactiveBgLabel,
+                            inactiveBg
+                        );
+                        if (updatedInactiveBg != inactiveBg)
+                        {
+                            inactiveBgField.SetValue(instance, updatedInactiveBg);
+                        }
+
+                        Color inactiveText = (Color)(
+                            inactiveTextField.GetValue(instance) ?? Color.clear
+                        );
+                        Color updatedInactiveText = EditorGUI.ColorField(
+                            inactiveTextRect,
+                            inactiveTextLabel,
+                            inactiveText
+                        );
+                        if (updatedInactiveText != inactiveText)
+                        {
+                            inactiveTextField.SetValue(instance, updatedInactiveText);
+                        }
+                    }
+                );
+            }
         }
 
         internal struct CommitResult
@@ -10032,469 +10495,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 return obj.GetHashCode();
             }
-        }
-
-        internal static void SyncRuntimeDictionary(SerializedProperty dictionaryProperty)
-        {
-            SerializedObject serializedObject = dictionaryProperty.serializedObject;
-            Object[] targets = serializedObject.targetObjects;
-            string propertyPath = dictionaryProperty.propertyPath;
-
-            foreach (Object target in targets)
-            {
-                object dictionaryInstance = GetTargetObjectOfProperty(target, propertyPath);
-                bool isSerializableDictionaryBase =
-                    dictionaryInstance is SerializableDictionaryBase;
-                bool calledSave = false;
-                bool isScriptableSingletonTarget = IsScriptableSingletonType(target);
-
-                // For ScriptableSingleton targets, we must NOT call EditorAfterDeserialize()
-                // immediately after ApplyModifiedProperties because the managed serialized fields
-                // (_keys, _values) are not yet updated by Unity's serialization system.
-                // Calling EditorAfterDeserialize would read stale data and overwrite our changes.
-                // Instead, we use ForwardSyncFromSerializedProperties to read the current values
-                // directly from the SerializedProperties and update the runtime dictionary.
-                if (
-                    isScriptableSingletonTarget
-                    && dictionaryInstance is SerializableDictionaryBase baseDictionary
-                )
-                {
-                    ForwardSyncFromSerializedProperties(dictionaryProperty, baseDictionary);
-                    EditorUtility.SetDirty(target);
-                    if (target is UnityHelpersSettings unitySettings)
-                    {
-                        unitySettings.SaveSettings();
-                    }
-                    else
-                    {
-                        SaveScriptableSingleton(target);
-                    }
-                    calledSave = true;
-                }
-                else if (dictionaryInstance is SerializableDictionaryBase nonSingletonDictionary)
-                {
-                    nonSingletonDictionary.EditorAfterDeserialize();
-                    EditorUtility.SetDirty(target);
-                }
-                else if (dictionaryInstance is ISerializationCallbackReceiver receiver)
-                {
-                    receiver.OnAfterDeserialize();
-                    EditorUtility.SetDirty(target);
-                }
-
-                PaletteSerializationDiagnostics.ReportSyncRuntimeDictionary(
-                    serializedObject,
-                    propertyPath,
-                    dictionaryInstance,
-                    isSerializableDictionaryBase,
-                    calledSave
-                );
-            }
-
-            serializedObject.UpdateIfRequiredOrScript();
-        }
-
-        /// <summary>
-        /// Performs a forward sync from SerializedProperties to the runtime dictionary.
-        /// This is used for ScriptableSingleton targets where the managed fields are stale
-        /// after ApplyModifiedProperties. Instead of reading from the managed fields (which
-        /// would give us stale data), we read directly from the SerializedProperties which
-        /// have the current values.
-        /// </summary>
-        private static void ForwardSyncFromSerializedProperties(
-            SerializedProperty dictionaryProperty,
-            SerializableDictionaryBase baseDictionary
-        )
-        {
-            // First, call OnBeforeSerialize to ensure the managed arrays are in sync with runtime
-            // (This writes runtime state to managed arrays, which is the opposite of what we want,
-            // but it's necessary to prepare for the next step)
-            // Actually, we need to update the managed arrays FROM the SerializedProperties first
-
-            // The managed arrays (_keys and _values) need to be updated from the SerializedProperties.
-            // We'll read all key-value pairs from the SerializedProperties and rebuild the runtime dictionary.
-            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-
-            if (
-                keysProperty == null
-                || valuesProperty == null
-                || !keysProperty.isArray
-                || !valuesProperty.isArray
-            )
-            {
-                return;
-            }
-
-            int count = Mathf.Min(keysProperty.arraySize, valuesProperty.arraySize);
-
-            // We need to update the managed arrays so that EditorAfterDeserialize reads current data.
-            // The cleanest way is to directly set the managed field values using reflection.
-            Type dictionaryType = baseDictionary.GetType();
-            Type baseType = dictionaryType;
-            while (baseType != null && !baseType.IsGenericType)
-            {
-                baseType = baseType.BaseType;
-            }
-
-            if (baseType == null)
-            {
-                // Fallback: just call EditorAfterDeserialize and hope the timing works out
-                baseDictionary.EditorAfterDeserialize();
-                return;
-            }
-
-            // Get the key and value types from the generic type arguments
-            Type[] genericArgs = baseType.GetGenericArguments();
-            if (genericArgs.Length < 2)
-            {
-                baseDictionary.EditorAfterDeserialize();
-                return;
-            }
-
-            Type keyType = genericArgs[0];
-            Type valueType = 2 <= genericArgs.Length ? genericArgs[1] : null;
-
-            // Get the _keys and _values fields
-            FieldInfo keysField = FindFieldInHierarchy(
-                dictionaryType,
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            FieldInfo valuesField = FindFieldInHierarchy(
-                dictionaryType,
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-
-            if (keysField == null || valuesField == null)
-            {
-                baseDictionary.EditorAfterDeserialize();
-                return;
-            }
-
-            // Create new arrays with the correct size
-            Array keysArray = Array.CreateInstance(keyType, count);
-            Array valuesArray = Array.CreateInstance(valueType, count);
-
-            // Copy values from SerializedProperties to the arrays
-            for (int i = 0; i < count; i++)
-            {
-                SerializedProperty keyProp = keysProperty.GetArrayElementAtIndex(i);
-                SerializedProperty valueProp = GetValueElement(valuesProperty, i);
-
-                object keyValue = GetPropertyValueBoxed(keyProp, keyType);
-                object valueValue = GetPropertyValueBoxed(valueProp, valueType);
-
-                if (keyValue != null || !keyType.IsValueType)
-                {
-                    keysArray.SetValue(keyValue, i);
-                }
-                if (valueValue != null || !valueType.IsValueType)
-                {
-                    valuesArray.SetValue(valueValue, i);
-                }
-            }
-
-            // Set the managed fields directly
-            keysField.SetValue(baseDictionary, keysArray);
-            valuesField.SetValue(baseDictionary, valuesArray);
-
-            // The managed arrays above are the fresh copy, so ask for the rebuild that trusts them.
-            // The plain EditorAfterDeserialize would refill the values array from the boxed one --
-            // correct for every OTHER caller here, which reaches it without writing anything, and
-            // wrong for this one, which would lose the write it just made.
-            baseDictionary.EditorAfterDeserializeFromManagedArrays();
-        }
-
-        private static FieldInfo FindFieldInHierarchy(Type type, string fieldName)
-        {
-            while (type != null)
-            {
-                FieldInfo field = type.GetField(
-                    fieldName,
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
-                );
-                if (field != null)
-                {
-                    return field;
-                }
-                type = type.BaseType;
-            }
-            return null;
-        }
-
-        private static object GetPropertyValueBoxed(SerializedProperty property, Type targetType)
-        {
-            if (property == null)
-            {
-                return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
-            }
-
-            return property.propertyType switch
-            {
-                SerializedPropertyType.Integer => property.intValue,
-                SerializedPropertyType.Boolean => property.boolValue,
-                SerializedPropertyType.Float => property.floatValue,
-                SerializedPropertyType.String => property.stringValue,
-                SerializedPropertyType.Color => property.colorValue,
-                SerializedPropertyType.ObjectReference => property.objectReferenceValue,
-                SerializedPropertyType.Enum => property.enumValueIndex,
-                SerializedPropertyType.Vector2 => property.vector2Value,
-                SerializedPropertyType.Vector3 => property.vector3Value,
-                SerializedPropertyType.Vector4 => property.vector4Value,
-                SerializedPropertyType.Rect => property.rectValue,
-                SerializedPropertyType.ArraySize => property.intValue,
-                SerializedPropertyType.Character => (char)property.intValue,
-                SerializedPropertyType.AnimationCurve => property.animationCurveValue,
-                SerializedPropertyType.Bounds => property.boundsValue,
-                SerializedPropertyType.Quaternion => property.quaternionValue,
-                SerializedPropertyType.Vector2Int => property.vector2IntValue,
-                SerializedPropertyType.Vector3Int => property.vector3IntValue,
-                SerializedPropertyType.RectInt => property.rectIntValue,
-                SerializedPropertyType.BoundsInt => property.boundsIntValue,
-                SerializedPropertyType.ManagedReference => property.managedReferenceValue,
-                _ => GetComplexPropertyValue(property, targetType),
-            };
-        }
-
-        private static object GetComplexPropertyValue(SerializedProperty property, Type targetType)
-        {
-            // For complex types (structs, classes), we need to create an instance and populate its fields
-            if (targetType == null || property == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                object instance = CreateInstanceSafe(targetType);
-                if (instance == null)
-                {
-                    return null;
-                }
-
-                // Iterate through the property's children and set field values
-                SerializedProperty iterator = property.Copy();
-                SerializedProperty endProperty = property.GetEndProperty();
-                bool enterChildren = true;
-                int depth = property.depth;
-
-                while (
-                    iterator.NextVisible(enterChildren)
-                    && !SerializedProperty.EqualContents(iterator, endProperty)
-                )
-                {
-                    enterChildren = false;
-                    if (iterator.depth <= depth)
-                    {
-                        break;
-                    }
-
-                    string fieldName = iterator.name;
-                    FieldInfo field = FindFieldInHierarchy(targetType, fieldName);
-                    if (field != null)
-                    {
-                        object fieldValue = GetPropertyValueBoxed(iterator, field.FieldType);
-                        field.SetValue(instance, fieldValue);
-                    }
-                }
-
-                return instance;
-            }
-            catch
-            {
-                return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
-            }
-        }
-
-        private static object CreateInstanceSafe(Type type)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                // Try default constructor first
-                return Activator.CreateInstance(type);
-            }
-            catch
-            {
-                // For types without default constructor, try FormatterServices
-                try
-                {
-                    return System.Runtime.Serialization.FormatterServices.GetUninitializedObject(
-                        type
-                    );
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-        }
-
-        private static object GetTargetObjectOfProperty(object target, string propertyPath)
-        {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
-            {
-                return null;
-            }
-
-            string path = propertyPath.Replace(".Array.data[", "[");
-            string[] elements = path.Split('.');
-
-            object current = target;
-            Type currentType = current.GetType();
-
-            foreach (string elementWithPotentialIndex in elements)
-            {
-                if (current == null)
-                {
-                    return null;
-                }
-
-                string element = elementWithPotentialIndex;
-                int index = -1;
-                int bracketIndex = element.IndexOf('[', StringComparison.Ordinal);
-                if (0 <= bracketIndex)
-                {
-                    int endBracket = element.IndexOf(']', bracketIndex + 1);
-                    if (endBracket < 0)
-                    {
-                        return null;
-                    }
-
-                    string indexString = element.Substring(
-                        bracketIndex + 1,
-                        endBracket - bracketIndex - 1
-                    );
-                    if (!int.TryParse(indexString, out index))
-                    {
-                        return null;
-                    }
-
-                    element = element.Substring(0, bracketIndex);
-                }
-
-                if (!string.IsNullOrEmpty(element))
-                {
-                    // Use cached reflection lookups for better performance
-                    if (
-                        ReflectionHelpers.TryGetField(
-                            currentType,
-                            element,
-                            out FieldInfo field,
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                        )
-                    )
-                    {
-                        Func<object, object> getter = ReflectionHelpers.GetFieldGetter(field);
-                        current = getter(current);
-                        currentType = current?.GetType();
-                    }
-                    else if (
-                        ReflectionHelpers.TryGetProperty(
-                            currentType,
-                            element,
-                            out PropertyInfo propertyInfo,
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                        )
-                    )
-                    {
-                        Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(
-                            propertyInfo
-                        );
-                        current = getter(current);
-                        currentType = current?.GetType();
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-
-                if (0 <= index)
-                {
-                    if (current is IList list)
-                    {
-                        if (list.Count <= index)
-                        {
-                            return null;
-                        }
-
-                        current = list[index];
-                        currentType = current?.GetType();
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-            }
-
-            return current;
-        }
-
-        /// <summary>
-        /// Gets a cached string representation of an integer.
-        /// Delegates to <see cref="EditorCacheHelper.GetCachedIntString"/> for shared LRU caching.
-        /// </summary>
-        private static string GetCachedIntString(int value)
-        {
-            return EditorCacheHelper.GetCachedIntString(value);
-        }
-
-        /// <summary>
-        /// Gets a cached pagination label in the format "Page X / Y".
-        /// Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/> for shared LRU caching.
-        /// </summary>
-        private static string GetPaginationLabel(int currentPage, int totalPages)
-        {
-            return EditorCacheHelper.GetPaginationLabel(currentPage, totalPages);
-        }
-
-        private static string GetRangeLabel(int start, int end, int total)
-        {
-            (int, int, int) key = (start, end, total);
-            if (RangeLabelCache.TryGetValue(key, out string cached))
-            {
-                return cached;
-            }
-
-            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
-                32,
-                out StringBuilder builder
-            );
-            builder.Clear();
-            builder.Append(start);
-            builder.Append('-');
-            builder.Append(end);
-            builder.Append(" of ");
-            builder.Append(total);
-            string result = builder.ToString();
-
-            if (RangeLabelCache.Count < 10000)
-            {
-                RangeLabelCache[key] = result;
-            }
-
-            return result;
-        }
-
-        internal void InvokeClearDictionary(
-            SerializedProperty dictionaryProperty,
-            SerializedProperty keysProperty,
-            SerializedProperty valuesProperty,
-            PaginationState pagination,
-            ReorderableList list
-        )
-        {
-            ClearDictionary(dictionaryProperty, keysProperty, valuesProperty, pagination, list);
         }
     }
 }

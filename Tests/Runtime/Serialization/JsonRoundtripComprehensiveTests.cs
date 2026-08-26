@@ -16,23 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class JsonRoundtripComprehensiveTests
     {
-        private sealed class CompositePayload
-        {
-            public FastVector2Int fv2 { get; set; }
-            public FastVector3Int fv3 { get; set; }
-            public Vector2 v2 { get; set; }
-            public Vector3 v3 { get; set; }
-            public Bounds bounds { get; set; }
-            public BoundsInt boundsInt { get; set; }
-            public Rect rect { get; set; }
-            public RectInt rectInt { get; set; }
-            public Quaternion q { get; set; }
-            public Range<int> ri { get; set; }
-            public Range<float> rf { get; set; }
-            public List<FastVector3Int> listFv3 { get; set; }
-            public Dictionary<string, FastVector2Int> mapFv2 { get; set; }
-        }
-
         [Test]
         public void AdaptersCollectionsRoundTrip()
         {
@@ -230,6 +213,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 again.mapFv2["x"],
                 "Dictionary element should match with fast options"
             );
+        }
+
+        private sealed class CompositePayload
+        {
+            public FastVector2Int fv2 { get; set; }
+            public FastVector3Int fv3 { get; set; }
+            public Vector2 v2 { get; set; }
+            public Vector3 v3 { get; set; }
+            public Bounds bounds { get; set; }
+            public BoundsInt boundsInt { get; set; }
+            public Rect rect { get; set; }
+            public RectInt rectInt { get; set; }
+            public Quaternion q { get; set; }
+            public Range<int> ri { get; set; }
+            public Range<float> rf { get; set; }
+            public List<FastVector3Int> listFv3 { get; set; }
+            public Dictionary<string, FastVector2Int> mapFv2 { get; set; }
         }
     }
 }

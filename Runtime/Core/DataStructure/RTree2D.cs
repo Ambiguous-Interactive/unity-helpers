@@ -34,66 +34,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         internal const float MinimumNodeSize = 0.001f;
 
-        [Serializable]
-        internal struct ElementData
-        {
-            internal T _value;
-            internal Bounds _bounds;
-            internal Vector2 _center;
-            internal ulong _sortKey;
-        }
-
-        [Serializable]
-        public sealed class RTreeNode
-        {
-            public readonly Bounds boundary;
-            internal readonly RTreeNode[] _children;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-
-            private RTreeNode(int startIndex, int count, Bounds boundary, RTreeNode[] children)
-            {
-                _startIndex = startIndex;
-                _count = count;
-                this.boundary = boundary;
-                _children = children ?? Array.Empty<RTreeNode>();
-                isTerminal = _children.Length == 0;
-            }
-
-            internal static RTreeNode CreateEmpty()
-            {
-                return new RTreeNode(0, 0, new Bounds(), Array.Empty<RTreeNode>());
-            }
-
-            internal static RTreeNode CreateLeaf(ElementData[] elements, int startIndex, int count)
-            {
-                Bounds nodeBounds = CalculateBounds(elements, startIndex, count);
-                return new RTreeNode(startIndex, count, nodeBounds, Array.Empty<RTreeNode>());
-            }
-
-            internal static RTreeNode CreateInternal(RTreeNode[] children)
-            {
-                if (children.Length == 0)
-                {
-                    return CreateEmpty();
-                }
-
-                int startIndex = children[0]._startIndex;
-                int lastChildIndex = children.Length - 1;
-                RTreeNode lastChild = children[lastChildIndex];
-                int endIndex = lastChild._startIndex + lastChild._count;
-                Bounds nodeBounds = children[0].boundary;
-                for (int i = 1; i < children.Length; ++i)
-                {
-                    nodeBounds.Encapsulate(children[i].boundary);
-                }
-
-                nodeBounds = EnsureMinimumBounds(nodeBounds);
-                return new RTreeNode(startIndex, endIndex - startIndex, nodeBounds, children);
-            }
-        }
-
         /// <summary>
         /// Default number of elements per leaf node.
         /// </summary>
@@ -711,6 +651,66 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             value = (value | (value << 2)) & 0x33333333;
             value = (value | (value << 1)) & 0x55555555;
             return value;
+        }
+
+        [Serializable]
+        internal struct ElementData
+        {
+            internal T _value;
+            internal Bounds _bounds;
+            internal Vector2 _center;
+            internal ulong _sortKey;
+        }
+
+        [Serializable]
+        public sealed class RTreeNode
+        {
+            public readonly Bounds boundary;
+            internal readonly RTreeNode[] _children;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+
+            private RTreeNode(int startIndex, int count, Bounds boundary, RTreeNode[] children)
+            {
+                _startIndex = startIndex;
+                _count = count;
+                this.boundary = boundary;
+                _children = children ?? Array.Empty<RTreeNode>();
+                isTerminal = _children.Length == 0;
+            }
+
+            internal static RTreeNode CreateEmpty()
+            {
+                return new RTreeNode(0, 0, new Bounds(), Array.Empty<RTreeNode>());
+            }
+
+            internal static RTreeNode CreateLeaf(ElementData[] elements, int startIndex, int count)
+            {
+                Bounds nodeBounds = CalculateBounds(elements, startIndex, count);
+                return new RTreeNode(startIndex, count, nodeBounds, Array.Empty<RTreeNode>());
+            }
+
+            internal static RTreeNode CreateInternal(RTreeNode[] children)
+            {
+                if (children.Length == 0)
+                {
+                    return CreateEmpty();
+                }
+
+                int startIndex = children[0]._startIndex;
+                int lastChildIndex = children.Length - 1;
+                RTreeNode lastChild = children[lastChildIndex];
+                int endIndex = lastChild._startIndex + lastChild._count;
+                Bounds nodeBounds = children[0].boundary;
+                for (int i = 1; i < children.Length; ++i)
+                {
+                    nodeBounds.Encapsulate(children[i].boundary);
+                }
+
+                nodeBounds = EnsureMinimumBounds(nodeBounds);
+                return new RTreeNode(startIndex, endIndex - startIndex, nodeBounds, children);
+            }
         }
     }
 }

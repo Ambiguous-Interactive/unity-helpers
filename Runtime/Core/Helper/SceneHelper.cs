@@ -205,6 +205,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static bool SceneAssetExists(string scenePath)
+        {
+            if (string.IsNullOrWhiteSpace(scenePath))
+            {
+                return false;
+            }
+
+            string normalized = scenePath.SanitizePath();
+            if (Path.IsPathRooted(normalized))
+            {
+                return File.Exists(normalized);
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return false;
+            }
+
+            string absolutePath = Path.Combine(projectRoot, normalized);
+            return File.Exists(absolutePath);
+        }
+
         /// <summary>
         /// A helper scope that ensures a target scene is loaded and provides an async disposal to unload it.
         /// </summary>
@@ -315,29 +338,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 await SceneManager.UnloadSceneAsync(openedScene, UnloadSceneOptions.None);
 #endif
             }
-        }
-
-        private static bool SceneAssetExists(string scenePath)
-        {
-            if (string.IsNullOrWhiteSpace(scenePath))
-            {
-                return false;
-            }
-
-            string normalized = scenePath.SanitizePath();
-            if (Path.IsPathRooted(normalized))
-            {
-                return File.Exists(normalized);
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return false;
-            }
-
-            string absolutePath = Path.Combine(projectRoot, normalized);
-            return File.Exists(absolutePath);
         }
     }
 }

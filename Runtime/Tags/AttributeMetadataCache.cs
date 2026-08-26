@@ -28,233 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         [SerializeField]
         private bool _prewarmRelationalOnLoad = false;
 
-        /// <summary>
-        /// Categorizes a relational attribute reference discovered on an <see cref="AttributesComponent"/>.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Relational attributes allow a component to expose references to related components so modifications can propagate
-        /// (e.g., parent/child links for hierarchical buffs). These values are serialized into the cache to avoid runtime reflection.
-        /// </para>
-        /// <para>
-        /// Typical usage happens via auto-generated metadata; you generally do not set this manually.
-        /// </para>
-        /// </remarks>
-        public enum RelationalAttributeKind : byte
-        {
-            [Obsolete("Default uninitialized value - should never be used")]
-            Unknown = 0,
-
-            /// <summary>
-            /// The relational field points to a parent component.
-            /// </summary>
-            Parent = 1,
-
-            /// <summary>
-            /// The relational field points to a child component.
-            /// </summary>
-            Child = 2,
-
-            /// <summary>
-            /// The relational field points to a sibling component.
-            /// </summary>
-            Sibling = 3,
-        }
-
-        /// <summary>
-        /// Describes the collection shape of a relational field captured in metadata.
-        /// </summary>
-        public enum FieldKind : byte
-        {
-            [Obsolete("Default uninitialized value - should never be used")]
-            None = 0,
-
-            /// <summary>
-            /// A single reference value.
-            /// </summary>
-            Single = 1,
-
-            /// <summary>
-            /// An array of values.
-            /// </summary>
-            Array = 2,
-
-            /// <summary>
-            /// A <see cref="List{T}"/> of values.
-            /// </summary>
-            List = 3,
-
-            /// <summary>
-            /// A <see cref="HashSet{T}"/> of values.
-            /// </summary>
-            HashSet = 4,
-        }
-
-        /// <summary>
-        /// Serializable entry describing attribute field names for a single component type.
-        /// </summary>
-        [Serializable]
-        public sealed class TypeFieldMetadata
-        {
-            /// <summary>
-            /// Assembly-qualified component type name.
-            /// </summary>
-            public string typeName;
-
-            /// <summary>
-            /// Attribute field names discovered on the component.
-            /// </summary>
-            public string[] fieldNames;
-
-            /// <summary>
-            /// Creates a new metadata entry for a component type.
-            /// </summary>
-            /// <param name="typeName">Assembly-qualified name of the component type.</param>
-            /// <param name="fieldNames">Attribute field names found on that type.</param>
-            public TypeFieldMetadata(string typeName, string[] fieldNames)
-            {
-                this.typeName = typeName;
-                this.fieldNames = fieldNames;
-            }
-        }
-
-        /// <summary>
-        /// Serializable entry describing a relational attribute field on a component.
-        /// </summary>
-        [Serializable]
-        public sealed class RelationalFieldMetadata
-        {
-            /// <summary>
-            /// The name of the relational field on the component.
-            /// </summary>
-            public string fieldName;
-
-            /// <summary>
-            /// The relationship classification (parent/child/sibling).
-            /// </summary>
-            public RelationalAttributeKind attributeKind;
-
-            /// <summary>
-            /// The collection shape of the field (single, array, list, hashset).
-            /// </summary>
-            public FieldKind fieldKind;
-
-            /// <summary>
-            /// The assembly-qualified element type name for the field (for collections) or the field type (for singles).
-            /// </summary>
-            public string elementTypeName;
-
-            /// <summary>
-            /// Indicates whether the element type is an interface (affects resolution and validation).
-            /// </summary>
-            public bool isInterface;
-
-            /// <summary>
-            /// Creates a relational metadata entry for a component field.
-            /// </summary>
-            /// <param name="fieldName">The field name on the component.</param>
-            /// <param name="attributeKind">How the field relates to other components.</param>
-            /// <param name="fieldKind">Collection shape of the field.</param>
-            /// <param name="elementTypeName">Assembly-qualified element or field type.</param>
-            /// <param name="isInterface">Whether the element type is an interface.</param>
-            public RelationalFieldMetadata(
-                string fieldName,
-                RelationalAttributeKind attributeKind,
-                FieldKind fieldKind,
-                string elementTypeName,
-                bool isInterface
-            )
-            {
-                this.fieldName = fieldName;
-                this.attributeKind = attributeKind;
-                this.fieldKind = fieldKind;
-                this.elementTypeName = elementTypeName;
-                this.isInterface = isInterface;
-            }
-        }
-
-        /// <summary>
-        /// Runtime-resolved relational field metadata with <see cref="Type"/> references resolved.
-        /// </summary>
-        public readonly struct ResolvedRelationalFieldMetadata
-        {
-            /// <summary>
-            /// Creates a resolved relational metadata entry.
-            /// </summary>
-            /// <param name="fieldName">The relational field name on the component.</param>
-            /// <param name="attributeKind">Relationship classification.</param>
-            /// <param name="fieldKind">Collection shape of the field.</param>
-            /// <param name="elementType">Resolved element type (or field type for singles).</param>
-            /// <param name="isInterface">Whether the element type is an interface.</param>
-            public ResolvedRelationalFieldMetadata(
-                string fieldName,
-                RelationalAttributeKind attributeKind,
-                FieldKind fieldKind,
-                Type elementType,
-                bool isInterface
-            )
-            {
-                FieldName = fieldName;
-                AttributeKind = attributeKind;
-                FieldKind = fieldKind;
-                ElementType = elementType;
-                IsInterface = isInterface;
-            }
-
-            /// <summary>
-            /// The name of the relational field.
-            /// </summary>
-            public string FieldName { get; }
-
-            /// <summary>
-            /// Relationship classification for the field.
-            /// </summary>
-            public RelationalAttributeKind AttributeKind { get; }
-
-            /// <summary>
-            /// Collection shape of the field.
-            /// </summary>
-            public FieldKind FieldKind { get; }
-
-            /// <summary>
-            /// Resolved CLR type for the element/field.
-            /// </summary>
-            public Type ElementType { get; }
-
-            /// <summary>
-            /// Indicates if the element type is an interface.
-            /// </summary>
-            public bool IsInterface { get; }
-        }
-
-        /// <summary>
-        /// Serializable entry describing all relational fields for a component type.
-        /// </summary>
-        [Serializable]
-        public sealed class RelationalTypeMetadata
-        {
-            /// <summary>
-            /// Assembly-qualified component type name.
-            /// </summary>
-            public string typeName;
-
-            /// <summary>
-            /// Relational attribute fields discovered on the component.
-            /// </summary>
-            public RelationalFieldMetadata[] fields;
-
-            /// <summary>
-            /// Creates relational metadata for a component type.
-            /// </summary>
-            /// <param name="typeName">Assembly-qualified name of the component type.</param>
-            /// <param name="fields">Relational fields discovered on that type.</param>
-            public RelationalTypeMetadata(string typeName, RelationalFieldMetadata[] fields)
-            {
-                this.typeName = typeName;
-                this.fields = fields;
-            }
-        }
-
         [SerializeField]
         private string[] _allAttributeNames = Array.Empty<string>();
 
@@ -271,50 +44,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         internal RelationalTypeMetadata[] _relationalTypeMetadata =
             Array.Empty<RelationalTypeMetadata>();
 
-        /// <summary>
-        /// Serialized entry describing an auto-loaded singleton dependency.
-        /// </summary>
-        [Serializable]
-        public sealed class AutoLoadSingletonEntry
-        {
-            /// <summary>
-            /// Assembly-qualified type name of the singleton to load.
-            /// </summary>
-            public string typeName;
-
-            /// <summary>
-            /// Whether the singleton should be created, fetched, or ignored.
-            /// </summary>
-            public SingletonAutoLoadKind kind;
-
-            /// <summary>
-            /// Unity load phase used to initialize the singleton.
-            /// </summary>
-            public RuntimeInitializeLoadType loadType;
-
-            /// <summary>
-            /// Default constructor for serialization.
-            /// </summary>
-            public AutoLoadSingletonEntry() { }
-
-            /// <summary>
-            /// Creates a new singleton auto-load entry.
-            /// </summary>
-            /// <param name="typeName">Assembly-qualified type name to load.</param>
-            /// <param name="kind">How the singleton should be handled.</param>
-            /// <param name="loadType">Unity load phase for initialization.</param>
-            public AutoLoadSingletonEntry(
-                string typeName,
-                SingletonAutoLoadKind kind,
-                RuntimeInitializeLoadType loadType
-            )
-            {
-                this.typeName = typeName;
-                this.kind = kind;
-                this.loadType = loadType;
-            }
-        }
-
         [SerializeField]
         private AutoLoadSingletonEntry[] _autoLoadSingletons =
             Array.Empty<AutoLoadSingletonEntry>();
@@ -329,35 +58,6 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         internal AutoLoadSingletonEntry[] SerializedAutoLoadSingletons =>
             _autoLoadSingletons ?? Array.Empty<AutoLoadSingletonEntry>();
-
-        // Compound key for element type lookup
-        private readonly struct ElementTypeKey : IEquatable<ElementTypeKey>
-        {
-            private readonly Type _componentType;
-            private readonly string _fieldName;
-
-            public ElementTypeKey(Type componentType, string fieldName)
-            {
-                _componentType = componentType;
-                _fieldName = fieldName;
-            }
-
-            public bool Equals(ElementTypeKey other)
-            {
-                return _componentType == other._componentType
-                    && string.Equals(_fieldName, other._fieldName, StringComparison.Ordinal);
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is ElementTypeKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return Objects.HashCode(_componentType, _fieldName);
-            }
-        }
 
         private readonly object _lookupLock = new();
 
@@ -1231,5 +931,305 @@ namespace WallstopStudios.UnityHelpers.Tags
             return result.ToArray();
         }
 #endif
+
+        /// <summary>
+        /// Categorizes a relational attribute reference discovered on an <see cref="AttributesComponent"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Relational attributes allow a component to expose references to related components so modifications can propagate
+        /// (e.g., parent/child links for hierarchical buffs). These values are serialized into the cache to avoid runtime reflection.
+        /// </para>
+        /// <para>
+        /// Typical usage happens via auto-generated metadata; you generally do not set this manually.
+        /// </para>
+        /// </remarks>
+        public enum RelationalAttributeKind : byte
+        {
+            [Obsolete("Default uninitialized value - should never be used")]
+            Unknown = 0,
+
+            /// <summary>
+            /// The relational field points to a parent component.
+            /// </summary>
+            Parent = 1,
+
+            /// <summary>
+            /// The relational field points to a child component.
+            /// </summary>
+            Child = 2,
+
+            /// <summary>
+            /// The relational field points to a sibling component.
+            /// </summary>
+            Sibling = 3,
+        }
+
+        /// <summary>
+        /// Describes the collection shape of a relational field captured in metadata.
+        /// </summary>
+        public enum FieldKind : byte
+        {
+            [Obsolete("Default uninitialized value - should never be used")]
+            None = 0,
+
+            /// <summary>
+            /// A single reference value.
+            /// </summary>
+            Single = 1,
+
+            /// <summary>
+            /// An array of values.
+            /// </summary>
+            Array = 2,
+
+            /// <summary>
+            /// A <see cref="List{T}"/> of values.
+            /// </summary>
+            List = 3,
+
+            /// <summary>
+            /// A <see cref="HashSet{T}"/> of values.
+            /// </summary>
+            HashSet = 4,
+        }
+
+        /// <summary>
+        /// Serializable entry describing attribute field names for a single component type.
+        /// </summary>
+        [Serializable]
+        public sealed class TypeFieldMetadata
+        {
+            /// <summary>
+            /// Assembly-qualified component type name.
+            /// </summary>
+            public string typeName;
+
+            /// <summary>
+            /// Attribute field names discovered on the component.
+            /// </summary>
+            public string[] fieldNames;
+
+            /// <summary>
+            /// Creates a new metadata entry for a component type.
+            /// </summary>
+            /// <param name="typeName">Assembly-qualified name of the component type.</param>
+            /// <param name="fieldNames">Attribute field names found on that type.</param>
+            public TypeFieldMetadata(string typeName, string[] fieldNames)
+            {
+                this.typeName = typeName;
+                this.fieldNames = fieldNames;
+            }
+        }
+
+        /// <summary>
+        /// Serializable entry describing a relational attribute field on a component.
+        /// </summary>
+        [Serializable]
+        public sealed class RelationalFieldMetadata
+        {
+            /// <summary>
+            /// The name of the relational field on the component.
+            /// </summary>
+            public string fieldName;
+
+            /// <summary>
+            /// The relationship classification (parent/child/sibling).
+            /// </summary>
+            public RelationalAttributeKind attributeKind;
+
+            /// <summary>
+            /// The collection shape of the field (single, array, list, hashset).
+            /// </summary>
+            public FieldKind fieldKind;
+
+            /// <summary>
+            /// The assembly-qualified element type name for the field (for collections) or the field type (for singles).
+            /// </summary>
+            public string elementTypeName;
+
+            /// <summary>
+            /// Indicates whether the element type is an interface (affects resolution and validation).
+            /// </summary>
+            public bool isInterface;
+
+            /// <summary>
+            /// Creates a relational metadata entry for a component field.
+            /// </summary>
+            /// <param name="fieldName">The field name on the component.</param>
+            /// <param name="attributeKind">How the field relates to other components.</param>
+            /// <param name="fieldKind">Collection shape of the field.</param>
+            /// <param name="elementTypeName">Assembly-qualified element or field type.</param>
+            /// <param name="isInterface">Whether the element type is an interface.</param>
+            public RelationalFieldMetadata(
+                string fieldName,
+                RelationalAttributeKind attributeKind,
+                FieldKind fieldKind,
+                string elementTypeName,
+                bool isInterface
+            )
+            {
+                this.fieldName = fieldName;
+                this.attributeKind = attributeKind;
+                this.fieldKind = fieldKind;
+                this.elementTypeName = elementTypeName;
+                this.isInterface = isInterface;
+            }
+        }
+
+        /// <summary>
+        /// Runtime-resolved relational field metadata with <see cref="Type"/> references resolved.
+        /// </summary>
+        public readonly struct ResolvedRelationalFieldMetadata
+        {
+            /// <summary>
+            /// Creates a resolved relational metadata entry.
+            /// </summary>
+            /// <param name="fieldName">The relational field name on the component.</param>
+            /// <param name="attributeKind">Relationship classification.</param>
+            /// <param name="fieldKind">Collection shape of the field.</param>
+            /// <param name="elementType">Resolved element type (or field type for singles).</param>
+            /// <param name="isInterface">Whether the element type is an interface.</param>
+            public ResolvedRelationalFieldMetadata(
+                string fieldName,
+                RelationalAttributeKind attributeKind,
+                FieldKind fieldKind,
+                Type elementType,
+                bool isInterface
+            )
+            {
+                FieldName = fieldName;
+                AttributeKind = attributeKind;
+                FieldKind = fieldKind;
+                ElementType = elementType;
+                IsInterface = isInterface;
+            }
+
+            /// <summary>
+            /// The name of the relational field.
+            /// </summary>
+            public string FieldName { get; }
+
+            /// <summary>
+            /// Relationship classification for the field.
+            /// </summary>
+            public RelationalAttributeKind AttributeKind { get; }
+
+            /// <summary>
+            /// Collection shape of the field.
+            /// </summary>
+            public FieldKind FieldKind { get; }
+
+            /// <summary>
+            /// Resolved CLR type for the element/field.
+            /// </summary>
+            public Type ElementType { get; }
+
+            /// <summary>
+            /// Indicates if the element type is an interface.
+            /// </summary>
+            public bool IsInterface { get; }
+        }
+
+        /// <summary>
+        /// Serializable entry describing all relational fields for a component type.
+        /// </summary>
+        [Serializable]
+        public sealed class RelationalTypeMetadata
+        {
+            /// <summary>
+            /// Assembly-qualified component type name.
+            /// </summary>
+            public string typeName;
+
+            /// <summary>
+            /// Relational attribute fields discovered on the component.
+            /// </summary>
+            public RelationalFieldMetadata[] fields;
+
+            /// <summary>
+            /// Creates relational metadata for a component type.
+            /// </summary>
+            /// <param name="typeName">Assembly-qualified name of the component type.</param>
+            /// <param name="fields">Relational fields discovered on that type.</param>
+            public RelationalTypeMetadata(string typeName, RelationalFieldMetadata[] fields)
+            {
+                this.typeName = typeName;
+                this.fields = fields;
+            }
+        }
+
+        /// <summary>
+        /// Serialized entry describing an auto-loaded singleton dependency.
+        /// </summary>
+        [Serializable]
+        public sealed class AutoLoadSingletonEntry
+        {
+            /// <summary>
+            /// Assembly-qualified type name of the singleton to load.
+            /// </summary>
+            public string typeName;
+
+            /// <summary>
+            /// Whether the singleton should be created, fetched, or ignored.
+            /// </summary>
+            public SingletonAutoLoadKind kind;
+
+            /// <summary>
+            /// Unity load phase used to initialize the singleton.
+            /// </summary>
+            public RuntimeInitializeLoadType loadType;
+
+            /// <summary>
+            /// Default constructor for serialization.
+            /// </summary>
+            public AutoLoadSingletonEntry() { }
+
+            /// <summary>
+            /// Creates a new singleton auto-load entry.
+            /// </summary>
+            /// <param name="typeName">Assembly-qualified type name to load.</param>
+            /// <param name="kind">How the singleton should be handled.</param>
+            /// <param name="loadType">Unity load phase for initialization.</param>
+            public AutoLoadSingletonEntry(
+                string typeName,
+                SingletonAutoLoadKind kind,
+                RuntimeInitializeLoadType loadType
+            )
+            {
+                this.typeName = typeName;
+                this.kind = kind;
+                this.loadType = loadType;
+            }
+        }
+
+        // Compound key for element type lookup
+        private readonly struct ElementTypeKey : IEquatable<ElementTypeKey>
+        {
+            private readonly Type _componentType;
+            private readonly string _fieldName;
+
+            public ElementTypeKey(Type componentType, string fieldName)
+            {
+                _componentType = componentType;
+                _fieldName = fieldName;
+            }
+
+            public bool Equals(ElementTypeKey other)
+            {
+                return _componentType == other._componentType
+                    && string.Equals(_fieldName, other._fieldName, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ElementTypeKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(_componentType, _fieldName);
+            }
+        }
     }
 }

@@ -59,69 +59,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             ("1 neighbor", 1),
         };
 
-        internal readonly struct DatasetSpec
-        {
-            public DatasetSpec(string label, Vector2Int gridSize)
-            {
-                Label = label;
-
-                GridSize = gridSize;
-
-                TotalPoints = gridSize.x * gridSize.y;
-
-                Span = new Vector2(Mathf.Max(gridSize.x - 1, 1), Mathf.Max(gridSize.y - 1, 1));
-
-                BoundsCenter = new Vector3((gridSize.x - 1) * 0.5f, (gridSize.y - 1) * 0.5f, 0f);
-
-                BoundsSize = new Vector3(Span.x, Span.y, 1f);
-
-                MaxSpan = Mathf.Max(Span.x, Span.y);
-            }
-
-            public string Label { get; }
-
-            public Vector2Int GridSize { get; }
-
-            public int TotalPoints { get; }
-
-            public Vector2 Span { get; }
-
-            public Vector3 BoundsCenter { get; }
-
-            public Vector3 BoundsSize { get; }
-
-            public float MaxSpan { get; }
-        }
-
-        private readonly struct TreeSpec
-        {
-            public TreeSpec(
-                string name,
-                Func<IEnumerable<Vector2>, ISpatialTree2D<Vector2>> factory
-            )
-            {
-                Name = name;
-                Factory = factory;
-            }
-
-            public string Name { get; }
-
-            public Func<IEnumerable<Vector2>, ISpatialTree2D<Vector2>> Factory { get; }
-        }
-
-        private readonly struct BoundsSpec
-        {
-            public BoundsSpec(string label, Bounds bounds)
-            {
-                Label = label;
-                Bounds = bounds;
-            }
-
-            public string Label { get; }
-
-            public Bounds Bounds { get; }
-        }
-
         [UnityTest]
         [Timeout(BenchmarkTimeoutMilliseconds)]
         public IEnumerator Benchmark()
@@ -738,6 +675,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 new Vector3(point.x, point.y, 0f),
                 new Vector3(PointBoundsSize, PointBoundsSize, 1f)
             );
+        }
+
+        internal readonly struct DatasetSpec
+        {
+            public DatasetSpec(string label, Vector2Int gridSize)
+            {
+                Label = label;
+
+                GridSize = gridSize;
+
+                TotalPoints = gridSize.x * gridSize.y;
+
+                Span = new Vector2(Mathf.Max(gridSize.x - 1, 1), Mathf.Max(gridSize.y - 1, 1));
+
+                BoundsCenter = new Vector3((gridSize.x - 1) * 0.5f, (gridSize.y - 1) * 0.5f, 0f);
+
+                BoundsSize = new Vector3(Span.x, Span.y, 1f);
+
+                MaxSpan = Mathf.Max(Span.x, Span.y);
+            }
+
+            public string Label { get; }
+
+            public Vector2Int GridSize { get; }
+
+            public int TotalPoints { get; }
+
+            public Vector2 Span { get; }
+
+            public Vector3 BoundsCenter { get; }
+
+            public Vector3 BoundsSize { get; }
+
+            public float MaxSpan { get; }
+        }
+
+        private readonly struct TreeSpec
+        {
+            public TreeSpec(
+                string name,
+                Func<IEnumerable<Vector2>, ISpatialTree2D<Vector2>> factory
+            )
+            {
+                Name = name;
+                Factory = factory;
+            }
+
+            public string Name { get; }
+
+            public Func<IEnumerable<Vector2>, ISpatialTree2D<Vector2>> Factory { get; }
+        }
+
+        private readonly struct BoundsSpec
+        {
+            public BoundsSpec(string label, Bounds bounds)
+            {
+                Label = label;
+                Bounds = bounds;
+            }
+
+            public string Label { get; }
+
+            public Bounds Bounds { get; }
         }
     }
 }

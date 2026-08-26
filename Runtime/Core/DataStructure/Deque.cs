@@ -36,51 +36,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         public const int DefaultCapacity = 16;
 
-        public struct DequeEnumerator : IEnumerator<T>
-        {
-            private readonly T[] _items;
-            private readonly int _head;
-            private readonly int _count;
-            private readonly int _capacity;
-            private int _index;
-            private T _current;
-
-            internal DequeEnumerator(T[] items, int head, int count, int capacity)
-            {
-                _items = items;
-                _head = head;
-                _count = count;
-                _capacity = capacity;
-                _index = -1;
-                _current = default;
-            }
-
-            public bool MoveNext()
-            {
-                if (++_index < _count)
-                {
-                    int actualIndex = _head.WrappedAdd(_index, _capacity);
-                    _current = _items[actualIndex];
-                    return true;
-                }
-
-                _current = default;
-                return false;
-            }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
-
-            public void Reset()
-            {
-                _index = -1;
-                _current = default;
-            }
-
-            public void Dispose() { }
-        }
-
         private const int MinimumGrowth = 4;
 
         [SerializeField]
@@ -574,6 +529,51 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        public struct DequeEnumerator : IEnumerator<T>
+        {
+            private readonly T[] _items;
+            private readonly int _head;
+            private readonly int _count;
+            private readonly int _capacity;
+            private int _index;
+            private T _current;
+
+            internal DequeEnumerator(T[] items, int head, int count, int capacity)
+            {
+                _items = items;
+                _head = head;
+                _count = count;
+                _capacity = capacity;
+                _index = -1;
+                _current = default;
+            }
+
+            public bool MoveNext()
+            {
+                if (++_index < _count)
+                {
+                    int actualIndex = _head.WrappedAdd(_index, _capacity);
+                    _current = _items[actualIndex];
+                    return true;
+                }
+
+                _current = default;
+                return false;
+            }
+
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
+            public void Reset()
+            {
+                _index = -1;
+                _current = default;
+            }
+
+            public void Dispose() { }
         }
     }
 }

@@ -19,28 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class EditorCacheHelperEnumDisplayNameTests
     {
-        private enum DisplayNameSample
-        {
-            [InspectorName("Custom Label")]
-            Decorated = 1,
-            UndecoratedValue = 2,
-        }
-
-        // Two members sharing one value: the map must collapse them the same way the old
-        // Array.IndexOf lookup did, or previously-correct labels silently change.
-        private enum AliasSample
-        {
-            Original = 7,
-            Alias = 7,
-        }
-
-        private enum SignedSample : sbyte
-        {
-            [InspectorName("Below Zero")]
-            Negative = -128,
-            Zero = 0,
-        }
-
         [Test]
         public void UsesTheInspectorNameAttribute()
         {
@@ -125,6 +103,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 EditorCacheHelper.GetEnumDisplayName(DisplayNameSample.Decorated),
                 "Clearing the name cache must clear the value map with it, or the two disagree."
             );
+        }
+
+        private enum DisplayNameSample
+        {
+            [InspectorName("Custom Label")]
+            Decorated = 1,
+            UndecoratedValue = 2,
+        }
+
+        // Two members sharing one value: the map must collapse them the same way the old
+        // Array.IndexOf lookup did, or previously-correct labels silently change.
+        private enum AliasSample
+        {
+            Original = 7,
+            Alias = 7,
+        }
+
+        private enum SignedSample : sbyte
+        {
+            [InspectorName("Below Zero")]
+            Negative = -128,
+            Zero = 0,
         }
     }
 #endif

@@ -20,12 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializedMemberNamesTests
     {
-        private sealed class Subject
-        {
-            [field: SerializeField]
-            public int Speed { get; set; }
-        }
-
         [Test]
         public void TheShapeMatchesWhatTheCompilerEmits()
         {
@@ -154,6 +148,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Assert.IsTrue(SerializedMemberNames.BackingFieldFor(null) == null);
             Assert.AreEqual(string.Empty, SerializedMemberNames.BackingFieldFor(string.Empty));
+        }
+
+        private sealed class Subject
+        {
+            [field: SerializeField]
+            public int Speed { get; set; }
         }
     }
 }

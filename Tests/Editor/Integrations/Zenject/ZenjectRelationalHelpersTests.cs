@@ -16,15 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
     [NUnit.Framework.Category("Integration")]
     public sealed class ZenjectRelationalHelpersTests : CommonTestBase
     {
-        private sealed class TestComponent : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
-
         [Test]
         public void InjectWithRelationsAssignsFields()
         {
@@ -127,6 +118,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
             {
                 _pool.InternalOnSpawned(item);
             }
+        }
+
+        private sealed class TestComponent : MonoBehaviour
+        {
+            [ParentComponent(OnlyAncestors = true)]
+            public Rigidbody parentBody;
+
+            [ChildComponent(OnlyDescendants = true)]
+            public CapsuleCollider childCollider;
         }
     }
 }

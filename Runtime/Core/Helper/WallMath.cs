@@ -573,18 +573,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Determines whether vector comparisons should use magnitude difference or per-component comparison.
-        /// </summary>
-        public enum VectorApproximationMode
-        {
-            /// <summary>Compares the distance between vectors against the tolerance.</summary>
-            Magnitude = 0,
-
-            /// <summary>Compares each component against the tolerance individually.</summary>
-            Components = 1,
-        }
-
-        /// <summary>
         /// Checks if two Vector2 values are approximately equal with the chosen comparison mode.
         /// Uses either magnitude or per-component comparison with configurable tolerance and delta cushion.
         /// </summary>
@@ -869,6 +857,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             return lhs == rhs;
+        }
+
+        /// <summary>
+        /// Determines whether vector comparisons should use magnitude difference or per-component comparison.
+        /// </summary>
+        public enum VectorApproximationMode
+        {
+            /// <summary>Compares the distance between vectors against the tolerance.</summary>
+            Magnitude = 0,
+
+            /// <summary>Compares each component against the tolerance individually.</summary>
+            Components = 1,
         }
     }
 }

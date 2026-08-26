@@ -53,32 +53,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             new();
 
         /// <summary>
-        /// Represents a dynamically generated ScriptableObject fixture with its associated metadata.
-        /// </summary>
-        public sealed class DynamicFixture
-        {
-            /// <summary>
-            /// The asset path of the dynamic fixture (null for non-persisted fixtures).
-            /// </summary>
-            public string AssetPath { get; internal set; }
-
-            /// <summary>
-            /// The cached ScriptableObject instance.
-            /// </summary>
-            public ScriptableObject Asset { get; internal set; }
-
-            /// <summary>
-            /// The type of the ScriptableObject.
-            /// </summary>
-            public Type AssetType { get; internal set; }
-
-            /// <summary>
-            /// Whether this fixture is persisted to disk.
-            /// </summary>
-            public bool IsPersisted { get; internal set; }
-        }
-
-        /// <summary>
         /// Gets the current reference count for diagnostic purposes.
         /// </summary>
         public static int ReferenceCount
@@ -438,6 +412,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             // Clean up any leftover "Temp N" folders before creating directories.
             TempFolderCleanupUtility.CleanupTempDuplicates();
             AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
+        }
+
+        /// <summary>
+        /// Represents a dynamically generated ScriptableObject fixture with its associated metadata.
+        /// </summary>
+        public sealed class DynamicFixture
+        {
+            /// <summary>
+            /// The asset path of the dynamic fixture (null for non-persisted fixtures).
+            /// </summary>
+            public string AssetPath { get; internal set; }
+
+            /// <summary>
+            /// The cached ScriptableObject instance.
+            /// </summary>
+            public ScriptableObject Asset { get; internal set; }
+
+            /// <summary>
+            /// The type of the ScriptableObject.
+            /// </summary>
+            public Type AssetType { get; internal set; }
+
+            /// <summary>
+            /// Whether this fixture is persisted to disk.
+            /// </summary>
+            public bool IsPersisted { get; internal set; }
         }
     }
 #endif

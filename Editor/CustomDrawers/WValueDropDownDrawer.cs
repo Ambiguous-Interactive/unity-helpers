@@ -24,18 +24,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(WValueDropDownAttribute))]
     public sealed class WValueDropDownDrawer : PropertyDrawer
     {
-        private sealed class PopupState
-        {
-            public string search = string.Empty;
-            public int page;
-        }
-
-        private sealed class DisplayLabelsCache
-        {
-            public object[] sourceOptions;
-            public string[] labels;
-        }
-
         private const float ButtonWidth = DropDownShared.ButtonWidth;
         private const float PageLabelWidth = DropDownShared.PageLabelWidth;
         private const float PaginationButtonHeight = DropDownShared.PaginationButtonHeight;
@@ -1474,6 +1462,201 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
+        private static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
+        {
+            int clampedRows = Mathf.Max(1, rowsOnPage);
+            float chromeHeight = CalculatePopupChromeHeight(includePagination);
+            float optionListHeight = clampedRows * GetOptionRowHeight();
+            float unclampedHeight = chromeHeight + optionListHeight;
+            return unclampedHeight;
+        }
+
+        private static float CalculatePopupChromeHeight(bool includePagination)
+        {
+            float searchHeight = EditorGUIUtility.singleLineHeight;
+            float paginationHeight = includePagination
+                ? PopupStyles.PaginationButtonLeft.fixedHeight
+                : EditorGUIUtility.standardVerticalSpacing;
+            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
+            return searchHeight + paginationHeight + footerHeight;
+        }
+
+        private static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
+        {
+            GUIStyle helpStyle = EditorStyles.helpBox;
+            int helpMargin = helpStyle.margin?.horizontal ?? 0;
+            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
+            availableWidth = Mathf.Max(32f, availableWidth);
+            float helpBoxHeight;
+            if (0f < measuredHelpBoxHeight)
+            {
+                helpBoxHeight = measuredHelpBoxHeight;
+            }
+            else
+            {
+                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
+                float marginVertical = helpStyle.margin?.vertical ?? 0;
+                helpBoxHeight = calculated + marginVertical;
+            }
+
+            float searchRow =
+                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float footer =
+                EditorGUIUtility.standardVerticalSpacing
+                + OptionBottomPadding
+                + EmptySearchExtraPadding;
+
+            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
+            return result;
+        }
+
+        private static float GetOptionRowHeight()
+        {
+            if (0f < s_cachedOptionRowHeight)
+            {
+                return s_cachedOptionRowHeight;
+            }
+
+            float controlHeight = GetOptionControlHeight();
+            RectOffset margin = PopupStyles.OptionButton.margin;
+            float adjustedMargin = 0f;
+            if (margin != null)
+            {
+                adjustedMargin = Mathf.Max(
+                    0f,
+                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
+                );
+            }
+            else
+            {
+                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
+            }
+
+            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
+            return s_cachedOptionRowHeight;
+        }
+
+        private static float GetOptionControlHeight()
+        {
+            if (0f < s_cachedOptionControlHeight)
+            {
+                return s_cachedOptionControlHeight;
+            }
+
+            float width = PopupWidth - 32f;
+            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
+            if (measured <= 0f || float.IsNaN(measured))
+            {
+                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
+            }
+
+            s_cachedOptionControlHeight = measured;
+            return measured;
+        }
+
+        private static string GetTypeMismatchMessage(
+            SerializedProperty property,
+            WValueDropDownAttribute dropdownAttribute
+        )
+        {
+            string fieldName = property.displayName;
+            string actualType = GetPropertyTypeName(property);
+            string expectedType = GetExpectedTypeName(dropdownAttribute);
+            return $"[WValueDropDown] Type mismatch: '{fieldName}' is {actualType}, but the dropdown provides {expectedType} values. Most serializable types are supported (primitives, enums, UnityEngine.Object, Vector2/3/4, Color, structs, etc.). Arrays are not supported.";
+        }
+
+        private static string GetExpectedTypeName(WValueDropDownAttribute dropdownAttribute)
+        {
+            if (dropdownAttribute?.ValueType == null)
+            {
+                return "unknown";
+            }
+
+            Type valueType = dropdownAttribute.ValueType;
+            if (valueType == typeof(int))
+            {
+                return "int";
+            }
+            if (valueType == typeof(float))
+            {
+                return "float";
+            }
+            if (valueType == typeof(double))
+            {
+                return "double";
+            }
+            if (valueType == typeof(string))
+            {
+                return "string";
+            }
+            if (valueType == typeof(long))
+            {
+                return "long";
+            }
+            if (valueType == typeof(short))
+            {
+                return "short";
+            }
+            if (valueType == typeof(byte))
+            {
+                return "byte";
+            }
+            if (valueType.IsEnum)
+            {
+                return $"enum ({valueType.Name})";
+            }
+
+            return valueType.Name;
+        }
+
+        private static string GetPropertyTypeName(SerializedProperty property)
+        {
+            return property.propertyType switch
+            {
+                SerializedPropertyType.Integer => "an int",
+                SerializedPropertyType.Float => "a float",
+                SerializedPropertyType.String => "a string",
+                SerializedPropertyType.Enum => "an enum",
+                SerializedPropertyType.Boolean => "a bool",
+                SerializedPropertyType.ObjectReference => "an object reference",
+                SerializedPropertyType.Vector2 => "a Vector2",
+                SerializedPropertyType.Vector3 => "a Vector3",
+                SerializedPropertyType.Vector4 => "a Vector4",
+                SerializedPropertyType.Color => "a Color",
+                SerializedPropertyType.Rect => "a Rect",
+                SerializedPropertyType.ArraySize => "an array size",
+                SerializedPropertyType.Character => "a char",
+                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
+                SerializedPropertyType.Bounds => "a Bounds",
+                SerializedPropertyType.Quaternion => "a Quaternion",
+                SerializedPropertyType.ExposedReference => "an exposed reference",
+                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
+                SerializedPropertyType.Vector2Int => "a Vector2Int",
+                SerializedPropertyType.Vector3Int => "a Vector3Int",
+                SerializedPropertyType.RectInt => "a RectInt",
+                SerializedPropertyType.BoundsInt => "a BoundsInt",
+                SerializedPropertyType.ManagedReference => "a managed reference",
+                SerializedPropertyType.Hash128 => "a Hash128",
+                SerializedPropertyType.Generic when property.isArray =>
+                    $"an array of {property.arrayElementType}",
+                _ => $"type '{property.propertyType}'",
+            };
+        }
+
+        private sealed class PopupState
+        {
+            public string search = string.Empty;
+            public int page;
+        }
+
+        private sealed class DisplayLabelsCache
+        {
+            public object[] sourceOptions;
+            public string[] labels;
+        }
+
         private sealed class WValueDropDownPopupContent : PopupWindowContent
         {
             private readonly SerializedObject _serializedObject;
@@ -1967,100 +2150,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             protected override string UndoActionName => "Change Value DropDown";
         }
 
-        private static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
-        {
-            int clampedRows = Mathf.Max(1, rowsOnPage);
-            float chromeHeight = CalculatePopupChromeHeight(includePagination);
-            float optionListHeight = clampedRows * GetOptionRowHeight();
-            float unclampedHeight = chromeHeight + optionListHeight;
-            return unclampedHeight;
-        }
-
-        private static float CalculatePopupChromeHeight(bool includePagination)
-        {
-            float searchHeight = EditorGUIUtility.singleLineHeight;
-            float paginationHeight = includePagination
-                ? PopupStyles.PaginationButtonLeft.fixedHeight
-                : EditorGUIUtility.standardVerticalSpacing;
-            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
-            return searchHeight + paginationHeight + footerHeight;
-        }
-
-        private static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
-        {
-            GUIStyle helpStyle = EditorStyles.helpBox;
-            int helpMargin = helpStyle.margin?.horizontal ?? 0;
-            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
-            availableWidth = Mathf.Max(32f, availableWidth);
-            float helpBoxHeight;
-            if (0f < measuredHelpBoxHeight)
-            {
-                helpBoxHeight = measuredHelpBoxHeight;
-            }
-            else
-            {
-                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
-                float marginVertical = helpStyle.margin?.vertical ?? 0;
-                helpBoxHeight = calculated + marginVertical;
-            }
-
-            float searchRow =
-                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float footer =
-                EditorGUIUtility.standardVerticalSpacing
-                + OptionBottomPadding
-                + EmptySearchExtraPadding;
-
-            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
-            return result;
-        }
-
-        private static float GetOptionRowHeight()
-        {
-            if (0f < s_cachedOptionRowHeight)
-            {
-                return s_cachedOptionRowHeight;
-            }
-
-            float controlHeight = GetOptionControlHeight();
-            RectOffset margin = PopupStyles.OptionButton.margin;
-            float adjustedMargin = 0f;
-            if (margin != null)
-            {
-                adjustedMargin = Mathf.Max(
-                    0f,
-                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
-                );
-            }
-            else
-            {
-                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
-            }
-
-            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
-            return s_cachedOptionRowHeight;
-        }
-
-        private static float GetOptionControlHeight()
-        {
-            if (0f < s_cachedOptionControlHeight)
-            {
-                return s_cachedOptionControlHeight;
-            }
-
-            float width = PopupWidth - 32f;
-            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
-            if (measured <= 0f || float.IsNaN(measured))
-            {
-                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
-            }
-
-            s_cachedOptionControlHeight = measured;
-            return measured;
-        }
-
         internal static class TestHooks
         {
             public static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
@@ -2183,95 +2272,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     alignment = TextAnchor.MiddleCenter,
                     padding = new RectOffset(0, 0, 0, 0),
                 };
-        }
-
-        private static string GetTypeMismatchMessage(
-            SerializedProperty property,
-            WValueDropDownAttribute dropdownAttribute
-        )
-        {
-            string fieldName = property.displayName;
-            string actualType = GetPropertyTypeName(property);
-            string expectedType = GetExpectedTypeName(dropdownAttribute);
-            return $"[WValueDropDown] Type mismatch: '{fieldName}' is {actualType}, but the dropdown provides {expectedType} values. Most serializable types are supported (primitives, enums, UnityEngine.Object, Vector2/3/4, Color, structs, etc.). Arrays are not supported.";
-        }
-
-        private static string GetExpectedTypeName(WValueDropDownAttribute dropdownAttribute)
-        {
-            if (dropdownAttribute?.ValueType == null)
-            {
-                return "unknown";
-            }
-
-            Type valueType = dropdownAttribute.ValueType;
-            if (valueType == typeof(int))
-            {
-                return "int";
-            }
-            if (valueType == typeof(float))
-            {
-                return "float";
-            }
-            if (valueType == typeof(double))
-            {
-                return "double";
-            }
-            if (valueType == typeof(string))
-            {
-                return "string";
-            }
-            if (valueType == typeof(long))
-            {
-                return "long";
-            }
-            if (valueType == typeof(short))
-            {
-                return "short";
-            }
-            if (valueType == typeof(byte))
-            {
-                return "byte";
-            }
-            if (valueType.IsEnum)
-            {
-                return $"enum ({valueType.Name})";
-            }
-
-            return valueType.Name;
-        }
-
-        private static string GetPropertyTypeName(SerializedProperty property)
-        {
-            return property.propertyType switch
-            {
-                SerializedPropertyType.Integer => "an int",
-                SerializedPropertyType.Float => "a float",
-                SerializedPropertyType.String => "a string",
-                SerializedPropertyType.Enum => "an enum",
-                SerializedPropertyType.Boolean => "a bool",
-                SerializedPropertyType.ObjectReference => "an object reference",
-                SerializedPropertyType.Vector2 => "a Vector2",
-                SerializedPropertyType.Vector3 => "a Vector3",
-                SerializedPropertyType.Vector4 => "a Vector4",
-                SerializedPropertyType.Color => "a Color",
-                SerializedPropertyType.Rect => "a Rect",
-                SerializedPropertyType.ArraySize => "an array size",
-                SerializedPropertyType.Character => "a char",
-                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
-                SerializedPropertyType.Bounds => "a Bounds",
-                SerializedPropertyType.Quaternion => "a Quaternion",
-                SerializedPropertyType.ExposedReference => "an exposed reference",
-                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
-                SerializedPropertyType.Vector2Int => "a Vector2Int",
-                SerializedPropertyType.Vector3Int => "a Vector3Int",
-                SerializedPropertyType.RectInt => "a RectInt",
-                SerializedPropertyType.BoundsInt => "a BoundsInt",
-                SerializedPropertyType.ManagedReference => "a managed reference",
-                SerializedPropertyType.Hash128 => "a Hash128",
-                SerializedPropertyType.Generic when property.isArray =>
-                    $"an array of {property.arrayElementType}",
-                _ => $"type '{property.propertyType}'",
-            };
         }
     }
 #endif

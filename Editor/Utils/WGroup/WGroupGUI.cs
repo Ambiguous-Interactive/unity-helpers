@@ -662,36 +662,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         private static float CurrentFoldoutContentOffset =>
             _isSettingsContext ? FoldoutContentOffsetSettings : FoldoutContentOffsetInspector;
 
-        /// <summary>
-        /// A disposable scope that sets <see cref="IsSettingsContext"/> to true for its duration.
-        /// </summary>
-        /// <remarks>
-        /// Use this scope when drawing WGroups in SettingsProvider contexts to ensure
-        /// proper indentation behavior.
-        /// </remarks>
-        internal sealed class SettingsContextScope : IDisposable
-        {
-            private readonly bool _previousValue;
-            private bool _disposed;
-
-            public SettingsContextScope()
-            {
-                _previousValue = _isSettingsContext;
-                _isSettingsContext = true;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _disposed = true;
-                _isSettingsContext = _previousValue;
-            }
-        }
-
         internal static Rect GetContentRect(
             Rect rect,
             float additionalTopPadding,
@@ -735,6 +705,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             }
 
             return contentRect;
+        }
+
+        /// <summary>
+        /// A disposable scope that sets <see cref="IsSettingsContext"/> to true for its duration.
+        /// </summary>
+        /// <remarks>
+        /// Use this scope when drawing WGroups in SettingsProvider contexts to ensure
+        /// proper indentation behavior.
+        /// </remarks>
+        internal sealed class SettingsContextScope : IDisposable
+        {
+            private readonly bool _previousValue;
+            private bool _disposed;
+
+            public SettingsContextScope()
+            {
+                _previousValue = _isSettingsContext;
+                _isSettingsContext = true;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _isSettingsContext = _previousValue;
+            }
         }
     }
 #endif

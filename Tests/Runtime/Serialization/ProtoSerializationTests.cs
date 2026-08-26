@@ -17,19 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoSerializationTests
     {
-        [ProtoContract]
-        private sealed class SampleMessage
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public List<int> Values { get; set; }
-        }
-
         [Test]
         public void ProtoSerializeRoundTripsComplexObject()
         {
@@ -184,6 +171,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 clone.TryGet(i, out bool actual);
                 Assert.AreEqual(expected, actual, $"Bit {i} mismatch");
             }
+        }
+
+        [ProtoContract]
+        private sealed class SampleMessage
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public List<int> Values { get; set; }
         }
     }
 }

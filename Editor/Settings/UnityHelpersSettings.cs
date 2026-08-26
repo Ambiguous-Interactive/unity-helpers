@@ -466,91 +466,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private static readonly GUIContent PoolApplyNowButtonContent =
             EditorGUIUtility.TrTextContent("Apply Settings Now");
 
-        public enum WButtonActionsPlacement
-        {
-            Top = 0,
-            Bottom = 1,
-        }
-
-        public enum WButtonFoldoutBehavior
-        {
-            AlwaysOpen = 0,
-            StartExpanded = 1,
-            StartCollapsed = 2,
-        }
-
-        public enum WGroupAutoIncludeMode
-        {
-            None = 0,
-            Finite = 1,
-            Infinite = 2,
-        }
-
-        public enum InlineEditorFoldoutBehavior
-        {
-            AlwaysOpen = 0,
-            StartExpanded = 1,
-            StartCollapsed = 2,
-        }
-
-        public readonly struct WGroupAutoIncludeConfiguration
-        {
-            public WGroupAutoIncludeConfiguration(WGroupAutoIncludeMode mode, int rowCount)
-            {
-                Mode = mode;
-                RowCount = rowCount < 0 ? 0 : rowCount;
-            }
-
-            public WGroupAutoIncludeMode Mode { get; }
-
-            public int RowCount { get; }
-        }
-
-        public readonly struct WButtonPaletteEntry
-        {
-            public WButtonPaletteEntry(Color buttonColor, Color textColor)
-            {
-                ButtonColor = buttonColor;
-                TextColor = textColor;
-            }
-
-            public Color ButtonColor { get; }
-
-            public Color TextColor { get; }
-        }
-
-        public readonly struct WEnumToggleButtonsPaletteEntry
-        {
-            public WEnumToggleButtonsPaletteEntry(
-                Color selectedBackgroundColor,
-                Color selectedTextColor,
-                Color inactiveBackgroundColor,
-                Color inactiveTextColor
-            )
-            {
-                SelectedBackgroundColor = selectedBackgroundColor;
-                SelectedTextColor = selectedTextColor;
-                InactiveBackgroundColor = inactiveBackgroundColor;
-                InactiveTextColor = inactiveTextColor;
-            }
-
-            public Color SelectedBackgroundColor { get; }
-
-            public Color SelectedTextColor { get; }
-
-            public Color InactiveBackgroundColor { get; }
-
-            public Color InactiveTextColor { get; }
-        }
-
-        public enum DuplicateRowAnimationMode
-        {
-            [Obsolete("Disable duplicate duplicate-row animations only when required.", false)]
-            None = 0,
-            Static = 1,
-            Tween = 2,
-        }
-
         [FormerlySerializedAs("waitInstructionBufferApplyOnLoad")]
         [SerializeField]
         [Tooltip(
@@ -1083,430 +998,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             set => _wbuttonCustomColorSkipAutoSuggest = value;
         }
 
-        [Serializable]
-        internal sealed class SerializableTypeIgnorePattern
-        {
-            [FormerlySerializedAs("pattern")]
-            [SerializeField]
-            internal string _pattern = string.Empty;
-
-            public SerializableTypeIgnorePattern() { }
-
-            public SerializableTypeIgnorePattern(string pattern)
-            {
-                Pattern = pattern;
-            }
-
-            public string Pattern
-            {
-                get => _pattern ?? string.Empty;
-                set => _pattern = value ?? string.Empty;
-            }
-        }
-
-        [Serializable]
-        internal sealed class WButtonCustomColor
-        {
-            [FormerlySerializedAs("buttonColor")]
-            [SerializeField]
-            internal Color _buttonColor = Color.white;
-
-            [FormerlySerializedAs("textColor")]
-            [SerializeField]
-            internal Color _textColor;
-
-            // Whether the text colour above is one someone CHOSE, rather than one to derive from
-            // the button. A flag rather than a sentinel value, because every sentinel a Color can
-            // spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
-            // read deliberately chosen opaque black as "unset" and overwrote it on the next load,
-            // and it could not represent a translucent choice at all -- any alpha under a
-            // zero-RGB colour was discarded the same way.
-            [SerializeField]
-            internal bool _hasTextColor;
-
-            public Color ButtonColor
-            {
-                get => _buttonColor;
-                set => _buttonColor = value;
-            }
-
-            public Color TextColor
-            {
-                get => _textColor;
-                set
-                {
-                    _textColor = value;
-                    _hasTextColor = true;
-                }
-            }
-
-            /// <summary>Whether someone chose this entry's text colour rather than deriving it.</summary>
-            internal bool HasChosenTextColor => _hasTextColor;
-
-            /// <summary>Derives a readable text colour for an entry that has not chosen one.</summary>
-            /// <remarks>
-            /// The flag is deliberately NOT set here. An entry with no chosen colour keeps deriving
-            /// one, so editing the button colour moves the text with it; under the old sentinel a
-            /// derived colour froze the moment it happened to be non-black, which is how a white
-            /// text colour survived onto a button someone later made white.
-            /// </remarks>
-            public void EnsureReadableText()
-            {
-                if (_hasTextColor)
-                {
-                    return;
-                }
-
-                _textColor = WButtonColorUtility.GetReadableTextColor(_buttonColor);
-            }
-
-            /// <summary>Reads an entry written before the flag existed.</summary>
-            /// <returns><c>true</c> when this entry was changed.</returns>
-            /// <remarks>
-            /// The old sentinel meant "unset" for any colour whose RGB was zero, so a stored colour
-            /// that is entirely zero is the only one that can have BEEN unset and round-tripped as
-            /// one. Everything else was already being kept, and stays kept -- nobody's colour
-            /// changes on upgrade, which is the whole requirement.
-            /// </remarks>
-            internal bool MigrateChosenTextColor()
-            {
-                if (_hasTextColor || _textColor == default)
-                {
-                    return false;
-                }
-
-                _hasTextColor = true;
-                return true;
-            }
-        }
-
-        // Colour keys are matched without regard to case everywhere they are read, so the dictionary
-        // that stores them has to agree: otherwise "Save" and "save" are two entries here and one
-        // entry to every reader.
-        [Serializable]
-        private sealed class WButtonCustomColorDictionary
-            : SerializableDictionary<string, WButtonCustomColor>
-        {
-            public WButtonCustomColorDictionary()
-                : base(new Dictionary<string, WButtonCustomColor>(StringComparer.OrdinalIgnoreCase))
-            { }
-        }
-
-#if UNITY_EDITOR
-        [CustomPropertyDrawer(typeof(WButtonCustomColor))]
-        private sealed class WButtonCustomColorDrawer : PropertyDrawer
-        {
-            private static readonly GUIContent ButtonLabelContent = EditorGUIUtility.TrTextContent(
-                "Button"
-            );
-            private static readonly GUIContent TextLabelContent = EditorGUIUtility.TrTextContent(
-                "Text"
-            );
-
-            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            {
-                return EditorGUIUtility.singleLineHeight;
-            }
-
-            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-            {
-                SerializedProperty buttonColor = property.FindPropertyRelative(
-                    SerializedPropertyNames.WButtonCustomColorButton
-                );
-                SerializedProperty textColor = property.FindPropertyRelative(
-                    SerializedPropertyNames.WButtonCustomColorText
-                );
-                SerializedProperty hasTextColor = property.FindPropertyRelative(
-                    SerializedPropertyNames.WButtonCustomColorHasText
-                );
-
-                float spacing = EditorGUIUtility.standardVerticalSpacing;
-                float availableWidth = Mathf.Max(0f, position.width - spacing);
-                float halfWidth = availableWidth * 0.5f;
-
-                float labelWidth = Mathf.Clamp(
-                    halfWidth * CustomColorDrawerLabelWidthRatio,
-                    CustomColorDrawerMinLabelWidth,
-                    CustomColorDrawerMaxLabelWidth
-                );
-
-                float previousLabelWidth = EditorGUIUtility.labelWidth;
-                EditorGUIUtility.labelWidth = labelWidth;
-
-                try
-                {
-                    Rect buttonRect = new(position.x, position.y, halfWidth, position.height);
-                    Rect textRect = new(
-                        position.x + halfWidth + spacing,
-                        position.y,
-                        halfWidth,
-                        position.height
-                    );
-
-                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = minFieldWidth <= halfWidth;
-
-                    EditorGUI.PropertyField(
-                        buttonRect,
-                        buttonColor,
-                        useLabels ? ButtonLabelContent : GUIContent.none
-                    );
-                    // Touching the field IS the choice. The drawer writes the serialized field
-                    // directly rather than through the property setter, so nothing else would
-                    // record that a colour stopped being derived.
-                    EditorGUI.BeginChangeCheck();
-                    EditorGUI.PropertyField(
-                        textRect,
-                        textColor,
-                        useLabels ? TextLabelContent : GUIContent.none
-                    );
-                    if (EditorGUI.EndChangeCheck() && hasTextColor != null)
-                    {
-                        hasTextColor.boolValue = true;
-                    }
-                }
-                finally
-                {
-                    EditorGUIUtility.labelWidth = previousLabelWidth;
-                }
-            }
-        }
-
-        [CustomPropertyDrawer(typeof(WEnumToggleButtonsCustomColor))]
-        private sealed class WEnumToggleButtonsCustomColorDrawer : PropertyDrawer
-        {
-            private static readonly GUIContent SelectedBackgroundLabelContent =
-                EditorGUIUtility.TrTextContent("Selected BG");
-            private static readonly GUIContent SelectedTextLabelContent =
-                EditorGUIUtility.TrTextContent("Selected Text");
-            private static readonly GUIContent InactiveBackgroundLabelContent =
-                EditorGUIUtility.TrTextContent("Inactive BG");
-            private static readonly GUIContent InactiveTextLabelContent =
-                EditorGUIUtility.TrTextContent("Inactive Text");
-
-            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            {
-                float lineHeight = EditorGUIUtility.singleLineHeight;
-                float spacing = EditorGUIUtility.standardVerticalSpacing;
-                return lineHeight * 2f + spacing;
-            }
-
-            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-            {
-                SerializedProperty selectedBackground = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsSelectedBackground
-                );
-                SerializedProperty selectedText = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsSelectedText
-                );
-                SerializedProperty inactiveBackground = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsInactiveBackground
-                );
-                SerializedProperty inactiveText = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsInactiveText
-                );
-                SerializedProperty hasSelectedText = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsHasSelectedText
-                );
-                SerializedProperty hasInactiveText = property.FindPropertyRelative(
-                    SerializedPropertyNames.WEnumToggleButtonsHasInactiveText
-                );
-
-                float spacing = EditorGUIUtility.standardVerticalSpacing;
-                float availableWidth = Mathf.Max(0f, position.width - spacing);
-                float halfWidth = availableWidth * 0.5f;
-                float lineHeight = EditorGUIUtility.singleLineHeight;
-
-                float labelWidth = Mathf.Clamp(
-                    halfWidth * CustomColorDrawerLabelWidthRatio,
-                    CustomColorDrawerMinLabelWidth,
-                    CustomColorDrawerMaxLabelWidth
-                );
-
-                float previousLabelWidth = EditorGUIUtility.labelWidth;
-                EditorGUIUtility.labelWidth = labelWidth;
-
-                try
-                {
-                    Rect selectedBackgroundRect = new(
-                        position.x,
-                        position.y,
-                        halfWidth,
-                        lineHeight
-                    );
-                    Rect selectedTextRect = new(
-                        position.x + halfWidth + spacing,
-                        position.y,
-                        halfWidth,
-                        lineHeight
-                    );
-                    Rect inactiveBackgroundRect = new(
-                        position.x,
-                        position.y + lineHeight + spacing,
-                        halfWidth,
-                        lineHeight
-                    );
-                    Rect inactiveTextRect = new(
-                        position.x + halfWidth + spacing,
-                        position.y + lineHeight + spacing,
-                        halfWidth,
-                        lineHeight
-                    );
-
-                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = minFieldWidth <= halfWidth;
-
-                    EditorGUI.PropertyField(
-                        selectedBackgroundRect,
-                        selectedBackground,
-                        useLabels ? SelectedBackgroundLabelContent : GUIContent.none
-                    );
-                    // Touching either text field IS the choice; see the WButton drawer.
-                    EditorGUI.BeginChangeCheck();
-                    EditorGUI.PropertyField(
-                        selectedTextRect,
-                        selectedText,
-                        useLabels ? SelectedTextLabelContent : GUIContent.none
-                    );
-                    if (EditorGUI.EndChangeCheck() && hasSelectedText != null)
-                    {
-                        hasSelectedText.boolValue = true;
-                    }
-
-                    EditorGUI.PropertyField(
-                        inactiveBackgroundRect,
-                        inactiveBackground,
-                        useLabels ? InactiveBackgroundLabelContent : GUIContent.none
-                    );
-                    EditorGUI.BeginChangeCheck();
-                    EditorGUI.PropertyField(
-                        inactiveTextRect,
-                        inactiveText,
-                        useLabels ? InactiveTextLabelContent : GUIContent.none
-                    );
-                    if (EditorGUI.EndChangeCheck() && hasInactiveText != null)
-                    {
-                        hasInactiveText.boolValue = true;
-                    }
-                }
-                finally
-                {
-                    EditorGUIUtility.labelWidth = previousLabelWidth;
-                }
-            }
-        }
-#endif
-
-        [Serializable]
-        internal sealed class WEnumToggleButtonsCustomColor
-        {
-            [FormerlySerializedAs("selectedBackgroundColor")]
-            [SerializeField]
-            internal Color _selectedBackgroundColor = DefaultColorKeyButtonColor;
-
-            [FormerlySerializedAs("selectedTextColor")]
-            [SerializeField]
-            internal Color _selectedTextColor;
-
-            /// <summary>Whether the selected text colour was chosen rather than derived.</summary>
-            [SerializeField]
-            internal bool _hasSelectedTextColor;
-
-            [FormerlySerializedAs("inactiveBackgroundColor")]
-            [SerializeField]
-            internal Color _inactiveBackgroundColor = DefaultLightThemeButtonColor;
-
-            [FormerlySerializedAs("inactiveTextColor")]
-            [SerializeField]
-            internal Color _inactiveTextColor;
-
-            /// <summary>Whether the inactive text colour was chosen rather than derived.</summary>
-            [SerializeField]
-            internal bool _hasInactiveTextColor;
-
-            public Color SelectedBackgroundColor
-            {
-                get => _selectedBackgroundColor;
-                set => _selectedBackgroundColor = value;
-            }
-
-            public Color SelectedTextColor
-            {
-                get => _selectedTextColor;
-                set
-                {
-                    _selectedTextColor = value;
-                    _hasSelectedTextColor = true;
-                }
-            }
-
-            public Color InactiveBackgroundColor
-            {
-                get => _inactiveBackgroundColor;
-                set => _inactiveBackgroundColor = value;
-            }
-
-            public Color InactiveTextColor
-            {
-                get => _inactiveTextColor;
-                set
-                {
-                    _inactiveTextColor = value;
-                    _hasInactiveTextColor = true;
-                }
-            }
-
-            /// <summary>Derives readable text colours for the halves that chose none.</summary>
-            public void EnsureReadableText()
-            {
-                if (!_hasSelectedTextColor)
-                {
-                    _selectedTextColor = WButtonColorUtility.GetReadableTextColor(
-                        _selectedBackgroundColor
-                    );
-                }
-
-                if (!_hasInactiveTextColor)
-                {
-                    _inactiveTextColor = WButtonColorUtility.GetReadableTextColor(
-                        _inactiveBackgroundColor
-                    );
-                }
-            }
-
-            /// <summary>Reads an entry written before the flags existed.</summary>
-            /// <returns><c>true</c> when this entry was changed.</returns>
-            internal bool MigrateChosenTextColors()
-            {
-                bool changed = false;
-                if (!_hasSelectedTextColor && _selectedTextColor != default)
-                {
-                    _hasSelectedTextColor = true;
-                    changed = true;
-                }
-
-                if (!_hasInactiveTextColor && _inactiveTextColor != default)
-                {
-                    _hasInactiveTextColor = true;
-                    changed = true;
-                }
-
-                return changed;
-            }
-        }
-
-        [Serializable]
-        private sealed class WEnumToggleButtonsCustomColorDictionary
-            : SerializableDictionary<string, WEnumToggleButtonsCustomColor>
-        {
-            public WEnumToggleButtonsCustomColorDictionary()
-                : base(
-                    new Dictionary<string, WEnumToggleButtonsCustomColor>(
-                        StringComparer.OrdinalIgnoreCase
-                    )
-                ) { }
-        }
-
         /// <summary>
         /// Retrieves the effective page size for StringInList drawers, clamped to safe bounds.
         /// </summary>
@@ -1714,56 +1205,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
                 _enumToggleButtonsPageSize = clamped;
                 SaveSettings();
-            }
-        }
-
-        [Serializable]
-        [Obsolete("Use WButtonCustomColorDictionary for serialization instead.")]
-        private sealed class WButtonPriorityColor
-        {
-            [FormerlySerializedAs("priority")]
-            [SerializeField]
-            internal string _priority = DefaultWButtonColorKey;
-
-            [FormerlySerializedAs("buttonColor")]
-            [SerializeField]
-            private Color _buttonColor = Color.white;
-
-            [FormerlySerializedAs("textColor")]
-            [SerializeField]
-            private Color _textColor = Color.black;
-
-            public WButtonPriorityColor() { }
-
-            public WButtonPriorityColor(string priority, Color buttonColor, Color textColor)
-            {
-                Priority = priority;
-                ButtonColor = buttonColor;
-                TextColor = textColor;
-            }
-
-            public string Priority
-            {
-                get =>
-                    string.IsNullOrWhiteSpace(_priority)
-                        ? DefaultWButtonColorKey
-                        : _priority.Trim();
-                set =>
-                    _priority = string.IsNullOrWhiteSpace(value)
-                        ? DefaultWButtonColorKey
-                        : value.Trim();
-            }
-
-            public Color ButtonColor
-            {
-                get => _buttonColor;
-                set => _buttonColor = value;
-            }
-
-            public Color TextColor
-            {
-                get => _textColor;
-                set => _textColor = value;
             }
         }
 
@@ -2099,7 +1540,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return new WGroupAutoIncludeConfiguration(settings._wgroupAutoIncludeMode, clamped);
         }
 
-#if UNITY_EDITOR
         internal static void SetWGroupAutoIncludeConfigurationForTests(
             WGroupAutoIncludeMode mode,
             int rowCount
@@ -2114,7 +1554,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             );
             settings.SaveSettings();
         }
-#endif
 
         public static WButtonPaletteEntry ResolveWButtonPalette(string colorKey)
         {
@@ -2589,202 +2028,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             instance?.RegisterPaletteManualEditInternal(propertyPath, key);
-        }
-
-        internal static class SerializedPropertyNames
-        {
-            internal const string SerializableTypeIgnorePatterns = nameof(
-                _serializableTypeIgnorePatterns
-            );
-            internal const string SerializableTypePatternsInitialized = nameof(
-                _serializableTypePatternsInitialized
-            );
-            internal const string SerializableTypePattern = nameof(
-                SerializableTypeIgnorePattern._pattern
-            );
-            internal const string LegacyWButtonPriorityColors = nameof(
-                _legacyWButtonPriorityColors
-            );
-            internal const string WButtonCustomColors = nameof(_wbuttonCustomColors);
-            internal const string WGroupFoldoutsStartCollapsed = nameof(
-                _wgroupFoldoutsStartCollapsed
-            );
-            internal const string WGroupFoldoutTweenEnabled = nameof(_wgroupFoldoutTweenEnabled);
-            internal const string WGroupFoldoutSpeed = nameof(_wgroupFoldoutSpeed);
-            internal const string WEnumToggleButtonsCustomColors = nameof(
-                _wenumToggleButtonsCustomColors
-            );
-            internal const string InlineEditorFoldoutBehavior = nameof(
-                _inlineEditorFoldoutBehavior
-            );
-            internal const string InlineEditorFoldoutTweenEnabled = nameof(
-                _inlineEditorFoldoutTweenEnabled
-            );
-            internal const string InlineEditorFoldoutSpeed = nameof(_inlineEditorFoldoutSpeed);
-            internal const string WButtonFoldoutTweenEnabled = nameof(_wbuttonFoldoutTweenEnabled);
-            internal const string SerializableDictionaryFoldoutTweenEnabled = nameof(
-                _serializableDictionaryFoldoutTweenEnabled
-            );
-            internal const string SerializableSortedDictionaryFoldoutTweenEnabled = nameof(
-                _serializableSortedDictionaryFoldoutTweenEnabled
-            );
-            internal const string SerializableSetFoldoutTweenEnabled = nameof(
-                _serializableSetFoldoutTweenEnabled
-            );
-            internal const string SerializableSortedSetFoldoutTweenEnabled = nameof(
-                _serializableSortedSetFoldoutTweenEnabled
-            );
-            internal const string FoldoutTweenSettingsInitialized = nameof(
-                _foldoutTweenSettingsInitialized
-            );
-            internal const string SerializableDictionaryFoldoutSpeed = nameof(
-                _serializableDictionaryFoldoutSpeed
-            );
-            internal const string SerializableSortedDictionaryFoldoutSpeed = nameof(
-                _serializableSortedDictionaryFoldoutSpeed
-            );
-            internal const string SerializableSetFoldoutSpeed = nameof(
-                _serializableSetFoldoutSpeed
-            );
-            internal const string SerializableSortedSetFoldoutSpeed = nameof(
-                _serializableSortedSetFoldoutSpeed
-            );
-            internal const string DetectAssetChangeLoopWindowSeconds = nameof(
-                _detectAssetChangeLoopWindowSeconds
-            );
-            internal const string DeferAssetPostprocessorCallbacks = nameof(
-                _deferAssetPostprocessorCallbacks
-            );
-#pragma warning disable CS0618 // Type or member is obsolete
-            internal const string WButtonPriority = nameof(WButtonPriorityColor._priority);
-#pragma warning restore CS0618 // Type or member is obsolete
-            internal const string WButtonCustomColorButton = nameof(
-                WButtonCustomColor._buttonColor
-            );
-            internal const string WButtonCustomColorText = nameof(WButtonCustomColor._textColor);
-            internal const string WButtonCustomColorHasText = nameof(
-                WButtonCustomColor._hasTextColor
-            );
-            internal const string WEnumToggleButtonsSelectedBackground = nameof(
-                WEnumToggleButtonsCustomColor._selectedBackgroundColor
-            );
-            internal const string WEnumToggleButtonsSelectedText = nameof(
-                WEnumToggleButtonsCustomColor._selectedTextColor
-            );
-            internal const string WEnumToggleButtonsInactiveBackground = nameof(
-                WEnumToggleButtonsCustomColor._inactiveBackgroundColor
-            );
-            internal const string WEnumToggleButtonsInactiveText = nameof(
-                WEnumToggleButtonsCustomColor._inactiveTextColor
-            );
-            internal const string WEnumToggleButtonsHasSelectedText = nameof(
-                WEnumToggleButtonsCustomColor._hasSelectedTextColor
-            );
-            internal const string WEnumToggleButtonsHasInactiveText = nameof(
-                WEnumToggleButtonsCustomColor._hasInactiveTextColor
-            );
-            internal const string FailedTestsOutputDirectory = nameof(_failedTestsOutputDirectory);
-
-            /// <summary>
-            /// Gets the serialized property name value for the given constant name.
-            /// Exposed for testing to avoid reflection-based field access.
-            /// </summary>
-            internal static string GetPropertyNameValue(string constantName)
-            {
-                return constantName switch
-                {
-                    nameof(SerializableTypeIgnorePatterns) => SerializableTypeIgnorePatterns,
-                    nameof(SerializableTypePatternsInitialized) =>
-                        SerializableTypePatternsInitialized,
-                    nameof(SerializableTypePattern) => SerializableTypePattern,
-                    nameof(LegacyWButtonPriorityColors) => LegacyWButtonPriorityColors,
-                    nameof(WButtonCustomColors) => WButtonCustomColors,
-                    nameof(WGroupFoldoutsStartCollapsed) => WGroupFoldoutsStartCollapsed,
-                    nameof(WGroupFoldoutTweenEnabled) => WGroupFoldoutTweenEnabled,
-                    nameof(WGroupFoldoutSpeed) => WGroupFoldoutSpeed,
-                    nameof(WEnumToggleButtonsCustomColors) => WEnumToggleButtonsCustomColors,
-                    nameof(InlineEditorFoldoutBehavior) => InlineEditorFoldoutBehavior,
-                    nameof(InlineEditorFoldoutTweenEnabled) => InlineEditorFoldoutTweenEnabled,
-                    nameof(InlineEditorFoldoutSpeed) => InlineEditorFoldoutSpeed,
-                    nameof(WButtonFoldoutTweenEnabled) => WButtonFoldoutTweenEnabled,
-                    nameof(SerializableDictionaryFoldoutTweenEnabled) =>
-                        SerializableDictionaryFoldoutTweenEnabled,
-                    nameof(SerializableSortedDictionaryFoldoutTweenEnabled) =>
-                        SerializableSortedDictionaryFoldoutTweenEnabled,
-                    nameof(SerializableSetFoldoutTweenEnabled) =>
-                        SerializableSetFoldoutTweenEnabled,
-                    nameof(SerializableSortedSetFoldoutTweenEnabled) =>
-                        SerializableSortedSetFoldoutTweenEnabled,
-                    nameof(FoldoutTweenSettingsInitialized) => FoldoutTweenSettingsInitialized,
-                    nameof(SerializableDictionaryFoldoutSpeed) =>
-                        SerializableDictionaryFoldoutSpeed,
-                    nameof(SerializableSortedDictionaryFoldoutSpeed) =>
-                        SerializableSortedDictionaryFoldoutSpeed,
-                    nameof(SerializableSetFoldoutSpeed) => SerializableSetFoldoutSpeed,
-                    nameof(SerializableSortedSetFoldoutSpeed) => SerializableSortedSetFoldoutSpeed,
-                    nameof(DetectAssetChangeLoopWindowSeconds) =>
-                        DetectAssetChangeLoopWindowSeconds,
-                    nameof(DeferAssetPostprocessorCallbacks) => DeferAssetPostprocessorCallbacks,
-                    nameof(WButtonPriority) => WButtonPriority,
-                    nameof(WButtonCustomColorButton) => WButtonCustomColorButton,
-                    nameof(WButtonCustomColorText) => WButtonCustomColorText,
-                    nameof(WButtonCustomColorHasText) => WButtonCustomColorHasText,
-                    nameof(WEnumToggleButtonsSelectedBackground) =>
-                        WEnumToggleButtonsSelectedBackground,
-                    nameof(WEnumToggleButtonsSelectedText) => WEnumToggleButtonsSelectedText,
-                    nameof(WEnumToggleButtonsInactiveBackground) =>
-                        WEnumToggleButtonsInactiveBackground,
-                    nameof(WEnumToggleButtonsInactiveText) => WEnumToggleButtonsInactiveText,
-                    nameof(WEnumToggleButtonsHasSelectedText) => WEnumToggleButtonsHasSelectedText,
-                    nameof(WEnumToggleButtonsHasInactiveText) => WEnumToggleButtonsHasInactiveText,
-                    nameof(FailedTestsOutputDirectory) => FailedTestsOutputDirectory,
-                    _ => null,
-                };
-            }
-        }
-
-        /// <summary>
-        /// Constants for custom color drawer layout calculations, exposed for testing.
-        /// </summary>
-        internal static class CustomColorDrawerLayout
-        {
-            /// <summary>
-            /// Minimum width for a color field (the picker itself, excluding label).
-            /// </summary>
-            internal const float MinColorFieldWidth = CustomColorDrawerMinColorFieldWidth;
-
-            /// <summary>
-            /// Ratio of column width to label width (e.g., 0.38 means label is 38% of the column).
-            /// </summary>
-            internal const float LabelWidthRatio = CustomColorDrawerLabelWidthRatio;
-
-            /// <summary>
-            /// Minimum label width in pixels.
-            /// </summary>
-            internal const float MinLabelWidth = CustomColorDrawerMinLabelWidth;
-
-            /// <summary>
-            /// Maximum label width in pixels.
-            /// </summary>
-            internal const float MaxLabelWidth = CustomColorDrawerMaxLabelWidth;
-
-            /// <summary>
-            /// Calculates the label width for a given column width using the same logic as the drawers.
-            /// </summary>
-            internal static float CalculateLabelWidth(float columnWidth)
-            {
-                return Mathf.Clamp(columnWidth * LabelWidthRatio, MinLabelWidth, MaxLabelWidth);
-            }
-
-            /// <summary>
-            /// Determines whether labels should be displayed for a given column width.
-            /// </summary>
-            internal static bool ShouldShowLabels(float columnWidth)
-            {
-                float labelWidth = CalculateLabelWidth(columnWidth);
-                float minFieldWidth = MinColorFieldWidth + labelWidth;
-                return minFieldWidth <= columnWidth;
-            }
         }
 
         /// <summary>
@@ -4221,25 +3464,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         settings.CaptureWaitInstructionDefaultsFromRuntime();
                     }
                 }
-            }
-        }
-
-        private readonly struct LabelWidthScope : IDisposable
-        {
-            private readonly float _previousWidth;
-
-            internal LabelWidthScope(float targetWidth)
-            {
-                _previousWidth = EditorGUIUtility.labelWidth;
-                float currentViewWidth = EditorGUIUtility.currentViewWidth;
-                float maxLabelWidth = Mathf.Max(0f, currentViewWidth - SettingsMinFieldWidth);
-                float appliedWidth = Mathf.Clamp(targetWidth, 0f, maxLabelWidth);
-                EditorGUIUtility.labelWidth = appliedWidth;
-            }
-
-            public void Dispose()
-            {
-                EditorGUIUtility.labelWidth = _previousWidth;
             }
         }
 
@@ -5781,6 +5005,778 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             AssetDatabase.SaveAssets();
             _waitInstructionBufferSettingsAsset = created;
             return _waitInstructionBufferSettingsAsset;
+        }
+
+        public enum WButtonActionsPlacement
+        {
+            Top = 0,
+            Bottom = 1,
+        }
+
+        public enum WButtonFoldoutBehavior
+        {
+            AlwaysOpen = 0,
+            StartExpanded = 1,
+            StartCollapsed = 2,
+        }
+
+        public enum WGroupAutoIncludeMode
+        {
+            None = 0,
+            Finite = 1,
+            Infinite = 2,
+        }
+
+        public enum InlineEditorFoldoutBehavior
+        {
+            AlwaysOpen = 0,
+            StartExpanded = 1,
+            StartCollapsed = 2,
+        }
+
+        public readonly struct WGroupAutoIncludeConfiguration
+        {
+            public WGroupAutoIncludeConfiguration(WGroupAutoIncludeMode mode, int rowCount)
+            {
+                Mode = mode;
+                RowCount = rowCount < 0 ? 0 : rowCount;
+            }
+
+            public WGroupAutoIncludeMode Mode { get; }
+
+            public int RowCount { get; }
+        }
+
+        public readonly struct WButtonPaletteEntry
+        {
+            public WButtonPaletteEntry(Color buttonColor, Color textColor)
+            {
+                ButtonColor = buttonColor;
+                TextColor = textColor;
+            }
+
+            public Color ButtonColor { get; }
+
+            public Color TextColor { get; }
+        }
+
+        public readonly struct WEnumToggleButtonsPaletteEntry
+        {
+            public WEnumToggleButtonsPaletteEntry(
+                Color selectedBackgroundColor,
+                Color selectedTextColor,
+                Color inactiveBackgroundColor,
+                Color inactiveTextColor
+            )
+            {
+                SelectedBackgroundColor = selectedBackgroundColor;
+                SelectedTextColor = selectedTextColor;
+                InactiveBackgroundColor = inactiveBackgroundColor;
+                InactiveTextColor = inactiveTextColor;
+            }
+
+            public Color SelectedBackgroundColor { get; }
+
+            public Color SelectedTextColor { get; }
+
+            public Color InactiveBackgroundColor { get; }
+
+            public Color InactiveTextColor { get; }
+        }
+
+        public enum DuplicateRowAnimationMode
+        {
+            [Obsolete("Disable duplicate duplicate-row animations only when required.", false)]
+            None = 0,
+            Static = 1,
+            Tween = 2,
+        }
+
+        [Serializable]
+        internal sealed class SerializableTypeIgnorePattern
+        {
+            [FormerlySerializedAs("pattern")]
+            [SerializeField]
+            internal string _pattern = string.Empty;
+
+            public SerializableTypeIgnorePattern() { }
+
+            public SerializableTypeIgnorePattern(string pattern)
+            {
+                Pattern = pattern;
+            }
+
+            public string Pattern
+            {
+                get => _pattern ?? string.Empty;
+                set => _pattern = value ?? string.Empty;
+            }
+        }
+
+        [Serializable]
+        internal sealed class WButtonCustomColor
+        {
+            [FormerlySerializedAs("buttonColor")]
+            [SerializeField]
+            internal Color _buttonColor = Color.white;
+
+            [FormerlySerializedAs("textColor")]
+            [SerializeField]
+            internal Color _textColor;
+
+            // Whether the text colour above is one someone CHOSE, rather than one to derive from
+            // the button. A flag rather than a sentinel value, because every sentinel a Color can
+            // spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
+            // read deliberately chosen opaque black as "unset" and overwrote it on the next load,
+            // and it could not represent a translucent choice at all -- any alpha under a
+            // zero-RGB colour was discarded the same way.
+            [SerializeField]
+            internal bool _hasTextColor;
+
+            public Color ButtonColor
+            {
+                get => _buttonColor;
+                set => _buttonColor = value;
+            }
+
+            public Color TextColor
+            {
+                get => _textColor;
+                set
+                {
+                    _textColor = value;
+                    _hasTextColor = true;
+                }
+            }
+
+            /// <summary>Whether someone chose this entry's text colour rather than deriving it.</summary>
+            internal bool HasChosenTextColor => _hasTextColor;
+
+            /// <summary>Derives a readable text colour for an entry that has not chosen one.</summary>
+            /// <remarks>
+            /// The flag is deliberately NOT set here. An entry with no chosen colour keeps deriving
+            /// one, so editing the button colour moves the text with it; under the old sentinel a
+            /// derived colour froze the moment it happened to be non-black, which is how a white
+            /// text colour survived onto a button someone later made white.
+            /// </remarks>
+            public void EnsureReadableText()
+            {
+                if (_hasTextColor)
+                {
+                    return;
+                }
+
+                _textColor = WButtonColorUtility.GetReadableTextColor(_buttonColor);
+            }
+
+            /// <summary>Reads an entry written before the flag existed.</summary>
+            /// <returns><c>true</c> when this entry was changed.</returns>
+            /// <remarks>
+            /// The old sentinel meant "unset" for any colour whose RGB was zero, so a stored colour
+            /// that is entirely zero is the only one that can have BEEN unset and round-tripped as
+            /// one. Everything else was already being kept, and stays kept -- nobody's colour
+            /// changes on upgrade, which is the whole requirement.
+            /// </remarks>
+            internal bool MigrateChosenTextColor()
+            {
+                if (_hasTextColor || _textColor == default)
+                {
+                    return false;
+                }
+
+                _hasTextColor = true;
+                return true;
+            }
+        }
+
+        // Colour keys are matched without regard to case everywhere they are read, so the dictionary
+        // that stores them has to agree: otherwise "Save" and "save" are two entries here and one
+        // entry to every reader.
+        [Serializable]
+        private sealed class WButtonCustomColorDictionary
+            : SerializableDictionary<string, WButtonCustomColor>
+        {
+            public WButtonCustomColorDictionary()
+                : base(new Dictionary<string, WButtonCustomColor>(StringComparer.OrdinalIgnoreCase))
+            { }
+        }
+
+        [Serializable]
+        internal sealed class WEnumToggleButtonsCustomColor
+        {
+            [FormerlySerializedAs("selectedBackgroundColor")]
+            [SerializeField]
+            internal Color _selectedBackgroundColor = DefaultColorKeyButtonColor;
+
+            [FormerlySerializedAs("selectedTextColor")]
+            [SerializeField]
+            internal Color _selectedTextColor;
+
+            /// <summary>Whether the selected text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasSelectedTextColor;
+
+            [FormerlySerializedAs("inactiveBackgroundColor")]
+            [SerializeField]
+            internal Color _inactiveBackgroundColor = DefaultLightThemeButtonColor;
+
+            [FormerlySerializedAs("inactiveTextColor")]
+            [SerializeField]
+            internal Color _inactiveTextColor;
+
+            /// <summary>Whether the inactive text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasInactiveTextColor;
+
+            public Color SelectedBackgroundColor
+            {
+                get => _selectedBackgroundColor;
+                set => _selectedBackgroundColor = value;
+            }
+
+            public Color SelectedTextColor
+            {
+                get => _selectedTextColor;
+                set
+                {
+                    _selectedTextColor = value;
+                    _hasSelectedTextColor = true;
+                }
+            }
+
+            public Color InactiveBackgroundColor
+            {
+                get => _inactiveBackgroundColor;
+                set => _inactiveBackgroundColor = value;
+            }
+
+            public Color InactiveTextColor
+            {
+                get => _inactiveTextColor;
+                set
+                {
+                    _inactiveTextColor = value;
+                    _hasInactiveTextColor = true;
+                }
+            }
+
+            /// <summary>Derives readable text colours for the halves that chose none.</summary>
+            public void EnsureReadableText()
+            {
+                if (!_hasSelectedTextColor)
+                {
+                    _selectedTextColor = WButtonColorUtility.GetReadableTextColor(
+                        _selectedBackgroundColor
+                    );
+                }
+
+                if (!_hasInactiveTextColor)
+                {
+                    _inactiveTextColor = WButtonColorUtility.GetReadableTextColor(
+                        _inactiveBackgroundColor
+                    );
+                }
+            }
+
+            /// <summary>Reads an entry written before the flags existed.</summary>
+            /// <returns><c>true</c> when this entry was changed.</returns>
+            internal bool MigrateChosenTextColors()
+            {
+                bool changed = false;
+                if (!_hasSelectedTextColor && _selectedTextColor != default)
+                {
+                    _hasSelectedTextColor = true;
+                    changed = true;
+                }
+
+                if (!_hasInactiveTextColor && _inactiveTextColor != default)
+                {
+                    _hasInactiveTextColor = true;
+                    changed = true;
+                }
+
+                return changed;
+            }
+        }
+
+        [Serializable]
+        private sealed class WEnumToggleButtonsCustomColorDictionary
+            : SerializableDictionary<string, WEnumToggleButtonsCustomColor>
+        {
+            public WEnumToggleButtonsCustomColorDictionary()
+                : base(
+                    new Dictionary<string, WEnumToggleButtonsCustomColor>(
+                        StringComparer.OrdinalIgnoreCase
+                    )
+                ) { }
+        }
+
+        [Serializable]
+        [Obsolete("Use WButtonCustomColorDictionary for serialization instead.")]
+        private sealed class WButtonPriorityColor
+        {
+            [FormerlySerializedAs("priority")]
+            [SerializeField]
+            internal string _priority = DefaultWButtonColorKey;
+
+            [FormerlySerializedAs("buttonColor")]
+            [SerializeField]
+            private Color _buttonColor = Color.white;
+
+            [FormerlySerializedAs("textColor")]
+            [SerializeField]
+            private Color _textColor = Color.black;
+
+            public WButtonPriorityColor() { }
+
+            public WButtonPriorityColor(string priority, Color buttonColor, Color textColor)
+            {
+                Priority = priority;
+                ButtonColor = buttonColor;
+                TextColor = textColor;
+            }
+
+            public string Priority
+            {
+                get =>
+                    string.IsNullOrWhiteSpace(_priority)
+                        ? DefaultWButtonColorKey
+                        : _priority.Trim();
+                set =>
+                    _priority = string.IsNullOrWhiteSpace(value)
+                        ? DefaultWButtonColorKey
+                        : value.Trim();
+            }
+
+            public Color ButtonColor
+            {
+                get => _buttonColor;
+                set => _buttonColor = value;
+            }
+
+            public Color TextColor
+            {
+                get => _textColor;
+                set => _textColor = value;
+            }
+        }
+
+        internal static class SerializedPropertyNames
+        {
+            internal const string SerializableTypeIgnorePatterns = nameof(
+                _serializableTypeIgnorePatterns
+            );
+            internal const string SerializableTypePatternsInitialized = nameof(
+                _serializableTypePatternsInitialized
+            );
+            internal const string SerializableTypePattern = nameof(
+                SerializableTypeIgnorePattern._pattern
+            );
+            internal const string LegacyWButtonPriorityColors = nameof(
+                _legacyWButtonPriorityColors
+            );
+            internal const string WButtonCustomColors = nameof(_wbuttonCustomColors);
+            internal const string WGroupFoldoutsStartCollapsed = nameof(
+                _wgroupFoldoutsStartCollapsed
+            );
+            internal const string WGroupFoldoutTweenEnabled = nameof(_wgroupFoldoutTweenEnabled);
+            internal const string WGroupFoldoutSpeed = nameof(_wgroupFoldoutSpeed);
+            internal const string WEnumToggleButtonsCustomColors = nameof(
+                _wenumToggleButtonsCustomColors
+            );
+            internal const string InlineEditorFoldoutBehavior = nameof(
+                _inlineEditorFoldoutBehavior
+            );
+            internal const string InlineEditorFoldoutTweenEnabled = nameof(
+                _inlineEditorFoldoutTweenEnabled
+            );
+            internal const string InlineEditorFoldoutSpeed = nameof(_inlineEditorFoldoutSpeed);
+            internal const string WButtonFoldoutTweenEnabled = nameof(_wbuttonFoldoutTweenEnabled);
+            internal const string SerializableDictionaryFoldoutTweenEnabled = nameof(
+                _serializableDictionaryFoldoutTweenEnabled
+            );
+            internal const string SerializableSortedDictionaryFoldoutTweenEnabled = nameof(
+                _serializableSortedDictionaryFoldoutTweenEnabled
+            );
+            internal const string SerializableSetFoldoutTweenEnabled = nameof(
+                _serializableSetFoldoutTweenEnabled
+            );
+            internal const string SerializableSortedSetFoldoutTweenEnabled = nameof(
+                _serializableSortedSetFoldoutTweenEnabled
+            );
+            internal const string FoldoutTweenSettingsInitialized = nameof(
+                _foldoutTweenSettingsInitialized
+            );
+            internal const string SerializableDictionaryFoldoutSpeed = nameof(
+                _serializableDictionaryFoldoutSpeed
+            );
+            internal const string SerializableSortedDictionaryFoldoutSpeed = nameof(
+                _serializableSortedDictionaryFoldoutSpeed
+            );
+            internal const string SerializableSetFoldoutSpeed = nameof(
+                _serializableSetFoldoutSpeed
+            );
+            internal const string SerializableSortedSetFoldoutSpeed = nameof(
+                _serializableSortedSetFoldoutSpeed
+            );
+            internal const string DetectAssetChangeLoopWindowSeconds = nameof(
+                _detectAssetChangeLoopWindowSeconds
+            );
+            internal const string DeferAssetPostprocessorCallbacks = nameof(
+                _deferAssetPostprocessorCallbacks
+            );
+#pragma warning disable CS0618 // Type or member is obsolete
+            internal const string WButtonPriority = nameof(WButtonPriorityColor._priority);
+#pragma warning restore CS0618 // Type or member is obsolete
+            internal const string WButtonCustomColorButton = nameof(
+                WButtonCustomColor._buttonColor
+            );
+            internal const string WButtonCustomColorText = nameof(WButtonCustomColor._textColor);
+            internal const string WButtonCustomColorHasText = nameof(
+                WButtonCustomColor._hasTextColor
+            );
+            internal const string WEnumToggleButtonsSelectedBackground = nameof(
+                WEnumToggleButtonsCustomColor._selectedBackgroundColor
+            );
+            internal const string WEnumToggleButtonsSelectedText = nameof(
+                WEnumToggleButtonsCustomColor._selectedTextColor
+            );
+            internal const string WEnumToggleButtonsInactiveBackground = nameof(
+                WEnumToggleButtonsCustomColor._inactiveBackgroundColor
+            );
+            internal const string WEnumToggleButtonsInactiveText = nameof(
+                WEnumToggleButtonsCustomColor._inactiveTextColor
+            );
+            internal const string WEnumToggleButtonsHasSelectedText = nameof(
+                WEnumToggleButtonsCustomColor._hasSelectedTextColor
+            );
+            internal const string WEnumToggleButtonsHasInactiveText = nameof(
+                WEnumToggleButtonsCustomColor._hasInactiveTextColor
+            );
+            internal const string FailedTestsOutputDirectory = nameof(_failedTestsOutputDirectory);
+
+            /// <summary>
+            /// Gets the serialized property name value for the given constant name.
+            /// Exposed for testing to avoid reflection-based field access.
+            /// </summary>
+            internal static string GetPropertyNameValue(string constantName)
+            {
+                return constantName switch
+                {
+                    nameof(SerializableTypeIgnorePatterns) => SerializableTypeIgnorePatterns,
+                    nameof(SerializableTypePatternsInitialized) =>
+                        SerializableTypePatternsInitialized,
+                    nameof(SerializableTypePattern) => SerializableTypePattern,
+                    nameof(LegacyWButtonPriorityColors) => LegacyWButtonPriorityColors,
+                    nameof(WButtonCustomColors) => WButtonCustomColors,
+                    nameof(WGroupFoldoutsStartCollapsed) => WGroupFoldoutsStartCollapsed,
+                    nameof(WGroupFoldoutTweenEnabled) => WGroupFoldoutTweenEnabled,
+                    nameof(WGroupFoldoutSpeed) => WGroupFoldoutSpeed,
+                    nameof(WEnumToggleButtonsCustomColors) => WEnumToggleButtonsCustomColors,
+                    nameof(InlineEditorFoldoutBehavior) => InlineEditorFoldoutBehavior,
+                    nameof(InlineEditorFoldoutTweenEnabled) => InlineEditorFoldoutTweenEnabled,
+                    nameof(InlineEditorFoldoutSpeed) => InlineEditorFoldoutSpeed,
+                    nameof(WButtonFoldoutTweenEnabled) => WButtonFoldoutTweenEnabled,
+                    nameof(SerializableDictionaryFoldoutTweenEnabled) =>
+                        SerializableDictionaryFoldoutTweenEnabled,
+                    nameof(SerializableSortedDictionaryFoldoutTweenEnabled) =>
+                        SerializableSortedDictionaryFoldoutTweenEnabled,
+                    nameof(SerializableSetFoldoutTweenEnabled) =>
+                        SerializableSetFoldoutTweenEnabled,
+                    nameof(SerializableSortedSetFoldoutTweenEnabled) =>
+                        SerializableSortedSetFoldoutTweenEnabled,
+                    nameof(FoldoutTweenSettingsInitialized) => FoldoutTweenSettingsInitialized,
+                    nameof(SerializableDictionaryFoldoutSpeed) =>
+                        SerializableDictionaryFoldoutSpeed,
+                    nameof(SerializableSortedDictionaryFoldoutSpeed) =>
+                        SerializableSortedDictionaryFoldoutSpeed,
+                    nameof(SerializableSetFoldoutSpeed) => SerializableSetFoldoutSpeed,
+                    nameof(SerializableSortedSetFoldoutSpeed) => SerializableSortedSetFoldoutSpeed,
+                    nameof(DetectAssetChangeLoopWindowSeconds) =>
+                        DetectAssetChangeLoopWindowSeconds,
+                    nameof(DeferAssetPostprocessorCallbacks) => DeferAssetPostprocessorCallbacks,
+                    nameof(WButtonPriority) => WButtonPriority,
+                    nameof(WButtonCustomColorButton) => WButtonCustomColorButton,
+                    nameof(WButtonCustomColorText) => WButtonCustomColorText,
+                    nameof(WButtonCustomColorHasText) => WButtonCustomColorHasText,
+                    nameof(WEnumToggleButtonsSelectedBackground) =>
+                        WEnumToggleButtonsSelectedBackground,
+                    nameof(WEnumToggleButtonsSelectedText) => WEnumToggleButtonsSelectedText,
+                    nameof(WEnumToggleButtonsInactiveBackground) =>
+                        WEnumToggleButtonsInactiveBackground,
+                    nameof(WEnumToggleButtonsInactiveText) => WEnumToggleButtonsInactiveText,
+                    nameof(WEnumToggleButtonsHasSelectedText) => WEnumToggleButtonsHasSelectedText,
+                    nameof(WEnumToggleButtonsHasInactiveText) => WEnumToggleButtonsHasInactiveText,
+                    nameof(FailedTestsOutputDirectory) => FailedTestsOutputDirectory,
+                    _ => null,
+                };
+            }
+        }
+
+        /// <summary>
+        /// Constants for custom color drawer layout calculations, exposed for testing.
+        /// </summary>
+        internal static class CustomColorDrawerLayout
+        {
+            /// <summary>
+            /// Minimum width for a color field (the picker itself, excluding label).
+            /// </summary>
+            internal const float MinColorFieldWidth = CustomColorDrawerMinColorFieldWidth;
+
+            /// <summary>
+            /// Ratio of column width to label width (e.g., 0.38 means label is 38% of the column).
+            /// </summary>
+            internal const float LabelWidthRatio = CustomColorDrawerLabelWidthRatio;
+
+            /// <summary>
+            /// Minimum label width in pixels.
+            /// </summary>
+            internal const float MinLabelWidth = CustomColorDrawerMinLabelWidth;
+
+            /// <summary>
+            /// Maximum label width in pixels.
+            /// </summary>
+            internal const float MaxLabelWidth = CustomColorDrawerMaxLabelWidth;
+
+            /// <summary>
+            /// Calculates the label width for a given column width using the same logic as the drawers.
+            /// </summary>
+            internal static float CalculateLabelWidth(float columnWidth)
+            {
+                return Mathf.Clamp(columnWidth * LabelWidthRatio, MinLabelWidth, MaxLabelWidth);
+            }
+
+            /// <summary>
+            /// Determines whether labels should be displayed for a given column width.
+            /// </summary>
+            internal static bool ShouldShowLabels(float columnWidth)
+            {
+                float labelWidth = CalculateLabelWidth(columnWidth);
+                float minFieldWidth = MinColorFieldWidth + labelWidth;
+                return minFieldWidth <= columnWidth;
+            }
+        }
+
+        private readonly struct LabelWidthScope : IDisposable
+        {
+            private readonly float _previousWidth;
+
+            internal LabelWidthScope(float targetWidth)
+            {
+                _previousWidth = EditorGUIUtility.labelWidth;
+                float currentViewWidth = EditorGUIUtility.currentViewWidth;
+                float maxLabelWidth = Mathf.Max(0f, currentViewWidth - SettingsMinFieldWidth);
+                float appliedWidth = Mathf.Clamp(targetWidth, 0f, maxLabelWidth);
+                EditorGUIUtility.labelWidth = appliedWidth;
+            }
+
+            public void Dispose()
+            {
+                EditorGUIUtility.labelWidth = _previousWidth;
+            }
+        }
+
+        [CustomPropertyDrawer(typeof(WButtonCustomColor))]
+        private sealed class WButtonCustomColorDrawer : PropertyDrawer
+        {
+            private static readonly GUIContent ButtonLabelContent = EditorGUIUtility.TrTextContent(
+                "Button"
+            );
+            private static readonly GUIContent TextLabelContent = EditorGUIUtility.TrTextContent(
+                "Text"
+            );
+
+            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+            {
+                return EditorGUIUtility.singleLineHeight;
+            }
+
+            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+            {
+                SerializedProperty buttonColor = property.FindPropertyRelative(
+                    SerializedPropertyNames.WButtonCustomColorButton
+                );
+                SerializedProperty textColor = property.FindPropertyRelative(
+                    SerializedPropertyNames.WButtonCustomColorText
+                );
+                SerializedProperty hasTextColor = property.FindPropertyRelative(
+                    SerializedPropertyNames.WButtonCustomColorHasText
+                );
+
+                float spacing = EditorGUIUtility.standardVerticalSpacing;
+                float availableWidth = Mathf.Max(0f, position.width - spacing);
+                float halfWidth = availableWidth * 0.5f;
+
+                float labelWidth = Mathf.Clamp(
+                    halfWidth * CustomColorDrawerLabelWidthRatio,
+                    CustomColorDrawerMinLabelWidth,
+                    CustomColorDrawerMaxLabelWidth
+                );
+
+                float previousLabelWidth = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = labelWidth;
+
+                try
+                {
+                    Rect buttonRect = new(position.x, position.y, halfWidth, position.height);
+                    Rect textRect = new(
+                        position.x + halfWidth + spacing,
+                        position.y,
+                        halfWidth,
+                        position.height
+                    );
+
+                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
+                    bool useLabels = minFieldWidth <= halfWidth;
+
+                    EditorGUI.PropertyField(
+                        buttonRect,
+                        buttonColor,
+                        useLabels ? ButtonLabelContent : GUIContent.none
+                    );
+                    // Touching the field IS the choice. The drawer writes the serialized field
+                    // directly rather than through the property setter, so nothing else would
+                    // record that a colour stopped being derived.
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUI.PropertyField(
+                        textRect,
+                        textColor,
+                        useLabels ? TextLabelContent : GUIContent.none
+                    );
+                    if (EditorGUI.EndChangeCheck() && hasTextColor != null)
+                    {
+                        hasTextColor.boolValue = true;
+                    }
+                }
+                finally
+                {
+                    EditorGUIUtility.labelWidth = previousLabelWidth;
+                }
+            }
+        }
+
+        [CustomPropertyDrawer(typeof(WEnumToggleButtonsCustomColor))]
+        private sealed class WEnumToggleButtonsCustomColorDrawer : PropertyDrawer
+        {
+            private static readonly GUIContent SelectedBackgroundLabelContent =
+                EditorGUIUtility.TrTextContent("Selected BG");
+            private static readonly GUIContent SelectedTextLabelContent =
+                EditorGUIUtility.TrTextContent("Selected Text");
+            private static readonly GUIContent InactiveBackgroundLabelContent =
+                EditorGUIUtility.TrTextContent("Inactive BG");
+            private static readonly GUIContent InactiveTextLabelContent =
+                EditorGUIUtility.TrTextContent("Inactive Text");
+
+            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+            {
+                float lineHeight = EditorGUIUtility.singleLineHeight;
+                float spacing = EditorGUIUtility.standardVerticalSpacing;
+                return lineHeight * 2f + spacing;
+            }
+
+            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+            {
+                SerializedProperty selectedBackground = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsSelectedBackground
+                );
+                SerializedProperty selectedText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsSelectedText
+                );
+                SerializedProperty inactiveBackground = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsInactiveBackground
+                );
+                SerializedProperty inactiveText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsInactiveText
+                );
+                SerializedProperty hasSelectedText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsHasSelectedText
+                );
+                SerializedProperty hasInactiveText = property.FindPropertyRelative(
+                    SerializedPropertyNames.WEnumToggleButtonsHasInactiveText
+                );
+
+                float spacing = EditorGUIUtility.standardVerticalSpacing;
+                float availableWidth = Mathf.Max(0f, position.width - spacing);
+                float halfWidth = availableWidth * 0.5f;
+                float lineHeight = EditorGUIUtility.singleLineHeight;
+
+                float labelWidth = Mathf.Clamp(
+                    halfWidth * CustomColorDrawerLabelWidthRatio,
+                    CustomColorDrawerMinLabelWidth,
+                    CustomColorDrawerMaxLabelWidth
+                );
+
+                float previousLabelWidth = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = labelWidth;
+
+                try
+                {
+                    Rect selectedBackgroundRect = new(
+                        position.x,
+                        position.y,
+                        halfWidth,
+                        lineHeight
+                    );
+                    Rect selectedTextRect = new(
+                        position.x + halfWidth + spacing,
+                        position.y,
+                        halfWidth,
+                        lineHeight
+                    );
+                    Rect inactiveBackgroundRect = new(
+                        position.x,
+                        position.y + lineHeight + spacing,
+                        halfWidth,
+                        lineHeight
+                    );
+                    Rect inactiveTextRect = new(
+                        position.x + halfWidth + spacing,
+                        position.y + lineHeight + spacing,
+                        halfWidth,
+                        lineHeight
+                    );
+
+                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
+                    bool useLabels = minFieldWidth <= halfWidth;
+
+                    EditorGUI.PropertyField(
+                        selectedBackgroundRect,
+                        selectedBackground,
+                        useLabels ? SelectedBackgroundLabelContent : GUIContent.none
+                    );
+                    // Touching either text field IS the choice; see the WButton drawer.
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUI.PropertyField(
+                        selectedTextRect,
+                        selectedText,
+                        useLabels ? SelectedTextLabelContent : GUIContent.none
+                    );
+                    if (EditorGUI.EndChangeCheck() && hasSelectedText != null)
+                    {
+                        hasSelectedText.boolValue = true;
+                    }
+
+                    EditorGUI.PropertyField(
+                        inactiveBackgroundRect,
+                        inactiveBackground,
+                        useLabels ? InactiveBackgroundLabelContent : GUIContent.none
+                    );
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUI.PropertyField(
+                        inactiveTextRect,
+                        inactiveText,
+                        useLabels ? InactiveTextLabelContent : GUIContent.none
+                    );
+                    if (EditorGUI.EndChangeCheck() && hasInactiveText != null)
+                    {
+                        hasInactiveText.boolValue = true;
+                    }
+                }
+                finally
+                {
+                    EditorGUIUtility.labelWidth = previousLabelWidth;
+                }
+            }
         }
     }
 #endif

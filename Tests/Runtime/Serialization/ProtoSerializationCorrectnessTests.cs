@@ -16,107 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoSerializationCorrectnessTests
     {
-        [ProtoContract]
-        private sealed class EdgeCaseMessage
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public List<int> Values { get; set; } = new();
-
-            [ProtoMember(4)]
-            public byte[] Data { get; set; } = Array.Empty<byte>();
-        }
-
-        [ProtoContract]
-        private sealed class NestedMessage
-        {
-            [ProtoMember(1)]
-            public string Title { get; set; }
-
-            [ProtoMember(2)]
-            public EdgeCaseMessage Inner { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class NumericBoundariesMessage
-        {
-            [ProtoMember(1)]
-            public int IntMin { get; set; }
-
-            [ProtoMember(2)]
-            public int IntMax { get; set; }
-
-            [ProtoMember(3)]
-            public long LongMin { get; set; }
-
-            [ProtoMember(4)]
-            public long LongMax { get; set; }
-
-            [ProtoMember(5)]
-            public float FloatMin { get; set; }
-
-            [ProtoMember(6)]
-            public float FloatMax { get; set; }
-
-            [ProtoMember(7)]
-            public double DoubleMin { get; set; }
-
-            [ProtoMember(8)]
-            public double DoubleMax { get; set; }
-
-            [ProtoMember(9)]
-            public float NaN { get; set; }
-
-            [ProtoMember(10)]
-            public float PositiveInfinity { get; set; }
-
-            [ProtoMember(11)]
-            public float NegativeInfinity { get; set; }
-
-            [ProtoMember(12)]
-            public double DoubleNaN { get; set; }
-
-            [ProtoMember(13)]
-            public double DoublePositiveInfinity { get; set; }
-
-            [ProtoMember(14)]
-            public double DoubleNegativeInfinity { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class UnicodeStringMessage
-        {
-            [ProtoMember(1)]
-            public string Ascii { get; set; }
-
-            [ProtoMember(2)]
-            public string Unicode { get; set; }
-
-            [ProtoMember(3)]
-            public string Emoji { get; set; }
-
-            [ProtoMember(4)]
-            public string ControlChars { get; set; }
-
-            [ProtoMember(5)]
-            public string VeryLongString { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class DeeplyNestedMessage
-        {
-            [ProtoMember(1)]
-            public int Level { get; set; }
-
-            [ProtoMember(2)]
-            public DeeplyNestedMessage Child { get; set; }
-        }
-
         [Test]
         public void RoundTripEmptyAndDefaults()
         {
@@ -509,6 +408,107 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return b;
+        }
+
+        [ProtoContract]
+        private sealed class EdgeCaseMessage
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public List<int> Values { get; set; } = new();
+
+            [ProtoMember(4)]
+            public byte[] Data { get; set; } = Array.Empty<byte>();
+        }
+
+        [ProtoContract]
+        private sealed class NestedMessage
+        {
+            [ProtoMember(1)]
+            public string Title { get; set; }
+
+            [ProtoMember(2)]
+            public EdgeCaseMessage Inner { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class NumericBoundariesMessage
+        {
+            [ProtoMember(1)]
+            public int IntMin { get; set; }
+
+            [ProtoMember(2)]
+            public int IntMax { get; set; }
+
+            [ProtoMember(3)]
+            public long LongMin { get; set; }
+
+            [ProtoMember(4)]
+            public long LongMax { get; set; }
+
+            [ProtoMember(5)]
+            public float FloatMin { get; set; }
+
+            [ProtoMember(6)]
+            public float FloatMax { get; set; }
+
+            [ProtoMember(7)]
+            public double DoubleMin { get; set; }
+
+            [ProtoMember(8)]
+            public double DoubleMax { get; set; }
+
+            [ProtoMember(9)]
+            public float NaN { get; set; }
+
+            [ProtoMember(10)]
+            public float PositiveInfinity { get; set; }
+
+            [ProtoMember(11)]
+            public float NegativeInfinity { get; set; }
+
+            [ProtoMember(12)]
+            public double DoubleNaN { get; set; }
+
+            [ProtoMember(13)]
+            public double DoublePositiveInfinity { get; set; }
+
+            [ProtoMember(14)]
+            public double DoubleNegativeInfinity { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class UnicodeStringMessage
+        {
+            [ProtoMember(1)]
+            public string Ascii { get; set; }
+
+            [ProtoMember(2)]
+            public string Unicode { get; set; }
+
+            [ProtoMember(3)]
+            public string Emoji { get; set; }
+
+            [ProtoMember(4)]
+            public string ControlChars { get; set; }
+
+            [ProtoMember(5)]
+            public string VeryLongString { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class DeeplyNestedMessage
+        {
+            [ProtoMember(1)]
+            public int Level { get; set; }
+
+            [ProtoMember(2)]
+            public DeeplyNestedMessage Child { get; set; }
         }
     }
 }

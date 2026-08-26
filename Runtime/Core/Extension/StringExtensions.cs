@@ -80,51 +80,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static readonly string CombiningDotAboveString = CombiningDotAbove.ToString();
         private static readonly string CapitalIWithDotString = CapitalIWithDot.ToString();
 
-        private enum CharacterCategory
-        {
-            None,
-            Lower,
-            Upper,
-            Digit,
-            Other,
-        }
-
-        private enum CaseTokenKind
-        {
-            Word,
-            Separator,
-        }
-
-        private readonly struct CaseToken
-        {
-            public CaseToken(
-                CaseTokenKind kind,
-                string value,
-                bool hasLetter,
-                bool hasDigit,
-                bool hasUppercase
-            )
-            {
-                Kind = kind;
-                Value = value;
-                HasLetter = hasLetter;
-                HasDigit = hasDigit;
-                HasUppercase = hasUppercase;
-            }
-
-            public CaseTokenKind Kind { get; }
-
-            public string Value { get; }
-
-            public bool HasLetter { get; }
-
-            public bool HasDigit { get; }
-
-            public bool HasUppercase { get; }
-
-            public bool IsNumeric => !HasLetter && HasDigit;
-        }
-
         /// <summary>
         /// Centers a string within a field of the specified total length by padding spaces on both sides.
         /// </summary>
@@ -1834,6 +1789,51 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 default:
                     return value ?? string.Empty;
             }
+        }
+
+        private enum CharacterCategory
+        {
+            None,
+            Lower,
+            Upper,
+            Digit,
+            Other,
+        }
+
+        private enum CaseTokenKind
+        {
+            Word,
+            Separator,
+        }
+
+        private readonly struct CaseToken
+        {
+            public CaseToken(
+                CaseTokenKind kind,
+                string value,
+                bool hasLetter,
+                bool hasDigit,
+                bool hasUppercase
+            )
+            {
+                Kind = kind;
+                Value = value;
+                HasLetter = hasLetter;
+                HasDigit = hasDigit;
+                HasUppercase = hasUppercase;
+            }
+
+            public CaseTokenKind Kind { get; }
+
+            public string Value { get; }
+
+            public bool HasLetter { get; }
+
+            public bool HasDigit { get; }
+
+            public bool HasUppercase { get; }
+
+            public bool IsNumeric => !HasLetter && HasDigit;
         }
     }
 }

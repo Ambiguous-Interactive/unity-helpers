@@ -13,26 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class ReflectionHelperTypedDelegatesTests : CommonTestBase
     {
-        private sealed class SampleComponent
-        {
-            public int InstanceField;
-            public static string StaticField = null;
-
-            public string Name { get; set; }
-            public static int StaticCount { get; set; }
-
-            public int Increment(int value)
-            {
-                InstanceField += value;
-                return InstanceField;
-            }
-
-            public static string Concat(string left, string right)
-            {
-                return string.Concat(left, right);
-            }
-        }
-
         [Test]
         public void TypedFieldGetterAndSetterWork()
         {
@@ -136,6 +116,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             >(method);
 
             Assert.AreEqual("ab", invoker("a", "b"));
+        }
+
+        private sealed class SampleComponent
+        {
+            public int InstanceField;
+            public static string StaticField = null;
+
+            public string Name { get; set; }
+            public static int StaticCount { get; set; }
+
+            public int Increment(int value)
+            {
+                InstanceField += value;
+                return InstanceField;
+            }
+
+            public static string Concat(string left, string right)
+            {
+                return string.Concat(left, right);
+            }
         }
     }
 }

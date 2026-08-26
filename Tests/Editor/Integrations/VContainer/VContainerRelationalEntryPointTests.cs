@@ -18,16 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
     [NUnit.Framework.Category("Integration")]
     public sealed class VContainerRelationalEntryPointTests : CommonTestBase
     {
-        private sealed class Consumer : MonoBehaviour
-        {
-            [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-            internal SpriteRenderer _spriteRenderer;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
-
-            public SpriteRenderer SR => _spriteRenderer;
-        }
-
         [UnityTest]
         public IEnumerator EntryPointAssignsSiblingOnActiveScene()
         {
@@ -83,6 +73,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
                 consumer.SR != null,
                 "Relational field should be assigned by entry point"
             );
+        }
+
+        private sealed class Consumer : MonoBehaviour
+        {
+            [SiblingComponent]
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+            internal SpriteRenderer _spriteRenderer;
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
+
+            public SpriteRenderer SR => _spriteRenderer;
         }
     }
 }

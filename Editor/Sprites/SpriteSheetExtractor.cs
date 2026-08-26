@@ -142,276 +142,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         private const float DefaultSplitterRatio = 0.4f;
 
-        /// <summary>
-        /// Represents a discovered sprite sheet with its metadata.
-        /// </summary>
-        public sealed class SpriteSheetEntry
-        {
-            internal string _assetPath;
-            internal Texture2D _texture;
-            internal TextureImporter _importer;
-            internal SpriteImportMode _importMode;
-            internal List<SpriteEntryData> _sprites;
-            internal bool _isExpanded;
-            internal bool _isSelected;
-
-            internal bool _useGlobalSettings = true;
-            internal bool _perSheetSettingsFoldout;
-            internal ExtractionMode? _extractionModeOverride;
-            internal GridSizeMode? _gridSizeModeOverride;
-            internal int? _gridColumnsOverride;
-            internal int? _gridRowsOverride;
-            internal int? _cellWidthOverride;
-            internal int? _cellHeightOverride;
-            internal int? _paddingLeftOverride;
-            internal int? _paddingRightOverride;
-            internal int? _paddingTopOverride;
-            internal int? _paddingBottomOverride;
-            internal float? _alphaThresholdOverride;
-            internal bool? _showOverlayOverride;
-            internal bool _sourcePreviewExpanded;
-
-            internal PivotMode? _pivotModeOverride;
-            internal Vector2? _customPivotOverride;
-            internal AutoDetectionAlgorithm? _autoDetectionAlgorithmOverride;
-            internal int? _expectedSpriteCountOverride;
-
-            /// <summary>
-            /// Per-sheet override for snap to texture divisor. Only used when _useGlobalSettings is false.
-            /// </summary>
-            internal bool? _snapToTextureDivisorOverride;
-
-            /// <summary>
-            /// Whether to use a per-sheet pivot marker color override.
-            /// </summary>
-            internal bool _usePivotMarkerColorOverride;
-
-            /// <summary>
-            /// Per-sheet pivot marker color override.
-            /// UI-only preference; not saved to per-sheet config files.
-            /// </summary>
-            internal Color _pivotMarkerColorOverride = Color.cyan;
-
-            /// <summary>
-            /// When enabled, allows interactive pivot editing via click/drag in the source texture preview.
-            /// </summary>
-            internal bool _editPivotsMode;
-
-            internal SpriteSheetConfig _loadedConfig;
-            internal bool _configLoaded;
-            internal bool _configStale;
-            internal SpriteSheetAlgorithms.AlgorithmResult? _cachedAlgorithmResult;
-            internal string _lastAlgorithmDisplayText;
-
-            /// <summary>
-            /// The last computed cache key used to detect when sprite bounds need regeneration.
-            /// </summary>
-            internal int _lastCacheKey;
-
-            /// <summary>
-            /// Indicates whether the sprite bounds need regeneration due to settings changes.
-            /// </summary>
-            internal bool _needsRegeneration;
-
-            /// <summary>
-            /// The last access time (ticks) for LRU cache eviction.
-            /// </summary>
-            internal long _lastAccessTime;
-
-            /// <summary>
-            /// Computes a composite cache key based on all settings that affect sprite bounds calculation.
-            /// Used to detect when cached sprite data is stale and needs regeneration.
-            /// </summary>
-            /// <param name="extractor">The SpriteSheetExtractor instance to read global settings from.</param>
-            /// <returns>A hash code representing the current configuration state.</returns>
-            internal int GetBoundsCacheKey(SpriteSheetExtractor extractor)
-            {
-                if (extractor == null)
-                {
-                    return 0;
-                }
-
-                ExtractionMode effectiveExtractionMode = extractor.GetEffectiveExtractionMode(this);
-                GridSizeMode effectiveGridSizeMode = extractor.GetEffectiveGridSizeMode(this);
-                int effectiveGridColumns = extractor.GetEffectiveGridColumns(this);
-                int effectiveGridRows = extractor.GetEffectiveGridRows(this);
-                int effectiveCellWidth = extractor.GetEffectiveCellWidth(this);
-                int effectiveCellHeight = extractor.GetEffectiveCellHeight(this);
-                int effectivePaddingLeft = extractor.GetEffectivePaddingLeft(this);
-                int effectivePaddingRight = extractor.GetEffectivePaddingRight(this);
-                int effectivePaddingTop = extractor.GetEffectivePaddingTop(this);
-                int effectivePaddingBottom = extractor.GetEffectivePaddingBottom(this);
-                float effectiveAlphaThreshold = extractor.GetEffectiveAlphaThreshold(this);
-                AutoDetectionAlgorithm effectiveAlgorithm =
-                    extractor.GetEffectiveAutoDetectionAlgorithm(this);
-                int effectiveExpectedCount = extractor.GetEffectiveExpectedSpriteCount(this);
-                bool effectiveSnapToDivisor = extractor.GetEffectiveSnapToTextureDivisor(this);
-
-                int textureWidth = _texture != null ? _texture.width : 0;
-                int textureHeight = _texture != null ? _texture.height : 0;
-
-                return Objects.HashCode(
-                    effectiveExtractionMode,
-                    effectiveGridSizeMode,
-                    effectiveGridColumns,
-                    effectiveGridRows,
-                    effectiveCellWidth,
-                    effectiveCellHeight,
-                    effectivePaddingLeft,
-                    effectivePaddingRight,
-                    effectivePaddingTop,
-                    effectivePaddingBottom,
-                    effectiveAlphaThreshold,
-                    effectiveAlgorithm,
-                    effectiveExpectedCount,
-                    effectiveSnapToDivisor,
-                    textureWidth,
-                    textureHeight
-                );
-            }
-        }
-
-        /// <summary>
-        /// Represents an individual sprite within a sprite sheet.
-        /// </summary>
-        internal sealed class SpriteEntryData
-        {
-            internal string _originalName;
-            internal string _outputName;
-            internal Rect _rect;
-            internal Vector2 _pivot;
-            internal Vector4 _border;
-            internal int _sortIndex;
-            internal bool _isSelected;
-            internal Texture2D _previewTexture;
-
-            /// <summary>
-            /// Whether to use a per-sprite pivot override.
-            /// </summary>
-            internal bool _usePivotOverride;
-
-            /// <summary>
-            /// Per-sprite pivot mode override. Only used when <see cref="_usePivotOverride"/> is true.
-            /// </summary>
-            internal PivotMode _pivotModeOverride;
-
-            /// <summary>
-            /// Per-sprite custom pivot override. Only used when <see cref="_usePivotOverride"/> is true
-            /// and <see cref="_pivotModeOverride"/> is <see cref="PivotMode.Custom"/>.
-            /// </summary>
-            internal Vector2 _customPivotOverride;
-
-            /// <summary>
-            /// Whether to use a per-sprite pivot marker color override.
-            /// </summary>
-            internal bool _usePivotColorOverride;
-
-            /// <summary>
-            /// Per-sprite pivot marker color override.
-            /// UI-only preference; not saved to per-sheet config files.
-            /// </summary>
-            internal Color _pivotColorOverride;
-        }
-
-        /// <summary>
-        /// Holds deferred import data for batch processing during sprite extraction.
-        /// This allows writing all PNG files first, then batching all import operations together.
-        /// </summary>
-        internal readonly struct PendingImportSettings
-        {
-            /// <summary>
-            /// The output path where the sprite was written.
-            /// </summary>
-            internal readonly string OutputPath;
-
-            /// <summary>
-            /// The source texture importer to copy settings from.
-            /// </summary>
-            internal readonly TextureImporter SourceImporter;
-
-            /// <summary>
-            /// The sprite entry data containing pivot, border, and other sprite-specific settings.
-            /// </summary>
-            internal readonly SpriteEntryData Sprite;
-
-            /// <summary>
-            /// The parent sheet entry for additional context.
-            /// </summary>
-            internal readonly SpriteSheetEntry Entry;
-
-            internal PendingImportSettings(
-                string outputPath,
-                TextureImporter sourceImporter,
-                SpriteEntryData sprite,
-                SpriteSheetEntry entry
-            )
-            {
-                OutputPath = outputPath;
-                SourceImporter = sourceImporter;
-                Sprite = sprite;
-                Entry = entry;
-            }
-        }
-
-        public enum SortMode
-        {
-            [Obsolete("Use a specific SortMode value instead of None.")]
-            None = 0,
-            Original = 1,
-            ByName = 2,
-            ByPositionTopLeft = 3,
-            ByPositionBottomLeft = 4,
-            Reversed = 5,
-        }
-
-        /// <summary>
-        /// Determines how sprites are discovered and extracted from sprite sheets.
-        /// </summary>
-        public enum ExtractionMode
-        {
-            [Obsolete("Use a specific ExtractionMode value instead of None.")]
-            None = 0,
-            FromMetadata = 1,
-            GridBased = 2,
-            AlphaDetection = 3,
-            PaddedGrid = 4,
-        }
-
-        /// <summary>
-        /// Determines whether grid dimensions are calculated automatically or manually specified.
-        /// </summary>
-        public enum GridSizeMode
-        {
-            [Obsolete("Use a specific GridSizeMode value instead of None.")]
-            None = 0,
-            Auto = 1,
-            Manual = 2,
-        }
-
-        /// <summary>
-        /// Determines the size of sprite preview thumbnails.
-        /// </summary>
-        public enum PreviewSizeMode
-        {
-            [Obsolete("Use a specific PreviewSizeMode value instead of None.")]
-            None = 0,
-            Size24 = 1,
-            Size32 = 2,
-            Size64 = 3,
-            RealSize = 4,
-        }
-
-        /// <summary>
-        /// Identifies whether a pivot drag operation targets a per-sprite or sheet-level pivot.
-        /// </summary>
-        private enum PivotDragType
-        {
-            [Obsolete("Use a specific PivotDragType value instead of None.")]
-            None = 0,
-            Sprite = 1,
-            Sheet = 2,
-        }
-
         [SerializeField]
         internal List<Object> _inputDirectories = new();
 
@@ -8279,6 +8009,276 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 this.LogError($"Error during reference replacement", e);
             }
+        }
+
+        /// <summary>
+        /// Represents a discovered sprite sheet with its metadata.
+        /// </summary>
+        public sealed class SpriteSheetEntry
+        {
+            internal string _assetPath;
+            internal Texture2D _texture;
+            internal TextureImporter _importer;
+            internal SpriteImportMode _importMode;
+            internal List<SpriteEntryData> _sprites;
+            internal bool _isExpanded;
+            internal bool _isSelected;
+
+            internal bool _useGlobalSettings = true;
+            internal bool _perSheetSettingsFoldout;
+            internal ExtractionMode? _extractionModeOverride;
+            internal GridSizeMode? _gridSizeModeOverride;
+            internal int? _gridColumnsOverride;
+            internal int? _gridRowsOverride;
+            internal int? _cellWidthOverride;
+            internal int? _cellHeightOverride;
+            internal int? _paddingLeftOverride;
+            internal int? _paddingRightOverride;
+            internal int? _paddingTopOverride;
+            internal int? _paddingBottomOverride;
+            internal float? _alphaThresholdOverride;
+            internal bool? _showOverlayOverride;
+            internal bool _sourcePreviewExpanded;
+
+            internal PivotMode? _pivotModeOverride;
+            internal Vector2? _customPivotOverride;
+            internal AutoDetectionAlgorithm? _autoDetectionAlgorithmOverride;
+            internal int? _expectedSpriteCountOverride;
+
+            /// <summary>
+            /// Per-sheet override for snap to texture divisor. Only used when _useGlobalSettings is false.
+            /// </summary>
+            internal bool? _snapToTextureDivisorOverride;
+
+            /// <summary>
+            /// Whether to use a per-sheet pivot marker color override.
+            /// </summary>
+            internal bool _usePivotMarkerColorOverride;
+
+            /// <summary>
+            /// Per-sheet pivot marker color override.
+            /// UI-only preference; not saved to per-sheet config files.
+            /// </summary>
+            internal Color _pivotMarkerColorOverride = Color.cyan;
+
+            /// <summary>
+            /// When enabled, allows interactive pivot editing via click/drag in the source texture preview.
+            /// </summary>
+            internal bool _editPivotsMode;
+
+            internal SpriteSheetConfig _loadedConfig;
+            internal bool _configLoaded;
+            internal bool _configStale;
+            internal SpriteSheetAlgorithms.AlgorithmResult? _cachedAlgorithmResult;
+            internal string _lastAlgorithmDisplayText;
+
+            /// <summary>
+            /// The last computed cache key used to detect when sprite bounds need regeneration.
+            /// </summary>
+            internal int _lastCacheKey;
+
+            /// <summary>
+            /// Indicates whether the sprite bounds need regeneration due to settings changes.
+            /// </summary>
+            internal bool _needsRegeneration;
+
+            /// <summary>
+            /// The last access time (ticks) for LRU cache eviction.
+            /// </summary>
+            internal long _lastAccessTime;
+
+            /// <summary>
+            /// Computes a composite cache key based on all settings that affect sprite bounds calculation.
+            /// Used to detect when cached sprite data is stale and needs regeneration.
+            /// </summary>
+            /// <param name="extractor">The SpriteSheetExtractor instance to read global settings from.</param>
+            /// <returns>A hash code representing the current configuration state.</returns>
+            internal int GetBoundsCacheKey(SpriteSheetExtractor extractor)
+            {
+                if (extractor == null)
+                {
+                    return 0;
+                }
+
+                ExtractionMode effectiveExtractionMode = extractor.GetEffectiveExtractionMode(this);
+                GridSizeMode effectiveGridSizeMode = extractor.GetEffectiveGridSizeMode(this);
+                int effectiveGridColumns = extractor.GetEffectiveGridColumns(this);
+                int effectiveGridRows = extractor.GetEffectiveGridRows(this);
+                int effectiveCellWidth = extractor.GetEffectiveCellWidth(this);
+                int effectiveCellHeight = extractor.GetEffectiveCellHeight(this);
+                int effectivePaddingLeft = extractor.GetEffectivePaddingLeft(this);
+                int effectivePaddingRight = extractor.GetEffectivePaddingRight(this);
+                int effectivePaddingTop = extractor.GetEffectivePaddingTop(this);
+                int effectivePaddingBottom = extractor.GetEffectivePaddingBottom(this);
+                float effectiveAlphaThreshold = extractor.GetEffectiveAlphaThreshold(this);
+                AutoDetectionAlgorithm effectiveAlgorithm =
+                    extractor.GetEffectiveAutoDetectionAlgorithm(this);
+                int effectiveExpectedCount = extractor.GetEffectiveExpectedSpriteCount(this);
+                bool effectiveSnapToDivisor = extractor.GetEffectiveSnapToTextureDivisor(this);
+
+                int textureWidth = _texture != null ? _texture.width : 0;
+                int textureHeight = _texture != null ? _texture.height : 0;
+
+                return Objects.HashCode(
+                    effectiveExtractionMode,
+                    effectiveGridSizeMode,
+                    effectiveGridColumns,
+                    effectiveGridRows,
+                    effectiveCellWidth,
+                    effectiveCellHeight,
+                    effectivePaddingLeft,
+                    effectivePaddingRight,
+                    effectivePaddingTop,
+                    effectivePaddingBottom,
+                    effectiveAlphaThreshold,
+                    effectiveAlgorithm,
+                    effectiveExpectedCount,
+                    effectiveSnapToDivisor,
+                    textureWidth,
+                    textureHeight
+                );
+            }
+        }
+
+        /// <summary>
+        /// Represents an individual sprite within a sprite sheet.
+        /// </summary>
+        internal sealed class SpriteEntryData
+        {
+            internal string _originalName;
+            internal string _outputName;
+            internal Rect _rect;
+            internal Vector2 _pivot;
+            internal Vector4 _border;
+            internal int _sortIndex;
+            internal bool _isSelected;
+            internal Texture2D _previewTexture;
+
+            /// <summary>
+            /// Whether to use a per-sprite pivot override.
+            /// </summary>
+            internal bool _usePivotOverride;
+
+            /// <summary>
+            /// Per-sprite pivot mode override. Only used when <see cref="_usePivotOverride"/> is true.
+            /// </summary>
+            internal PivotMode _pivotModeOverride;
+
+            /// <summary>
+            /// Per-sprite custom pivot override. Only used when <see cref="_usePivotOverride"/> is true
+            /// and <see cref="_pivotModeOverride"/> is <see cref="PivotMode.Custom"/>.
+            /// </summary>
+            internal Vector2 _customPivotOverride;
+
+            /// <summary>
+            /// Whether to use a per-sprite pivot marker color override.
+            /// </summary>
+            internal bool _usePivotColorOverride;
+
+            /// <summary>
+            /// Per-sprite pivot marker color override.
+            /// UI-only preference; not saved to per-sheet config files.
+            /// </summary>
+            internal Color _pivotColorOverride;
+        }
+
+        /// <summary>
+        /// Holds deferred import data for batch processing during sprite extraction.
+        /// This allows writing all PNG files first, then batching all import operations together.
+        /// </summary>
+        internal readonly struct PendingImportSettings
+        {
+            /// <summary>
+            /// The output path where the sprite was written.
+            /// </summary>
+            internal readonly string OutputPath;
+
+            /// <summary>
+            /// The source texture importer to copy settings from.
+            /// </summary>
+            internal readonly TextureImporter SourceImporter;
+
+            /// <summary>
+            /// The sprite entry data containing pivot, border, and other sprite-specific settings.
+            /// </summary>
+            internal readonly SpriteEntryData Sprite;
+
+            /// <summary>
+            /// The parent sheet entry for additional context.
+            /// </summary>
+            internal readonly SpriteSheetEntry Entry;
+
+            internal PendingImportSettings(
+                string outputPath,
+                TextureImporter sourceImporter,
+                SpriteEntryData sprite,
+                SpriteSheetEntry entry
+            )
+            {
+                OutputPath = outputPath;
+                SourceImporter = sourceImporter;
+                Sprite = sprite;
+                Entry = entry;
+            }
+        }
+
+        public enum SortMode
+        {
+            [Obsolete("Use a specific SortMode value instead of None.")]
+            None = 0,
+            Original = 1,
+            ByName = 2,
+            ByPositionTopLeft = 3,
+            ByPositionBottomLeft = 4,
+            Reversed = 5,
+        }
+
+        /// <summary>
+        /// Determines how sprites are discovered and extracted from sprite sheets.
+        /// </summary>
+        public enum ExtractionMode
+        {
+            [Obsolete("Use a specific ExtractionMode value instead of None.")]
+            None = 0,
+            FromMetadata = 1,
+            GridBased = 2,
+            AlphaDetection = 3,
+            PaddedGrid = 4,
+        }
+
+        /// <summary>
+        /// Determines whether grid dimensions are calculated automatically or manually specified.
+        /// </summary>
+        public enum GridSizeMode
+        {
+            [Obsolete("Use a specific GridSizeMode value instead of None.")]
+            None = 0,
+            Auto = 1,
+            Manual = 2,
+        }
+
+        /// <summary>
+        /// Determines the size of sprite preview thumbnails.
+        /// </summary>
+        public enum PreviewSizeMode
+        {
+            [Obsolete("Use a specific PreviewSizeMode value instead of None.")]
+            None = 0,
+            Size24 = 1,
+            Size32 = 2,
+            Size64 = 3,
+            RealSize = 4,
+        }
+
+        /// <summary>
+        /// Identifies whether a pivot drag operation targets a per-sprite or sheet-level pivot.
+        /// </summary>
+        private enum PivotDragType
+        {
+            [Obsolete("Use a specific PivotDragType value instead of None.")]
+            None = 0,
+            Sprite = 1,
+            Sheet = 2,
         }
     }
 #endif

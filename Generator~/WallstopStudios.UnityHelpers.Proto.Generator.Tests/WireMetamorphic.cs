@@ -29,26 +29,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// </remarks>
     internal static class WireMetamorphic
     {
-        /// <summary>One top-level field occurrence, as the exact bytes it occupied.</summary>
-        internal readonly struct Field
-        {
-            internal Field(int number, int wireType, byte[] bytes)
-            {
-                Number = number;
-                WireType = wireType;
-                Bytes = bytes;
-            }
-
-            /// <summary>The field number from the key.</summary>
-            internal int Number { get; }
-
-            /// <summary>The wire type from the key.</summary>
-            internal int WireType { get; }
-
-            /// <summary>The key and the value, verbatim.</summary>
-            internal byte[] Bytes { get; }
-        }
-
         /// <summary>
         /// Splits <paramref name="payload"/> into its top-level fields, or returns <c>null</c> when
         /// it is not a payload this can safely rewrite.
@@ -320,6 +300,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             bytes.Add((byte)value);
+        }
+
+        /// <summary>One top-level field occurrence, as the exact bytes it occupied.</summary>
+        internal readonly struct Field
+        {
+            internal Field(int number, int wireType, byte[] bytes)
+            {
+                Number = number;
+                WireType = wireType;
+                Bytes = bytes;
+            }
+
+            /// <summary>The field number from the key.</summary>
+            internal int Number { get; }
+
+            /// <summary>The wire type from the key.</summary>
+            internal int WireType { get; }
+
+            /// <summary>The key and the value, verbatim.</summary>
+            internal byte[] Bytes { get; }
         }
     }
 }

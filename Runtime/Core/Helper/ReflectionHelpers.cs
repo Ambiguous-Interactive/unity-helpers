@@ -287,31 +287,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return new CapabilityOverrideScope(previousExpressions, previousDynamicIl);
         }
 
-        private sealed class CapabilityOverrideScope : IDisposable
-        {
-            private readonly bool? _previousExpressions;
-            private readonly bool? _previousDynamicIl;
-            private bool _disposed;
-
-            internal CapabilityOverrideScope(bool? expressions, bool? dynamicIl)
-            {
-                _previousExpressions = expressions;
-                _previousDynamicIl = dynamicIl;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _expressionCapabilityOverride = _previousExpressions;
-                _dynamicIlCapabilityOverride = _previousDynamicIl;
-                _disposed = true;
-            }
-        }
-
 #if SINGLE_THREADED
         private static readonly Dictionary<
             (Type type, string name, BindingFlags flags),
@@ -1146,20 +1121,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 nameof(BuildTypedArray),
                 BindingFlags.NonPublic | BindingFlags.Static
             );
-
-        private static class TypedArrayBuilders<TSource>
-            where TSource : class
-        {
-#if SINGLE_THREADED
-            internal static readonly Dictionary<Type, Func<List<TSource>, int, Array>> Builders =
-                new();
-#else
-            internal static readonly ConcurrentDictionary<
-                Type,
-                Func<List<TSource>, int, Array>
-            > Builders = new();
-#endif
-        }
 
         /// <summary>
         /// Builds an array whose element type is <paramref name="elementType"/> from the first
@@ -5753,6 +5714,45 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 return null;
             }
+        }
+
+        private sealed class CapabilityOverrideScope : IDisposable
+        {
+            private readonly bool? _previousExpressions;
+            private readonly bool? _previousDynamicIl;
+            private bool _disposed;
+
+            internal CapabilityOverrideScope(bool? expressions, bool? dynamicIl)
+            {
+                _previousExpressions = expressions;
+                _previousDynamicIl = dynamicIl;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _expressionCapabilityOverride = _previousExpressions;
+                _dynamicIlCapabilityOverride = _previousDynamicIl;
+                _disposed = true;
+            }
+        }
+
+        private static class TypedArrayBuilders<TSource>
+            where TSource : class
+        {
+#if SINGLE_THREADED
+            internal static readonly Dictionary<Type, Func<List<TSource>, int, Array>> Builders =
+                new();
+#else
+            internal static readonly ConcurrentDictionary<
+                Type,
+                Func<List<TSource>, int, Array>
+            > Builders = new();
+#endif
         }
     }
 }

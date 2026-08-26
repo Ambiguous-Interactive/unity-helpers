@@ -15,15 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class ReflectionHelperCapabilityMatrixTests : CommonTestBase
     {
-        public enum CapabilityMode
-        {
-            [Obsolete("Use a concrete capability mode.", false)]
-            Unknown = 0,
-            Expressions = 1,
-            DynamicIl = 2,
-            Reflection = 3,
-        }
-
         private static readonly CapabilityMode[] CapabilityModes =
         {
             CapabilityMode.Expressions,
@@ -3016,6 +3007,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
+        }
+
+        public enum CapabilityMode
+        {
+            [Obsolete("Use a concrete capability mode.", false)]
+            Unknown = 0,
+            Expressions = 1,
+            DynamicIl = 2,
+            Reflection = 3,
         }
     }
 }

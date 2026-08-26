@@ -33,29 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     public class SerializableSortedSet<T> : SerializableSetBase<T, SortedSet<T>>
         where T : IComparable<T>
     {
-        private sealed class StorageSet : SortedSet<T>
-        {
-            /// <summary>
-            /// Initializes an empty storage set using the default comparer.
-            /// </summary>
-            public StorageSet() { }
-
-            /// <summary>
-            /// Initializes the storage set with the provided collection.
-            /// </summary>
-            /// <param name="collection">Elements copied into the sorted set.</param>
-            public StorageSet(IEnumerable<T> collection)
-                : base(collection ?? Array.Empty<T>()) { }
-
-            /// <summary>
-            /// Deserialization constructor used by <see cref="ISerializable"/>.
-            /// </summary>
-            /// <param name="info">Serialized data describing the set.</param>
-            /// <param name="context">Context describing the serialization source.</param>
-            public StorageSet(SerializationInfo info, StreamingContext context)
-                : base(info, context) { }
-        }
-
         /// <summary>
         /// Initializes an empty sorted set that can participate in Unity and ProtoBuf serialization.
         /// </summary>
@@ -166,5 +143,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         protected override bool SupportsSorting => true;
+
+        private sealed class StorageSet : SortedSet<T>
+        {
+            /// <summary>
+            /// Initializes an empty storage set using the default comparer.
+            /// </summary>
+            public StorageSet() { }
+
+            /// <summary>
+            /// Initializes the storage set with the provided collection.
+            /// </summary>
+            /// <param name="collection">Elements copied into the sorted set.</param>
+            public StorageSet(IEnumerable<T> collection)
+                : base(collection ?? Array.Empty<T>()) { }
+
+            /// <summary>
+            /// Deserialization constructor used by <see cref="ISerializable"/>.
+            /// </summary>
+            /// <param name="info">Serialized data describing the set.</param>
+            /// <param name="context">Context describing the serialization source.</param>
+            public StorageSet(SerializationInfo info, StreamingContext context)
+                : base(info, context) { }
+        }
     }
 }

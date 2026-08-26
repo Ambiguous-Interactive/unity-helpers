@@ -85,13 +85,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private Vector2 _scrollPosition;
         private bool _packAfterGenerate;
 
-        private sealed class ScanResult
-        {
-            public List<Sprite> spritesToAdd = new();
-            public List<Sprite> spritesToRemove = new();
-            public bool hasScanned;
-        }
-
         private readonly Dictionary<ScriptableSpriteAtlas, ScanResult> _scanResultsCache = new();
         private readonly Dictionary<ScriptableSpriteAtlas, bool> _foldoutStates = new();
 
@@ -1782,6 +1775,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             result.spritesToRemove.Clear();
             ScanFoldersForConfig(config);
             Repaint();
+        }
+
+        private sealed class ScanResult
+        {
+            public List<Sprite> spritesToAdd = new();
+            public List<Sprite> spritesToRemove = new();
+            public bool hasScanned;
         }
     }
 #endif

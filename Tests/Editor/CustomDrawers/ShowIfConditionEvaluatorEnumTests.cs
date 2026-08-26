@@ -11,34 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Fast")]
     public sealed class ShowIfConditionEvaluatorEnumTests
     {
-        // Convert.ToInt64 throws OverflowException on any of these above long.MaxValue, and the
-        // evaluator's catch turned that into a silent "does not match" -- so a WShowIf naming
-        // Highest hid the field it was supposed to reveal.
-        public enum UnsignedExampleEnum : ulong
-        {
-            None = 0,
-            One = 1,
-            AboveSignedMaximum = (ulong)long.MaxValue + 1UL,
-            Highest = ulong.MaxValue,
-        }
-
-        [Flags]
-        public enum UnsignedExampleFlags : ulong
-        {
-            None = 0,
-            Low = 1UL << 0,
-            Mid = 1UL << 1,
-            TopBit = 1UL << 63,
-        }
-
-        public enum SignedExampleEnum : long
-        {
-            None = 0,
-            Minimum = long.MinValue,
-            MinusOne = -1,
-            Maximum = long.MaxValue,
-        }
-
         [Test]
         public void ValuesEqualMatchesEveryMemberOfAUnsignedBackedEnum(
             [Values(
@@ -102,6 +74,34 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(ShowIfConditionEvaluator.ValuesEqual(UnsignedExampleEnum.One, 1.0));
             Assert.IsTrue(ShowIfConditionEvaluator.ValuesEqual(SignedExampleEnum.MinusOne, -1));
             Assert.IsFalse(ShowIfConditionEvaluator.ValuesEqual(UnsignedExampleEnum.One, 2));
+        }
+
+        // Convert.ToInt64 throws OverflowException on any of these above long.MaxValue, and the
+        // evaluator's catch turned that into a silent "does not match" -- so a WShowIf naming
+        // Highest hid the field it was supposed to reveal.
+        public enum UnsignedExampleEnum : ulong
+        {
+            None = 0,
+            One = 1,
+            AboveSignedMaximum = (ulong)long.MaxValue + 1UL,
+            Highest = ulong.MaxValue,
+        }
+
+        [Flags]
+        public enum UnsignedExampleFlags : ulong
+        {
+            None = 0,
+            Low = 1UL << 0,
+            Mid = 1UL << 1,
+            TopBit = 1UL << 63,
+        }
+
+        public enum SignedExampleEnum : long
+        {
+            None = 0,
+            Minimum = long.MinValue,
+            MinusOne = -1,
+            Maximum = long.MaxValue,
         }
     }
 }

@@ -19,27 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class JsonSerializationPerformanceTests
     {
-        private sealed class SmallMsg
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-        }
-
-        private sealed class MediumMsg
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public int[] Values { get; set; }
-        }
-
-        private sealed class LargeMsg
-        {
-            public Guid Guid { get; set; }
-            public string Description { get; set; }
-            public byte[] Blob { get; set; }
-            public MediumMsg Nested { get; set; }
-        }
-
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -474,6 +453,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        private sealed class SmallMsg
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+        }
+
+        private sealed class MediumMsg
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public int[] Values { get; set; }
+        }
+
+        private sealed class LargeMsg
+        {
+            public Guid Guid { get; set; }
+            public string Description { get; set; }
+            public byte[] Blob { get; set; }
+            public MediumMsg Nested { get; set; }
         }
     }
 }

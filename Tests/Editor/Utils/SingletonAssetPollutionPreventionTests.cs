@@ -256,29 +256,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        public sealed class ProtectedPathTestCase
-        {
-            public string Path { get; }
-            public bool ExpectedIsProtected { get; }
-            public bool ExpectedIsDuplicatePollution { get; }
-            public string Description { get; }
-
-            public ProtectedPathTestCase(
-                string path,
-                bool expectedIsProtected,
-                bool expectedIsDuplicatePollution,
-                string description
-            )
-            {
-                Path = path;
-                ExpectedIsProtected = expectedIsProtected;
-                ExpectedIsDuplicatePollution = expectedIsDuplicatePollution;
-                Description = description;
-            }
-
-            public override string ToString() => $"{(Path ?? "(null)")} - {Description}";
-        }
-
         [Test]
         public void IsProtectedPathReturnsExpectedValue(
             [ValueSource(nameof(ProtectedPathTestCases))] ProtectedPathTestCase testCase
@@ -654,26 +631,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        public sealed class DuplicateFolderTestCase
-        {
-            public string ParentPath { get; }
-            public string FolderBaseName { get; }
-            public string Description { get; }
-
-            public DuplicateFolderTestCase(
-                string parentPath,
-                string folderBaseName,
-                string description
-            )
-            {
-                ParentPath = parentPath;
-                FolderBaseName = folderBaseName;
-                Description = description;
-            }
-
-            public override string ToString() => $"{FolderBaseName} in {ParentPath}";
-        }
-
         [Test]
         public void NoDuplicateFoldersExist(
             [ValueSource(nameof(DuplicateFolderTestCases))] DuplicateFolderTestCase testCase
@@ -891,6 +848,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             AssetDatabase.DeleteAsset(folderPath);
+        }
+
+        public sealed class ProtectedPathTestCase
+        {
+            public string Path { get; }
+            public bool ExpectedIsProtected { get; }
+            public bool ExpectedIsDuplicatePollution { get; }
+            public string Description { get; }
+
+            public ProtectedPathTestCase(
+                string path,
+                bool expectedIsProtected,
+                bool expectedIsDuplicatePollution,
+                string description
+            )
+            {
+                Path = path;
+                ExpectedIsProtected = expectedIsProtected;
+                ExpectedIsDuplicatePollution = expectedIsDuplicatePollution;
+                Description = description;
+            }
+
+            public override string ToString() => $"{(Path ?? "(null)")} - {Description}";
+        }
+
+        public sealed class DuplicateFolderTestCase
+        {
+            public string ParentPath { get; }
+            public string FolderBaseName { get; }
+            public string Description { get; }
+
+            public DuplicateFolderTestCase(
+                string parentPath,
+                string folderBaseName,
+                string description
+            )
+            {
+                ParentPath = parentPath;
+                FolderBaseName = folderBaseName;
+                Description = description;
+            }
+
+            public override string ToString() => $"{FolderBaseName} in {ParentPath}";
         }
     }
 #endif

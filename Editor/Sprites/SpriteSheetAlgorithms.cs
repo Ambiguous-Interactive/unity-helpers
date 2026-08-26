@@ -111,55 +111,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         };
 
         /// <summary>
-        /// Result of a grid detection algorithm.
-        /// </summary>
-        public readonly struct AlgorithmResult
-        {
-            /// <summary>
-            /// The detected cell width in pixels.
-            /// </summary>
-            public readonly int CellWidth;
-
-            /// <summary>
-            /// The detected cell height in pixels.
-            /// </summary>
-            public readonly int CellHeight;
-
-            /// <summary>
-            /// Confidence score in the range [0, 1] where 1 is highest confidence.
-            /// </summary>
-            public readonly float Confidence;
-
-            /// <summary>
-            /// The algorithm that produced this result.
-            /// </summary>
-            public readonly AutoDetectionAlgorithm Algorithm;
-
-            /// <summary>
-            /// Whether this result represents a valid grid detection.
-            /// </summary>
-            public bool IsValid => MinimumCellSize <= CellWidth && MinimumCellSize <= CellHeight;
-
-            public AlgorithmResult(
-                int cellWidth,
-                int cellHeight,
-                float confidence,
-                AutoDetectionAlgorithm algorithm
-            )
-            {
-                CellWidth = cellWidth;
-                CellHeight = cellHeight;
-                Confidence = Mathf.Clamp01(confidence);
-                Algorithm = algorithm;
-            }
-
-            public static AlgorithmResult Invalid(AutoDetectionAlgorithm algorithm)
-            {
-                return new AlgorithmResult(0, 0, 0f, algorithm);
-            }
-        }
-
-        /// <summary>
         /// Detects optimal grid dimensions using the specified algorithm.
         /// </summary>
         /// <param name="pixels">The texture pixel data in Color32 format.</param>
@@ -3244,6 +3195,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return 0 < totalCount ? (float)transparentCount / totalCount : 1f;
+        }
+
+        /// <summary>
+        /// Result of a grid detection algorithm.
+        /// </summary>
+        public readonly struct AlgorithmResult
+        {
+            /// <summary>
+            /// The detected cell width in pixels.
+            /// </summary>
+            public readonly int CellWidth;
+
+            /// <summary>
+            /// The detected cell height in pixels.
+            /// </summary>
+            public readonly int CellHeight;
+
+            /// <summary>
+            /// Confidence score in the range [0, 1] where 1 is highest confidence.
+            /// </summary>
+            public readonly float Confidence;
+
+            /// <summary>
+            /// The algorithm that produced this result.
+            /// </summary>
+            public readonly AutoDetectionAlgorithm Algorithm;
+
+            /// <summary>
+            /// Whether this result represents a valid grid detection.
+            /// </summary>
+            public bool IsValid => MinimumCellSize <= CellWidth && MinimumCellSize <= CellHeight;
+
+            public AlgorithmResult(
+                int cellWidth,
+                int cellHeight,
+                float confidence,
+                AutoDetectionAlgorithm algorithm
+            )
+            {
+                CellWidth = cellWidth;
+                CellHeight = cellHeight;
+                Confidence = Mathf.Clamp01(confidence);
+                Algorithm = algorithm;
+            }
+
+            public static AlgorithmResult Invalid(AutoDetectionAlgorithm algorithm)
+            {
+                return new AlgorithmResult(0, 0, 0f, algorithm);
+            }
         }
     }
 #endif

@@ -823,66 +823,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
-        {
-            public CaseInsensitiveKey(string token)
-            {
-                Token = token;
-            }
-
-            public string Token { get; }
-
-            public int CompareTo(CaseInsensitiveKey other)
-            {
-                return other == null
-                    ? 1
-                    : string.Compare(Token, other.Token, StringComparison.OrdinalIgnoreCase);
-            }
-
-            int IComparable.CompareTo(object obj)
-            {
-                if (ReferenceEquals(this, obj))
-                {
-                    return 0;
-                }
-
-                if (obj is CaseInsensitiveKey candidate)
-                {
-                    return CompareTo(candidate);
-                }
-
-                return 1;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is CaseInsensitiveKey other)
-                {
-                    return string.Equals(Token, other.Token, StringComparison.OrdinalIgnoreCase);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                if (Token == null)
-                {
-                    return 0;
-                }
-
-                return StringComparer.OrdinalIgnoreCase.GetHashCode(Token);
-            }
-
-            public override string ToString()
-            {
-                return Token ?? string.Empty;
-            }
-        }
-
         [Test]
         public void ToKeysArrayReturnsEmptyArrayForEmptyDictionary()
         {
@@ -1879,6 +1819,66 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, result.Length);
             Assert.AreEqual("only", result[0].Key);
             Assert.AreEqual(42, result[0].Value);
+        }
+
+        // Internal rather than private so the generated registrar can name the marshalled
+        // collection closed over it. A private nested type is skipped with WPROTO028 and
+        // would throw on its first WallstopProto serialization.
+        internal sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
+        {
+            public CaseInsensitiveKey(string token)
+            {
+                Token = token;
+            }
+
+            public string Token { get; }
+
+            public int CompareTo(CaseInsensitiveKey other)
+            {
+                return other == null
+                    ? 1
+                    : string.Compare(Token, other.Token, StringComparison.OrdinalIgnoreCase);
+            }
+
+            int IComparable.CompareTo(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return 0;
+                }
+
+                if (obj is CaseInsensitiveKey candidate)
+                {
+                    return CompareTo(candidate);
+                }
+
+                return 1;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is CaseInsensitiveKey other)
+                {
+                    return string.Equals(Token, other.Token, StringComparison.OrdinalIgnoreCase);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                if (Token == null)
+                {
+                    return 0;
+                }
+
+                return StringComparer.OrdinalIgnoreCase.GetHashCode(Token);
+            }
+
+            public override string ToString()
+            {
+                return Token ?? string.Empty;
+            }
         }
     }
 }

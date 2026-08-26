@@ -82,20 +82,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private string _searchText = string.Empty;
         private readonly string _prefsScope;
 
-        private readonly struct Item
-        {
-            public readonly bool isDirectory;
-            public readonly string fullPath;
-            public readonly string name;
-
-            public Item(bool isDirectory, string fullPath, string name)
-            {
-                this.isDirectory = isDirectory;
-                this.fullPath = fullPath;
-                this.name = name;
-            }
-        }
-
         /// <summary>
         /// Creates a new multi-file selector.
         /// </summary>
@@ -956,6 +942,20 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 }
             }
             return new string(buffer, 0, n).Trim('_');
+        }
+
+        private readonly struct Item
+        {
+            public readonly bool isDirectory;
+            public readonly string fullPath;
+            public readonly string name;
+
+            public Item(bool isDirectory, string fullPath, string name)
+            {
+                this.isDirectory = isDirectory;
+                this.fullPath = fullPath;
+                this.name = name;
+            }
         }
     }
 }

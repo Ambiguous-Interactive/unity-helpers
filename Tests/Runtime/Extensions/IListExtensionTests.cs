@@ -21,37 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private const int NumTries = 1_000;
 
-        private readonly struct IntComparer : IComparer<int>
-        {
-            public int Compare(int x, int y) => x.CompareTo(y);
-        }
-
-        private sealed class CountingComparer : IComparer<int>
-        {
-            public int ComparisonCount { get; private set; }
-
-            public int Compare(int x, int y)
-            {
-                ComparisonCount++;
-                return x.CompareTo(y);
-            }
-        }
-
-        private sealed class StableTupleComparer : IComparer<ValueTuple<int, int>>
-        {
-            public int Compare(ValueTuple<int, int> x, ValueTuple<int, int> y)
-            {
-                return x.Item1.CompareTo(y.Item1);
-            }
-        }
-
-        private readonly struct IntEqualityComparer : IEqualityComparer<int>
-        {
-            public bool Equals(int x, int y) => x == y;
-
-            public int GetHashCode(int obj) => obj.GetHashCode();
-        }
-
         public delegate IList<int> ContainerFactory(IEnumerable<int> source);
 
         /// <remarks>
@@ -104,24 +73,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             IList<ValueTuple<int, int>> list,
             IComparer<ValueTuple<int, int>> comparer
         );
-
-        private readonly struct SortDataset
-        {
-            private readonly Func<int[]> factory;
-
-            public SortDataset(string label, Func<int[]> factory)
-            {
-                Label = label;
-                this.factory = factory;
-            }
-
-            public string Label { get; }
-
-            public int[] Create()
-            {
-                return factory();
-            }
-        }
 
         private static IEnumerable<TestCaseData> SortingAlgorithmCases
         {
@@ -1719,6 +1670,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
                 _inner.GetEnumerator();
+        }
+
+        private readonly struct IntComparer : IComparer<int>
+        {
+            public int Compare(int x, int y) => x.CompareTo(y);
+        }
+
+        private sealed class CountingComparer : IComparer<int>
+        {
+            public int ComparisonCount { get; private set; }
+
+            public int Compare(int x, int y)
+            {
+                ComparisonCount++;
+                return x.CompareTo(y);
+            }
+        }
+
+        private sealed class StableTupleComparer : IComparer<ValueTuple<int, int>>
+        {
+            public int Compare(ValueTuple<int, int> x, ValueTuple<int, int> y)
+            {
+                return x.Item1.CompareTo(y.Item1);
+            }
+        }
+
+        private readonly struct IntEqualityComparer : IEqualityComparer<int>
+        {
+            public bool Equals(int x, int y) => x == y;
+
+            public int GetHashCode(int obj) => obj.GetHashCode();
+        }
+
+        private readonly struct SortDataset
+        {
+            private readonly Func<int[]> factory;
+
+            public SortDataset(string label, Func<int[]> factory)
+            {
+                Label = label;
+                this.factory = factory;
+            }
+
+            public string Label { get; }
+
+            public int[] Create()
+            {
+                return factory();
+            }
         }
     }
 }

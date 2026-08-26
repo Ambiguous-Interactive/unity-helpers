@@ -69,11 +69,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ProtobufUnityModel.EnsureInitialized();
         }
 
-        internal static class SerializedPropertyNames
-        {
-            internal const string Items = nameof(_items);
-        }
-
         [SerializeField]
         [ProtoMember(1, OverwriteList = true)]
         [WProtoMember(1, OverwriteList = true)]
@@ -404,6 +399,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private List<T> EnsureItems()
         {
             return _items ??= new List<T>();
+        }
+
+        internal static class SerializedPropertyNames
+        {
+            internal const string Items = nameof(_items);
         }
     }
 

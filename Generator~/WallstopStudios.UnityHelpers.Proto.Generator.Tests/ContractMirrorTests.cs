@@ -740,6 +740,134 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>Strips the arity suffix, leaving the name as a person writes it.</summary>
+        /// <param name="key">A contract key, arity-qualified or not.</param>
+        private static string Identifier(string key)
+        {
+            int tick = key.IndexOf('`');
+            return tick < 0 ? key : key.Substring(0, tick);
+        }
+
+        /// <summary>
+        /// Names a contract the way the CLR does, so two arities of one generic are two contracts.
+        /// </summary>
+        /// <param name="type">The declaration to name.</param>
+        /// <remarks>
+        /// The identifier alone is not a key: C# lets <c>Foo&lt;T1, T2&gt;</c> and
+        /// <c>Foo&lt;T1, T2, T3&gt;</c> coexist -- the pattern the BCL itself uses for
+        /// <c>ValueTuple</c>, <c>Func</c> and <c>Tuple</c> -- and this repository now ships one.
+        /// Keying on the identifier let a single <c>NotMirrored</c> or <c>Mirrors</c> entry silently
+        /// cover both, which is the failure
+        /// <see cref="TheMirrorCheckReachesEveryContractInTheRuntimeTree"/> exists to refuse.
+        /// </remarks>
+        private static string NameWithArity(TypeDeclarationSyntax type)
+        {
+            int arity = type.TypeParameterList?.Parameters.Count ?? 0;
+            return arity == 0 ? type.Identifier.ValueText : type.Identifier.ValueText + "`" + arity;
+        }
+
+        private static List<AttributeSyntax> Attributes(SyntaxList<AttributeListSyntax> lists)
+        {
+            return lists.SelectMany(list => list.Attributes).ToList();
+        }
+
+        private static string NameOf(AttributeSyntax attribute)
+        {
+            string name = attribute.Name.ToString();
+            int lastDot = name.LastIndexOf('.');
+            if (0 <= lastDot)
+            {
+                name = name.Substring(lastDot + 1);
+            }
+
+            return name.EndsWith("Attribute", StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - "Attribute".Length)
+                : name;
+        }
+
+        private static string FirstPositionalArgument(AttributeSyntax attribute)
+        {
+            AttributeArgumentSyntax argument = (
+                attribute.ArgumentList?.Arguments ?? default
+            ).FirstOrDefault(a => a.NameEquals == null);
+            return argument == null ? "<none>" : Normalize(argument.Expression.ToString());
+        }
+
+        private static IReadOnlyDictionary<string, string> NamedArguments(AttributeSyntax attribute)
+        {
+            Dictionary<string, string> arguments = new Dictionary<string, string>(
+                StringComparer.Ordinal
+            );
+            if (attribute?.ArgumentList == null)
+            {
+                return arguments;
+            }
+
+            foreach (AttributeArgumentSyntax argument in attribute.ArgumentList.Arguments)
+            {
+                if (argument.NameEquals == null)
+                {
+                    continue;
+                }
+
+                string name = argument.NameEquals.Name.Identifier.ValueText;
+
+                // Name is documentation on both sides and never reaches the wire; comparing it would
+                // make a schema label a wire-compatibility failure.
+                if (name == "Name")
+                {
+                    continue;
+                }
+
+                arguments[name] = Normalize(argument.Expression.ToString());
+            }
+
+            return arguments;
+        }
+
+        /// <summary>
+        /// Reduces an attribute argument to the text two mirrored annotations can be compared by.
+        /// </summary>
+        /// <remarks>
+        /// Whitespace is noise. The qualifier on an enum member is not noise but it is not a
+        /// difference either: the two serializers name the same choice through two enums --
+        /// <c>DataFormat.ZigZag</c> and <c>WProtoDataFormat.ZigZag</c> -- so comparing the written
+        /// text would report every mirrored <c>DataFormat</c> as a mismatch. The member name is what
+        /// the mirror is about, and it is compared exactly. Only a dotted chain of identifiers is
+        /// reduced this way, so a numeric literal keeps its fractional part.
+        /// </remarks>
+        private static string Normalize(string expression)
+        {
+            string bare = string.Concat(
+                expression.Where(character => !char.IsWhiteSpace(character))
+            );
+
+            int dot = bare.LastIndexOf('.');
+            if (dot < 0)
+            {
+                return bare;
+            }
+
+            return bare.Split('.').All(IsIdentifier) ? bare.Substring(dot + 1) : bare;
+        }
+
+        private static bool IsIdentifier(string text)
+        {
+            return 0 < text.Length
+                && (char.IsLetter(text[0]) || text[0] == '_')
+                && text.All(character => char.IsLetterOrDigit(character) || character == '_');
+        }
+
+        private static string Location(string file, SyntaxNode node)
+        {
+            string root = RepositoryRoot();
+            string relative = file.StartsWith(root, StringComparison.Ordinal)
+                ? file.Substring(root.Length).TrimStart('/', '\\')
+                : file;
+            int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+            return relative.Replace('\\', '/') + ":" + line + ": ";
+        }
+
         private sealed class ContractDeclaration
         {
             internal string Name { get; private set; }
@@ -965,134 +1093,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         return member.Kind().ToString();
                 }
             }
-        }
-
-        /// <summary>Strips the arity suffix, leaving the name as a person writes it.</summary>
-        /// <param name="key">A contract key, arity-qualified or not.</param>
-        private static string Identifier(string key)
-        {
-            int tick = key.IndexOf('`');
-            return tick < 0 ? key : key.Substring(0, tick);
-        }
-
-        /// <summary>
-        /// Names a contract the way the CLR does, so two arities of one generic are two contracts.
-        /// </summary>
-        /// <param name="type">The declaration to name.</param>
-        /// <remarks>
-        /// The identifier alone is not a key: C# lets <c>Foo&lt;T1, T2&gt;</c> and
-        /// <c>Foo&lt;T1, T2, T3&gt;</c> coexist -- the pattern the BCL itself uses for
-        /// <c>ValueTuple</c>, <c>Func</c> and <c>Tuple</c> -- and this repository now ships one.
-        /// Keying on the identifier let a single <c>NotMirrored</c> or <c>Mirrors</c> entry silently
-        /// cover both, which is the failure
-        /// <see cref="TheMirrorCheckReachesEveryContractInTheRuntimeTree"/> exists to refuse.
-        /// </remarks>
-        private static string NameWithArity(TypeDeclarationSyntax type)
-        {
-            int arity = type.TypeParameterList?.Parameters.Count ?? 0;
-            return arity == 0 ? type.Identifier.ValueText : type.Identifier.ValueText + "`" + arity;
-        }
-
-        private static List<AttributeSyntax> Attributes(SyntaxList<AttributeListSyntax> lists)
-        {
-            return lists.SelectMany(list => list.Attributes).ToList();
-        }
-
-        private static string NameOf(AttributeSyntax attribute)
-        {
-            string name = attribute.Name.ToString();
-            int lastDot = name.LastIndexOf('.');
-            if (0 <= lastDot)
-            {
-                name = name.Substring(lastDot + 1);
-            }
-
-            return name.EndsWith("Attribute", StringComparison.Ordinal)
-                ? name.Substring(0, name.Length - "Attribute".Length)
-                : name;
-        }
-
-        private static string FirstPositionalArgument(AttributeSyntax attribute)
-        {
-            AttributeArgumentSyntax argument = (
-                attribute.ArgumentList?.Arguments ?? default
-            ).FirstOrDefault(a => a.NameEquals == null);
-            return argument == null ? "<none>" : Normalize(argument.Expression.ToString());
-        }
-
-        private static IReadOnlyDictionary<string, string> NamedArguments(AttributeSyntax attribute)
-        {
-            Dictionary<string, string> arguments = new Dictionary<string, string>(
-                StringComparer.Ordinal
-            );
-            if (attribute?.ArgumentList == null)
-            {
-                return arguments;
-            }
-
-            foreach (AttributeArgumentSyntax argument in attribute.ArgumentList.Arguments)
-            {
-                if (argument.NameEquals == null)
-                {
-                    continue;
-                }
-
-                string name = argument.NameEquals.Name.Identifier.ValueText;
-
-                // Name is documentation on both sides and never reaches the wire; comparing it would
-                // make a schema label a wire-compatibility failure.
-                if (name == "Name")
-                {
-                    continue;
-                }
-
-                arguments[name] = Normalize(argument.Expression.ToString());
-            }
-
-            return arguments;
-        }
-
-        /// <summary>
-        /// Reduces an attribute argument to the text two mirrored annotations can be compared by.
-        /// </summary>
-        /// <remarks>
-        /// Whitespace is noise. The qualifier on an enum member is not noise but it is not a
-        /// difference either: the two serializers name the same choice through two enums --
-        /// <c>DataFormat.ZigZag</c> and <c>WProtoDataFormat.ZigZag</c> -- so comparing the written
-        /// text would report every mirrored <c>DataFormat</c> as a mismatch. The member name is what
-        /// the mirror is about, and it is compared exactly. Only a dotted chain of identifiers is
-        /// reduced this way, so a numeric literal keeps its fractional part.
-        /// </remarks>
-        private static string Normalize(string expression)
-        {
-            string bare = string.Concat(
-                expression.Where(character => !char.IsWhiteSpace(character))
-            );
-
-            int dot = bare.LastIndexOf('.');
-            if (dot < 0)
-            {
-                return bare;
-            }
-
-            return bare.Split('.').All(IsIdentifier) ? bare.Substring(dot + 1) : bare;
-        }
-
-        private static bool IsIdentifier(string text)
-        {
-            return 0 < text.Length
-                && (char.IsLetter(text[0]) || text[0] == '_')
-                && text.All(character => char.IsLetterOrDigit(character) || character == '_');
-        }
-
-        private static string Location(string file, SyntaxNode node)
-        {
-            string root = RepositoryRoot();
-            string relative = file.StartsWith(root, StringComparison.Ordinal)
-                ? file.Substring(root.Length).TrimStart('/', '\\')
-                : file;
-            int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            return relative.Replace('\\', '/') + ":" + line + ": ";
         }
     }
 }

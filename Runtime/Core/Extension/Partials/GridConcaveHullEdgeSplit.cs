@@ -34,71 +34,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return points.BuildConcaveHull(options);
         }
 
-        private readonly struct HullEdge
-        {
-            public readonly float edgeLength;
-
-            public readonly FastVector3Int from;
-            public readonly FastVector3Int to;
-
-            public readonly Vector2 fromWorld;
-            public readonly Vector2 toWorld;
-
-            private readonly Grid _grid;
-
-            public HullEdge(FastVector3Int from, FastVector3Int to, Grid grid)
-            {
-                this.from = from;
-                this.to = to;
-                _grid = grid;
-                fromWorld = grid.CellToWorld(from);
-                toWorld = grid.CellToWorld(to);
-                edgeLength = (fromWorld - toWorld).sqrMagnitude;
-            }
-
-            public bool Intersects(HullEdge other)
-            {
-                return UnityExtensions.Intersects(
-                    fromWorld,
-                    toWorld,
-                    other.fromWorld,
-                    other.toWorld
-                );
-            }
-
-            public float LargestAngle(FastVector3Int point)
-            {
-                Vector2 worldPoint = _grid.CellToWorld(point);
-                float angleFrom = Vector2.Angle(toWorld - fromWorld, worldPoint - fromWorld);
-                float angleTo = Vector2.Angle(fromWorld - toWorld, worldPoint - toWorld);
-                return Math.Max(angleFrom, angleTo);
-            }
-        }
-
-        private sealed class ConcaveHullComparer : IComparer<HullEdge>
-        {
-            public static readonly ConcaveHullComparer Instance = new();
-
-            private ConcaveHullComparer() { }
-
-            public int Compare(HullEdge lhs, HullEdge rhs)
-            {
-                int comparison = lhs.edgeLength.CompareTo(rhs.edgeLength);
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-
-                comparison = lhs.from.CompareTo(rhs.from);
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-
-                return lhs.to.CompareTo(rhs.to);
-            }
-        }
-
         /// <summary>
         /// Grid-based edge-splitting concave hull.
         /// </summary>
@@ -700,6 +635,71 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 return lhs.to.y.CompareTo(rhs.to.y);
+            }
+        }
+
+        private readonly struct HullEdge
+        {
+            public readonly float edgeLength;
+
+            public readonly FastVector3Int from;
+            public readonly FastVector3Int to;
+
+            public readonly Vector2 fromWorld;
+            public readonly Vector2 toWorld;
+
+            private readonly Grid _grid;
+
+            public HullEdge(FastVector3Int from, FastVector3Int to, Grid grid)
+            {
+                this.from = from;
+                this.to = to;
+                _grid = grid;
+                fromWorld = grid.CellToWorld(from);
+                toWorld = grid.CellToWorld(to);
+                edgeLength = (fromWorld - toWorld).sqrMagnitude;
+            }
+
+            public bool Intersects(HullEdge other)
+            {
+                return UnityExtensions.Intersects(
+                    fromWorld,
+                    toWorld,
+                    other.fromWorld,
+                    other.toWorld
+                );
+            }
+
+            public float LargestAngle(FastVector3Int point)
+            {
+                Vector2 worldPoint = _grid.CellToWorld(point);
+                float angleFrom = Vector2.Angle(toWorld - fromWorld, worldPoint - fromWorld);
+                float angleTo = Vector2.Angle(fromWorld - toWorld, worldPoint - toWorld);
+                return Math.Max(angleFrom, angleTo);
+            }
+        }
+
+        private sealed class ConcaveHullComparer : IComparer<HullEdge>
+        {
+            public static readonly ConcaveHullComparer Instance = new();
+
+            private ConcaveHullComparer() { }
+
+            public int Compare(HullEdge lhs, HullEdge rhs)
+            {
+                int comparison = lhs.edgeLength.CompareTo(rhs.edgeLength);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+
+                comparison = lhs.from.CompareTo(rhs.from);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+
+                return lhs.to.CompareTo(rhs.to);
             }
         }
     }

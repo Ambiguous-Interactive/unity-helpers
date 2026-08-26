@@ -45,80 +45,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int NumChildren = 4;
 
         /// <summary>
-        /// Represents a value and its position used to construct the tree directly.
-        /// </summary>
-        [Serializable]
-        public readonly struct Entry
-        {
-            public readonly T value;
-            public readonly Vector2 position;
-
-            public Entry(T value, Vector2 position)
-            {
-                this.value = value;
-                this.position = position;
-            }
-        }
-
-        private readonly struct Neighbor
-        {
-            public readonly T value;
-            public readonly float sqrDistance;
-
-            public Neighbor(T value, float sqrDistance)
-            {
-                this.value = value;
-                this.sqrDistance = sqrDistance;
-            }
-        }
-
-        [Serializable]
-        public sealed class QuadTreeNode
-        {
-            public readonly Bounds boundary;
-            internal readonly QuadTreeNode[] _children;
-            internal readonly int _startIndex;
-            internal readonly int _count;
-            public readonly bool isTerminal;
-
-            private QuadTreeNode(
-                Bounds boundary,
-                int startIndex,
-                int count,
-                bool isTerminal,
-                QuadTreeNode[] children
-            )
-            {
-                this.boundary = boundary;
-                _startIndex = startIndex;
-                _count = count;
-                this.isTerminal = isTerminal;
-                _children = children ?? Array.Empty<QuadTreeNode>();
-            }
-
-            internal static QuadTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
-            {
-                return new QuadTreeNode(
-                    boundary,
-                    startIndex,
-                    count,
-                    true,
-                    Array.Empty<QuadTreeNode>()
-                );
-            }
-
-            internal static QuadTreeNode CreateInternal(
-                Bounds boundary,
-                QuadTreeNode[] children,
-                int startIndex,
-                int count
-            )
-            {
-                return new QuadTreeNode(boundary, startIndex, count, false, children);
-            }
-        }
-
-        /// <summary>
         /// Default bucket size for leaves before subdivision.
         /// </summary>
         public const int DefaultBucketSize = 12;
@@ -743,6 +669,80 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public int Compare(Neighbor x, Neighbor y)
             {
                 return x.sqrDistance.CompareTo(y.sqrDistance);
+            }
+        }
+
+        /// <summary>
+        /// Represents a value and its position used to construct the tree directly.
+        /// </summary>
+        [Serializable]
+        public readonly struct Entry
+        {
+            public readonly T value;
+            public readonly Vector2 position;
+
+            public Entry(T value, Vector2 position)
+            {
+                this.value = value;
+                this.position = position;
+            }
+        }
+
+        private readonly struct Neighbor
+        {
+            public readonly T value;
+            public readonly float sqrDistance;
+
+            public Neighbor(T value, float sqrDistance)
+            {
+                this.value = value;
+                this.sqrDistance = sqrDistance;
+            }
+        }
+
+        [Serializable]
+        public sealed class QuadTreeNode
+        {
+            public readonly Bounds boundary;
+            internal readonly QuadTreeNode[] _children;
+            internal readonly int _startIndex;
+            internal readonly int _count;
+            public readonly bool isTerminal;
+
+            private QuadTreeNode(
+                Bounds boundary,
+                int startIndex,
+                int count,
+                bool isTerminal,
+                QuadTreeNode[] children
+            )
+            {
+                this.boundary = boundary;
+                _startIndex = startIndex;
+                _count = count;
+                this.isTerminal = isTerminal;
+                _children = children ?? Array.Empty<QuadTreeNode>();
+            }
+
+            internal static QuadTreeNode CreateLeaf(Bounds boundary, int startIndex, int count)
+            {
+                return new QuadTreeNode(
+                    boundary,
+                    startIndex,
+                    count,
+                    true,
+                    Array.Empty<QuadTreeNode>()
+                );
+            }
+
+            internal static QuadTreeNode CreateInternal(
+                Bounds boundary,
+                QuadTreeNode[] children,
+                int startIndex,
+                int count
+            )
+            {
+                return new QuadTreeNode(boundary, startIndex, count, false, children);
             }
         }
     }

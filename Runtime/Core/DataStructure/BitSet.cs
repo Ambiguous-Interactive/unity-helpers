@@ -43,43 +43,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [WProtoMember(2)]
         private int _capacity;
 
-        public struct BitEnumerator : IEnumerator<bool>
-        {
-            private readonly BitSet _bitSet;
-            private int _index;
-            private bool _current;
-
-            internal BitEnumerator(BitSet bitSet)
-            {
-                _bitSet = bitSet;
-                _index = -1;
-                _current = false;
-            }
-
-            public bool MoveNext()
-            {
-                if (++_index < _bitSet._capacity)
-                {
-                    _bitSet.TryGet(_index, out _current);
-                    return true;
-                }
-                _current = false;
-                return false;
-            }
-
-            public bool Current => _current;
-
-            object IEnumerator.Current => Current;
-
-            public void Reset()
-            {
-                _index = -1;
-                _current = false;
-            }
-
-            public void Dispose() { }
-        }
-
         public int Count => _capacity;
 
         /// <summary>
@@ -633,6 +596,43 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        public struct BitEnumerator : IEnumerator<bool>
+        {
+            private readonly BitSet _bitSet;
+            private int _index;
+            private bool _current;
+
+            internal BitEnumerator(BitSet bitSet)
+            {
+                _bitSet = bitSet;
+                _index = -1;
+                _current = false;
+            }
+
+            public bool MoveNext()
+            {
+                if (++_index < _bitSet._capacity)
+                {
+                    _bitSet.TryGet(_index, out _current);
+                    return true;
+                }
+                _current = false;
+                return false;
+            }
+
+            public bool Current => _current;
+
+            object IEnumerator.Current => Current;
+
+            public void Reset()
+            {
+                _index = -1;
+                _current = false;
+            }
+
+            public void Dispose() { }
         }
     }
 }

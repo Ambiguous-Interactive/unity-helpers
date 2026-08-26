@@ -66,7 +66,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 3. Explicit types over `var`
 4. **NEVER use `#region` or `#endregion`** (see [no-regions](./skills/no-regions.md))
 5. NEVER use nullable reference types (`string?`)
-6. One file per MonoBehaviour/ScriptableObject (production AND tests); a nested type goes at the END of its containing type or in its own file, never between members (backlog [#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575))
+6. One file per MonoBehaviour/ScriptableObject (production AND tests); a nested type goes at the END of its containing type or in its own file, never between members. `npm run lint:nested-type-placement` enforces it over `Runtime/`, `Editor/`, `Tests/` and `Generator~` and runs in `lint:repo`; `npm run lint:nested-type-placement:fix` moves what it can and reports the rest. A type that would cross a `#if` boundary is reported and never moved ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575))
 7. NEVER use `?.`, `??`, `??=` on UnityEngine.Object types
 8. Minimal comments -- only explain **why**, never **what**
 9. Generate `.meta` files after creating ANY file/folder (see [create-unity-meta](./skills/create-unity-meta.md)); exception: no `.meta` for dot folders (`.llm/`, `.github/`, `.git/`, `.vscode/`). Use `./scripts/generate-meta.sh <path>` for new or empty folders, then run `npm run agent:preflight:fix` for changed-file `.meta` recovery.

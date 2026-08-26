@@ -16,45 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class ProtoEqualsPerformanceTests
     {
-        [ProtoContract]
-        private sealed class SmallMsg
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class MediumMsg
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public int[] Values { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class LargeMsg
-        {
-            [ProtoMember(1)]
-            public Guid Guid { get; set; }
-
-            [ProtoMember(2)]
-            public string Description { get; set; }
-
-            [ProtoMember(3)]
-            public byte[] Blob { get; set; }
-
-            [ProtoMember(4)]
-            public MediumMsg Nested { get; set; }
-        }
-
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -162,6 +123,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        [ProtoContract]
+        private sealed class SmallMsg
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class MediumMsg
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public int[] Values { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class LargeMsg
+        {
+            [ProtoMember(1)]
+            public Guid Guid { get; set; }
+
+            [ProtoMember(2)]
+            public string Description { get; set; }
+
+            [ProtoMember(3)]
+            public byte[] Blob { get; set; }
+
+            [ProtoMember(4)]
+            public MediumMsg Nested { get; set; }
         }
     }
 }

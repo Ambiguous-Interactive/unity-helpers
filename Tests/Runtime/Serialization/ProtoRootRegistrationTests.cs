@@ -13,70 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class ProtoRootRegistrationTests
     {
-        public interface IAnimal { }
-
-        [ProtoContract]
-        private sealed class Dog : IAnimal
-        {
-            [ProtoMember(1)]
-            public int Age { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class Cat : IAnimal
-        {
-            [ProtoMember(1)]
-            public int Lives { get; set; }
-
-            [ProtoMember(2)]
-            public string Color { get; set; }
-        }
-
-        private sealed class NoContractAnimal : IAnimal { }
-
-        public interface IInferredAnimal { }
-
-        [ProtoContract]
-        [ProtoInclude(100, typeof(InferredDog))]
-        private abstract class InferredAnimalBase : IInferredAnimal
-        {
-            [ProtoMember(1)]
-            public int Age { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class InferredDog : InferredAnimalBase
-        {
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class ExplicitBird : IInferredAnimal
-        {
-            [ProtoMember(1)]
-            public int Wings { get; set; }
-        }
-
-        public interface IPlainAbstractAnimal { }
-
-        [ProtoContract]
-        private abstract class PlainAbstractAnimalBase : IPlainAbstractAnimal
-        {
-            [ProtoMember(1)]
-            public int Age { get; set; }
-        }
-
-        [ProtoContract]
-        private sealed class ExplicitPlainAnimal : IPlainAbstractAnimal
-        {
-            [ProtoMember(1)]
-            public int Age { get; set; }
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -164,6 +100,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.DoesNotThrow(() =>
                 Serializer.RegisterProtobufRoot<IPlainAbstractAnimal, ExplicitPlainAnimal>()
             );
+        }
+
+        public interface IAnimal { }
+
+        [ProtoContract]
+        private sealed class Dog : IAnimal
+        {
+            [ProtoMember(1)]
+            public int Age { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class Cat : IAnimal
+        {
+            [ProtoMember(1)]
+            public int Lives { get; set; }
+
+            [ProtoMember(2)]
+            public string Color { get; set; }
+        }
+
+        private sealed class NoContractAnimal : IAnimal { }
+
+        public interface IInferredAnimal { }
+
+        [ProtoContract]
+        [ProtoInclude(100, typeof(InferredDog))]
+        private abstract class InferredAnimalBase : IInferredAnimal
+        {
+            [ProtoMember(1)]
+            public int Age { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class InferredDog : InferredAnimalBase
+        {
+            [ProtoMember(2)]
+            public string Name { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class ExplicitBird : IInferredAnimal
+        {
+            [ProtoMember(1)]
+            public int Wings { get; set; }
+        }
+
+        public interface IPlainAbstractAnimal { }
+
+        [ProtoContract]
+        private abstract class PlainAbstractAnimalBase : IPlainAbstractAnimal
+        {
+            [ProtoMember(1)]
+            public int Age { get; set; }
+        }
+
+        [ProtoContract]
+        private sealed class ExplicitPlainAnimal : IPlainAbstractAnimal
+        {
+            [ProtoMember(1)]
+            public int Age { get; set; }
         }
     }
 }

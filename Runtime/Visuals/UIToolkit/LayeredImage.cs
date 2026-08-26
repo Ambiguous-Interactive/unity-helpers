@@ -327,6 +327,160 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             return computed;
         }
 
+        private static void ComposeSpriteOntoBuffer(
+            Color[] bufferPixels,
+            int bufferWidth,
+            int bufferHeight,
+            Color[] spritePixels,
+            int spriteWidth,
+            int spriteHeight,
+            float baseX,
+            float baseY,
+            float layerAlpha,
+            float pixelCutoff
+        )
+        {
+            if (spriteWidth == 0 || spriteHeight == 0)
+            {
+                return;
+            }
+
+            BlendSpriteRowJob job = new(
+                bufferPixels,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                baseX,
+                baseY,
+                layerAlpha,
+                pixelCutoff
+            );
+
+            if (ParallelBlendThreshold <= spriteWidth * spriteHeight)
+            {
+                Parallel.For(0, spriteHeight, job.Execute);
+                return;
+            }
+
+            job.RunSequential(spriteHeight);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void BlendSpriteRow(
+            Color[] bufferPixels,
+            int bufferWidth,
+            int bufferHeight,
+            Color[] spritePixels,
+            int spriteWidth,
+            float baseX,
+            float baseY,
+            float layerAlpha,
+            float pixelCutoff,
+            int spriteRow
+        )
+        {
+            int spriteRowOffset = spriteRow * spriteWidth;
+            float targetY = baseY + spriteRow;
+            int bufferY = Mathf.FloorToInt(targetY);
+            if (bufferY < 0 || bufferHeight <= bufferY)
+            {
+                return;
+            }
+
+            int bufferRowOffset = bufferY * bufferWidth;
+
+            for (int spriteColumn = 0; spriteColumn < spriteWidth; ++spriteColumn)
+            {
+                Color spritePixel = spritePixels[spriteRowOffset + spriteColumn];
+                float spriteAlpha = spritePixel.a * layerAlpha;
+                if (IsAlphaEffectivelyInvisible(spriteAlpha, pixelCutoff))
+                {
+                    continue;
+                }
+
+                if (1f < spriteAlpha)
+                {
+                    spriteAlpha = 1f;
+                }
+
+                int bufferX = Mathf.FloorToInt(baseX + spriteColumn);
+                if (bufferX < 0 || bufferWidth <= bufferX)
+                {
+                    continue;
+                }
+
+                int bufferIndex = bufferRowOffset + bufferX;
+                ref Color destination = ref bufferPixels[bufferIndex];
+
+                float destinationAlpha = destination.a;
+                if (IsAlphaEffectivelyInvisible(destinationAlpha, pixelCutoff))
+                {
+                    destination.r = spritePixel.r;
+                    destination.g = spritePixel.g;
+                    destination.b = spritePixel.b;
+                    destination.a = spriteAlpha;
+                    continue;
+                }
+
+                float inverseSourceAlpha = 1f - spriteAlpha;
+                float outAlpha = spriteAlpha + destinationAlpha * inverseSourceAlpha;
+                if (IsAlphaEffectivelyInvisible(outAlpha, pixelCutoff))
+                {
+                    destination = Color.clear;
+                    continue;
+                }
+
+                if (1f < outAlpha)
+                {
+                    outAlpha = 1f;
+                }
+
+                float invOutAlpha = 1f / outAlpha;
+                float sourceWeight = spriteAlpha * invOutAlpha;
+                float destinationWeight = destinationAlpha * inverseSourceAlpha * invOutAlpha;
+
+                float destR = destination.r;
+                float destG = destination.g;
+                float destB = destination.b;
+
+                destination.r = spritePixel.r * sourceWeight + destR * destinationWeight;
+                destination.g = spritePixel.g * sourceWeight + destG * destinationWeight;
+                destination.b = spritePixel.b * sourceWeight + destB * destinationWeight;
+                destination.a = outAlpha;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool TryGetLayerFrame(
+            in AnimatedSpriteLayer layer,
+            int frameIndex,
+            out Sprite sprite
+        )
+        {
+            Sprite[] frames = layer.frames;
+            if (frames == null || frameIndex < 0 || frames.Length <= frameIndex)
+            {
+                sprite = null;
+                return false;
+            }
+
+            sprite = frames[frameIndex];
+            return sprite != null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector2 GetPixelOffset(in AnimatedSpriteLayer layer, int frameIndex)
+        {
+            Vector2[] offsets = layer.perFramePixelOffsets;
+            if (offsets == null || frameIndex < 0 || offsets.Length <= frameIndex)
+            {
+                return Vector2.zero;
+            }
+
+            return offsets[frameIndex];
+        }
+
         private readonly struct FrameCompositor
         {
             private readonly AnimatedSpriteLayer[] _layers;
@@ -659,45 +813,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
         }
 
-        private static void ComposeSpriteOntoBuffer(
-            Color[] bufferPixels,
-            int bufferWidth,
-            int bufferHeight,
-            Color[] spritePixels,
-            int spriteWidth,
-            int spriteHeight,
-            float baseX,
-            float baseY,
-            float layerAlpha,
-            float pixelCutoff
-        )
-        {
-            if (spriteWidth == 0 || spriteHeight == 0)
-            {
-                return;
-            }
-
-            BlendSpriteRowJob job = new(
-                bufferPixels,
-                bufferWidth,
-                bufferHeight,
-                spritePixels,
-                spriteWidth,
-                baseX,
-                baseY,
-                layerAlpha,
-                pixelCutoff
-            );
-
-            if (ParallelBlendThreshold <= spriteWidth * spriteHeight)
-            {
-                Parallel.For(0, spriteHeight, job.Execute);
-                return;
-            }
-
-            job.RunSequential(spriteHeight);
-        }
-
         private readonly struct BlendSpriteRowJob
         {
             private readonly Color[] _bufferPixels;
@@ -759,121 +874,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     Execute(spriteRow);
                 }
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void BlendSpriteRow(
-            Color[] bufferPixels,
-            int bufferWidth,
-            int bufferHeight,
-            Color[] spritePixels,
-            int spriteWidth,
-            float baseX,
-            float baseY,
-            float layerAlpha,
-            float pixelCutoff,
-            int spriteRow
-        )
-        {
-            int spriteRowOffset = spriteRow * spriteWidth;
-            float targetY = baseY + spriteRow;
-            int bufferY = Mathf.FloorToInt(targetY);
-            if (bufferY < 0 || bufferHeight <= bufferY)
-            {
-                return;
-            }
-
-            int bufferRowOffset = bufferY * bufferWidth;
-
-            for (int spriteColumn = 0; spriteColumn < spriteWidth; ++spriteColumn)
-            {
-                Color spritePixel = spritePixels[spriteRowOffset + spriteColumn];
-                float spriteAlpha = spritePixel.a * layerAlpha;
-                if (IsAlphaEffectivelyInvisible(spriteAlpha, pixelCutoff))
-                {
-                    continue;
-                }
-
-                if (1f < spriteAlpha)
-                {
-                    spriteAlpha = 1f;
-                }
-
-                int bufferX = Mathf.FloorToInt(baseX + spriteColumn);
-                if (bufferX < 0 || bufferWidth <= bufferX)
-                {
-                    continue;
-                }
-
-                int bufferIndex = bufferRowOffset + bufferX;
-                ref Color destination = ref bufferPixels[bufferIndex];
-
-                float destinationAlpha = destination.a;
-                if (IsAlphaEffectivelyInvisible(destinationAlpha, pixelCutoff))
-                {
-                    destination.r = spritePixel.r;
-                    destination.g = spritePixel.g;
-                    destination.b = spritePixel.b;
-                    destination.a = spriteAlpha;
-                    continue;
-                }
-
-                float inverseSourceAlpha = 1f - spriteAlpha;
-                float outAlpha = spriteAlpha + destinationAlpha * inverseSourceAlpha;
-                if (IsAlphaEffectivelyInvisible(outAlpha, pixelCutoff))
-                {
-                    destination = Color.clear;
-                    continue;
-                }
-
-                if (1f < outAlpha)
-                {
-                    outAlpha = 1f;
-                }
-
-                float invOutAlpha = 1f / outAlpha;
-                float sourceWeight = spriteAlpha * invOutAlpha;
-                float destinationWeight = destinationAlpha * inverseSourceAlpha * invOutAlpha;
-
-                float destR = destination.r;
-                float destG = destination.g;
-                float destB = destination.b;
-
-                destination.r = spritePixel.r * sourceWeight + destR * destinationWeight;
-                destination.g = spritePixel.g * sourceWeight + destG * destinationWeight;
-                destination.b = spritePixel.b * sourceWeight + destB * destinationWeight;
-                destination.a = outAlpha;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool TryGetLayerFrame(
-            in AnimatedSpriteLayer layer,
-            int frameIndex,
-            out Sprite sprite
-        )
-        {
-            Sprite[] frames = layer.frames;
-            if (frames == null || frameIndex < 0 || frames.Length <= frameIndex)
-            {
-                sprite = null;
-                return false;
-            }
-
-            sprite = frames[frameIndex];
-            return sprite != null;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector2 GetPixelOffset(in AnimatedSpriteLayer layer, int frameIndex)
-        {
-            Vector2[] offsets = layer.perFramePixelOffsets;
-            if (offsets == null || frameIndex < 0 || offsets.Length <= frameIndex)
-            {
-                return Vector2.zero;
-            }
-
-            return offsets[frameIndex];
         }
     }
 }

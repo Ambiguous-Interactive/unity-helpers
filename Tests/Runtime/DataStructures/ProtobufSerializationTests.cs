@@ -441,19 +441,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        // Internal rather than private so the generated registrar can name
-        // SerializableDictionary.Cache<SerializablePayload>. A private nested type is skipped with
-        // WPROTO028 and would throw on its first WallstopProto serialization.
-        [ProtoContract]
-        internal sealed class SerializablePayload
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-        }
-
         [Test]
         public void DequeSerializesAndDeserializes()
         {
@@ -1441,6 +1428,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(1, thirdRoundTrip.Count);
             Assert.IsTrue(thirdRoundTrip.Contains(200));
+        }
+
+        // Internal rather than private so the generated registrar can name
+        // SerializableDictionary.Cache<SerializablePayload>. A private nested type is skipped with
+        // WPROTO028 and would throw on its first WallstopProto serialization.
+        [ProtoContract]
+        internal sealed class SerializablePayload
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
         }
     }
 }

@@ -41,18 +41,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Sprites";
 
         /// <summary>
-        /// Represents the expected metadata from a golden file.
-        /// </summary>
-        private sealed class GoldenMetadata
-        {
-            public string SourceFile { get; set; }
-            public int SpriteCount { get; set; }
-            public List<string> ExpectedNames { get; set; }
-            public int[] SpriteDimensions { get; set; }
-            public int[] GridSize { get; set; }
-        }
-
-        /// <summary>
         /// Converts a Unity relative path to an absolute file system path.
         /// </summary>
         private static string RelToFull(string relativePath)
@@ -935,6 +923,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
   ""gridSize"": [{columns}, {rows}]
 }}
 ";
+        }
+
+        /// <summary>
+        /// Represents the expected metadata from a golden file.
+        /// </summary>
+        private sealed class GoldenMetadata
+        {
+            public string SourceFile { get; set; }
+            public int SpriteCount { get; set; }
+            public List<string> ExpectedNames { get; set; }
+            public int[] SpriteDimensions { get; set; }
+            public int[] GridSize { get; set; }
         }
     }
 #endif

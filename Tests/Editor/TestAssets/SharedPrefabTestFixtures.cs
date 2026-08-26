@@ -51,22 +51,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             new();
 
         /// <summary>
-        /// Represents a dynamically generated prefab fixture with its associated metadata.
-        /// </summary>
-        public sealed class DynamicPrefabFixture
-        {
-            /// <summary>
-            /// The asset path of the dynamic fixture.
-            /// </summary>
-            public string AssetPath { get; internal set; }
-
-            /// <summary>
-            /// The cached prefab for the dynamic fixture.
-            /// </summary>
-            public GameObject Prefab { get; internal set; }
-        }
-
-        /// <summary>
         /// Path to the shared prefab handler fixture (single TestPrefabAssetChangeHandler component).
         /// </summary>
         public static string PrefabHandlerPath => $"{StaticAssetsDir}/test_prefab_handler.prefab";
@@ -402,6 +386,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     $"[SharedPrefabTestFixtures] Missing prefab fixture: {SceneHandlerPath}"
                 );
             }
+        }
+
+        /// <summary>
+        /// Represents a dynamically generated prefab fixture with its associated metadata.
+        /// </summary>
+        public sealed class DynamicPrefabFixture
+        {
+            /// <summary>
+            /// The asset path of the dynamic fixture.
+            /// </summary>
+            public string AssetPath { get; internal set; }
+
+            /// <summary>
+            /// The cached prefab for the dynamic fixture.
+            /// </summary>
+            public GameObject Prefab { get; internal set; }
         }
     }
 #endif

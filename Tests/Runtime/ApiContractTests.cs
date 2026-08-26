@@ -254,20 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializerApiContractTests
     {
-        [Serializable]
-        [ProtoContract]
-        private sealed class TestMessage
-        {
-            [ProtoMember(1)]
-            public int Id { get; set; }
-
-            [ProtoMember(2)]
-            public string Name { get; set; }
-
-            [ProtoMember(3)]
-            public List<int> Values { get; set; }
-        }
-
         /// <summary>
         /// Verifies that JsonStringify with pretty=true produces indented output.
         /// This test helps catch misuse like calling JsonSerialize(obj, true) which
@@ -555,6 +541,20 @@ namespace WallstopStudios.UnityHelpers.Tests
                 fromCompact.Values,
                 "Both should deserialize to same Values"
             );
+        }
+
+        [Serializable]
+        [ProtoContract]
+        private sealed class TestMessage
+        {
+            [ProtoMember(1)]
+            public int Id { get; set; }
+
+            [ProtoMember(2)]
+            public string Name { get; set; }
+
+            [ProtoMember(3)]
+            public List<int> Values { get; set; }
         }
     }
 

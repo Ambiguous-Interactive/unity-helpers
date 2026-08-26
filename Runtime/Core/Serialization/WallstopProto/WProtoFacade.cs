@@ -36,19 +36,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public static class WProtoFacade
     {
         /// <summary>
-        /// Whether a value of <typeparamref name="T"/> can be null, resolved once per closure.
-        /// </summary>
-        /// <typeparam name="T">The declared type.</typeparam>
-        /// <remarks>
-        /// Reference-type closures share one canonical instantiation, so <c>typeof(T)</c> inside a
-        /// generic method is a per-call handle lookup rather than a constant.
-        /// </remarks>
-        private static class TypeShape<T>
-        {
-            internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
-        }
-
-        /// <summary>
         /// Serializes <paramref name="value"/> into <paramref name="buffer"/>, growing it only when
         /// what is already there is too small.
         /// </summary>
@@ -384,6 +371,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // dispatch chain.
             return formatter is IWProtoPolymorphicFormatter polymorphic
                 && polymorphic.CanWrite(concrete);
+        }
+
+        /// <summary>
+        /// Whether a value of <typeparamref name="T"/> can be null, resolved once per closure.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <remarks>
+        /// Reference-type closures share one canonical instantiation, so <c>typeof(T)</c> inside a
+        /// generic method is a per-call handle lookup rather than a constant.
+        /// </remarks>
+        private static class TypeShape<T>
+        {
+            internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
         }
     }
 }

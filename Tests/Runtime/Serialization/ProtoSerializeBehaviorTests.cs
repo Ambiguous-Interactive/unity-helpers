@@ -11,21 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class ProtoSerializeBehaviorTests
     {
-        [ProtoContract]
-        [ProtoInclude(100, typeof(DerivedMsg))]
-        private class BaseMsg
-        {
-            [ProtoMember(1)]
-            public int A { get; set; }
-        }
-
-        [ProtoContract]
-        private class DerivedMsg : BaseMsg
-        {
-            [ProtoMember(2)]
-            public string B { get; set; }
-        }
-
         [Test]
         public void GenericBasePrefersRuntimeTypeWhenDifferent()
         {
@@ -61,6 +46,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(round != null, "Deserialized instance should not be null");
             Assert.AreEqual(42, round.A, "Base field A should match");
             Assert.AreEqual("obj", round.B, "Derived field B should be preserved");
+        }
+
+        [ProtoContract]
+        [ProtoInclude(100, typeof(DerivedMsg))]
+        private class BaseMsg
+        {
+            [ProtoMember(1)]
+            public int A { get; set; }
+        }
+
+        [ProtoContract]
+        private class DerivedMsg : BaseMsg
+        {
+            [ProtoMember(2)]
+            public string B { get; set; }
         }
     }
 }

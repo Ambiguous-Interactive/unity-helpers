@@ -900,21 +900,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return ColorQuantization.ToNormalized((byte)Mathf.Min(bucket * bucketSize, 255));
         }
 
-        // Helper struct for LAB color space
-        private readonly struct LABColor
-        {
-            public readonly double l;
-            public readonly double a;
-            public readonly double b;
-
-            public LABColor(double l, double a, double b)
-            {
-                this.l = l;
-                this.a = a;
-                this.b = b;
-            }
-        }
-
         private static LABColor RGBToLAB(Color rgb)
         {
             // First convert to XYZ
@@ -1066,6 +1051,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 return rng.NextFloat(maxScale);
+            }
+        }
+
+        // Helper struct for LAB color space
+        private readonly struct LABColor
+        {
+            public readonly double l;
+            public readonly double a;
+            public readonly double b;
+
+            public LABColor(double l, double a, double b)
+            {
+                this.l = l;
+                this.a = a;
+                this.b = b;
             }
         }
     }
