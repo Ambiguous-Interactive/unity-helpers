@@ -850,9 +850,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Pool should be created with size-aware effective options
+            // `Assert.IsTrue(stats != null)` was here, and PoolStatistics is a struct: the
+            // compiler proves that always true (CS8073), so the test's only assertion could not
+            // fail. Assert what its name claims instead -- the threshold above makes SmallClass a
+            // large object, so the size-aware options must differ from the base ones in the three
+            // ways GetSizeAwareEffectiveOptions documents.
+            PoolPurgeEffectiveOptions baseOptions =
+                PoolPurgeSettings.GetEffectiveOptions<SmallClass>();
+            PoolPurgeEffectiveOptions sizeAware =
+                PoolPurgeSettings.GetSizeAwareEffectiveOptions<SmallClass>();
+
+            Assert.AreEqual(
+                PoolPurgeSettings.LargeObjectWarmRetainCount,
+                sizeAware.WarmRetainCount,
+                "A large object keeps the large-object warm count"
+            );
+            Assert.LessOrEqual(
+                sizeAware.BufferMultiplier,
+                baseOptions.BufferMultiplier,
+                "A large object never buffers more than the base policy"
+            );
+            Assert.LessOrEqual(
+                sizeAware.IdleTimeoutSeconds,
+                baseOptions.IdleTimeoutSeconds,
+                "A large object is never held idle longer than the base policy"
+            );
+
             PoolStatistics stats = pool.GetStatistics();
-            Assert.IsTrue(stats != null, "Pool statistics should not be null");
+            Assert.AreEqual(0, stats.CurrentSize, "Nothing has been returned to the pool yet");
         }
 
         [Test]

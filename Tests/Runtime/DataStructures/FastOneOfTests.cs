@@ -817,18 +817,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class NoneTests
     {
+        // `Assert.IsTrue(none != null)` was here twice, and `None` is a struct: the comparison
+        // lifts to `None?` and the compiler proves it always true (CS8073). Neither test could
+        // fail. What they were reaching for -- that `default` and `None.Default` are the same
+        // value -- is asserted below by NoneEqualsDefaultSingleton and
+        // NoneEqualityOperatorReturnsTrue, so this is what they leave behind.
         [Test]
-        public void DefaultNoneIsValid()
+        public void DefaultNoneRoundTripsThroughItsMembers()
         {
             None none = default;
-            Assert.IsTrue(none != null);
-        }
 
-        [Test]
-        public void NoneDefaultSingletonIsValid()
-        {
-            None none = None.Default;
-            Assert.IsTrue(none != null);
+            Assert.AreEqual(None.Default, none);
+            Assert.AreEqual(0, none.GetHashCode());
+            Assert.AreEqual("None", none.ToString());
         }
 
         [Test]

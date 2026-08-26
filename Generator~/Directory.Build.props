@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    Compiler warnings are errors here, at the maximum warning level, for every project under
+    Generator~ (including TypeCheck and TestCheck, which compile the real Runtime/, Editor/ and
+    Tests/ sources against the Unity reference assemblies). Measured before turning it on: at
+    WarningLevel 9999 those trees produce ZERO CS warnings, so this locks in a property the
+    repository already has rather than starting a cleanup (#378).
+
+    The .NET analyzer suite is deliberately NOT enabled. Measured on the same build with
+    EnableNETAnalyzers=true and AnalysisLevel=latest-recommended: 756 findings across 35 rules and
+    119 files, dominated by CA1815, CA1508, CA1000 and CA1715. That is a project, and mostly
+    opinion, where the compiler half is free. The inventory is recorded on #378.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>9999</WarningLevel>
+  </PropertyGroup>
+</Project>
