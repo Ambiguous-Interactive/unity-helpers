@@ -62,26 +62,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private static readonly object _expectedErrorLock = new();
         private static UnityEngine.ILogHandler _expectErrorInnerHandler;
         private static ExpectedErrorSuppressingHandler _expectErrorHandler;
-
-        // Messages the ENGINE emits that no test here asserts, and that no test can prevent.
-        // Reconciled at teardown rather than expected up front: see ToleratedEngineLogs below.
-        private static readonly (
-            UnityEngine.LogType type,
-            System.Text.RegularExpressions.Regex pattern
-        )[] ToleratedEngineLogs =
-        {
-            (
-                UnityEngine.LogType.Warning,
-                new System.Text.RegularExpressions.Regex(
-                    @"deleting an allocation that is older than its permitted lifetime of \d+ frames"
-                )
-            ),
-        };
-        private static readonly int[] _toleratedEngineLogCounts = new int[
-            ToleratedEngineLogs.Length
-        ];
-        private static readonly object _toleratedEngineLogLock = new();
-        private static bool _toleratedEngineLogsSubscribed;
         protected readonly List<Func<ValueTask>> _trackedAsyncDisposals = new();
 
         /// <summary>
@@ -184,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             if (Application.isPlaying)
             {
                 InstallExpectedErrorSuppression();
-                BeginToleratedEngineLogWatch();
                 CaptureLeakGuardBaseline();
             }
 
@@ -659,7 +638,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 DrainUnityMainThreadDispatchersForTeardown();
                 yield return null;
                 DrainUnityMainThreadDispatchersForTeardown();
-                ReconcileToleratedEngineLogs();
                 LogAssert.NoUnexpectedReceived();
             }
 
@@ -920,124 +898,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
             UnityEngine.TestTools.LogAssert.Expect(type, pattern);
-        }
-
-        /// <summary>
-        /// Starts counting the engine-emitted messages in <c>ToleratedEngineLogs</c> for this test.
-        /// </summary>
-        /// <remarks>
-        /// <para>The Unity Test Framework treats a <c>[Warning]</c> as a failing log -- measured on
-        /// 6000.4.6f1: a bare <c>Debug.LogWarning</c> inside a <c>LogScope</c> fails
-        /// <see cref="LogAssert.NoUnexpectedReceived"/> with <c>UnhandledLogMessageException</c>.
-        /// Some of those warnings come from the engine's own native temp allocator and fire on
-        /// frame count rather than on anything a test does, so the same commit passes on three
-        /// editors and fails on a fourth (#393).</para>
-        /// <para>The reconciliation is retroactive on purpose. <see cref="LogAssert.Expect(LogType,
-        /// System.Text.RegularExpressions.Regex)"/> matches a log that has ALREADY been recorded --
-        /// measured, same editor -- so registering the expectation only for what actually arrived
-        /// avoids the "expected log did not appear" failure that expecting a nondeterministic
-        /// message up front would guarantee. It takes ONE expectation per occurrence: two warnings
-        /// and one <c>Expect</c> still fail. An unrelated warning still fails after a tolerated one
-        /// is reconciled, which is what keeps this from being
-        /// <see cref="LogAssert.ignoreFailingMessages"/> with extra steps.</para>
-        /// <para>An expectation that matches NOTHING is itself a failure -- the framework's
-        /// end-of-scope evaluation throws <c>UnexpectedLogMessageException</c>, measured -- so this
-        /// may never expect more than arrived. It cannot: the subscription opens in
-        /// <see cref="CommonUnitySetUp"/> and closes in teardown, both inside the framework's own
-        /// per-test scope, so every message counted here was recorded there. A recorded message
-        /// satisfies the retroactive expectation whether or not
-        /// <see cref="LogAssert.ignoreFailingMessages"/> is set, which was measured rather than
-        /// assumed because that flag decides whether the log was ever treated as failing.</para>
-        /// <para>PlayMode only, because that is where this base owns the reconciliation. In EditMode
-        /// the framework's own end-of-test check is the gate and there is nowhere to hook before
-        /// it.</para>
-        /// </remarks>
-        private static void BeginToleratedEngineLogWatch()
-        {
-            lock (_toleratedEngineLogLock)
-            {
-                System.Array.Clear(_toleratedEngineLogCounts, 0, _toleratedEngineLogCounts.Length);
-                if (_toleratedEngineLogsSubscribed)
-                {
-                    return;
-                }
-                Application.logMessageReceivedThreaded += OnToleratedEngineLogCandidate;
-                _toleratedEngineLogsSubscribed = true;
-            }
-        }
-
-        /// <summary>
-        /// Reports whether a message is one of the engine-emitted logs this base reconciles rather
-        /// than fails on. Exposed so the rule can be driven in both directions: a tolerated message
-        /// must match, and anything else -- including the same text at a different
-        /// <see cref="LogType"/> -- must not.
-        /// </summary>
-        protected static bool IsToleratedEngineLog(LogType type, string message)
-        {
-            return 0 <= ToleratedEngineLogIndex(type, message);
-        }
-
-        private static int ToleratedEngineLogIndex(LogType type, string message)
-        {
-            if (message == null)
-            {
-                return -1;
-            }
-
-            for (int index = 0; index < ToleratedEngineLogs.Length; index++)
-            {
-                (UnityEngine.LogType toleratedType, System.Text.RegularExpressions.Regex pattern) =
-                    ToleratedEngineLogs[index];
-                if (toleratedType == type && pattern.IsMatch(message))
-                {
-                    return index;
-                }
-            }
-
-            return -1;
-        }
-
-        private static void OnToleratedEngineLogCandidate(
-            string condition,
-            string stackTrace,
-            LogType type
-        )
-        {
-            lock (_toleratedEngineLogLock)
-            {
-                int index = ToleratedEngineLogIndex(type, condition);
-                if (0 <= index)
-                {
-                    _toleratedEngineLogCounts[index]++;
-                }
-            }
-        }
-
-        private static void ReconcileToleratedEngineLogs()
-        {
-            lock (_toleratedEngineLogLock)
-            {
-                if (_toleratedEngineLogsSubscribed)
-                {
-                    Application.logMessageReceivedThreaded -= OnToleratedEngineLogCandidate;
-                    _toleratedEngineLogsSubscribed = false;
-                }
-
-                for (int index = 0; index < ToleratedEngineLogs.Length; index++)
-                {
-                    (UnityEngine.LogType type, System.Text.RegularExpressions.Regex pattern) =
-                        ToleratedEngineLogs[index];
-                    for (
-                        int occurrence = 0;
-                        occurrence < _toleratedEngineLogCounts[index];
-                        occurrence++
-                    )
-                    {
-                        LogAssert.Expect(type, pattern);
-                    }
-                    _toleratedEngineLogCounts[index] = 0;
-                }
-            }
         }
 
         private static void InstallExpectedErrorSuppression()
