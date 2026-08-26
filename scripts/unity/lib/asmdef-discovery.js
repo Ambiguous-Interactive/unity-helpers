@@ -228,7 +228,19 @@ function isAsmdefCompatibleWithTarget(includePlatforms, excludePlatforms, target
     if (excludes.has("Editor")) {
       return false;
     }
-    return includes.size === 0 || includes.has("Editor");
+    // Editor-ONLY, not merely editor-compatible. Unity's EditMode runner takes only assemblies
+    // flagged `EditorAssembly`, and an asmdef with no `includePlatforms` compiles for every
+    // platform and is not flagged -- so naming one in `-assemblyNames` is accepted and then
+    // silently dropped, and the list reads as coverage that does not exist (#570).
+    //
+    // Measured twice on the same commit. In the editor,
+    // `CompilationPipeline.GetAssemblies(AssembliesType.Editor)` on 6000.4.6f1 flags 26 of this
+    // repository's 33 test assemblies, and the seven it does not are exactly the seven whose
+    // `includePlatforms` is not `["Editor"]`. In CI, the 2021.3.45f1 editmode leg's log mentions
+    // `Tests.Runtime.Random` three times -- the assembly list being echoed -- against 2,375
+    // times in the playmode leg, and `PoolLifecycleHooksTests` runs 94 times in playmode and
+    // zero times in editmode.
+    return includes.size === 1 && includes.has("Editor");
   }
 
   if (target === "playmode") {

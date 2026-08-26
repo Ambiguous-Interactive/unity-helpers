@@ -226,6 +226,23 @@ limit ([#568](https://github.com/Ambiguous-Interactive/unity-helpers/issues/568)
   ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)). When a change touches
   an edit-mode branch of runtime code, the fixture belongs in an editor-only assembly.
 
+  The seven, named so nobody has to re-measure them:
+  `Tests.Core`, `Tests.Runtime`, `Tests.Runtime.Performance`, `Tests.Runtime.Random`,
+  `Tests.Runtime.Reflex`, `Tests.Runtime.VContainer` and `Tests.Runtime.Zenject`, all under the
+  `WallstopStudios.UnityHelpers.` prefix. `scripts/tests/test-asmdef-discovery.js` holds that list
+  and fails if an eighth appears, and `defaultIncludeAssemblies({ target: "editmode" })` no longer
+  returns any of them -- the list CI hands the editmode legs used to be a superset of what Unity
+  would run, which is what made the gap invisible
+  ([#570](https://github.com/Ambiguous-Interactive/unity-helpers/issues/570)).
+
+  It also cost a whole workflow. `unity-benchmarks.yml` gave its EditMode legs
+  `Tests.Runtime.Performance` and `Tests.Runtime.Random`; both are platform-neutral, so those four
+  legs ran **zero** tests and failed `Verify tests actually ran` on every scheduled run. Confirmed
+  in CI rather than inferred: the `2021.3.45f1` editmode leg's log mentions `Tests.Runtime.Random`
+  three times -- the assembly list being echoed -- against **2,375** times in the playmode leg, and
+  `PoolLifecycleHooksTests` runs 94 times in playmode and 0 times in editmode. The benchmark matrix
+  is playmode-only now, carrying the thorough Random configuration with it.
+
 - `WaitForEndOfFrame` does not work in batch mode (PlayMode tests)
 - Xvfb provides 0 Hz virtual display - frame timing may differ from real editor
 - First run is slow (Docker image pull ~3-4 GB); subsequent runs use cached image

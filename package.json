@@ -207,6 +207,7 @@
     "test:lint-workflow-run-expression-length": "pwsh -NoProfile -File scripts/tests/test-lint-workflow-run-expression-length.ps1 -VerboseOutput",
     "test:pr-workflow-concurrency": "pwsh -NoProfile -File scripts/tests/test-pr-workflow-concurrency.ps1 -VerboseOutput",
     "test:workflow-repository-guard": "pwsh -NoProfile -File scripts/tests/test-workflow-repository-guard.ps1 -VerboseOutput",
+    "test:asmdef-discovery": "node scripts/tests/test-asmdef-discovery.js",
     "test:unity-workflow-matrix-contract": "pwsh -NoProfile -File scripts/tests/test-unity-workflow-matrix-contract.ps1 -VerboseOutput",
     "test:perf-tools": "node scripts/unity/lib/extract-perf-metrics.js --self-test && node scripts/unity/lib/evaluate-perf-refresh.js --self-test && node scripts/unity/lib/render-perf-deltas.js --self-test",
     "test:git-path-helpers": "pwsh -NoProfile -File scripts/tests/test-git-path-helpers.ps1 -VerboseOutput",

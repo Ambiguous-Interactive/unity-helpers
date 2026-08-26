@@ -208,6 +208,11 @@ const CHECKS = [
     run: "npm run test:workflow-repository-guard"
   },
   {
+    id: "asmdef-discovery",
+    name: "Asmdef discovery classification",
+    run: "npm run test:asmdef-discovery"
+  },
+  {
     id: "unity-workflow-matrix-contract",
     name: "Unity workflow matrix contract",
     run: "npm run test:unity-workflow-matrix-contract"

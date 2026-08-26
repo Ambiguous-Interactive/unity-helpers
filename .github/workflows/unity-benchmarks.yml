@@ -70,30 +70,32 @@ jobs:
           const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance";
           const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random";
 
+          // PlayMode only. Both benchmark assemblies are platform-neutral, and Unity's EditMode
+          // runner takes only assemblies flagged EditorAssembly -- so the four editmode legs
+          // were handed two assembly names, ran zero tests, and failed "Verify tests actually
+          // ran" on every scheduled run. Measured: the 2021.3.45f1 editmode leg's log mentions
+          // Tests.Runtime.Random three times (the echoed list) against 2,375 in playmode
+          // (#570). The thorough Random sweep the editmode leg was configured for moves here,
+          // which is the only mode that can execute it.
           function benchmarkProfile(target) {
             const discovered = discovery.defaultIncludeAssemblies(process.cwd(), {
               includePerf: true,
               target
             });
-            if (!discovered.includes(performanceAssembly)) {
-              throw new Error(`The ${target} benchmark profile did not discover ${performanceAssembly}.`);
+            for (const required of [performanceAssembly, randomAssembly]) {
+              if (!discovered.includes(required)) {
+                throw new Error(`The ${target} benchmark profile did not discover ${required}.`);
+              }
             }
-            if (target === "editmode" && !discovered.includes(randomAssembly)) {
-              throw new Error(`The editmode benchmark profile did not discover ${randomAssembly}.`);
-            }
-            const assemblies = target === "editmode"
-              ? [performanceAssembly, randomAssembly]
-              : [performanceAssembly];
-            return assemblies.join(";");
+            return [performanceAssembly, randomAssembly].join(";");
           }
 
           const profiles = {
-            editmode: benchmarkProfile("editmode"),
             playmode: benchmarkProfile("playmode")
           };
           const include = [];
           for (const version of versions) {
-            for (const mode of ["editmode", "playmode"]) {
+            for (const mode of ["playmode"]) {
               include.push({
                 "unity-version": version,
                 "test-mode": mode,
@@ -289,19 +291,18 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          # EditMode also owns the thorough Random sweep. Selecting both its
+          # This leg also owns the thorough Random sweep. Selecting both its
           # assembly and Fast category folds that sweep into this one Unity
           # launch while the explicit assembly list prevents unrelated Fast
           # tests from entering the benchmark lane.
           UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}
-          UH_UNITY_TEST_CATEGORY: >-
-            ${{ matrix.test-mode == 'editmode' && 'Performance;Stress;Fast' || 'Performance;Stress' }}
-          UH_RANDOM_SAMPLE_COUNT: ${{ matrix.test-mode == 'editmode' && '12750000' || '' }}
-          UH_RANDOM_NOISE_MAP_ITERATIONS: ${{ matrix.test-mode == 'editmode' && '1000' || '' }}
-          # The combined EditMode pass previously had two independent 80-minute
-          # watchdog budgets. Keep deliberate combined headroom while leaving
-          # ten minutes for cleanup before this step's 120-minute hard limit.
-          UH_EDITOR_TEST_TIMEOUT_SECONDS: ${{ matrix.test-mode == 'editmode' && '6600' || '' }}
+          UH_UNITY_TEST_CATEGORY: "Performance;Stress;Fast"
+          UH_RANDOM_SAMPLE_COUNT: "12750000"
+          UH_RANDOM_NOISE_MAP_ITERATIONS: "1000"
+          # The combined pass previously had two independent 80-minute watchdog
+          # budgets. Keep deliberate combined headroom while leaving ten minutes
+          # for cleanup before this step's 120-minute hard limit.
+          UH_EDITOR_TEST_TIMEOUT_SECONDS: "6600"
           UH_PERF_COMMIT: ${{ github.sha }}
         run: |
           # Release (not Debug) code optimization for the editmode/playmode perf

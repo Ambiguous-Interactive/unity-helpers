@@ -697,17 +697,18 @@ $benchmarkRunsThoroughRandomInSharedInvocation = (
     -not $benchmarkJob.Contains('Run Random suite at full sample count') -and
     -not $benchmarkJob.Contains('benchmarks-random') -and
     $benchmarkJob.Contains('UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}') -and
-    $benchmarkJob.Contains("'Performance;Stress;Fast'") -and
-    $benchmarkJob.Contains("UH_RANDOM_SAMPLE_COUNT: `${{ matrix.test-mode == 'editmode' && '12750000' || '' }}") -and
-    $benchmarkJob.Contains("UH_RANDOM_NOISE_MAP_ITERATIONS: `${{ matrix.test-mode == 'editmode' && '1000' || '' }}") -and
-    $benchmarkJob.Contains("UH_EDITOR_TEST_TIMEOUT_SECONDS: `${{ matrix.test-mode == 'editmode' && '6600' || '' }}") -and
+    $benchmarkJob.Contains('UH_UNITY_TEST_CATEGORY: "Performance;Stress;Fast"') -and
+    $benchmarkJob.Contains('UH_RANDOM_SAMPLE_COUNT: "12750000"') -and
+    $benchmarkJob.Contains('UH_RANDOM_NOISE_MAP_ITERATIONS: "1000"') -and
+    $benchmarkJob.Contains('UH_EDITOR_TEST_TIMEOUT_SECONDS: "6600"') -and
+    -not $benchmarkJob.Contains("matrix.test-mode == 'editmode'") -and
     $benchmarkJob.Contains('-AssemblyNames $env:UH_BENCHMARK_ASSEMBLIES')
 )
 if (-not $benchmarkRunsThoroughRandomInSharedInvocation) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The EditMode benchmark leg must run Performance/Stress and the full-sample Random assembly in one Unity invocation with explicit assembly scoping.'
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The benchmark leg must run Performance/Stress/Fast and the full-sample Random assembly in one Unity invocation with explicit assembly scoping, and must not branch its configuration on a test-mode that no longer exists.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked weekly EditMode performance and thorough Random coverage share one Unity invocation.'
+    Write-Info 'Checked weekly performance and thorough Random coverage share one Unity invocation.'
 }
 
 $benchmarkAssemblyDiscoveryIsCentralized = (
@@ -716,7 +717,13 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     $benchmarksJobTexts['matrix-config'].Contains('require("./scripts/unity/lib/asmdef-discovery.js")') -and
     $benchmarksJobTexts['matrix-config'].Contains('const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance"') -and
     $benchmarksJobTexts['matrix-config'].Contains('const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random"') -and
-    $benchmarksJobTexts['matrix-config'].Contains('if (target === "editmode" && !discovered.includes(randomAssembly))') -and
+    $benchmarksJobTexts['matrix-config'].Contains('for (const required of [performanceAssembly, randomAssembly])') -and
+    # PlayMode only, and asserted rather than assumed. Both benchmark assemblies are
+    # platform-neutral, and Unity's EditMode runner takes only assemblies flagged
+    # EditorAssembly -- so an editmode benchmark leg is handed two assembly names, runs zero
+    # tests, and fails "Verify tests actually ran" on every scheduled run (#570).
+    $benchmarksJobTexts['matrix-config'].Contains('for (const mode of ["playmode"])') -and
+    -not $benchmarksJobTexts['matrix-config'].Contains('editmode: benchmarkProfile("editmode")') -and
     $benchmarksWorkflowContent.Contains('matrix-include: ${{ steps.resolve.outputs.matrix-include }}') -and
     $benchmarksWorkflowContent.Contains('expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}') -and
     $benchmarksWorkflowContent.Contains('allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}') -and
