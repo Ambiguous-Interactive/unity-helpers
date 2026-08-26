@@ -24,6 +24,33 @@ generator falls back to the un-paired number and the run says so.
 So a Speed bucket is a claim about the generators; an ops/s figure is a claim about this machine on
 that day.
 
+## Two batteries, because they ask different questions
+
+**PractRand** streams until something fails and reports the depth: a generator is "clean through
+8GB" or it is not. **TestU01 SmallCrush** runs fifteen fixed statistics and reports a p-value for
+each. A generator can be clean at 8GB of PractRand and still land a decisive p-value here, so
+neither stands in for the other.
+
+Both run against the same byte stream, from the same host, so a difference between them is a
+difference between the batteries rather than between two ways of producing bytes.
+
+Reading a SmallCrush result takes one piece of context: with fifteen statistics, a perfectly good
+generator lands one p-value outside `[0.001, 0.9990]` roughly one run in seven. The threshold that
+separates noise from signal is not close: the recorded weak control reports `eps` (below 1e-300),
+while noise sits around 1e-4. Anything below **1e-10** is treated as a failure; anything above it is
+reported and ignored. `IllusionFlow` produced a single 7.2e-4 at the manifest seed and was clean on
+two other seeds, which is what that rule is for.
+
+Whole-inventory SmallCrush, 2026-08-26, seed `00010203-0405-0607-0809-0a0b0c0d0e0f`, 908 MB and
+6.3 s of CPU per generator:
+
+- **Every generator rated `Good` or better passed.**
+- Four recorded-weak generators failed decisively, most of their statistics at `eps`:
+  `LinearCongruentialGenerator`, `WDoomRandom`, `WaveSplatRandom`, `XorShiftRandom`.
+- Three recorded-weak generators passed: `DotNetRandom`, `SquirrelRandom`, `SystemRandom`.
+  SmallCrush is the shallower instrument, so that is inconclusive rather than a contradiction of
+  their rating.
+
 For statistical batteries, the repository's
 `Generator~/WallstopStudios.UnityHelpers.RandomQuality` host emits a reproducible little-endian byte
 stream from an explicit generator, GUID seed and byte count. Long PractRand/TestU01 runs belong in

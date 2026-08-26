@@ -226,6 +226,86 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  testu01:
+    name: TestU01 SmallCrush (whole inventory)
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: "9.0.306"
+
+      # TestU01 is the second battery, and it answers a different question from PractRand.
+      # PractRand streams until something fails and reports the depth; SmallCrush runs 15 fixed
+      # statistics and reports p-values. A generator can be clean at 8GB of PractRand and still
+      # land a decisive p-value here, which is why both run rather than one standing in for the
+      # other (issue #286).
+      #
+      # SmallCrush is what the SCHEDULE runs because it is cheap: measured at 6.33 s of CPU and
+      # 908 MB of stream per generator, so the whole inventory is minutes. Crush and BigCrush are
+      # hours per generator; the driver takes either by name for a deliberate dispatch when a
+      # generator is being promoted.
+      - name: Download generator host
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: random-quality-host
+          path: .artifacts/random-quality/host
+
+      - name: Restore cached TestU01 driver
+        id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: .artifacts/random-quality/testu01
+          key: testu01-${{ runner.os }}-${{ hashFiles('scripts/random-quality/testu01-driver.c', 'scripts/random-quality/build-testu01.sh') }}
+
+      - name: Build TestU01 and prove it can fail
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        env:
+          TESTU01_BUILD_ROOT: ${{ github.workspace }}/.artifacts/random-quality/testu01
+        run: bash scripts/random-quality/build-testu01.sh
+
+      - name: Run SmallCrush over the inventory
+        env:
+          GENERATORS: ${{ needs.resolve.outputs.generators }}
+          SEED: ${{ needs.resolve.outputs.seed }}
+          MANIFEST_PATH: ${{ env.MANIFEST }}
+        run: |
+          set -eu
+          driver=".artifacts/random-quality/testu01/wallstop-testu01"
+          chmod +x "${driver}"
+          host=".artifacts/random-quality/host/WallstopStudios.UnityHelpers.RandomQuality.dll"
+          reports=".artifacts/random-quality/testu01-reports"
+          mkdir -p "${reports}"
+          for generator in $(printf '%s' "${GENERATORS}" | jq -r '.[]'); do
+            echo "::group::${generator}"
+            # No pipefail: the battery stops reading once it has drawn its fixed number of words,
+            # which SIGPIPEs the host. The verdict comes from the report, never from a status code.
+            dotnet "${host}" --generator "${generator}" --seed "${SEED}" --width 32 \
+              --bytes 2000000000 2>/dev/null \
+              | "${driver}" SmallCrush > "${reports}/${generator}.txt" 2>&1 || true
+            tail -n 20 "${reports}/${generator}.txt"
+            echo "::endgroup::"
+          done
+
+      - name: Report
+        run: node scripts/random-quality/report-testu01.mjs .artifacts/random-quality/testu01-reports
+
+      - name: Upload TestU01 reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: random-quality-testu01
+          path: .artifacts/random-quality/testu01-reports
+          if-no-files-found: error
+          retention-days: 30
+
   battery:
     name: ${{ matrix.generator }} ${{ matrix.width }}-bit (${{ needs.resolve.outputs.budget }})
     needs:
