@@ -5,10 +5,11 @@ Started from `main` at `d7015d34`, after session 227's PR #576 merged. A fully p
 unstable on the existing #498/#411/#325 Unity-license return chain and was not mixed into this
 serializer change.
 
-Branch: `session-228-wproto-stdlib-shapes`. This is a measured tranche of #399 and #343, not their
-closure: `char`, `Uri`, `Type`, `IntPtr`, and `UIntPtr` remain in protobuf-net v3's accepted inventory,
-the consumer-repository survey is still pending, and `DateTimeOffset` is refused by both oracle
-majors. `PLAN.md` keeps that remaining work first.
+Branch: `session-228-wproto-stdlib-shapes`; PR
+[#579](https://github.com/Ambiguous-Interactive/unity-helpers/pull/579). This is a measured tranche of
+#399 and #343, not their closure: `char`, `Uri`, `Type`, `IntPtr`, and `UIntPtr` remain in
+protobuf-net v3's accepted inventory, the consumer-repository survey is still pending, and
+`DateTimeOffset` is refused by both oracle majors. `PLAN.md` keeps that remaining work first.
 
 ## What shipped in this tranche
 
