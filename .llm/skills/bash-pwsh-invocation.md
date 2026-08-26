@@ -27,7 +27,7 @@ pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${FILES[@]}"
 
 These rules are enforced by:
 
-1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`).
+1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`.
 2. `.github/workflows/pwsh-invocations-lint.yml` — runs the lint on every PR that touches hook/workflow/script files.
 3. `scripts/tests/test-precommit-integration.sh` — smoke-tests that each pwsh-invoked hook branch works.
 4. `scripts/validate-lint-error-codes.ps1` — enforces that the `PWS` prefix (and any other lint-error-code prefix introduced by a new lint script) is registered in `cspell.json`, so the skill/doc tokens `PWS001`/`PWS002` do not trip the spell checker.
@@ -136,6 +136,14 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 - `PWS002`: `& <script-var-or-path>.ps1 --` in `scripts/tests/*.ps1`.
 - `PWS003`: top-level `scripts/*.ps1` invokes `pwsh[.exe]|powershell[.exe] -File|-f <sibling>`. Nested scripts and tests are excluded for this rule.
 - `PWS004`: `pwsh[.exe]|powershell[.exe] -File|-f .githooks/<extensionless-hook>` in `*.sh`, `.githooks/*`, workflows, `scripts/**/*.ps1`, and `package.json`.
+- `PWS005`: a script-level array parameter without BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]`.
+- `PWS006`: `Start-Process -ArgumentList|-Args <array|@()|variable>`.
+
+`PWS005` and `PWS006` are AST rules rather than line scans, and they read `scripts/**/*.ps1` plus
+`.githooks/*.ps1`. Both skip files `git` reports as ignored: CI checks out tracked content only, so
+a violation in a developer's scratch script is one the repository cannot fix and CI can never see.
+An untracked file that is NOT ignored is still scanned -- a new script you forgot to stage is
+exactly the one a rule should catch -- and where `git` cannot answer, nothing is excluded.
 
 Detection beyond a single physical line:
 
@@ -223,15 +231,26 @@ Two caveats before converting a call site:
 - **A test whose fixtures live under a spaceless path cannot see this.** Put the space in the
   fixture root so the regression cannot come back quietly:
   `Join-Path $tempBase "my-test $(Get-Random)"`. Reverting the launch mechanism under that root
-  reddens six of nine scenarios in `test-validate-lint-error-codes.ps1`; the two that stay green are
-  the ones asserting only a non-zero exit.
+  reddens six of nine scenarios in `test-validate-lint-error-codes.ps1`; the three that stay green
+  are the ones asserting only a non-zero exit or the absence of a crash marker.
 
-**Not currently linted.** `PWS006` is the obvious home and is filed as
-[#572](https://github.com/Ambiguous-Interactive/unity-helpers/issues/572); until it exists this rule
-is documentation. The repository has exactly **two** tracked `Start-Process -ArgumentList` sites --
-`scripts/tests/test-validate-lint-error-codes.ps1`, which no longer uses it, and the installer
-above -- so check with `git ls-files` rather than a working-tree grep: `scripts/run-unity*` is
-gitignored, and an untracked local copy is not a call site this repository ships.
+**`PWS006` enforces this** (#572). It matches the command and its `-ArgumentList` as one thing in
+the AST -- matching them independently over the file is the mistake #556's CSS gate made -- and
+reports only the three shapes that can hold more than one argument: an array literal, an `@()`
+expression, and a variable, whose contents the linter cannot know. A string literal is quoted by
+its author and is left alone.
+
+Opt out **per site**, not per file, when the arguments really are fixed switches:
+
+```powershell
+# lint-pwsh-invocations: allow-start-process-argument-list every caller passes fixed switches
+# and -Wait waits on installer descendants in a way Process.WaitForExit does not.
+$process = Start-Process -FilePath $installerPath -ArgumentList $Arguments -Wait -PassThru
+```
+
+The marker may be a trailing comment on the invocation or a line of the comment block directly
+above it; a blank line ends that block, and a marker with no rationale is not an opt-out. The
+installer above is the one live site that carries it.
 
 ## Quick Reference
 

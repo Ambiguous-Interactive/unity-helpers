@@ -1267,6 +1267,156 @@ Write-Host $Path
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_Pws005ScalarStringNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 for a scalar [string] parameter. Exit: $($result.ExitCode). Output: $($result.Output)"
 
+    Write-Host "`n  Section: PWS006 (Start-Process -ArgumentList joins without quoting)" -ForegroundColor White
+
+    # PWS006 exists because the failure is INDISTINGUISHABLE from a real one: pwsh answers its
+    # usage banner and exits 64, so a caller asserting "the child failed" is satisfied by a child
+    # that never ran (#572). Every fixture below launches `installer.exe` rather than pwsh, so
+    # nothing here can be attributed to PWS001/PWS003 instead.
+
+    # --- Fail_Pws006ArrayLiteralArgumentList ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-array.ps1') -Value @'
+Set-StrictMode -Version Latest
+$target = "/tmp/dir with space/probe.txt"
+$process = Start-Process -FilePath 'installer.exe' -ArgumentList @('--input', $target) -Wait -PassThru
+Write-Host $process.ExitCode
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-array\.ps1'
+    Write-TestResult "Fail_Pws006ArrayLiteralArgumentList" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for an array literal -ArgumentList. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws006VariableArgumentList ---
+    # A variable is the shape all three live sites had. The script cannot know what is in it, so
+    # it is reported.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-variable.ps1') -Value @'
+Set-StrictMode -Version Latest
+$arguments = @('--input', "/tmp/dir with space/probe.txt")
+$process = Start-Process -FilePath 'installer.exe' -ArgumentList $arguments -Wait -PassThru
+Write-Host $process.ExitCode
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-variable\.ps1'
+    Write-TestResult "Fail_Pws006VariableArgumentList" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for a variable -ArgumentList. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws006ArgsAliasCovered ---
+    # -Args is the shipped alias, and PowerShell binds any unambiguous prefix, so a rule that
+    # only matched the full parameter name would miss it.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-alias.ps1') -Value @'
+Set-StrictMode -Version Latest
+$arguments = @('--input', 'probe.txt')
+$process = Start-Process -FilePath 'installer.exe' -Args $arguments -Wait -PassThru
+Write-Host $process.ExitCode
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-alias\.ps1'
+    Write-TestResult "Fail_Pws006ArgsAliasCovered" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for the -Args alias. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws006NoParamBlockStillScanned ---
+    # PWS005 skips a script with no param block. PWS006 must not: a launcher is exactly the kind
+    # of script that takes no parameters of its own.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-no-params.ps1') -Value @'
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-no-params\.ps1'
+    Write-TestResult "Fail_Pws006NoParamBlockStillScanned" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 in a script with no param block. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws006MarkerWithoutRationaleStillReported ---
+    # The marker requires a rationale, exactly as PWS003's does. A bare marker is not an opt-out.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-bare-marker.ps1') -Value @'
+# lint-pwsh-invocations: allow-start-process-argument-list
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-bare-marker\.ps1'
+    Write-TestResult "Fail_Pws006MarkerWithoutRationaleStillReported" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for a marker with no rationale. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Fail_Pws006DetachedMarkerStillReported ---
+    # A blank line ends the comment block, so a rationale further up is not attached to this call.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-detached-marker.ps1') -Value @'
+# lint-pwsh-invocations: allow-start-process-argument-list fixed switches only
+
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'launch-detached-marker\.ps1'
+    Write-TestResult "Fail_Pws006DetachedMarkerStillReported" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for a marker detached by a blank line. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws006MarkerInCommentBlockAbove ---
+    # The live opt-out shape: scripts/unity/bootstrap-windows-runner.ps1.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-marked.ps1') -Value @'
+# lint-pwsh-invocations: allow-start-process-argument-list every caller passes fixed switches
+# and -Wait waits on installer descendants in a way Process.WaitForExit does not.
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q', '/norestart') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws006MarkerInCommentBlockAbove" ($result.ExitCode -eq 0) "Expected exit 0 for an opted-out site. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws006TrailingMarkerOnSite ---
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-marked-trailing.ps1') -Value @'
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait # lint-pwsh-invocations: allow-start-process-argument-list fixed switches only
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws006TrailingMarkerOnSite" ($result.ExitCode -eq 0) "Expected exit 0 for a trailing marker on the invocation. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws006StringArgumentNotFlagged ---
+    # A single string literal is quoted by its author; the rule is about the join.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-string.ps1') -Value @'
+Start-Process -FilePath 'installer.exe' -ArgumentList '/q /norestart' -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws006StringArgumentNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 for a string -ArgumentList. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_Pws006ProcessStartInfoNotFlagged ---
+    # The fix the message names must itself be clean, or the rule cannot be complied with.
+    $root = New-FixtureRoot
+    Set-Content -LiteralPath (Join-Path $root 'scripts/launch-psi.ps1') -Value @'
+Set-StrictMode -Version Latest
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = 'installer.exe'
+[void]$psi.ArgumentList.Add('/q')
+[void]$psi.ArgumentList.Add('/tmp/dir with space/log.txt')
+$process = [System.Diagnostics.Process]::Start($psi)
+$process.WaitForExit()
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_Pws006ProcessStartInfoNotFlagged" ($result.ExitCode -eq 0) "Expected exit 0 for the ProcessStartInfo form. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    Write-Host "`n  Section: scan set (gitignored scripts are not the repository's)" -ForegroundColor White
+
+    # CI checks out tracked content only, so a gate that scans a developer's gitignored scratch
+    # script reports a violation the repository cannot fix and CI can never see. This container
+    # has one. Both halves are asserted: the same file, ignored and not ignored.
+
+    # --- Fail_UnignoredScriptIsScanned ---
+    $root = New-FixtureRoot
+    & git -C $root init --quiet 2>&1 | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'scripts/local-tool.ps1') -Value @'
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    $hasPws006 = $result.Output -match 'PWS006' -and $result.Output -match 'local-tool\.ps1'
+    Write-TestResult "Fail_UnignoredScriptIsScanned" ($result.ExitCode -ne 0 -and $hasPws006) "Expected exit != 0 + PWS006 for an untracked but unignored script. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+    # --- Pass_GitignoredScriptIsNotScanned ---
+    $root = New-FixtureRoot
+    & git -C $root init --quiet 2>&1 | Out-Null
+    Set-Content -LiteralPath (Join-Path $root '.gitignore') -Value 'scripts/local-*.ps1'
+    Set-Content -LiteralPath (Join-Path $root 'scripts/local-tool.ps1') -Value @'
+Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
+'@
+    $result = Invoke-LintInFixture $root
+    Write-TestResult "Pass_GitignoredScriptIsNotScanned" ($result.ExitCode -eq 0) "Expected exit 0 — a gitignored script is not the repository's to fix. Exit: $($result.ExitCode). Output: $($result.Output)"
+
 } finally {
     Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
 }

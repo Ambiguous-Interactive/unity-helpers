@@ -32,6 +32,18 @@
                PowerShell -File targets must be .ps1 files on every supported
                host; run the extensionless hook directly or invoke the
                companion `.githooks/<hook>.ps1` implementation.
+      PWS005 - A script declares an array parameter without BOTH a
+               `[Parameter(ValueFromRemainingArguments = $true)]` sibling and
+               `[CmdletBinding(PositionalBinding = $false)]`, so
+               `pwsh -File <script> -Paths a b` binds only 'a' and puts 'b' on
+               whichever parameter is positionally next -- silently.
+      PWS006 - `Start-Process -ArgumentList <array|variable>`. Start-Process
+               joins the array with spaces and adds NO quoting, so an argument
+               containing a space is split into separate arguments. Use
+               `System.Diagnostics.ProcessStartInfo.ArgumentList`, which quotes
+               each element. Opt-out per site: a comment marker
+               `# lint-pwsh-invocations: allow-start-process-argument-list <rationale>`
+               on the invocation's line or in the comment block directly above.
 
     Scanned paths:
       - *.sh
@@ -169,6 +181,13 @@ $pws004JoinPathVariableAssignmentPattern = '(?:^|[;\s])(?:\[[^\]]+\]\s*)?\$(?<na
 # should explain WHY subprocess isolation is needed — e.g. the called script
 # uses `exit` heavily, or it must run in a fresh PS session).
 $pws003AllowMarker = '^\s*#\s*lint-pwsh-invocations:\s*allow-subprocess-pwsh\s+\S+'
+
+# PWS006 opt-out marker. Per SITE rather than per file: a script may legitimately
+# launch one fixed-switch installer and still be wrong to hand a path to another.
+# Not anchored to the start of a line, so it may be a trailing comment on the
+# invocation itself or a line of the comment block directly above it. A rationale
+# is required, as it is for PWS003.
+$pws006AllowMarker = '#\s*lint-pwsh-invocations:\s*allow-start-process-argument-list\s+\S+'
 
 # Strips PowerShell string literals (double-quoted and single-quoted) from a
 # line, replacing each literal with a same-length sequence of spaces so that
@@ -974,7 +993,50 @@ foreach ($file in $targets) {
 # silently put 'b' in -InstallRoot. So the script must ALSO declare
 # [CmdletBinding(PositionalBinding = $false)], which is what routes every stray value to the
 # catch-all. Requiring only the sibling institutionalised a non-fix.
-foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File)) {
+# The PowerShell files this repository OWNS: everything under scripts/, plus the four
+# .githooks/<hook>.ps1 implementations, which are scripts that take arguments like any other.
+#
+# Ignored files are dropped. CI checks out tracked content only, so a gate that scans a
+# developer's gitignored scratch script reports a violation the repository cannot fix and CI
+# can never see -- and this container has one (`scripts/run-unity*` is in .gitignore).
+# Untracked-but-not-ignored files are still scanned: a new script you forgot to stage is
+# exactly the one a rule should catch. `git` failing (a fixture root is not a repository)
+# excludes nothing.
+function Get-OwnedPowerShellScript {
+    $candidates = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+    foreach ($scriptDirectory in @('scripts', '.githooks')) {
+        $absolute = Join-Path $repoRoot $scriptDirectory
+        if (-not (Test-Path -LiteralPath $absolute -PathType Container)) { continue }
+        foreach ($file in (Get-ChildItem -LiteralPath $absolute -Filter '*.ps1' -Recurse -File)) {
+            $candidates.Add($file) | Out-Null
+        }
+    }
+
+    $ignored = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    try {
+        $listed = & git -C $repoRoot ls-files --others --ignored --exclude-standard -- 'scripts' '.githooks' 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            foreach ($ignoredPath in @($listed)) {
+                if (-not [string]::IsNullOrWhiteSpace($ignoredPath)) {
+                    $ignored.Add($ignoredPath.Replace('\', '/')) | Out-Null
+                }
+            }
+        }
+    } catch {
+        # No git, or no repository. Scan everything rather than nothing.
+    }
+
+    $owned = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+    foreach ($candidate in $candidates) {
+        $candidateRelative = [System.IO.Path]::GetRelativePath($repoRoot, $candidate.FullName).Replace('\', '/')
+        if ($ignored.Contains($candidateRelative)) { continue }
+        $owned.Add($candidate) | Out-Null
+    }
+
+    return $owned
+}
+
+foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
     # '\' not '\\': in a PowerShell single-quoted string the latter is TWO backslashes, so a
     # Windows separator from GetRelativePath would pass through unchanged and the self-exclusion
     # against $selfRel would never match (Bugbot, PR #555).
@@ -995,6 +1057,87 @@ foreach ($scriptPath in (Get-ChildItem -LiteralPath (Join-Path $repoRoot 'script
         }) | Out-Null
         continue
     }
+    # PWS006: `Start-Process -ArgumentList <array>` joins the array with spaces and adds no
+    # quoting, so an argument containing a space is split into separate arguments. What makes it
+    # worth a rule rather than three fixes is the failure SHAPE: pwsh answers its usage banner and
+    # exits 64, so a caller asserting "the child failed" is satisfied by a child that never ran.
+    # Measured on #571's harness -- reverting one converted site under a spaced fixture root
+    # reddened six of nine scenarios and left three green (#572).
+    #
+    # Checked from the AST, not a regex: the parameter and its value have to be matched as ONE
+    # thing, and matching them independently over the file is the mistake #556's CSS gate made.
+    #
+    # Deliberately narrow. Only the three shapes that can hold more than one argument are
+    # reported -- an array literal, an @() expression, and a variable, whose contents this script
+    # cannot know. A string literal is quoted by its author and is left alone.
+    $startProcessAsts = $ast.FindAll(
+        {
+            param($node)
+            $node -is [System.Management.Automation.Language.CommandAst]
+        },
+        $true
+    )
+    $scriptLines = $null
+    foreach ($startProcessAst in $startProcessAsts) {
+        $commandName = $startProcessAst.GetCommandName()
+        if ([string]::IsNullOrEmpty($commandName)) { continue }
+        # `saps` is the shipped alias. `start` is one too, but it is also an ordinary word, and a
+        # rule that reports `start` reports things that are not Start-Process.
+        if ($commandName -notmatch '^(?:Start-Process|saps)$') { continue }
+
+        $elements = $startProcessAst.CommandElements
+        for ($elementIndex = 1; $elementIndex -lt $elements.Count; $elementIndex++) {
+            $element = $elements[$elementIndex]
+            if ($element -isnot [System.Management.Automation.Language.CommandParameterAst]) { continue }
+            # PowerShell binds any unambiguous prefix, so -Arg, -Args, -ArgumentL and
+            # -ArgumentList are all the same parameter. Start-Process has no other -Arg* one.
+            if ($element.ParameterName -notmatch '^(?i:arg)') { continue }
+
+            # `-ArgumentList:$values` puts the value on the parameter; `-ArgumentList $values`
+            # puts it in the next element.
+            $argumentValue = $element.Argument
+            if ($null -eq $argumentValue -and ($elementIndex + 1) -lt $elements.Count) {
+                $argumentValue = $elements[$elementIndex + 1]
+            }
+            if ($null -eq $argumentValue) { continue }
+
+            $isJoinedShape = (
+                $argumentValue -is [System.Management.Automation.Language.ArrayLiteralAst] -or
+                $argumentValue -is [System.Management.Automation.Language.ArrayExpressionAst] -or
+                $argumentValue -is [System.Management.Automation.Language.VariableExpressionAst]
+            )
+            if (-not $isJoinedShape) { continue }
+
+            $siteLine = $startProcessAst.Extent.StartLineNumber
+            if ($null -eq $scriptLines) {
+                $scriptLines = [System.IO.File]::ReadAllLines($scriptPath.FullName)
+            }
+
+            # The marker may be a trailing comment on the invocation itself, or a line of the
+            # comment block directly above it. A blank line ends the block: a rationale three
+            # paragraphs up is not attached to this call.
+            $isAllowed = $false
+            if ($siteLine -le $scriptLines.Length -and $scriptLines[$siteLine - 1] -match $pws006AllowMarker) {
+                $isAllowed = $true
+            }
+            for ($above = $siteLine - 2; 0 -le $above -and -not $isAllowed; $above--) {
+                $aboveLine = $scriptLines[$above]
+                if ($aboveLine -notmatch '^\s*#') { break }
+                if ($aboveLine -match $pws006AllowMarker) { $isAllowed = $true }
+            }
+            if ($isAllowed) { continue }
+
+            $violations.Add(@{
+                Path = $rel
+                Line = $siteLine
+                Code = 'PWS006'
+                Message = "Start-Process -$($element.ParameterName) is handed an array or a variable, which it joins with spaces and does NOT quote, so any element containing a space is split into separate arguments -- and the failure is a non-zero exit with a usage banner, which reads exactly like the child running and failing. Use System.Diagnostics.ProcessStartInfo.ArgumentList, which quotes each element. The conversion is not always mechanical: Start-Process -Wait also waits on the child's descendants, which Process.WaitForExit() does not. If the arguments are genuinely fixed switches, opt out on this site with a comment '# lint-pwsh-invocations: allow-start-process-argument-list <rationale>'. See .llm/skills/bash-pwsh-invocation.md."
+                Content = $startProcessAst.Extent.Text.Split("`n")[0].Trim()
+            }) | Out-Null
+            break
+        }
+    }
+
     # The SCRIPT's own param block, not a nested function's: a function parameter is bound in
     # process and never goes through -File argument binding.
     $paramBlock = $ast.ParamBlock
