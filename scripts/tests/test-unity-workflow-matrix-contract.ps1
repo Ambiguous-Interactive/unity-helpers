@@ -1116,10 +1116,15 @@ if (-not $runnerMaintenanceHasNoDeadForceSurface) {
 
 $runCiTestsClearsStaleCompilationCache = (
     $runCiTestsContent.Contains('function Clear-StaleUnityCompilationCache') -and
+    $runCiTestsContent.Contains('function Get-UnityCompilationSourceInventory') -and
+    $runCiTestsContent.Contains('function Write-UnityCompilationSourceInventoryMarker') -and
+    $runCiTestsContent.Contains("foreach (`$relativeRoot in @('Runtime', 'Editor', 'Styles', 'Tests'))") -and
     $runCiTestsContent.Contains('function Test-UnityCompilationCacheRepoRootMatch') -and
     $runCiTestsContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
     $runCiTestsContent.Contains('.unity-helpers-repo-root.txt') -and
+    $runCiTestsContent.Contains('.unity-helpers-source-inventory.txt') -and
     $runCiTestsContent.Contains('Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot') -and
+    $runCiTestsContent.Contains('Write-UnityCompilationSourceInventoryMarker -Project $ProjectPath -RepoRoot $RepoRoot') -and
     $runCiTestsContent.Contains("'Bee'") -and
     $runCiTestsContent.Contains("'ScriptAssemblies'") -and
     $runCiTestsContent.Contains("'PlayerScriptAssemblies'") -and
@@ -1136,6 +1141,8 @@ if (-not $runCiTestsClearsStaleCompilationCache) {
 try {
     foreach ($runCiTestsFunctionName in @(
             'Get-UnityCompilationCacheRepoRootComparison',
+            'Get-UnityCompilationSourceInventory',
+            'Write-UnityCompilationSourceInventoryMarker',
             'Test-UnityCompilationCacheRepoRootMatch',
             'Clear-StaleUnityCompilationCache'
         )) {
@@ -1154,7 +1161,10 @@ $compilationCacheDirectories = @(
 )
 
 function New-UnityCompilationCacheFixture {
-    param([string]$MarkerValue)
+    param(
+        [string]$MarkerValue,
+        [string]$SourceMarkerValue
+    )
 
     $root = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cache-contract-$PID-$(Get-Random)"
     $project = Join-Path $root 'project'
@@ -1180,11 +1190,17 @@ function New-UnityCompilationCacheFixture {
         Set-Content -LiteralPath $markerPath -Value $MarkerValue -Encoding utf8
     }
 
+    $sourceMarkerPath = Join-Path $library '.unity-helpers-source-inventory.txt'
+    if ($PSBoundParameters.ContainsKey('SourceMarkerValue')) {
+        Set-Content -LiteralPath $sourceMarkerPath -Value $SourceMarkerValue -Encoding utf8
+    }
+
     [pscustomobject]@{
         Root = $root
         Project = $project
         Library = $library
         MarkerPath = $markerPath
+        SourceMarkerPath = $sourceMarkerPath
         Sentinels = $sentinels
         PackageCacheSentinel = $packageCacheSentinel
     }
@@ -1273,8 +1289,13 @@ function Test-UnityCompilationCacheBehavior {
 
         $matchingMarkerRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cache-contract-root-$PID-$(Get-Random)"
         New-Item -ItemType Directory -Force -Path $matchingMarkerRoot | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $matchingMarkerRoot 'Runtime') | Out-Null
+        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Existing.cs') -Value 'class Existing {}' -Encoding utf8
         $matchingMarkerValue = Get-NormalizedContractRoot -Path $matchingMarkerRoot
-        $matchingMarkerFixture = New-UnityCompilationCacheFixture -MarkerValue $matchingMarkerValue
+        $matchingSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
+        $matchingMarkerFixture = New-UnityCompilationCacheFixture `
+            -MarkerValue $matchingMarkerValue `
+            -SourceMarkerValue $matchingSourceInventory
         $fixtures += $matchingMarkerFixture
         Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
         $matchingMarkerAfter = (Get-Content -LiteralPath $matchingMarkerFixture.MarkerPath -Raw).Trim()
@@ -1282,6 +1303,51 @@ function Test-UnityCompilationCacheBehavior {
             -not (Test-Path -LiteralPath $matchingMarkerFixture.PackageCacheSentinel -PathType Leaf) -or
             $matchingMarkerAfter -cne $matchingMarkerValue) {
             return 'matching marker must preserve compilation-cache sentinels, PackageCache, and marker contents'
+        }
+
+        # Content-only changes are normal on every commit and Unity tracks them itself. Preserve
+        # the warm compilation cache when the source path set is unchanged.
+        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Existing.cs') -Value 'class Existing { int Value; }' -Encoding utf8
+        Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
+        if (-not (Test-CompilationCacheSentinelsPresent -Fixture $matchingMarkerFixture)) {
+            return 'content-only source changes must preserve compilation caches to retain normal warm-build performance'
+        }
+
+        # A newly added source path is different: Unity 2022 can begin Bee compilation before a
+        # warm persistent project's AssetDatabase includes the new package file, leaving sibling
+        # sources to compile against a missing type. Invalidate only compilation outputs so the
+        # source graph is rebuilt while PackageCache remains warm.
+        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Added.cs') -Value 'class Added {}' -Encoding utf8
+        Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $matchingMarkerFixture) -or
+            -not (Test-Path -LiteralPath $matchingMarkerFixture.PackageCacheSentinel -PathType Leaf)) {
+            return 'an added package source path must invalidate compilation outputs while preserving PackageCache'
+        }
+
+        $storedInventoryBeforeSuccess = (Get-Content -LiteralPath $matchingMarkerFixture.SourceMarkerPath -Raw).Trim()
+        if ($storedInventoryBeforeSuccess -cne $matchingSourceInventory) {
+            return 'source-inventory invalidation must retain the last successful inventory until Unity succeeds'
+        }
+
+        # Model a failed Unity attempt recreating compilation outputs without valid NUnit
+        # results. Because the marker is still old, the retry must invalidate them again.
+        foreach ($directory in $script:compilationCacheDirectories) {
+            $retryCachePath = Join-Path $matchingMarkerFixture.Library $directory
+            New-Item -ItemType Directory -Force -Path $retryCachePath | Out-Null
+            Set-Content -LiteralPath (Join-Path $retryCachePath 'failed-attempt.txt') -Value 'stale' -Encoding utf8
+        }
+        Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $matchingMarkerFixture)) {
+            return 'a failed Unity attempt must leave the old inventory so the retry invalidates compilation outputs again'
+        }
+
+        Write-UnityCompilationSourceInventoryMarker `
+            -Project $matchingMarkerFixture.Project `
+            -RepoRoot $matchingMarkerRoot
+        $updatedInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
+        $storedInventoryAfterSuccess = (Get-Content -LiteralPath $matchingMarkerFixture.SourceMarkerPath -Raw).Trim()
+        if ($storedInventoryAfterSuccess -cne $updatedInventory) {
+            return 'a successful Unity run must persist the new normalized source inventory'
         }
 
         return ''

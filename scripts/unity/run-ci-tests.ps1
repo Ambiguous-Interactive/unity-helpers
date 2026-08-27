@@ -577,6 +577,56 @@ function Test-UnityCompilationCacheRepoRootMatch {
     return [string]::Equals($PreviousRepoRoot, $CurrentRepoRoot, $Comparison)
 }
 
+function Get-UnityCompilationSourceInventory {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $normalizedRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $sourceExtensions = @('.cs', '.asmdef', '.asmref', '.rsp')
+    $relativePaths = @(
+        # These are the source-bearing roots imported by the local UPM package and
+        # its testable assemblies. Samples~/ and Generator~/ are not imported into
+        # the ephemeral project and must not invalidate its warm compilation cache.
+        foreach ($relativeRoot in @('Runtime', 'Editor', 'Styles', 'Tests')) {
+            $sourceRoot = Join-Path $normalizedRoot $relativeRoot
+            if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+                continue
+            }
+
+            foreach ($source in @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)) {
+                if ($sourceExtensions -notcontains $source.Extension) {
+                    continue
+                }
+
+                $fullPath = [System.IO.Path]::GetFullPath($source.FullName)
+                $relativePath = $fullPath.Substring($normalizedRoot.Length).TrimStart(
+                    [System.IO.Path]::DirectorySeparatorChar,
+                    [System.IO.Path]::AltDirectorySeparatorChar
+                )
+                $relativePath.Replace([System.IO.Path]::DirectorySeparatorChar, '/')
+            }
+        }
+    )
+
+    return (@($relativePaths | Sort-Object -CaseSensitive) -join "`n")
+}
+
+function Write-UnityCompilationSourceInventoryMarker {
+    param(
+        [Parameter(Mandatory = $true)][string]$Project,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $libraryPath = Join-Path $Project 'Library'
+    New-Item -ItemType Directory -Force -Path $libraryPath | Out-Null
+    $sourceMarkerPath = Join-Path $libraryPath '.unity-helpers-source-inventory.txt'
+    $currentSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $RepoRoot
+    Set-Content -LiteralPath $sourceMarkerPath -Value $currentSourceInventory -Encoding utf8
+    Write-Host "Wrote successful source-inventory marker: $sourceMarkerPath"
+}
+
 function Clear-StaleUnityCompilationCache {
     param(
         [Parameter(Mandatory = $true)][string]$Project,
@@ -589,6 +639,7 @@ function Clear-StaleUnityCompilationCache {
     }
 
     $markerPath = Join-Path $libraryPath '.unity-helpers-repo-root.txt'
+    $sourceMarkerPath = Join-Path $libraryPath '.unity-helpers-source-inventory.txt'
     $currentRepoRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd(
         [System.IO.Path]::DirectorySeparatorChar,
         [System.IO.Path]::AltDirectorySeparatorChar
@@ -602,18 +653,45 @@ function Clear-StaleUnityCompilationCache {
         }
     }
 
-    if (Test-UnityCompilationCacheRepoRootMatch -PreviousRepoRoot $previousRepoRoot -CurrentRepoRoot $currentRepoRoot) {
+    $currentSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $RepoRoot
+    $previousSourceInventory = $null
+    if (Test-Path -LiteralPath $sourceMarkerPath -PathType Leaf) {
+        try {
+            $previousSourceInventory = (Get-Content -LiteralPath $sourceMarkerPath -Raw).Trim()
+        } catch {
+            $previousSourceInventory = $null
+        }
+    }
+
+    $repoRootMatches = Test-UnityCompilationCacheRepoRootMatch `
+        -PreviousRepoRoot $previousRepoRoot `
+        -CurrentRepoRoot $currentRepoRoot
+    $sourceInventoryMatches = (
+        $null -ne $previousSourceInventory -and
+        $previousSourceInventory -ceq $currentSourceInventory
+    )
+    if ($repoRootMatches -and $sourceInventoryMatches) {
         return
     }
 
-    $reason = if ([string]::IsNullOrWhiteSpace($previousRepoRoot)) {
-        'repo-root marker is missing or unreadable'
-    } else {
-        "repo-root marker changed from '$previousRepoRoot' to '$currentRepoRoot'"
+    $reasons = @()
+    if (-not $repoRootMatches) {
+        $reasons += if ([string]::IsNullOrWhiteSpace($previousRepoRoot)) {
+            'repo-root marker is missing or unreadable'
+        } else {
+            "repo-root marker changed from '$previousRepoRoot' to '$currentRepoRoot'"
+        }
+    }
+    if (-not $sourceInventoryMatches) {
+        $reasons += if ($null -eq $previousSourceInventory) {
+            'source-inventory marker is missing or unreadable'
+        } else {
+            'the package source path set changed'
+        }
     }
 
     Write-Host "::group::Unity compilation cache root check"
-    Write-Host "Clearing Unity compilation cache because $reason."
+    Write-Host "Clearing Unity compilation cache because $($reasons -join '; ')."
     foreach ($relativePath in @(
             'Bee',
             'ScriptAssemblies',
@@ -631,6 +709,7 @@ function Clear-StaleUnityCompilationCache {
 
     Set-Content -LiteralPath $markerPath -Value $currentRepoRoot -Encoding utf8
     Write-Host "Wrote repo-root marker: $markerPath"
+    Write-Host "Deferring the source-inventory marker until Unity produces valid passing NUnit results."
     Write-Host "::endgroup::"
 }
 
@@ -4020,6 +4099,10 @@ try {
         Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $logPath -Label "$UnityVersion $TestMode test compile"
         Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit
     }
+    # Commit the inventory only after the selected mode produced valid passing
+    # NUnit output. If import/compilation fails, the old or missing marker remains
+    # and the next attempt invalidates compilation outputs again.
+    Write-UnityCompilationSourceInventoryMarker -Project $ProjectPath -RepoRoot $RepoRoot
 } finally {
     # Deterministic RETURN of the seat on EVERY exit path (clean exit, throw, or a
     # kill that still unwinds this finally). The workflow if:always() step is the
