@@ -101,6 +101,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoScalarFormatterProvider.Register(new UInt64Formatter());
             WProtoScalarFormatterProvider.Register(new Int16Formatter());
             WProtoScalarFormatterProvider.Register(new UInt16Formatter());
+            WProtoScalarFormatterProvider.Register(new CharFormatter());
             WProtoScalarFormatterProvider.Register(new SByteFormatter());
             WProtoScalarFormatterProvider.Register(new ByteFormatter());
             WProtoScalarFormatterProvider.Register(new BooleanFormatter());
@@ -168,6 +169,35 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out ulong value) =>
                 reader.TryReadVarint64(out value);
+        }
+
+        /// <remarks>
+        /// A code unit rides the same plain varint the unsigned 32-bit shape uses, and a member at
+        /// its default is omitted exactly like zero -- which is why this lives beside the integer
+        /// scalars rather than with the wrapped base-class-library messages.
+        /// </remarks>
+        private sealed class CharFormatter : IWProtoScalarFormatter<char>
+        {
+            public int WireType => WProtoWireType.Varint;
+
+            public bool IsDefault(in char value) => value == '\0';
+
+            public int MeasureValue(in char value) => WProtoSizes.Varint32Size(value);
+
+            public bool WriteValue(ref WProtoWriter writer, in char value) =>
+                writer.TryWriteVarint32(value);
+
+            public bool TryReadValue(ref WProtoReader reader, out char value)
+            {
+                if (!reader.TryReadVarint32(out uint raw))
+                {
+                    value = default(char);
+                    return false;
+                }
+
+                value = (char)raw;
+                return true;
+            }
         }
 
         private sealed class Int16Formatter : IWProtoScalarFormatter<short>

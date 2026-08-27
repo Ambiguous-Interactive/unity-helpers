@@ -42,6 +42,11 @@ outputs:
 runs:
   using: composite
   steps:
+    # The return-log digest is computed but deliberately not passed to the classifier yet: the
+    # newer central classifier requires it AND fails closed on the benign post-work shutdown crash
+    # that truncates every Unity 2021-2022 leg's return log here (issue #356). Both digest outputs
+    # and this comment are the groundwork for that bump, so whoever retries it starts from code
+    # that is half-done on purpose rather than from a red matrix.
     - name: Resolve prior return metadata
       id: prior_metadata
       shell: pwsh
@@ -95,13 +100,12 @@ runs:
     - name: Classify prior exact return evidence
       id: classify_prior
       if: ${{ steps.prior_metadata.outputs.prior-ready == 'true' }}
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
         return-command-completed: "true"
         return-exit-code: ${{ steps.prior_metadata.outputs.return-exit-code }}
         evidence-capture-complete: "true"
-        return-log-digest: ${{ steps.prior_metadata.outputs.return-log-digest }}
 
     - name: Capture redundant Unity return evidence
       id: capture_return
@@ -169,11 +173,10 @@ runs:
     - name: Classify redundant return evidence
       id: classify_return
       if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.capture_return.outputs.return-log-path }}
         return-command-completed: ${{ steps.capture_return.outputs.return-command-completed }}
         return-exit-code: ${{ steps.capture_return.outputs.return-exit-code }}
         evidence-capture-complete: ${{ steps.capture_return.outputs.evidence-capture-complete }}
         supplemental-evidence-paths: ${{ steps.prior_metadata.outputs.supplemental-evidence-paths }}
-        return-log-digest: ${{ steps.capture_return.outputs.return-log-digest }}

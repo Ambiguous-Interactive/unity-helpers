@@ -627,7 +627,7 @@ jobs:
 
       - name: Require confirmed Unity cleanup
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
           classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
@@ -984,7 +984,7 @@ jobs:
 
       - name: Require confirmed Unity cleanup
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
           classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
@@ -1327,7 +1327,7 @@ jobs:
 
       - name: Require confirmed Unity cleanup
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
           classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
@@ -1507,7 +1507,7 @@ jobs:
 
       - name: Require confirmed Unity cleanup
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
           classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}

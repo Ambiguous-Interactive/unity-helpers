@@ -226,18 +226,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         /// Produces the exact-sized result and returns the scratch storage to its pool.
         /// </summary>
         /// <returns>The elements collected, in order; an empty array when none were.</returns>
+        /// <remarks>
+        /// The copy happens BEFORE the pooled buffer goes back: a reference-typed buffer may be
+        /// cleared on return, and copying from a returned buffer would read whatever the pool did
+        /// to it -- measured in CI as keys deserializing to nulls.
+        /// </remarks>
         public T[] Finish()
         {
-            T[] items = _items;
             int count = _count;
-            Dispose();
             if (count == 0)
             {
+                Dispose();
                 return Array.Empty<T>();
             }
 
+            T[] items = _items;
             T[] exact = new T[count];
             Array.Copy(items, exact, count);
+            Dispose();
             return exact;
         }
 

@@ -332,17 +332,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnUnregisteredTypeReportsWhichTypeAndHowToFixIt()
         {
-            Assert.IsFalse(WProtoFormatterProvider.TryGet(out IWProtoFormatter<Uri> unregistered));
+            // Uri gained a built-in formatter and left this club; Type is the standing resident,
+            // refused because its bytes would be a runtime-bound assembly-qualified name.
+            Assert.IsFalse(WProtoFormatterProvider.TryGet(out IWProtoFormatter<Type> unregistered));
             Assert.IsTrue(unregistered == null);
 
             InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
-                WProtoFormatterProvider.Get<Uri>()
+                WProtoFormatterProvider.Get<Type>()
             );
 
             // The whole reason this throws instead of returning null: an opaque
             // ExecutionEngineException from IL2CPP names nothing.
-            Assert.IsTrue(error.Message.Contains(typeof(Uri).FullName));
+            Assert.IsTrue(error.Message.Contains(typeof(Type).FullName));
             Assert.IsTrue(error.Message.Contains(nameof(WProtoFormatterProvider)));
+        }
+
+        [Test]
+        public void CharClosesThroughTheRuntimeScalarPath()
+        {
+            // Generated contracts inline the char primitives directly; this closure exercises the
+            // registry a raw-collection root takes, which is where an unregistered char used to
+            // refuse silently.
+            Assert.IsTrue(WProtoScalarFormatterProvider.TryGet(out IWProtoScalarFormatter<char> _));
+            Assert.IsTrue(WProtoGeneric<char>.CanEncode);
+            Assert.AreEqual(WProtoWireType.Varint, WProtoGeneric<char>.WireType);
+
+            byte[] buffer = new byte[16];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(WProtoGeneric<char>.WriteField(ref writer, 3, 'é'));
+            Assert.AreEqual(5, writer.Position);
+            Assert.AreEqual("18E901", ToHex(buffer[..writer.Position]));
         }
 
         [TestCase(0, true)]

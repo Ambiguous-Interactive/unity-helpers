@@ -34,8 +34,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </para>
     /// </remarks>
     public sealed class IntMap<TValue>
-        : IEnumerable<KeyValuePair<int, TValue>>,
-            IReadOnlyCollection<KeyValuePair<int, TValue>>
+        : IReadOnlyDictionary<int, TValue>,
+            IEnumerable<KeyValuePair<int, TValue>>
     {
         /// <summary>The smallest key a caller may store; everything lower names a slot state.</summary>
         public const int MinimumAllowedKey = int.MinValue + 2;
@@ -84,7 +84,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 );
             }
 
-            Rebuild(SmallestSufficientPower(initialCapacity));
+            int power = SmallestSufficientPower(initialCapacity);
+            if ((long)initialCapacity > (1L << power) / 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(initialCapacity),
+                    "Requested capacity exceeds what an int-keyed table can address."
+                );
+            }
+
+            Rebuild(power);
         }
 
         /// <summary>Gets how many live entries the map holds.</summary>
@@ -202,18 +211,73 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return true;
         }
 
+        /// <summary>Gets the stored keys, in table order.</summary>
+        public IEnumerable<int> Keys
+        {
+            get
+            {
+                for (int index = 0; index < _keys.Length; ++index)
+                {
+                    int stored = _keys[index];
+                    if (MinimumAllowedKey <= stored)
+                    {
+                        yield return stored;
+                    }
+                }
+            }
+        }
+
+        /// <summary>Gets the stored values, in table order.</summary>
+        public IEnumerable<TValue> Values
+        {
+            get
+            {
+                for (int index = 0; index < _keys.Length; ++index)
+                {
+                    if (MinimumAllowedKey <= _keys[index])
+                    {
+                        yield return _values[index];
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="key"/> is currently stored.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns><c>false</c> when absent or below <see cref="MinimumAllowedKey"/>.</returns>
+        public bool ContainsKey(int key)
+        {
+            return TryGet(key, out _);
+        }
+
         /// <summary>Drops every entry, keeping the current table.</summary>
+        /// <remarks>
+        /// The keys array holds slot-state markers even while idle, so an array-wide zero fill would
+        /// read back as tens of thousands of live key-zero entries. Every slot goes back to
+        /// <see cref="EmptySlot"/> explicitly.
+        /// </remarks>
         public void Clear()
         {
             if (_count != 0 || _tombstones != 0)
             {
-                Array.Clear(_keys, 0, _keys.Length);
+                for (int index = 0; index < _keys.Length; ++index)
+                {
+                    _keys[index] = EmptySlot;
+                }
+
                 Array.Clear(_values, 0, _values.Length);
             }
 
             _count = 0;
             _tombstones = 0;
             ++_version;
+        }
+
+        bool IReadOnlyDictionary<int, TValue>.TryGetValue(int key, out TValue value)
+        {
+            return TryGet(key, out value);
         }
 
         /// <inheritdoc />
@@ -398,9 +462,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private static int SmallestSufficientPower(int capacityHint)
         {
             // The smallest power whose half exceeds the hint, so the hint itself rests below the
-            // load factor and the first insert never triggers a resize.
+            // load factor and the first insert never triggers a resize. Bounded by the table
+            // maximum: past it, a 32-bit shift wraps and this loop would never end.
             int power = MinimumTablePower;
-            while (0 < capacityHint && (long)(1 << power) / 2 <= (long)capacityHint)
+            while (
+                MaximumTablePower > power
+                && 0 < (long)capacityHint
+                && (long)(1 << power) / 2 <= (long)capacityHint
+            )
             {
                 ++power;
             }
@@ -465,6 +534,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             /// <inheritdoc />
             public void Reset()
             {
+                if (_version != _map._version)
+                {
+                    throw new InvalidOperationException("The map changed during enumeration.");
+                }
+
                 _slot = 0;
                 _current = default(KeyValuePair<int, TValue>);
             }
