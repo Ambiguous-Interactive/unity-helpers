@@ -53,16 +53,27 @@
     // own GIT_ASKPASS for the git processes it launches, so the editor's UI is unaffected.
     "GIT_ASKPASS": "${containerWorkspaceFolder}/scripts/git-askpass-refuse.sh"
   },
+  // Runs on the HOST before Dev Containers resolves the container. After an
+  // unclean Docker Desktop / WSL2 restart, the previous container can be left
+  // as a zombie (metadata exists, `docker exec` fails with an OCI setns
+  // error), which makes every subsequent "Reopen in Container" abort with
+  // "An error occurred setting up the container." Removing the unusable
+  // container lets Dev Containers recreate it from the cached image. The
+  // script is best-effort: it exits 0 even when docker is missing.
+  "initializeCommand": "pwsh -NoProfile -File .devcontainer/initialize-host.ps1 || exit 0",
   // Run any post-create commands (see post-create.sh for details)
   // 1. Fix volume mount permissions (Docker named volumes are root-owned)
   // 2. Restore .NET tools (CSharpier, etc.)
   // 3. Install npm dependencies (markdownlint-cli, cspell, prettier)
-  // 4. Install/update OpenAI Codex CLI (latest via npm)
-  // 5. Install git hooks
-  // 6. Mark workspace as safe directory
-  // 7. Pre-pull Unity Docker image (background, non-blocking)
+  // 4. Install/update AI coding agent CLIs (codex, opencode, nanocoder — latest via npm)
+  // 5. Check Codex authentication state (advisory)
+  // 6. Sync Unity MCP client configs from .env.local (all agents)
+  // 7. Install git hooks
+  // 8. Mark workspace as safe directory
+  // 9. Pre-pull Unity Docker image (background, non-blocking)
   "postCreateCommand": "bash .devcontainer/post-create.sh",
-  // Runs on every container start to verify/repair Codex CLI availability.
+  // Runs on every container start to verify/repair agent CLI availability and
+  // re-assert volume ownership Docker may have reset (keeps `npm install` sudo-free).
   "postStartCommand": "bash .devcontainer/post-start.sh",
   // Runs after the Dev Containers extension finishes attaching, which is the ONLY point guaranteed
   // to be after it copies the host's git config in. That copy is what re-adds a second

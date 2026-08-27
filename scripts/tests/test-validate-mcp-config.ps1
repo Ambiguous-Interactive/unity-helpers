@@ -84,12 +84,13 @@ function Invoke-Validator {
   return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($out -join "`n") }
 }
 
-# Gitignore that covers all four machine-local config paths (mirrors the real repo).
+# Gitignore that covers all machine-local config paths (mirrors the real repo).
 $cleanGitIgnore = @"
 .mcp.json
 .cursor/mcp.json
 .vscode/**
 .codex/*
+opencode.json
 .env.local
 "@
 
@@ -184,9 +185,49 @@ try {
 }
 finally { Remove-Item -Recurse -Force -LiteralPath $f6 -ErrorAction SilentlyContinue }
 
-# --- Test 7: regression smoke test against the real repo ---
-$r7 = Invoke-Validator -FixtureRoot $repoRoot
-Write-TestResult 'Real repository passes (exit 0)' ($r7.ExitCode -eq 0) $r7.Output
+# --- Test 7: valid OpenCode config passes ---
+$validOpencode = '{ "mcp": { "unity-mcp-remote": { "type": "remote", "url": "http://192.168.1.33:9003/mcp", "enabled": true } } }'
+$f7 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
+  '.mcp.json'             = $validMcpJson
+  'opencode.json'         = $validOpencode
+  'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
+}
+try {
+  $r7 = Invoke-Validator -FixtureRoot $f7
+  Write-TestResult 'Valid OpenCode config passes (exit 0)' ($r7.ExitCode -eq 0) $r7.Output
+}
+finally { Remove-Item -Recurse -Force -LiteralPath $f7 -ErrorAction SilentlyContinue }
+
+# --- Test 8: tracked OpenCode config -> UNH-MCP-TRACKED ---
+$f8 = New-McpFixture -GitIgnore ".mcp.json`n.cursor/mcp.json`n.vscode/**`n.codex/*" -Files @{
+  '.mcp.json'             = $validMcpJson
+  'opencode.json'         = $validOpencode
+  'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
+}
+try {
+  $r8 = Invoke-Validator -FixtureRoot $f8
+  Write-TestResult 'Untracked opencode.json -> UNH-MCP-TRACKED' (($r8.ExitCode -ne 0) -and ($r8.Output -match 'UNH-MCP-TRACKED') -and ($r8.Output -match 'opencode\.json')) $r8.Output
+}
+finally { Remove-Item -Recurse -Force -LiteralPath $f8 -ErrorAction SilentlyContinue }
+
+# --- Test 9: OpenCode config with wrong path -> UNH-MCP-INVALID ---
+$f9 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
+  '.mcp.json'             = $validMcpJson
+  'opencode.json'         = '{ "mcp": { "unity-mcp-remote": { "type": "remote", "url": "http://192.168.1.33:9003/wrong", "enabled": true } } }'
+  'scripts/mcp/README.md' = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
+}
+try {
+  $r9 = Invoke-Validator -FixtureRoot $f9
+  Write-TestResult 'Bad OpenCode url -> UNH-MCP-INVALID' (($r9.ExitCode -ne 0) -and ($r9.Output -match 'UNH-MCP-INVALID')) $r9.Output
+}
+finally { Remove-Item -Recurse -Force -LiteralPath $f9 -ErrorAction SilentlyContinue }
+
+# --- Test 10: regression smoke test against the real repo ---
+$r10 = Invoke-Validator -FixtureRoot $repoRoot
+Write-TestResult 'Real repository passes (exit 0)' ($r10.ExitCode -eq 0) $r10.Output
 
 Write-Host ''
 Write-Host "Passed: $script:TestsPassed  Failed: $script:TestsFailed" -ForegroundColor White

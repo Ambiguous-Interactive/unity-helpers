@@ -6,11 +6,15 @@
 // answers the MCP handshake and the GetProjectRoot tool call, and assert on the classification.
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  clientConfigPaths,
+  configure,
   findUnityProjectRoot,
   isUnityProjectRoot,
   mergeCodexToml,
@@ -253,6 +257,101 @@ test("the Codex merge replaces the existing table rather than adding a second", 
   assert.match(merged, /\[mcp_servers\.unity_mcp_remote\]/);
   assert.match(merged, /9007/);
   assert.doesNotMatch(merged, /9003/);
+});
+
+// ── configure(): every supported agent client ────────────────────────────────
+// OpenCode and nanocoder must be configured by the same `npm run
+// unity:mcp:configure` run as Claude Code, Cursor, VS Code, and Codex, or the
+// "the bridge is configured" claim silently covers only some of the agents.
+
+function newTempRepoRoot() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "unity-mcp-configure-"));
+}
+
+function configuredEndpoint() {
+  return { host: "host.docker.internal", port: 9007, endpointPath: "/mcp" };
+}
+
+test("clientConfigPaths includes the OpenCode config", () => {
+  const repoRoot = path.resolve("/repo");
+  const paths = clientConfigPaths(repoRoot);
+  assert.equal(paths.opencode, path.join(repoRoot, "opencode.json"));
+});
+
+test("configure writes an OpenCode remote entry that enables the server", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    const token = "t".repeat(32);
+    const { url, written } = configure({ repoRoot, bearerToken: token }, configuredEndpoint());
+    assert.ok(written.includes(path.join(repoRoot, "opencode.json")));
+    assert.equal(url, "http://host.docker.internal:9007/mcp");
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, "opencode.json"), "utf8"));
+    const server = document.mcp["unity-mcp-remote"];
+    assert.equal(server.type, "remote");
+    assert.equal(server.url, "http://host.docker.internal:9007/mcp");
+    assert.equal(server.enabled, true);
+    assert.equal(server.headers.Authorization, `Bearer ${token}`);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("configure merges into an existing OpenCode config without clobbering other servers", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    fs.writeFileSync(
+      path.join(repoRoot, "opencode.json"),
+      JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          mcp: { context7: { type: "remote", url: "https://mcp.context7.com/mcp" } }
+        },
+        null,
+        2
+      )
+    );
+    configure({ repoRoot, bearerToken: "t".repeat(32) }, configuredEndpoint());
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, "opencode.json"), "utf8"));
+    assert.ok(document.mcp.context7, "existing server must survive");
+    assert.ok(document.mcp["unity-mcp-remote"], "unity server must be added");
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+// Nanocoder reads the same project-root .mcp.json as Claude Code but selects
+// the HTTP transport with `transport` instead of `type`, so the shared entry
+// has to carry both keys: Claude Code reads `type`, nanocoder reads
+// `transport`, and each ignores the other's key.
+test("the shared .mcp.json entry carries both the Claude Code and nanocoder transport keys", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    const token = "t".repeat(32);
+    configure({ repoRoot, bearerToken: token }, configuredEndpoint());
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, ".mcp.json"), "utf8"));
+    const server = document.mcpServers["unity-mcp-remote"];
+    assert.equal(server.type, "http");
+    assert.equal(server.transport, "http");
+    assert.equal(server.url, "http://host.docker.internal:9007/mcp");
+    assert.equal(server.headers.Authorization, `Bearer ${token}`);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("Cursor and VS Code configs keep only the standard type key", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    configure({ repoRoot, bearerToken: "t".repeat(32) }, configuredEndpoint());
+    const cursor = JSON.parse(fs.readFileSync(path.join(repoRoot, ".cursor", "mcp.json"), "utf8"));
+    assert.equal(cursor.mcpServers["unity-mcp-remote"].type, "http");
+    assert.equal(cursor.mcpServers["unity-mcp-remote"].transport, undefined);
+    const vscode = JSON.parse(fs.readFileSync(path.join(repoRoot, ".vscode", "mcp.json"), "utf8"));
+    assert.equal(vscode.servers["unity-mcp-remote"].type, "http");
+    assert.equal(vscode.servers["unity-mcp-remote"].transport, undefined);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
 });
 
 // This repository is a PACKAGE at <project>/Packages/com.wallstop-studios.unity-helpers, not a

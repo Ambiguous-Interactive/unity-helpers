@@ -73,11 +73,16 @@ there and only the pairing is wrong, so overwriting the config would bake in the
 
 These carry a per-developer endpoint and a bearer token and are all gitignored:
 
-- `.mcp.json` (Claude Code)
+- `.mcp.json` (Claude Code **and** nanocoder — see the note below)
 - `.cursor/mcp.json`
 - `.vscode/mcp.json`
 - `.codex/config.toml`
+- `opencode.json` (OpenCode)
 - `.env.local` (the source of the values above)
+
+Claude Code and nanocoder both load `.mcp.json` from the project root, but they select the HTTP
+transport with different keys: Claude Code reads `type`, nanocoder reads `transport`. The generated
+entry carries **both** keys, so one file configures both agents; each ignores the other's key.
 
 `npm run validate:mcp-config` fails if any of them stops being ignored, if a present config is
 malformed or does not target `/mcp`, or if these docs reference a script that does not exist.

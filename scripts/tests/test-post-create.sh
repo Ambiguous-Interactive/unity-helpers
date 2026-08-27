@@ -52,7 +52,7 @@ trap cleanup_temp_dirs EXIT
 # Files under test
 POST_CREATE="$REPO_ROOT/.devcontainer/post-create.sh"
 POST_START="$REPO_ROOT/.devcontainer/post-start.sh"
-INSTALL_CODEX="$REPO_ROOT/.devcontainer/install-codex.sh"
+INSTALL_AGENT_CLIS="$REPO_ROOT/.devcontainer/install-agent-clis.sh"
 CODEX_LOGIN_WRAPPER="$REPO_ROOT/scripts/codex-login.sh"
 CODEX_YOLO_WRAPPER="$REPO_ROOT/scripts/codex-yolo.sh"
 DEVCONTAINER_JSON="$REPO_ROOT/.devcontainer/devcontainer.json"
@@ -165,10 +165,10 @@ if [[ ! -f "$POST_START" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$INSTALL_CODEX" ]]; then
-    fail "install-codex.sh exists" "File not found: .devcontainer/install-codex.sh"
+if [[ ! -f "$INSTALL_AGENT_CLIS" ]]; then
+    fail "install-agent-clis.sh exists" "File not found: .devcontainer/install-agent-clis.sh"
     echo ""
-    echo -e "${RED}Cannot continue without install-codex.sh${NC}"
+    echo -e "${RED}Cannot continue without install-agent-clis.sh${NC}"
     exit 1
 fi
 
@@ -226,7 +226,7 @@ echo -e "${BLUE}Checking error handling...${NC}"
 SCRIPT_CONTRACTS=(
     "$POST_CREATE|post-create.sh"
     "$POST_START|post-start.sh"
-    "$INSTALL_CODEX|install-codex.sh"
+    "$INSTALL_AGENT_CLIS|install-agent-clis.sh"
     "$CODEX_LOGIN_WRAPPER|codex-login.sh"
     "$CODEX_YOLO_WRAPPER|codex-yolo.sh"
 )
@@ -265,11 +265,11 @@ else
         "postStartCommand should call bash .devcontainer/post-start.sh"
 fi
 
-if grep -q 'install-codex\.sh" --force-latest-check' "$POST_CREATE"; then
-    pass "post-create.sh forces latest Codex install check"
+if grep -q 'install-agent-clis\.sh" --force-latest-check' "$POST_CREATE"; then
+    pass "post-create.sh forces latest agent CLI install check"
 else
-    fail "post-create.sh forces latest Codex install check" \
-        "post-create.sh should call install-codex.sh --force-latest-check"
+    fail "post-create.sh forces latest agent CLI install check" \
+        "post-create.sh should call install-agent-clis.sh --force-latest-check"
 fi
 
 if grep -q 'CODEX_VERSION_TIMEOUT_SECONDS' "$POST_CREATE"; then
@@ -279,11 +279,11 @@ else
         "Expected CODEX_VERSION_TIMEOUT_SECONDS in post-create.sh"
 fi
 
-if grep -qE 'timeout[[:space:]]+"\$\{CODEX_VERSION_TIMEOUT_SECONDS\}"[[:space:]]+codex --version' "$POST_CREATE"; then
+if grep -qE 'timeout[[:space:]]+"\$\{CODEX_VERSION_TIMEOUT_SECONDS\}"[[:space:]]+"\$agent_bin" --version' "$POST_CREATE"; then
     pass "post-create.sh bounds codex --version check with timeout"
 else
     fail "post-create.sh bounds codex --version check with timeout" \
-        "Expected timeout-wrapped codex --version in post-create.sh"
+        "Expected timeout-wrapped agent_bin --version in post-create.sh"
 fi
 
 if grep -q 'CODEX_LOGIN_STATUS_TIMEOUT_SECONDS' "$POST_CREATE"; then
@@ -300,11 +300,11 @@ else
         "Expected timeout-wrapped codex login status in post-create.sh"
 fi
 
-if grep -q 'install-codex\.sh' "$POST_START"; then
-    pass "post-start.sh calls install-codex.sh"
+if grep -q 'install-agent-clis\.sh' "$POST_START"; then
+    pass "post-start.sh calls install-agent-clis.sh"
 else
-    fail "post-start.sh calls install-codex.sh" \
-        "post-start.sh should call install-codex.sh for runtime repair"
+    fail "post-start.sh calls install-agent-clis.sh" \
+        "post-start.sh should call install-agent-clis.sh for runtime repair"
 fi
 
 if grep -q 'CODEX_VERSION_TIMEOUT_SECONDS' "$POST_START"; then
@@ -314,70 +314,84 @@ else
         "Expected CODEX_VERSION_TIMEOUT_SECONDS in post-start.sh"
 fi
 
-if grep -qE 'timeout[[:space:]]+"\$\{CODEX_VERSION_TIMEOUT_SECONDS\}"[[:space:]]+codex --version' "$POST_START"; then
+if grep -qE 'timeout[[:space:]]+"\$\{CODEX_VERSION_TIMEOUT_SECONDS\}"[[:space:]]+"\$agent_bin" --version' "$POST_START"; then
     pass "post-start.sh bounds codex --version check with timeout"
 else
     fail "post-start.sh bounds codex --version check with timeout" \
-        "Expected timeout-wrapped codex --version in post-start.sh"
+        "Expected timeout-wrapped agent_bin --version in post-start.sh"
 fi
 
-if grep -q '@openai/codex' "$INSTALL_CODEX"; then
-    pass "install-codex.sh targets @openai/codex"
+if grep -q '@openai/codex' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh targets @openai/codex"
 else
-    fail "install-codex.sh targets @openai/codex" \
-        "install-codex.sh must install @openai/codex"
+    fail "install-agent-clis.sh targets @openai/codex" \
+        "install-agent-clis.sh must install @openai/codex"
 fi
 
-if grep -q 'NPM_CONFIG_PREFIX' "$INSTALL_CODEX"; then
-    pass "install-codex.sh uses user-global npm prefix"
+if grep -q 'opencode-ai' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh targets opencode-ai"
 else
-    fail "install-codex.sh uses user-global npm prefix" \
-        "Expected NPM_CONFIG_PREFIX usage in install-codex.sh"
+    fail "install-agent-clis.sh targets opencode-ai" \
+        "install-agent-clis.sh must install opencode-ai"
 fi
 
-if grep -Eq 'timeout[[:space:]]+"\$\{VIEW_TIMEOUT_SECONDS\}"[[:space:]]+npm view' "$INSTALL_CODEX"; then
-    pass "install-codex.sh uses timeout for npm latest lookup"
+if grep -q '@nanocollective/nanocoder' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh targets @nanocollective/nanocoder"
 else
-    fail "install-codex.sh uses timeout for npm latest lookup" \
+    fail "install-agent-clis.sh targets @nanocollective/nanocoder" \
+        "install-agent-clis.sh must install @nanocollective/nanocoder"
+fi
+
+if grep -q 'NPM_CONFIG_PREFIX' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh uses user-global npm prefix"
+else
+    fail "install-agent-clis.sh uses user-global npm prefix" \
+        "Expected NPM_CONFIG_PREFIX usage in install-agent-clis.sh"
+fi
+
+if grep -Eq 'timeout[[:space:]]+"\$\{VIEW_TIMEOUT_SECONDS\}"[[:space:]]+npm view' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh uses timeout for npm latest lookup"
+else
+    fail "install-agent-clis.sh uses timeout for npm latest lookup" \
         "Expected timeout wrapping npm view"
 fi
 
-if grep -Eq 'timeout[[:space:]]+"\$\{INSTALL_TIMEOUT_SECONDS\}"[[:space:]]+npm install -g' "$INSTALL_CODEX"; then
-    pass "install-codex.sh uses timeout for npm install"
+if grep -Eq 'timeout[[:space:]]+"\$\{INSTALL_TIMEOUT_SECONDS\}"[[:space:]]+npm install -g' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh uses timeout for npm install"
 else
-    fail "install-codex.sh uses timeout for npm install" \
+    fail "install-agent-clis.sh uses timeout for npm install" \
         "Expected timeout wrapping npm install"
 fi
 
-if grep -q 'for attempt in 1 2 3' "$INSTALL_CODEX"; then
-    pass "install-codex.sh retries transient failures"
+if grep -q 'for attempt in 1 2 3' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh retries transient failures"
 else
-    fail "install-codex.sh retries transient failures" \
-        "Expected three-attempt retry loop in install-codex.sh"
+    fail "install-agent-clis.sh retries transient failures" \
+        "Expected three-attempt retry loop in install-agent-clis.sh"
 fi
 
-if grep -q 'sudo npm install' "$INSTALL_CODEX"; then
-    fail "install-codex.sh avoids sudo npm install" \
-        "install-codex.sh should use writable user prefix instead of sudo"
+if grep -q 'sudo npm install' "$INSTALL_AGENT_CLIS"; then
+    fail "install-agent-clis.sh avoids sudo npm install" \
+        "install-agent-clis.sh should use writable user prefix instead of sudo"
 else
-    pass "install-codex.sh avoids sudo npm install"
+    pass "install-agent-clis.sh avoids sudo npm install"
 fi
 
-if grep -q 'hash -r' "$INSTALL_CODEX"; then
-    pass "install-codex.sh refreshes command cache after install"
+if grep -q 'hash -r' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh refreshes command cache after install"
 else
-    fail "install-codex.sh refreshes command cache after install" \
-        "Expected hash -r usage in install-codex.sh"
+    fail "install-agent-clis.sh refreshes command cache after install" \
+        "Expected hash -r usage in install-agent-clis.sh"
 fi
 
-if grep -q 'codex-install-failure-state' "$POST_START"; then
-    pass "post-start.sh tracks Codex failure state"
+if grep -q 'agent-clis-install-failure-state' "$POST_START"; then
+    pass "post-start.sh tracks agent CLI failure state"
 else
-    fail "post-start.sh tracks Codex failure state" \
-        "Expected codex-install-failure-state usage in post-start.sh"
+    fail "post-start.sh tracks agent CLI failure state" \
+        "Expected agent-clis-install-failure-state usage in post-start.sh"
 fi
 
-if grep -q 'Skipping Codex retry' "$POST_START"; then
+if grep -q 'Skipping agent CLI retry' "$POST_START"; then
     pass "post-start.sh defers retries after repeated failures"
 else
     fail "post-start.sh defers retries after repeated failures" \

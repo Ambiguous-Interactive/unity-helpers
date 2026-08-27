@@ -1163,7 +1163,8 @@ export function clientConfigPaths(repoRoot) {
     claudeCode: path.join(repoRoot, ".mcp.json"),
     cursor: path.join(repoRoot, ".cursor", "mcp.json"),
     vscode: path.join(repoRoot, ".vscode", "mcp.json"),
-    codex: path.join(repoRoot, ".codex", "config.toml")
+    codex: path.join(repoRoot, ".codex", "config.toml"),
+    opencode: path.join(repoRoot, "opencode.json")
   };
 }
 
@@ -1171,15 +1172,24 @@ export function configure(inputOptions, endpoint, beforeCommit) {
   const options = ensureBearerToken(inputOptions);
   const url = endpointUrl(endpoint);
   const server = { type: "http", url, headers: { Authorization: `Bearer ${options.bearerToken}` } };
+  // Nanocoder loads the same project-root .mcp.json as Claude Code but selects
+  // the HTTP transport with `transport` rather than `type` (its loader reads
+  // `transport` and ignores unknown keys; Claude Code mirrors that for
+  // `type`). One entry carrying both keys configures both agents.
+  const sharedFileServer = { type: "http", transport: "http", url, headers: server.headers };
+  // OpenCode's schema names the collection `mcp`, its type is `remote`, and a
+  // server only registers when `enabled` is true.
+  const opencodeServer = { type: "remote", url, enabled: true, headers: server.headers };
   const paths = clientConfigPaths(options.repoRoot);
   const codexRaw = fs.existsSync(paths.codex) ? fs.readFileSync(paths.codex, "utf8") : "";
 
   const written = transactionalWrite(
     [
-      [paths.claudeCode, prepareJsonServer(paths.claudeCode, "mcpServers", server)],
+      [paths.claudeCode, prepareJsonServer(paths.claudeCode, "mcpServers", sharedFileServer)],
       [paths.cursor, prepareJsonServer(paths.cursor, "mcpServers", server)],
       [paths.vscode, prepareJsonServer(paths.vscode, "servers", server)],
-      [paths.codex, mergeCodexToml(codexRaw, url, options.bearerToken)]
+      [paths.codex, mergeCodexToml(codexRaw, url, options.bearerToken)],
+      [paths.opencode, prepareJsonServer(paths.opencode, "mcp", opencodeServer)]
     ],
     beforeCommit
   );
@@ -1717,7 +1727,7 @@ export async function runConfigure(options, runtime = {}) {
   const { endpoint, attempts, found } = await resolveEndpoint(options, runtime);
   // `unauthorized` means a bridge IS running there and only the token is wrong. Falling back to the
   // default endpoint and minting a fresh token would guarantee a 401 and persist the bogus token
-  // into .env.local and all four configs, so this refuses to write anything.
+  // into .env.local and every agent config, so this refuses to write anything.
   // A live bridge serving a DIFFERENT Unity project is the failure this tooling exists to stop
   // (issue #333). Writing its endpoint would point every agent at the wrong editor while every
   // check reported success, which is exactly how the old scripts behaved.
@@ -1747,7 +1757,7 @@ export async function runConfigure(options, runtime = {}) {
     );
   }
   // A foreign WebSocket server on the port is as unusable as a bridge with the wrong token, and
-  // writing its endpoint into four configs would point every agent at something that can never
+  // writing its endpoint into every agent config would point each agent at something that can never
   // answer. Refuse for the same reason the three cases above do.
   const occupied = found ? undefined : attempts.find((a) => a.status === "port-occupied");
   if (occupied) {
@@ -1802,7 +1812,7 @@ function usage() {
     "Usage: node scripts/mcp/unity-mcp.mjs <probe|configure|bridge> [options]",
     "",
     "  probe      Discover a live Unity MCP endpoint and complete an initialize handshake.",
-    "  configure  Discover, then write .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .codex/config.toml.",
+    "  configure  Discover, then write .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .codex/config.toml, opencode.json.",
     "  bridge     Serve the Unity relay over authenticated streamable HTTP (run next to Unity).",
     "",
     "Options:",

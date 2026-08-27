@@ -117,16 +117,23 @@ else
     log_ok "npm install succeeded (no lockfile)"
 fi
 
-# ── Step 4: Install/update OpenAI Codex CLI ──────────────────────────────────
-# Ensures `codex` is installed globally and current on first container create.
-# Failures are non-fatal and retried again from post-start.
+# ── Step 4: Install/update AI coding agent CLIs ─────────────────────────────
+# Ensures OpenAI Codex, OpenCode, and nanocoder are installed globally and
+# current on first container create. Failures are non-fatal and retried again
+# from post-start.
 
-log_step "Installing OpenAI Codex CLI"
+log_step "Installing AI coding agent CLIs (codex, opencode, nanocoder)"
 
-if bash "$SCRIPT_DIR/install-codex.sh" --force-latest-check && command -v codex >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" codex --version >/dev/null 2>&1; then
-    log_ok "OpenAI Codex CLI is available"
+if bash "$SCRIPT_DIR/install-agent-clis.sh" --force-latest-check; then
+    for agent_bin in codex opencode nanocoder; do
+        if command -v "$agent_bin" >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" "$agent_bin" --version >/dev/null 2>&1; then
+            log_ok "$agent_bin CLI is available"
+        else
+            log_warn "$agent_bin CLI is not currently available (non-fatal). It will retry on next container start."
+        fi
+    done
 else
-    log_warn "OpenAI Codex CLI is not currently available (non-fatal). It will retry on next container start."
+    log_warn "Agent CLI installation failed (non-fatal). It will retry on next container start."
 fi
 
 # ── Step 4b: Check Codex authentication state ───────────────────────────────
@@ -138,6 +145,22 @@ if command -v codex >/dev/null 2>&1 && timeout "${CODEX_LOGIN_STATUS_TIMEOUT_SEC
     log_ok "Codex is already authenticated"
 else
     log_warn "Codex is not logged in yet. Run: npm run codex:login"
+fi
+
+# ── Step 4c: Sync Unity MCP client configs ──────────────────────────────────
+# Regenerates every agent MCP config (Claude Code, Cursor, VS Code, Codex,
+# OpenCode, nanocoder) from .env.local so a rebuilt container never serves a
+# stale endpoint to a newly installed agent. Best-effort: the bridge is
+# usually running on the HOST, so discovery failing here is expected; the
+# pinned endpoint is written anyway. Requires node_modules (Step 3 ran first).
+
+log_step "Syncing Unity MCP client configs"
+
+MCP_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure --no-discover >/dev/null 2>&1; then
+    log_ok "Unity MCP client configs written"
+else
+    log_warn "Could not sync Unity MCP client configs (non-fatal). Run: npm run unity:mcp:configure"
 fi
 
 # ── Step 5: Install git hooks ────────────────────────────────────────────────

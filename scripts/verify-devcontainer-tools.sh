@@ -137,6 +137,8 @@ echo ""
 
 echo "=== AI CLI Tools (container-only) ==="
 check_tool "codex" "codex" "--version" "$IN_CONTAINER"
+check_tool "opencode" "opencode" "--version" "$IN_CONTAINER"
+check_tool "nanocoder" "nanocoder" "--version" "$IN_CONTAINER"
 echo ""
 
 echo "=== High-Performance CLI Tools (container-only) ==="

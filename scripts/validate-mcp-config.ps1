@@ -58,10 +58,11 @@ try {
 
   # Machine-local MCP client config files written by `npm run unity:mcp:configure`.
   # host:port and the bearer token are per-developer, so all of these MUST be
-  # gitignored. .vscode/** and .codex/* already cover two of them; .mcp.json,
-  # .cursor/mcp.json and .env.local need explicit entries. .env.local is the SOURCE
-  # of the others and holds the token, so leaving it tracked defeats the rest.
-  $localConfigs = @('.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.codex/config.toml', '.env.local')
+  # gitignored. .vscode/** and .codex/* already cover two of them; .mcp.json
+  # (Claude Code AND nanocoder), .cursor/mcp.json, opencode.json and .env.local
+  # need explicit entries. .env.local is the SOURCE of the others and holds the
+  # token, so leaving it tracked defeats the rest.
+  $localConfigs = @('.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.codex/config.toml', 'opencode.json', '.env.local')
 
   # ---- Check 1: every machine-local config path is gitignored ----
   Write-Info 'Check 1: machine-local MCP configs are gitignored...'
@@ -86,6 +87,7 @@ try {
     '.mcp.json'        = 'mcpServers'
     '.cursor/mcp.json' = 'mcpServers'
     '.vscode/mcp.json' = 'servers'
+    'opencode.json'    = 'mcp'
   }
   foreach ($path in $jsonConfigs.Keys) {
     if (-not (Test-Path -LiteralPath $path)) { continue }

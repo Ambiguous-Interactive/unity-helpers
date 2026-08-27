@@ -294,8 +294,35 @@ RUN mkdir -p /home/vscode/.npm \
 USER vscode
 RUN dotnet tool install -g csharpier --version 1.2.6
 
+# Point npm's global prefix at a user-owned directory so `npm install -g` works
+# without sudo for the vscode user (npm docs: "resolving EACCES permissions
+# errors when installing packages globally"). The system prefix (/usr, root-owned)
+# is what forced `sudo npm install` before. PATH entries for ~/.local/bin are
+# added below (ENV for processes, profile.d for login shells).
+RUN npm config set prefix "${HOME}/.local"
+
+# Pre-install the AI coding agent CLIs so a freshly built/rebuilt image has them
+# even before post-create runs. post-create.sh/post-start.sh refresh these to the
+# latest versions (via .devcontainer/install-agent-clis.sh), so this layer is a
+# fast offline-safe baseline rather than the source of truth.
+RUN npm install -g --no-fund --no-audit \
+    "@openai/codex@latest" \
+    "opencode-ai@latest" \
+    "@nanocollective/nanocoder@latest" \
+    && "$(npm prefix -g)/bin/codex" --version \
+    && "$(npm prefix -g)/bin/opencode" --version \
+    && "$(npm prefix -g)/bin/nanocoder" --version
+
 # Switch back to root for remaining setup
 USER root
+
+# Put user-installed npm binaries on PATH for login shells (ENV PATH below covers
+# non-login processes). $HOME expands per-user, so root keeps a working PATH too.
+RUN printf '%s\n' \
+    '# User-global npm/bin tools (npm prefix ~/.local, dotnet tools, pip --user)' \
+    'export PATH="$HOME/.local/bin:$HOME/.dotnet/tools:$PATH"' \
+    > /etc/profile.d/90-user-binaries.sh \
+    && chmod 0644 /etc/profile.d/90-user-binaries.sh
 
 # Configure delta as the default git pager for better diffs
 RUN git config --system core.pager delta \
@@ -379,8 +406,8 @@ RUN mkdir -p /opt/microsoft/powershell/7 \
     echo '}'; \
     } >> /opt/microsoft/powershell/7/profile.ps1
 
-# Ensure dotnet tools are on the PATH for both root and vscode users
-ENV PATH="${PATH}:/root/.dotnet/tools:/home/vscode/.dotnet/tools"
+# Ensure dotnet tools and user-global npm binaries are on the PATH
+ENV PATH="${PATH}:/root/.dotnet/tools:/home/vscode/.dotnet/tools:/home/vscode/.local/bin"
 
 # Reset to non-root user
 USER vscode

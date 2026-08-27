@@ -91,7 +91,7 @@ case "${1:-}" in
 esac
 
 if ! command -v codex >/dev/null 2>&1; then
-    echo "Error: codex is not available in PATH. Run: bash .devcontainer/install-codex.sh" >&2
+    echo "Error: codex is not available in PATH. Run: bash .devcontainer/install-agent-clis.sh" >&2
     exit 1
 fi
 
