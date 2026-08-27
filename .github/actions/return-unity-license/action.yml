@@ -42,11 +42,6 @@ outputs:
 runs:
   using: composite
   steps:
-    # The return-log digest is computed but deliberately not passed to the classifier yet: the
-    # newer central classifier requires it AND fails closed on the benign post-work shutdown crash
-    # that truncates every Unity 2021-2022 leg's return log here (issue #356). Both digest outputs
-    # and this comment are the groundwork for that bump, so whoever retries it starts from code
-    # that is half-done on purpose rather than from a red matrix.
     - name: Resolve prior return metadata
       id: prior_metadata
       shell: pwsh
@@ -60,7 +55,6 @@ runs:
         $exitCode = ''
         $returnLogPath = ''
         $supplementalPaths = ''
-        $priorDigest = ''
         try {
           $candidate = [string]$env:PRIOR_RETURN_LOG_PATH
           if ($candidate -match "[`r`n]") {
@@ -72,7 +66,6 @@ runs:
               throw 'Prior return evidence is outside the supported bounds.'
             }
             $supplementalPaths = $file.FullName
-            $priorDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
             if ($env:PRIOR_COMMAND_SUCCEEDED -eq 'true') {
               $lastLine = @(
                 Get-Content -LiteralPath $file.FullName -Tail 4 -ErrorAction Stop |
@@ -95,7 +88,6 @@ runs:
         "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         "return-log-path=$returnLogPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         "supplemental-evidence-paths=$supplementalPaths" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "return-log-digest=$priorDigest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
     - name: Classify prior exact return evidence
       id: classify_prior
@@ -160,15 +152,10 @@ runs:
           $captureComplete = $false
           Write-Host '::warning::Unity return evidence capture failed; cleanup remains unknown and central release will fail closed.'
         }
-        $returnDigest = ''
-        if (Test-Path -LiteralPath $returnLog -PathType Leaf) {
-          $returnDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $returnLog).Hash.ToLowerInvariant()
-        }
         "return-log-path=$returnLog" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         "return-command-completed=$($commandCompleted.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         "evidence-capture-complete=$($captureComplete.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "return-log-digest=$returnDigest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
     - name: Classify redundant return evidence
       id: classify_return

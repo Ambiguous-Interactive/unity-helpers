@@ -340,7 +340,7 @@ jobs:
 
       - name: Require an online Unity runner
         if: ${{ steps.credentials.outputs.present == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
@@ -392,7 +392,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -513,7 +513,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -522,7 +522,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -613,7 +613,7 @@ jobs:
         id: release_unity_lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -757,7 +757,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-standalone) }}
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -878,7 +878,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -887,7 +887,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -970,7 +970,7 @@ jobs:
         id: release_unity_lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -1120,7 +1120,7 @@ jobs:
         include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include-single-threaded) }}
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1226,7 +1226,7 @@ jobs:
 
       - name: Require current PR head before lock acquisition
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1235,7 +1235,7 @@ jobs:
       - name: Acquire organization Unity lock
         id: unity_lock
         if: ${{ matrix.is-empty != true }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1313,7 +1313,7 @@ jobs:
         id: release_unity_lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1412,7 +1412,7 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Require current PR head before setup
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1437,7 +1437,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Require current PR head before lock acquisition
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@300501e91c9bec81bb9b5a977c22aa5bb2d9b649
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@168b8dea5351f1cc448ed499e354cb31ad64ef10
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1445,7 +1445,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
@@ -1493,7 +1493,7 @@ jobs:
         id: release_unity_lock
         if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
