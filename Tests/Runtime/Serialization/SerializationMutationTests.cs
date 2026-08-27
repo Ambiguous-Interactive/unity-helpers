@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     /// decoder refuses on sight; single-bit flips and truncations of a well-formed message explore
     /// the near-miss space where a decode bug actually lives, and every mutation is a potential
     /// kill the suite must survive honestly: never throw, and never answer success with the
-    /// unmutated value when the mutated bytes named a different one.
+    /// original value when the mutated bytes named a different one.
     /// </summary>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
