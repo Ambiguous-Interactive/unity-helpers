@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int power = SmallestSufficientPower(initialCapacity);
-            if ((long)initialCapacity > (1L << power) / 2)
+            if ((1L << power) / 2 < initialCapacity)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(initialCapacity),
@@ -466,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // maximum: past it, a 32-bit shift wraps and this loop would never end.
             int power = MinimumTablePower;
             while (
-                MaximumTablePower > power
+                power < MaximumTablePower
                 && 0 < (long)capacityHint
                 && (long)(1 << power) / 2 <= (long)capacityHint
             )

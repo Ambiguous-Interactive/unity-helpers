@@ -36,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual("0801", Encode(new Box<int> { Value = 1 }));
             Assert.AreEqual("09000000000000F03F", Encode(new Box<double> { Value = 1 }));
             Assert.AreEqual("0A0161", Encode(new Box<string> { Value = "a" }));
+            Assert.AreEqual("08E901", Encode(new Box<char> { Value = 'é' }));
             Assert.AreEqual(
                 "0A020801",
                 Encode(new Box<Outer.Point> { Value = new Outer.Point { X = 1 } })
@@ -59,6 +60,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertMatches(new Box<string> { Value = string.Empty });
             AssertMatches(new Box<string> { Value = "é中", Trailer = -1 });
             AssertMatches(new Box<string> { Many = new[] { "a", string.Empty } });
+
+            // A code unit closure: the default omits, and a repeated Many writes each element under
+            // its own key because the oracle never packs chars.
+            AssertMatches(new Box<char>());
+            AssertMatches(new Box<char> { Value = 'é' });
+            AssertMatches(new Box<char> { Value = '\0', Trailer = 4 });
+            AssertMatches(new Box<char> { Many = new[] { 'A', '\0', '\uFFFF' } });
 
             AssertMatches(new Box<Outer.Point>());
             AssertMatches(
