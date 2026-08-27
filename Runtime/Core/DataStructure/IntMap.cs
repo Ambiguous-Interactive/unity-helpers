@@ -212,35 +212,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>Gets the stored keys, in table order.</summary>
-        public IEnumerable<int> Keys
-        {
-            get
-            {
-                for (int index = 0; index < _keys.Length; ++index)
-                {
-                    int stored = _keys[index];
-                    if (MinimumAllowedKey <= stored)
-                    {
-                        yield return stored;
-                    }
-                }
-            }
-        }
+        /// <remarks>
+        /// Returns the concrete <see cref="KeyView"/> rather than <see cref="IEnumerable{T}"/> so
+        /// typed <c>foreach</c> binds the struct enumerator directly and allocates nothing; the
+        /// <c>IReadOnlyDictionary</c> surface reaches this same view through its explicit
+        /// interface implementation.
+        /// </remarks>
+        public KeyView Keys => new KeyView(this);
+
+        IEnumerable<int> IReadOnlyDictionary<int, TValue>.Keys => Keys;
 
         /// <summary>Gets the stored values, in table order.</summary>
-        public IEnumerable<TValue> Values
-        {
-            get
-            {
-                for (int index = 0; index < _keys.Length; ++index)
-                {
-                    if (MinimumAllowedKey <= _keys[index])
-                    {
-                        yield return _values[index];
-                    }
-                }
-            }
-        }
+        /// <remarks>
+        /// Returns the concrete <see cref="ValueView"/> for the same reason <see cref="Keys"/>
+        /// does: typed <c>foreach</c> must reach the struct enumerator without boxing.
+        /// </remarks>
+        public ValueView Values => new ValueView(this);
+
+        IEnumerable<TValue> IReadOnlyDictionary<int, TValue>.Values => Values;
 
         /// <summary>
         /// Reports whether <paramref name="key"/> is currently stored.
@@ -541,6 +530,186 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 _slot = 0;
                 _current = default(KeyValuePair<int, TValue>);
+            }
+
+            /// <inheritdoc />
+            public void Dispose() { }
+        }
+
+        /// <summary>A live-keys view whose typed enumerator is a struct.</summary>
+        /// <remarks>
+        /// Like <see cref="Enumerator"/>, the walk fails fast on a version change: a resize swaps
+        /// the slot storage, and an iterator that kept the old index would skip or repeat entries
+        /// against new arrays instead of reporting the mutation.
+        /// </remarks>
+        public readonly struct KeyView : IEnumerable<int>
+        {
+            private readonly IntMap<TValue> _map;
+
+            internal KeyView(IntMap<TValue> map)
+            {
+                _map = map;
+            }
+
+            /// <summary>Returns the struct enumerator; the typed foreach path allocates nothing.</summary>
+            public KeyEnumerator GetEnumerator()
+            {
+                return new KeyEnumerator(_map);
+            }
+
+            IEnumerator<int> IEnumerable<int>.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+        }
+
+        /// <summary>A live-values view whose typed enumerator is a struct.</summary>
+        /// <remarks>
+        /// Shares <see cref="KeyView"/>'s fail-fast contract and its no-boxing rationale.
+        /// </remarks>
+        public readonly struct ValueView : IEnumerable<TValue>
+        {
+            private readonly IntMap<TValue> _map;
+
+            internal ValueView(IntMap<TValue> map)
+            {
+                _map = map;
+            }
+
+            /// <summary>Returns the struct enumerator; the typed foreach path allocates nothing.</summary>
+            public ValueEnumerator GetEnumerator()
+            {
+                return new ValueEnumerator(_map);
+            }
+
+            IEnumerator<TValue> IEnumerable<TValue>.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+        }
+
+        /// <summary>Enumerates live keys; fails fast when the map changes mid-walk.</summary>
+        public struct KeyEnumerator : IEnumerator<int>
+        {
+            private readonly IntMap<TValue> _map;
+            private readonly ulong _version;
+            private int _slot;
+            private int _current;
+
+            internal KeyEnumerator(IntMap<TValue> map)
+            {
+                _map = map;
+                _version = map._version;
+                _slot = 0;
+                _current = 0;
+            }
+
+            /// <inheritdoc />
+            public int Current => _current;
+
+            object IEnumerator.Current => _current;
+
+            /// <inheritdoc />
+            public bool MoveNext()
+            {
+                if (_version != _map._version)
+                {
+                    throw new InvalidOperationException("The map changed during enumeration.");
+                }
+
+                while (_slot < _map._keys.Length)
+                {
+                    int stored = _map._keys[_slot];
+                    ++_slot;
+                    if (MinimumAllowedKey <= stored)
+                    {
+                        _current = stored;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            /// <inheritdoc />
+            public void Reset()
+            {
+                if (_version != _map._version)
+                {
+                    throw new InvalidOperationException("The map changed during enumeration.");
+                }
+
+                _slot = 0;
+                _current = 0;
+            }
+
+            /// <inheritdoc />
+            public void Dispose() { }
+        }
+
+        /// <summary>Enumerates live values; fails fast when the map changes mid-walk.</summary>
+        public struct ValueEnumerator : IEnumerator<TValue>
+        {
+            private readonly IntMap<TValue> _map;
+            private readonly ulong _version;
+            private int _slot;
+            private TValue _current;
+
+            internal ValueEnumerator(IntMap<TValue> map)
+            {
+                _map = map;
+                _version = map._version;
+                _slot = 0;
+                _current = default(TValue);
+            }
+
+            /// <inheritdoc />
+            public TValue Current => _current;
+
+            object IEnumerator.Current => _current;
+
+            /// <inheritdoc />
+            public bool MoveNext()
+            {
+                if (_version != _map._version)
+                {
+                    throw new InvalidOperationException("The map changed during enumeration.");
+                }
+
+                while (_slot < _map._keys.Length)
+                {
+                    int stored = _map._keys[_slot];
+                    ++_slot;
+                    if (MinimumAllowedKey <= stored)
+                    {
+                        _current = _map._values[_slot - 1];
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            /// <inheritdoc />
+            public void Reset()
+            {
+                if (_version != _map._version)
+                {
+                    throw new InvalidOperationException("The map changed during enumeration.");
+                }
+
+                _slot = 0;
+                _current = default(TValue);
             }
 
             /// <inheritdoc />

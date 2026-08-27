@@ -113,7 +113,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             get
             {
                 Resolve();
-                return _scalar != null && _scalar.WireType != WProtoWireType.LengthDelimited;
+                return _scalar != null
+                    && _scalar.WireType != WProtoWireType.LengthDelimited
+                    && !(_scalar is IWProtoNeverPacked);
             }
         }
 

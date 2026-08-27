@@ -356,6 +356,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(WProtoScalarFormatterProvider.TryGet(out IWProtoScalarFormatter<char> _));
             Assert.IsTrue(WProtoGeneric<char>.CanEncode);
             Assert.AreEqual(WProtoWireType.Varint, WProtoGeneric<char>.WireType);
+            Assert.IsFalse(
+                WProtoGeneric<char>.Packable,
+                "the oracle writes repeated chars unpacked; the runtime path must agree"
+            );
 
             byte[] buffer = new byte[16];
             WProtoWriter writer = new WProtoWriter(buffer);

@@ -174,9 +174,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>
         /// A code unit rides the same plain varint the unsigned 32-bit shape uses, and a member at
         /// its default is omitted exactly like zero -- which is why this lives beside the integer
-        /// scalars rather than with the wrapped base-class-library messages.
+        /// scalars rather than with the wrapped base-class-library messages. It opts out of packing
+        /// through <see cref="IWProtoNeverPacked"/> because the oracle writes every repeated char
+        /// under its own field key.
         /// </remarks>
-        private sealed class CharFormatter : IWProtoScalarFormatter<char>
+        private sealed class CharFormatter : IWProtoScalarFormatter<char>, IWProtoNeverPacked
         {
             public int WireType => WProtoWireType.Varint;
 

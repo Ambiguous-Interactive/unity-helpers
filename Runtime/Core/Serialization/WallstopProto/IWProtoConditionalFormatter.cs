@@ -40,3 +40,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         bool CanServe();
     }
 }
+
+/// <summary>
+/// Marks a scalar formatter whose wire type would pack by shape but must never pack by oracle
+/// behavior.
+/// </summary>
+/// <remarks>
+/// Measured case: protobuf-net writes every repeated <see cref="char"/> under its own field key
+/// even though a code unit rides the varint wire type integers pack with. The generator carries
+/// the same distinction as <c>Shape.NeverPacked</c>; this marker is its runtime counterpart, and
+/// implementing it is package-internal by design so third-party scalars keep their default
+/// packability.
+/// </remarks>
+internal interface IWProtoNeverPacked { }

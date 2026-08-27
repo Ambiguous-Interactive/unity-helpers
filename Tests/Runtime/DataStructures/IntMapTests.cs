@@ -315,6 +315,102 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(absent == null);
         }
 
+        [Test]
+        public void KeysAndValuesViewsEnumerateLiveEntriesWithoutAllocating()
+        {
+            IntMap<GuidHolder> map = new();
+            for (int key = 0; key < 24; ++key)
+            {
+                map.TrySet(key * 5, new GuidHolder { Payload = Guid.NewGuid() });
+            }
+
+            // Both views walk the same live slots as pair enumeration, in the same order.
+            int keySum = 0;
+            int valueCount = 0;
+            int valueSeen = 0;
+            foreach (int key in map.Keys)
+            {
+                ++valueCount;
+                keySum += key;
+                if (!map.ContainsKey(key) || map[key] == null)
+                {
+                    Assert.Fail($"key {key} should be live with a value");
+                }
+                else
+                {
+                    ++valueSeen;
+                }
+            }
+            int valuesEnumerated = 0;
+            foreach (GuidHolder value in map.Values)
+            {
+                if (value != null)
+                {
+                    ++valuesEnumerated;
+                }
+            }
+
+            Assert.AreEqual(24, valueCount);
+            Assert.AreEqual(24, valueSeen);
+            Assert.AreEqual(24, valuesEnumerated);
+            Assert.AreEqual(5 * 23 * 24 / 2, keySum);
+
+            long allocated = MeasureAllocated(() =>
+            {
+                foreach (int ignored in map.Keys) { }
+                foreach (GuidHolder ignored in map.Values) { }
+            });
+            Assert.AreEqual(
+                0L,
+                allocated,
+                "typed foreach over Keys or Values must reach the struct enumerators"
+            );
+        }
+
+        [Test]
+        public void KeyAndViewEnumeratorsFailFastWhenTheMapChanges()
+        {
+            IntMap<int> map = new();
+            for (int key = 0; key < 16; ++key)
+            {
+                map.TrySet(key, key);
+            }
+
+            IEnumerator<int> keys = ((IEnumerable<int>)map.Keys).GetEnumerator();
+            Assert.IsTrue(keys.MoveNext());
+            map.TrySet(1000, 1000);
+            Assert.Throws<InvalidOperationException>(() => keys.MoveNext());
+
+            IntMap<int> second = new();
+            for (int key = 0; key < 4; ++key)
+            {
+                second.TrySet(key, key);
+            }
+
+            IEnumerator<int> frozenKeys = ((IEnumerable<int>)second.Keys).GetEnumerator();
+            IEnumerator<int> typedReset = ((IEnumerable<int>)second.Keys).GetEnumerator();
+            Assert.IsTrue(typedReset.MoveNext());
+            second.Remove(0, out _);
+            Assert.Throws<InvalidOperationException>(() => frozenKeys.MoveNext());
+            Assert.Throws<InvalidOperationException>(() => typedReset.Reset());
+        }
+
+        private static long MeasureAllocated(Action action)
+        {
+            action();
+            try
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                action();
+                return GC.GetAllocatedBytesForCurrentThread() - before;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                Assert.Ignore("allocation accounting is unavailable on this runtime");
+                return -1;
+            }
+        }
+
         private static int CountByEnumeration<T>(IntMap<T> map)
         {
             int count = 0;
