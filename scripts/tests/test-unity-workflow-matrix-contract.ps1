@@ -1289,8 +1289,9 @@ function Test-UnityCompilationCacheBehavior {
 
         $matchingMarkerRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cache-contract-root-$PID-$(Get-Random)"
         New-Item -ItemType Directory -Force -Path $matchingMarkerRoot | Out-Null
-        New-Item -ItemType Directory -Force -Path (Join-Path $matchingMarkerRoot 'Runtime') | Out-Null
-        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Existing.cs') -Value 'class Existing {}' -Encoding utf8
+        $matchingRuntimeRoot = Join-Path $matchingMarkerRoot 'Runtime'
+        New-Item -ItemType Directory -Force -Path $matchingRuntimeRoot | Out-Null
+        Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing {}' -Encoding utf8
         $matchingMarkerValue = Get-NormalizedContractRoot -Path $matchingMarkerRoot
         $matchingSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
         $matchingMarkerFixture = New-UnityCompilationCacheFixture `
@@ -1307,7 +1308,7 @@ function Test-UnityCompilationCacheBehavior {
 
         # Content-only changes are normal on every commit and Unity tracks them itself. Preserve
         # the warm compilation cache when the source path set is unchanged.
-        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Existing.cs') -Value 'class Existing { int Value; }' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing { int Value; }' -Encoding utf8
         Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
         if (-not (Test-CompilationCacheSentinelsPresent -Fixture $matchingMarkerFixture)) {
             return 'content-only source changes must preserve compilation caches to retain normal warm-build performance'
@@ -1317,7 +1318,7 @@ function Test-UnityCompilationCacheBehavior {
         # warm persistent project's AssetDatabase includes the new package file, leaving sibling
         # sources to compile against a missing type. Invalidate only compilation outputs so the
         # source graph is rebuilt while PackageCache remains warm.
-        Set-Content -LiteralPath (Join-Path $matchingMarkerRoot 'Runtime\Added.cs') -Value 'class Added {}' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Added.cs') -Value 'class Added {}' -Encoding utf8
         Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot
         if (-not (Test-CompilationCacheDirsAbsent -Fixture $matchingMarkerFixture) -or
             -not (Test-Path -LiteralPath $matchingMarkerFixture.PackageCacheSentinel -PathType Leaf)) {
