@@ -3039,6 +3039,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // The pooled writer already holds the payload contiguously, so copying it into a
             // throwaway array of the same size just to hand Encoding an array doubled the peak
             // for every document this branch writes.
+            // Forgiving decode is safe here: these bytes came from this same writer, whose JSON
+            // output is ASCII/UTF-8 by construction -- there is no foreign payload to distrust.
             return SerializerEncoding.Encoding.GetString(bufferWriter.WrittenSpan);
         }
 

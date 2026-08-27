@@ -175,6 +175,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static string DecodeEngineState(RandomState internalState)
         {
             byte[] payload = internalState._payload;
+            // Forgiving decode is safe here: the payload was written by EncodeEngineState above,
+            // and any text it did not write fails JsonUtility.FromJson in ApplyEngineState, which
+            // already answers a malformed state by keeping the engine where it is.
             return payload == null || payload.Length == 0 ? null : Encoding.UTF8.GetString(payload);
         }
 

@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
     using System.Buffers.Binary;
     using System.Runtime.InteropServices;
-    using System.Text;
 
     /// <summary>
     /// Shared pieces of the wire encoding protobuf-net gives the base-class-library value types,
@@ -1035,23 +1034,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>The shared instance; the formatter holds no state.</summary>
         public static readonly WProtoUriFormatter Instance = new WProtoUriFormatter();
 
-        // The BCL's Encoding.UTF8 replaces an invalid byte with U+FFFD instead of reporting it,
-        // which would turn corrupt bytes into a silently different Uri. A strict decoder is what
-        // makes a malformed region refuse instead of decode.
-        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
-
         private WProtoUriFormatter() { }
 
         /// <inheritdoc />
         public int Measure(in Uri value)
         {
-            return StrictUtf8.GetByteCount(value.OriginalString);
+            return WProtoText.StrictUtf8.GetByteCount(value.OriginalString);
         }
 
         /// <inheritdoc />
         public bool Write(ref WProtoWriter writer, in Uri value)
         {
-            byte[] encoded = StrictUtf8.GetBytes(value.OriginalString);
+            byte[] encoded = WProtoText.StrictUtf8.GetBytes(value.OriginalString);
             return writer.TryWriteRaw(encoded);
         }
 
@@ -1067,7 +1061,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             string text;
             try
             {
-                text = StrictUtf8.GetString(payload);
+                text = WProtoText.StrictUtf8.GetString(payload);
             }
             catch (ArgumentException)
             {

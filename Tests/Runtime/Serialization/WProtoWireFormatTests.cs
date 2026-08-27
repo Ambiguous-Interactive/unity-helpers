@@ -560,6 +560,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        // Each payload is a field 1, wire type 2 (tag 0x0A) whose declared length matches the bytes
+        // that follow, so the refusal is the UTF-8 validation and nothing else. Every sequence is
+        // one the forgiving decoder would silently turn into U+FFFD-laden text.
+        [TestCase("0A01FF", TestName = "InvalidUtf8StringsAreRejected(impossible byte FF)")]
+        [TestCase("0A0180", TestName = "InvalidUtf8StringsAreRejected(lone continuation byte)")]
+        [TestCase(
+            "0A01C3",
+            TestName = "InvalidUtf8StringsAreRejected(truncated two-byte sequence)"
+        )]
+        [TestCase("0A02C0AF", TestName = "InvalidUtf8StringsAreRejected(overlong two-byte)")]
+        [TestCase("0A03E08080", TestName = "InvalidUtf8StringsAreRejected(overlong three-byte)")]
+        [TestCase("0A04F4908080", TestName = "InvalidUtf8StringsAreRejected(above U+10FFFF)")]
+        public void InvalidUtf8StringsAreRejected(string hex)
+        {
+            byte[] payload = FromHex(hex);
+            WProtoReader reader = new(payload);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+
+            Assert.IsFalse(reader.TryReadString(out string decoded));
+            Assert.IsTrue(
+                decoded == null,
+                "A refused string must leave null, not partial or replacement text."
+            );
+            Assert.IsTrue(
+                reader.Malformed,
+                "Invalid UTF-8 is malformed wire data under proto3, not a decodable string."
+            );
+        }
+
+        [Test]
+        public void AnEmptyStringFieldDoesNotReachTheDecoder()
+        {
+            byte[] payload = FromHex("0A00");
+            WProtoReader reader = new(payload);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadString(out string decoded));
+            Assert.AreEqual(string.Empty, decoded);
+            Assert.IsFalse(reader.Malformed);
+        }
+
         [TestCase(0x00, TestName = "InvalidFieldKeysAreRejected(field number zero)")]
         [TestCase(0x0E, TestName = "InvalidFieldKeysAreRejected(wire type 6)")]
         [TestCase(0x0F, TestName = "InvalidFieldKeysAreRejected(wire type 7)")]

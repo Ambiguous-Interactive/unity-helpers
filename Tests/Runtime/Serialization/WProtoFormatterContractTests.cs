@@ -120,6 +120,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void AStringFieldCarryingInvalidUtf8RefusesTheWholeMessage()
+        {
+            // Field 2 is the label (length-delimited); this sends length 1 carrying 0xFF, which is
+            // not a legal UTF-8 byte in any position. The framing is well formed, so the refusal
+            // is the string validation itself: a forgiving decoder would answer a label made of
+            // replacement characters and the message would "decode".
+            byte[] payload = { 0x12, 0x01, 0xFF };
+            WProtoReader reader = new(payload);
+            HookedMessage.Formatter formatter = new();
+
+            Assert.IsFalse(formatter.TryRead(ref reader, out HookedMessage restored));
+            Assert.IsTrue(restored == null);
+        }
+
+        [Test]
         public void ExplicitMemberNamesAreCarriedOnTheContractRatherThanTheWire()
         {
             FieldInfo field = typeof(HookedMessage).GetField(

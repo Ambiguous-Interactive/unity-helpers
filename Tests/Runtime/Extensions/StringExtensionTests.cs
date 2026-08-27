@@ -2067,6 +2067,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void FromBase64RefusesBytesThatAreNotUtf8()
+        {
+            // Valid base64 whose decoded bytes are not UTF-8 -- the shape corruption after encoding
+            // produces. The forgiving decoder would answer replacement-character text; refusal
+            // keeps the result an honest empty string.
+            string base64 = Convert.ToBase64String(new byte[] { 0xFF, 0xFE, 0xFF });
+
+            Assert.AreEqual(string.Empty, base64.FromBase64());
+        }
+
+        [Test]
         public void FromBase64RejectsLikelyButInvalidPadding()
         {
             Assert.AreEqual(string.Empty, "AAAA====".FromBase64());

@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
     using System.Runtime.CompilerServices;
-    using System.Text;
 
     /// <summary>
     /// Reads protobuf wire-format primitives out of a <see cref="ReadOnlySpan{T}"/>.
@@ -440,7 +439,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="value">Receives the decoded string, or <c>null</c> on failure.</param>
         /// <returns><c>true</c> when the string was read.</returns>
-        /// <remarks>A zero-length field decodes to <see cref="string.Empty"/>, never to <c>null</c>.</remarks>
+        /// <remarks>
+        /// A zero-length field decodes to <see cref="string.Empty"/>, never to <c>null</c>. The
+        /// bytes must be valid UTF-8, matching what proto3 requires of every string field: a
+        /// payload that is not latches <see cref="Malformed"/> and answers <c>false</c> rather than
+        /// decoding to replacement characters that no honest writer could have produced.
+        /// </remarks>
         public bool TryReadString(out string value)
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
@@ -455,8 +459,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            value = Encoding.UTF8.GetString(payload);
-            return true;
+            try
+            {
+                value = WProtoText.StrictUtf8.GetString(payload);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                _malformed = true;
+                value = null;
+                return false;
+            }
         }
 
         /// <summary>

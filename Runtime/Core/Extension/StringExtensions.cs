@@ -80,6 +80,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static readonly string CombiningDotAboveString = CombiningDotAbove.ToString();
         private static readonly string CapitalIWithDotString = CapitalIWithDot.ToString();
 
+        // The BCL's Encoding.UTF8 substitutes U+FFFD for bytes it cannot decode. Base64 payloads
+        // are outside our control, so the decode that ends this type's Try path refuses rather
+        // than invent.
+        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(
+            encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: true
+        );
+
         /// <summary>
         /// Centers a string within a field of the specified total length by padding spaces on both sides.
         /// </summary>
@@ -140,6 +148,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Performance: O(n) where n is the byte array length.
         /// Allocations: Allocates a new string.
         /// Edge cases: Empty or null byte arrays return empty string.
+        /// Decoding policy: forgiving. This mirrors the BCL's own byte-array-to-string behavior for
+        /// a general-purpose conversion of caller-owned bytes; package internals that decode
+        /// untrusted payloads use strict decoders and refuse instead.
         /// </remarks>
         public static string GetString(this byte[] bytes)
         {
@@ -1520,8 +1531,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            result = Encoding.UTF8.GetString(buffer, 0, outputLen);
-            return true;
+            try
+            {
+                result = StrictUtf8.GetString(buffer.AsSpan(0, outputLen));
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                // Valid base64 can still carry bytes that are not UTF-8 (corruption after encoding).
+                // Decoding those with the BCL's default would invent replacement characters; refusal
+                // keeps the Try contract honest.
+                result = string.Empty;
+                return false;
+            }
         }
 
         private static int Base64Map(char c)
