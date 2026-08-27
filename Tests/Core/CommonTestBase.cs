@@ -937,7 +937,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     (
                         UnityEngine.LogType.Warning,
                         new System.Text.RegularExpressions.Regex(
-                            "deleting an allocation that is older than its permitted lifetime"
+                            "deleting an allocation that is older than its permitted lifetime",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase
                         )
                     )
                 );

@@ -296,6 +296,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ),
                 "text that no Uri constructor accepts is refused, not defaulted"
             );
+            Uri loneSurrogate = new Uri("/\ud800", UriKind.RelativeOrAbsolute);
+            int measured = WProtoUriFormatter.Instance.Measure(loneSurrogate);
+            WProtoWriter surrogateWriter = new WProtoWriter(new byte[64]);
+            Assert.IsTrue(
+                WProtoUriFormatter.Instance.Write(ref surrogateWriter, loneSurrogate),
+                "a lone surrogate must reach the wire as replacement bytes, not throw"
+            );
+            Assert.AreEqual(
+                measured,
+                surrogateWriter.Position,
+                "Measure must agree with Write for a lone surrogate, or every enclosing prefix lies"
+            );
+            Assert.AreEqual(
+                "2FEFBFBD",
+                ToHex(surrogateWriter.Written.ToArray()),
+                "the lone surrogate encodes as U+FFFD, matching every other string-shaped field"
+            );
             Assert.Throws<InvalidOperationException>(
                 () => WProtoFacade.TryDeserialize(Parse("0A050801"), out DateTime _),
                 "the facade reports an owned malformed root with its documented exception"

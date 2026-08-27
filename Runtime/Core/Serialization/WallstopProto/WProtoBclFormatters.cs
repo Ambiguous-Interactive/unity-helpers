@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
     using System.Buffers.Binary;
     using System.Runtime.InteropServices;
+    using System.Text;
 
     /// <summary>
     /// Shared pieces of the wire encoding protobuf-net gives the base-class-library value types,
@@ -1026,8 +1027,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <remarks>
     /// The measure deliberately excludes every prefix: callers wrap this payload in a length or a
     /// message envelope themselves, which is also how the oracle reaches an identical member and
-    /// root form. An empty region refuses rather than manufacturing a value no constructor could
-    /// have produced.
+    /// root form. Writing uses the same forgiving encoder as every other string-shaped field, so
+    /// an unpaired surrogate becomes U+FFFD bytes rather than an exception from inside a save;
+    /// reading stays strict, because wire bytes that are not valid UTF-8 are corruption to refuse,
+    /// not text to invent. An empty region refuses rather than manufacturing a value no
+    /// constructor could have produced.
     /// </remarks>
     public sealed class WProtoUriFormatter : IWProtoFormatter<Uri>
     {
@@ -1039,13 +1043,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <inheritdoc />
         public int Measure(in Uri value)
         {
-            return WProtoText.StrictUtf8.GetByteCount(value.OriginalString);
+            return WProtoSizes.Utf8ByteCount(value.OriginalString);
         }
 
         /// <inheritdoc />
         public bool Write(ref WProtoWriter writer, in Uri value)
         {
-            byte[] encoded = WProtoText.StrictUtf8.GetBytes(value.OriginalString);
+            byte[] encoded = Encoding.UTF8.GetBytes(value.OriginalString);
             return writer.TryWriteRaw(encoded);
         }
 

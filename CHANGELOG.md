@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add strict UTF-8 validation to WallstopProto strings and Uri: wire bytes that are not valid UTF-8 refuse the payload as malformed instead of decoding to replacement characters, as proto3 requires ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).
 - Add `IntMap<TValue>`, an int-keyed open-addressing map measured at 1.26x–2.19x `Dictionary<int,int>` on hit-heavy lookups, with no comparer indirection on the lookup path. See [Data Structures](./docs/features/utilities/data-structures.md#intmap-int-keyed-open-addressing-map) ([#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578)).
 - Add `char` and `Uri` support to WallstopProto, byte-compatible with both protobuf-net majors, so links and code units inside a save no longer need a surrogate. `DateTimeOffset`, `IntPtr`, `UIntPtr` and `Type` stay refused, with the reasons in the serialization guide ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).
 - Add `stackTrace: false` to `Log`, `LogWarn` and `LogError`, for a diagnostic that repeats once per object or once per frame. Unity captures a stack trace for every log by default, measured at 178.4 us against 13.3 us without one. See [Logging Extensions](./docs/features/logging/logging-extensions.md) ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564)).
@@ -142,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `string.FromBase64()` inventing replacement-character text when the decoded bytes are not valid UTF-8; corrupt payloads now return an empty string instead ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).
 - Fix entering Play Mode destroying scene-authored `RuntimeSingleton` components before their scene starts ([#582](https://github.com/Ambiguous-Interactive/unity-helpers/issues/582)).
 - Fix double allocation when JSON-deserializing arrays: array growth rents from the shared pool and collection property names match without a throwaway string ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - An `AttributeEffect` authoring mistake -- `Instant` with periodic or behaviour data, or an unassigned cosmetic entry -- is now reported once per effect and in the Inspector, not on every application. Each report rendered the whole effect to JSON, measured at 20.5 us ([#567](https://github.com/Ambiguous-Interactive/unity-helpers/issues/567)).
