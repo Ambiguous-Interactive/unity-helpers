@@ -12,13 +12,89 @@ For timing, allocation and staleness gates, see
 [unity-mcp-measurement](./unity-mcp-measurement.md). For the licensed Docker legs, see
 [unity-devcontainer-testing](./unity-devcontainer-testing.md).
 
+## The RunCommand contract, measured on 2026-08-27 (editor 6000.4.6f1)
+
+The host is the `com.unity.ai.assistant` package inside the editor (a throw stack names
+`AgentRunCommand.Execute` in that package), not the standalone unity-mcp-server where
+[#583](https://github.com/Ambiguous-Interactive/unity-helpers/issues/583) watched every execution
+fail closed with `No logs available`. That failure does not reproduce here: the template below
+compiles, runs, and its output arrives.
+
+```csharp
+using UnityEngine;
+using UnityEditor;
+
+internal class CommandScript : IRunCommand
+{
+    public void Execute(ExecutionResult result)
+    {
+        result.Log("RESULT answer");
+    }
+}
+```
+
+- The class MUST be named `CommandScript`, `internal`, with
+  `public void Execute(ExecutionResult result)`. `IRunCommand` declares that one method and nothing
+  else. The sandbox wraps the class in `Unity.AI.Assistant.Agent.Dynamic.Extension.Editor`.
+- `result.Log(string)` text arrives in the tool result's `executionLogs` field. **`result.Log` does
+  not format** — `"{0:E3}"` prints literally; build the string first.
+- `Debug.Log` is NOT in `executionLogs` — it goes to the editor console only. Only `result.Log`
+  output is relayed back.
+- `result.LogWarning` / `result.LogError` / `Debug.LogWarning` / any exception from the body are
+  reported as `success: false` with
+  `UNEXPECTED_ERROR: Command was executed partially, but reported warnings or errors:` followed by
+  the complete log payload. **The body ran to completion** — read the payload before concluding the
+  probe failed; the discriminator is whether your RESULT line is inside it. A deliberate
+  `result.LogError` is therefore the way a probe reports failure without losing its evidence.
+- `ExecutionResult` surface worth knowing (fields, since properties do not appear):
+  `RegisterObjectCreation(Object|Component)`, `RegisterObjectModification(Object, string)`,
+  `DestroyObject(Object)`, `Log/LogWarning/LogError(string, params Object[])`, `GetFormattedLogs()`,
+  `ConsoleLogs`, `Logs`, `UndoGroup`, `CommandName`, `SuccessfullyStarted`.
+- Statement-level scripts fail `CS8805`; everything must live in the class.
+
+### When the editor refuses to recompile your edited sources (measured 2026-08-27)
+
+`AssetDatabase.Refresh()` inside a sandbox command can return normally and recompile nothing, and
+`CompilationPipeline.RequestScriptCompilation()` called unqualified resolves to the
+`Unity.CompilationPipeline` namespace collision (see below) or otherwise does nothing. The recipe
+that actually moved the pipeline:
+
+```csharp
+bool invoked = EditorApplication.ExecuteMenuItem("Assets/Refresh");
+UnityEditor
+    .Compilation
+    .CompilationPipeline
+    .RequestScriptCompilation(UnityEditor.Compilation.RequestScriptCompilationOptions.None);
+```
+
+`RequestScriptCompilation` then reports `isCompiling=True` within the same command, and the domain
+reload follows a minute or two later.
+
+**The failure mode that hides this: a compile error in a package test assembly is INVISIBLE.** The
+editor keeps serving the stale DLL, reports no error in the tool result, and `Unity_ReadConsole`
+returns zero entries for the CS error. A session burned forty minutes on probes that "looked up
+null" before comparing source mtime against the DLL from inside the sandbox:
+
+```csharp
+string dll = System.IO.Path.Combine(UnityEngine.Application.dataPath, "..",
+    "Library", "ScriptAssemblies", "WallstopStudios.UnityHelpers.Tests.Core.dll");
+bool stale = !System.Text.Encoding.ASCII
+    .GetString(System.IO.File.ReadAllBytes(dll)).Contains("YourNewSymbolName");
+```
+
+`GetLastWriteTime` comparisons work too. Diagnose with `npm run typecheck:tests` from the container
+— it catches the same CS error in seconds — fix, and only then re-probe. Never conclude "the
+sandbox cannot see my change" from a null lookup; check for a hidden compile error first.
+
 ## No license? The MCP editor still runs the real fixtures
 
 **The container's working tree and the host Unity project's embedded package are the same
 filesystem.** Proven 2026-08-16 by writing a probe file in the container and reading it back through
-`Unity_RunCommand`; the `.git` bind mount in `devcontainer.json` is an addition to the default
-workspace bind, not a substitute for it. So the editor on the other end of the MCP bridge compiles
-**your edits**, and an `AssetDatabase.Refresh` picks up a file you just wrote.
+`Unity_RunCommand`; re-proven 2026-08-27 by reading a just-edited `CommonTestBase.cs` back from the
+sandbox with `System.IO.File.ReadAllText`. The `.git` bind mount in `devcontainer.json` is an
+addition to the default workspace bind, not a substitute for it. So the editor on the other end of
+the MCP bridge compiles **your edits**, and an `AssetDatabase.Refresh` picks up a file you just
+wrote.
 
 Two sessions in a row concluded that an editor-only change "has no local verification path at all",
 because `Unity_RunCommand` fails with `CS0234` on `WallstopStudios.UnityHelpers.*`. That is
