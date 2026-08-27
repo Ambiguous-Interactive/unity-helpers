@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -398,6 +399,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         private static long MeasureAllocated(Action action)
         {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
             action();
             try
             {
