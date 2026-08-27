@@ -909,6 +909,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             _expectErrorInnerHandler = UnityEngine.Debug.unityLogger.logHandler;
             _expectErrorHandler = new ExpectedErrorSuppressingHandler(_expectErrorInnerHandler);
             UnityEngine.Debug.unityLogger.logHandler = _expectErrorHandler;
+            SeedToleratedLogs();
+        }
+
+        // Engine-emitted logs that must never fail a test wherever they appear. These are messages
+        // Unity's native layer produces on its own schedule (dependent on machine load, not on any
+        // test's logic), are never produced by package code, and have falsified teardowns of
+        // scene-initializing fixtures (#393): the temp allocator warns when an internal allocation
+        // outlives its four-frame lifetime, and how many frames elapse during scene setup is not
+        // something a test controls. Optional by nature -- a run without one is healthy too -- so
+        // unlike _expectedErrors there is no match-or-fail bookkeeping.
+        private static readonly List<(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )> _toleratedLogs = new();
+
+        private static void SeedToleratedLogs()
+        {
+            lock (_expectedErrorLock)
+            {
+                if (0 < _toleratedLogs.Count)
+                {
+                    return;
+                }
+
+                _toleratedLogs.Add(
+                    (
+                        UnityEngine.LogType.Warning,
+                        new System.Text.RegularExpressions.Regex(
+                            "deleting an allocation that is older than its permitted lifetime"
+                        )
+                    )
+                );
+            }
+        }
+
+        private static bool IsToleratedLog(UnityEngine.LogType logType, string message)
+        {
+            lock (_expectedErrorLock)
+            {
+                for (int i = 0; i < _toleratedLogs.Count; i++)
+                {
+                    if (
+                        _toleratedLogs[i].type == logType
+                        && _toleratedLogs[i].pattern.IsMatch(message)
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         // Restores the real handler and returns a failure string for any expected pattern never matched
@@ -2796,6 +2848,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                                 return;
                             }
                         }
+                    }
+
+                    if (IsToleratedLog(logType, message))
+                    {
+                        return;
                     }
                 }
 
