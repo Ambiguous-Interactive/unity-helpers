@@ -29,7 +29,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$workspaceFolder = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+# $PSScriptRoot is the .devcontainer directory; the workspace folder is its parent, which is the
+# exact value Dev Containers stores in each container's devcontainer.local_folder label.
+$workspaceFolder = Split-Path -Parent $PSScriptRoot
 $execProbeTimeoutSeconds = 20
 
 function Write-Info {
@@ -44,12 +46,17 @@ function Invoke-Docker {
 
 # A trivial exec into the container. A healthy running container answers
 # instantly; a zombie fails with an OCI setns/runc error from the daemon.
+# The probe is bounded so a hung docker CLI cannot stall workspace open.
 function Test-ContainerUsable {
     param([string]$ContainerId)
     try {
         $probe = Start-Process -FilePath 'docker' `
             -ArgumentList @('exec', $ContainerId, '/bin/sh', '-c', 'exit 0') `
-            -NoNewWindow -Wait -PassThru
+            -NoNewWindow -PassThru
+        if (-not $probe.WaitForExit($execProbeTimeoutSeconds * 1000)) {
+            if (-not $probe.HasExited) { $probe.Kill() }
+            return $false
+        }
         return $probe.ExitCode -eq 0
     }
     catch {
@@ -90,7 +97,9 @@ try {
         if ($labelFolders.Count -eq 0) { continue }
 
         $labelFolder = [string]$labelFolders[0]
-        if (-not $labelFolder -ieq $workspaceFolder) { continue }
+        # -ine is case-insensitive not-equal: drive letter case varies between sessions. A plain
+        # container from another project must never reach the removal branch below.
+        if ($labelFolder -ine $workspaceFolder) { continue }
 
         $status = [string]$container.State.Status
         $remove = $false
