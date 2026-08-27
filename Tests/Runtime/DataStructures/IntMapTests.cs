@@ -297,6 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 (IEnumerable<KeyValuePair<int, int>>)map
             ).GetEnumerator();
             Assert.IsTrue(enumerator.MoveNext());
+            map.TrySet(99, 99);
             Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
         }
 

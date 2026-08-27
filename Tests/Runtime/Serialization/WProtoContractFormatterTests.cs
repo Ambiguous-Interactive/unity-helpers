@@ -364,7 +364,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] buffer = new byte[16];
             WProtoWriter writer = new WProtoWriter(buffer);
             Assert.IsTrue(WProtoGeneric<char>.WriteField(ref writer, 3, 'é'));
-            Assert.AreEqual(5, writer.Position);
+            // Tag 0x18 (field 3, varint) plus a two-byte varint of code point 233: three bytes,
+            // not the five UTF-8 would spend on the character.
+            Assert.AreEqual(3, writer.Position);
             Assert.AreEqual("18E901", ToHex(buffer[..writer.Position]));
         }
 
